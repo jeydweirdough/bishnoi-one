@@ -5,8 +5,10 @@
 #   main's folder first, then rebuilds the branches.
 #
 # It runs scripts/sync-branches.sh, the same script you can still run by hand.
-# Its own pushes use the workflow's token, and GitHub doesn't start workflows
-# from those, so it never triggers itself.
+# Every app is synced on every run, whichever branch was pushed, so no branch
+# is left behind. It can't loop: pushes made with GitHub's own token start no
+# runs. Pushes made with SYNC_TOKEN start one more run, which finds nothing to
+# do and pushes nothing.
 #
 # GitHub reads a push's workflow from the branch pushed to, and an app branch
 # holds only its folder. So this same file is also in each app folder
@@ -42,6 +44,10 @@ jobs:
         with:
           ref: main
           fetch-depth: 0 # git subtree needs the whole history
+          # SYNC_TOKEN (a repo secret) lets the sync also push changes to
+          # workflow files, which GitHub's own token may not. Without it, the
+          # sync still works, except for those.
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Commit as the repo owner
         # Merge commits the sync makes show the owner, like the commits
