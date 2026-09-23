@@ -2,42 +2,13 @@
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
 from app.models import SignInSession, User
-from app.routers.auth import attempts
 from app.security import hash_password
-
-PASSWORD = "correct horse battery"
-
-
-@pytest.fixture
-def app(tmp_path):
-    attempts.clear()
-    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
-    app = create_app(settings)
-    with app.state.sessions() as db:
-        db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role="admin"))
-        db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD)))
-        db.commit()
-    return app
-
-
-@pytest.fixture
-def client(app):
-    with TestClient(app) as c:
-        yield c
-
-
-def sign_in(client, email="ana@example.com", password=PASSWORD):
-    return client.post("/auth/login", json={"email": email, "password": password})
-
-
-def bearer(r) -> dict:
-    return {"Authorization": f"Bearer {r.json()['accessToken']}"}
+from tests.conftest import bearer, role_id, sign_in
 
 
 def test_health(client):
@@ -52,12 +23,13 @@ def test_sign_in_and_see_who_you_are(client):
     assert me["user"]["email"] == "ana@example.com" and me["user"]["fullName"] == "Ana Reyes"
     assert me["isDeveloperAdmin"] is False
     assert [m["key"] for m in me["modules"]] == ["sales"]
+    assert me["role"]["name"] == "Administrator" and "admin.users" in me["permissions"]
 
 
 def test_admins_run_settings_members_dont(client):
     ana = client.get("/auth/me", headers=bearer(sign_in(client))).json()
     ben = client.get("/auth/me", headers=bearer(sign_in(client, "ben@example.com"))).json()
-    assert ana["canManageSettings"] is (not False)
+    assert ana["canManageSettings"] is True
     assert ben["canManageSettings"] is False
 
 
@@ -126,7 +98,7 @@ def test_demo_accounts_list_only_what_exists_here(client, app):
     assert client.get("/auth/demo-accounts").json()["items"] == []
     first = DEMO_ACCOUNTS[0]
     with app.state.sessions() as db:
-        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD)))
+        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD), role_id=role_id(db, first.access)))
         db.commit()
     listed = client.get("/auth/demo-accounts").json()
     assert [d["email"] for d in listed["items"]] == [first.email]

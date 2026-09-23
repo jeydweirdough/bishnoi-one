@@ -1,7 +1,8 @@
 """Sales's endpoints. Add them here, under /sales.
 
-Anything that needs a signed-in person takes `user: CurrentUser` (or
-`AdminUser` for this app's admins) from app.deps.
+An endpoint that needs a permission takes
+`access: Annotated[Access, Depends(require("customers.view"))]` (app.access);
+one that only needs a signed-in person takes `user: CurrentUser` (app.deps).
 """
 
 from fastapi import APIRouter

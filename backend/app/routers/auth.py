@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import func, select
 
+from app.audit import audit
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
 from app.identity import me_out
@@ -80,6 +81,8 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> d
     ok = verify_password(body.password, user.password_hash if user else DUMMY_HASH)
     if user is None or not ok or not user.is_active:
         attempts.failed(email, window)
+        audit(db, email, "auth.sign_in_failed", target=email, target_type="user", target_id=user.id if user else None)
+        db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
     attempts.clear(email)
 
@@ -87,14 +90,16 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> d
     now = datetime.now(UTC)
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
+    audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id)
     db.commit()
     response.headers["Cache-Control"] = "no-store"
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(record: CurrentSession, db: DB) -> Response:
+def logout(record: CurrentSession, user: CurrentUser, db: DB) -> Response:
     record.revoked_at = datetime.now(UTC)
+    audit(db, user, "auth.signed_out", target=user.email, target_type="user", target_id=user.id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

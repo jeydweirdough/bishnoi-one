@@ -1,4 +1,4 @@
-"""This app's database. Tables are created on start-up if they're missing."""
+"""This app's database. Its tables come from migrations (app/migrate.py)."""
 
 from collections.abc import Iterator
 
@@ -34,12 +34,6 @@ def make_engine(url: str) -> Engine:
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
-
-
-def create_tables(engine: Engine) -> None:
-    from app import models  # noqa: F401  (registers the tables)
-
-    Base.metadata.create_all(engine)
 
 
 def open_session(sessions: sessionmaker[Session]) -> Iterator[Session]:

@@ -15,8 +15,12 @@ uv run main.py          # http://127.0.0.1:8302  (docs at /docs)
 uv run pytest
 ```
 
-The database and its tables are created on first start (SQLite in `.data/`
-unless `DATABASE_URL` says otherwise).
+The database is created, and brought up to date, on every start: migrations
+in `migrations/versions` run by themselves (SQLite in `.data/` unless
+`DATABASE_URL` says otherwise). Before a migration touches a SQLite file, a copy
+is kept beside it (`sales.db.before-<revision>`), and a failed migration puts
+it back. To run them by hand: `uv run alembic upgrade head`. A change to the
+tables needs a new migration: `uv run alembic revision -m "what changed"`.
 
 ## Accounts
 
@@ -31,7 +35,26 @@ There is no sign-up page. Accounts are made from the command line:
 | `uv run python -m app.tools.users disable --email …` | Switches the account off; ends its sessions |
 | `uv run python -m app.tools.users enable --email …` | Switches it back on |
 
-`--admin` accounts can run this app's settings; the rest just use it.
+`--admin` gives the Administrator role; `--role "Team Lead"` and `--team B2C`
+pick others (default: Sales Rep, no team). Everything else about people is in
+the app, under Administration.
+
+## Administration
+
+Users, Roles & permissions, Teams and the Audit log, under `/admin/...`, each
+behind its own permission (`admin.users`, `admin.roles`, `admin.teams`,
+`admin.audit`).
+
+- A **role** is a set of permissions (`app/permissions.py`: every area of the
+  CRM, including ones not built yet) and a **scope**: whose records it reaches,
+  own, team's or all. Each person has one role and may be in one team.
+- Four roles to start from: **Administrator** (everything, can't be changed or
+  deleted), Manager (all records), Team Lead (team's), Sales Rep (own).
+- Nothing may leave the app with nobody able to manage users and roles.
+- Every change, sign-in, sign-out and failed sign-in goes to the audit log,
+  naming the fields that changed, never their values.
+- Endpoints ask for a permission with `Depends(require("customers.edit"))`
+  (`app/access.py`).
 
 ## Sign-in endpoints
 

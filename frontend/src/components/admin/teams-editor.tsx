@@ -1,0 +1,234 @@
+"use client";
+
+import { Plus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/src/platform/ui/button";
+import { ConfirmButton } from "@/src/platform/ui/confirm";
+import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { createTeam, deleteTeam, updateTeam } from "../../actions/admin";
+import type { TeamRow } from "@/src/platform/lib/types";
+import { OffTag } from "./words";
+
+/** Teams: add one, rename it, switch it off, or delete it while nobody's in it. */
+export function TeamsEditor({ teams }: { teams: TeamRow[] }) {
+  return (
+    <div className="space-y-5">
+      <AddTeam />
+      <Sheet>
+        {teams.length === 0 ? (
+          <Empty icon="teams" title="No teams yet">
+            A team groups people, so a Team Lead's role can reach their team's records.
+          </Empty>
+        ) : (
+          <ul className="divide-y divide-rule">
+            {teams.map((t) => (
+              <TeamLine key={t.id} team={t} />
+            ))}
+          </ul>
+        )}
+      </Sheet>
+    </div>
+  );
+}
+
+function AddTeam() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [pending, start] = useTransition();
+
+  function add() {
+    start(async () => {
+      const result = await createTeam({ name: name.trim(), description: description.trim() || null });
+      if (!result.ok) {
+        setError(result.fields ? null : result.error);
+        setFields(result.fields ?? {});
+        return;
+      }
+      toast.success("Team added", { description: result.data.name });
+      setName("");
+      setDescription("");
+      setError(null);
+      setFields({});
+      router.refresh();
+    });
+  }
+
+  return (
+    <Sheet className="px-5 pt-4 pb-5">
+      <SectionTitle icon="teams">Add a team</SectionTitle>
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+        className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-end"
+      >
+        <Field label="Name" error={fields.name}>
+          {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}
+        </Field>
+        <Field label="What it does" optional error={fields.description}>
+          {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
+        </Field>
+        <Button type="submit" variant="primary" loading={pending} disabled={!name.trim()} icon={<Plus className="size-4" aria-hidden />}>
+          Add
+        </Button>
+      </form>
+      {error && (
+        <div className="mt-3">
+          <FormError message={error} />
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function TeamLine({ team }: { team: TeamRow }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(team.name);
+  const [description, setDescription] = useState(team.description ?? "");
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function save() {
+    start(async () => {
+      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null });
+      if (!result.ok) {
+        setError(result.fields ? null : result.error);
+        setFields(result.fields ?? {});
+        return;
+      }
+      toast.success("Team saved", { description: result.data.name });
+      setEditing(false);
+      setFields({});
+      setError(null);
+      router.refresh();
+    });
+  }
+
+  async function toggle(): Promise<boolean> {
+    const result = await updateTeam(team.id, { isActive: !team.isActive });
+    if (!result.ok) {
+      toast.error(result.error);
+      return false;
+    }
+    toast.success(team.isActive ? "Team switched off" : "Team switched back on", { description: team.name });
+    router.refresh();
+    return true;
+  }
+
+  async function remove(): Promise<boolean> {
+    const result = await deleteTeam(team.id);
+    if (!result.ok) {
+      toast.error(result.error);
+      return false;
+    }
+    toast.success("Team deleted", { description: team.name });
+    router.refresh();
+    return true;
+  }
+
+  if (editing) {
+    return (
+      <li className="px-5 py-4">
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+          className="grid gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-end"
+        >
+          <Field label="Name" error={fields.name}>
+            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}
+          </Field>
+          <Field label="What it does" optional error={fields.description}>
+            {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
+          </Field>
+          <span className="flex gap-2">
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setEditing(false);
+                setName(team.name);
+                setDescription(team.description ?? "");
+                setFields({});
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={pending} disabled={!name.trim()}>
+              Save
+            </Button>
+          </span>
+        </form>
+        {error && (
+          <div className="mt-3">
+            <FormError message={error} />
+          </div>
+        )}
+      </li>
+    );
+  }
+
+  return (
+    <li className="grid gap-2 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <span className={`font-semibold ${team.isActive ? "text-ink" : "text-ink-3"}`}>{team.name}</span>
+          {!team.isActive && <OffTag />}
+        </p>
+        <p className="text-meta text-ink-3">
+          {team.memberCount === 0 ? (
+            "Nobody yet"
+          ) : (
+            <Link href={`/admin/users?team=${encodeURIComponent(team.id)}`} className="text-ink-2 hover:text-hema hover:underline">
+              {team.memberCount} {team.memberCount === 1 ? "person" : "people"}
+            </Link>
+          )}
+          {team.description && <> · {team.description}</>}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="quiet" onClick={() => setEditing(true)}>
+          Rename
+        </Button>
+        <ConfirmButton
+          label={team.isActive ? "Switch off" : "Switch on"}
+          title={team.isActive ? `Switch ${team.name} off?` : `Switch ${team.name} back on?`}
+          body={
+            team.isActive
+              ? "People already in it stay, but nobody new can be put in it. Switch it back on any time."
+              : "People can be put in it again."
+          }
+          confirmLabel={team.isActive ? "Switch off" : "Switch on"}
+          danger={team.isActive}
+          triggerSize="sm"
+          triggerVariant="quiet"
+          onConfirm={toggle}
+        />
+        {team.memberCount === 0 && (
+          <ConfirmButton
+            label="Delete"
+            title={`Delete ${team.name}?`}
+            body="Nobody is in it, so nothing else changes."
+            confirmLabel="Delete team"
+            triggerSize="sm"
+            triggerVariant="quiet"
+            onConfirm={remove}
+          />
+        )}
+      </div>
+    </li>
+  );
+}
