@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, type ReactNode } from "react";
+import { useActionState, useRef, useState, type ReactNode } from "react";
 import { signIn, type SignInState } from "../actions/session";
 import { Button } from "../ui/button";
 import { Field, FormError, Input } from "../ui/field";
@@ -27,8 +27,10 @@ export function LoginForm({
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
   const email = useRef<HTMLInputElement>(null);
   const password = useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<string | null>(null);
 
   function fillDemo(address: string) {
+    setPicked(address);
     if (email.current) email.current.value = address;
     if (password.current && demoPassword) password.current.value = demoPassword;
     password.current?.focus();
@@ -77,20 +79,46 @@ export function LoginForm({
         <p className="mt-1 text-ink-3">
           Pick one to fill the form{demoPassword ? <>. Password <span className="font-medium text-ink-2">{demoPassword}</span></> : null}.
         </p>
-        <ul className="mt-3 divide-y divide-rule">
-          {demo.map((d, i) => (
-            <li key={d.email}>
-              {d.group !== demo[i - 1]?.group && (
-                <p className="mt-3 pt-3 text-caps text-ink-3 uppercase first:mt-0 first:pt-0">{d.group}</p>
-              )}
-              <button type="button" onClick={() => fillDemo(d.email)} className="w-full py-2 text-left hover:text-hema">
-                <span className="font-medium">{d.who}</span>
-                <span className="block text-ink-3">{d.role}</span>
-              </button>
-            </li>
+        <div className="mt-2">
+          {groups(demo).map(([group, people]) => (
+            <section key={group} className="mt-4 first:mt-3">
+              <h3 className="text-caps text-ink-3 uppercase">{group}</h3>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {people.map((d) => (
+                  <li key={d.email}>
+                    <button
+                      type="button"
+                      onClick={() => fillDemo(d.email)}
+                      title={`${d.role} — ${d.email}`}
+                      aria-pressed={picked === d.email}
+                      className={`rounded-full border px-3 py-1 transition-colors ${
+                        picked === d.email
+                          ? "border-hema bg-hema-tint text-hema"
+                          : "border-rule-strong bg-sheet text-ink hover:border-hema hover:text-hema"
+                      }`}
+                    >
+                      <span className="font-medium">{d.who}</span>
+                      <span className="text-ink-3"> · {shortRole(d.role)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       </aside>
     </div>
   );
+}
+
+/** Accounts under their group headings, in the order they came. */
+function groups(demo: Demo[]): [string, Demo[]][] {
+  const byGroup = new Map<string, Demo[]>();
+  for (const d of demo) byGroup.set(d.group, [...(byGroup.get(d.group) ?? []), d]);
+  return [...byGroup];
+}
+
+/** "Rep · B2C MD Telesales" -> "Rep": the chip says what they are; hovering says the rest. */
+function shortRole(role: string): string {
+  return role.split("·")[0].trim();
 }
