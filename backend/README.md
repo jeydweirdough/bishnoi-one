@@ -26,6 +26,7 @@ There is no sign-up page. Accounts are made from the command line:
 |---|---|
 | `uv run python -m app.tools.users add --email … --name "…" [--admin]` | Makes an account; asks for its password |
 | `uv run python -m app.tools.users list` | Lists accounts |
+| `uv run python -m app.tools.users demo` | Makes this app's demo accounts, password `demo1234` (development only; listed in `app/demo.py`) |
 | `uv run python -m app.tools.users password --email …` | Sets a new password; ends that person's sessions |
 | `uv run python -m app.tools.users disable --email …` | Switches the account off; ends its sessions |
 | `uv run python -m app.tools.users enable --email …` | Switches it back on |
@@ -39,6 +40,7 @@ There is no sign-up page. Accounts are made from the command line:
 | `POST /auth/login` | `{email, password}` → `{accessToken, expiresIn}` |
 | `GET /auth/me` | Who is signed in, and what this app lets them do |
 | `POST /auth/logout` | Ends the session |
+| `GET /auth/demo-accounts` | This app's demo accounts that exist, for the sign-in page (development only) |
 
 Send the token as `Authorization: Bearer <token>`. The database keeps only a
 hash of each token. Passwords are hashed with scrypt. Five wrong passwords for
