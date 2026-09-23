@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { createContact, updateContact, type ContactInput } from "../../actions/crm";
-import type { Assignable, ContactDetail, Ref } from "@/src/platform/lib/types";
+import type { Assignable, Duplicate, ContactDetail, Ref } from "@/src/platform/lib/types";
+import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
 
 const TEXT = ["firstName", "lastName", "jobTitle", "email", "phone", "mobile", "notes"] as const;
@@ -33,11 +34,13 @@ export function ContactForm({
   const [ownerId, setOwnerId] = useState(contact?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
+  const [dupMessage, setDupMessage] = useState("");
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
   // Their current company stays offered even if it's no longer on the list.
   const options = contact?.company && !companies.some((c) => c.id === contact.company!.id) ? [contact.company, ...companies] : companies;
 
-  function submit() {
+  function submit(allowDuplicate = false) {
     const input: ContactInput = {
       ...(Object.fromEntries(TEXT.map((k) => [k, values[k].trim() || null])) as Record<Text, string | null>),
       firstName: values.firstName.trim(),
@@ -57,7 +60,7 @@ export function ContactForm({
         }
         result = await updateContact(contact.id, change);
       } else {
-        result = await createContact(input);
+        result = await createContact({ ...input, allowDuplicate });
       }
       if (result.ok) {
         toast.success(contact ? "Changes saved" : "Contact added", { description: result.data.name });
@@ -65,7 +68,11 @@ export function ContactForm({
         router.refresh();
         return;
       }
-      setError(result.error);
+      // "Looks like one already here" is a question, not an error: it gets its own panel.
+      const found = result.duplicates ?? [];
+      setDuplicates(found);
+      setDupMessage(found.length ? result.error : "");
+      setError(found.length ? null : result.error);
       setFields(result.fields ?? {});
     });
   }
@@ -128,6 +135,9 @@ export function ContactForm({
       </fieldset>
 
       <FormError message={error} />
+      {duplicates.length > 0 && (
+        <Duplicates message={dupMessage} found={duplicates} base="/contacts" pending={pending} onAddAnyway={() => submit(true)} />
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
           {contact ? "Save changes" : "Add contact"}

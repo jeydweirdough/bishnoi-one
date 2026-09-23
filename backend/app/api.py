@@ -68,3 +68,22 @@ def changed(model: BaseModel) -> dict:
 
 def camel(names: list[str]) -> list[str]:
     return [to_camel(n) for n in names]
+
+
+def digits(phone: str | None) -> str | None:
+    """A phone number's digits alone, for telling two ways of writing it apart."""
+    only = re.sub(r"\D", "", phone or "")
+    return only or None
+
+
+def duplicates_error(noun: str, found: list[dict]) -> HTTPException:
+    """Refuses a new record that looks like one already there. The screens list
+    them, and send it again with allowDuplicate if it really is a different one."""
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        {
+            "message": f"This looks like {'a ' + noun if len(found) == 1 else noun + 's'} already here. Check before adding another.",
+            "duplicates": found,
+        },
+    )
+

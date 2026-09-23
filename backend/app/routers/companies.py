@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.access import Access, require
-from app.api import Api, camel, changed, check_email, field_error, iso, not_found, person_out, team_out
+from app.api import Api, camel, changed, check_email, digits, duplicates_error, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import COMPANY_STATUSES, Activity, Company, Contact
@@ -57,6 +57,8 @@ class CompanyFields(Api):
 
 class CompanyIn(CompanyFields):
     name: str = Field(min_length=1, max_length=160)
+    # Add it even though it looks like one already here.
+    allow_duplicate: bool = False
 
 
 class CompanyPatch(CompanyFields):
@@ -127,10 +129,36 @@ def list_companies(
     }
 
 
+def lookalikes(db: Session, access: Access, body: CompanyIn) -> list[dict]:
+    """Companies with the same name, email or phone. Anyone may learn that one
+    exists (so nobody adds it twice); only those in reach can be opened."""
+    checks = [func.lower(Company.name) == body.name.lower()]
+    if body.email:
+        checks.append(func.lower(Company.email) == body.email.lower())
+    found = db.scalars(select(Company).where(or_(*checks)).limit(5)).unique().all()
+    phone = digits(body.phone)
+    if phone:
+        found += [c for c in db.scalars(select(Company).where(Company.phone.is_not(None))).unique() if digits(c.phone) == phone and c not in found][:5]
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "teamName": c.team.name if c.team else None,
+            "phone": c.phone if reaches(c, access) else None,
+            "canOpen": reaches(c, access),
+        }
+        for c in found[:5]
+    ]
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> dict:
+    if not body.allow_duplicate:
+        found = lookalikes(db, access, body)
+        if found:
+            raise duplicates_error("company", found)
     owner = owner_for(db, access, body.owner_id)
-    values = body.model_dump(exclude={"owner_id"}, exclude_none=True)
+    values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     company = Company(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
     db.add(company)
     db.flush()

@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.access import Access, require
-from app.api import Api, camel, changed, check_email, field_error, iso, not_found, person_out, team_out
+from app.api import Api, camel, changed, check_email, digits, duplicates_error, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import Activity, Company, Contact
@@ -45,6 +45,8 @@ class ContactFields(Api):
 
 class ContactIn(ContactFields):
     first_name: str = Field(min_length=1, max_length=80)
+    # Add them even though they look like someone already here.
+    allow_duplicate: bool = False
 
 
 class ContactPatch(ContactFields):
@@ -135,11 +137,40 @@ def list_contacts(
     return {"items": [contact_row(c, access, last.get(c.id)) for c in contacts], "total": total}
 
 
+def lookalikes(db: Session, access: Access, body: ContactIn) -> list[dict]:
+    """People with the same email or phone, or the same name in the same company."""
+    checks = []
+    if body.email:
+        checks.append(func.lower(Contact.email) == body.email.lower())
+    same_name = func.lower(Contact.first_name) == body.first_name.lower()
+    if body.last_name:
+        same_name = same_name & (func.lower(Contact.last_name) == body.last_name.lower())
+    checks.append(same_name & (Contact.company_id == body.company_id) if body.company_id else same_name & Contact.company_id.is_(None))
+    found = list(db.scalars(select(Contact).where(or_(*checks)).limit(5)).unique())
+    for phone in {digits(body.phone), digits(body.mobile)} - {None}:
+        found += [c for c in db.scalars(select(Contact).where(or_(Contact.phone.is_not(None), Contact.mobile.is_not(None)))).unique()
+                  if phone in (digits(c.phone), digits(c.mobile)) and c not in found][:5]
+    return [
+        {
+            "id": c.id,
+            "name": c.full_name,
+            "teamName": c.team.name if c.team else None,
+            "phone": (c.phone or c.mobile) if reaches(c, access) else None,
+            "canOpen": reaches(c, access),
+        }
+        for c in found[:5]
+    ]
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_contact(access: Create, me: CurrentUser, db: DB, body: ContactIn) -> dict:
     company_in_reach(db, access, body.company_id)
+    if not body.allow_duplicate:
+        found = lookalikes(db, access, body)
+        if found:
+            raise duplicates_error("contact", found)
     owner = owner_for(db, access, body.owner_id)
-    values = body.model_dump(exclude={"owner_id"}, exclude_none=True)
+    values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     contact = Contact(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
     db.add(contact)
     db.flush()

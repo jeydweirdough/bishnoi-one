@@ -6,7 +6,7 @@ import { useOptimistic, useTransition } from "react";
 import { toast } from "sonner";
 import { SelectBox, useSelectionMaybe } from "@/src/platform/bulk/selection";
 import { Flag } from "@/src/platform/ui/marks";
-import { setFollowUpStatus } from "../actions/sales";
+import { updateActivity } from "../actions/crm";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Bucket, Org } from "@/src/platform/lib/types";
 
@@ -18,6 +18,8 @@ export type FollowUpRow = {
   status: "open" | "done";
   customerId: string;
   customerName: string | null;
+  /** Where the customer's page is (a company or a contact). */
+  href?: string;
   place?: string; // "B&B · MD Telesales" or just the team
   assigneeName?: string | null;
   doneByName?: string | null;
@@ -44,7 +46,8 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
     const next = done ? "open" : "done";
     start(async () => {
       showStatus(next);
-      const result = await setFollowUpStatus(row.id, next);
+      // A follow-up is a task: done or not.
+      const result = await updateActivity(row.id, { done: next === "done" });
       if (!result.ok) toast.error(result.error, { description: row.title });
       else if (next === "done") toast.success("Marked done", { description: row.title });
     });
@@ -84,7 +87,7 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           {showCustomer && row.customerName && (
             <>
               <Link
-                href={`/customers/${row.customerId}`}
+                href={row.href ?? `/companies/${row.customerId}`}
                 className="font-medium text-hema hover:underline"
               >
                 {row.customerName}

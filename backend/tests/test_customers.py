@@ -181,6 +181,9 @@ def test_whats_due(client, crew):
     activity(client, crew["ria"], kind="meeting", subject="done already", at=(now - timedelta(days=1)).isoformat(), done=True)
     counts = client.get("/activities/summary", headers=crew["ria"]).json()
     assert (counts["overdue"], counts["upcoming"], counts["open"]) == (1, 1, 2)
+    activity(client, crew["ria"], kind="meeting", subject="a meeting", at=(now + timedelta(days=3)).isoformat())
+    tasks_only = client.get("/activities/summary", params={"kind": "task"}, headers=crew["ria"]).json()
+    assert (tasks_only["upcoming"], tasks_only["open"]) == (1, 2)
     overdue = client.get("/activities", params={"state": "overdue"}, headers=crew["ria"]).json()["items"]
     assert [a["subject"] for a in overdue] == ["late"] and overdue[0]["isOverdue"]
 

@@ -4,8 +4,8 @@ import { SelectAllBox, SelectToggle, SelectionProvider } from "@/src/platform/bu
 import { FollowUpItem } from "../components/follow-up-item";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
-import { salesWorkspace } from "@/src/platform/lib/module";
-import type { Bucket, FollowUp } from "@/src/platform/lib/types";
+import type { ActivityItem, Assignable, Bucket, Paged } from "@/src/platform/lib/types";
+import { dayOf, followUpRow } from "../components/crm/follow-up-rows";
 
 export const metadata = { title: "Follow-ups" };
 
@@ -36,42 +36,39 @@ function Toggle({ options, current }: { options: { href: string; label: string; 
 
 export default async function FollowUpsPage({ searchParams }: { params: Promise<Record<string, never>>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const search = await searchParams;
-  const [ws, me] = await Promise.all([salesWorkspace(), getCompanyMe()]);
+  const me = await getCompanyMe();
   const who = search.who === "team" ? "team" : "me";
   const state = search.state === "done" ? "done" : "open";
+  const teamWide = me.role?.scope !== "own";
 
-  // One list across every division they sell in, as Home already shows them.
-  const { today, items } = await load<{ today: string; items: FollowUp[] }>(
-    `/sales/follow-ups?who=${who}&state=${state}`,
+  // Follow-ups are tasks: the person's own, or everyone's within their reach.
+  const query = new URLSearchParams({ kind: "task", state, limit: state === "done" ? "50" : "200" });
+  if (who === "me") query.set("owner", "me");
+  const [list, people] = await Promise.all([load<Paged<ActivityItem>>(`/activities?${query}`), load<Assignable[]>("/people/assignable")]);
+  const today = dayOf(new Date().toISOString(), me.org.timezone);
+  const items = list.items.map((a) =>
+    followUpRow(a, today, me.org.timezone, {
+      // Whose it is, on the team list.
+      place: who === "team" ? a.owner.name : undefined,
+    }),
   );
   const href = (w: string, s: string) => `/follow-ups?who=${w}&state=${s}`;
-  const row = (f: FollowUp) => ({
-    ...f,
-    // Where it is: its division too, when there is more than one to tell apart.
-    place: [
-      ws.manyDivisions ? f.divisionName : null,
-      ws.teams.length > 1 ? f.teamName : null,
-      who === "team" ? f.assignee.name : null,
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    doneByName: f.doneBy?.name,
-    canEdit: f.can.edit,
-  });
 
-  const editable = items.filter((f) => f.can.edit).map((f) => ({ id: f.id, name: f.title }));
+  const editable = items.filter((f) => f.canEdit).map((f) => ({ id: f.id, name: f.title }));
 
   return (
     <SelectionProvider key={`${who}-${state}`} items={editable} toggled>
       <PageHeader title="Follow-ups" />
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Toggle
-          current={who}
-          options={[
-            { value: "me", label: "Mine", href: href("me", state) },
-            { value: "team", label: ws.teams.length > 1 ? "All my teams" : "Whole team", href: href("team", state) },
-          ]}
-        />
+        {teamWide && (
+          <Toggle
+            current={who}
+            options={[
+              { value: "me", label: "Mine", href: href("me", state) },
+              { value: "team", label: me.role?.scope === "all" ? "Everyone" : "Whole team", href: href("team", state) },
+            ]}
+          />
+        )}
         <Toggle
           current={state}
           options={[
@@ -95,13 +92,13 @@ export default async function FollowUpsPage({ searchParams }: { params: Promise<
         {items.length === 0 ? (
           <Empty icon="followUps" title={state === "open" ? "Nothing to do" : "Nothing done yet"}>
             {state === "open"
-              ? "Follow-ups are added when you log a call or visit, or from a customer's page."
+              ? "Follow-ups are the tasks you plan: from a company's or contact's page, from Activities, or for many customers at once."
               : "Finished follow-ups from the last while show up here."}
           </Empty>
         ) : state === "done" ? (
           <ul className="divide-y divide-rule">
             {items.map((f) => (
-              <FollowUpItem key={f.id} row={row(f)} today={today} org={me.org} />
+              <FollowUpItem key={f.id} row={f} today={today} org={me.org} />
             ))}
           </ul>
         ) : (
@@ -115,7 +112,7 @@ export default async function FollowUpsPage({ searchParams }: { params: Promise<
                 </h2>
                 <ul className="divide-y divide-rule">
                   {rows.map((f) => (
-                    <FollowUpItem key={f.id} row={row(f)} today={today} org={me.org} />
+                    <FollowUpItem key={f.id} row={f} today={today} org={me.org} />
                   ))}
                 </ul>
               </section>
@@ -123,7 +120,7 @@ export default async function FollowUpsPage({ searchParams }: { params: Promise<
           })
         )}
       </Sheet>
-      <FollowUpsBulk teams={ws.teams} state={state} org={me.org} />
+      <FollowUpsBulk people={people} state={state} org={me.org} />
     </SelectionProvider>
   );
 }
