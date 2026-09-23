@@ -10,28 +10,47 @@ Repo: **https://github.com/jeydweirdough/orbit**
 
 ## 1. How the repo is laid out
 
+Every app is its own webapp, in its own folder, with two parts:
+**`frontend/`** (its screens, Next.js) and **`backend/`** (its API, Python /
+FastAPI). The apps don't depend on each other. Each has its own API, its own
+`.env` and its own database.
+
+```
+orbit/
+├── orbit-admin/          frontend/ :4300   backend/ :8300
+├── orbit-sales/          frontend/ :4302   backend/ :8302
+├── orbit-finance/        frontend/ :4303   backend/ :8303
+├── orbit-inventory/      frontend/ :4304   backend/ :8304
+├── orbit-platform/       frontend/ :4305   backend/ :8305
+├── orbit-in-licensing/   frontend/ :4306   backend/ :8306   (screens not built yet)
+├── orbit-pharmacy/       frontend/ :4307   backend/ :8307   (screens not built yet)
+├── orbit-regulatory/     frontend/ :4308   backend/ :8308   (screens not built yet)
+└── scripts/sync-branches.sh
+```
+
+An app's API port is its screens' port + 4000, so each pair is easy to spot.
+The screens reach their own API through `API_URL` in `frontend/.env.local`.
+
 One repo, two kinds of branch:
 
 | Branch | What's in it | Who uses it |
 |---|---|---|
 | `main` | **Everything**: every app in its own folder, plus `scripts/` | Anyone working across apps, and whoever keeps the branches in sync |
-| `orbit-admin` | Only the Admin app, at the top level | Admin developers |
-| `orbit-backend` | Only the API | Backend developers |
+| `orbit-admin` | Only the Admin app (`frontend/`, `backend/`) | Admin developers |
+| `orbit-sales` | Only the Sales app | Sales developers |
 | `orbit-finance` | Only the Finance app | Finance developers |
 | `orbit-inventory` | Only the Inventory app | Inventory developers |
 | `orbit-platform` | Only the Platform app | Platform developers |
-| `orbit-sales` | Only the Sales app | Sales developers |
-| `orbit-in-licensing`, `orbit-pharmacy`, `orbit-regulatory` | Placeholder apps, not built yet | — |
+| `orbit-in-licensing`, `orbit-pharmacy`, `orbit-regulatory` | Apps whose screens aren't built yet | — |
 
 `main` is the source of truth. An app branch holds the same files as that
 app's folder on `main`, and the two are kept in step by
 `scripts/sync-branches.sh` (section 5).
 
 ```
-main                         orbit-admin branch
-├── orbit-admin/   ◄──sync──►  (the contents of orbit-admin/)
-├── orbit-backend/ ◄──sync──►  orbit-backend branch
-├── orbit-sales/   ◄──sync──►  orbit-sales branch
+main                          app branches
+├── orbit-admin/   ◄──sync──►  orbit-admin    (frontend/, backend/)
+├── orbit-sales/   ◄──sync──►  orbit-sales    (frontend/, backend/)
 └── ...
 ```
 
@@ -88,16 +107,15 @@ You land on `main` with every app in its own folder. To use the sync script
 
 ### After cloning: files that are not in Git
 
-Secrets and local data are never committed, so a fresh clone won't run until
-you add them:
+Secrets and local data are never committed. Each part has an example to copy:
 
-| App | Create | Get the values from |
+| Part | Create | From |
 |---|---|---|
-| Any web app | `.env.local` in the app's folder | A teammate. At minimum `API_URL=http://127.0.0.1:8000` |
-| Backend | `.env` in `orbit-backend/` | Copy `.env.example`, then fill it in |
+| Screens | `orbit-<app>/frontend/.env.local` | `frontend/.env.example` |
+| API | `orbit-<app>/backend/.env` | `backend/.env.example` |
 
-Then install dependencies (`npm install` for a web app; see
-`orbit-backend/README.md` for the API).
+Then install: `npm install` in `frontend/`, and `uv sync` in `backend/`.
+Each app's `GIT-GUIDE.md` has the exact steps to run it.
 
 ---
 
@@ -229,15 +247,43 @@ bash scripts/sync-branches.sh   # run it again to finish
 
 ## 7. Adding a new app
 
-1. On `main`, create the folder `orbit-<name>/`, with its own `.gitignore`
-   (copy one from another app) and a `GIT-GUIDE.md`.
+1. On `main`, create `orbit-<name>/` with `frontend/` and `backend/`. Copy
+   the `.gitignore` and `GIT-GUIDE.md` from another app and adjust them, and
+   start `backend/` from another app's (change the names and the port).
 2. Commit and push `main`.
 3. Run `bash scripts/sync-branches.sh orbit-<name>` to create its branch on
    GitHub.
 
 ---
 
-## 8. Cheat sheet
+## 8. Running an app
+
+Every app runs the same way, in two terminals:
+
+```
+cd orbit-<app>/backend              cd orbit-<app>/frontend
+cp .env.example .env                cp .env.example .env.local
+uv sync                             npm install
+uv run main.py                      npm run dev
+```
+
+| App | Screens | API |
+|---|---|---|
+| Admin | http://localhost:4300 | http://127.0.0.1:8300 |
+| Sales | http://localhost:4302 | http://127.0.0.1:8302 |
+| Finance | http://localhost:4303 | http://127.0.0.1:8303 |
+| Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
+| Platform | http://localhost:4305 | http://127.0.0.1:8305 |
+| Licensing, Pharmacy, Regulatory | (not built) | 8306, 8307, 8308 |
+
+Each API's database comes from `DATABASE_URL` in its own `backend/.env`
+(SQLite in `backend/.data/` by default). To try an app against test data,
+point that at a test database; nothing else changes. Each API has its
+interactive docs at `/docs` and its tests under `uv run pytest`.
+
+---
+
+## 9. Cheat sheet
 
 | I want to… | Command |
 |---|---|

@@ -1,12 +1,20 @@
 # Git guide — Finance app (`orbit-finance`)
 
 How to clone, pull and push **just the Finance app**. For the whole repo and how
-the branches fit together, see `GIT-GUIDE.md` at the top of the `main`
-branch: https://github.com/jeydweirdough/orbit/blob/main/GIT-GUIDE.md
+the branches fit together, see `README.md` at the top of the `main` branch:
+https://github.com/jeydweirdough/orbit/blob/main/README.md
 
-Branch: **`orbit-finance`**. It holds only this app's files, at the top level. The
-same files live in the `orbit-finance/` folder on `main`, and the two are kept in
-sync.
+Branch: **`orbit-finance`**. It holds only this app, at the top level:
+
+```
+frontend/     the screens (Next.js)
+backend/      the API (Python, FastAPI)
+GIT-GUIDE.md  this guide
+```
+
+The app stands on its own: its own screens, its own API, its own database.
+The same files live in the `orbit-finance/` folder on `main`, and the two are kept
+in sync.
 
 ---
 
@@ -41,16 +49,30 @@ pushes go to `main`.
 
 ## 3. Run it
 
-Secrets aren't in Git. Create `.env.local` in this folder (ask a teammate for the
-values; at minimum `API_URL=http://127.0.0.1:8000`). Then:
+**API** (`backend/`, Python). Secrets aren't in Git, so copy the example first:
 
 ```
+cd backend
+cp .env.example .env
+uv sync
+uv run main.py
+```
+
+Serves on **http://127.0.0.1:8303** (interactive docs at `/docs`). Its database
+is set by `DATABASE_URL` in `.env`: SQLite in `backend/.data/` unless you
+change it. Tests: `uv run pytest`.
+
+**Screens** (`frontend/`, Next.js), in a second terminal:
+
+```
+cd frontend
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Opens on **http://localhost:4303**. The API (`orbit-backend`) must be running
-for sign-in and data.
+Opens on **http://localhost:4303**. `API_URL` in `.env.local` points at this
+app's API (port 8303).
 
 ---
 
@@ -101,7 +123,8 @@ anything else.
 ## 6. Rules
 
 - **Never** `git push --force` to this branch. It deletes other people's work.
-- **Never** commit secrets (`.env`, `.env.local`, keys). They're already
-  ignored, so don't force them in with `git add -f`.
+- **Never** commit secrets (`.env`, `.env.local`, keys) or local data
+  (`backend/.data/`). They're already ignored, so don't force them in with
+  `git add -f`.
 - **Don't** open a pull request from this branch into `main`. The sync
   already handles that. Ignore GitHub's "Compare & pull request" banner.

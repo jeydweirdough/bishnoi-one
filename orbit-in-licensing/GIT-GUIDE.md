@@ -1,12 +1,20 @@
 # Git guide — Licensing app (`orbit-in-licensing`)
 
 How to clone, pull and push **just the Licensing app**. For the whole repo and how
-the branches fit together, see `GIT-GUIDE.md` at the top of the `main`
-branch: https://github.com/jeydweirdough/orbit/blob/main/GIT-GUIDE.md
+the branches fit together, see `README.md` at the top of the `main` branch:
+https://github.com/jeydweirdough/orbit/blob/main/README.md
 
-Branch: **`orbit-in-licensing`**. It holds only this app's files, at the top level. The
-same files live in the `orbit-in-licensing/` folder on `main`, and the two are kept in
-sync.
+Branch: **`orbit-in-licensing`**. It holds only this app, at the top level:
+
+```
+frontend/     the screens (Next.js)
+backend/      the API (Python, FastAPI)
+GIT-GUIDE.md  this guide
+```
+
+The app stands on its own: its own screens, its own API, its own database.
+The same files live in the `orbit-in-licensing/` folder on `main`, and the two are kept
+in sync.
 
 ---
 
@@ -41,8 +49,22 @@ pushes go to `main`.
 
 ## 3. Run it
 
-This app is a placeholder: it has no screens or `dev` script yet. See
-`README.md` for what it's meant to become. Port **4306** is reserved for it.
+**API** (`backend/`, Python). Secrets aren't in Git, so copy the example first:
+
+```
+cd backend
+cp .env.example .env
+uv sync
+uv run main.py
+```
+
+Serves on **http://127.0.0.1:8306** (interactive docs at `/docs`). Its database
+is set by `DATABASE_URL` in `.env`: SQLite in `backend/.data/` unless you
+change it. Tests: `uv run pytest`.
+
+**Screens** (`frontend/`): a placeholder, with no screens or `dev` script yet.
+See `frontend/README.md` for what it's meant to become. Port **4306** is
+reserved for it.
 
 ---
 
@@ -93,7 +115,8 @@ anything else.
 ## 6. Rules
 
 - **Never** `git push --force` to this branch. It deletes other people's work.
-- **Never** commit secrets (`.env`, `.env.local`, keys). They're already
-  ignored, so don't force them in with `git add -f`.
+- **Never** commit secrets (`.env`, `.env.local`, keys) or local data
+  (`backend/.data/`). They're already ignored, so don't force them in with
+  `git add -f`.
 - **Don't** open a pull request from this branch into `main`. The sync
   already handles that. Ignore GitHub's "Compare & pull request" banner.
