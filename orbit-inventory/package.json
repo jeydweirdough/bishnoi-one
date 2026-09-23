@@ -1,0 +1,49 @@
+{
+  "name": "@orbit/inventory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "What the company sells, and what it costs.",
+  "exports": {
+    "./module.json": "./module.json",
+    "./actions/bulk": "./src/actions/bulk.ts",
+    "./actions/inventory": "./src/actions/inventory.ts",
+    "./actions/pricing": "./src/actions/pricing.ts",
+    "./components/bundle-form": "./src/components/bundle-form.tsx",
+    "./components/product-form": "./src/components/product-form.tsx",
+    "./components/products-bulk": "./src/components/products-bulk.tsx",
+    "./components/promo-form": "./src/components/promo-form.tsx",
+    "./components/switch-active": "./src/components/switch-active.tsx",
+    "./screens/bundle-new": "./src/screens/bundle-new.tsx",
+    "./screens/bundle": "./src/screens/bundle.tsx",
+    "./screens/bundles": "./src/screens/bundles.tsx",
+    "./screens/overview": "./src/screens/overview.tsx",
+    "./screens/product-new": "./src/screens/product-new.tsx",
+    "./screens/product": "./src/screens/product.tsx",
+    "./screens/products": "./src/screens/products.tsx",
+    "./screens/promo-new": "./src/screens/promo-new.tsx",
+    "./screens/promo": "./src/screens/promo.tsx",
+    "./screens/promos": "./src/screens/promos.tsx"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "lucide-react": "^1.47.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "sonner": "^2.0.8"
+  },
+  "scripts": {
+    "dev": "next dev --port 4304",
+    "build": "next build",
+    "start": "next start --port 4304",
+    "lint": "eslint"
+  }
+}

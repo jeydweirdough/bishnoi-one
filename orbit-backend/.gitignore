@@ -1,0 +1,39 @@
+# Secrets. Never commit these; .env.example documents the names instead.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local data: the accounts database, the records file store, uploaded letters,
+# the development signing key, and the backups taken before each migration.
+.data/
+.data-before-*/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Virtual environments
+env/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Claude plugin data
+.claude/data/

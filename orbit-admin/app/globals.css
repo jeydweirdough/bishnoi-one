@@ -1,0 +1,6 @@
+/* The look is core's, so every app wears the same one. Tailwind scans
+   outward from here and skips node_modules, so both projects are named. */
+@import "../src/platform/styles/globals.css";
+
+@source "../../orbit-core/src";
+@source "../src";
