@@ -196,8 +196,29 @@ app branch.
 ## 5. Keeping `main` and the app branches in sync
 
 Pushes land in two places: some people push to `main`, others push to an app
-branch. The sync script brings them together. Run it from a **full clone**, on
-`main`, with nothing uncommitted:
+branch. **This happens by itself:** after every push to `main` or to an
+`orbit-*` branch, GitHub runs the **Sync branches** action
+(`.github/workflows/sync-branches.yml`). For each app, it:
+
+1. Merges anything new pushed to the app branch into that app's folder on `main`.
+2. Pushes `main`.
+3. Rebuilds the app branch from `main` and pushes it, so app-branch
+   developers get `main`'s changes the next time they `git pull`.
+
+Watch it on the repo's **Actions** tab. To run it without pushing anything,
+open **Actions → Sync branches → Run workflow**.
+
+The action file is at `.github/workflows/sync-branches.yml` and, as a copy, in
+each app folder (`orbit-*/.github/workflows/`). Each app branch needs the copy
+because GitHub only runs workflows that are in the branch being pushed. GitHub
+won't let the action push changes to workflow files. So when you change these
+files, push them yourself: commit on `main`, then run
+`bash scripts/sync-branches.sh` by hand once. That run carries the new copies
+to the app branches.
+
+The action runs `scripts/sync-branches.sh`, which still works by hand, from a
+**full clone**, on `main`, with nothing uncommitted (Git Bash on Windows runs
+it as-is):
 
 ```
 git switch main
@@ -205,27 +226,18 @@ bash scripts/sync-branches.sh                 # every app
 bash scripts/sync-branches.sh orbit-sales     # just one app
 ```
 
-For each app, it:
-
-1. Merges anything pushed to the app branch into that app's folder on `main`.
-2. Pushes `main`.
-3. Rebuilds the app branch from `main` and pushes it, so app-branch
-   developers get `main`'s changes the next time they `git pull`.
-
-Run it whenever someone pushes, or at least daily. Git Bash on Windows runs it
-as-is.
-
 ### If the sync stops with a conflict
 
 This happens when the same lines were changed on `main` and on the app branch.
-The script stops partway through a merge:
+The action's run turns red, and its summary says what to do. On your computer,
+run the script by hand; it stops partway through the merge:
 
 ```
 git status                 # lists the files in conflict
 # fix the <<<<<<< ======= >>>>>>> markers in each file
 git add .
 git commit                 # finishes the merge
-bash scripts/sync-branches.sh   # run it again to finish
+bash scripts/sync-branches.sh   # run it again to finish (it pushes too)
 ```
 
 ---
@@ -309,4 +321,4 @@ interactive docs at `/docs` and its tests under `uv run pytest`.
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` (or `git who` on the office machine) |
-| Sync main ⇄ app branches | `bash scripts/sync-branches.sh` (full clone, on `main`) |
+| Sync main ⇄ app branches | Automatic after every push (Actions tab). By hand: `bash scripts/sync-branches.sh` |

@@ -115,7 +115,7 @@ markers in the listed files, then `git add .`, `git rebase --continue`,
 
 ## 5. What happens after you push
 
-The repo maintainer runs `scripts/sync-branches.sh` on `main`, which:
+A GitHub action (**Sync branches**) runs by itself a minute after your push. It:
 
 - merges your pushes into the `orbit-admin/` folder on `main`, and
 - brings any changes made on `main` back to this branch.
