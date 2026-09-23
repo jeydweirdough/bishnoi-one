@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { ActivityItem, CompanyDetail, CompanyStatus, ContactDetail, CrmKind } from "@/src/platform/lib/types";
+import type { ActivityItem, CompanyDetail, CompanyStatus, ContactDetail, CrmKind, Job } from "@/src/platform/lib/types";
 
 // Companies, contacts and activities. The API decides whose records someone
 // reaches and what their role lets them do; these carry the request and hand
@@ -11,6 +11,7 @@ import type { ActivityItem, CompanyDetail, CompanyStatus, ContactDetail, CrmKind
 
 export type CompanyInput = {
   name: string;
+  allowDuplicate?: boolean;
   status: CompanyStatus;
   industry: string | null;
   website: string | null;
@@ -44,6 +45,7 @@ export async function deleteCompany(id: string): Promise<Result> {
 
 export type ContactInput = {
   firstName: string;
+  allowDuplicate?: boolean;
   lastName: string | null;
   jobTitle: string | null;
   email: string | null;
@@ -108,5 +110,45 @@ export async function deleteActivity(id: string): Promise<Result> {
     await api.del(`/activities/${enc(id)}`);
     refresh();
     return null;
+  });
+}
+
+// --- bulk -------------------------------------------------------------------------------
+
+export type RecordsChange =
+  | { action: "status"; status: CompanyStatus }
+  | { action: "owner"; ownerId: string }
+  | { action: "follow_up"; followUp: { title: string; dueOn: string }; toOwner: boolean }
+  | { action: "delete" };
+
+/** Many companies or contacts at once. The API checks each one and says which it couldn't do. */
+export async function bulkRecords(kind: "companies" | "contacts", ids: string[], change: RecordsChange): Promise<Result<Job>> {
+  return attempt(async () => {
+    const job = await api.post<Job>(`/${kind}/bulk`, { ...change, ids });
+    refresh();
+    return job;
+  });
+}
+
+export type ActivitiesChange = { action: "done" | "open" } | { action: "due"; dueOn: string } | { action: "assign"; assigneeId: string };
+
+export async function bulkActivities(ids: string[], change: ActivitiesChange): Promise<Result<Job>> {
+  return attempt(async () => {
+    const job = await api.post<Job>("/activities/bulk", { ...change, ids });
+    refresh();
+    return job;
+  });
+}
+
+/** For "select all that match": every company or contact the filters find, up to what one bulk action takes. */
+export async function recordsMatching(kind: "companies" | "contacts", filters: Record<string, string>): Promise<Result<{ id: string; name: string }[]>> {
+  return attempt(async () => {
+    const found: { id: string; name: string }[] = [];
+    for (let offset = 0; offset < 500; offset += 200) {
+      const page = await api.get<{ items: { id: string; name: string }[]; total: number }>(`/${kind}?${new URLSearchParams({ ...filters, limit: "200", offset: String(offset) })}`);
+      found.push(...page.items.map((r) => ({ id: r.id, name: r.name })));
+      if (found.length >= page.total) break;
+    }
+    return found.slice(0, 500);
   });
 }

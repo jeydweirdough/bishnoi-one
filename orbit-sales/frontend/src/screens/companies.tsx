@@ -5,9 +5,12 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { CompanyRow, Paged } from "@/src/platform/lib/types";
+import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
+import type { Assignable, CompanyRow, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { CustomerTabs } from "../components/crm/customer-tabs";
 import { Filters, Pager } from "../components/crm/list-controls";
+import { RecordsBulk } from "../components/crm/records-bulk";
 import { STATUSES, StatusTag } from "../components/crm/words";
 
 export const metadata = { title: "Companies" };
@@ -26,7 +29,12 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   if (q) query.set("q", q);
   if (status) query.set("status", status);
   if (owner) query.set("owner", owner);
-  const list = await load<Paged<CompanyRow>>(`/companies?${query}`);
+  const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
+  const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
+  const [list, people] = await Promise.all([
+    load<Paged<CompanyRow>>(`/companies?${query}`),
+    bulkAllowed ? load<Assignable[]>("/people/assignable") : Promise.resolve([] as Assignable[]),
+  ]);
   const fmt = makeFormat(me.org);
   const filtered = Boolean(q || status || owner);
   const here = new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(owner && { owner }) });
@@ -34,7 +42,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   return (
     <>
       <PageHeader
-        title="Companies"
+        title="Customers"
         actions={
           can(me, "customers.create") && (
             <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
@@ -48,6 +56,8 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : ""}.
       </PageHeader>
 
+      <CustomerTabs current="companies" />
+
       <Filters
         search="Search by name, city or industry"
         selects={[
@@ -58,37 +68,52 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         ]}
       />
 
-      <Sheet>
-        {list.items.length === 0 ? (
-          <Empty icon="company" title={filtered ? "No companies match" : "No companies yet"}>
-            {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
-          </Empty>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {list.items.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/companies/${c.id}`}
-                  className="grid gap-1 px-5 py-3 hover:bg-bench/40 md:grid-cols-[minmax(0,1fr)_6.5rem_minmax(0,9rem)_minmax(0,9rem)_7rem] md:items-center md:gap-4"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-hema">{c.name}</span>
-                    <span className="block truncate text-meta text-ink-3">
-                      {[c.industry, `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`].filter(Boolean).join(" · ")}
-                    </span>
-                  </span>
-                  <span>
-                    <StatusTag status={c.status} />
-                  </span>
-                  <span className="truncate text-meta text-ink-2">{[c.city, c.country].filter(Boolean).join(", ") || "—"}</span>
-                  <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
-                  <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+      <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
+        <Sheet>
+          {list.items.length === 0 ? (
+            <Empty icon="company" title={filtered ? "No companies match" : "No companies yet"}>
+              {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
+            </Empty>
+          ) : (
+            <>
+              {bulkAllowed && (
+                <div className="border-b border-rule px-5">
+                  <SelectAllBox>
+                    <span className="text-meta text-ink-3">Select all on this page</span>
+                  </SelectAllBox>
+                </div>
+              )}
+              <ul className="divide-y divide-rule">
+                {list.items.map((c) => (
+                  <SelectableRow key={c.id} id={c.id} as="li" className="flex items-center gap-3 px-5 hover:bg-bench/40">
+                    {bulkAllowed && <SelectBox id={c.id} label={c.name} />}
+                    <Link
+                      href={`/companies/${c.id}`}
+                      className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_6.5rem_minmax(0,9rem)_minmax(0,9rem)_7rem] md:items-center md:gap-4"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-hema">{c.name}</span>
+                        <span className="block truncate text-meta text-ink-3">
+                          {[c.industry, `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      <span>
+                        <StatusTag status={c.status} />
+                      </span>
+                      <span className="truncate text-meta text-ink-2">{[c.city, c.country].filter(Boolean).join(", ") || "—"}</span>
+                      <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
+                      <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
+                    </Link>
+                  </SelectableRow>
+                ))}
+              </ul>
+            </>
+          )}
+        </Sheet>
+        {bulkAllowed && (
+          <RecordsBulk kind="companies" can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
         )}
-      </Sheet>
+      </SelectionProvider>
       <Pager total={list.total} page={page} size={SIZE} base={`/companies${here.size ? `?${here}` : ""}`} />
     </>
   );

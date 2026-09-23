@@ -9,7 +9,7 @@ import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
-import { adminPagesFor, can } from "../lib/access";
+import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
 
@@ -58,30 +58,15 @@ function salesPages(sales: ModuleAccess[]): Page[] {
     // The Sales app opens on its overview; in the shell that screen is a page
     // of its own, because the shell's own root is the dashboard.
     { href: THIS_APP === "sales" ? "/" : "/overview", label: "Overview", icon: "overview" },
-    // A quote is opened from its customer, so it counts as being in Customers.
-    { href: "/customers", label: "Customers", icon: "customers", also: ["/quotes"] },
+    // Customers are companies and the contacts in them; a quote is opened from
+    // its customer, so both count as being in Customers.
+    { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/quotes", "/customers"] },
     { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
+    { href: "/activities", label: "Activities", icon: "activity" },
     { href: "/retention", label: "Retention", icon: "retention" },
     // Only the leads who set what a team charges; a rep quoting from those
     // prices has no use for the page.
     ...(sales.some((m) => m.actions.includes("prices")) ? [{ href: "/prices", label: "Prices", icon: "pricing" as const }] : []),
-  ];
-}
-
-/**
- * The CRM pages added beside the sales workspace: companies, contacts,
- * activities and your own to-do. Each shows only for a role that may open it.
- */
-function crmPages(me: Me): Page[] {
-  return [
-    ...(can(me, "activities.view") ? [{ href: "/my-work", label: "My work", icon: "followUps" as const }] : []),
-    ...(can(me, "customers.view")
-      ? [
-          { href: "/companies", label: "Companies", icon: "company" as const },
-          { href: "/contacts", label: "Contacts", icon: "customers" as const },
-        ]
-      : []),
-    ...(can(me, "activities.view") ? [{ href: "/activities", label: "Activities", icon: "activity" as const }] : []),
   ];
 }
 
@@ -552,16 +537,6 @@ function Links({ me }: { me: Me }) {
           ))}
         </Group>
       )}
-      {/* The CRM: companies, contacts and activities, beside the sales workspace. */}
-      {THIS_APP === "sales" && crmPages(me).length > 0 && (
-        <Group label="CRM">
-          {crmPages(me).map((page) => (
-            <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
-              {page.label}
-            </Row>
-          ))}
-        </Group>
-      )}
       {/* Sales' own Administration: its users, roles, teams and audit log,
           each page only for a role that may open it. */}
       {THIS_APP === "sales" && adminPagesFor(me).length > 0 && (
@@ -653,8 +628,6 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  const crm = crmPages(me).find((p) => isCurrent(p, pathname, false));
-  if (crm) return crm.label;
   const sales = me.modules.filter((x) => x.kind === "sales");
   return salesPages(sales).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }

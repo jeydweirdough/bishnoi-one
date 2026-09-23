@@ -1,2 +1,6 @@
-// The route. The screen is in src/, so it can be read on its own.
-export { default, metadata } from "../../../src/screens/home";
+// Your follow-ups and what's due are on the Overview.
+import { redirect } from "next/navigation";
+
+export default function Page() {
+  redirect("/");
+}

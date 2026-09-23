@@ -1,2 +1,6 @@
-// The route. The screen is in src/, so it can be read on its own.
-export { default, metadata } from "../../../../../src/screens/customer-edit";
+// Customers are companies and contacts now: the old address goes to the new section.
+import { redirect } from "next/navigation";
+
+export default function Page() {
+  redirect("/companies");
+}

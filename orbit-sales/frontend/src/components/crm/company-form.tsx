@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { createCompany, updateCompany, type CompanyInput } from "../../actions/crm";
-import type { Assignable, CompanyDetail, CompanyStatus } from "@/src/platform/lib/types";
+import type { Assignable, Duplicate, CompanyDetail, CompanyStatus } from "@/src/platform/lib/types";
+import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
 import { STATUSES } from "./words";
 
@@ -24,9 +25,11 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
   const [ownerId, setOwnerId] = useState(company?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
+  const [dupMessage, setDupMessage] = useState("");
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
 
-  function submit() {
+  function submit(allowDuplicate = false) {
     const input: CompanyInput = {
       ...(Object.fromEntries(TEXT.map((k) => [k, values[k].trim() || null])) as Record<Text, string | null>),
       name: values.name.trim(),
@@ -46,7 +49,7 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
         }
         result = await updateCompany(company.id, change);
       } else {
-        result = await createCompany(input);
+        result = await createCompany({ ...input, allowDuplicate });
       }
       if (result.ok) {
         toast.success(company ? "Changes saved" : "Company added", { description: result.data.name });
@@ -54,7 +57,11 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
         router.refresh();
         return;
       }
-      setError(result.error);
+      // "Looks like one already here" is a question, not an error: it gets its own panel.
+      const found = result.duplicates ?? [];
+      setDuplicates(found);
+      setDupMessage(found.length ? result.error : "");
+      setError(found.length ? null : result.error);
       setFields(result.fields ?? {});
     });
   }
@@ -112,6 +119,9 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
       </fieldset>
 
       <FormError message={error} />
+      {duplicates.length > 0 && (
+        <Duplicates message={dupMessage} found={duplicates} base="/companies" pending={pending} onAddAnyway={() => submit(true)} />
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
           {company ? "Save changes" : "Add company"}

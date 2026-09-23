@@ -169,9 +169,14 @@ def list_activities(
 
 
 @router.get("/summary")
-def summary(access: View, db: DB, settings: SettingsDep, owner: str | None = Query("me", max_length=36)) -> dict:
-    """How much is still to do: overdue, due today, coming up."""
+def summary(
+    access: View, db: DB, settings: SettingsDep, owner: str | None = Query("me", max_length=36), kind: Kind | None = None
+) -> dict:
+    """How much is still to do: overdue, due today, coming up. `kind=task` counts
+    follow-ups alone; otherwise meetings are counted too."""
     base = within(select(Activity), Activity, access)
+    if kind:
+        base = base.where(Activity.kind == kind)
     if owner and owner != "all":
         base = base.where(Activity.owner_id == (access.user_id if owner == "me" else owner))
     counts = {}

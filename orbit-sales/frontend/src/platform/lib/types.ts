@@ -239,7 +239,7 @@ export type HomeFollowUp = {
   bucket: Bucket;
 };
 
-export type Duplicate = { id: string; name: string; teamName: string | null; phone: string | null };
+export type Duplicate = { id: string; name: string; teamName: string | null; phone: string | null; canOpen?: boolean };
 
 export type Headquarters = { code: string; name: string; isActive: boolean };
 export type OrgTeam = { code: string; name: string; isActive: boolean; headquarters: Headquarters[] };
