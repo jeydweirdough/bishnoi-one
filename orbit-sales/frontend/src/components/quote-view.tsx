@@ -27,7 +27,7 @@ function Decision({ fmt, label, by, at, note }: { fmt: Format; label: string; by
   );
 }
 
-/** A quote as everyone reads it: lines, totals and where Finance is with it. Each of Finance's actions sits in the part it decides. */
+/** A quote as everyone reads it: lines, totals and where approval and payment stand. Each of the approver's actions sits in the part it decides. */
 export async function QuoteView({
   quote,
   letterHref,
@@ -135,7 +135,7 @@ export async function QuoteView({
                     quote.customerName
                   ),
                 ],
-                ["Division", `${quote.divisionName} · ${quote.teamName}`],
+                ["Team", quote.teamName],
                 ["Price", `${quote.priceTypeName}${quote.rx ? " · with Rx" : ""}`],
                 ["Paid by", quote.payerName ? `${quote.payerName}, with a guarantee letter` : "The customer"],
                 ["Made by", `${quote.createdBy.name} · ${fmt.whenLabel(quote.createdAt)}`],
@@ -152,7 +152,7 @@ export async function QuoteView({
       </div>
 
       <Sheet className="px-5 pt-4 pb-5">
-        <SectionTitle icon="finance">Finance</SectionTitle>
+        <SectionTitle icon="approvals">Approval & payment</SectionTitle>
         <div className="mt-1 divide-y divide-rule text-sm">
           <section className="py-3" aria-label="Approval">
             <h3 className="text-meta text-ink-3">Approval</h3>
@@ -161,7 +161,7 @@ export async function QuoteView({
             ) : (
               <>
                 {approval.status === "pending" ? (
-                  <Flag letter="!">Waiting for Finance</Flag>
+                  <Flag letter="!">Waiting for an approver</Flag>
                 ) : (
                   <Decision fmt={fmt} label={APPROVAL_STATUSES[approval.status]} by={approval.by} at={approval.at} note={approval.note} />
                 )}
@@ -190,7 +190,7 @@ export async function QuoteView({
               )}
               <div className="mt-2">
                 {letter.status === "pending" ? (
-                  <Flag letter="!">Finance hasn&apos;t checked it yet</Flag>
+                  <Flag letter="!">Not checked yet</Flag>
                 ) : (
                   <Decision fmt={fmt} label={LETTER_STATUSES[letter.status]} by={letter.by} at={letter.at} note={letter.note} />
                 )}

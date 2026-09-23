@@ -355,12 +355,11 @@ export type TeamPriceCell = { company: number | null; team: number | null };
 export type TeamPricedProduct = { id: string; code: string; name: string; unit: string; prices: Record<string, TeamPriceCell> };
 
 export type TeamPrices = {
-  division: string;
-  divisionName: string;
+  /** The team's id. */
   team: string;
   teamName: string;
-  /** True while the team hasn't narrowed its price types: it quotes with whatever its division does. */
-  usesDivisionTypes: boolean;
+  /** True while the team hasn't narrowed its price types: it quotes with every one there is. */
+  usesAllTypes: boolean;
   priceTypes: TeamPriceType[];
   products: TeamPricedProduct[];
 };
@@ -492,11 +491,13 @@ export type Quote = {
   id: string;
   rev: string | null;
   number: string;
-  division: string;
-  divisionName: string;
   team: string;
   teamName: string;
+  /** Who it's for: a company, or a contact (and the company they're in). */
+  company: Ref | null;
+  contact: Ref | null;
   customerId: string;
+  customerHref: string | null;
   customerName: string | null;
   priceType: string;
   priceTypeName: string;
@@ -530,6 +531,7 @@ export type Quote = {
   payment: { status: "none" | "unpaid" | "partial" | "paid"; paidCentavos: number; payments: Payment[] };
   createdAt: string;
   createdBy: Person;
+  owner: Person | null;
   can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean };
 };
 
@@ -878,3 +880,17 @@ export type Paged<T> = { items: T[]; total: number };
 export type ActivitySummary = { overdue: number; today: number; upcoming: number; open: number };
 export type Assignable = { id: string; name: string; team: Ref | null; isMe: boolean };
 
+
+// --- the catalogue (Products, Promos, Bundles, Pricing rules) ---
+
+export type CatalogueProduct = Product & { can: { edit: boolean; delete: boolean } };
+
+export type SalesRules = {
+  priceTypes: (PriceType & { rule: PriceRule; sortOrder: number })[];
+  issuers: Issuer[];
+  settings: { discountApprovalBp: number; allowsGuaranteeLetters: boolean; atRiskDays: number; lostDays: number };
+  can: { edit: boolean };
+};
+
+export type PromoRow = Omit<Promo, "divisionCodes" | "startsOn"> & { startsOn: string | null };
+export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn: string | null };

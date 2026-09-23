@@ -204,3 +204,203 @@ class Activity(Owned, Base):
     contact: Mapped[Contact | None] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Activity.owner_id", lazy="joined")
 
+
+# --- the catalogue: what's sold, and at what price ---------------------------------------
+#
+# Money is whole minor units (centavos) everywhere; percentages are basis points
+# (1250 = 12.5%).
+
+
+class PriceType(Base):
+    """A way of pricing a quote: "Patient", "Drugstore/Hospital", "Special Price"."""
+
+    __tablename__ = "price_types"
+    __table_args__ = (
+        CheckConstraint("entry IN ('list', 'entered')", name="price_type_entry"),
+        CheckConstraint("rule IN ('always', 'with_rx')", name="price_type_rule"),
+    )
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    # list: the price comes from the price list. entered: the rep types it on the quote.
+    entry: Mapped[str] = mapped_column(String(8), default="list")
+    # always: offered on every quote. with_rx: only when there's a prescription.
+    rule: Mapped[str] = mapped_column(String(8), default="always")
+    requires_notes: Mapped[bool] = mapped_column(default=False)
+    needs_approval: Mapped[bool] = mapped_column(default=False)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Product(Base):
+    __tablename__ = "products"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(160))
+    generic_name: Mapped[str | None] = mapped_column(String(160), default=None)
+    strength: Mapped[str | None] = mapped_column(String(60), default=None)
+    form: Mapped[str | None] = mapped_column(String(60), default=None)
+    unit: Mapped[str] = mapped_column(String(30), default="piece")
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    prices: Mapped[list["ProductPrice"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+
+
+class ProductPrice(Base):
+    """The company's price for a product under a price type."""
+
+    __tablename__ = "product_prices"
+
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+
+
+class TeamPriceType(Base):
+    """The price types a team quotes with. None chosen: every one there is."""
+
+    __tablename__ = "team_price_types"
+
+    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+
+
+class TeamPrice(Base):
+    """A team's own price, standing over the company's for its quotes."""
+
+    __tablename__ = "team_prices"
+
+    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+
+
+PROMO_KINDS = ("percent", "amount", "free_goods", "tiered")
+
+
+class Promo(Base):
+    """A price promotion. percent: off the line. amount: off each unit.
+    free_goods: buy X, get Y free. tiered: a percent that grows with quantity."""
+
+    __tablename__ = "promos"
+    __table_args__ = (CheckConstraint("kind IN ('percent', 'amount', 'free_goods', 'tiered')", name="promo_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(12))
+    percent_bp: Mapped[int | None] = mapped_column(Integer, default=None)
+    amount_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
+    buy_qty: Mapped[int | None] = mapped_column(Integer, default=None)
+    free_qty: Mapped[int | None] = mapped_column(Integer, default=None)
+    # [{"minQty": 20, "percentBp": 500}, ...]
+    tiers: Mapped[list] = mapped_column(JSON, default=list)
+    # None: every product.
+    product_ids: Mapped[list | None] = mapped_column(JSON, default=None)
+    starts_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    ends_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Bundle(Base):
+    """Products sold together at one set price."""
+
+    __tablename__ = "bundles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    price_centavos: Mapped[int] = mapped_column(Integer)
+    # True: one line on the quote. False: shown as its items, sharing the set price.
+    as_one_line: Mapped[bool] = mapped_column(default=True)
+    # [{"productId": "...", "qty": 2}, ...]
+    items: Mapped[list] = mapped_column(JSON, default=list)
+    starts_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    ends_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Issuer(Base):
+    """Who may pay for a quote with a guarantee letter: DSWD, PCSO..."""
+
+    __tablename__ = "issuers"
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class SalesSettings(Base):
+    """Sales' own rules. One row."""
+
+    __tablename__ = "sales_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    # An extra discount above this, on a line, needs Finance's approval.
+    discount_approval_bp: Mapped[int] = mapped_column(Integer, default=1000)
+    allows_guarantee_letters: Mapped[bool] = mapped_column(default=True)
+    # Retention: a customer with no quote in this many days is at risk; in this many, lost.
+    at_risk_days: Mapped[int] = mapped_column(Integer, default=60)
+    lost_days: Mapped[int] = mapped_column(Integer, default=90)
+
+
+# --- quotes --------------------------------------------------------------------------------
+
+
+class Quote(Owned, Base):
+    """A priced offer to a company or a contact. Lines and totals are kept as
+    priced when it was made: changing a price later never changes a quote.
+    The owner is who made it."""
+
+    __tablename__ = "quotes"
+    __table_args__ = (
+        CheckConstraint("approval_status IN ('none', 'pending', 'approved', 'rejected')", name="quote_approval"),
+        CheckConstraint("letter_status IN ('none', 'pending', 'verified', 'rejected')", name="quote_letter"),
+        CheckConstraint("payment_status IN ('none', 'unpaid', 'partial', 'paid')", name="quote_payment"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(24), unique=True)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True, default=None)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), index=True, default=None)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    price_type: Mapped[str] = mapped_column(String(40))
+    price_type_name: Mapped[str] = mapped_column(String(80))
+    rx: Mapped[bool] = mapped_column(default=False)
+    # "self", or an issuer's code when a guarantee letter pays.
+    payer: Mapped[str] = mapped_column(String(40), default="self")
+    payer_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    lines: Mapped[list] = mapped_column(JSON, default=list)
+    gross_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    promo_discount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    discount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+
+    approval_status: Mapped[str] = mapped_column(String(10), default="none", index=True)
+    approval_reasons: Mapped[list] = mapped_column(JSON, default=list)
+    approval_note: Mapped[str | None] = mapped_column(Text, default=None)
+    approval_by_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    approval_by_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    approval_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    # {"number", "issuedOn", "amountCentavos", "file": {"ref", "name", "contentType", "size", "ext"} | None}
+    letter: Mapped[dict | None] = mapped_column(JSON, default=None)
+    letter_status: Mapped[str] = mapped_column(String(10), default="none", index=True)
+    letter_note: Mapped[str | None] = mapped_column(Text, default=None)
+    letter_by_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    letter_by_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    letter_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    payment_status: Mapped[str] = mapped_column(String(10), default="none", index=True)
+    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    payments: Mapped[list] = mapped_column(JSON, default=list)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    created_by: Mapped[User] = relationship(foreign_keys="Quote.created_by_id", lazy="joined")
+

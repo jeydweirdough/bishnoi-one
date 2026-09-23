@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'sales.db').as_posix()}"
+    # Where uploaded files (guarantee letters) are kept.
+    files_dir: Path = DATA_DIR / "files"
     # How long a sign-in lasts.
     session_hours: int = 10
     # Wrong passwords allowed per email before sign-in waits, and for how long.

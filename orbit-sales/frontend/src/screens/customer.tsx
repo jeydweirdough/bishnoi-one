@@ -101,7 +101,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
             <Sheet className="order-4 px-5 pt-4 pb-3">
               <SectionTitle icon="quotes">Quotes</SectionTitle>
-              <QuotesPanel customerId={id} quotes={customer.quotes} today={today} canAdd={customer.can.log} />
+              <QuotesPanel customerHref={`/customers/${id}`} quotes={customer.quotes} canAdd={customer.can.log} />
             </Sheet>
 
             <Sheet className="order-5 px-5 pt-4 pb-2">
