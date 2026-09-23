@@ -2,6 +2,7 @@
 
     uv run python -m app.tools.users add --email ana@example.com --name "Ana Reyes" [--admin]
     uv run python -m app.tools.users list
+    uv run python -m app.tools.users demo        # this app's demo accounts (development)
     uv run python -m app.tools.users password --email ana@example.com
     uv run python -m app.tools.users disable --email ana@example.com
     uv run python -m app.tools.users enable --email ana@example.com
@@ -20,6 +21,7 @@ from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.db import create_tables, make_engine, make_sessions
+from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.models import User
 from app.security import check_password_rules, hash_password
 
@@ -44,6 +46,7 @@ def main() -> int:
     add.add_argument("--name", required=True)
     add.add_argument("--admin", action="store_true", help="can run this app's settings")
     sub.add_parser("list", help="list accounts")
+    sub.add_parser("demo", help="make this app's demo accounts (development only)")
     for name in ("password", "disable", "enable"):
         sub.add_parser(name).add_argument("--email", required=True)
     args = parser.parse_args()
@@ -54,6 +57,18 @@ def main() -> int:
         if args.command == "list":
             for u in db.scalars(select(User).order_by(User.email)):
                 print(f"{u.email:40} {u.full_name:30} {u.role:7} {'on' if u.is_active else 'off'}")
+            return 0
+
+        if args.command == "demo":
+            if get_settings().is_production:
+                sys.exit("Demo accounts are for development only.")
+            made = 0
+            for d in DEMO_ACCOUNTS:
+                if db.scalar(select(User).where(func.lower(User.email) == d.email)) is None:
+                    db.add(User(email=d.email, full_name=d.name, password_hash=hash_password(DEMO_PASSWORD), role="admin" if d.admin else "member"))
+                    made += 1
+            db.commit()
+            print(f"Made {made} demo account(s); {len(DEMO_ACCOUNTS) - made} already there. Password: {DEMO_PASSWORD}")
             return 0
 
         email = args.email.strip().lower()

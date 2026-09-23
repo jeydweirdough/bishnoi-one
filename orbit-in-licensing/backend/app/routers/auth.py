@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import func, select
 
+from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
 from app.identity import me_out
 from app.models import SignInSession, User
@@ -101,6 +102,19 @@ def logout(record: CurrentSession, db: DB) -> Response:
 @router.get("/me")
 def me(user: CurrentUser, settings: SettingsDep) -> dict:
     return me_out(user, settings)
+
+
+@router.get("/demo-accounts")
+def demo_accounts(db: DB, settings: SettingsDep) -> dict:
+    """The demo accounts that exist here, for the sign-in page. Development only."""
+    if settings.is_production:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+    emails = [d.email for d in DEMO_ACCOUNTS]
+    active = set(db.scalars(select(User.email).where(User.email.in_(emails), User.is_active)))
+    return {
+        "password": DEMO_PASSWORD,
+        "items": [{"group": d.group, "email": d.email, "who": d.name, "role": d.role} for d in DEMO_ACCOUNTS if d.email in active],
+    }
 
 
 @router.post("/switch-org")
