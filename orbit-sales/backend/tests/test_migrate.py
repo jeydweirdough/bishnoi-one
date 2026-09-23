@@ -32,11 +32,12 @@ def test_a_database_from_before_administration_is_upgraded(tmp_path):
     with app.state.sessions() as db:
         people = {u.email: u.role.name for u in db.query(User)}
     assert people == {"boss@example.com": "Administrator", "rep@example.com": "Sales Rep"}
-    assert (tmp_path / "sales.db.before-0002").exists()
+    backups = sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name)
+    assert len(backups) == 1  # named after the newest migration
 
     # Starting again changes nothing and copies nothing more.
     create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{file.as_posix()}"))
-    assert sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name) == ["sales.db.before-0002"]
+    assert sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name) == backups
 
 
 def test_a_failed_migration_leaves_the_database_as_it_was(tmp_path, monkeypatch):

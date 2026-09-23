@@ -69,6 +69,24 @@ Send the token as `Authorization: Bearer <token>`. The database keeps only a
 hash of each token. Passwords are hashed with scrypt. Five wrong passwords for
 one email make it wait 15 minutes (`LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`).
 
+## Customers and activities
+
+| Endpoints | What they are | Permissions |
+|---|---|---|
+| `/companies` | Companies: list (search, status, owner), add, detail with contacts and activity, change, delete (refused while it has contacts) | `customers.*` |
+| `/contacts` | Contacts, each optionally in a company | `customers.*` |
+| `/activities` | Calls, emails and notes (logged); meetings and tasks (planned, then done). `state=open/overdue/today/upcoming/done`; `/activities/summary` counts what's still to do | `activities.*` |
+| `/people/assignable` | Who a record can be given to | signed in |
+
+Every company, contact and activity has an **owner** and the owner's **team**.
+A role's scope decides which of them someone reaches (`app/scope.py`): their
+own, their team's, or all. Anything outside that answers 404, and a record can
+only be given to someone within it. A time sent without a zone (what a
+datetime field gives) is the company's own local time (`ORG_TIMEZONE`).
+
+`uv run python -m app.tools.users demo` also adds sample companies, contacts
+and activities, owned by the demo reps, into a database with no companies yet.
+
 ## Settings (`.env`)
 
 | Setting | What it is | Default |
