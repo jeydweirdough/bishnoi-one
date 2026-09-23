@@ -1,0 +1,29 @@
+{
+  "name": "sales",
+  "label": "Sales",
+  "icon": "salesDivision",
+  "what": "Customers, and everything that happens with them.",
+  "state": "moved",
+  "screens": [
+    "Overview",
+    "Customers",
+    "Follow-ups",
+    "Quotes",
+    "Retention",
+    "Prices"
+  ],
+  "owns": [
+    "customers",
+    "activities",
+    "follow-ups",
+    "quotes",
+    "retention_rules",
+    "team_prices",
+    "team_price_types"
+  ],
+  "asks": {
+    "inventory": "what does this product cost?",
+    "finance": "the approve, letter and payment buttons on a quote"
+  },
+  "api": "shared"
+}
