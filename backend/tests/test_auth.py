@@ -117,3 +117,23 @@ def test_tokens_are_not_stored(client, app):
     with app.state.sessions() as db:
         stored = [s.token_hash for s in db.query(SignInSession)]
     assert token not in stored and len(stored) == 1
+
+
+
+def test_demo_accounts_list_only_what_exists_here(client, app):
+    from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
+
+    assert client.get("/auth/demo-accounts").json()["items"] == []
+    first = DEMO_ACCOUNTS[0]
+    with app.state.sessions() as db:
+        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD)))
+        db.commit()
+    listed = client.get("/auth/demo-accounts").json()
+    assert [d["email"] for d in listed["items"]] == [first.email]
+    assert sign_in(client, first.email, listed["password"]).status_code == 200
+
+
+def test_no_demo_accounts_in_production(tmp_path):
+    settings = Settings(_env_file=None, environment="production", allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'p.db').as_posix()}")
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/auth/demo-accounts").status_code == 404
