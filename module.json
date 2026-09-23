@@ -1,0 +1,20 @@
+{
+  "name": "platform",
+  "label": "Platform",
+  "icon": "companies",
+  "what": "The companies on Orbit. The Developer Admin's floor.",
+  "state": "moved",
+  "screens": [
+    "Companies",
+    "Add a company",
+    "See as somebody"
+  ],
+  "owns": [
+    "platform_admins",
+    "platform_sessions"
+  ],
+  "asks": {
+    "core": "the company list"
+  },
+  "api": "shared"
+}
