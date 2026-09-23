@@ -1,0 +1,157 @@
+/*
+ * The company tree's branches. A parent's children hang off one trunk; each
+ * child gets a twig. Every line meets a node at its middle: --mid is an
+ * item's top padding plus half a node.
+ *
+ * Narrow containers read top to bottom, like a file tree. From 52rem the same
+ * markup reads left to right, like a topology: each level is a column of
+ * equal-width nodes, and a short link joins a parent to its children's trunk.
+ */
+
+.tree {
+  --line: var(--color-rule-strong);
+  --node: 2.5rem;
+  --pad: 0.25rem;
+  --mid: calc(var(--pad) + var(--node) / 2);
+  --twig: 1rem;
+  --link: 1.25rem;
+  --elbow: 0.5rem;
+  container: tree / inline-size;
+  /* a very wide open branch scrolls rather than squeezing its nodes */
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  position: relative;
+  padding-block: var(--pad);
+}
+
+.children {
+  position: relative;
+  list-style: none;
+  margin: 0 0 0 1.125rem;
+  padding: 0;
+}
+
+.children > .item {
+  padding-left: var(--twig);
+}
+
+/* the twig to this child */
+.children > .item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--mid);
+  width: calc(var(--twig) - 0.125rem);
+  border-top: 1px solid var(--line);
+}
+
+/* the trunk past this child */
+.children > .item::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+}
+
+/* the last child turns the trunk's corner */
+.children > .item:last-child::before {
+  display: none;
+}
+
+.children > .item:last-child::after {
+  bottom: auto;
+  height: var(--mid);
+  width: calc(var(--twig) - 0.125rem);
+  border-bottom: 1px solid var(--line);
+  border-bottom-left-radius: var(--elbow);
+}
+
+/* the node plus whatever opens beneath it (its actions, a rename) */
+.node {
+  width: fit-content;
+  /* deep branches on a phone get what room is left, never more */
+  min-width: min(12rem, 100%);
+  max-width: 100%;
+}
+
+@container tree (min-width: 52rem) {
+  .item {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .children {
+    margin: calc(var(--pad) * -1) 0;
+    padding-left: var(--link);
+  }
+
+  /* the link from the parent to its children's trunk */
+  .children::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: var(--mid);
+    width: var(--link);
+    border-top: 1px solid var(--line);
+  }
+
+  .children > .item:first-child::after {
+    top: var(--mid);
+  }
+
+  /* one child: a straight line, no corner */
+  .children > .item:only-child::before {
+    display: block;
+  }
+
+  .children > .item:only-child::after {
+    display: none;
+  }
+
+  .node {
+    flex: none;
+    min-width: 0;
+  }
+
+  .root {
+    width: 7rem;
+  }
+
+  /* wide enough for the longest name ("Regulatory Affairs") beside its count,
+     twisty and the pencil that opens its actions */
+  .department {
+    width: 13rem;
+  }
+
+  .group {
+    width: 8.5rem;
+  }
+
+  .division {
+    width: 8rem;
+  }
+
+  .team {
+    width: 12rem;
+  }
+
+  .hq {
+    width: 10rem;
+  }
+
+  /* typing a name needs more room than showing one; it's the branch's last node */
+  .wide {
+    width: 15rem;
+  }
+}
