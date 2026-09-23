@@ -128,12 +128,25 @@ class Owned:
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
-COMPANY_STATUSES = ("prospect", "customer", "partner", "inactive")
+CUSTOMER_COLORS = ("gray", "brand", "green", "blue", "amber", "red", "purple", "muted")
+
+
+class CustomerType(Base):
+    """What kind of customer a company is: Prospect, Customer, Partner... The
+    list is an administrator's to keep (Administration → Customer types)."""
+
+    __tablename__ = "customer_types"
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True)
+    color: Mapped[str] = mapped_column(String(12), default="gray")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Switched off: companies keep it, but it isn't offered any more.
+    is_active: Mapped[bool] = mapped_column(default=True)
 
 
 class Company(Owned, Base):
     __tablename__ = "companies"
-    __table_args__ = (CheckConstraint("status IN ('prospect', 'customer', 'partner', 'inactive')", name="company_status"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(160), index=True)

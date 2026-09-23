@@ -1,5 +1,5 @@
 import type { IconName } from "@/src/platform/ui/icons";
-import type { CompanyStatus, CrmKind } from "@/src/platform/lib/types";
+import type { CompanyStatus, CrmKind, CustomerType, CustomerTypeColor } from "@/src/platform/lib/types";
 
 export const KINDS: { kind: CrmKind; label: string; icon: IconName; planned: boolean }[] = [
   { kind: "call", label: "Call", icon: "call", planned: false },
@@ -11,24 +11,27 @@ export const KINDS: { kind: CrmKind; label: string; icon: IconName; planned: boo
 
 export const kindOf = (kind: CrmKind) => KINDS.find((k) => k.kind === kind) ?? KINDS[0];
 
-export const STATUSES: { value: CompanyStatus; label: string }[] = [
-  { value: "prospect", label: "Prospect" },
-  { value: "customer", label: "Customer" },
-  { value: "partner", label: "Partner" },
-  { value: "inactive", label: "Inactive" },
-];
-
-const STATUS_STYLE: Record<CompanyStatus, string> = {
-  prospect: "border-rule-strong text-ink-2",
-  customer: "border-hema bg-hema-tint text-hema",
-  partner: "border-filed text-filed",
-  inactive: "border-rule text-ink-3",
+export const TYPE_COLORS: Record<CustomerTypeColor, { label: string; style: string }> = {
+  gray: { label: "Gray", style: "border-rule-strong text-ink-2" },
+  brand: { label: "Indigo", style: "border-hema bg-hema-tint text-hema" },
+  green: { label: "Green", style: "border-filed text-filed" },
+  blue: { label: "Blue", style: "border-sky-700 text-sky-700" },
+  amber: { label: "Amber", style: "border-amber-600 text-amber-700" },
+  red: { label: "Red", style: "border-danger text-danger" },
+  purple: { label: "Purple", style: "border-purple-700 text-purple-700" },
+  muted: { label: "Faded", style: "border-rule text-ink-3" },
 };
 
-export function StatusTag({ status }: { status: CompanyStatus }) {
-  const label = STATUSES.find((s) => s.value === status)?.label ?? status;
+/** The customer types to pick from: those switched on, plus the one a company already has. */
+export const typeOptions = (types: CustomerType[], current?: string) =>
+  types.filter((t) => t.isActive || t.code === current).map((t) => ({ value: t.code, label: t.name }));
+
+export function StatusTag({ status, types }: { status: CompanyStatus; types: CustomerType[] }) {
+  const type = types.find((t) => t.code === status);
   return (
-    <span className={`inline-flex h-5 items-center rounded-[2px] border px-1.5 text-stamp uppercase ${STATUS_STYLE[status]}`}>{label}</span>
+    <span className={`inline-flex h-5 items-center rounded-[2px] border px-1.5 text-stamp uppercase ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
+      {type?.name ?? status}
+    </span>
   );
 }
 

@@ -5,7 +5,7 @@ import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
+import type { Assignable, CustomerType, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { QuotesPanel } from "../components/quotes-panel";
 import { ActivityList } from "../components/crm/activity-list";
@@ -29,10 +29,11 @@ export default async function CompanyPage({ params }: { params: Params }) {
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
-  const [company, people, quotes] = await Promise.all([
+  const [company, people, quotes, types] = await Promise.all([
     load<CompanyDetail>(`/companies/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
+    load<CustomerType[]>("/customer-types"),
   ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && company.can.edit;
@@ -43,7 +44,7 @@ export default async function CompanyPage({ params }: { params: Params }) {
         title={
           <span className="inline-flex flex-wrap items-center gap-2.5">
             {company.name}
-            <StatusTag status={company.status} />
+            <StatusTag status={company.status} types={types} />
           </span>
         }
         crumbs={[{ href: "/companies", label: "Companies" }]}

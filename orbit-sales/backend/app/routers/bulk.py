@@ -25,6 +25,7 @@ from app.api import Api
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import PLANNED_KINDS, Activity, Company, Contact, User
+from app.routers.customer_types import check_type
 from app.scope import reachable_people, reaches
 
 router = APIRouter(tags=["bulk actions"])
@@ -104,7 +105,7 @@ class FollowUpIn(Api):
 class RecordsBulkIn(Api):
     ids: Ids
     action: Literal["status", "owner", "follow_up", "delete"]
-    status: Literal["prospect", "customer", "partner", "inactive"] | None = None
+    status: str | None = Field(None, max_length=40)
     owner_id: str | None = Field(None, max_length=36)
     follow_up: FollowUpIn | None = None
     # Follow-ups: for each record's owner, or for the person asking.
@@ -124,7 +125,9 @@ def bulk_records(
     if not access.can(permission):
         raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_ALLOWED)
     if body.action == "status" and (model is not Company or body.status is None):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick a status for the companies.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick a type for the companies.")
+    if body.action == "status":
+        check_type(db, body.status)
     new_owner = None
     if body.action == "owner":
         new_owner = assignee(db, access, body.owner_id)

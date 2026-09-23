@@ -6,22 +6,22 @@ import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { createCompany, updateCompany, type CompanyInput } from "../../actions/crm";
-import type { Assignable, Duplicate, CompanyDetail, CompanyStatus } from "@/src/platform/lib/types";
+import type { Assignable, Duplicate, CompanyDetail, CompanyStatus, CustomerType } from "@/src/platform/lib/types";
 import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
-import { STATUSES } from "./words";
+import { typeOptions } from "./words";
 
 const TEXT = ["name", "industry", "website", "email", "phone", "address", "city", "country", "notes"] as const;
 type Text = (typeof TEXT)[number];
 
 /** Adding a company, or changing one. */
-export function CompanyForm({ people, company }: { people: Assignable[]; company?: CompanyDetail }) {
+export function CompanyForm({ people, types, company }: { people: Assignable[]; types: CustomerType[]; company?: CompanyDetail }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [values, setValues] = useState<Record<Text, string>>(() =>
     Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? ""])) as Record<Text, string>,
   );
-  const [status, setStatus] = useState<CompanyStatus>(company?.status ?? "prospect");
+  const [status, setStatus] = useState<CompanyStatus>(company?.status ?? types.find((t) => t.isActive)?.code ?? "");
   const [ownerId, setOwnerId] = useState(company?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -52,7 +52,7 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
         result = await createCompany({ ...input, allowDuplicate });
       }
       if (result.ok) {
-        toast.success(company ? "Changes saved" : "Company added", { description: result.data.name });
+        toast.success(company ? "Changes saved" : "Customer added", { description: result.data.name });
         router.push(`/companies/${result.data.id}`);
         router.refresh();
         return;
@@ -81,7 +81,7 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
           {(p) => <Input {...p} value={values.name} onChange={set("name")} autoFocus={!company} required />}
         </Field>
         <div className="sm:col-span-2">
-          <Choice<CompanyStatus> name="status" legend="Status" value={status} onChange={setStatus} options={STATUSES} />
+          <Choice<CompanyStatus> name="status" legend="Type" value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />
         </div>
         <Field label="Industry" optional error={fields.industry}>
           {(p) => <Input {...p} value={values.industry} onChange={set("industry")} placeholder="Hospital, retail pharmacy…" />}
@@ -124,7 +124,7 @@ export function CompanyForm({ people, company }: { people: Assignable[]; company
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          {company ? "Save changes" : "Add company"}
+          {company ? "Save changes" : "Add customer"}
         </Button>
         <LinkButton href={company ? `/companies/${company.id}` : "/companies"} variant="quiet">
           Cancel

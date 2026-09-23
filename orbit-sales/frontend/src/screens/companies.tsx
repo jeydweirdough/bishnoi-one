@@ -6,12 +6,12 @@ import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
-import type { Assignable, CompanyRow, Paged } from "@/src/platform/lib/types";
+import type { Assignable, CompanyRow, CustomerType, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { CustomerTabs } from "../components/crm/customer-tabs";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { RecordsBulk } from "../components/crm/records-bulk";
-import { STATUSES, StatusTag } from "../components/crm/words";
+import { StatusTag, typeOptions } from "../components/crm/words";
 
 export const metadata = { title: "Companies" };
 
@@ -31,9 +31,10 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   if (owner) query.set("owner", owner);
   const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
   const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
-  const [list, people] = await Promise.all([
+  const [list, people, types] = await Promise.all([
     load<Paged<CompanyRow>>(`/companies?${query}`),
     bulkAllowed ? load<Assignable[]>("/people/assignable") : Promise.resolve([] as Assignable[]),
+    load<CustomerType[]>("/customer-types"),
   ]);
   const fmt = makeFormat(me.org);
   const filtered = Boolean(q || status || owner);
@@ -46,7 +47,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         actions={
           can(me, "customers.create") && (
             <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add company
+              Add customer
             </LinkButton>
           )
         }
@@ -61,7 +62,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
       <Filters
         search="Search by name, city or industry"
         selects={[
-          { name: "status", label: "Status", options: [{ value: "", label: "Any status" }, ...STATUSES] },
+          { name: "status", label: "Type", options: [{ value: "", label: "Any type" }, ...typeOptions(types)] },
           ...(me.role?.scope !== "own"
             ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "Everyone you can see" }, { value: "me", label: "Mine" }] }]
             : []),
@@ -98,7 +99,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                         </span>
                       </span>
                       <span>
-                        <StatusTag status={c.status} />
+                        <StatusTag status={c.status} types={types} />
                       </span>
                       <span className="truncate text-meta text-ink-2">{[c.city, c.country].filter(Boolean).join(", ") || "—"}</span>
                       <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
@@ -111,7 +112,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           )}
         </Sheet>
         {bulkAllowed && (
-          <RecordsBulk kind="companies" can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
+          <RecordsBulk kind="companies" types={types} can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
         )}
       </SelectionProvider>
       <Pager total={list.total} page={page} size={SIZE} base={`/companies${here.size ? `?${here}` : ""}`} />

@@ -1,0 +1,23 @@
+import { PageHeader } from "@/src/platform/ui/sheet";
+import { can } from "@/src/platform/lib/access";
+import { getCompanyMe, load } from "@/src/platform/lib/api";
+import type { CustomerType } from "@/src/platform/lib/types";
+import { CustomerTypesEditor } from "../components/admin/customer-types-editor";
+import { NoAccess } from "../components/admin/words";
+
+export const metadata = { title: "Customer types" };
+
+export default async function CustomerTypesPage() {
+  const me = await getCompanyMe();
+  if (!can(me, "admin.types")) return <NoAccess what="managing customer types" />;
+  const types = await load<CustomerType[]>("/customer-types");
+  return (
+    <>
+      <PageHeader title="Customer types">
+        What kind of customer a company is. The first one switched on is what a new company starts as. A type in use can be switched off
+        (the companies keep it) but not deleted.
+      </PageHeader>
+      <CustomerTypesEditor types={types} />
+    </>
+  );
+}

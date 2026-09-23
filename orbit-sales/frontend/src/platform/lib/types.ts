@@ -807,7 +807,12 @@ export type AuditLog = { items: AuditItem[]; more: boolean };
 // --- Customers and activities (Sales' own) ---------------------------------------
 
 export type Ref = { id: string; name: string };
-export type CompanyStatus = "prospect" | "customer" | "partner" | "inactive";
+/** A customer type's code ("prospect", "customer"...). The list is an administrator's to keep. */
+export type CompanyStatus = string;
+
+export type CustomerTypeColor = "gray" | "brand" | "green" | "blue" | "amber" | "red" | "purple" | "muted";
+
+export type CustomerType = { code: string; name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean; companies: number };
 export type Can = { edit: boolean; delete: boolean };
 
 export type CompanyRow = {
