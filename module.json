@@ -1,0 +1,31 @@
+{
+  "name": "inventory",
+  "label": "Inventory",
+  "icon": "inventory",
+  "what": "What the company sells, and what it costs.",
+  "state": "moved",
+  "screens": [
+    "Products",
+    "Prices",
+    "Promos",
+    "Bundles"
+  ],
+  "owns": [
+    "products",
+    "product_prices",
+    "price_types",
+    "division_pricing",
+    "division_price_types",
+    "promos",
+    "promo_products",
+    "promo_divisions",
+    "promo_tiers",
+    "bundles",
+    "bundle_items",
+    "bundle_divisions",
+    "pricing_settings",
+    "gl_issuers"
+  ],
+  "asks": {},
+  "api": "shared"
+}
