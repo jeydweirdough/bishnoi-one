@@ -6,7 +6,7 @@ import { api, ApiError } from "../lib/api";
 // browser here; someone not signed in gets the sign-in page first (proxy.ts),
 // then comes back. Orbit's API makes a one-time code for this person's
 // session, and only for an address registered to that app, and the browser
-// goes back with it. See orbit-core/backend/app/routers/sso.py.
+// goes back with it.
 
 function refuse(message: string, status = 400): Response {
   return new Response(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
