@@ -140,7 +140,7 @@ export function ContactForm({
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          {contact ? "Save changes" : "Add contact"}
+          {contact ? "Save changes" : "Add customer"}
         </Button>
         <LinkButton href={cancel} variant="quiet">
           Cancel

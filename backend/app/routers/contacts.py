@@ -131,7 +131,7 @@ def list_contacts(
     ids = [c.id for c in contacts]
     last = dict(
         db.execute(
-            select(Activity.contact_id, func.max(Activity.at)).where(Activity.contact_id.in_(ids), Activity.done_at.is_not(None)).group_by(Activity.contact_id)
+            select(Activity.contact_id, func.max(Activity.done_at)).where(Activity.contact_id.in_(ids), Activity.done_at.is_not(None)).group_by(Activity.contact_id)
         ).all()
     )
     return {"items": [contact_row(c, access, last.get(c.id)) for c in contacts], "total": total}

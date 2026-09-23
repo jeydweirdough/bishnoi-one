@@ -222,3 +222,26 @@ def test_changes_are_audited(client, crew, ana):
     log = client.get("/admin/audit", params={"limit": 3}, headers=ana).json()["items"]
     assert [e["action"] for e in log] == ["activity.completed", "activity.created", "company.updated"]
     assert sorted(log[2]["fields"]) == ["phone", "status"]
+
+
+# --- customer types ---
+
+
+def test_an_administrator_keeps_the_customer_types(client, crew, ana):
+    assert [t["code"] for t in client.get("/customer-types", headers=crew["ria"]).json()] == ["prospect", "customer", "partner", "inactive"]
+    assert client.post("/admin/customer-types", json={"name": "Distributor"}, headers=crew["max"]).status_code == 403
+    types = client.post("/admin/customer-types", json={"name": "Key account", "color": "amber"}, headers=ana).json()
+    key = next(t for t in types if t["name"] == "Key account")
+    assert key["code"] == "key_account" and key["isActive"]
+    assert client.post("/admin/customer-types", json={"name": "key ACCOUNT"}, headers=ana).status_code == 422
+
+    acme = company(client, crew["ria"], status="key_account")
+    assert acme["status"] == "key_account"
+    assert company(client, crew["ria"], "Beta")["status"] == "prospect"  # the first on the list
+    assert client.post("/companies", json={"name": "Gamma", "status": "nonsense"}, headers=crew["ria"]).status_code == 422
+
+    assert client.delete("/admin/customer-types/key_account", headers=ana).status_code == 409  # in use
+    client.patch("/admin/customer-types/key_account", json={"isActive": False, "name": "Key acct"}, headers=ana)
+    assert client.patch(f"/companies/{acme['id']}", json={"name": "Acme 2"}, headers=crew["ria"]).status_code == 200  # keeps its type
+    assert client.post("/companies", json={"name": "Delta", "status": "key_account"}, headers=crew["ria"]).status_code == 422  # not offered
+    assert client.delete("/admin/customer-types/partner", headers=ana).status_code == 204

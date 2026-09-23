@@ -44,7 +44,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
         actions={
           can(me, "customers.create") && (
             <LinkButton href="/contacts/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add contact
+              Add customer
             </LinkButton>
           )
         }

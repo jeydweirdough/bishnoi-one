@@ -16,8 +16,9 @@ from app.access import Access, require
 from app.api import Api, camel, changed, check_email, digits, duplicates_error, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser
-from app.models import COMPANY_STATUSES, Activity, Company, Contact
+from app.models import Activity, Company, Contact
 from app.routers.activities import activity_out
+from app.routers.customer_types import check_type, first_type
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -27,11 +28,10 @@ Create = Annotated[Access, Depends(require("customers.create"))]
 Edit = Annotated[Access, Depends(require("customers.edit"))]
 Delete = Annotated[Access, Depends(require("customers.delete"))]
 
-Status = Literal["prospect", "customer", "partner", "inactive"]
 
 
 class CompanyFields(Api):
-    status: Status | None = None
+    status: str | None = Field(None, max_length=40)
     industry: str | None = Field(None, max_length=80)
     website: str | None = Field(None, max_length=200)
     email: str | None = Field(None, max_length=254)
@@ -102,7 +102,7 @@ def list_companies(
     access: View,
     db: DB,
     q: str | None = Query(None, max_length=100),
-    status_: Status | None = Query(None, alias="status"),
+    status_: str | None = Query(None, alias="status", max_length=40),
     owner: str | None = Query(None, max_length=36, description="'me', or a person's id"),
     sort: Literal["name", "updated"] = "name",
     limit: int = Query(50, ge=1, le=200),
@@ -121,11 +121,10 @@ def list_companies(
     companies = db.scalars(query.order_by(*order).limit(limit).offset(offset)).unique().all()
     ids = [c.id for c in companies]
     contacts = dict(db.execute(select(Contact.company_id, func.count()).where(Contact.company_id.in_(ids)).group_by(Contact.company_id)).all())
-    last = dict(db.execute(select(Activity.company_id, func.max(Activity.at)).where(Activity.company_id.in_(ids), Activity.done_at.is_not(None)).group_by(Activity.company_id)).all())
+    last = dict(db.execute(select(Activity.company_id, func.max(Activity.done_at)).where(Activity.company_id.in_(ids), Activity.done_at.is_not(None)).group_by(Activity.company_id)).all())
     return {
         "items": [company_row(c, access, contacts.get(c.id, 0), last.get(c.id)) for c in companies],
         "total": total,
-        "statuses": list(COMPANY_STATUSES),
     }
 
 
@@ -159,6 +158,7 @@ def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> 
             raise duplicates_error("company", found)
     owner = owner_for(db, access, body.owner_id)
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
+    values["status"] = check_type(db, body.status) if body.status else first_type(db)
     company = Company(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
     db.add(company)
     db.flush()
@@ -199,7 +199,9 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
     if "name" in wanted and wanted["name"] is None:
         raise field_error("name", "Give the company a name.")
     if "status" in wanted and wanted["status"] is None:
-        raise field_error("status", "Pick a status.")
+        raise field_error("status", "Pick a type.")
+    if wanted.get("status") and wanted["status"] != company.status:
+        check_type(db, wanted["status"])
     if "owner_id" in wanted:
         owner = owner_for(db, access, wanted.pop("owner_id"))
         if owner.id != company.owner_id:

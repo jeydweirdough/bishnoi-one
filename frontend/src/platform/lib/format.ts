@@ -130,7 +130,8 @@ export function makeFormat(company: Company) {
       const diff = daysBetween(dayKey.format(at), today);
       if (diff === 0) return `Today, ${time.format(at)}`;
       if (diff === 1) return `Yesterday, ${time.format(at)}`;
-      if (diff < 7) return `${diff} days ago`;
+      if (diff === -1) return `Tomorrow, ${time.format(at)}`;
+      if (diff > 1 && diff < 7) return `${diff} days ago`;
       const sameYear = today.slice(0, 4) === dayKey.format(at).slice(0, 4);
       return (sameYear ? atDate : atDateYear).format(at);
     },

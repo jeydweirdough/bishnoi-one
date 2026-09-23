@@ -27,6 +27,7 @@ ACTION_LABELS = {
     "users": "Users",
     "roles": "Roles & permissions",
     "teams": "Teams",
+    "types": "Customer types",
     "audit": "Audit logs",
 }
 
@@ -57,7 +58,7 @@ AREAS: tuple[Area, ...] = (
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("automations", "Automations", "Insight & tools", ("view", "manage")),
     Area("integrations", "Integrations", "Insight & tools", ("view", "manage")),
-    Area("admin", "Administration", "Administration", ("users", "roles", "teams", "audit")),
+    Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "audit")),
 )
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())

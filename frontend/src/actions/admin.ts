@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { AdminUserRow, RoleRow, Scope, TeamRow } from "@/src/platform/lib/types";
+import type { AdminUserRow, CustomerType, CustomerTypeColor, RoleRow, Scope, TeamRow } from "@/src/platform/lib/types";
 
 // Administration: Sales' own users, roles and teams. The API checks each
 // permission and every rule (nobody left able to administer, a role in use
@@ -82,6 +82,29 @@ export async function updateTeam(id: string, change: Partial<TeamInput & { isAct
 export async function deleteTeam(id: string): Promise<Result> {
   return attempt(async () => {
     await api.del(`/admin/teams/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}
+
+// --- customer types ---
+
+export type CustomerTypeChange = Partial<{ name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean }>;
+
+/** A new type (no code yet), or a change to one. Answers with the whole list. */
+export async function saveCustomerType(code: string | null, change: CustomerTypeChange): Promise<Result<CustomerType[]>> {
+  return attempt(async () => {
+    const types = code
+      ? await api.patch<CustomerType[]>(`/admin/customer-types/${enc(code)}`, change)
+      : await api.post<CustomerType[]>("/admin/customer-types", change);
+    refresh();
+    return types;
+  });
+}
+
+export async function deleteCustomerType(code: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/admin/customer-types/${enc(code)}`);
     refresh();
     return null;
   });

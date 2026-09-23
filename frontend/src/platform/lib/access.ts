@@ -8,6 +8,7 @@ export const ADMIN_PAGES = [
   { href: "/admin/users", label: "Users", icon: "people", permission: "admin.users" },
   { href: "/admin/roles", label: "Roles & permissions", icon: "roles", permission: "admin.roles" },
   { href: "/admin/teams", label: "Teams", icon: "teams", permission: "admin.teams" },
+  { href: "/admin/customer-types", label: "Customer types", icon: "lists", permission: "admin.types" },
   { href: "/admin/audit", label: "Audit log", icon: "auditLog", permission: "admin.audit" },
 ] as const;
 

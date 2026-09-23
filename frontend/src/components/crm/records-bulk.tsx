@@ -8,9 +8,9 @@ import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, Input, Select } from "@/src/platform/ui/field";
 import { BulkBar, BulkStep, useBulkRun, useSelection } from "@/src/platform/bulk/selection";
 import { makeFormat, plural } from "@/src/platform/lib/format";
-import type { Assignable, CompanyStatus, Org } from "@/src/platform/lib/types";
+import type { Assignable, CompanyStatus, CustomerType, Org } from "@/src/platform/lib/types";
 import { bulkRecords, recordsMatching } from "../../actions/crm";
-import { STATUSES } from "./words";
+import { typeOptions } from "./words";
 
 type Step = "follow_up" | "status" | "owner" | null;
 
@@ -26,8 +26,11 @@ export function RecordsBulk({
   filters,
   total,
   org,
+  types = [],
 }: {
   kind: "companies" | "contacts";
+  /** The customer types a company can be set to (companies only). */
+  types?: CustomerType[];
   can: { followUp: boolean; edit: boolean; delete: boolean };
   people: Assignable[];
   /** The list's filters, for "select all that match". */
@@ -100,16 +103,16 @@ export function RecordsBulk({
         onCancel={() => setStep(null)}
         onSubmit={async (form) => {
           const status = String(form.get("status")) as CompanyStatus;
-          const label = STATUSES.find((x) => x.value === status)?.label.toLowerCase() ?? status;
-          await run({ doing: "Changing status", did: (n) => `${plural(n, ...noun)} now ${label}` }, (ids) =>
+          const label = types.find((x) => x.code === status)?.name.toLowerCase() ?? status;
+          await run({ doing: "Changing type", did: (n) => `${plural(n, ...noun)} now ${label}` }, (ids) =>
             bulkRecords(kind, ids, { action: "status", status }),
           );
         }}
       >
-        <Field label="Status" className="w-36">
+        <Field label="Type" className="w-44">
           {(p) => (
-            <Select {...p} name="status" defaultValue="customer" autoFocus>
-              {STATUSES.map((x) => (
+            <Select {...p} name="status" autoFocus>
+              {typeOptions(types).map((x) => (
                 <option key={x.value} value={x.value}>
                   {x.label}
                 </option>
@@ -160,7 +163,7 @@ export function RecordsBulk({
       )}
       {can.edit && kind === "companies" && (
         <Button size="sm" disabled={running} onClick={() => setStep("status")}>
-          Set status
+          Set type
         </Button>
       )}
       {can.edit && people.length > 1 && (
