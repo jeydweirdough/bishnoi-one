@@ -30,12 +30,21 @@ fi
 git pull --ff-only "$remote" main
 git fetch -q "$remote"
 
-# 1. App branches -> main
+# 1. App branches -> main, but only work pushed to the app branch itself.
+#    An app branch this script built (step 2) is main's own history split out:
+#    merging it back would bring the same changes in twice, and conflict with
+#    anything main has done since. So it's merged only when it has commits the
+#    split of main doesn't.
 for app in "${apps[@]}"; do
   if git show-ref -q --verify "refs/remotes/$remote/$app"; then
-    echo "==> merging $remote/$app into main"
-    git subtree merge -q --prefix="$app" "$remote/$app" \
-      -m "Merge $app branch into main"
+    split="$(git subtree split -q --prefix="$app" main)"
+    if git merge-base --is-ancestor "$remote/$app" "$split"; then
+      echo "==> $app: nothing new on its branch"
+    else
+      echo "==> merging $remote/$app into main"
+      git subtree merge -q --prefix="$app" "$remote/$app" \
+        -m "Merge $app branch into main"
+    fi
   fi
 done
 git push -q "$remote" main
