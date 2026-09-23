@@ -92,7 +92,7 @@ export const PROMO_KINDS: Record<PromoKind, string> = {
 };
 
 export const QUOTE_STATES: Record<Quote["state"], string> = {
-  waiting: "Waiting on Finance",
+  waiting: "Waiting for approval",
   ready: "Ready",
   rejected: "Rejected",
 };
@@ -118,7 +118,7 @@ export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
 };
 
 export function approvalReason(reason: ApprovalReason, quote: Pick<Quote, "priceTypeName">): string {
-  return reason === "price" ? `${quote.priceTypeName} needs Finance's approval` : "Discount is over the division's limit";
+  return reason === "price" ? `${quote.priceTypeName} needs approval` : "An extra discount is over the limit";
 }
 
 /** "10% off", "10.00 off each" in the company's money, "Buy 10, get 1 free", "5% from 20 · 8% from 50". */

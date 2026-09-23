@@ -5,8 +5,9 @@ import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, ContactDetail } from "@/src/platform/lib/types";
+import type { Assignable, Paged, Quote, ContactDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { QuotesPanel } from "../components/quotes-panel";
 import { ActivityList } from "../components/crm/activity-list";
 import { DeleteRecord } from "../components/crm/list-controls";
 import { LogActivity } from "../components/crm/log-activity";
@@ -26,7 +27,12 @@ export default async function ContactPage({ params }: { params: Params }) {
   const me = await getCompanyMe();
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
-  const [contact, people] = await Promise.all([load<ContactDetail>(`/contacts/${enc(id)}`), load<Assignable[]>("/people/assignable")]);
+  const seesQuotes = can(me, "quotes.view");
+  const [contact, people, quotes] = await Promise.all([
+    load<ContactDetail>(`/contacts/${enc(id)}`),
+    load<Assignable[]>("/people/assignable"),
+    seesQuotes ? load<Paged<Quote>>(`/quotes?contact=${enc(id)}&limit=20`) : null,
+  ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && contact.can.edit;
   const link = (href: string, text: string) => (
@@ -81,6 +87,12 @@ export default async function ContactPage({ params }: { params: Params }) {
               <div className="mt-3">
                 <LogActivity org={me.org} now={new Date().toISOString()} people={people} contactId={contact.id} companyId={contact.company?.id} />
               </div>
+            </Sheet>
+          )}
+          {quotes && (
+            <Sheet className="px-5 pt-4 pb-3">
+              <SectionTitle icon="quotes">Quotes{quotes.total > quotes.items.length ? ` (latest ${quotes.items.length} of ${quotes.total})` : ""}</SectionTitle>
+              <QuotesPanel customerHref={`/contacts/${contact.id}`} quotes={quotes.items} canAdd={can(me, "quotes.create")} />
             </Sheet>
           )}
           <Sheet className="px-5 pt-4 pb-2">

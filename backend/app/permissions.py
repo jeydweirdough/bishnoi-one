@@ -23,6 +23,7 @@ ACTION_LABELS = {
     "approve": "Approve",
     "export": "Export",
     "manage": "Manage",
+    "prices": "Set team prices",
     "users": "Users",
     "roles": "Roles & permissions",
     "teams": "Teams",
@@ -48,7 +49,7 @@ AREAS: tuple[Area, ...] = (
     Area("opportunities", "Opportunities", "Sales", CRUD),
     Area("deals", "Deals", "Sales", CRUD),
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "Sales", CRUD),
-    Area("products", "Products & services", "Catalogue & paperwork", CRUD),
+    Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices")),
     Area("quotes", "Quotes", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("contracts", "Contracts", "Catalogue & paperwork", CRUD),
@@ -98,6 +99,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "contracts", "documents")
             | _grant("quotes", "orders", actions=("approve",))
             | _grant("dashboard", "products", actions=("view",))
+            | _grant("products", actions=("prices",))
             | _grant("reports", actions=("view", "export"))
             | _grant("automations", "integrations", actions=("view",))
         ),
@@ -109,6 +111,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         frozenset(
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "documents")
             | _grant("dashboard", "products", "contracts", actions=("view",))
+            | _grant("products", actions=("prices",))
             | _grant("reports", actions=("view",))
         ),
     ),

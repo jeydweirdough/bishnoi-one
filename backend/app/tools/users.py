@@ -25,9 +25,20 @@ from sqlalchemy.orm import Session
 from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
-from app.demo import DEMO_ACCOUNTS, DEMO_ACTIVITIES, DEMO_COMPANIES, DEMO_CONTACTS, DEMO_PASSWORD
+from app.demo import (
+    DEMO_ACCOUNTS,
+    DEMO_ACTIVITIES,
+    DEMO_BUNDLES,
+    DEMO_COMPANIES,
+    DEMO_CONTACTS,
+    DEMO_ISSUERS,
+    DEMO_PASSWORD,
+    DEMO_PRICE_TYPES,
+    DEMO_PRODUCTS,
+    DEMO_PROMOS,
+)
 from app.migrate import upgrade
-from app.models import PLANNED_KINDS, Activity, Company, Contact, Role, Team, User
+from app.models import PLANNED_KINDS, Activity, Bundle, Company, Contact, Issuer, PriceType, Product, ProductPrice, Promo, Role, Team, User
 from app.permissions import ADMINISTRATOR
 from app.security import check_password_rules, hash_password
 
@@ -89,6 +100,39 @@ def make_demo(db: Session) -> None:
     db.commit()
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
     make_demo_records(db)
+    make_demo_catalogue(db)
+
+
+def make_demo_catalogue(db: Session) -> None:
+    """Price types, issuers, products with prices, promos and bundles. Only
+    into a database with no products yet."""
+    if db.scalar(select(func.count()).select_from(Product)):
+        print("Demo catalogue: skipped, there are products already.")
+        return
+    for n, (code, name, entry, rule, notes, approval) in enumerate(DEMO_PRICE_TYPES):
+        if db.get(PriceType, code) is None:
+            db.add(PriceType(code=code, name=name, entry=entry, rule=rule, requires_notes=notes, needs_approval=approval, sort_order=n))
+    for code, name in DEMO_ISSUERS:
+        if db.get(Issuer, code) is None:
+            db.add(Issuer(code=code, name=name))
+    db.flush()
+    listed = [t[0] for t in DEMO_PRICE_TYPES if t[2] == "list"]
+    products: dict[str, Product] = {}
+    for code, name, generic, strength, form, unit, pesos in DEMO_PRODUCTS:
+        products[code] = Product(
+            code=code, name=name, generic_name=generic, strength=strength or None, form=form, unit=unit,
+            prices=[ProductPrice(price_type_code=t, amount_centavos=p * 100) for t, p in zip(listed, pesos, strict=True)],
+        )
+    db.add_all(products.values())
+    db.flush()
+    for name, kind, terms, codes in DEMO_PROMOS:
+        db.add(Promo(name=name, kind=kind, product_ids=[products[c].id for c in codes] if codes else None, **terms))
+    for code, name, pesos, one_line, items in DEMO_BUNDLES:
+        db.add(Bundle(code=code, name=name, price_centavos=pesos * 100, as_one_line=one_line, items=[{"productId": products[c].id, "qty": q} for c, q in items]))
+    summary = f"{len(DEMO_PRICE_TYPES)} price types, {len(products)} products, {len(DEMO_PROMOS)} promos, {len(DEMO_BUNDLES)} bundles"
+    audit(db, TOOL, "demo.catalogue_made", target=summary)
+    db.commit()
+    print(f"Demo catalogue: {summary}.")
 
 
 def make_demo_records(db: Session) -> None:

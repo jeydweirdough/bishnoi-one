@@ -21,7 +21,7 @@ def role_id(db, name: str) -> str:
 @pytest.fixture
 def app(tmp_path):
     attempts.clear()
-    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}", files_dir=tmp_path / "files")
     app = create_app(settings)
     with app.state.sessions() as db:
         db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Administrator")))

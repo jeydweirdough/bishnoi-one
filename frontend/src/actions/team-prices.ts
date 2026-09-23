@@ -9,12 +9,11 @@ import type { TeamPriceInput, TeamPrices } from "@/src/platform/lib/types";
 // list. The API checks on every one of these that the caller may price that
 // team, and writes each change to the audit log.
 
-const sheetPath = (division: string, team: string, part = "") =>
-  `/sales/prices${part}?division=${enc(division)}&team=${enc(team)}`;
+const sheetPath = (team: string, part = "") => `/prices${part}?team=${enc(team)}`;
 
-/** One team's sheet. Only the team being looked at is fetched, so a division with many teams stays light. */
-export async function loadTeamPrices(division: string, team: string): Promise<Result<TeamPrices>> {
-  return attempt(() => api.get<TeamPrices>(sheetPath(division, team)));
+/** One team's sheet. Only the team being looked at is fetched, so many teams stay light. */
+export async function loadTeamPrices(team: string): Promise<Result<TeamPrices>> {
+  return attempt(() => api.get<TeamPrices>(sheetPath(team)));
 }
 
 /**
@@ -23,16 +22,15 @@ export async function loadTeamPrices(division: string, team: string): Promise<Re
  * ends up showing exactly what the API now holds.
  */
 export async function saveTeamPrices(
-  division: string,
   team: string,
   changes: { codes?: string[]; items?: TeamPriceInput[] },
 ): Promise<Result<TeamPrices>> {
   return attempt(async () => {
     let sheet: TeamPrices | null = null;
-    if (changes.codes) sheet = await api.put<TeamPrices>(sheetPath(division, team, "/types"), { codes: changes.codes });
-    if (changes.items?.length) sheet = await api.put<TeamPrices>(sheetPath(division, team), { items: changes.items });
+    if (changes.codes) sheet = await api.put<TeamPrices>(sheetPath(team, "/types"), { codes: changes.codes });
+    if (changes.items?.length) sheet = await api.put<TeamPrices>(sheetPath(team), { items: changes.items });
     // Reps quote from these, so anything else this session has open should agree.
     refresh();
-    return sheet ?? (await api.get<TeamPrices>(sheetPath(division, team)));
+    return sheet ?? (await api.get<TeamPrices>(sheetPath(team)));
   });
 }

@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FileInput, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
-import { createQuote, previewQuote, type QuoteInput } from "../actions/sales";
+import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/sales";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { promoTerms } from "@/src/platform/lib/labels";
 import type { Org, PriceList, QuotePreview } from "@/src/platform/lib/types";
@@ -84,7 +84,7 @@ function discountOf(fmt: Format, l: LineDraft): ManualDiscount {
   return value ? { kind: l.discountKind, value } : null;
 }
 
-export function QuoteForm({ customerId, priceList, org }: { customerId: string; priceList: PriceList; org: Org }) {
+export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: PriceList; org: Org }) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const always = priceList.priceTypes.filter((t) => t.rule === "always");
@@ -126,7 +126,7 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
     }
     timer.current = setTimeout(async () => {
       const ask = ++asked.current;
-      const result = await previewQuote(customerId, input);
+      const result = await previewQuote(to, input);
       if (ask !== asked.current) return; // a newer change is on its way
       if (result.ok) {
         setPreview(result.data);
@@ -189,14 +189,14 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
     form.set("quote", JSON.stringify(toInput(fmt, draft, entered, letter)));
     if (withLetter && file) form.set("letterFile", file);
     startSave(async () => {
-      const result = await createQuote(customerId, form);
+      const result = await createQuote(to, form);
       if (!result.ok) {
         setError(result.error);
         setFields(result.fields ?? {});
         return;
       }
       toast.success("Quote saved", {
-        description: preview?.approvalReasons.length || withLetter ? "It's with Finance now." : undefined,
+        description: preview?.approvalReasons.length || withLetter ? "It's waiting for an approver now." : undefined,
       });
       router.push(`/quotes/${result.data.id}`);
       router.refresh();
@@ -206,7 +206,7 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
   if (!priceList.usesPriceList || priceList.priceTypes.length === 0) {
     return (
       <p className="text-ink-2">
-        This division has no prices to quote with yet. An admin sets them in Settings → Pricing rules.
+        There are no prices to quote with yet. Whoever keeps the catalogue sets them up in Products → Pricing rules.
       </p>
     );
   }
@@ -247,7 +247,7 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
               {offered.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.name}
-                  {t.needsApproval ? " (Finance approves)" : ""}
+                  {t.needsApproval ? " (needs approval)" : ""}
                 </option>
               ))}
             </Select>
@@ -493,7 +493,7 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
       </div>
       {preview && preview.approvalReasons.length > 0 && (
         <p className="animate-reshape rounded-[3px] bg-hema-tint px-3 py-2 text-meta text-ink-2">
-          Finance approves this quote before it goes out:{" "}
+          An approver checks this quote before it goes out:{" "}
           {preview.approvalReasons
             .map((r) => (r === "price" ? `${priceType?.name} needs approval` : `extra discounts are over ${percent(priceList.discountApprovalBp)}`))
             .join(", and ")}
@@ -550,7 +550,7 @@ export function QuoteForm({ customerId, priceList, org }: { customerId: string; 
         <div className="min-w-0">
           <p className="text-meta text-ink-3">Total</p>
           <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.totalCentavos) : "—"}</p>
-          {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes to Finance for approval</p>}
+          {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes for approval</p>}
         </div>
         <Button type="submit" variant="primary" loading={saving} className="!h-10 !px-6">
           Save quote

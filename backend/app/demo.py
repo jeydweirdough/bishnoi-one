@@ -94,3 +94,41 @@ DEMO_ACTIVITIES: tuple[tuple[str, str | None, str, str, int, bool], ...] = (
     ("Department of Health – Region IV-A", "Arturo", "task", "Prepare bid documents", 6, False),
     ("Department of Health – Region IV-A", None, "note", "Bid opening moved to next month", -7, True),
 )
+
+
+# The catalogue quotes are priced from (only when there are no products yet).
+# code, name, entry, rule, requires notes, needs approval
+DEMO_PRICE_TYPES: tuple[tuple[str, str, str, str, bool, bool], ...] = (
+    ("PATIENT", "Patient Price", "list", "always", False, False),
+    ("TRADE", "Drugstore/Hospital Price", "list", "always", False, False),
+    ("DOCTOR", "Doctor's Price", "list", "with_rx", False, False),
+    ("SPECIAL", "Special Price", "entered", "always", True, True),
+)
+
+# code, name
+DEMO_ISSUERS: tuple[tuple[str, str], ...] = (("DSWD", "DSWD"), ("PCSO", "PCSO"), ("MAYOR", "Office of the Mayor"))
+
+# code, name, generic name, strength, form, unit, prices in pesos (PATIENT, TRADE, DOCTOR)
+DEMO_PRODUCTS: tuple[tuple[str, str, str, str, str, str, tuple[int, int, int]], ...] = (
+    ("AMX-500", "Amoxil", "Amoxicillin", "500 mg", "Capsule", "box of 100", (1450, 1180, 1300)),
+    ("CTZ-10", "Cetrin", "Cetirizine", "10 mg", "Tablet", "box of 100", (980, 760, 870)),
+    ("PCM-SYR", "Tempra Syrup", "Paracetamol", "250 mg/5 mL", "Syrup", "bottle 60 mL", (165, 128, 150)),
+    ("MTF-500", "Glucophage", "Metformin", "500 mg", "Tablet", "box of 100", (1250, 990, 1120)),
+    ("ALP-5", "Norvasc", "Amlodipine", "5 mg", "Tablet", "box of 30", (1890, 1520, 1700)),
+    ("OMP-20", "Losec", "Omeprazole", "20 mg", "Capsule", "box of 30", (1320, 1050, 1190)),
+    ("ORS-SACH", "Hydrite", "Oral rehydration salts", "", "Sachet", "box of 25", (310, 240, 280)),
+    ("VTC-500", "Poten-Cee", "Ascorbic acid", "500 mg", "Tablet", "box of 100", (720, 560, 650)),
+)
+
+# name, kind, terms, product codes (None: every product)
+DEMO_PROMOS: tuple[tuple[str, str, dict, tuple[str, ...] | None], ...] = (
+    ("Flu season 10% off", "percent", {"percent_bp": 1000}, ("CTZ-10", "PCM-SYR", "VTC-500")),
+    ("Buy 10, get 1", "free_goods", {"buy_qty": 10, "free_qty": 1}, ("AMX-500", "OMP-20")),
+    ("Volume discount", "tiered", {"tiers": [{"minQty": 20, "percentBp": 300}, {"minQty": 50, "percentBp": 500}]}, None),
+)
+
+# code, name, set price in pesos, as one line, (product code, qty)...
+DEMO_BUNDLES: tuple[tuple[str, str, int, bool, tuple[tuple[str, int], ...]], ...] = (
+    ("KIDS-KIT", "Pedia fever kit", 900, True, (("PCM-SYR", 4), ("ORS-SACH", 1))),
+    ("MAINT-3", "Maintenance trio", 4200, False, (("MTF-500", 1), ("ALP-5", 1), ("OMP-20", 1))),
+)

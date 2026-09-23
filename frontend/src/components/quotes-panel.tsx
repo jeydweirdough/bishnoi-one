@@ -6,9 +6,10 @@ import { QuoteStateMark } from "@/src/platform/ui/marks";
 import { orgFormat } from "@/src/platform/lib/org";
 import type { Quote } from "@/src/platform/lib/types";
 
-/** A customer's quotes, newest first. */
-export async function QuotesPanel({ customerId, quotes, today, canAdd }: { customerId: string; quotes: Quote[]; today: string; canAdd: boolean }) {
+/** A company's or contact's quotes, newest first. `customerHref` is its page. */
+export async function QuotesPanel({ customerHref, quotes, canAdd, showWho = false }: { customerHref: string; quotes: Quote[]; canAdd: boolean; showWho?: boolean }) {
   const fmt = await orgFormat();
+  const today = fmt.todayKey();
   return (
     <div>
       {quotes.length === 0 ? (
@@ -23,6 +24,7 @@ export async function QuotesPanel({ customerId, quotes, today, canAdd }: { custo
                 </Link>
                 <p className="text-meta text-ink-3">
                   {fmt.whenLabel(q.createdAt, today)} · {q.priceTypeName}
+                  {showWho && q.contact && ` · ${q.contact.name}`}
                   {q.rx && " · Rx"}
                   {q.payerName && ` · ${q.payerName} letter`}
                 </p>
@@ -34,7 +36,7 @@ export async function QuotesPanel({ customerId, quotes, today, canAdd }: { custo
                     answer comes from the API per quote — the same one the
                     quote's own page asks. */}
                 {q.can.delete && (
-                  <DeleteQuote id={q.id} number={q.number} customerId={customerId} stay size="sm" />
+                  <DeleteQuote id={q.id} number={q.number} stay size="sm" />
                 )}
               </div>
             </li>
@@ -43,7 +45,7 @@ export async function QuotesPanel({ customerId, quotes, today, canAdd }: { custo
       )}
       {canAdd && (
         <LinkButton
-          href={`/customers/${customerId}/quotes/new`}
+          href={`${customerHref}/quotes/new`}
           size="sm"
           variant="quiet"
           className="mt-1 -ml-3"

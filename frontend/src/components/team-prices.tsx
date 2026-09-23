@@ -17,7 +17,6 @@ import type { Org, TeamPriceInput, TeamPriceType, TeamPrices, TeamPricedProduct 
 // there is no floor and no approval, which is why nothing here argues with a
 // number or asks twice.
 
-type Team = { code: string; name: string };
 /** A team's unsaved sheet: which price types it quotes with, and what it charges, as typed. */
 type Draft = { chosen: string[]; amounts: Record<string, string> };
 
@@ -33,7 +32,7 @@ function toDraft(fmt: Format, sheet: TeamPrices): Draft {
   };
 }
 
-/** What a team actually quotes with: the ones it ticked, or the division's whole list when it ticked none. */
+/** What a team actually quotes with: the ones it ticked, or every one when it ticked none. */
 function quoting(sheet: TeamPrices, chosen: string[]): TeamPriceType[] {
   return chosen.length ? sheet.priceTypes.filter((t) => chosen.includes(t.code)) : sheet.priceTypes;
 }
@@ -48,11 +47,8 @@ function describe(t: TeamPriceType): string {
     .join(" · ");
 }
 
-/** A team a lead prices, and the division it belongs to: a team code is only
- *  unique inside one, and a lead may lead teams in more than one division. */
-export type PricedTeam = Team & { division: string; divisionName: string };
-
-const keyOf = (t: { division: string; code: string }) => `${t.division}:${t.code}`;
+/** A team this person may set prices for. */
+export type PricedTeam = { id: string; name: string };
 
 export function TeamPricesEditor({
   teams,
@@ -64,7 +60,7 @@ export function TeamPricesEditor({
   org: Org;
 }) {
   const fmt = makeFormat(org);
-  const [team, setTeam] = useState(keyOf({ division: initial.division, code: initial.team }));
+  const [team, setTeam] = useState(initial.team);
   // Each team's sheet is fetched the first time it's picked and kept, so
   // switching back and forth doesn't cost a wait or lose what was typed.
   const [sheets, setSheets] = useState<Record<string, TeamPrices>>(() => ({ [team]: initial }));
@@ -82,19 +78,18 @@ export function TeamPricesEditor({
     const base = toDraft(fmt, there);
     return !same(typed.chosen, base.chosen) || Object.keys(typed.amounts).some((k) => typed.amounts[k] !== base.amounts[k]);
   };
-  const picked = teams.find((t) => keyOf(t) === team);
+  const picked = teams.find((t) => t.id === team);
   const teamName = picked?.name ?? team;
-  const divisionName = picked?.divisionName ?? "";
   const forget = () => setDrafts((all) => ({ ...all, [team]: undefined }));
 
   function pick(key: string) {
     setTeam(key);
     setError(null);
     if (sheets[key]) return;
-    const wanted = teams.find((t) => keyOf(t) === key);
+    const wanted = teams.find((t) => t.id === key);
     if (!wanted) return;
     startLoad(async () => {
-      const result = await loadTeamPrices(wanted.division, wanted.code);
+      const result = await loadTeamPrices(wanted.id);
       if (!result.ok) return setError(result.error);
       setSheets((all) => ({ ...all, [key]: result.data }));
     });
@@ -104,25 +99,20 @@ export function TeamPricesEditor({
     <PickList
       title="Your teams"
       icon="teams"
-      // Across divisions, the division's name is what tells two teams apart.
-      items={teams.map((t) => ({
-        key: keyOf(t),
-        label: new Set(teams.map((x) => x.division)).size > 1 ? `${t.divisionName} · ${t.name}` : t.name,
-        unsaved: dirtyIn(keyOf(t)),
-      }))}
+      items={teams.map((t) => ({ key: t.id, label: t.name, unsaved: dirtyIn(t.id) }))}
       selected={team}
       onSelect={pick}
     />
   );
 
-  // A division an Admin hasn't set up to quote from a price list has
-  // nothing for a lead to price. Say so rather than showing an empty table.
+  // With no price types set up there is nothing for a lead to price. Say so
+  // rather than showing an empty table.
   if (sheet && sheet.priceTypes.length === 0) {
     return (
       <Sheet>
-        <Empty icon="pricing" title="Your division doesn't quote from a price list yet">
-          An admin sets that up in Settings → Pricing. Until then {divisionName} quotes with no price list, so there is
-          nothing for {teams.length > 1 ? "your teams" : teamName} to charge over.
+        <Empty icon="pricing" title="There's no price list yet">
+          Whoever keeps the catalogue sets up price types in Products → Pricing rules. Until then there is nothing for{" "}
+          {teams.length > 1 ? "your teams" : teamName} to charge over.
         </Empty>
       </Sheet>
     );
@@ -140,9 +130,7 @@ export function TeamPricesEditor({
           <TeamSheet
             key={team}
             fmt={fmt}
-            division={picked?.division ?? ""}
-            divisionName={divisionName}
-            team={picked?.code ?? ""}
+            team={team}
             teamName={teamName}
             sheet={sheet}
             saved={saved}
@@ -164,8 +152,6 @@ export function TeamPricesEditor({
 
 function TeamSheet({
   fmt,
-  division,
-  divisionName,
   team,
   teamName,
   sheet,
@@ -177,8 +163,6 @@ function TeamSheet({
   onSaved,
 }: {
   fmt: Format;
-  division: string;
-  divisionName: string;
   team: string;
   teamName: string;
   sheet: TeamPrices;
@@ -212,7 +196,7 @@ function TeamSheet({
     if (Object.keys(found).length) return setError("Some amounts need a look.");
     const codes = same(draft.chosen, saved.chosen) ? undefined : draft.chosen;
     start(async () => {
-      const result = await saveTeamPrices(division, team, { codes, items });
+      const result = await saveTeamPrices(team, { codes, items });
       if (!result.ok) return setError(result.error);
       setError(null);
       onSaved(result.data);
@@ -225,8 +209,7 @@ function TeamSheet({
       <Sheet className="max-w-[54rem] px-5 pt-4 pb-5">
         <SectionTitle icon="pricing">Prices {teamName} quotes with</SectionTitle>
         <p className="text-meta text-ink-3">
-          Which of {divisionName}&apos;s prices your reps may pick on a quote. Tick none and the team follows {divisionName}: it quotes
-          with all of them.
+          Which prices your reps may pick on a quote. Tick none and the team quotes with all of them.
         </p>
         <ul className="mt-3 divide-y divide-rule border-y border-rule">
           {sheet.priceTypes.map((t) => {
@@ -245,7 +228,7 @@ function TeamSheet({
           })}
         </ul>
         {draft.chosen.length === 0 && (
-          <p className="mt-2.5 text-meta text-ink-2">Nothing ticked, so {teamName} follows {divisionName} and quotes with all of them.</p>
+          <p className="mt-2.5 text-meta text-ink-2">Nothing ticked, so {teamName} quotes with all of them.</p>
         )}
       </Sheet>
 

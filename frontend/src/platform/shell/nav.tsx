@@ -52,21 +52,23 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 /** Above every company, so not a company's to grant. */
 const develops = (me: Me) => me.isDeveloperAdmin;
 
-/** The sales workspace: one set of pages over every division a person sells in. */
-function salesPages(sales: ModuleAccess[]): Page[] {
+/** Sales' own pages. Each shows only for a role that may open it. */
+function salesPages(me: Me): Page[] {
+  const may = (permission: string) => me.permissions?.includes(permission) ?? false;
   return [
     // The Sales app opens on its overview; in the shell that screen is a page
     // of its own, because the shell's own root is the dashboard.
     { href: THIS_APP === "sales" ? "/" : "/overview", label: "Overview", icon: "overview" },
-    // Customers are companies and the contacts in them; a quote is opened from
-    // its customer, so both count as being in Customers.
-    { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/quotes", "/customers"] },
+    // Customers are companies and the contacts in them.
+    { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] },
+    ...(may("quotes.view") ? [{ href: "/quotes", label: "Quotes", icon: "quotes" as const }] : []),
     { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
     { href: "/activities", label: "Activities", icon: "activity" },
     { href: "/retention", label: "Retention", icon: "retention" },
+    ...(may("products.view") ? [{ href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/pricing"] }] : []),
     // Only the leads who set what a team charges; a rep quoting from those
     // prices has no use for the page.
-    ...(sales.some((m) => m.actions.includes("prices")) ? [{ href: "/prices", label: "Prices", icon: "pricing" as const }] : []),
+    ...(may("products.prices") ? [{ href: "/prices", label: "Prices", icon: "pricing" as const }] : []),
   ];
 }
 
@@ -530,7 +532,7 @@ function Links({ me }: { me: Me }) {
           same pages whether you sell in one of the seven or all of them. */}
       {sales.length > 0 && isOurs("sales") && (
         <Group label="Sales">
-          {salesPages(sales).map((page) => (
+          {salesPages(me).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
               {page.label}
             </Row>
@@ -628,8 +630,7 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  const sales = me.modules.filter((x) => x.kind === "sales");
-  return salesPages(sales).find((p) => isCurrent(p, pathname, false))?.label ?? null;
+  return salesPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }
 
 function Account({ me }: { me: Me }) {
