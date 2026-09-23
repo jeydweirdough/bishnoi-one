@@ -3,13 +3,14 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { platformHome } from "./apps";
+import { SESSION_COOKIE } from "./session-cookie";
 import type { Me, Org } from "./types";
 
 // The browser never talks to the API. Pages and server actions call it from
 // the Next server with the token kept in an httpOnly cookie, so the token
 // never reaches browser scripts.
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
-export const SESSION_COOKIE = "crm_session";
+export { SESSION_COOKIE };
 
 export class ApiError extends Error {
   constructor(

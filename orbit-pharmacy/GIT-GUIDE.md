@@ -55,12 +55,17 @@ pushes go to `main`.
 cd backend
 cp .env.example .env
 uv sync
+uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
 uv run main.py
 ```
 
 Serves on **http://127.0.0.1:8307** (interactive docs at `/docs`). Its database
 is set by `DATABASE_URL` in `.env`: SQLite in `backend/.data/` unless you
 change it. Tests: `uv run pytest`.
+
+The app has **its own sign-in**: accounts live in its own database and sign in
+to this app only. There is no sign-up page. Make accounts with
+`uv run python -m app.tools.users` (see `backend/README.md`).
 
 **Screens** (`frontend/`): a placeholder, with no screens or `dev` script yet.
 See `frontend/README.md` for what it's meant to become. Port **4307** is

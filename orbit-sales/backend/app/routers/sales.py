@@ -1,4 +1,8 @@
-"""Sales's endpoints. Add them here, under /sales."""
+"""Sales's endpoints. Add them here, under /sales.
+
+Anything that needs a signed-in person takes `user: CurrentUser` (or
+`AdminUser` for this app's admins) from app.deps.
+"""
 
 from fastapi import APIRouter
 

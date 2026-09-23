@@ -276,6 +276,17 @@ uv run main.py                      npm run dev
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
 | Licensing, Pharmacy, Regulatory | (not built) | 8306, 8307, 8308 |
 
+**Each app has its own sign-in.** Its accounts live in its own database and
+sign in to that app only, and each app's screens keep their own cookie, so
+being signed in to one app doesn't sign you in (or out) of another. There is
+no sign-up page. Make the first account in each app's `backend/`:
+
+```
+uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
+```
+
+`list`, `password`, `disable` and `enable` manage them afterwards.
+
 Each API's database comes from `DATABASE_URL` in its own `backend/.env`
 (SQLite in `backend/.data/` by default). To try an app against test data,
 point that at a test database; nothing else changes. Each API has its
