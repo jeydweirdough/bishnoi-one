@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
-from app.db import create_tables, make_engine, make_sessions
-from app.routers import auth, sales
+from app.db import make_engine, make_sessions
+from app.migrate import upgrade
+from app.routers import admin, auth, sales
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -25,7 +26,7 @@ SECURITY_HEADERS = {
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
-    create_tables(engine)
+    upgrade(engine)
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
@@ -54,5 +55,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"ok": True, "app": "sales"}
 
     app.include_router(auth.router)
+    app.include_router(admin.router)
     app.include_router(sales.router)
     return app

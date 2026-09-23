@@ -9,6 +9,7 @@ import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
+import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
 
@@ -534,6 +535,17 @@ function Links({ me }: { me: Me }) {
           ))}
         </Group>
       )}
+      {/* Sales' own Administration: its users, roles, teams and audit log,
+          each page only for a role that may open it. */}
+      {THIS_APP === "sales" && adminPagesFor(me).length > 0 && (
+        <Group label="Administration">
+          {adminPagesFor(me).map((page) => (
+            <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href)}>
+              {page.label}
+            </Row>
+          ))}
+        </Group>
+      )}
       {departments.some(serves) && (
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
@@ -596,6 +608,10 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
+  if (THIS_APP === "sales" && within(pathname, "/admin")) {
+    const page = adminPagesFor(me).find((p) => within(pathname, p.href));
+    return page ? `Administration · ${page.label}` : "Administration";
+  }
   if (within(pathname, "/settings")) {
     const page = settingsFor(me).flatMap((g) => g.pages).find((p) => !isAway(p.href) && within(pathname, p.href));
     return page ? `Settings · ${page.label}` : "Settings";

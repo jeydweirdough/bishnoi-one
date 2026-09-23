@@ -124,6 +124,11 @@ export type Me = {
    *  grant it; it is set on the platform (api app/platform.py). */
   isDeveloperAdmin: boolean;
   modules: ModuleAccess[];
+  /** Sales' own access (its Administration): the person's role, team, and
+   *  every permission the role gives, as "area.action". */
+  role?: { id: string; name: string; scope: Scope };
+  team?: { id: string; name: string } | null;
+  permissions?: string[];
   // The company's own words for its customers, its activities and how a call went.
   // Only the switched-on ones: a record holding a switched-off code falls back to the code.
   lists: CompanyLists;
@@ -736,3 +741,63 @@ export type AuditEntry = { id: string; at: string; actor: string; action: string
 export type AuditPage = { items: AuditEntry[]; more: boolean };
 
 export type AppModule = RolesPayload["modules"][number];
+
+// --- Administration (Sales' own users, roles, teams and audit log) -------------
+
+/** Whose records a role's permissions reach. */
+export type Scope = "own" | "team" | "all";
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  role: { id: string; name: string; scope: Scope };
+  team: { id: string; name: string } | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+};
+
+export type PermissionArea = {
+  key: string;
+  name: string;
+  group: string;
+  actions: { key: string; label: string; permission: string }[];
+};
+
+export type RoleRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  scope: Scope;
+  isSystem: boolean;
+  permissions: string[];
+  userCount: number;
+};
+
+export type RolesData = {
+  roles: RoleRow[];
+  catalogue: PermissionArea[];
+  scopes: { key: Scope; label: string }[];
+};
+
+/** What a person can be given: for whoever manages users, who may not manage roles or teams. */
+export type UserOptions = {
+  roles: { id: string; name: string; description: string | null; scope: Scope }[];
+  teams: { id: string; name: string; isActive: boolean }[];
+};
+
+export type TeamRow = { id: string; name: string; description: string | null; isActive: boolean; memberCount: number };
+
+export type AuditItem = {
+  id: number;
+  at: string;
+  actor: string;
+  actorId: string | null;
+  action: string;
+  target: string;
+  targetType: string | null;
+  fields: string[];
+};
+
+export type AuditLog = { items: AuditItem[]; more: boolean };
