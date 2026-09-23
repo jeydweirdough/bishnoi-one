@@ -1,0 +1,20 @@
+{
+  "name": "finance",
+  "label": "Finance",
+  "icon": "finance",
+  "what": "The money side of a quote.",
+  "state": "moved",
+  "screens": [
+    "Overview",
+    "Approvals",
+    "Guarantee letters",
+    "Letter payments"
+  ],
+  "owns": [
+    "the approval trail on a quote"
+  ],
+  "asks": {
+    "sales": "which quotes need deciding?"
+  },
+  "api": "shared"
+}
