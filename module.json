@@ -1,0 +1,21 @@
+{
+  "name": "in-licensing",
+  "label": "In-Licensing",
+  "icon": "inlicensing",
+  "what": "Products being taken on from a principal.",
+  "state": "to-build",
+  "screens": [
+    "Principals",
+    "Under negotiation",
+    "Agreements & their dates"
+  ],
+  "owns": [
+    "principals",
+    "agreements",
+    "renewal dates"
+  ],
+  "asks": {
+    "inventory": "once a deal lands, the product exists"
+  },
+  "api": "shared"
+}
