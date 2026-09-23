@@ -1,6 +1,6 @@
 # Orbit
 
-Orbit is a set of separate web apps (Admin, Sales, Finance, Inventory, and
+Orbit is a set of separate web apps (Admin, CRM, Finance, Inventory, and
 more) kept in one GitHub repo. This page shows you how to:
 
 - get the code onto your computer
@@ -43,7 +43,7 @@ and sign-in.
 ```
 orbit/
 ├── orbit-admin/          screens :4300   API :8300
-├── orbit-sales/          screens :4302   API :8302
+├── orbit-crm/            screens :4302   API :8302
 ├── orbit-finance/        screens :4303   API :8303
 ├── orbit-inventory/      screens :4304   API :8304
 ├── orbit-platform/       screens :4305   API :8305
@@ -57,7 +57,7 @@ orbit/
 | Branch | What's in it |
 |---|---|
 | `main` | **Everything**: every app, each in its own folder |
-| `orbit-admin`, `orbit-sales`, `orbit-finance`, … | **One app only**, named after it |
+| `orbit-admin`, `orbit-crm`, `orbit-finance`, … | **One app only**, named after it |
 
 An app branch holds the same files as that app's folder on `main`. You can
 work on either one; GitHub keeps them matched for you
@@ -110,14 +110,14 @@ projects, then pick **one** option.
 
 ### Option A: One app (most people)
 
-Use this if you work on a single app. Example for Sales:
+Use this if you work on a single app. Example for CRM:
 
 ```
-git clone -b orbit-sales --single-branch https://github.com/jeydweirdough/orbit.git orbit-sales
-cd orbit-sales
+git clone -b orbit-crm --single-branch https://github.com/jeydweirdough/orbit.git orbit-crm
+cd orbit-crm
 ```
 
-For another app, replace **both** `orbit-sales`s with its branch name
+For another app, replace **both** `orbit-crm`s with its branch name
 (`orbit-admin`, `orbit-finance`, …). You get only that app, with `frontend/`
 and `backend/` right at the top.
 
@@ -233,7 +233,7 @@ pulled, and you can ask for help.
 ## 5. Run an app
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
-into the app's folder (`cd orbit-sales`).
+into the app's folder (`cd orbit-crm`).
 
 **Terminal 1: the API**
 
@@ -256,7 +256,7 @@ Then open the screens in your browser:
 | App | Screens | API |
 |---|---|---|
 | Admin | http://localhost:4300 | http://127.0.0.1:8300 |
-| Sales | http://localhost:4302 | http://127.0.0.1:8302 |
+| CRM | http://localhost:4302 | http://127.0.0.1:8302 |
 | Finance | http://localhost:4303 | http://127.0.0.1:8303 |
 | Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
@@ -359,7 +359,7 @@ git clone -b orbit-hr --single-branch https://github.com/jeydweirdough/orbit.git
 **Nothing for you to do.** About a minute after any push to `main` or to an
 app branch, GitHub's **Sync branches** action runs:
 
-- Push to an **app branch** (e.g. `orbit-sales`): your work is copied into
+- Push to an **app branch** (e.g. `orbit-crm`): your work is copied into
   that app's folder on `main`.
 - Push to **`main`**: each app's folder is copied to its app branch.
 

@@ -95,7 +95,7 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
   Bash):
   ```
   bash scripts/sync-branches.sh                 # every app
-  bash scripts/sync-branches.sh orbit-sales     # just one app
+  bash scripts/sync-branches.sh orbit-crm       # just one app
   ```
 
 ---

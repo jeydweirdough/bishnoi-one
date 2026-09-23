@@ -1,7 +1,7 @@
 # Keeps main and the per-app branches in step, on GitHub, after every push.
 #
 # - A push to main rebuilds every app's branch from its folder.
-# - A push to an app branch (orbit-sales, orbit-admin, ...) merges that work into
+# - A push to an app branch (orbit-crm, orbit-admin, ...) merges that work into
 #   main's folder first, then rebuilds the branches.
 #
 # It runs scripts/sync-branches.sh, the same script you can still run by hand.

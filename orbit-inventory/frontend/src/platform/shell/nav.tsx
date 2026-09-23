@@ -526,7 +526,7 @@ function Links({ me }: { me: Me }) {
           a division is a property of a record, not a place, so these are the
           same pages whether you sell in one of the seven or all of them. */}
       {sales.length > 0 && isOurs("sales") && (
-        <Group label="Sales">
+        <Group label={appLabel("sales")}>
           {salesPages(sales).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
               {page.label}

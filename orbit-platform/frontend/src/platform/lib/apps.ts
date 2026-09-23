@@ -90,7 +90,7 @@ export const isOurs = (app: AppName): boolean => !THIS_APP || THIS_APP === app;
 
 const LABELS: Record<AppName, string> = {
   exec: "Executive Admin",
-  sales: "Sales",
+  sales: "CRM",
   finance: "Finance",
   inventory: "Inventory",
   regulatory: "Regulatory",
