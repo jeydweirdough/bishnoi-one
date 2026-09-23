@@ -1,3 +1,6 @@
+# This app has two parts: frontend/ (Next.js) and backend/ (Python API).
+# These rules cover both.
+
 # Dependencies
 node_modules/
 .pnp
@@ -37,3 +40,23 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Python (backend/)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Backend local data: databases, the records file store, uploaded files, keys
+.data/
+.data-before-*/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+*.key

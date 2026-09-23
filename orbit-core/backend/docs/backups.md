@@ -19,7 +19,7 @@ would only put stale tokens back.
 ## Running it by hand
 
 ```
-cd orbit-backend
+cd orbit-core/backend
 uv run python -m app.tools.backup --out-dir D:\orbit-backups
 ```
 
@@ -36,7 +36,7 @@ the last 12 months. `--keep-daily` and `--keep-monthly` change that.
 folder at the top of it, then register the task **as an administrator**:
 
 ```
-schtasks /Create /TN "Orbit backup" /TR "powershell -ExecutionPolicy Bypass -File C:\Users\Getmeds Backend\Desktop\orbit-backend\scripts\backup-daily.ps1" /SC DAILY /ST 02:00 /RL HIGHEST /F
+schtasks /Create /TN "Orbit backup" /TR "powershell -ExecutionPolicy Bypass -File C:\Users\Getmeds Backend\Desktop\orbit\orbit-core\backend\scripts\backup-daily.ps1" /SC DAILY /ST 02:00 /RL HIGHEST /F
 ```
 
 Check it afterwards with `schtasks /Query /TN "Orbit backup" /V /FO LIST`, and

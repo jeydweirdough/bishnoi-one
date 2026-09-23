@@ -33,10 +33,11 @@ venv/
 .mypy_cache/
 *.egg-info/
 
-# Backend local data: databases, file store, and pre-migration backups
-orbit-backend/env/
-orbit-backend/.data/
-orbit-backend/.data-before-*/
+# Backend local data in every orbit-*/backend: databases, the records file
+# store, pre-migration backups, virtual environments
+env/
+.data/
+.data-before-*/
 *.db
 *.db-shm
 *.db-wal

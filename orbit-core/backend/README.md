@@ -31,7 +31,7 @@ One port each, so they can all run at once. An app takes its own with
 
 | Port | App | Folder | Built? |
 |------|-----|--------|--------|
-| **8000** | the API | `orbit-backend` | yes |
+| **8000** | the API (Orbit Core) | `orbit-core/backend` | yes |
 | **4300** | Executive Admin | `orbit-admin` | yes |
 | 4301 | — free | — | was Analytics, removed |
 | **4302** | Sales | `orbit-sales` | yes |
