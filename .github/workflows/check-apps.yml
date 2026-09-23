@@ -1,0 +1,63 @@
+# Checks every pull request into main before it is merged. Its main job is to
+# check a new app's folder: once merged, the Sync branches action makes the
+# app its own branch, named after the folder.
+#
+# For each orbit-* folder it checks that:
+# - the name is orbit-<name>: small letters, digits and dashes
+# - it has frontend/, backend/, .gitignore and GIT-GUIDE.md
+# - its .github/workflows/sync-branches.yml is the same as main's, without
+#   which pushes to its branch wouldn't sync
+# - no secrets (.env, .env.local, keys) or local data (.data/) are committed
+name: Check apps
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check each app folder
+        run: |
+          problems=0
+          fail() { echo "::error::$1"; echo "- $1" >> "$GITHUB_STEP_SUMMARY"; problems=$((problems + 1)); }
+
+          echo "### Checking the app folders" >> "$GITHUB_STEP_SUMMARY"
+          for dir in orbit-*/; do
+            app="${dir%/}"
+            if ! [[ "$app" =~ ^orbit-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+              fail "$app: name it orbit-<name>, in small letters, digits and dashes (e.g. orbit-hr)"
+            fi
+            for part in frontend backend; do
+              [ -d "$app/$part" ] || fail "$app: the $part/ folder is missing"
+            done
+            for file in .gitignore GIT-GUIDE.md; do
+              [ -f "$app/$file" ] || fail "$app: $file is missing (copy it from another app and adjust it)"
+            done
+            copy="$app/.github/workflows/sync-branches.yml"
+            if [ ! -f "$copy" ]; then
+              fail "$app: $copy is missing (copy .github/workflows/sync-branches.yml there)"
+            elif ! cmp -s "$copy" .github/workflows/sync-branches.yml; then
+              fail "$app: $copy differs from .github/workflows/sync-branches.yml (they must be the same)"
+            fi
+          done
+
+          secrets="$(git ls-files | grep -E '(^|/)(\.env(\.[^/]*)?|[^/]*\.(pem|key))$|(^|/)\.data/' | grep -vE '(^|/)\.env\.example$' || true)"
+          if [ -n "$secrets" ]; then
+            while read -r f; do fail "$f: secrets and local data must not be committed"; done <<< "$secrets"
+          fi
+
+          if [ "$problems" -gt 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Fix these on your branch, then push again. This check runs again by itself." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "All app folders look right." >> "$GITHUB_STEP_SUMMARY"

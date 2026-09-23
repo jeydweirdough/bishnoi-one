@@ -1,24 +1,32 @@
 # Orbit
 
 Orbit is a set of separate web apps (Admin, Sales, Finance, Inventory, and
-more) kept in one GitHub repo. This page explains how to get the code onto your
-computer, keep it up to date, and share your changes.
+more) kept in one GitHub repo. This page shows you how to:
+
+- get the code onto your computer
+- keep it up to date
+- share your changes
+- run an app
+- add a new app
 
 Repo: **https://github.com/jeydweirdough/orbit**
 
-Each app folder also has its own `GIT-GUIDE.md`, a shorter version of this
-page for people who work on that app only.
+Everyday Git is three commands: **clone** once, then **pull** and **push**.
+The rest of this page walks through them.
 
 ---
 
-## Start here: which setup is yours?
+## Contents
 
-| You work on… | Use | Go to |
-|---|---|---|
-| **One app only** (e.g. just Sales) | a **single-app clone** | [Clone one app](#option-a-clone-one-app-most-people) |
-| **Several apps**, or you look after the repo | a **full clone** | [Clone everything](#option-b-clone-everything) |
-
-Not sure? Pick **one app**. You can always clone everything later.
+1. [How the repo is laid out](#1-how-the-repo-is-laid-out)
+2. [Before you start (once per computer)](#2-before-you-start-once-per-computer)
+3. [Clone: download the code](#3-clone-download-the-code)
+4. [Pull and push: everyday work](#4-pull-and-push-everyday-work)
+5. [Run an app](#5-run-an-app)
+6. [Add a new app](#6-add-a-new-app)
+7. [What happens after you push](#7-what-happens-after-you-push)
+8. [Rules](#8-rules)
+9. [Cheat sheet](#9-cheat-sheet)
 
 ---
 
@@ -29,8 +37,8 @@ Each app is a complete web app in its own folder, with two parts:
 - **`frontend/`**: the screens (Next.js)
 - **`backend/`**: the API (Python, FastAPI)
 
-The apps don't depend on each other. Each has its own API, its own settings
-file, its own database and its own sign-in.
+The apps don't depend on each other. Each one has its own settings, database
+and sign-in.
 
 ```
 orbit/
@@ -41,177 +49,164 @@ orbit/
 ├── orbit-platform/       screens :4305   API :8305
 ├── orbit-in-licensing/   screens :4306   API :8306   (screens not built yet)
 ├── orbit-pharmacy/       screens :4307   API :8307   (screens not built yet)
-├── orbit-regulatory/     screens :4308   API :8308   (screens not built yet)
-├── scripts/sync-branches.sh
-└── .github/workflows/sync-branches.yml
+└── orbit-regulatory/     screens :4308   API :8308   (screens not built yet)
 ```
-
-Tip: an app's API port is its screens' port + 4000.
 
 ### Branches
 
-The repo has one branch with everything, plus one branch per app:
-
 | Branch | What's in it |
 |---|---|
-| `main` | **Everything**: every app in its own folder |
-| `orbit-admin` | Only the Admin app |
-| `orbit-sales` | Only the Sales app |
-| `orbit-finance` | Only the Finance app |
-| `orbit-inventory` | Only the Inventory app |
-| `orbit-platform` | Only the Platform app |
-| `orbit-in-licensing`, `orbit-pharmacy`, `orbit-regulatory` | Apps whose screens aren't built yet |
+| `main` | **Everything**: every app, each in its own folder |
+| `orbit-admin`, `orbit-sales`, `orbit-finance`, … | **One app only**, named after it |
 
-An app branch holds the same files as that app's folder on `main`. **GitHub
-keeps them matched for you:** push to either one and, about a minute later,
-the other has your change too (see [section 5](#5-how-main-and-the-app-branches-stay-in-sync)).
-
-```
-main                          app branches
-├── orbit-admin/   ◄──sync──►  orbit-admin
-├── orbit-sales/   ◄──sync──►  orbit-sales
-└── ...
-```
+An app branch holds the same files as that app's folder on `main`. You can
+work on either one; GitHub keeps them matched for you
+([section 7](#7-what-happens-after-you-push)).
 
 ---
 
-## 2. First-time setup (once per computer)
+## 2. Before you start (once per computer)
 
-### Step 1: Install the tools
+### Step 1: Get access
+
+Ask the repo owner to add you to the repo. GitHub sends you an email
+invitation. **Accept it**, or you won't be able to push.
+
+### Step 2: Install the tools
 
 | Tool | What it's for | Get it |
 |---|---|---|
-| Git | cloning, pulling, pushing | https://git-scm.com (on Windows this also installs **Git Bash**) |
+| Git | clone, pull, push | https://git-scm.com |
 | Node.js (LTS) | running the screens | https://nodejs.org |
 | uv | running the Python API | https://docs.astral.sh/uv/ |
 
-### Step 2: Tell Git who you are
+### Step 3: Tell Git who you are
 
-Every commit carries your name, and GitHub shows it.
+Open a terminal (PowerShell, Git Bash or Terminal) and run:
 
 ```
 git config --global user.name  "Your Name"
 git config --global user.email "you@example.com"
 ```
 
-To keep your real email out of the history, use your GitHub "noreply" address
-(GitHub → Settings → Emails).
+Every commit carries this name, and GitHub shows it next to your work. Use the
+same email as your GitHub account, so the commits are linked to your profile.
 
-### Step 3: Sign in to GitHub
+### Step 4: Sign in to GitHub
 
-The first time you push, Git opens a browser window to sign in to GitHub.
-Sign in, and Git remembers you from then on.
+You don't have to do anything now. The first time you push, Git opens a
+browser window: sign in to GitHub, and Git remembers you from then on.
 
-**On the shared office machine**, these shortcuts switch accounts for the
-current repo:
-
-```
-git use-jeyd       # commit and push as jeydweirdough
-git use-backend    # commit and push as backenddepartment
-git who            # show which account is active
-```
-
-Run `git who` before you commit, so your work goes under the right name.
+> **Shared office machine?** Use `git use-jeyd` or `git use-backend` to
+> switch accounts, and `git who` to check which one is active, before you
+> commit.
 
 ---
 
-## 3. Clone (download the code)
+## 3. Clone: download the code
 
-Open a terminal (PowerShell, Git Bash or Terminal) in the folder where you
-keep your projects, then pick one option.
+Do this once. In your terminal, go to the folder where you keep your
+projects, then pick **one** option.
 
-### Option A: Clone one app (most people)
+### Option A: One app (most people)
+
+Use this if you work on a single app. Example for Sales:
 
 ```
 git clone -b orbit-sales --single-branch https://github.com/jeydweirdough/orbit.git orbit-sales
 cd orbit-sales
 ```
 
-Replace **both** `orbit-sales`s with your app (`orbit-admin`,
-`orbit-finance`, …). You get only that app, with `frontend/` and `backend/` at
-the top.
+For another app, replace **both** `orbit-sales`s with its branch name
+(`orbit-admin`, `orbit-finance`, …). You get only that app, with `frontend/`
+and `backend/` right at the top.
 
-### Option B: Clone everything
+### Option B: Everything
+
+Use this if you work across several apps, or to [add a new app](#6-add-a-new-app):
 
 ```
 git clone https://github.com/jeydweirdough/orbit.git
 cd orbit
 ```
 
-You get `main`: every app, each in its own folder.
+You get `main`, with every app in its own folder.
 
 ### Then: create your settings files
 
-Passwords and other secrets are never stored in Git. Every app includes
-example files. Copy them once:
+Passwords and other secrets are never stored in Git. Each app includes
+example files instead. Copy them once per app:
 
-| Part | Copy this… | …to this |
-|---|---|---|
-| API | `backend/.env.example` | `backend/.env` |
-| Screens | `frontend/.env.example` | `frontend/.env.local` |
+| Copy this… | …to this |
+|---|---|
+| `backend/.env.example` | `backend/.env` |
+| `frontend/.env.example` | `frontend/.env.local` |
 
-[Section 7](#7-running-an-app) shows how to install and run the app.
+You're ready. See [Run an app](#5-run-an-app).
 
 ---
 
-## 4. Everyday work
+## 4. Pull and push: everyday work
 
-The daily routine is **pull → work → commit → pull → push**.
+Every time you work, follow the same loop:
 
-### Step 1: Pull before you start
+```
+pull  →  make your changes  →  commit  →  pull  →  push
+```
+
+### 1. Pull before you start
 
 ```
 git pull
 ```
 
-This downloads what everyone else pushed since last time.
+This downloads everything others pushed since your last pull.
 
-### Step 2: Work
+### 2. Make your changes
 
-Edit files as usual. To see what you've changed at any point:
+Edit the code as usual. To check what you've changed at any time:
 
 ```
 git status      # which files changed
 git diff        # the exact lines that changed
 ```
 
-### Step 3: Commit (save a checkpoint)
+### 3. Commit: save your changes
 
 ```
 git add .
 git commit -m "Add expiry column to stock list"
 ```
 
-Say *what changed* in the message: "Fix total on the invoice page", not
-"update" or "fix".
+Describe *what changed*: "Fix total on the invoice page" helps everyone;
+"update" or "fix" doesn't.
 
-### Step 4: Pull again, then push
+You can commit as often as you like. Commits stay on your computer until you
+push.
+
+### 4. Pull again, then push: share your changes
 
 ```
 git pull
 git push
 ```
 
-Where does `git push` send your work?
-
-- **Single-app clone:** to that app's branch (e.g. `orbit-sales`).
-- **Full clone:** to `main`.
-
-Both are fine. GitHub copies your change to the other side for you.
+That's it. Your work is on GitHub, and the other branch gets it too
+(see [section 7](#7-what-happens-after-you-push)).
 
 ### If `git push` is rejected
 
-This means someone pushed before you. Bring in their work first, then push:
+Someone pushed while you were working. Bring in their work, then push:
 
 ```
 git pull --rebase
 git push
 ```
 
-### If Git reports a conflict
+### If Git says there's a conflict
 
-A conflict means you and someone else changed the same lines. Git lists the
-files. Open each one and find the markers:
+You and someone else changed the same lines. Git lists the files. Open each
+one and look for these markers:
 
 ```
 <<<<<<< yours
@@ -221,7 +216,8 @@ their version
 >>>>>>> theirs
 ```
 
-Edit it down to the correct final code, delete the three marker lines, then:
+Edit each one down to the correct final code and delete the three marker
+lines. Then:
 
 ```
 git add .
@@ -229,122 +225,20 @@ git rebase --continue
 git push
 ```
 
-Stuck? `git rebase --abort` puts everything back the way it was before
-`git pull --rebase`.
-
-### Bigger changes: use your own branch (optional, full clone)
-
-Put unfinished work on its own branch, so `main` stays working:
-
-```
-git switch -c feature/stock-alerts
-# ...commit as usual...
-git push -u origin feature/stock-alerts
-```
-
-On GitHub, open a pull request from `feature/stock-alerts` into **`main`**,
-and merge it when it's ready. Feature branches always go into `main`, never
-into an app branch.
+Stuck? `git rebase --abort` puts everything back the way it was before you
+pulled, and you can ask for help.
 
 ---
 
-## 5. How `main` and the app branches stay in sync
+## 5. Run an app
 
-**You don't need to do anything.** After every push to `main` or to an app
-branch, GitHub runs the **Sync branches** action. It goes through **every
-app**, whichever branch you pushed, so no branch is left behind. For each
-app, it:
-
-1. Copies new work from the app branch into that app's folder on `main`.
-2. Copies `main`'s version of the folder back to the app branch.
-
-It also runs every 30 minutes as a safety net. Watch it on the repo's
-**Actions** tab.
-
-The next time you `git pull`, you get the changes that were pushed on the
-other side.
-
-### If a sync fails (red ✗ on the Actions tab)
-
-This almost always means the same lines were changed on `main` and on the app
-branch. The failed run's summary says what to do. In short, on a **full
-clone**, in **Git Bash**:
-
-```
-git switch main
-git pull
-bash scripts/sync-branches.sh     # stops at the conflict
-git status                        # lists the files in conflict
-# fix the <<<<<<< ======= >>>>>>> markers in each file
-git add .
-git commit                        # finishes the merge
-bash scripts/sync-branches.sh     # run it again: it finishes and pushes
-```
-
-### For whoever looks after the repo
-
-- **Run a sync on demand:** Actions → Sync branches → **Run workflow**.
-- **Run it by hand:** on a full clone, on `main`, with nothing uncommitted,
-  in Git Bash:
-  ```
-  bash scripts/sync-branches.sh                 # every app
-  bash scripts/sync-branches.sh orbit-sales     # just one app
-  ```
-- **GitHub settings the action needs (once):**
-  1. Settings → Actions → General → Workflow permissions: **Read and write**.
-  2. Add a **`SYNC_TOKEN`** secret. GitHub's own token isn't allowed to push
-     changes to workflow files. With this secret, the action can push them
-     too, so every branch gets everything.
-     - Create the token: GitHub → your profile → Settings → Developer
-       settings → Personal access tokens → **Fine-grained tokens** →
-       Generate new token.
-     - Repository access: only `jeydweirdough/orbit`.
-     - Permissions: **Contents: Read and write** and
-       **Workflows: Read and write**.
-     - Save it on the repo: Settings → Secrets and variables → Actions →
-       New repository secret. Name it `SYNC_TOKEN`.
-     - The token expires on the date you choose. When it does, make a new one
-       and replace the secret.
-  3. If `main` is protected, allow the token's owner (or GitHub Actions) to
-     push to it.
-- **Without `SYNC_TOKEN`**, the sync still works, except for changes to
-  workflow files. Push those yourself: commit and push `main`, then run
-  `bash scripts/sync-branches.sh` by hand once.
-- **Changing the action file:** it lives at
-  `.github/workflows/sync-branches.yml`, with a copy in each app folder
-  (`orbit-*/.github/workflows/`). Each app branch needs its copy, because
-  GitHub only runs the workflows in the branch that was pushed. Keep all the
-  copies the same. To stage them all at once:
-  ```
-  git add .github "orbit-*/.github/*"
-  ```
-
----
-
-## 6. Rules
-
-1. **Never force-push** (`git push --force`). It deletes other people's work.
-2. **Never commit secrets.** `.env`, `.env.local`, keys, and the backend's
-   `.data/` folders are already ignored. Don't force them in with
-   `git add -f`.
-3. **Don't open pull requests from an app branch into `main`.** The sync
-   already does that, and the two branches have different folder layouts. If
-   GitHub shows a yellow "Compare & pull request" banner after you push to an
-   app branch, ignore it.
-4. **Pull before you start, and pull before you push.**
-
----
-
-## 7. Running an app
-
-Every app runs the same way, in **two terminals**. On a full clone, first
-`cd orbit-<app>`.
+Every app runs the same way, in **two terminals**. On a full clone, first go
+into the app's folder (`cd orbit-sales`).
 
 **Terminal 1: the API**
 
 ```
 cd backend
-cp .env.example .env       # first time only
 uv sync
 uv run main.py
 ```
@@ -353,12 +247,11 @@ uv run main.py
 
 ```
 cd frontend
-cp .env.example .env.local # first time only
 npm install
 npm run dev
 ```
 
-Then open the app's screens in your browser:
+Then open the screens in your browser:
 
 | App | Screens | API |
 |---|---|---|
@@ -371,37 +264,127 @@ Then open the app's screens in your browser:
 
 ### Your first account
 
-**Each app has its own sign-in.** An account works in one app only, and
-there is no sign-up page. Create the first account from the app's `backend/`
-folder:
+Each app has **its own sign-in**, and there's no sign-up page. Create your
+account from the app's `backend/` folder:
 
 ```
 uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
 ```
 
-Use `list`, `password`, `disable` and `enable` to manage accounts afterwards.
+Later, `list`, `password`, `disable` and `enable` manage accounts.
 
 ### Good to know
 
-- Each API's database is set by `DATABASE_URL` in its `backend/.env`. By
-  default it's SQLite, in `backend/.data/`. To try an app against test data,
-  point `DATABASE_URL` at a test database.
-- Each API has interactive docs at `/docs`, e.g. http://127.0.0.1:8302/docs.
+- The database is set by `DATABASE_URL` in `backend/.env`. By default it's a
+  local SQLite file in `backend/.data/`.
+- Every API has interactive docs at `/docs`
+  (e.g. http://127.0.0.1:8302/docs).
 - Run an API's tests with `uv run pytest` in its `backend/` folder.
 
 ---
 
-## 8. Adding a new app
+## 6. Add a new app
 
-1. On `main`, create `orbit-<name>/` with `frontend/` and `backend/`. Copy
-   these from another app, then adjust the names and ports:
-   - `.gitignore`
-   - `GIT-GUIDE.md`
-   - `.github/workflows/sync-branches.yml`
-   - `backend/`
-2. Commit and push `main`.
-3. In Git Bash, run `bash scripts/sync-branches.sh orbit-<name>`. This creates
-   the app's branch on GitHub.
+A new app goes in through a **pull request**. You propose it, and GitHub
+checks it. The repo owner then reviews and merges it, and your app gets its
+own branch.
+
+### Step 1: Clone everything and start a branch
+
+You need the full repo ([Option B](#option-b-everything)). Then:
+
+```
+git switch main
+git pull
+git switch -c add-app/hr
+```
+
+Replace `hr` with your app's name.
+
+> Name your branch `add-app/<name>`. **Don't** start it with `orbit-`: those
+> names are kept for the app branches.
+
+### Step 2: Create the app's folder
+
+Name the folder **`orbit-<name>`**, using small letters, digits and dashes
+only (e.g. `orbit-hr`, `orbit-field-sales`). This becomes your app's branch
+name. Inside it, add:
+
+| What | How |
+|---|---|
+| `frontend/` | the screens: start from another app's `frontend/` |
+| `backend/` | the API: start from another app's `backend/` |
+| `.gitignore` | copy it from another app |
+| `GIT-GUIDE.md` | copy it from another app, and change the app name and ports |
+| `.github/workflows/sync-branches.yml` | copy `.github/workflows/sync-branches.yml` from the top of the repo, **unchanged** |
+
+Pick the next free ports: the screens get the next number after the last app
+(currently **4309**), and the API is that + 4000 (**8309**).
+
+### Step 3: Commit and push your branch
+
+```
+git add .
+git commit -m "Add the HR app"
+git push -u origin add-app/hr
+```
+
+### Step 4: Open a pull request
+
+1. On the repo's GitHub page, click **Compare & pull request** (or go to
+   **Pull requests → New pull request**).
+2. Set it to merge **`add-app/hr` into `main`**.
+3. In the description, say what the app is for and which ports it uses.
+4. Click **Create pull request**.
+
+GitHub's **Check apps** check runs by itself. If it shows a red ✗, click
+**Details**: it lists what to fix (for example, a missing file or a wrong
+folder name). Fix it on your branch, then commit and push again. The check
+runs again by itself.
+
+### Step 5: The owner merges it
+
+The repo owner reviews your app and merges it into `main`. About a minute
+later, your app has **its own branch, named after its folder**
+(`orbit-hr`). From then on, anyone can clone just your app:
+
+```
+git clone -b orbit-hr --single-branch https://github.com/jeydweirdough/orbit.git orbit-hr
+```
+
+---
+
+## 7. What happens after you push
+
+**Nothing for you to do.** About a minute after any push to `main` or to an
+app branch, GitHub's **Sync branches** action runs:
+
+- Push to an **app branch** (e.g. `orbit-sales`): your work is copied into
+  that app's folder on `main`.
+- Push to **`main`**: each app's folder is copied to its app branch.
+
+Every branch is brought up to date on every run, so none is left behind. Your
+teammates get your work the next time they `git pull`.
+
+You can watch it on the repo's **Actions** tab. If a run there shows a red ✗
+after your push, tell the repo owner. It usually means the same lines were
+changed on `main` and on an app branch, and it needs sorting out by hand.
+
+---
+
+## 8. Rules
+
+1. **Pull before you start, and pull before you push.**
+2. **Never force-push** (`git push --force`). It deletes other people's work.
+3. **Never commit secrets.** `.env`, `.env.local`, keys and the backend's
+   `.data/` folder are already ignored by Git. Don't force them in with
+   `git add -f`.
+4. **Don't open pull requests from an app branch into `main`.** The sync
+   already does that. If GitHub shows a yellow "Compare & pull request"
+   banner after you push to an app branch, ignore it. (Pull requests from an
+   `add-app/…` or `feature/…` branch are fine.)
+5. **Don't create branches that start with `orbit-`.** Those are the app
+   branches, and the sync manages them.
 
 ---
 
@@ -409,15 +392,20 @@ Use `list`, `password`, `disable` and `enable` to manage accounts afterwards.
 
 | I want to… | Command |
 |---|---|
-| Clone one app | `git clone -b <branch> --single-branch https://github.com/jeydweirdough/orbit.git <folder>` |
+| Clone one app | `git clone -b <app> --single-branch https://github.com/jeydweirdough/orbit.git <app>` |
 | Clone everything | `git clone https://github.com/jeydweirdough/orbit.git` |
 | Get the latest | `git pull` |
 | See what I changed | `git status` / `git diff` |
-| Save my work | `git add .` then `git commit -m "message"` |
-| Share it | `git pull` then `git push` |
+| Save my changes | `git add .` then `git commit -m "what changed"` |
+| Share them | `git pull` then `git push` |
 | Push was rejected | `git pull --rebase` then `git push` |
 | Undo my edits to one file | `git restore <file>` |
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
-| Who am I committing as? | `git config user.name` (or `git who` on the office machine) |
-| Sync `main` ⇄ app branches | Automatic after every push. By hand: `bash scripts/sync-branches.sh` |
+| Who am I committing as? | `git config user.name` |
+| Start a new app | `git switch -c add-app/<name>`, then [section 6](#6-add-a-new-app) |
+
+---
+
+*Looking after the repo (sync settings, tokens, reviewing new apps)? See
+[MAINTAINING.md](MAINTAINING.md).*
