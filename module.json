@@ -1,0 +1,21 @@
+{
+  "name": "pharmacy",
+  "label": "Pharmacy",
+  "icon": "pharmacy",
+  "what": "Prescriptions checked, and batches tracked.",
+  "state": "to-build",
+  "screens": [
+    "Rx to check",
+    "Batches",
+    "Expiring soon"
+  ],
+  "owns": [
+    "prescription checks (who checked, when, what they found)",
+    "batches (lot, made, expires, quantity)"
+  ],
+  "asks": {
+    "sales": "which quotes carry an Rx?",
+    "inventory": "which product is this a batch of?"
+  },
+  "api": "shared"
+}
