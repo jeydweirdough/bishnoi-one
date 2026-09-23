@@ -14,8 +14,21 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     environment: str = "development"
-    # This app's own database.
+    # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'finance.db').as_posix()}"
+    # How long a sign-in lasts.
+    session_hours: int = 10
+    # Wrong passwords allowed per email before sign-in waits, and for how long.
+    login_attempts: int = 5
+    login_lockout_minutes: int = 15
+
+    # The company this app belongs to, as its screens show it.
+    org_name: str = "Orbit"
+    org_currency: str = "PHP"
+    org_minor_units: int = 2
+    org_locale: str = "en-PH"
+    org_timezone: str = "Asia/Manila"
+
     # Host names this API answers to. Anything else gets 400.
     allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
     # Browser origins allowed to call the API directly. None by default.
@@ -30,6 +43,8 @@ class Settings(BaseSettings):
         for origin in self.cors_origins:
             if "*" in origin or not origin.startswith(("https://", "http://")) or origin.rstrip("/") != origin:
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
+        if self.session_hours < 1:
+            raise ValueError("SESSION_HOURS must be at least 1.")
         return self
 
 
