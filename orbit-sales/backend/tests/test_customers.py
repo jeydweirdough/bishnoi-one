@@ -4,25 +4,28 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models import Team, User
+from app.models import Role, RolePermission, Team, User
 from app.security import hash_password
 from tests.conftest import PASSWORD, bearer, role_id, sign_in
 
 
 @pytest.fixture
 def crew(app, client) -> dict[str, dict]:
-    """Two teams. North: Ria and Rex (reps), Lia (their lead). South: Sam (rep).
-    Max, a manager, reaches everyone. Returns each person's sign-in headers."""
+    """Two teams. North: Ria and Rex (salespeople), Lia (their lead). South: Sam
+    (salesperson). Max has a Team Lead's permissions over every team (a role an
+    admin made, "Director"). Returns each person's sign-in headers."""
     with app.state.sessions() as db:
         north, south = Team(name="North"), Team(name="South")
-        db.add_all([north, south])
+        lead = db.get(Role, role_id(db, "Team Lead"))
+        director = Role(name="Director", scope="all", grants=[RolePermission(permission=p) for p in lead.permissions])
+        db.add_all([north, south, director])
         db.flush()
         people = {
-            "ria": ("Sales Rep", north.id),
-            "rex": ("Sales Rep", north.id),
+            "ria": ("Salesperson", north.id),
+            "rex": ("Salesperson", north.id),
             "lia": ("Team Lead", north.id),
-            "sam": ("Sales Rep", south.id),
-            "max": ("Manager", None),
+            "sam": ("Salesperson", south.id),
+            "max": ("Director", None),
         }
         for name, (role, team) in people.items():
             db.add(User(email=f"{name}@example.com", full_name=name.title(), password_hash=hash_password(PASSWORD), role_id=role_id(db, role), team_id=team))
@@ -202,7 +205,7 @@ def test_activities_link_only_within_reach(client, crew):
     other = company(client, crew["ria"], "Other")
     maria = contact(client, crew["ria"], companyId=acme["id"])
     r = client.post("/activities", json={"kind": "note", "subject": "x", "companyId": other["id"], "contactId": maria["id"]}, headers=crew["ria"])
-    assert r.status_code == 422 and "another company" in r.json()["detail"][0]["msg"]
+    assert r.status_code == 422 and "another customer" in r.json()["detail"][0]["msg"]
 
 
 def test_activities_follow_reach_too(client, crew):

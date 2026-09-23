@@ -11,9 +11,10 @@ import { Field, FormError, Input } from "@/src/platform/ui/field";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { createTeam, deleteTeam, updateTeam } from "../../actions/admin";
 import type { TeamRow } from "@/src/platform/lib/types";
+import { Chip, ChipsInput } from "./chips-input";
 import { OffTag } from "./words";
 
-/** Teams: add one, rename it, switch it off, or delete it while nobody's in it. */
+/** Teams: add one, change its name, description or headquarters, switch it off, or delete it while nobody's in it. */
 export function TeamsEditor({ teams }: { teams: TeamRow[] }) {
   return (
     <div className="space-y-5">
@@ -39,13 +40,14 @@ function AddTeam() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [headquarters, setHeadquarters] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
 
   function add() {
     start(async () => {
-      const result = await createTeam({ name: name.trim(), description: description.trim() || null });
+      const result = await createTeam({ name: name.trim(), description: description.trim() || null, headquarters });
       if (!result.ok) {
         setError(result.fields ? null : result.error);
         setFields(result.fields ?? {});
@@ -54,6 +56,7 @@ function AddTeam() {
       toast.success("Team added", { description: result.data.name });
       setName("");
       setDescription("");
+      setHeadquarters([]);
       setError(null);
       setFields({});
       router.refresh();
@@ -77,6 +80,9 @@ function AddTeam() {
         <Field label="What it does" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
         </Field>
+        <div className="sm:order-last sm:col-span-3">
+          <ChipsInput label="Headquarters" value={headquarters} onChange={setHeadquarters} placeholder="e.g. Makati office" error={fields.headquarters} />
+        </div>
         <Button type="submit" variant="primary" loading={pending} disabled={!name.trim()} icon={<Plus className="size-4" aria-hidden />}>
           Add
         </Button>
@@ -95,13 +101,14 @@ function TeamLine({ team }: { team: TeamRow }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(team.name);
   const [description, setDescription] = useState(team.description ?? "");
+  const [headquarters, setHeadquarters] = useState<string[]>(team.headquarters);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function save() {
     start(async () => {
-      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null });
+      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null, headquarters });
       if (!result.ok) {
         setError(result.fields ? null : result.error);
         setFields(result.fields ?? {});
@@ -154,6 +161,9 @@ function TeamLine({ team }: { team: TeamRow }) {
           <Field label="What it does" optional error={fields.description}>
             {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
           </Field>
+          <div className="sm:order-last sm:col-span-3">
+            <ChipsInput label="Headquarters" value={headquarters} onChange={setHeadquarters} placeholder="e.g. Makati office" error={fields.headquarters} />
+          </div>
           <span className="flex gap-2">
             <Button
               variant="quiet"
@@ -161,6 +171,7 @@ function TeamLine({ team }: { team: TeamRow }) {
                 setEditing(false);
                 setName(team.name);
                 setDescription(team.description ?? "");
+                setHeadquarters(team.headquarters);
                 setFields({});
                 setError(null);
               }}
@@ -198,10 +209,18 @@ function TeamLine({ team }: { team: TeamRow }) {
           )}
           {team.description && <> · {team.description}</>}
         </p>
+        {team.headquarters.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5" aria-label="Headquarters">
+            <span className="text-meta text-ink-3">Headquarters</span>
+            {team.headquarters.map((h) => (
+              <Chip key={h}>{h}</Chip>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="quiet" onClick={() => setEditing(true)}>
-          Rename
+          Edit
         </Button>
         <ConfirmButton
           label={team.isActive ? "Switch off" : "Switch on"}

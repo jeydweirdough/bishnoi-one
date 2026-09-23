@@ -153,7 +153,7 @@ function TypeRow({
         ))}
       </select>
       <span className="w-28 text-meta text-ink-3">
-        {type.companies} {type.companies === 1 ? "company" : "companies"}
+        {type.companies} {type.companies === 1 ? "customer" : "customers"}
       </span>
       <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !type.isActive }, type.isActive ? `${type.name} switched off` : `${type.name} switched on`)}>
         {type.isActive ? "Switch off" : "Switch on"}
@@ -163,7 +163,7 @@ function TypeRow({
           label="Delete"
           triggerSize="sm"
           title={`Delete ${type.name}?`}
-          body="No company is this type, so nothing else changes."
+          body="No customer is this type, so nothing else changes."
           confirmLabel="Delete type"
           onConfirm={async () => {
             const result = await deleteCustomerType(type.code);

@@ -2,7 +2,7 @@
 Administration → Users; this is for the first account, and for scripts.
 
     uv run python -m app.tools.users add --email ana@example.com --name "Ana Reyes" --admin
-    uv run python -m app.tools.users add --email ben@example.com --name "Ben Cruz" --role "Sales Rep" --team B2C
+    uv run python -m app.tools.users add --email ben@example.com --name "Ben Cruz" --role "Salesperson" --team B2C
     uv run python -m app.tools.users list
     uv run python -m app.tools.users demo        # the demo accounts, roles and teams (development)
     uv run python -m app.tools.users password --email ana@example.com
@@ -19,7 +19,7 @@ import os
 import sys
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.audit import audit
@@ -33,12 +33,13 @@ from app.demo import (
     DEMO_CONTACTS,
     DEMO_ISSUERS,
     DEMO_PASSWORD,
+    RENAMED_TEAMS,
     DEMO_PRICE_TYPES,
     DEMO_PRODUCTS,
     DEMO_PROMOS,
 )
 from app.migrate import upgrade
-from app.models import PLANNED_KINDS, Activity, Bundle, Company, Contact, Issuer, PriceType, Product, ProductPrice, Promo, Role, Team, User
+from app.models import PLANNED_KINDS, Activity, Bundle, Quote, Company, Contact, Issuer, PriceType, Product, ProductPrice, Promo, Role, Team, User
 from app.permissions import ADMINISTRATOR
 from app.security import check_password_rules, hash_password
 
@@ -82,6 +83,12 @@ def make_demo(db: Session) -> None:
     if get_settings().is_production:
         sys.exit("Demo accounts are for development only.")
     made = updated = 0
+    for old, new in RENAMED_TEAMS.items():
+        team = db.scalar(select(Team).where(func.lower(Team.name) == old.lower()))
+        if team is not None and db.scalar(select(Team).where(func.lower(Team.name) == new.lower())) is None:
+            team.name = new
+            audit(db, TOOL, "team.updated", target=new, target_type="team", target_id=team.id, fields=["name"])
+    db.flush()
     for d in DEMO_ACCOUNTS:
         role = role_named(db, d.access)
         team = team_named(db, d.team, make=True) if d.team else None
@@ -94,8 +101,13 @@ def make_demo(db: Session) -> None:
             made += 1
         elif (user.role_id, user.team_id) != (role.id, team.id if team else None):
             # A demo account that predates roles and teams gets its own.
+            moved = user.team_id != (team.id if team else None)
             user.role_id, user.team_id = role.id, team.id if team else None
             audit(db, TOOL, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["roleId", "teamId"])
+            if moved:
+                # Demo data only: a demo rep's records go with them to their new team.
+                for model in (Company, Contact, Activity, Quote):
+                    db.execute(update(model).where(model.owner_id == user.id).values(team_id=user.team_id))
             updated += 1
     db.commit()
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
@@ -186,7 +198,7 @@ def main() -> int:
     add.add_argument("--email", required=True)
     add.add_argument("--name", required=True)
     add.add_argument("--admin", action="store_true", help=f"give them the {ADMINISTRATOR} role")
-    add.add_argument("--role", help="the role's name (default: Sales Rep)")
+    add.add_argument("--role", help="the role's name (default: Salesperson)")
     add.add_argument("--team", help="the team's name")
     sub.add_parser("list", help="list accounts")
     sub.add_parser("demo", help="make the demo accounts, roles and teams (development only)")
@@ -211,7 +223,7 @@ def main() -> int:
         if args.command == "add":
             if user is not None:
                 sys.exit(f"{email} already has an account.")
-            role = role_named(db, ADMINISTRATOR if args.admin else (args.role or "Sales Rep"))
+            role = role_named(db, ADMINISTRATOR if args.admin else (args.role or "Salesperson"))
             team = team_named(db, args.team) if args.team else None
             user = User(email=email, full_name=args.name.strip(), password_hash=hash_password(ask_password()), role_id=role.id, team_id=team.id if team else None)
             db.add(user)

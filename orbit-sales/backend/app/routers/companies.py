@@ -5,7 +5,7 @@ customers.create / edit / delete. All of it only within the person's reach
 (app/scope.py).
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
@@ -16,6 +16,7 @@ from app.access import Access, require
 from app.api import Api, camel, changed, check_email, digits, duplicates_error, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser
+from app.extra import check_extra, check_required
 from app.models import Activity, Company, Contact
 from app.routers.activities import activity_out
 from app.routers.customer_types import check_type, first_type
@@ -41,6 +42,8 @@ class CompanyFields(Api):
     country: str | None = Field(None, max_length=80)
     notes: str | None = Field(None, max_length=5000)
     owner_id: str | None = Field(None, max_length=36)
+    # Added fields' values, by key (Settings → Forms). A null clears one.
+    extra: dict[str, Any] | None = None
 
     @field_validator("email")
     @classmethod
@@ -85,6 +88,7 @@ def company_row(company: Company, access: Access, contacts: int = 0, last_activi
         "team": team_out(company.team),
         "contactCount": contacts,
         "lastActivityAt": iso(last_activity),
+        "extra": company.extra or {},
         "updatedAt": iso(company.updated_at),
         "can": can_of(company, access),
     }
@@ -93,7 +97,7 @@ def company_row(company: Company, access: Access, contacts: int = 0, last_activi
 def get_company(db: Session, access: Access, company_id: str) -> Company:
     company = db.get(Company, company_id)
     if company is None or not reaches(company, access):
-        raise not_found("company")
+        raise not_found("customer")
     return company
 
 
@@ -155,11 +159,13 @@ def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> 
     if not body.allow_duplicate:
         found = lookalikes(db, access, body)
         if found:
-            raise duplicates_error("company", found)
+            raise duplicates_error("customer", found)
     owner = owner_for(db, access, body.owner_id)
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     values["status"] = check_type(db, body.status) if body.status else first_type(db)
+    values["extra"] = check_extra(db, "company", body.extra)
     company = Company(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
+    check_required(db, "company", company)
     db.add(company)
     db.flush()
     audit(db, me, "company.created", target=company.name, target_type="company", target_id=company.id)
@@ -197,11 +203,13 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
     company = get_company(db, access, company_id)
     wanted = changed(body)
     if "name" in wanted and wanted["name"] is None:
-        raise field_error("name", "Give the company a name.")
+        raise field_error("name", "Give the customer a name.")
     if "status" in wanted and wanted["status"] is None:
         raise field_error("status", "Pick a type.")
     if wanted.get("status") and wanted["status"] != company.status:
         check_type(db, wanted["status"])
+    if "extra" in wanted:
+        wanted["extra"] = check_extra(db, "company", wanted["extra"], company.extra)
     if "owner_id" in wanted:
         owner = owner_for(db, access, wanted.pop("owner_id"))
         if owner.id != company.owner_id:
@@ -209,6 +217,7 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
     fields = [k for k, v in wanted.items() if getattr(company, k) != v]
     for key in fields:
         setattr(company, key, wanted[key])
+    check_required(db, "company", company)
     if fields:
         audit(db, me, "company.updated", target=company.name, target_type="company", target_id=company.id, fields=camel([f for f in fields if f != "team_id"]))
         db.commit()
@@ -223,7 +232,7 @@ def delete_company(access: Delete, me: CurrentUser, db: DB, company_id: str) -> 
     if contacts:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"{contacts} {'contact is' if contacts == 1 else 'contacts are'} in this company. Move or delete them first.",
+            f"{contacts} {'contact is' if contacts == 1 else 'contacts are'} with this customer. Move or delete them first.",
         )
     audit(db, me, "company.deleted", target=company.name, target_type="company", target_id=company.id)
     db.delete(company)  # its activities go with it

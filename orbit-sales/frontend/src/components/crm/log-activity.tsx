@@ -31,6 +31,7 @@ export function LogActivity({
   contactId,
   contacts = [],
   companies,
+  onDone,
 }: {
   org: Org;
   /** The moment the page was made, so the server and the browser start the
@@ -43,6 +44,8 @@ export function LogActivity({
   contacts?: Ref[];
   /** On the Activities page: companies to pick from. */
   companies?: Ref[];
+  /** Called once it's saved (the panel it sits in closes). */
+  onDone?: () => void;
 }) {
   const [kind, setKind] = useState<CrmKind>("call");
   const [subject, setSubject] = useState("");
@@ -95,6 +98,7 @@ export function LogActivity({
       setError(null);
       setFields({});
       setAt(info.planned ? tomorrowMorning(org.timezone) : localDateTime(new Date(), org.timezone));
+      onDone?.();
     });
   }
 
@@ -142,7 +146,7 @@ export function LogActivity({
           />
         )}
         {companies && (
-          <Field label="Company" optional error={fields.companyId}>
+          <Field label="Customer" optional error={fields.companyId}>
             {(p) => (
               <Select {...p} value={company} onChange={(e) => setCompany(e.target.value)}>
                 <option value="">None</option>

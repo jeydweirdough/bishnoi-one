@@ -19,7 +19,7 @@ export function UserForm({ roles, teams, user }: Props) {
   const [pending, start] = useTransition();
   const [fullName, setFullName] = useState(user?.fullName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [roleId, setRoleId] = useState(user?.role.id ?? roles.find((r) => r.name === "Sales Rep")?.id ?? roles[0]?.id ?? "");
+  const [roleId, setRoleId] = useState(user?.role.id ?? roles.find((r) => r.name === "Salesperson")?.id ?? roles[0]?.id ?? "");
   const [teamId, setTeamId] = useState(user?.team?.id ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -18,6 +18,8 @@ export type ProductInput = {
   isActive: boolean;
   /** price type code -> centavos; null clears that price. */
   prices: Record<string, number | null>;
+  /** Added fields (Settings → Forms), by key: only what changed (null clears one). */
+  extra?: Record<string, string | boolean | string[] | null>;
 };
 
 export async function saveProduct(id: string | null, input: ProductInput): Promise<Result<CatalogueProduct>> {

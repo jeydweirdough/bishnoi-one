@@ -103,7 +103,7 @@ export function DeleteRecord({ kind, id, name, body }: { kind: "company" | "cont
       label="Delete"
       title={`Delete ${name}?`}
       body={body}
-      confirmLabel={`Delete ${kind}`}
+      confirmLabel={`Delete ${kind === "company" ? "customer" : kind}`}
       triggerVariant="quiet"
       triggerSize="sm"
       onConfirm={async () => {
@@ -112,7 +112,7 @@ export function DeleteRecord({ kind, id, name, body }: { kind: "company" | "cont
           toast.error(result.error);
           return false;
         }
-        toast.success(`${kind === "company" ? "Company" : "Contact"} deleted`, { description: name });
+        toast.success(`${kind === "company" ? "Customer" : "Contact"} deleted`, { description: name });
         router.push(kind === "company" ? "/companies" : "/contacts");
         router.refresh();
       }}

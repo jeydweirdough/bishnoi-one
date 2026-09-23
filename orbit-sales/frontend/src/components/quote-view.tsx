@@ -6,7 +6,8 @@ import { Particulars, SectionTitle, Subheading, Sheet } from "@/src/platform/ui/
 import { percent, type Format } from "@/src/platform/lib/format";
 import { orgFormat } from "@/src/platform/lib/org";
 import { APPROVAL_STATUSES, LETTER_STATUSES, PAYMENT_STATUSES, approvalReason } from "@/src/platform/lib/labels";
-import type { Quote, QuoteLine } from "@/src/platform/lib/types";
+import type { CustomField, Quote, QuoteLine } from "@/src/platform/lib/types";
+import { extraItems } from "./extra/extra-values";
 
 function discountLabel(fmt: Format, line: QuoteLine) {
   if (!line.discountKind || !line.discountValue) return null;
@@ -33,8 +34,11 @@ export async function QuoteView({
   letterHref,
   customerHref,
   actions,
+  fields = [],
 }: {
   quote: Quote;
+  /** The fields added to quotes (Settings → Forms), to show the values this one has. */
+  fields?: CustomField[];
   letterHref: string;
   customerHref?: string;
   actions?: { approval?: ReactNode; letter?: ReactNode; payment?: ReactNode };
@@ -139,9 +143,17 @@ export async function QuoteView({
                 ["Price", `${quote.priceTypeName}${quote.rx ? " · with Rx" : ""}`],
                 ["Paid by", quote.payerName ? `${quote.payerName}, with a guarantee letter` : "The customer"],
                 ["Made by", `${quote.createdBy.name} · ${fmt.whenLabel(quote.createdAt)}`],
+                ["Good until", quote.validUntil ? fmt.dateLabel(quote.validUntil) : null],
+                ...extraItems(fmt, fields, quote.extra),
               ]}
             />
           </div>
+          {quote.terms && (
+            <div className="mt-5 border-t border-rule pt-4">
+              <Subheading>Terms</Subheading>
+              <p className="mt-1 whitespace-pre-line text-ink-2">{quote.terms}</p>
+            </div>
+          )}
           {quote.notes && (
             <div className="mt-5 border-t border-rule pt-4">
               <Subheading>Notes</Subheading>

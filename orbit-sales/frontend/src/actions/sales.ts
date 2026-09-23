@@ -31,6 +31,8 @@ export type QuoteInput = {
     | { bundleId: string; quantity: number }
   )[];
   letter: { number: string; issuedOn: string; amountCentavos: number | null } | null;
+  /** Added fields (Settings → Forms), by key. */
+  extra?: Record<string, string | boolean | string[] | null>;
 };
 
 /** What the quote comes to, priced by the API with the customer's team's prices. Nothing is saved. */

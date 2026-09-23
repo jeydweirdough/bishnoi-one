@@ -4,7 +4,7 @@ Same permissions as companies (customers.view / create / edit / delete), within
 the person's reach. A contact can be put only in a company within reach.
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import Field, field_validator
@@ -15,6 +15,7 @@ from app.access import Access, require
 from app.api import Api, camel, changed, check_email, digits, duplicates_error, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser
+from app.extra import check_extra, check_required
 from app.models import Activity, Company, Contact
 from app.routers.activities import activity_out
 from app.scope import owner_for, reaches, within
@@ -36,6 +37,8 @@ class ContactFields(Api):
     notes: str | None = Field(None, max_length=5000)
     company_id: str | None = Field(None, max_length=36)
     owner_id: str | None = Field(None, max_length=36)
+    # Added fields' values, by key (Settings → Forms). A null clears one.
+    extra: dict[str, Any] | None = None
 
     @field_validator("email")
     @classmethod
@@ -68,6 +71,7 @@ def contact_row(contact: Contact, access: Access, last_activity=None) -> dict:
         "owner": person_out(contact.owner),
         "team": team_out(contact.team),
         "lastActivityAt": iso(last_activity),
+        "extra": contact.extra or {},
         "updatedAt": iso(contact.updated_at),
         "can": {"edit": inside and access.can("customers.edit"), "delete": inside and access.can("customers.delete")},
     }
@@ -85,7 +89,7 @@ def company_in_reach(db: Session, access: Access, company_id: str | None) -> Com
         return None
     company = db.get(Company, company_id)
     if company is None or not reaches(company, access):
-        raise field_error("companyId", "Pick a company you can see.")
+        raise field_error("companyId", "Pick a customer you can see.")
     return company
 
 
@@ -171,7 +175,9 @@ def create_contact(access: Create, me: CurrentUser, db: DB, body: ContactIn) -> 
             raise duplicates_error("contact", found)
     owner = owner_for(db, access, body.owner_id)
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
+    values["extra"] = check_extra(db, "contact", body.extra)
     contact = Contact(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
+    check_required(db, "contact", contact)
     db.add(contact)
     db.flush()
     audit(db, me, "contact.created", target=contact.full_name, target_type="contact", target_id=contact.id)
@@ -193,6 +199,8 @@ def update_contact(access: Edit, me: CurrentUser, db: DB, contact_id: str, body:
         raise field_error("firstName", "Give their first name.")
     if wanted.get("company_id"):
         company_in_reach(db, access, wanted["company_id"])
+    if "extra" in wanted:
+        wanted["extra"] = check_extra(db, "contact", wanted["extra"], contact.extra)
     if "owner_id" in wanted:
         owner = owner_for(db, access, wanted.pop("owner_id"))
         if owner.id != contact.owner_id:
@@ -200,6 +208,7 @@ def update_contact(access: Edit, me: CurrentUser, db: DB, contact_id: str, body:
     fields = [k for k, v in wanted.items() if getattr(contact, k) != v]
     for key in fields:
         setattr(contact, key, wanted[key])
+    check_required(db, "contact", contact)
     if fields:
         audit(db, me, "contact.updated", target=contact.full_name, target_type="contact", target_id=contact.id, fields=camel([f for f in fields if f != "team_id"]))
         db.commit()

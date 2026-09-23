@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -8,9 +8,12 @@ import { makeFormat } from "@/src/platform/lib/format";
 import type { Assignable, Paged, Quote, ContactDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { QuotesPanel } from "../components/quotes-panel";
+import { formLayout, layoutFields } from "../components/extra/load";
+import { layoutItems } from "../components/extra/extra-values";
 import { ActivityList } from "../components/crm/activity-list";
 import { DeleteRecord } from "../components/crm/list-controls";
-import { LogActivity } from "../components/crm/log-activity";
+import { LogActivityButton } from "../components/crm/log-activity-button";
+import { RecordTabs } from "../components/crm/record-tabs";
 
 type Params = Promise<{ id: string }>;
 
@@ -23,18 +26,20 @@ export async function generateMetadata({ params }: { params: Params }) {
   }
 }
 
-export default async function ContactPage({ params }: { params: Params }) {
+export default async function ContactPage({ params, searchParams }: { params: Params; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
-  const [contact, people, quotes] = await Promise.all([
+  const [contact, people, quotes, fields] = await Promise.all([
     load<ContactDetail>(`/contacts/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?contact=${enc(id)}&limit=20`) : null,
+    formLayout("contact"),
   ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && contact.can.edit;
+  const tab = (await searchParams).tab === "quotes" && quotes ? "quotes" : "activity";
   const link = (href: string, text: string) => (
     <a href={href} className="text-hema hover:underline">
       {text}
@@ -48,8 +53,15 @@ export default async function ContactPage({ params }: { params: Params }) {
         crumbs={[{ href: "/contacts", label: "Contacts" }]}
         actions={
           <>
+            {/* The one solid button: what a customer's page is most often opened to do. */}
+            {can(me, "quotes.create") && (
+              <LinkButton href={`/contacts/${contact.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                New quote
+              </LinkButton>
+            )}
+            {mayLog && <LogActivityButton org={me.org} now={new Date().toISOString()} people={people} contactId={contact.id} companyId={contact.company?.id} />}
             {contact.can.edit && (
-              <LinkButton href={`/contacts/${contact.id}/edit`} size="sm" icon={<Pencil className="size-3.5" aria-hidden />}>
+              <LinkButton href={`/contacts/${contact.id}/edit`} variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />}>
                 Edit
               </LinkButton>
             )}
@@ -75,46 +87,50 @@ export default async function ContactPage({ params }: { params: Params }) {
             {contact.company.name}
           </Link>
         ) : (
-          !contact.jobTitle && "No company"
+          !contact.jobTitle && "No customer"
         )}
       </PageHeader>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <div className="space-y-5">
-          {mayLog && (
-            <Sheet className="px-5 pt-4 pb-5">
-              <SectionTitle icon="logActivity">Log or plan</SectionTitle>
-              <div className="mt-3">
-                <LogActivity org={me.org} now={new Date().toISOString()} people={people} contactId={contact.id} companyId={contact.company?.id} />
-              </div>
-            </Sheet>
-          )}
-          {quotes && (
-            <Sheet className="px-5 pt-4 pb-3">
-              <SectionTitle icon="quotes">Quotes{quotes.total > quotes.items.length ? ` (latest ${quotes.items.length} of ${quotes.total})` : ""}</SectionTitle>
-              <QuotesPanel customerHref={`/contacts/${contact.id}`} quotes={quotes.items} canAdd={can(me, "quotes.create")} />
-            </Sheet>
-          )}
-          <Sheet className="px-5 pt-4 pb-2">
-            <SectionTitle icon="history">Activity</SectionTitle>
+        <Sheet className="px-5 pb-2">
+          <RecordTabs
+            base={`/contacts/${contact.id}`}
+            current={tab}
+            tabs={[
+              { key: "activity", label: "Activity", count: contact.activities.length },
+              ...(quotes ? [{ key: "quotes", label: "Quotes", count: quotes.total }] : []),
+            ]}
+          />
+          {tab === "quotes" && quotes ? (
+            <QuotesPanel customerHref={`/contacts/${contact.id}`} quotes={quotes.items} canAdd={false} />
+          ) : (
             <ActivityList
               activities={contact.activities}
               org={me.org}
               hide={["contact"]}
-              empty="Nothing yet. Calls, meetings, emails, notes and tasks with them show up here."
+              empty="Nothing yet. Calls, meetings, emails, notes and tasks with them show up here: use Log activity."
             />
-          </Sheet>
-        </div>
+          )}
+        </Sheet>
 
         <Sheet className="px-5 pt-4 pb-5">
           <SectionTitle icon="particulars">Details</SectionTitle>
           <div className="mt-3">
             <Particulars
               items={[
-                ["Email", contact.email ? link(`mailto:${contact.email}`, contact.email) : null],
-                ["Phone", contact.phone ? link(`tel:${contact.phone}`, contact.phone) : null],
-                ["Mobile", contact.mobile ? link(`tel:${contact.mobile}`, contact.mobile) : null],
-                ["Owner", contact.owner.id === me.user.id ? "You" : contact.owner.name],
+                ...layoutItems(
+                  fmt,
+                  layoutFields(fields),
+                  contact,
+                  {
+                    email: contact.email ? link(`mailto:${contact.email}`, contact.email) : null,
+                    phone: contact.phone ? link(`tel:${contact.phone}`, contact.phone) : null,
+                    mobile: contact.mobile ? link(`tel:${contact.mobile}`, contact.mobile) : null,
+                    ownerId: contact.owner.id === me.user.id ? "You" : contact.owner.name,
+                  },
+                  // Already on the page: the name and title in the header, the notes under these.
+                  ["firstName", "lastName", "jobTitle", "companyId", "notes"],
+                ),
                 ["Team", contact.team?.name ?? null],
                 ["Added", fmt.whenLabel(contact.createdAt)],
               ]}

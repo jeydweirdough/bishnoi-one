@@ -28,6 +28,7 @@ ACTION_LABELS = {
     "roles": "Roles & permissions",
     "teams": "Teams",
     "types": "Customer types",
+    "settings": "Settings",
     "audit": "Audit logs",
 }
 
@@ -45,7 +46,7 @@ class Area:
 
 AREAS: tuple[Area, ...] = (
     Area("dashboard", "Dashboard", "Sales", ("view",)),
-    Area("customers", "Customers (companies & contacts)", "Sales", CRUD),
+    Area("customers", "Customers & contacts", "Sales", CRUD),
     Area("leads", "Leads", "Sales", CRUD),
     Area("opportunities", "Opportunities", "Sales", CRUD),
     Area("deals", "Deals", "Sales", CRUD),
@@ -58,7 +59,7 @@ AREAS: tuple[Area, ...] = (
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("automations", "Automations", "Insight & tools", ("view", "manage")),
     Area("integrations", "Integrations", "Insight & tools", ("view", "manage")),
-    Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "audit")),
+    Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
@@ -87,15 +88,17 @@ def _grant(*areas: str, actions: tuple[str, ...] = CRUD) -> set[str]:
 
 
 # The roles Sales starts with. Administrator is the system role: it always
-# holds every permission and can't be changed or deleted. The others are
+# holds every permission and can't be changed or deleted. The other two are
 # ordinary roles, there to start from.
 ADMINISTRATOR = "Administrator"
+TEAM_LEAD = "Team Lead"
+SALESPERSON = "Salesperson"
 STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
-    (ADMINISTRATOR, "Everything, including users, roles, teams and the audit log.", "all", ALL_PERMISSIONS),
+    (ADMINISTRATOR, "Everything, including users, roles, teams, settings and the audit log.", "all", ALL_PERMISSIONS),
     (
-        "Manager",
-        "Sees and works every record, approves quotes and orders, runs reports. No administration.",
-        "all",
+        TEAM_LEAD,
+        "Manages their own team: its customers, quotes and prices. Approves the team's quotes.",
+        "team",
         frozenset(
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "contracts", "documents")
             | _grant("quotes", "orders", actions=("approve",))
@@ -106,19 +109,8 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         ),
     ),
     (
-        "Team Lead",
-        "Works their team's records and runs its reports.",
-        "team",
-        frozenset(
-            _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "documents")
-            | _grant("dashboard", "products", "contracts", actions=("view",))
-            | _grant("products", actions=("prices",))
-            | _grant("reports", actions=("view",))
-        ),
-    ),
-    (
-        "Sales Rep",
-        "Works their own customers, leads, deals and quotes.",
+        SALESPERSON,
+        "Works their own customers, activities and quotes.",
         "own",
         frozenset(
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))

@@ -9,7 +9,7 @@ import { makeFormat, plural } from "@/src/platform/lib/format";
 import { BulkBar, BulkStep, useBulkRun, useSelection } from "@/src/platform/bulk/selection";
 import type { Assignable, Org } from "@/src/platform/lib/types";
 
-const NOUN: [string, string] = ["follow-up", "follow-ups"];
+const NOUN: [string, string] = ["item", "items"];
 
 export function FollowUpsBulk({
   people,

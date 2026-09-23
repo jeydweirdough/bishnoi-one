@@ -3,10 +3,10 @@ import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { SalesRules } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
+import { SettingsTabs } from "../components/settings/settings-tabs";
 import { RulesEditor } from "../components/catalogue/rules-editor";
 
-export const metadata = { title: "Pricing rules" };
+export const metadata = { title: "Pricing & retention" };
 
 export default async function PricingPage() {
   const me = await getCompanyMe();
@@ -14,8 +14,8 @@ export default async function PricingPage() {
   const rules = await load<SalesRules>("/pricing");
   return (
     <>
-      <PageHeader title="Products & services">The rules every quote is priced by.</PageHeader>
-      <CatalogueTabs current="/pricing" />
+      <PageHeader title="Settings">The rules every quote is priced by, and when a quiet customer counts as at risk or lost.</PageHeader>
+      <SettingsTabs me={me} current="/admin/settings/pricing" />
       <RulesEditor rules={rules} />
     </>
   );

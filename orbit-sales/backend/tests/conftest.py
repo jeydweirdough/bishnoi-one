@@ -1,5 +1,5 @@
 """A Sales API on a fresh database for each test, with two people:
-Ana, an Administrator, and Ben, a Sales Rep."""
+Ana, an Administrator, and Ben, a Salesperson."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,7 +25,7 @@ def app(tmp_path):
     app = create_app(settings)
     with app.state.sessions() as db:
         db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Administrator")))
-        db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Sales Rep")))
+        db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Salesperson")))
         db.commit()
     return app
 

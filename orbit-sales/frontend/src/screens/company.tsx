@@ -8,9 +8,12 @@ import { makeFormat } from "@/src/platform/lib/format";
 import type { Assignable, CustomerType, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { QuotesPanel } from "../components/quotes-panel";
+import { formLayout, layoutFields } from "../components/extra/load";
+import { layoutItems } from "../components/extra/extra-values";
 import { ActivityList } from "../components/crm/activity-list";
 import { DeleteRecord } from "../components/crm/list-controls";
-import { LogActivity } from "../components/crm/log-activity";
+import { LogActivityButton } from "../components/crm/log-activity-button";
+import { RecordTabs } from "../components/crm/record-tabs";
 import { StatusTag, siteHref, siteLabel } from "../components/crm/words";
 
 type Params = Promise<{ id: string }>;
@@ -20,23 +23,25 @@ export async function generateMetadata({ params }: { params: Params }) {
   try {
     return { title: (await load<CompanyDetail>(`/companies/${enc(id)}`)).name };
   } catch {
-    return { title: "Company" };
+    return { title: "Customer" };
   }
 }
 
-export default async function CompanyPage({ params }: { params: Params }) {
+export default async function CompanyPage({ params, searchParams }: { params: Params; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
-  const [company, people, quotes, types] = await Promise.all([
+  const [company, people, quotes, types, fields] = await Promise.all([
     load<CompanyDetail>(`/companies/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
     load<CustomerType[]>("/customer-types"),
+    formLayout("company"),
   ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && company.can.edit;
+  const tab = (await searchParams).tab === "quotes" && quotes ? "quotes" : "activity";
 
   return (
     <>
@@ -47,11 +52,26 @@ export default async function CompanyPage({ params }: { params: Params }) {
             <StatusTag status={company.status} types={types} />
           </span>
         }
-        crumbs={[{ href: "/companies", label: "Companies" }]}
+        crumbs={[{ href: "/companies", label: "Customers" }]}
         actions={
           <>
+            {/* The one solid button: what a customer's page is most often opened to do. */}
+            {can(me, "quotes.create") && (
+              <LinkButton href={`/companies/${company.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                New quote
+              </LinkButton>
+            )}
+            {mayLog && (
+              <LogActivityButton
+                org={me.org}
+                now={new Date().toISOString()}
+                people={people}
+                companyId={company.id}
+                contacts={company.contacts.map((c) => ({ id: c.id, name: c.name }))}
+              />
+            )}
             {company.can.edit && (
-              <LinkButton href={`/companies/${company.id}/edit`} size="sm" icon={<Pencil className="size-3.5" aria-hidden />}>
+              <LinkButton href={`/companies/${company.id}/edit`} variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />}>
                 Edit
               </LinkButton>
             )}
@@ -74,31 +94,33 @@ export default async function CompanyPage({ params }: { params: Params }) {
       </PageHeader>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <div className="space-y-5">
-          {mayLog && (
-            <Sheet className="px-5 pt-4 pb-5">
-              <SectionTitle icon="logActivity">Log or plan</SectionTitle>
-              <div className="mt-3">
-                <LogActivity org={me.org} now={new Date().toISOString()} people={people} companyId={company.id} contacts={company.contacts.map((c) => ({ id: c.id, name: c.name }))} />
-              </div>
-            </Sheet>
-          )}
-          {quotes && (
-            <Sheet className="px-5 pt-4 pb-3">
-              <SectionTitle icon="quotes">Quotes{quotes.total > quotes.items.length ? ` (latest ${quotes.items.length} of ${quotes.total})` : ""}</SectionTitle>
-              <QuotesPanel customerHref={`/companies/${company.id}`} quotes={quotes.items} canAdd={can(me, "quotes.create")} showWho />
-            </Sheet>
-          )}
-          <Sheet className="px-5 pt-4 pb-2">
-            <SectionTitle icon="history">Activity</SectionTitle>
+        <Sheet className="px-5 pb-2">
+          <RecordTabs
+            base={`/companies/${company.id}`}
+            current={tab}
+            tabs={[
+              { key: "activity", label: "Activity", count: company.activities.length },
+              ...(quotes ? [{ key: "quotes", label: "Quotes", count: quotes.total }] : []),
+            ]}
+          />
+          {tab === "quotes" && quotes ? (
+            <>
+              <QuotesPanel customerHref={`/companies/${company.id}`} quotes={quotes.items} canAdd={false} showWho />
+              {quotes.total > quotes.items.length && (
+                <Link href={`/quotes?q=${encodeURIComponent(company.name)}`} className="block py-2 text-meta text-hema hover:underline">
+                  See all {quotes.total}
+                </Link>
+              )}
+            </>
+          ) : (
             <ActivityList
               activities={company.activities}
               org={me.org}
               hide={["company"]}
-              empty="Nothing yet. Calls, meetings, emails, notes and tasks about this company show up here."
+              empty="Nothing yet. Calls, meetings, emails, notes and tasks about this customer show up here: use Log activity."
             />
-          </Sheet>
-        </div>
+          )}
+        </Sheet>
 
         <div className="space-y-5">
           <Sheet className="px-5 pt-4 pb-5">
@@ -106,12 +128,24 @@ export default async function CompanyPage({ params }: { params: Params }) {
             <div className="mt-3">
               <Particulars
                 items={[
-                  ["Owner", company.owner.id === me.user.id ? "You" : company.owner.name],
+                  ...layoutItems(
+                    fmt,
+                    layoutFields(fields),
+                    company,
+                    {
+                      ownerId: company.owner.id === me.user.id ? "You" : company.owner.name,
+                      phone: company.phone ? <a href={`tel:${company.phone}`} className="text-hema hover:underline">{company.phone}</a> : null,
+                      email: company.email ? <a href={`mailto:${company.email}`} className="text-hema hover:underline">{company.email}</a> : null,
+                      website: company.website ? (
+                        <a href={siteHref(company.website)} target="_blank" rel="noopener noreferrer" className="text-hema hover:underline">
+                          {siteLabel(company.website)}
+                        </a>
+                      ) : null,
+                    },
+                    // Already on the page: in the header, and the notes under these.
+                    ["name", "status", "notes"],
+                  ),
                   ["Team", company.team?.name ?? null],
-                  ["Phone", company.phone ? <a href={`tel:${company.phone}`} className="text-hema hover:underline">{company.phone}</a> : null],
-                  ["Email", company.email ? <a href={`mailto:${company.email}`} className="text-hema hover:underline">{company.email}</a> : null],
-                  ["Website", company.website ? <a href={siteHref(company.website)} target="_blank" rel="noopener noreferrer" className="text-hema hover:underline">{siteLabel(company.website)}</a> : null],
-                  ["Address", company.address],
                   ["Added", fmt.whenLabel(company.createdAt)],
                 ]}
               />

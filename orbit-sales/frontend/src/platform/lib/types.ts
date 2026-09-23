@@ -412,6 +412,7 @@ export type Product = {
   unit: string;
   isActive: boolean;
   prices: Record<string, number>;
+  extra: ExtraValues;
   updatedAt: string | null;
 };
 
@@ -529,6 +530,10 @@ export type Quote = {
     at: string | null;
   } | null;
   payment: { status: "none" | "unpaid" | "partial" | "paid"; paidCentavos: number; payments: Payment[] };
+  /** From the quote settings when it was made. */
+  validUntil: string | null;
+  terms: string | null;
+  extra: ExtraValues;
   createdAt: string;
   createdBy: Person;
   owner: Person | null;
@@ -589,13 +594,11 @@ export type NextFollowUp = { dueOn: string; title: string; assignee: string | nu
 export type WatchRow = {
   customerId: string;
   name: string;
-  division: string;
-  divisionName: string;
   team: string;
   teamName: string;
-  owner: Person;
+  owner: { id: string | null; name: string | null };
   health: Health;
-  status: CustomerStatus;
+  status: CompanyStatus;
   lastQuoteOn: string | null;
   daysSince: number;
   followUp: NextFollowUp;
@@ -609,6 +612,9 @@ export type DivisionRules = RetentionRules & { division: string; divisionName: s
 export type ModuleRetention = {
   view: "mine" | "team";
   canSeeTeam: boolean;
+  /** The teams to narrow "team" to: only for a role that reaches every record. */
+  teams: Ref[];
+  team: string | null;
   asOf: string;
   rules: DivisionRules[];
   summary: RetentionSummary;
@@ -789,7 +795,7 @@ export type UserOptions = {
   teams: { id: string; name: string; isActive: boolean }[];
 };
 
-export type TeamRow = { id: string; name: string; description: string | null; isActive: boolean; memberCount: number };
+export type TeamRow = { id: string; name: string; description: string | null; headquarters: string[]; isActive: boolean; memberCount: number };
 
 export type AuditItem = {
   id: number;
@@ -830,6 +836,7 @@ export type CompanyRow = {
   contactCount: number;
   lastActivityAt: string | null;
   updatedAt: string;
+  extra: ExtraValues;
   can: Can;
 };
 
@@ -855,6 +862,7 @@ export type ContactRow = {
   team: Ref | null;
   lastActivityAt: string | null;
   updatedAt: string;
+  extra: ExtraValues;
   can: Can;
 };
 
@@ -899,3 +907,90 @@ export type SalesRules = {
 
 export type PromoRow = Omit<Promo, "divisionCodes" | "startsOn"> & { startsOn: string | null };
 export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn: string | null };
+
+// --- Settings (Administration → Settings) ---
+
+export type CustomEntity = "product" | "company" | "contact" | "quote";
+/** Kinds an admin can add. Built-in fields also have their own (status, owner, company). */
+export type CustomFieldType = "text" | "long_text" | "number" | "money" | "date" | "choice" | "multi_choice" | "yes_no" | "email" | "phone" | "url";
+
+/** One field on a form (Administration → Settings → Forms): built in, or added.
+ *  An added field keeps its values in the record's `extra`, by `key`. */
+export type FormFieldDef = {
+  id: string;
+  key: string;
+  label: string;
+  type: CustomFieldType | "status" | "owner" | "company";
+  standard: boolean;
+  /** The record can't do without it: always shown, always required. */
+  locked: boolean;
+  required: boolean;
+  hidden: boolean;
+  inList: boolean;
+  options: string[];
+  helpText: string | null;
+  placeholder: string | null;
+  /** Only in Settings: how many records have a value in it. */
+  used?: number;
+};
+/** The name most places use: a field on a form. */
+export type CustomField = FormFieldDef;
+
+export type FormSectionDef = { id: string; title: string; columns: 1 | 2; fields: FormFieldDef[] };
+export type FormLayout = { entity: CustomEntity; sections: FormSectionDef[] };
+
+export type ExtraValues = Record<string, string | number | boolean | string[]>;
+
+export type CompanySettings = {
+  orgName: string;
+  currency: string;
+  locale: string;
+  timezone: string;
+  quotePrefix: string;
+  quoteValidDays: number;
+  quoteTerms: string | null;
+  currencies: string[];
+};
+
+// --- insights (a lead's team, the admin's dashboard) ---
+
+export type PersonInsight = {
+  id: string;
+  name: string;
+  role: string;
+  team: Ref | null;
+  isMe: boolean;
+  overdue: number;
+  dueToday: number;
+  upcoming: number;
+  doneThisWeek: number;
+  doneByKind: Partial<Record<CrmKind, number>>;
+  lastActivityAt: string | null;
+  customers: number;
+  newCustomersThisMonth: number;
+  quotesThisMonth: number;
+  quotedThisMonthCentavos: number;
+  quotesWaiting: number;
+  quotesRejectedThisMonth: number;
+  lastSignInAt: string | null;
+  signInsThisWeek: number;
+};
+
+export type PeopleInsights = {
+  asOf: string;
+  monthStart: string;
+  people: PersonInsight[];
+  totals: {
+    people: number;
+    signedInThisWeek: number;
+    activeThisWeek: number;
+    overdue: number;
+    dueToday: number;
+    doneThisWeek: number;
+    customers: number;
+    newCustomersThisMonth: number;
+    quotesThisMonth: number;
+    quotedThisMonthCentavos: number;
+    quotesWaiting: number;
+  };
+};

@@ -2,6 +2,7 @@ import { ApprovalActions, LetterActions, PaymentForm } from "@/src/vendor-financ
 import { DeleteQuote } from "../components/delete-quote";
 import { RaiseOrder } from "../components/raise-order";
 import { QuoteView } from "../components/quote-view";
+import { customFields } from "../components/extra/load";
 import { QuoteStateMark } from "@/src/platform/ui/marks";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
@@ -32,7 +33,7 @@ export default async function QuotePage({ params, searchParams }: { params: Para
   const [{ id }, search] = await Promise.all([params, searchParams]);
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
-  const quote = await load<Quote>(`/quotes/${enc(id)}`);
+  const [quote, fields] = await Promise.all([load<Quote>(`/quotes/${enc(id)}`), customFields("quote")]);
   const from = search.from;
   const customer = quote.contact ?? quote.company;
   const crumbs = fromList(from)
@@ -42,7 +43,7 @@ export default async function QuotePage({ params, searchParams }: { params: Para
       ]
     : customer && quote.customerHref
       ? [
-          { href: quote.contact ? "/contacts" : "/companies", label: quote.contact ? "Contacts" : "Companies" },
+          { href: quote.contact ? "/contacts" : "/companies", label: quote.contact ? "Contacts" : "Customers" },
           { href: quote.customerHref, label: customer.name },
         ]
       : [{ href: "/quotes", label: "Quotes" }];
@@ -69,6 +70,7 @@ export default async function QuotePage({ params, searchParams }: { params: Para
         quote={quote}
         letterHref={`/quotes/${id}/letter`}
         customerHref={quote.customerHref ?? undefined}
+        fields={fields}
         actions={{
           approval: <ApprovalActions quote={quote} org={me.org} />,
           letter: <LetterActions quote={quote} org={me.org} />,

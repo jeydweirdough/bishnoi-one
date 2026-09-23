@@ -15,9 +15,9 @@ the customer it's for.
 
 import json
 import secrets
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
@@ -30,8 +30,9 @@ from app.access import Access, require
 from app.api import Api, iso, not_found, person_out
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
+from app.extra import check_extra
 from app.models import Company, Contact, Quote, Team, User
-from app.pricing import Problems, price_book, price_lines, price_list_out, today
+from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
 router = APIRouter(tags=["quotes"])
@@ -84,6 +85,8 @@ class QuoteIn(Api):
     notes: str | None = Field(None, max_length=2000)
     lines: list[LineIn] = Field(min_length=1, max_length=50)
     letter: LetterIn | None = None
+    # Added fields' values, by key (Settings → Forms).
+    extra: dict[str, Any] | None = None
 
 
 def lines_in(body: QuoteIn) -> list[dict]:
@@ -98,7 +101,7 @@ def customer_of(db: Session, access: Access, kind: str, record_id: str) -> tuple
     if kind == "companies":
         company = db.get(Company, record_id)
         if company is None or not reaches(company, access):
-            raise not_found("company")
+            raise not_found("customer")
         return company, None
     contact = db.get(Contact, record_id)
     if contact is None or not reaches(contact, access):
@@ -202,6 +205,9 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         },
         "letter": letter,
         "payment": {"status": q.payment_status, "paidCentavos": q.paid_centavos, "payments": q.payments},
+        "validUntil": q.valid_until,
+        "terms": q.terms,
+        "extra": q.extra or {},
         "createdAt": iso(q.created_at),
         "createdBy": person_out(q.created_by) or {"id": "", "name": "Someone no longer here"},
         "owner": person_out(db.get(User, q.owner_id)),
@@ -234,7 +240,7 @@ def preview_quote(access: Create, db: DB, settings: SettingsDep, kind: Kind, rec
 
 
 def next_number(db: Session, on: str) -> str:
-    prefix = f"Q-{on[:4]}{on[5:7]}-"
+    prefix = f"{sales_settings(db).quote_prefix}-{on[:4]}{on[5:7]}-"
     last = db.scalar(select(func.max(Quote.number)).where(Quote.number.like(f"{prefix}%")))
     return f"{prefix}{(int(last.rsplit('-', 1)[1]) + 1 if last else 1):04d}"
 
@@ -294,6 +300,8 @@ async def create_quote(
         if issuer is not None and (letter_file is None or not letter_file.filename):
             problems.add(["letterFile"], "Attach the letter: a PDF, or a photo (JPG or PNG).")
     problems.raise_if_any()
+    extra = check_extra(db, "quote", body.extra)
+    rules = book.settings
 
     stored = None
     if issuer is not None:
@@ -333,6 +341,9 @@ async def create_quote(
         letter_status="pending" if issuer else "none",
         payment_status="unpaid" if issuer else "none",
         payments=[],
+        valid_until=(date.fromisoformat(on) + timedelta(days=rules.quote_valid_days)).isoformat(),
+        terms=rules.quote_terms,
+        extra=extra,
         owner_id=me.id,
         team_id=me.team_id,
         created_by_id=me.id,

@@ -22,6 +22,8 @@ export type CompanyInput = {
   country: string | null;
   notes: string | null;
   ownerId: string | null;
+  /** Added fields (Settings → Forms), by key: only what changed (null clears one). */
+  extra?: Record<string, string | boolean | string[] | null>;
 };
 
 export async function createCompany(input: CompanyInput): Promise<Result<CompanyDetail>> {
@@ -54,6 +56,8 @@ export type ContactInput = {
   notes: string | null;
   companyId: string | null;
   ownerId: string | null;
+  /** Added fields (Settings → Forms), by key: only what changed (null clears one). */
+  extra?: Record<string, string | boolean | string[] | null>;
 };
 
 export async function createContact(input: ContactInput): Promise<Result<ContactDetail>> {

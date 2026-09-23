@@ -9,7 +9,8 @@ import { Field, FileInput, FormError, Input, Select, Textarea } from "@/src/plat
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/sales";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { promoTerms } from "@/src/platform/lib/labels";
-import type { Org, PriceList, QuotePreview } from "@/src/platform/lib/types";
+import type { CustomField, Org, PriceList, QuotePreview } from "@/src/platform/lib/types";
+import { ExtraFields, extraChanges, toDraft, type ExtraDraft } from "./extra/extra-fields";
 
 const MAX_LETTER_BYTES = 8 * 1024 * 1024;
 
@@ -84,7 +85,7 @@ function discountOf(fmt: Format, l: LineDraft): ManualDiscount {
   return value ? { kind: l.discountKind, value } : null;
 }
 
-export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: PriceList; org: Org }) {
+export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: QuoteFor; priceList: PriceList; org: Org; fields?: CustomField[] }) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const always = priceList.priceTypes.filter((t) => t.rule === "always");
@@ -104,6 +105,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
   const letterFile = useRef<HTMLInputElement>(null);
+  const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(custom, undefined));
   const today = fmt.todayKey();
 
   const offered = draft.rx && withRx.length ? withRx : always;
@@ -186,7 +188,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
     }
 
     const form = new FormData();
-    form.set("quote", JSON.stringify(toInput(fmt, draft, entered, letter)));
+    form.set("quote", JSON.stringify({ ...toInput(fmt, draft, entered, letter), extra: extraChanges(custom, extra) }));
     if (withLetter && file) form.set("letterFile", file);
     startSave(async () => {
       const result = await createQuote(to, form);
@@ -196,7 +198,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
         return;
       }
       toast.success("Quote saved", {
-        description: preview?.approvalReasons.length || withLetter ? "It's waiting for an approver now." : undefined,
+        description: preview?.approvalReasons.length || withLetter ? "It's waiting for approval now." : undefined,
       });
       router.push(`/quotes/${result.data.id}`);
       router.refresh();
@@ -206,7 +208,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
   if (!priceList.usesPriceList || priceList.priceTypes.length === 0) {
     return (
       <p className="text-ink-2">
-        There are no prices to quote with yet. Whoever keeps the catalogue sets them up in Products → Pricing rules.
+        There are no prices to quote with yet. An administrator sets them up in Administration → Settings → Pricing &amp; retention.
       </p>
     );
   }
@@ -247,7 +249,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
               {offered.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.name}
-                  {t.needsApproval ? " (needs approval)" : ""}
+                  {t.needsApproval ? " (your team lead approves)" : ""}
                 </option>
               ))}
             </Select>
@@ -493,7 +495,7 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
       </div>
       {preview && preview.approvalReasons.length > 0 && (
         <p className="animate-reshape rounded-[3px] bg-hema-tint px-3 py-2 text-meta text-ink-2">
-          An approver checks this quote before it goes out:{" "}
+          Your team lead approves this quote before it goes out:{" "}
           {preview.approvalReasons
             .map((r) => (r === "price" ? `${priceType?.name} needs approval` : `extra discounts are over ${percent(priceList.discountApprovalBp)}`))
             .join(", and ")}
@@ -544,13 +546,20 @@ export function QuoteForm({ to, priceList, org }: { to: QuoteFor; priceList: Pri
         )}
       </Field>
 
+      {custom.length > 0 && (
+        <fieldset>
+          <legend className="mb-2 text-meta font-medium text-ink-2">More about this quote</legend>
+          <ExtraFields fields={custom} draft={extra} onChange={setExtra} errors={fields} />
+        </fieldset>
+      )}
+
       <FormError message={error} />
       {/* The total and the button that commits to it, together, pinned where the hand already is. */}
       <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
         <div className="min-w-0">
           <p className="text-meta text-ink-3">Total</p>
           <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.totalCentavos) : "—"}</p>
-          {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes for approval</p>}
+          {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes to your team lead for approval</p>}
         </div>
         <Button type="submit" variant="primary" loading={saving} className="!h-10 !px-6">
           Save quote

@@ -20,7 +20,7 @@ export default async function BundlesPage() {
   return (
     <>
       <PageHeader title="Products & services">Sets of products sold together at one price.</PageHeader>
-      <CatalogueTabs current="/bundles" />
+      <CatalogueTabs me={me} current="/bundles" />
       <BundlesEditor
         bundles={bundles.items}
         products={products.items.map((p) => ({ id: p.id, name: p.name, code: p.code, unit: p.unit, prices: p.prices }))}

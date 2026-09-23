@@ -269,3 +269,24 @@ def test_the_rules_can_be_changed(client, ana, crew, catalogue):
     rules = client.patch("/pricing/price-types/SPECIAL", json={"isActive": False}, headers=ana).json()
     assert next(t for t in rules["priceTypes"] if t["code"] == "SPECIAL")["isActive"] is False
     assert client.patch("/pricing/settings", json={"lostDays": 200}, headers=crew["lia"]).status_code == 403
+
+
+def test_a_requested_price_goes_to_the_salespersons_team_lead(app, client, crew, ids):
+    """A salesperson asks for a lower price for a client; their own lead approves it."""
+    from app.models import Team, User
+    from app.security import hash_password
+    from tests.conftest import PASSWORD, bearer, role_id, sign_in
+
+    with app.state.sessions() as db:  # a lead for South too, who mustn't see North's quotes
+        south = db.query(Team).filter_by(name="South").one()
+        db.add(User(email="lou@example.com", full_name="Lou", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Team Lead"), team_id=south.id))
+        db.commit()
+    lou = bearer(sign_in(client, "lou@example.com"))
+    acme = company(client, crew["ria"])
+    q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 10, unitPriceCentavos=120000)], price_type="SPECIAL", notes="Client asked for a lower price").json()
+    assert (q["state"], q["approval"]["reasons"]) == ("waiting", ["price"])
+    assert client.get("/quotes?task=approvals", headers=crew["lia"]).json()["total"] == 1  # Ria's lead sees it
+    assert client.get("/quotes?task=approvals", headers=lou).json()["total"] == 0  # another team's lead doesn't
+    assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=lou).status_code == 404
+    done = client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["lia"]).json()
+    assert (done["state"], done["approval"]["by"]["name"]) == ("ready", "Lia")

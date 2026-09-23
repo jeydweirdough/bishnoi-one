@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { createCompany, updateCompany, type CompanyInput } from "../../actions/crm";
-import type { Assignable, Duplicate, CompanyDetail, CompanyStatus, CustomerType } from "@/src/platform/lib/types";
+import type { Assignable, CompanyDetail, CompanyStatus, CustomerType, Duplicate, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
+import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
 import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
 import { typeOptions } from "./words";
@@ -14,10 +15,11 @@ import { typeOptions } from "./words";
 const TEXT = ["name", "industry", "website", "email", "phone", "address", "city", "country", "notes"] as const;
 type Text = (typeof TEXT)[number];
 
-/** Adding a company, or changing one. */
-export function CompanyForm({ people, types, company }: { people: Assignable[]; types: CustomerType[]; company?: CompanyDetail }) {
+/** Adding a company, or changing one. The form is laid out as an admin set it (Settings → Forms). */
+export function CompanyForm({ people, types, layout, company }: { people: Assignable[]; types: CustomerType[]; layout: FormLayout; company?: CompanyDetail }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const allFields = layout.sections.flatMap((s) => s.fields);
   const [values, setValues] = useState<Record<Text, string>>(() =>
     Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? ""])) as Record<Text, string>,
   );
@@ -27,22 +29,28 @@ export function CompanyForm({ people, types, company }: { people: Assignable[]; 
   const [fields, setFields] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [dupMessage, setDupMessage] = useState("");
+  const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(allFields, company?.extra));
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
+  // What isn't on the form (hidden in Settings) isn't sent, so it stays as it was.
+  const shown = new Set(allFields.map((f) => f.key));
 
   function submit(allowDuplicate = false) {
     const input: CompanyInput = {
-      ...(Object.fromEntries(TEXT.map((k) => [k, values[k].trim() || null])) as Record<Text, string | null>),
+      ...(Object.fromEntries(TEXT.filter((k) => shown.has(k)).map((k) => [k, values[k].trim() || null])) as Record<Text, string | null>),
       name: values.name.trim(),
       status,
       ownerId: ownerId || null,
+      extra: extraChanges(allFields, extra),
     };
     start(async () => {
       let result;
       if (company) {
         const change: Partial<CompanyInput> = {};
-        for (const k of TEXT) if ((input[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
+        for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
         if (status !== company.status) change.status = status;
         if (ownerId !== company.owner.id) change.ownerId = ownerId;
+        const extraChange = extraChanges(allFields, extra, company.extra);
+        if (extraChange) change.extra = extraChange;
         if (Object.keys(change).length === 0) {
           router.push(`/companies/${company.id}`);
           return;
@@ -66,6 +74,47 @@ export function CompanyForm({ people, types, company }: { people: Assignable[]; 
     });
   }
 
+  /** A built-in field, drawn with the label and hints the admin gave it. */
+  function standard(f: FormFieldDef) {
+    const hint = f.helpText ?? undefined;
+    const placeholder = f.placeholder ?? undefined;
+    switch (f.key) {
+      case "status":
+        return <Choice<CompanyStatus> name="status" legend={f.label} value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />;
+      case "ownerId":
+        return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
+      case "industry":
+        return <ChoiceSelect field={f} value={values.industry} onChange={(v) => setValues({ ...values, industry: v })} error={fields.industry} />;
+      case "notes":
+        return (
+          <Field label={f.label} optional={!f.required} error={fields.notes} hint={hint}>
+            {(p) => <Textarea {...p} rows={3} value={values.notes} onChange={set("notes")} placeholder={placeholder} />}
+          </Field>
+        );
+      default: {
+        if (!(TEXT as readonly string[]).includes(f.key)) return null;
+        const k = f.key as Text;
+        const kind = f.type === "email" ? "email" : f.type === "phone" ? "tel" : "text";
+        return (
+          <Field label={f.label} optional={!f.required} error={fields[k]} hint={hint}>
+            {(p) => (
+              <Input
+                {...p}
+                type={kind}
+                inputMode={f.type === "email" ? "email" : f.type === "url" ? "url" : undefined}
+                value={values[k]}
+                onChange={set(k)}
+                placeholder={placeholder}
+                autoFocus={k === "name" && !company}
+                required={f.required}
+              />
+            )}
+          </Field>
+        );
+      }
+    }
+  }
+
   return (
     <form
       noValidate
@@ -75,48 +124,7 @@ export function CompanyForm({ people, types, company }: { people: Assignable[]; 
       }}
       className="space-y-7"
     >
-      <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">The company</legend>
-        <Field label="Name" error={fields.name} className="sm:col-span-2">
-          {(p) => <Input {...p} value={values.name} onChange={set("name")} autoFocus={!company} required />}
-        </Field>
-        <div className="sm:col-span-2">
-          <Choice<CompanyStatus> name="status" legend="Type" value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />
-        </div>
-        <Field label="Industry" optional error={fields.industry}>
-          {(p) => <Input {...p} value={values.industry} onChange={set("industry")} placeholder="Hospital, retail pharmacy…" />}
-        </Field>
-        <Field label="Website" optional error={fields.website}>
-          {(p) => <Input {...p} value={values.website} onChange={set("website")} inputMode="url" placeholder="example.com" />}
-        </Field>
-      </fieldset>
-
-      <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">How to reach them</legend>
-        <Field label="Email" optional error={fields.email}>
-          {(p) => <Input {...p} type="email" inputMode="email" value={values.email} onChange={set("email")} />}
-        </Field>
-        <Field label="Phone" optional error={fields.phone}>
-          {(p) => <Input {...p} type="tel" value={values.phone} onChange={set("phone")} />}
-        </Field>
-        <Field label="Address" optional error={fields.address} className="sm:col-span-2">
-          {(p) => <Input {...p} value={values.address} onChange={set("address")} />}
-        </Field>
-        <Field label="City" optional error={fields.city}>
-          {(p) => <Input {...p} value={values.city} onChange={set("city")} />}
-        </Field>
-        <Field label="Country" optional error={fields.country}>
-          {(p) => <Input {...p} value={values.country} onChange={set("country")} />}
-        </Field>
-      </fieldset>
-
-      <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">Who looks after it</legend>
-        <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} />
-        <Field label="Notes" optional error={fields.notes} className="sm:col-span-2">
-          {(p) => <Textarea {...p} rows={3} value={values.notes} onChange={set("notes")} />}
-        </Field>
-      </fieldset>
+      <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
 
       <FormError message={error} />
       {duplicates.length > 0 && (

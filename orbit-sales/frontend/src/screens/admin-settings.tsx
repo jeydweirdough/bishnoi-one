@@ -1,0 +1,31 @@
+import { PageHeader } from "@/src/platform/ui/sheet";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { can } from "@/src/platform/lib/access";
+import { getCompanyMe, load } from "@/src/platform/lib/api";
+import type { CustomEntity, FormLayout } from "@/src/platform/lib/types";
+import { NoAccess } from "../components/admin/words";
+import { FormEditor } from "../components/settings/form-editor";
+import { SettingsTabs } from "../components/settings/settings-tabs";
+import { ENTITY_WORDS } from "../components/settings/words";
+
+export const metadata = { title: "Forms" };
+
+const ENTITIES = Object.keys(ENTITY_WORDS) as CustomEntity[];
+
+export default async function FormsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const me = await getCompanyMe();
+  if (!can(me, "admin.settings")) return <NoAccess what="Settings" />;
+  const asked = (await searchParams).entity;
+  const entity = ENTITIES.find((e) => e === asked) ?? "company";
+  const layout = await load<FormLayout>(`/forms/${entity}?all=true`);
+  return (
+    <>
+      <PageHeader title="Settings">Lay out each form: its sections, the fields on it, and what each one asks. Everyone gets the form as saved here.</PageHeader>
+      <SettingsTabs me={me} current="/admin/settings" />
+      <div className="mb-4">
+        <ToggleLinks current={entity} options={ENTITIES.map((e) => ({ value: e, label: ENTITY_WORDS[e].many, href: `/admin/settings?entity=${e}` }))} />
+      </div>
+      <FormEditor key={entity} entity={entity} layout={layout} />
+    </>
+  );
+}

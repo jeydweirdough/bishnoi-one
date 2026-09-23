@@ -111,7 +111,7 @@ export function TeamPricesEditor({
     return (
       <Sheet>
         <Empty icon="pricing" title="There's no price list yet">
-          Whoever keeps the catalogue sets up price types in Products → Pricing rules. Until then there is nothing for{" "}
+          An administrator sets up price types in Administration → Settings → Pricing &amp; retention. Until then there is nothing for{" "}
           {teams.length > 1 ? "your teams" : teamName} to charge over.
         </Empty>
       </Sheet>
@@ -200,7 +200,7 @@ function TeamSheet({
       if (!result.ok) return setError(result.error);
       setError(null);
       onSaved(result.data);
-      toast.success("Prices saved", { description: `Reps in ${teamName} see them on their next quote.` });
+      toast.success("Special prices saved", { description: `Reps in ${teamName} see them on their next quote.` });
     });
   }
 
@@ -233,16 +233,16 @@ function TeamSheet({
       </Sheet>
 
       <Sheet className="max-w-[54rem] px-5 pt-4 pb-4">
-        <SectionTitle icon="products">What {teamName} charges</SectionTitle>
+        <SectionTitle icon="products">{teamName}&apos;s special prices</SectionTitle>
         <p className="text-meta text-ink-3">
-          Leave a price empty and it follows the company&apos;s. Your number is the number: nobody is asked to approve it.
+          Leave a price empty and it follows the standard price. Your team quotes at these; a salesperson asking for a lower one sends it to you for approval.
         </p>
         {columns.length === 0 ? (
           <Empty icon="products" title="Nothing to set here">
             Every price {teamName} quotes with is typed on the quote itself, so there is no list to price from.
           </Empty>
         ) : sheet.products.length === 0 ? (
-          <Empty icon="products" title="No products yet">Inventory keeps the products reps quote, with the company&apos;s prices.</Empty>
+          <Empty icon="products" title="No products yet">Products and their standard prices are kept in Products.</Empty>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm sm:min-w-[42rem]">
@@ -251,7 +251,7 @@ function TeamSheet({
                   <th scope="col" className="w-full py-2 pr-3 font-semibold">Product</th>
                   {/* A phone has no room for three money columns, so the company's
                       price and the difference move under the product's name. */}
-                  <th scope="col" className="hidden px-3 py-2 text-right font-semibold sm:table-cell">Company</th>
+                  <th scope="col" className="hidden px-3 py-2 text-right font-semibold sm:table-cell">Standard</th>
                   <th scope="col" className="px-3 py-2 text-right font-semibold normal-case tracking-normal">{teamName}</th>
                   <th scope="col" className="hidden py-2 pl-3 font-semibold sm:table-cell">Difference</th>
                 </tr>
@@ -328,10 +328,10 @@ function PriceRow({
         <span className="mt-0.5 block text-meta font-normal sm:hidden">
           {text.trim() ? (
             <>
-              <span className="text-ink-3">Company {companyText}</span> · {difference(fmt, company, text)}
+              <span className="text-ink-3">Standard {companyText}</span> · {difference(fmt, company, text)}
             </>
           ) : (
-            <span className="text-ink-3">Follows company · {companyText}</span>
+            <span className="text-ink-3">Follows standard · {companyText}</span>
           )}
         </span>
       </th>
@@ -342,7 +342,7 @@ function PriceRow({
         <span className="flex items-center justify-end gap-1">
           <span className="text-meta text-ink-3">{fmt.symbol}</span>
           <CellInput
-            aria-label={`${label}: what your team charges. Leave empty to follow the company's price.`}
+            aria-label={`${label}: what your team charges. Leave empty to follow the standard price.`}
             aria-invalid={problem ? true : undefined}
             inputMode="decimal"
             value={text}
@@ -352,7 +352,7 @@ function PriceRow({
           {/* Emptying the box is what hands the price back, so there's a button that does it. */}
           <span className="w-8 shrink-0">
             {text !== "" && (
-              <IconButton label={`Clear ${label} and follow the company's price`} onClick={() => onType("")}>
+              <IconButton label={`Clear ${label} and follow the standard price`} onClick={() => onType("")}>
                 <X className="size-4" aria-hidden />
               </IconButton>
             )}
@@ -367,11 +367,11 @@ function PriceRow({
 
 /** How the team's price reads against the company's, in words rather than a sign. */
 function difference(fmt: Format, company: number | null, text: string): ReactNode {
-  if (!text.trim()) return <span className="text-ink-3">Follows company</span>;
+  if (!text.trim()) return <span className="text-ink-3">Follows standard</span>;
   const team = fmt.toCentavos(text);
   if (team === null) return <span className="text-danger">Check this amount</span>;
-  if (company === null) return <span className="text-ink-2">The company has no price here</span>;
-  if (team === company) return <span className="text-ink-3">Same as the company</span>;
+  if (company === null) return <span className="text-ink-2">No standard price here</span>;
+  if (team === company) return <span className="text-ink-3">Same as standard</span>;
   return (
     <span className="text-ink-2 tabular-nums">
       {fmt.peso(Math.abs(team - company))} {team < company ? "less" : "more"}

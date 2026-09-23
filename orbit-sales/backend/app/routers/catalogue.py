@@ -10,7 +10,7 @@ The catalogue is the company's, so a role's scope doesn't narrow it.
 
 import re
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field, field_validator, model_validator
@@ -21,6 +21,7 @@ from app.access import Access, require
 from app.api import Api, camel, changed, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
+from app.extra import check_extra, check_required
 from app.models import Bundle, Issuer, PriceType, Product, ProductPrice, Promo
 from app.pricing import FULL, promo_terms, sales_settings, state_of, today
 
@@ -205,6 +206,7 @@ def product_out(p: Product, access: Access) -> dict:
         "unit": p.unit,
         "isActive": p.is_active,
         "prices": {pp.price_type_code: pp.amount_centavos for pp in p.prices},
+        "extra": p.extra or {},
         "updatedAt": iso(p.updated_at),
         "can": {"edit": access.can("products.edit"), "delete": access.can("products.delete")},
     }
@@ -249,6 +251,8 @@ class ProductFields(Api):
     is_active: bool | None = None
     # price type code -> centavos; null clears that price.
     prices: dict[str, int | None] | None = None
+    # Added fields' values, by key (Settings → Forms). A null clears one.
+    extra: dict[str, Any] | None = None
 
     @field_validator("code")
     @classmethod
@@ -300,7 +304,8 @@ def code_taken(db: Session, model, code: str, not_id: str | None = None) -> bool
 def create_product(access: Create, me: CurrentUser, db: DB, body: ProductIn) -> dict:
     if code_taken(db, Product, body.code):
         raise field_error("code", "Another product has this code.")
-    product = Product(**body.model_dump(exclude={"prices"}, exclude_none=True))
+    product = Product(**body.model_dump(exclude={"prices", "extra"}, exclude_none=True), extra=check_extra(db, "product", body.extra))
+    check_required(db, "product", product)
     db.add(product)
     set_prices(db, product, body.prices or {})
     db.flush()
@@ -325,10 +330,13 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
             raise field_error(camel([required])[0], "This is required.")
     if wanted.get("code") and code_taken(db, Product, wanted["code"], product.id):
         raise field_error("code", "Another product has this code.")
+    if "extra" in wanted:
+        wanted["extra"] = check_extra(db, "product", wanted["extra"], product.extra)
     fields = [k for k, v in wanted.items() if getattr(product, k) != v]
     for k in fields:
         setattr(product, k, wanted[k])
     touched = set_prices(db, product, prices) if prices else []
+    check_required(db, "product", product)
     if fields or touched:
         audit(db, me, "product.updated", target=product.name, target_type="product", target_id=product.id, fields=camel(fields) + (["prices"] if touched else []))
         db.commit()

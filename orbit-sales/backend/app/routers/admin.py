@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
@@ -385,14 +385,29 @@ def delete_role(_: Roles, me: CurrentUser, db: DB, role_id: str) -> Response:
 # --- teams ------------------------------------------------------------------------------------
 
 
+def _headquarters(value: list[str]) -> list[str]:
+    """Each once (whatever the capitals), blanks dropped, in the order given."""
+    seen: dict[str, str] = {}
+    for name in (v.strip() for v in value):
+        if name and name.lower() not in seen:
+            seen[name.lower()] = name
+    return list(seen.values())
+
+
+# The offices a team works from, each a chip on the Teams page.
+Headquarters = Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=20), AfterValidator(_headquarters)]
+
+
 class TeamIn(Api):
     name: str = Field(min_length=1, max_length=80)
     description: str | None = Field(None, max_length=300)
+    headquarters: Headquarters = []
 
 
 class TeamPatch(Api):
     name: str | None = Field(None, min_length=1, max_length=80)
     description: str | None = Field(None, max_length=300)
+    headquarters: Headquarters | None = None
     is_active: bool | None = None
 
 
@@ -401,6 +416,7 @@ def team_out(team: Team, members: int = 0) -> dict:
         "id": team.id,
         "name": team.name,
         "description": team.description,
+        "headquarters": team.headquarters or [],
         "isActive": team.is_active,
         "memberCount": members,
     }
@@ -429,7 +445,7 @@ def list_teams(_: Teams, db: DB) -> list[dict]:
 def create_team(_: Teams, me: CurrentUser, db: DB, body: TeamIn) -> dict:
     if name_taken(db, Team, body.name):
         raise field_error("name", "There's already a team with that name.")
-    team = Team(name=body.name, description=body.description)
+    team = Team(name=body.name, description=body.description, headquarters=body.headquarters)
     db.add(team)
     db.flush()
     audit(db, me, "team.created", target=team.name, target_type="team", target_id=team.id)
@@ -445,7 +461,9 @@ def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch
         raise field_error("name", "Give the team a name.")
     if "name" in wanted and name_taken(db, Team, wanted["name"], but=team.id):
         raise field_error("name", "There's already a team with that name.")
-    fields = [k for k in ("name", "description", "is_active") if k in wanted and getattr(team, k) != wanted[k]]
+    if "headquarters" in wanted and wanted["headquarters"] is None:
+        wanted["headquarters"] = []
+    fields = [k for k in ("name", "description", "headquarters", "is_active") if k in wanted and getattr(team, k) != wanted[k]]
     for key in fields:
         setattr(team, key, wanted[key])
     if fields:

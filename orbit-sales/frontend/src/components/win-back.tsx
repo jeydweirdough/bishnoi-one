@@ -3,11 +3,11 @@
 import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncButton } from "@/src/platform/ui/async-button";
-import { addFollowUp } from "../actions/sales";
+import { bulkRecords } from "../actions/crm";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 
-/** One click: a follow-up, due today, for whoever owns the customer (or you, if nobody does). */
+/** One click: a follow-up task, due today, for whoever owns the company. */
 export function WinBack({
   customerId,
   name,
@@ -28,15 +28,16 @@ export function WinBack({
     <AsyncButton
       size="sm"
       icon={<RotateCcw className="size-3.5" aria-hidden />}
-      aria-label={`Win back ${name}: add a follow-up`}
+      aria-label={`Win back ${name}: add a task`}
       onRun={async () => {
-        const result = await addFollowUp(customerId, {
-          title: `Win back: no quote in ${days} days`,
-          dueOn: fmt.todayKey(),
-          assigneeId: ownerId,
+        const result = await bulkRecords("companies", [customerId], {
+          action: "follow_up",
+          followUp: { title: `Win back: no quote in ${days} days`, dueOn: fmt.todayKey() },
+          toOwner: true,
         });
         if (!result.ok) return void toast.error(result.error);
-        toast.success(`Follow-up added for ${ownerName ?? "you"}`, { description: `${name}, due today` });
+        if (result.data.failed) return void toast.error(result.data.failures[0]?.error ?? "Couldn't add the task.");
+        toast.success(`Task added for ${ownerName ?? "you"}`, { description: `${name}, due today` });
       }}
     >
       Win back

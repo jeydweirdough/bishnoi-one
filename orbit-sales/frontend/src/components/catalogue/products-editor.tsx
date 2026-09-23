@@ -9,7 +9,9 @@ import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, FormError, Input } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
-import type { CatalogueProduct, Org, SalesRules } from "@/src/platform/lib/types";
+import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules } from "@/src/platform/lib/types";
+import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
+import { extraText } from "../extra/extra-values";
 import { deleteProduct, saveProduct, type ProductInput } from "../../actions/catalogue";
 
 type PriceType = SalesRules["priceTypes"][number];
@@ -22,12 +24,16 @@ export function ProductsEditor({
   priceTypes,
   org,
   mayCreate,
+  layout,
 }: {
   products: CatalogueProduct[];
   priceTypes: PriceType[];
   org: Org;
   mayCreate: boolean;
+  /** The product form as an admin laid it out (Settings → Forms). */
+  layout: FormLayout;
 }) {
+  const fields = layout.sections.flatMap((s) => s.fields).filter((f) => !f.standard);
   const fmt = makeFormat(org);
   const [editing, setEditing] = useState<CatalogueProduct | "new" | null>(null);
   // Only prices from the list are set here; a price typed on the quote has nothing to keep.
@@ -36,7 +42,14 @@ export function ProductsEditor({
   return (
     <div className="space-y-5">
       {editing ? (
-        <ProductForm key={editing === "new" ? "new" : editing.id} fmt={fmt} product={editing === "new" ? null : editing} listed={listed} onDone={() => setEditing(null)} />
+        <ProductForm
+          key={editing === "new" ? "new" : editing.id}
+          fmt={fmt}
+          product={editing === "new" ? null : editing}
+          listed={listed}
+          layout={layout}
+          onDone={() => setEditing(null)}
+        />
       ) : (
         mayCreate && (
           <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
@@ -56,6 +69,13 @@ export function ProductsEditor({
               <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                 <th scope="col" className="px-5 py-2.5 font-semibold">Product</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Unit</th>
+                {fields
+                  .filter((f) => f.inList)
+                  .map((f) => (
+                    <th key={f.key} scope="col" className="px-3 py-2.5 font-semibold">
+                      {f.label}
+                    </th>
+                  ))}
                 {listed.map((t) => (
                   <th key={t.code} scope="col" className="px-3 py-2.5 text-right font-semibold">
                     {t.name}
@@ -77,6 +97,13 @@ export function ProductsEditor({
                     <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form].filter(Boolean).join(" · ")}</p>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{p.unit}</td>
+                  {fields
+                    .filter((f) => f.inList)
+                    .map((f) => (
+                      <td key={f.key} className="px-3 py-2.5 text-ink-2">
+                        {extraText(fmt, f, p.extra[f.key]) ?? "—"}
+                      </td>
+                    ))}
                   {listed.map((t) => (
                     <td key={t.code} className="px-3 py-2.5 text-right tabular-nums">
                       {p.prices[t.code] !== undefined ? fmt.peso(p.prices[t.code]) : <span className="text-danger">Not set</span>}
@@ -99,16 +126,30 @@ export function ProductsEditor({
   );
 }
 
-function ProductForm({ fmt, product, listed, onDone }: { fmt: Format; product: CatalogueProduct | null; listed: PriceType[]; onDone: () => void }) {
+function ProductForm({
+  fmt,
+  product,
+  listed,
+  layout,
+  onDone,
+}: {
+  fmt: Format;
+  product: CatalogueProduct | null;
+  listed: PriceType[];
+  layout: FormLayout;
+  onDone: () => void;
+}) {
+  const custom = layout.sections.flatMap((s) => s.fields);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [values, setValues] = useState<Record<Text, string>>(() =>
-    Object.fromEntries(TEXT.map((k) => [k, (product?.[k] as string | null) ?? (k === "unit" ? "box" : "")])) as Record<Text, string>,
+    Object.fromEntries(TEXT.map((k) => [k, (product?.[k] as string | null) ?? ""])) as Record<Text, string>,
   );
   const [prices, setPrices] = useState<Record<string, string>>(() =>
     Object.fromEntries(listed.map((t) => [t.code, fmt.pesosText(product?.prices[t.code] ?? null)])),
   );
   const [isActive, setActive] = useState(product?.isActive ?? true);
+  const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(custom, product?.extra));
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
@@ -137,6 +178,7 @@ function ProductForm({ fmt, product, listed, onDone }: { fmt: Format; product: C
       unit: values.unit.trim(),
       isActive,
       prices: amounts,
+      extra: extraChanges(custom, extra, product?.extra),
     };
     start(async () => {
       const result = await saveProduct(product?.id ?? null, input);
@@ -151,6 +193,28 @@ function ProductForm({ fmt, product, listed, onDone }: { fmt: Format; product: C
     });
   }
 
+  /** A built-in field, drawn with the label and hints the admin gave it. */
+  function standard(f: FormFieldDef) {
+    if (f.key === "isActive") {
+      return (
+        <label className="flex h-full items-end gap-2 pb-2 text-sm">
+          <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+          {f.label}: offered on new quotes
+        </label>
+      );
+    }
+    if (f.key === "form" || f.key === "unit") {
+      return <ChoiceSelect field={f} value={values[f.key]} onChange={(v) => setValues({ ...values, [f.key]: v })} error={fields[f.key]} />;
+    }
+    if (!(TEXT as readonly string[]).includes(f.key)) return null;
+    const k = f.key as Text;
+    return (
+      <Field label={f.label} optional={!f.required} error={fields[k]} hint={f.helpText ?? (k === "code" ? "Unique, e.g. AMX-500" : undefined)}>
+        {(p) => <Input {...p} value={values[k]} onChange={set(k)} placeholder={f.placeholder ?? undefined} autoFocus={k === "code" && !product} />}
+      </Field>
+    );
+  }
+
   return (
     <Sheet className="px-5 pt-4 pb-5">
       <h2 className="mb-4 font-semibold">{product ? `Change ${product.name}` : "Add a product or service"}</h2>
@@ -162,26 +226,7 @@ function ProductForm({ fmt, product, listed, onDone }: { fmt: Format; product: C
         }}
         className="space-y-5"
       >
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Code" error={fields.code} hint="Unique, e.g. AMX-500">
-            {(p) => <Input {...p} value={values.code} onChange={set("code")} autoFocus={!product} />}
-          </Field>
-          <Field label="Name" error={fields.name} className="sm:col-span-2">
-            {(p) => <Input {...p} value={values.name} onChange={set("name")} />}
-          </Field>
-          <Field label="Generic name" optional error={fields.genericName}>
-            {(p) => <Input {...p} value={values.genericName} onChange={set("genericName")} />}
-          </Field>
-          <Field label="Strength" optional error={fields.strength}>
-            {(p) => <Input {...p} value={values.strength} onChange={set("strength")} placeholder="500 mg" />}
-          </Field>
-          <Field label="Form" optional error={fields.form}>
-            {(p) => <Input {...p} value={values.form} onChange={set("form")} placeholder="Tablet" />}
-          </Field>
-          <Field label="Sold by" error={fields.unit} hint="What one unit on a quote is">
-            {(p) => <Input {...p} value={values.unit} onChange={set("unit")} placeholder="box of 100" />}
-          </Field>
-        </div>
+        <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
 
         {listed.length > 0 && (
           <fieldset>
@@ -198,11 +243,6 @@ function ProductForm({ fmt, product, listed, onDone }: { fmt: Format; product: C
             <p className="mt-2 text-meta text-ink-3">A price left empty can&apos;t be quoted at that price type.</p>
           </fieldset>
         )}
-
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-          On sale: offered on new quotes
-        </label>
 
         <FormError message={error} />
         <div className="flex flex-wrap items-center gap-2">

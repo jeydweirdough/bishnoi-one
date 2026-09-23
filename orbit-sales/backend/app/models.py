@@ -6,7 +6,7 @@ Accounts here are Sales' own: nobody signed in here exists in any other Orbit ap
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -26,6 +26,8 @@ class Team(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(80), unique=True)
     description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # The offices the team works from: ["Makati", "Cebu"].
+    headquarters: Mapped[list[str]] = mapped_column(JSON, default=list)
     # Switched off: kept for its history, but nobody new is put in it.
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -148,6 +150,9 @@ class CustomerType(Base):
 class Company(Owned, Base):
     __tablename__ = "companies"
 
+    # Values of the fields an admin added (Settings → Forms), by key.
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(160), index=True)
     status: Mapped[str] = mapped_column(String(16), default="prospect")
@@ -166,6 +171,9 @@ class Company(Owned, Base):
 
 class Contact(Owned, Base):
     __tablename__ = "contacts"
+
+    # Values of the fields an admin added (Settings → Forms), by key.
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"), index=True, default=None)
@@ -225,7 +233,7 @@ class Activity(Owned, Base):
 
 
 class PriceType(Base):
-    """A way of pricing a quote: "Patient", "Drugstore/Hospital", "Special Price"."""
+    """A way of pricing a quote: "Patient", "Drugstore/Hospital", "Requested price"."""
 
     __tablename__ = "price_types"
     __table_args__ = (
@@ -247,6 +255,9 @@ class PriceType(Base):
 
 class Product(Base):
     __tablename__ = "products"
+
+    # Values of the fields an admin added (Settings → Forms), by key.
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     code: Mapped[str] = mapped_column(String(40), unique=True)
@@ -360,6 +371,15 @@ class SalesSettings(Base):
     # Retention: a customer with no quote in this many days is at risk; in this many, lost.
     at_risk_days: Mapped[int] = mapped_column(Integer, default=60)
     lost_days: Mapped[int] = mapped_column(Integer, default=90)
+    # The company as the screens show it. Null: what .env says.
+    org_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    currency: Mapped[str | None] = mapped_column(String(3), default=None)
+    locale: Mapped[str | None] = mapped_column(String(20), default=None)
+    timezone: Mapped[str | None] = mapped_column(String(60), default=None)
+    # Quotes: numbered PREFIX-YYYYMM-####, good for this many days, on these terms.
+    quote_prefix: Mapped[str] = mapped_column(String(10), default="Q")
+    quote_valid_days: Mapped[int] = mapped_column(Integer, default=30)
+    quote_terms: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 # --- quotes --------------------------------------------------------------------------------
@@ -415,5 +435,61 @@ class Quote(Owned, Base):
     payments: Mapped[list] = mapped_column(JSON, default=list)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
+    # From the quote settings when it was made: good until this day, on these terms.
+    valid_until: Mapped[str | None] = mapped_column(String(10), default=None)
+    terms: Mapped[str | None] = mapped_column(Text, default=None)
+    # Values of the fields an admin added (Settings → Forms), by key.
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+
     created_by: Mapped[User] = relationship(foreign_keys="Quote.created_by_id", lazy="joined")
 
+
+
+# --- settings: the forms (Administration → Settings → Forms) --------------------------
+#
+# Every form (a company, a contact, a product, a quote) is laid out in sections,
+# and every field on it is a row here: the built-in ones (name, email...) and
+# the ones an admin added. Built-in fields keep their values in the record's
+# own columns; added ones in its `extra`, under their key.
+
+FORM_ENTITIES = ("company", "contact", "product", "quote")
+# Kinds an admin can add. Built-in fields have their own kinds too (status, owner...).
+FIELD_TYPES = ("text", "long_text", "number", "money", "date", "choice", "multi_choice", "yes_no", "email", "phone", "url")
+
+
+class FormSection(Base):
+    __tablename__ = "form_sections"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    entity: Mapped[str] = mapped_column(String(12), index=True)
+    title: Mapped[str] = mapped_column(String(80))
+    # 1 or 2: how many fields sit side by side.
+    columns: Mapped[int] = mapped_column(Integer, default=2)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class FormField(Base):
+    __tablename__ = "form_fields"
+    __table_args__ = (UniqueConstraint("entity", "key", name="uq_form_field_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    entity: Mapped[str] = mapped_column(String(12), index=True)
+    # Built-in: the field's name in the API ("industry", "jobTitle"). Added: "x_..."
+    # made from its first label, and never changed: it's where values are kept.
+    key: Mapped[str] = mapped_column(String(40))
+    label: Mapped[str] = mapped_column(String(80))
+    type: Mapped[str] = mapped_column(String(12))
+    # Built in: can't be deleted, and its kind can't change.
+    standard: Mapped[bool] = mapped_column(default=False)
+    # The record can't do without it: always shown, always required.
+    locked: Mapped[bool] = mapped_column(default=False)
+    required: Mapped[bool] = mapped_column(default=False)
+    # Taken off the form (built-in fields are hidden, never deleted).
+    hidden: Mapped[bool] = mapped_column(default=False)
+    in_list: Mapped[bool] = mapped_column(default=False)
+    # For a pick list: what can be picked.
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    help_text: Mapped[str | None] = mapped_column(String(200), default=None)
+    placeholder: Mapped[str | None] = mapped_column(String(80), default=None)
+    section_id: Mapped[str | None] = mapped_column(ForeignKey("form_sections.id", ondelete="SET NULL"), default=None)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)

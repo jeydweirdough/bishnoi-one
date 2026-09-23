@@ -15,7 +15,7 @@ export function CustomerTabs({ current }: { current: "companies" | "contacts" })
   );
   return (
     <nav aria-label="Customers" className="mb-5 flex gap-6 border-b border-rule">
-      {tab("companies", "Companies")}
+      {tab("companies", "Customers")}
       {tab("contacts", "Contacts")}
     </nav>
   );

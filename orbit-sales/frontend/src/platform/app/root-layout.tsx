@@ -9,7 +9,7 @@ const publicSans = Public_Sans({ variable: "--font-public-sans", subsets: ["lati
 /** What every Orbit app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
-  description: "Customers, calls, visits and follow-ups for every division and team.",
+  description: "Customers, quotes, activities and products for every team.",
 };
 
 export const viewport: Viewport = { themeColor: "#eceef2" };

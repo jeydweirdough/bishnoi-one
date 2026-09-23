@@ -46,7 +46,7 @@ def first_type(db: Session) -> str:
     """What a new company is when nobody says: the first type on the list."""
     code = db.scalar(select(CustomerType.code).where(CustomerType.is_active).order_by(CustomerType.sort_order, CustomerType.name).limit(1))
     if code is None:
-        raise field_error("status", "There are no customer types. An administrator adds them in Administration → Customer types.")
+        raise field_error("status", "There are no customer types. An administrator adds them in Administration → Settings → Customer types.")
     return code
 
 
@@ -100,7 +100,7 @@ def update_type(access: Manage, me: CurrentUser, db: DB, code: str, body: TypeFi
     if wanted.get("is_active") is False and kind.is_active:
         others = db.scalar(select(func.count()).select_from(CustomerType).where(CustomerType.is_active, CustomerType.code != code)) or 0
         if not others:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Keep at least one type switched on, or companies couldn't be added.")
+            raise HTTPException(status.HTTP_409_CONFLICT, "Keep at least one type switched on, or customers couldn't be added.")
     fields = [k for k, v in wanted.items() if getattr(kind, k) != v]
     for k in fields:
         setattr(kind, k, wanted[k])
@@ -117,9 +117,9 @@ def delete_type(access: Manage, me: CurrentUser, db: DB, code: str) -> Response:
         raise not_found("customer type")
     used = db.scalar(select(func.count()).select_from(Company).where(Company.status == code)) or 0
     if used:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"{used} {'company is' if used == 1 else 'companies are'} this type. Switch it off instead, or change them first.")
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{used} {'customer is' if used == 1 else 'customers are'} this type. Switch it off instead, or change them first.")
     if kind.is_active and not db.scalar(select(func.count()).select_from(CustomerType).where(CustomerType.is_active, CustomerType.code != code)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Keep at least one type switched on, or companies couldn't be added.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Keep at least one type switched on, or customers couldn't be added.")
     audit(db, me, "customer_type.deleted", target=kind.name, target_type="customer_type", target_id=code)
     db.delete(kind)
     db.commit()

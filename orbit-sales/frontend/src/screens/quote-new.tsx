@@ -1,5 +1,6 @@
 import { QuoteForm } from "../components/quote-form";
 import { NoAccess } from "../components/admin/words";
+import { customFields } from "../components/extra/load";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
@@ -16,18 +17,19 @@ async function NewQuote({ to }: { to: QuoteFor }) {
   const me = await getCompanyMe();
   if (!can(me, "quotes.create")) return <NoAccess what="quotes" />;
   const base = `/${to.kind}/${enc(to.id)}`;
-  const [customer, priceList] = await Promise.all([
+  const [customer, priceList, fields] = await Promise.all([
     to.kind === "companies" ? load<CompanyDetail>(base) : load<ContactDetail>(base),
     load<PriceList>(`${base}/price-list`),
+    customFields("quote"),
   ]);
-  const list = to.kind === "companies" ? { href: "/companies", label: "Companies" } : { href: "/contacts", label: "Contacts" };
+  const list = to.kind === "companies" ? { href: "/companies", label: "Customers" } : { href: "/contacts", label: "Contacts" };
   return (
     <>
       <PageHeader crumbs={[list, { href: `/${to.kind}/${to.id}`, label: customer.name }]} title={`New quote for ${customer.name}`}>
         {customer.team ? `Priced with ${customer.team.name}'s prices. ` : ""}Promos and extra discounts are per product line.
       </PageHeader>
       <Sheet className="max-w-[70rem] px-5 py-6 sm:px-8">
-        <QuoteForm to={to} priceList={priceList} org={me.org} />
+        <QuoteForm to={to} priceList={priceList} org={me.org} fields={fields} />
       </Sheet>
     </>
   );

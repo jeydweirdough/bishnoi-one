@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.models import SignInSession, User
+from app.models import SalesSettings, SignInSession, User
 from app.security import token_hash
 
 _bearer = HTTPBearer(auto_error=False)
@@ -18,7 +18,16 @@ SIGN_IN_AGAIN = "Your session has ended. Please sign in again."
 
 
 def get_settings_dep(request: Request) -> Settings:
-    return request.app.state.settings
+    """The settings from .env, with what an admin changed in Settings over them
+    (company name, currency, locale, timezone), read fresh on each request."""
+    base: Settings = request.app.state.settings
+    with request.app.state.sessions() as db:
+        row = db.get(SalesSettings, 1)
+    if row is None:
+        return base
+    overrides = {"org_name": row.org_name, "org_currency": row.currency, "org_locale": row.locale, "org_timezone": row.timezone}
+    overrides = {k: v for k, v in overrides.items() if v}
+    return base.model_copy(update=overrides) if overrides else base
 
 
 def get_db(request: Request):

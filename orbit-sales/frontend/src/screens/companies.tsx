@@ -12,8 +12,10 @@ import { CustomerTabs } from "../components/crm/customer-tabs";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { RecordsBulk } from "../components/crm/records-bulk";
 import { StatusTag, typeOptions } from "../components/crm/words";
+import { customFields } from "../components/extra/load";
+import { extraText } from "../components/extra/extra-values";
 
-export const metadata = { title: "Companies" };
+export const metadata = { title: "Customers" };
 
 const SIZE = 50;
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -31,11 +33,14 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   if (owner) query.set("owner", owner);
   const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
   const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
-  const [list, people, types] = await Promise.all([
+  const [list, people, types, fields] = await Promise.all([
     load<Paged<CompanyRow>>(`/companies?${query}`),
     bulkAllowed ? load<Assignable[]>("/people/assignable") : Promise.resolve([] as Assignable[]),
     load<CustomerType[]>("/customer-types"),
+    customFields("company"),
   ]);
+  // Fields an admin added and chose to show in the list: under each name, after the industry.
+  const inList = fields.filter((f) => f.inList);
   const fmt = makeFormat(me.org);
   const filtered = Boolean(q || status || owner);
   const here = new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(owner && { owner }) });
@@ -52,7 +57,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           )
         }
       >
-        {list.total} {list.total === 1 ? "company" : "companies"}
+        {list.total} {list.total === 1 ? "customer" : "customers"}
         {filtered ? " match" : ""}
         {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : ""}.
       </PageHeader>
@@ -72,7 +77,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
       <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
         <Sheet>
           {list.items.length === 0 ? (
-            <Empty icon="company" title={filtered ? "No companies match" : "No companies yet"}>
+            <Empty icon="company" title={filtered ? "No customers match" : "No customers yet"}>
               {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
             </Empty>
           ) : (
@@ -95,7 +100,16 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-hema">{c.name}</span>
                         <span className="block truncate text-meta text-ink-3">
-                          {[c.industry, `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`].filter(Boolean).join(" · ")}
+                          {[
+                            c.industry,
+                            `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`,
+                            ...inList.map((f) => {
+                              const v = extraText(fmt, f, c.extra[f.key]);
+                              return v && `${f.label}: ${v}`;
+                            }),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </span>
                       </span>
                       <span>

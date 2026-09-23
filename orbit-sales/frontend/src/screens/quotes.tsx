@@ -59,7 +59,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   return (
     <>
       <PageHeader title="Quotes">
-        {task ? "Waiting on you as an approver." : "Every quote you can see. New quotes are made from a company's or a contact's page."}
+        {task ? "Waiting on you as an approver." : "Every quote you can see. New quotes are made from a customer's or a contact's page."}
       </PageHeader>
 
       {approver && (
@@ -95,7 +95,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
       <Sheet className="overflow-hidden">
         {list.items.length === 0 ? (
           <Empty icon="quotes" title={task ? task.empty : q || state || owner ? "No quotes match." : "No quotes yet."}>
-            {!task && !q && !state && !owner && "Open a company or a contact and choose New quote."}
+            {!task && !q && !state && !owner && "Open a customer or a contact and choose New quote."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">

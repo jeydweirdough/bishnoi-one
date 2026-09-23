@@ -18,7 +18,7 @@ export default async function PromosPage() {
   return (
     <>
       <PageHeader title="Products & services">Promos a rep can pick on a quote line, while they run.</PageHeader>
-      <CatalogueTabs current="/promos" />
+      <CatalogueTabs me={me} current="/promos" />
       <PromosEditor
         promos={promos.items}
         products={products.items.map((p) => ({ id: p.id, name: p.name, code: p.code }))}

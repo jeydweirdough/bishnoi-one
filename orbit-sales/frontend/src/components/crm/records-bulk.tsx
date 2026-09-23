@@ -38,7 +38,7 @@ export function RecordsBulk({
   total: number;
   org: Org;
 }) {
-  const noun: [string, string] = kind === "companies" ? ["company", "companies"] : ["contact", "contacts"];
+  const noun: [string, string] = kind === "companies" ? ["customer", "customers"] : ["contact", "contacts"];
   const fmt = makeFormat(org);
   const s = useSelection();
   const { run, running } = useBulkRun();
@@ -67,22 +67,22 @@ export function RecordsBulk({
   const steps: Record<Exclude<Step, null>, ReactNode> = {
     follow_up: (
       <BulkStep
-        submitLabel={`Add ${plural(count, "follow-up")}`}
+        submitLabel={`Add ${plural(count, "task")}`}
         onCancel={() => setStep(null)}
         onSubmit={async (form) => {
           const title = String(form.get("title") ?? "").trim();
           const dueOn = String(form.get("dueOn") ?? "");
           if (title.length < 2 || !dueOn) {
-            toast.error("Give the follow-up a title and a date.");
+            toast.error("Give the task a title and a date.");
             return false;
           }
-          await run({ doing: "Adding follow-ups", did: (n) => `Follow-up added for ${plural(n, ...noun)}` }, (ids) =>
+          await run({ doing: "Adding tasks", did: (n) => `Task added for ${plural(n, ...noun)}` }, (ids) =>
             bulkRecords(kind, ids, { action: "follow_up", followUp: { title, dueOn }, toOwner: form.get("who") === "owner" }),
           );
         }}
       >
-        <Field label="Follow-up" className="w-56">
-          {(p) => <Input {...p} name="title" defaultValue="Follow-up call" required minLength={2} maxLength={160} autoFocus />}
+        <Field label="Task" className="w-56">
+          {(p) => <Input {...p} name="title" defaultValue="Call back" required minLength={2} maxLength={160} autoFocus />}
         </Field>
         <Field label="Due" className="w-36">
           {(p) => <Input {...p} name="dueOn" type="date" defaultValue={fmt.todayKey()} min={fmt.todayKey()} required />}
@@ -158,7 +158,7 @@ export function RecordsBulk({
     <BulkBar noun={noun} extra={extra} step={step ? steps[step] : undefined}>
       {can.followUp && (
         <Button size="sm" variant="primary" disabled={running} onClick={() => setStep("follow_up")} icon={<CalendarPlus className="size-4" aria-hidden />}>
-          Add follow-up
+          Add task
         </Button>
       )}
       {can.edit && kind === "companies" && (
@@ -180,7 +180,7 @@ export function RecordsBulk({
           title={`Delete ${many}?`}
           body={
             kind === "companies"
-              ? "Their activities are deleted with them. A company that still has contacts is skipped. This can't be undone."
+              ? "Their activities are deleted with them. A customer that still has contacts is skipped. This can't be undone."
               : "Activities only about them are deleted with them. This can't be undone."
           }
           confirmLabel={`Delete ${many}`}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, Input } from "@/src/platform/ui/field";
-import { bulkCustomers } from "../actions/bulk";
+import { bulkRecords } from "../actions/crm";
 import { makeFormat, plural } from "@/src/platform/lib/format";
 import { BulkBar, BulkStep, useBulkRun, useSelection } from "@/src/platform/bulk/selection";
 import type { Org } from "@/src/platform/lib/types";
@@ -21,21 +21,21 @@ export function WinBackBulk({ org }: { org: Org }) {
 
   const step = (
     <BulkStep
-      submitLabel={`Add ${plural(s.ids.length, "follow-up")}`}
+      submitLabel={`Add ${plural(s.ids.length, "task")}`}
       onCancel={() => setAsking(false)}
       onSubmit={async (form) => {
         const title = String(form.get("title") ?? "").trim();
         const dueOn = String(form.get("dueOn") ?? "");
         if (title.length < 2 || !dueOn) {
-          toast.error("Give the follow-up a title and a date.");
+          toast.error("Give the task a title and a date.");
           return false;
         }
-        await run({ doing: "Adding win-back calls", did: (n) => `Win-back follow-up added for ${plural(n, ...NOUN)}` }, (ids) =>
-          bulkCustomers(ids, { action: "follow_up", followUp: { title, dueOn, assigneeId: null }, toOwner: true }),
+        await run({ doing: "Adding win-back calls", did: (n) => `Win-back task added for ${plural(n, ...NOUN)}` }, (ids) =>
+          bulkRecords("companies", ids, { action: "follow_up", followUp: { title, dueOn }, toOwner: true }),
         );
       }}
     >
-      <Field label="Follow-up, for each customer's owner" className="w-64">
+      <Field label="Task, for each customer's owner" className="w-64">
         {(p) => <Input {...p} name="title" defaultValue="Win back: no quote lately" required minLength={2} maxLength={160} autoFocus />}
       </Field>
       <Field label="Due" className="w-36">

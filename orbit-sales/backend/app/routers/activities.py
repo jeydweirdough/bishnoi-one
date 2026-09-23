@@ -106,9 +106,9 @@ def linked(db: Session, access: Access, company_id: str | None, contact_id: str 
         company_id = contact.company_id
     company = db.get(Company, company_id) if company_id else None
     if company_id and (company is None or not reaches(company, access)):
-        raise field_error("companyId", "Pick a company you can see.")
+        raise field_error("companyId", "Pick a customer you can see.")
     if contact and company and contact.company_id and contact.company_id != company.id:
-        raise field_error("contactId", f"{contact.full_name} is in another company.")
+        raise field_error("contactId", f"{contact.full_name} is with another customer.")
     return company, contact
 
 

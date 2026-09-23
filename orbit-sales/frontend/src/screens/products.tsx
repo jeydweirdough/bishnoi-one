@@ -1,3 +1,5 @@
+import { Upload } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
@@ -6,6 +8,7 @@ import { NoAccess } from "../components/admin/words";
 import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
 import { ProductsEditor } from "../components/catalogue/products-editor";
 import { Filters, Pager } from "../components/crm/list-controls";
+import { formLayout } from "../components/extra/load";
 
 export const metadata = { title: "Products" };
 
@@ -22,15 +25,26 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
   if (q) query.set("q", q);
   if (active) query.set("active", active);
-  const [list, rules] = await Promise.all([
+  const [list, rules, layout] = await Promise.all([
     load<Paged<CatalogueProduct> & { missingPrices: number }>(`/products?${query}`),
     load<SalesRules>("/pricing"),
+    formLayout("product"),
   ]);
   const here = new URLSearchParams(Object.entries({ q, active }).filter(([, v]) => v));
 
   return (
     <>
-      <PageHeader title="Products & services">
+      <PageHeader
+        title="Products & services"
+        actions={
+          can(me, "products.create") &&
+          can(me, "products.edit") && (
+            <LinkButton href="/products/import" icon={<Upload className="size-4" aria-hidden />}>
+              Import
+            </LinkButton>
+          )
+        }
+      >
         What you sell and what it costs at each price type. Quotes are priced from here, and each team may set its own prices over these.
         {list.missingPrices > 0 && (
           <span className="mt-1 block text-danger">
@@ -39,7 +53,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           </span>
         )}
       </PageHeader>
-      <CatalogueTabs current="/products" />
+      <CatalogueTabs me={me} current="/products" />
       <Filters
         search="Name, code or generic name"
         selects={[
@@ -54,7 +68,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           },
         ]}
       />
-      <ProductsEditor products={list.items} priceTypes={rules.priceTypes} org={me.org} mayCreate={can(me, "products.create")} />
+      <ProductsEditor products={list.items} priceTypes={rules.priceTypes} org={me.org} mayCreate={can(me, "products.create")} layout={layout} />
       <Pager total={list.total} page={page} size={SIZE} base={`/products${here.size ? `?${here}` : ""}`} />
     </>
   );

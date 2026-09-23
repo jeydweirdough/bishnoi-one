@@ -14,7 +14,7 @@ def new_team(client, headers, name="B2C") -> dict:
 
 
 def new_user(client, headers, **overrides) -> dict:
-    body = {"email": "cara@example.com", "fullName": "Cara Diaz", "roleId": roles(client, headers)["Sales Rep"]["id"], "password": "a fine password", **overrides}
+    body = {"email": "cara@example.com", "fullName": "Cara Diaz", "roleId": roles(client, headers)["Salesperson"]["id"], "password": "a fine password", **overrides}
     r = client.post("/admin/users", json=body, headers=headers)
     assert r.status_code == 201, r.text
     return r.json()
@@ -40,7 +40,7 @@ def test_managing_users_needs_only_admin_users(client, ana):
     new_user(client, ana, email="pd@example.com", roleId=only_users["id"])
     pd = bearer(sign_in(client, "pd@example.com", "a fine password"))
     options = client.get("/admin/users/options", headers=pd).json()
-    assert [r["name"] for r in options["roles"]][:2] == ["Administrator", "Manager"]
+    assert [r["name"] for r in options["roles"]][:2] == ["Administrator", "Team Lead"]
     assert [t["name"] for t in options["teams"]] == ["HOS"]
     assert client.get("/admin/roles", headers=pd).status_code == 403
 
@@ -61,14 +61,14 @@ def test_each_admin_job_is_its_own_permission(client, ana):
 def test_add_a_person_who_can_then_sign_in(client, ana):
     team = new_team(client, ana)
     cara = new_user(client, ana, teamId=team["id"])
-    assert (cara["role"]["name"], cara["team"]["name"], cara["isActive"]) == ("Sales Rep", "B2C", True)
+    assert (cara["role"]["name"], cara["team"]["name"], cara["isActive"]) == ("Salesperson", "B2C", True)
     me = client.get("/auth/me", headers=bearer(sign_in(client, "cara@example.com", "a fine password"))).json()
     assert me["team"]["name"] == "B2C" and "customers.view" in me["permissions"] and "admin.users" not in me["permissions"]
     assert "user.created" in audit_actions(client, ana)
 
 
 def test_new_people_are_checked(client, ana):
-    rep = roles(client, ana)["Sales Rep"]["id"]
+    rep = roles(client, ana)["Salesperson"]["id"]
     base = {"email": "x@example.com", "fullName": "X", "roleId": rep, "password": "a fine password"}
     assert client.post("/admin/users", json={**base, "email": "ben@example.com"}, headers=ana).status_code == 422
     assert client.post("/admin/users", json={**base, "email": "not-an-email"}, headers=ana).status_code == 422
@@ -107,7 +107,7 @@ def test_you_cant_switch_yourself_off(client, ana):
 
 def test_nobody_can_take_away_the_last_administrator(client, ana):
     ana_id = client.get("/auth/me", headers=ana).json()["user"]["id"]
-    rep = roles(client, ana)["Sales Rep"]["id"]
+    rep = roles(client, ana)["Salesperson"]["id"]
     r = client.patch(f"/admin/users/{ana_id}", json={"roleId": rep}, headers=ana)
     assert r.status_code == 409 and "nobody able to manage" in r.json()["detail"]
     assert client.get("/auth/me", headers=ana).json()["role"]["name"] == "Administrator"
@@ -131,10 +131,10 @@ def test_resetting_a_password_ends_their_sessions(client, ana, ben):
 def test_starting_roles_and_the_permission_catalogue(client, ana):
     data = client.get("/admin/roles", headers=ana).json()
     by_name = {r["name"]: r for r in data["roles"]}
-    assert list(by_name) == ["Administrator", "Manager", "Team Lead", "Sales Rep"]
+    assert list(by_name) == ["Administrator", "Team Lead", "Salesperson"]
     assert by_name["Administrator"]["isSystem"] and "admin.audit" in by_name["Administrator"]["permissions"]
-    assert (by_name["Sales Rep"]["scope"], by_name["Team Lead"]["scope"], by_name["Manager"]["scope"]) == ("own", "team", "all")
-    assert "customers.delete" not in by_name["Sales Rep"]["permissions"]
+    assert (by_name["Salesperson"]["scope"], by_name["Team Lead"]["scope"]) == ("own", "team")
+    assert "customers.delete" not in by_name["Salesperson"]["permissions"]
     areas = {a["key"] for a in data["catalogue"]}
     assert {"customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "contracts", "documents", "reports", "automations", "integrations", "admin"} <= areas
     assert [s["key"] for s in data["scopes"]] == ["own", "team", "all"]
@@ -156,7 +156,7 @@ def test_make_edit_and_delete_a_role(client, ana):
 
 
 def test_a_role_in_use_cant_be_deleted(client, ana):
-    rep = roles(client, ana)["Sales Rep"]
+    rep = roles(client, ana)["Salesperson"]
     r = client.delete(f"/admin/roles/{rep['id']}", headers=ana)
     assert r.status_code == 409 and "1 person has this role" in r.json()["detail"]
 
@@ -192,7 +192,7 @@ def test_teams(client, ana):
     # With someone in it, it can be switched off but not deleted; nobody new joins it then.
     assert client.delete(f"/admin/teams/{team['id']}", headers=ana).status_code == 409
     assert client.patch(f"/admin/teams/{team['id']}", json={"isActive": False}, headers=ana).status_code == 200
-    rep = roles(client, ana)["Sales Rep"]["id"]
+    rep = roles(client, ana)["Salesperson"]["id"]
     r = client.post("/admin/users", json={"email": "d@example.com", "fullName": "D", "roleId": rep, "teamId": team["id"], "password": "a fine password"}, headers=ana)
     assert r.status_code == 422
 
@@ -228,3 +228,12 @@ def test_times_carry_their_zone(client, ana):
     for moment in (user["createdAt"], user["lastSignInAt"], entry["at"]):
         assert moment.endswith("+00:00"), moment
 
+
+
+def test_a_team_has_headquarters(client, ana):
+    team = client.post("/admin/teams", json={"name": "STC", "headquarters": ["Makati", " Cebu ", "makati", ""]}, headers=ana).json()
+    assert team["headquarters"] == ["Makati", "Cebu"]  # each once, blanks dropped
+    team = client.patch(f"/admin/teams/{team['id']}", json={"headquarters": ["Cebu", "Davao"]}, headers=ana).json()
+    assert team["headquarters"] == ["Cebu", "Davao"]
+    assert client.patch(f"/admin/teams/{team['id']}", json={"headquarters": []}, headers=ana).json()["headquarters"] == []
+    assert client.post("/admin/teams", json={"name": "URO"}, headers=ana).json()["headquarters"] == []

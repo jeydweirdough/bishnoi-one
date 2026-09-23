@@ -56,7 +56,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
       <CustomerTabs current="contacts" />
 
       <Filters
-        search="Search by name, email or company"
+        search="Search by name, email or customer"
         selects={
           me.role?.scope !== "own"
             ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "Everyone you can see" }, { value: "me", label: "Mine" }] }]
@@ -68,7 +68,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
         <Sheet>
           {list.items.length === 0 ? (
             <Empty icon="customers" title={filtered ? "No contacts match" : "No contacts yet"}>
-              {filtered ? "Try another search, or clear the filters." : "Add the people you talk to, and the company each works for."}
+              {filtered ? "Try another search, or clear the filters." : "Add the people you talk to, and the customer each works for."}
             </Empty>
           ) : (
             <>
@@ -92,7 +92,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                         <span className="block truncate text-meta text-ink-3">{c.jobTitle ?? "—"}</span>
                       </span>
                       <span className="min-w-0 text-meta">
-                        <span className="block truncate text-ink-2">{c.company?.name ?? "No company"}</span>
+                        <span className="block truncate text-ink-2">{c.company?.name ?? "No customer"}</span>
                         <span className="block truncate text-ink-3">{c.email ?? c.phone ?? c.mobile ?? ""}</span>
                       </span>
                       <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>

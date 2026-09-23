@@ -125,7 +125,7 @@ def bulk_records(
     if not access.can(permission):
         raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_ALLOWED)
     if body.action == "status" and (model is not Company or body.status is None):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick a type for the companies.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick a type for the customers.")
     if body.action == "status":
         check_type(db, body.status)
     new_owner = None

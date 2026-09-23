@@ -52,23 +52,30 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 /** Above every company, so not a company's to grant. */
 const develops = (me: Me) => me.isDeveloperAdmin;
 
-/** Sales' own pages. Each shows only for a role that may open it. */
+/** Sales' own pages. Each shows only for a role that may open it. Six at
+ *  most: each is a place, and what belongs to a place is a tab inside it. */
 function salesPages(me: Me): Page[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
+  if (THIS_APP === "sales" && me.isOwner) {
+    return [
+      { href: "/", label: "Dashboard", icon: "overview" },
+      { href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices"] },
+    ];
+  }
   return [
-    // The Sales app opens on its overview; in the shell that screen is a page
-    // of its own, because the shell's own root is the dashboard.
-    { href: THIS_APP === "sales" ? "/" : "/overview", label: "Overview", icon: "overview" },
+    // The Sales app opens on Home; in the shell that screen is a page of its
+    // own, because the shell's own root is the dashboard.
+    { href: THIS_APP === "sales" ? "/" : "/overview", label: "Home", icon: "home" },
     // Customers are companies and the contacts in them.
     { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] },
     ...(may("quotes.view") ? [{ href: "/quotes", label: "Quotes", icon: "quotes" as const }] : []),
-    { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
-    { href: "/activities", label: "Activities", icon: "activity" },
+    // To do and history; follow-ups are its To do list now.
+    { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
     { href: "/retention", label: "Retention", icon: "retention" },
-    ...(may("products.view") ? [{ href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/pricing"] }] : []),
-    // Only the leads who set what a team charges; a rep quoting from those
-    // prices has no use for the page.
-    ...(may("products.prices") ? [{ href: "/prices", label: "Prices", icon: "pricing" as const }] : []),
+    // Products, promos, bundles, and a team's own prices, as tabs.
+    ...(may("products.view") || may("products.prices")
+      ? [{ href: may("products.view") ? "/products" : "/prices", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices", "/products"] }]
+      : []),
   ];
 }
 
@@ -544,7 +551,7 @@ function Links({ me }: { me: Me }) {
       {THIS_APP === "sales" && adminPagesFor(me).length > 0 && (
         <Group label="Administration">
           {adminPagesFor(me).map((page) => (
-            <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href)}>
+            <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href) || page.also.some((a) => within(pathname, a))}>
               {page.label}
             </Row>
           ))}
@@ -613,7 +620,7 @@ function Links({ me }: { me: Me }) {
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
   if (THIS_APP === "sales" && within(pathname, "/admin")) {
-    const page = adminPagesFor(me).find((p) => within(pathname, p.href));
+    const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
     return page ? `Administration · ${page.label}` : "Administration";
   }
   if (within(pathname, "/settings")) {

@@ -31,7 +31,8 @@ def test_a_database_from_before_administration_is_upgraded(tmp_path):
     app = create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{file.as_posix()}"))
     with app.state.sessions() as db:
         people = {u.email: u.role.name for u in db.query(User)}
-    assert people == {"boss@example.com": "Administrator", "rep@example.com": "Sales Rep"}
+    # "Sales Rep" then; "Salesperson" since the three roles (0008).
+    assert people == {"boss@example.com": "Administrator", "rep@example.com": "Salesperson"}
     backups = sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name)
     assert len(backups) == 1  # named after the newest migration
 
@@ -73,3 +74,28 @@ def test_a_failed_migration_leaves_the_database_as_it_was(tmp_path, monkeypatch)
 
     monkeypatch.setattr(Operations, "batch_alter_table", real)
     create_app(settings)  # and the next start finishes the job
+
+
+def test_three_roles_managers_become_team_leads(tmp_path):
+    """0008: Manager goes (its people become Team Leads), Sales Rep is Salesperson,
+    and Team Lead approves quotes."""
+    from alembic import command
+
+    from app.migrate import _config
+
+    engine = create_engine(f"sqlite:///{(tmp_path / 'old.db').as_posix()}")
+    cfg = _config(engine)
+    command.upgrade(cfg, "0007")
+    with engine.begin() as db:
+        manager = db.execute(text("SELECT id FROM roles WHERE name = 'Manager'")).scalar()
+        db.execute(
+            text("INSERT INTO users (id, email, full_name, password_hash, role_id, is_active, created_at, password_changed_at) VALUES ('u1', 'lorna@x.com', 'Lorna', 'x', :r, 1, '2026-01-01', '2026-01-01')"),
+            {"r": manager},
+        )
+    command.upgrade(cfg, "0008")
+    with engine.begin() as db:
+        names = set(db.execute(text("SELECT name FROM roles")).scalars())
+        lorna = db.execute(text("SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.email = 'lorna@x.com'")).scalar()
+        approve = db.execute(text("SELECT count(*) FROM role_permissions p JOIN roles r ON r.id = p.role_id WHERE r.name = 'Team Lead' AND p.permission = 'quotes.approve'")).scalar()
+    assert names == {"Administrator", "Team Lead", "Salesperson"}
+    assert (lorna, approve) == ("Team Lead", 1)

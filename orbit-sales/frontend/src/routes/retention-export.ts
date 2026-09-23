@@ -3,14 +3,12 @@ import { ApiError, enc, fetchFile } from "@/src/platform/lib/api";
 
 // The retention list as a CSV download. Passed through from the API, which
 // scopes it to what the signed-in person may see (their own customers, or
-// the team with Reports access).
+// everyone their role reaches, with Reports → Export).
 export async function GET(request: NextRequest) {
   const asked = request.nextUrl.searchParams;
   const view = asked.get("view") === "team" ? "team" : "mine";
-  // A team only means something with the division it is in.
   const team = asked.get("team");
-  const division = asked.get("division");
-  const query = [`view=${view}`, division && `division=${enc(division)}`, team && `team=${enc(team)}`].filter(Boolean).join("&");
+  const query = [`view=${view}`, team && `team=${enc(team)}`].filter(Boolean).join("&");
   try {
     const file = await fetchFile(`/retention/export?${query}`);
     return new Response(file.body, {

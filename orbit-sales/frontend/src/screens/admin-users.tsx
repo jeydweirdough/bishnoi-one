@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -7,6 +7,7 @@ import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow } from "@/src/platform/lib/types";
 import { NoAccess, OffTag } from "../components/admin/words";
+import { PeopleTabs } from "../components/admin/people-tabs";
 
 export const metadata = { title: "Users" };
 
@@ -26,13 +27,19 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
   return (
     <>
       <PageHeader
-        title={inTeam ? `Users · ${inTeam.name}` : "Users"}
+        title="People & access"
         actions={
-          <LinkButton href="/admin/users/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-            Add person
-          </LinkButton>
+          <>
+            <LinkButton href="/admin/users/import" icon={<Upload className="size-4" aria-hidden />}>
+              Import
+            </LinkButton>
+            <LinkButton href="/admin/users/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+              Add person
+            </LinkButton>
+          </>
         }
       >
+        {inTeam ? `${inTeam.name}: ` : ""}
         {active} active{people.length > active ? ` · ${people.length - active} switched off` : ""}. Each person has one role, and may be in
         one team.
         {inTeam && (
@@ -44,6 +51,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
           </>
         )}
       </PageHeader>
+      <PeopleTabs me={me} current="/admin/users" />
 
       <Sheet>
         {people.length === 0 ? (
