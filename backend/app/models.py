@@ -6,7 +6,7 @@ Accounts here are Sales' own: nobody signed in here exists in any other Orbit ap
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -109,3 +109,98 @@ class AuditEntry(Base):
     target_id: Mapped[str | None] = mapped_column(String(36), default=None)
     target: Mapped[str] = mapped_column(String(200), default="")
     fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+
+# --- customers and what's done with them --------------------------------------------
+#
+# Every record has an owner (a person here) and the owner's team, which is what
+# a role's scope reads (app/scope.py): own records, the team's, or all of them.
+
+
+class Owned:
+    """Who a record belongs to. `team_id` is the owner's team when it was last
+    given to them, so moving someone to another team doesn't move their records."""
+
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), index=True, default=None)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+COMPANY_STATUSES = ("prospect", "customer", "partner", "inactive")
+
+
+class Company(Owned, Base):
+    __tablename__ = "companies"
+    __table_args__ = (CheckConstraint("status IN ('prospect', 'customer', 'partner', 'inactive')", name="company_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="prospect")
+    industry: Mapped[str | None] = mapped_column(String(80), default=None)
+    website: Mapped[str | None] = mapped_column(String(200), default=None)
+    email: Mapped[str | None] = mapped_column(String(254), default=None)
+    phone: Mapped[str | None] = mapped_column(String(40), default=None)
+    address: Mapped[str | None] = mapped_column(String(300), default=None)
+    city: Mapped[str | None] = mapped_column(String(80), default=None)
+    country: Mapped[str | None] = mapped_column(String(80), default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+
+    owner: Mapped[User] = relationship(foreign_keys="Company.owner_id", lazy="joined")
+    team: Mapped[Team | None] = relationship(lazy="joined")
+
+
+class Contact(Owned, Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"), index=True, default=None)
+    first_name: Mapped[str] = mapped_column(String(80))
+    last_name: Mapped[str | None] = mapped_column(String(80), default=None)
+    job_title: Mapped[str | None] = mapped_column(String(120), default=None)
+    email: Mapped[str | None] = mapped_column(String(254), default=None)
+    phone: Mapped[str | None] = mapped_column(String(40), default=None)
+    mobile: Mapped[str | None] = mapped_column(String(40), default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+
+    company: Mapped[Company | None] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="Contact.owner_id", lazy="joined")
+    team: Mapped[Team | None] = relationship(lazy="joined")
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip() if self.last_name else self.first_name
+
+
+ACTIVITY_KINDS = ("call", "meeting", "email", "note", "task")
+# Kinds that are planned first and done later; the rest are logged once they've happened.
+PLANNED_KINDS = ("meeting", "task")
+
+
+class Activity(Owned, Base):
+    """A call, meeting, email, note or task, about a company and/or a contact.
+
+    `at` is when it happened (call, email, note) or when it's due (meeting,
+    task). A meeting or task is open until `done_at` is set; the others are done
+    when logged. The owner is who did it, or who it's assigned to."""
+
+    __tablename__ = "activities"
+    __table_args__ = (CheckConstraint("kind IN ('call', 'meeting', 'email', 'note', 'task')", name="activity_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(8), index=True)
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str | None] = mapped_column(Text, default=None)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True, default=None)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), index=True, default=None)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, default=None)
+    # Calls and meetings: how long, in minutes. Calls and emails: which way.
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, default=None)
+    direction: Mapped[str | None] = mapped_column(String(8), default=None)
+
+    company: Mapped[Company | None] = relationship(lazy="joined")
+    contact: Mapped[Contact | None] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="Activity.owner_id", lazy="joined")
+

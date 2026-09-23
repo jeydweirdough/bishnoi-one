@@ -51,6 +51,8 @@ import {
   UserPlus,
   Users,
   UsersRound,
+  Mail,
+  SquareCheckBig,
   type LucideIcon,
 } from "lucide-react";
 
@@ -124,6 +126,8 @@ export const ICONS = {
   visit: MapPin,
   message: MessageSquare,
   note: StickyNote,
+  email: Mail,
+  task: SquareCheckBig,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

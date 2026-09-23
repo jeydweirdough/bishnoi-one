@@ -17,7 +17,7 @@ import argparse
 import getpass
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -25,9 +25,9 @@ from sqlalchemy.orm import Session
 from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
-from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
+from app.demo import DEMO_ACCOUNTS, DEMO_ACTIVITIES, DEMO_COMPANIES, DEMO_CONTACTS, DEMO_PASSWORD
 from app.migrate import upgrade
-from app.models import Role, Team, User
+from app.models import PLANNED_KINDS, Activity, Company, Contact, Role, Team, User
 from app.permissions import ADMINISTRATOR
 from app.security import check_password_rules, hash_password
 
@@ -88,6 +88,51 @@ def make_demo(db: Session) -> None:
             updated += 1
     db.commit()
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
+    make_demo_records(db)
+
+
+def make_demo_records(db: Session) -> None:
+    """Sample companies, contacts and activities, owned by the demo reps. Only
+    into a database with no companies yet, so it never doubles anything up."""
+    if db.scalar(select(func.count()).select_from(Company)):
+        print("Demo records: skipped, there are companies already.")
+        return
+    people = {u.email: u for u in db.scalars(select(User))}
+    companies: dict[str, Company] = {}
+    for owner_email, name, status, industry, city, phone, email in DEMO_COMPANIES:
+        owner = people[owner_email]
+        companies[name] = Company(
+            name=name, status=status, industry=industry, city=city, country="Philippines", phone=phone, email=email,
+            owner_id=owner.id, team_id=owner.team_id, created_by_id=owner.id,
+        )
+    db.add_all(companies.values())
+    db.flush()
+    contacts: dict[tuple[str, str], Contact] = {}
+    for company_name, first, last, title, email, phone in DEMO_CONTACTS:
+        company = companies[company_name]
+        contacts[(company_name, first)] = Contact(
+            company_id=company.id, first_name=first, last_name=last, job_title=title, email=email, phone=phone,
+            owner_id=company.owner_id, team_id=company.team_id, created_by_id=company.owner_id,
+        )
+    db.add_all(contacts.values())
+    db.flush()
+    # On the hour, a few days either side of now: some done, some overdue, some coming up.
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    for company_name, first, kind, subject, days, done in DEMO_ACTIVITIES:
+        company = companies[company_name]
+        at = now + timedelta(days=days, hours=1)
+        db.add(
+            Activity(
+                kind=kind, subject=subject, company_id=company.id,
+                contact_id=contacts[(company_name, first)].id if first else None,
+                at=at, done_at=(at if done else None) if kind in PLANNED_KINDS else at,
+                owner_id=company.owner_id, team_id=company.team_id, created_by_id=company.owner_id,
+            )
+        )
+    summary = f"{len(companies)} companies, {len(contacts)} contacts, {len(DEMO_ACTIVITIES)} activities"
+    audit(db, TOOL, "demo.records_made", target=summary)
+    db.commit()
+    print(f"Demo records: {summary}.")
 
 
 def main() -> int:

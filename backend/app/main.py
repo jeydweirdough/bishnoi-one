@@ -12,7 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.migrate import upgrade
-from app.routers import admin, auth, sales
+from app.routers import activities, admin, auth, companies, contacts, people, sales
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -56,5 +56,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(companies.router)
+    app.include_router(contacts.router)
+    app.include_router(activities.router)
+    app.include_router(people.router)
     app.include_router(sales.router)
     return app

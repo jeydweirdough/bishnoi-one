@@ -801,3 +801,80 @@ export type AuditItem = {
 };
 
 export type AuditLog = { items: AuditItem[]; more: boolean };
+
+// --- Customers and activities (Sales' own) ---------------------------------------
+
+export type Ref = { id: string; name: string };
+export type CompanyStatus = "prospect" | "customer" | "partner" | "inactive";
+export type Can = { edit: boolean; delete: boolean };
+
+export type CompanyRow = {
+  id: string;
+  name: string;
+  status: CompanyStatus;
+  industry: string | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  country: string | null;
+  owner: Ref;
+  team: Ref | null;
+  contactCount: number;
+  lastActivityAt: string | null;
+  updatedAt: string;
+  can: Can;
+};
+
+export type CompanyDetail = CompanyRow & {
+  address: string | null;
+  notes: string | null;
+  createdAt: string;
+  contacts: { id: string; name: string; jobTitle: string | null; email: string | null; phone: string | null }[];
+  activities: ActivityItem[];
+};
+
+export type ContactRow = {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  name: string;
+  jobTitle: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  company: Ref | null;
+  owner: Ref;
+  team: Ref | null;
+  lastActivityAt: string | null;
+  updatedAt: string;
+  can: Can;
+};
+
+export type ContactDetail = ContactRow & { notes: string | null; createdAt: string; activities: ActivityItem[] };
+
+export type CrmKind = "call" | "meeting" | "email" | "note" | "task";
+
+export type ActivityItem = {
+  id: string;
+  kind: CrmKind;
+  subject: string;
+  body: string | null;
+  at: string;
+  doneAt: string | null;
+  isPlanned: boolean;
+  isDone: boolean;
+  isOverdue: boolean;
+  durationMinutes: number | null;
+  direction: "in" | "out" | null;
+  company: Ref | null;
+  contact: Ref | null;
+  owner: Ref;
+  createdAt: string;
+  can: Can;
+};
+
+export type Paged<T> = { items: T[]; total: number };
+export type ActivitySummary = { overdue: number; today: number; upcoming: number; open: number };
+export type Assignable = { id: string; name: string; team: Ref | null; isMe: boolean };
+
