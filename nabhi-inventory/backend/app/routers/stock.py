@@ -1,7 +1,8 @@
 """How much there is and what has happened to it: the stock overview, the
 movement trail, batches and their expiry, and serial numbers."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func, or_, select
@@ -84,14 +85,16 @@ def movement_out(m: Movement) -> dict:
     }
 
 
-def day_start(d: date) -> datetime:
-    return datetime.combine(d, time.min)
+def day_start(d: date, zone: str) -> datetime:
+    """The start of the company's day, as a moment."""
+    return datetime.combine(d, time.min, ZoneInfo(zone)).astimezone(UTC)
 
 
 @router.get("/movements")
 def movements(
     _: View,
     db: DB,
+    settings: SettingsDep,
     product: str | None = Query(None, max_length=36),
     warehouse: str | None = Query(None, max_length=36),
     kind: str | None = Query(None, max_length=16, description="a kind, or several: receive,issue"),
@@ -116,9 +119,9 @@ def movements(
         like = f"%{q.lower()}%"
         query = query.join(Product).where(or_(func.lower(Product.name).like(like), func.lower(Product.sku).like(like), func.lower(Movement.reference).like(like)))
     if start:
-        query = query.where(Movement.at >= day_start(start))
+        query = query.where(Movement.at >= day_start(start, settings.org_timezone))
     if end:
-        query = query.where(Movement.at < day_start(end + timedelta(days=1)))
+        query = query.where(Movement.at < day_start(end + timedelta(days=1), settings.org_timezone))
     if before:
         query = query.where(Movement.id < before)
     found = db.scalars(query).all()

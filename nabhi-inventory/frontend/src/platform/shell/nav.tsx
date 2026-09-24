@@ -20,9 +20,9 @@ import type { Me, ModuleAccess } from "../lib/types";
 // contents merge. So they are five plain links, the same for someone in one
 // division as for someone in six.
 //
-// A department is different. Inventory's pages (products, promos, bundles) are
-// nothing like Finance's (approvals, letters, payments), so a department really
-// is a section, and opens to show its own.
+// A department is different. Inventory's pages (stock, transfers, purchasing)
+// are nothing like Finance's (approvals, letters, payments), so a department
+// really is a section, and opens to show its own.
 
 type Page = {
   href: string;
@@ -79,6 +79,63 @@ function crmPages(me: Me): Page[] {
   ];
 }
 
+/** Inventory's own pages, in its groups. Each shows only for a role that may
+ *  open it; what belongs to a place (a product's categories, the stock's
+ *  movements) is a tab inside it rather than another row here. */
+function inventoryGroups(me: Me): PageGroup[] {
+  const may = (permission: string) => me.permissions?.includes(permission) ?? false;
+  const only = (show: boolean, page: Page) => (show ? [page] : []);
+  const groups: PageGroup[] = [
+    {
+      label: "Inventory",
+      pages: [
+        ...only(may("dashboard.view"), { href: "/", label: "Dashboard", icon: "overview" }),
+        ...only(may("dashboard.view"), { href: "/alerts", label: "Alerts", icon: "alerts" }),
+        ...only(may("products.view"), { href: "/products", label: "Products", icon: "products", also: ["/catalog"] }),
+        ...only(may("stock.view"), { href: "/stock", label: "Stock", icon: "stock", also: ["/movements", "/batches", "/serials"] }),
+        ...only(may("transfers.view"), { href: "/transfers", label: "Transfers", icon: "transfers" }),
+        ...only(may("adjustments.view") || may("counts.view"), {
+          href: may("adjustments.view") ? "/adjustments" : "/counts",
+          label: "Adjustments & counts",
+          icon: "adjustments",
+          also: ["/adjustments", "/counts"],
+        }),
+        ...only(may("warehouses.view"), { href: "/warehouses", label: "Warehouses", icon: "warehouses" }),
+      ],
+    },
+    {
+      label: "Purchasing",
+      pages: [
+        ...only(may("purchasing.view") || may("receiving.view"), {
+          href: may("purchasing.view") ? "/purchase-orders" : "/receipts",
+          label: "Purchase orders",
+          icon: "purchaseOrders",
+          also: ["/purchase-orders", "/receipts", "/backorders"],
+        }),
+        ...only(may("suppliers.view"), { href: "/suppliers", label: "Suppliers", icon: "suppliers" }),
+      ],
+    },
+    {
+      label: "Orders",
+      pages: [...only(may("orders.view"), { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"] })],
+    },
+    { label: "Insight", pages: [...only(may("reports.view"), { href: "/reports", label: "Reports", icon: "report" })] },
+    {
+      label: "Administration",
+      pages: [
+        ...only(may("admin.users") || may("admin.roles"), {
+          href: may("admin.users") ? "/admin/users" : "/admin/roles",
+          label: "Users & roles",
+          icon: "people",
+          also: ["/admin/users", "/admin/roles"],
+        }),
+        ...only(may("admin.audit"), { href: "/admin/audit", label: "Activity log", icon: "auditLog" }),
+      ],
+    },
+  ];
+  return groups.filter((g) => g.pages.length > 0);
+}
+
 function modulePages(m: ModuleAccess): Page[] {
   const base = moduleBase(m.key);
   // In the module's own app the prefix is empty, so its root is plain "/".
@@ -89,15 +146,6 @@ function modulePages(m: ModuleAccess): Page[] {
       { href: `${base}/approvals`, label: "Approvals", icon: "approvals" },
       { href: `${base}/letters`, label: "Guarantee letters", icon: "letters" },
       { href: `${base}/payments`, label: "Letter payments", icon: "payments" },
-    ];
-  }
-  if (m.key === "inventory") {
-    return [
-      { href: root, label: "Overview", icon: "overview" },
-      { href: `${base}/products`, label: "Products & prices", icon: "products" },
-      { href: `${base}/promos`, label: "Promos & discounts", icon: "promos" },
-      // Beside promos, because a person looks for both in the same place.
-      { href: `${base}/bundles`, label: "Bundles", icon: "bundles" },
     ];
   }
   return [{ href: root, label: "Overview", icon: "overview" }];
@@ -557,7 +605,18 @@ function Links({ me }: { me: Me }) {
           ))}
         </Group>
       )}
-      {departments.some(serves) && (
+      {/* Inventory's own groups, each only with the pages this role opens. */}
+      {THIS_APP === "inventory" &&
+        inventoryGroups(me).map((g) => (
+          <Group key={g.label} label={g.label!}>
+            {g.pages.map((page) => (
+              <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, page.href === "/")}>
+                {page.label}
+              </Row>
+            ))}
+          </Group>
+        ))}
+      {THIS_APP !== "inventory" && departments.some(serves) && (
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (
@@ -619,6 +678,13 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
+  if (THIS_APP === "inventory") {
+    for (const g of inventoryGroups(me)) {
+      const page = g.pages.find((p) => isCurrent(p, pathname, p.href === "/"));
+      if (page) return page.label;
+    }
+    return null;
+  }
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
     return page ? `Administration · ${page.label}` : "Administration";

@@ -1,43 +1,13 @@
-"""Signing in and out of this app, with its own accounts."""
+"""Signing in and out of Inventory, with its own accounts."""
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings
 from app.main import create_app
 from app.models import SignInSession, User
-from app.routers.auth import attempts
 from app.security import hash_password
-
-PASSWORD = "correct horse battery"
-
-
-@pytest.fixture
-def app(tmp_path):
-    attempts.clear()
-    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
-    app = create_app(settings)
-    with app.state.sessions() as db:
-        db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role="admin"))
-        db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD)))
-        db.commit()
-    return app
-
-
-@pytest.fixture
-def client(app):
-    with TestClient(app) as c:
-        yield c
-
-
-def sign_in(client, email="ana@example.com", password=PASSWORD):
-    return client.post("/auth/login", json={"email": email, "password": password})
-
-
-def bearer(r) -> dict:
-    return {"Authorization": f"Bearer {r.json()['accessToken']}"}
+from tests.conftest import PASSWORD, bearer, settings_for, sign_in
 
 
 def test_health(client):
@@ -49,16 +19,18 @@ def test_sign_in_and_see_who_you_are(client):
     assert r.status_code == 200, r.text
     assert r.json()["expiresIn"] == 10 * 3600
     me = client.get("/auth/me", headers=bearer(r)).json()
-    assert me["user"]["email"] == "ana@example.com" and me["user"]["fullName"] == "Ana Reyes"
-    assert me["isDeveloperAdmin"] is False
+    assert me["user"]["email"] == "ana@example.com" and me["user"]["fullName"] == "Ana"
+    assert me["role"]["name"] == "Administrator"
     assert [m["key"] for m in me["modules"]] == ["inventory"]
+    assert "adjustments.approve" in me["permissions"]
 
 
-def test_admins_run_settings_members_dont(client):
+def test_the_role_says_what_you_may_do(client):
     ana = client.get("/auth/me", headers=bearer(sign_in(client))).json()
-    ben = client.get("/auth/me", headers=bearer(sign_in(client, "ben@example.com"))).json()
-    assert ana["canManageSettings"] is (not False)
-    assert ben["canManageSettings"] is False
+    sal = client.get("/auth/me", headers=bearer(sign_in(client, "sal@example.com"))).json()
+    assert ana["canManageSettings"] is True
+    assert sal["canManageSettings"] is False
+    assert "orders.create" in sal["permissions"] and "receiving.receive" not in sal["permissions"]
 
 
 def test_wrong_password_and_unknown_email_look_the_same(client):
@@ -89,9 +61,9 @@ def test_an_expired_session_ends(client, app):
 
 
 def test_switching_someone_off_or_changing_their_password_ends_their_sessions(client, app):
-    headers = bearer(sign_in(client, "ben@example.com"))
+    headers = bearer(sign_in(client, "sal@example.com"))
     with app.state.sessions() as db:
-        db.query(User).filter_by(email="ben@example.com").one().password_changed_at = datetime.now(UTC) + timedelta(seconds=1)
+        db.query(User).filter_by(email="sal@example.com").one().password_changed_at = datetime.now(UTC) + timedelta(seconds=1)
         db.commit()
     assert client.get("/auth/me", headers=headers).status_code == 401
 
@@ -109,7 +81,7 @@ def test_too_many_wrong_passwords_waits(client):
     blocked = sign_in(client)  # even the right one, for now
     assert blocked.status_code == 429
     assert int(blocked.headers["retry-after"]) > 60
-    assert sign_in(client, "ben@example.com").status_code == 200  # per email
+    assert sign_in(client, "sal@example.com").status_code == 200  # per email
 
 
 def test_tokens_are_not_stored(client, app):
@@ -126,7 +98,8 @@ def test_demo_accounts_list_only_what_exists_here(client, app):
     assert client.get("/auth/demo-accounts").json()["items"] == []
     first = DEMO_ACCOUNTS[0]
     with app.state.sessions() as db:
-        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD)))
+        role_id = db.query(User).filter_by(email="wes@example.com").one().role_id
+        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD), role_id=role_id))
         db.commit()
     listed = client.get("/auth/demo-accounts").json()
     assert [d["email"] for d in listed["items"]] == [first.email]
@@ -134,6 +107,5 @@ def test_demo_accounts_list_only_what_exists_here(client, app):
 
 
 def test_no_demo_accounts_in_production(tmp_path):
-    settings = Settings(_env_file=None, environment="production", allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'p.db').as_posix()}")
-    with TestClient(create_app(settings)) as c:
+    with TestClient(create_app(settings_for(tmp_path, environment="production"))) as c:
         assert c.get("/auth/demo-accounts").status_code == 404

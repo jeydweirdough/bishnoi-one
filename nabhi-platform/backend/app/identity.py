@@ -3,20 +3,18 @@
 from app.config import Settings
 from app.models import User
 
-# This app's module, as the screens' sidebar and door check read it. None: the
-# Platform app, which works above any one company.
-MODULE: dict | None = None
-# The Platform app's people are its Developer Admins.
-DEVELOPER_ADMIN_APP = True
+# Everyone who signs in here works above every company, so none is open:
+# `org` is null and the shell treats them as the platform tier.
 ORG_ID = "00000000-0000-4000-8000-000000004305"
 
-ALL_ACTIONS = ["view", "create", "edit", "delete"]
+# Staff roles as the screens name them.
+ROLE_NAMES = {"admin": "Platform Admin", "member": "Support"}
 
 
 def org_out(settings: Settings) -> dict:
     return {
         "id": ORG_ID,
-        "slug": "orbit",
+        "slug": "nabhi",
         "name": settings.org_name,
         "brandName": settings.org_name,
         "currency": settings.org_currency,
@@ -27,15 +25,18 @@ def org_out(settings: Settings) -> dict:
 
 
 def me_out(user: User, settings: Settings) -> dict:
-    admin = user.role == "admin"
     return {
         "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
-        "org": None if DEVELOPER_ADMIN_APP else org_out(settings),
-        "canManageSettings": admin and not DEVELOPER_ADMIN_APP,
-        "canRecover": DEVELOPER_ADMIN_APP,
+        "org": None,
+        "canManageSettings": False,
+        "canRecover": True,
         "viewedBy": None,
-        "isOwner": admin and not DEVELOPER_ADMIN_APP,
-        "isDeveloperAdmin": DEVELOPER_ADMIN_APP,
-        "modules": [] if MODULE is None else [{**MODULE, "built": True, "url": None, "actions": ALL_ACTIONS, "teams": []}],
+        "isOwner": False,
+        "isDeveloperAdmin": True,
+        "modules": [],
         "lists": {"customer_kind": [], "activity_kind": [], "outcome": []},
+        # This app's own: which kind of staff, and so what they may change.
+        "platformRole": user.role,
+        "platformRoleName": ROLE_NAMES[user.role],
+        "canAdminister": user.role == "admin",
     }

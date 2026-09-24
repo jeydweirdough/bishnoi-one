@@ -6,6 +6,7 @@ Revision ID: 0013
 Revises: 0012
 """
 
+import sqlalchemy as sa
 from alembic import op
 
 revision = "0013"
@@ -41,8 +42,11 @@ TABLES = (
 
 
 def upgrade() -> None:
+    # nbcm_ too: a table already renamed further (0014) stays as it is.
+    present = set(sa.inspect(op.get_bind()).get_table_names())
     for name in TABLES:
-        op.rename_table(name, f"orcm_{name}")
+        if name in present and f"orcm_{name}" not in present and f"nbcm_{name}" not in present:
+            op.rename_table(name, f"orcm_{name}")
 
 
 def downgrade() -> None:

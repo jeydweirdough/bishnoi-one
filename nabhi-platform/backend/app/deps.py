@@ -1,4 +1,9 @@
-"""Who is asking: the bearer token, checked against this app's sessions."""
+"""Who is asking: the bearer token, checked against this app's sessions.
+
+Two kinds of staff sign in here. Anyone signed in sees everything and works
+Support and Incidents; changing the platform itself (companies, applications,
+people's access, announcements, settings) takes a Platform Admin (`AdminUser`).
+"""
 
 from datetime import UTC, datetime
 from typing import Annotated
@@ -24,6 +29,14 @@ def get_settings_dep(request: Request) -> Settings:
 def get_db(request: Request):
     with request.app.state.sessions() as db:
         yield db
+
+
+def client_address(request: Request) -> str | None:
+    """Who is asking, as the screens' server reports it (it sits in front)."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()[:64] or None
+    return request.client.host if request.client else None
 
 
 def as_utc(moment: datetime) -> datetime:
@@ -56,12 +69,13 @@ def current_user(
 
 def require_admin(user: Annotated[User, Depends(current_user)]) -> User:
     if user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only this app's admins can do that.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a Platform Admin can change that. Support can see it, not change it.")
     return user
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 DB = Annotated[Session, Depends(get_db)]
+Address = Annotated[str | None, Depends(client_address)]
 CurrentSession = Annotated[SignInSession, Depends(current_session)]
 CurrentUser = Annotated[User, Depends(current_user)]
 AdminUser = Annotated[User, Depends(require_admin)]

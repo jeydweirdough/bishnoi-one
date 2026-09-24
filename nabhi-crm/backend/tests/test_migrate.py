@@ -99,3 +99,26 @@ def test_three_roles_managers_become_team_leads(tmp_path):
         approve = db.execute(text("SELECT count(*) FROM role_permissions p JOIN roles r ON r.id = p.role_id WHERE r.name = 'Team Lead' AND p.permission = 'quotes.approve'")).scalar()
     assert names == {"Administrator", "Team Lead", "Salesperson"}
     assert (lorna, approve) == ("Team Lead", 1)
+
+
+def test_table_names_are_put_right_whatever_the_recorded_revision_says(tmp_path):
+    """A database at 0013 on paper, whose tables are under all three names
+    (a deploy that stopped partway): 0014 brings each one to nbcm_."""
+    from sqlalchemy import inspect
+
+    from app.migrate import VERSION_TABLE, upgrade
+    from app.db import make_engine
+
+    engine = make_engine(f"sqlite:///{(tmp_path / 'mixed.db').as_posix()}")
+    upgrade(engine)  # all the way: every table nbcm_
+    with engine.begin() as db:
+        db.execute(text("ALTER TABLE nbcm_teams RENAME TO teams"))  # never renamed
+        db.execute(text("ALTER TABLE nbcm_users RENAME TO orcm_users"))  # renamed once
+        # nbcm_quotes: already where it belongs
+        db.execute(text(f"UPDATE {VERSION_TABLE} SET version_num = '0013'"))
+    upgrade(engine)
+    tables = set(inspect(engine).get_table_names())
+    assert {"nbcm_teams", "nbcm_users", "nbcm_quotes"} <= tables
+    assert not {"teams", "orcm_users", "orcm_teams"} & tables
+    with engine.connect() as db:
+        assert db.execute(text(f"SELECT version_num FROM {VERSION_TABLE}")).scalar() == "0014"

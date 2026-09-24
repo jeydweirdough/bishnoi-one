@@ -53,6 +53,15 @@ import {
   UsersRound,
   Mail,
   SquareCheckBig,
+  Bell,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  Warehouse,
+  Factory,
+  ClipboardList,
+  PackageCheck,
+  ShoppingBag,
+  ChartColumn,
   type LucideIcon,
 } from "lucide-react";
 
@@ -128,6 +137,18 @@ export const ICONS = {
   note: StickyNote,
   email: Mail,
   task: SquareCheckBig,
+
+  // Inventory's places.
+  alerts: Bell,
+  stock: Boxes,
+  transfers: ArrowLeftRight,
+  adjustments: SlidersHorizontal,
+  warehouses: Warehouse,
+  suppliers: Factory,
+  purchaseOrders: ClipboardList,
+  receiving: PackageCheck,
+  issuance: ShoppingBag,
+  report: ChartColumn,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

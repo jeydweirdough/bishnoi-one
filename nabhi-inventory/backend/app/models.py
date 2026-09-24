@@ -212,14 +212,6 @@ class Product(Stamped, Base):
     parent: Mapped["Product | None"] = relationship(remote_side="Product.id", lazy="select")
 
 
-# How many variants a product has. A product with variants only groups them:
-# it holds no stock of its own, so it is never low or out.
-_variant = aliased(Product)
-Product.variant_count = column_property(
-    select(func.count(_variant.id)).where(_variant.parent_id == Product.id).correlate_except(_variant).scalar_subquery()
-)
-
-
 class ProductImage(Base):
     """A product's pictures, kept in the database like everything else here."""
 
@@ -724,3 +716,11 @@ class CountLine(Base):
     product: Mapped[Product] = relationship(lazy="joined")
     location: Mapped[Location] = relationship(lazy="joined")
     batch: Mapped[Batch | None] = relationship(lazy="joined")
+
+
+# How many variants a product has. A product with variants only groups them:
+# it holds no stock of its own, so it is never low or out.
+_variant = aliased(Product)
+Product.variant_count = column_property(
+    select(func.count(_variant.id)).where(_variant.parent_id == Product.id).correlate_except(_variant).scalar_subquery()
+)

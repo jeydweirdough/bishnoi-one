@@ -1,0 +1,194 @@
+"use client";
+
+import { Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/src/platform/ui/button";
+import { CellInput } from "@/src/platform/ui/field";
+import type { Format } from "@/src/platform/lib/format";
+
+export type PickableProduct = { id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string };
+export type Line = { productId: string; quantity: string; money: string };
+
+type Failure = { ok: false; error: string; fields?: Record<string, string> };
+type Outcome<T> = { ok: true; data: T } | Failure;
+
+/**
+ * Saving a form: runs the action, keeps the API's words for what's wrong
+ * (overall and per field), and on success says so and moves on.
+ */
+export function useSave() {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+
+  function save<T>(run: () => Promise<Outcome<T>>, done: (data: T) => { message: string; go?: string }) {
+    start(async () => {
+      const result = await run();
+      if (!result.ok) {
+        setError(result.error);
+        setFields(result.fields ?? {});
+        return;
+      }
+      setError(null);
+      setFields({});
+      const next = done(result.data);
+      toast.success(next.message);
+      if (next.go) router.push(next.go);
+      else router.refresh();
+    });
+  }
+
+  return { pending, error, fields, save, fail: (message: string) => setError(message) };
+}
+
+/**
+ * The lines of a document: a product and a quantity each, and (for purchase
+ * orders and customer orders) a unit amount that starts at the product's own.
+ */
+export function LinesEditor({
+  products,
+  lines,
+  onChange,
+  errors,
+  money,
+  fmt,
+  note,
+}: {
+  products: PickableProduct[];
+  lines: Line[];
+  onChange: (lines: Line[]) => void;
+  errors: Record<string, string>;
+  /** A unit amount column, and which price it starts from. */
+  money?: { label: string; from: "costPrice" | "sellingPrice" };
+  fmt: Format;
+  /** Something to say under a line: what's available, for example. */
+  note?: (productId: string) => string | null;
+}) {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const offered = products.filter((p) => p.status === "active");
+
+  function set(i: number, change: Partial<Line>) {
+    const next = lines.map((line, j) => (j === i ? { ...line, ...change } : line));
+    // Picking a product fills in its usual amount, when none has been typed.
+    if (change.productId && money) {
+      const p = byId.get(change.productId);
+      if (p && !lines[i].money) next[i].money = fmt.pesosText(p[money.from]);
+    }
+    onChange(next);
+  }
+
+  const total = money ? lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (fmt.toCentavos(l.money) ?? 0), 0) : 0;
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[36rem] text-left text-sm">
+          <thead>
+            <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+              <th scope="col" className="py-2 pr-3 font-semibold">Product</th>
+              <th scope="col" className="w-28 px-3 py-2 text-right font-semibold">Quantity</th>
+              {money && <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{money.label}</th>}
+              {money && <th scope="col" className="w-32 px-3 py-2 text-right font-semibold">Amount</th>}
+              <th scope="col" className="w-10 py-2">
+                <span className="sr-only">Remove</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {lines.map((line, i) => {
+              const p = byId.get(line.productId);
+              const productError = errors[`lines.${i}.productId`];
+              const qtyError = errors[`lines.${i}.quantity`];
+              const said = line.productId && note ? note(line.productId) : null;
+              return (
+                <tr key={i}>
+                  <td className="py-2 pr-3 align-top">
+                    <select
+                      aria-label={`Line ${i + 1} product`}
+                      aria-invalid={productError ? true : undefined}
+                      value={line.productId}
+                      onChange={(e) => set(i, { productId: e.target.value })}
+                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none aria-[invalid=true]:border-danger"
+                    >
+                      <option value="">Pick a product…</option>
+                      {offered.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} · {o.sku}
+                        </option>
+                      ))}
+                      {/* Kept, so a line already on a document still shows what it is. */}
+                      {p && p.status !== "active" && <option value={p.id}>{p.name} · {p.sku} ({p.status})</option>}
+                    </select>
+                    {(productError || qtyError) && <p className="mt-1 text-meta text-danger">{productError || qtyError}</p>}
+                    {said && <p className="mt-1 text-meta text-ink-3">{said}</p>}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <CellInput
+                        aria-label={`Line ${i + 1} quantity`}
+                        aria-invalid={qtyError ? true : undefined}
+                        inputMode="numeric"
+                        value={line.quantity}
+                        onChange={(e) => set(i, { quantity: e.target.value.replace(/[^\d]/g, "") })}
+                        className="w-20"
+                      />
+                      <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>
+                    </div>
+                  </td>
+                  {money && (
+                    <td className="px-3 py-2 align-top">
+                      <CellInput aria-label={`Line ${i + 1} ${money.label}`} inputMode="decimal" value={line.money} onChange={(e) => set(i, { money: e.target.value })} className="w-28" />
+                    </td>
+                  )}
+                  {money && (
+                    <td className="px-3 py-2 text-right align-top tabular-nums text-ink-2">
+                      {fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0))}
+                    </td>
+                  )}
+                  <td className="py-2 text-right align-top">
+                    {lines.length > 1 && (
+                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
+                        <X className="size-4" aria-hidden />
+                        <span className="sr-only">Remove line {i + 1}</span>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {money && (
+            <tfoot>
+              <tr className="border-t border-rule-strong">
+                <td colSpan={3} className="py-2 pr-3 text-right text-meta text-ink-3">
+                  Total
+                </td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmt.peso(total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
+        Add a line
+      </Button>
+    </div>
+  );
+}
+
+/** The lines as the API takes them. Blank lines are left out. */
+export function linesOut(lines: Line[], fmt: Format, moneyKey?: "unitCost" | "unitPrice") {
+  return lines
+    .filter((l) => l.productId || l.quantity)
+    .map((l) => ({
+      productId: l.productId,
+      quantity: Number(l.quantity) || 0,
+      ...(moneyKey ? { [moneyKey]: fmt.toCentavos(l.money) ?? 0 } : {}),
+    }));
+}
+
+export const blankLine = (): Line => ({ productId: "", quantity: "", money: "" });

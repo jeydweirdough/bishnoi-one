@@ -3,115 +3,168 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { Bundle, Product, Promo, PromoKind, PromoTier } from "@/src/platform/lib/types";
 
-// Products, prices and promos. The API checks the caller's Inventory access on every one.
+// Everything the screens change. The API checks the caller's role and every
+// rule on each one (enough stock, the right status, nobody locked out);
+// these only carry the request and hand back what it said.
 
-export type ProductInput = {
-  code: string;
-  name: string;
-  genericName: string | null;
-  strength: string | null;
-  form: string | null;
-  unit: string;
-};
+type Json = Record<string, unknown>;
 
-export async function createProduct(input: ProductInput & { prices: Record<string, number> }): Promise<Result<{ id: string }>> {
+async function send<T = Json>(method: "post" | "put" | "patch" | "del", path: string, body?: unknown): Promise<Result<T>> {
   return attempt(async () => {
-    const product = await api.post<Product>("/inventory/products", input);
-    return { id: product.id };
-  });
-}
-
-/** Details and prices together, as the product page saves them. */
-export async function updateProduct(
-  id: string,
-  input: ProductInput,
-  prices: Record<string, number | null>,
-): Promise<Result> {
-  return attempt(async () => {
-    await api.patch<Product>(`/inventory/products/${enc(id)}`, input);
-    await api.put<Product>(`/inventory/products/${enc(id)}/prices`, { prices });
+    const out = method === "del" ? await api.del<T>(path) : await api[method]<T>(path, body ?? {});
     refresh();
-    return null;
+    return out;
   });
 }
 
-export async function setProductActive(id: string, isActive: boolean): Promise<Result> {
+type Id = { id: string };
+type Numbered = { id: string; number: string };
+
+// --- catalog ---------------------------------------------------------------------------
+
+export async function saveProduct(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("patch", `/inventory/products/${enc(id)}`, input) : send<Id>("post", "/inventory/products", input);
+}
+export async function deleteProduct(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/products/${enc(id)}`);
+}
+export async function uploadImage(id: string, form: FormData): Promise<Result<Id>> {
   return attempt(async () => {
-    await api.patch<Product>(`/inventory/products/${enc(id)}`, { isActive });
+    const out = await api.upload<Id>(`/inventory/products/${enc(id)}/images`, form);
     refresh();
-    return null;
+    return out;
   });
 }
-
-export type PromoInput = {
-  name: string;
-  kind: PromoKind;
-  percentBp: number | null;
-  amountCentavos: number | null;
-  buyQty: number | null;
-  freeQty: number | null;
-  tiers: PromoTier[];
-  startsOn: string;
-  endsOn: string | null;
-  productIds: string[] | null;
-  divisionCodes: string[];
-};
-
-export async function createPromo(input: PromoInput): Promise<Result<{ id: string }>> {
-  return attempt(async () => {
-    const promo = await api.post<Promo>("/inventory/promos", input);
-    return { id: promo.id };
-  });
+export async function deleteImage(productId: string, imageId: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/products/${enc(productId)}/images/${enc(imageId)}`);
+}
+export async function setSupplierPrice(productId: string, supplierId: string, input: Json): Promise<Result> {
+  return send("put", `/inventory/products/${enc(productId)}/suppliers/${enc(supplierId)}`, input);
+}
+export async function removeSupplierPrice(productId: string, supplierId: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/products/${enc(productId)}/suppliers/${enc(supplierId)}`);
 }
 
-export async function updatePromo(id: string, input: PromoInput): Promise<Result> {
-  return attempt(async () => {
-    await api.put<Promo>(`/inventory/promos/${enc(id)}`, input);
-    refresh();
-    return null;
-  });
+type CatalogList = "categories" | "brands" | "units";
+export async function saveCatalogItem(list: CatalogList, key: string | null, input: Json): Promise<Result> {
+  return key ? send("patch", `/inventory/${list}/${enc(key)}`, input) : send("post", `/inventory/${list}`, input);
+}
+export async function deleteCatalogItem(list: CatalogList, key: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/${list}/${enc(key)}`);
 }
 
-export async function setPromoActive(id: string, isActive: boolean): Promise<Result> {
-  return attempt(async () => {
-    await api.patch<Promo>(`/inventory/promos/${enc(id)}`, { isActive });
-    refresh();
-    return null;
-  });
+// --- warehouses -------------------------------------------------------------------------
+
+export async function saveWarehouse(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("patch", `/inventory/warehouses/${enc(id)}`, input) : send<Id>("post", "/inventory/warehouses", input);
+}
+export async function deleteWarehouse(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/warehouses/${enc(id)}`);
+}
+export async function saveLocation(warehouseId: string, id: string | null, input: Json): Promise<Result<Id>> {
+  const base = `/inventory/warehouses/${enc(warehouseId)}/locations`;
+  return id ? send<Id>("patch", `${base}/${enc(id)}`, input) : send<Id>("post", base, input);
+}
+export async function deleteLocation(warehouseId: string, id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/warehouses/${enc(warehouseId)}/locations/${enc(id)}`);
 }
 
-export type BundleInput = {
-  code: string;
-  name: string;
-  priceCentavos: number;
-  asOneLine: boolean;
-  items: { productId: string; qty: number }[];
-  startsOn: string;
-  endsOn: string | null;
-  divisionCodes: string[];
-};
+// --- suppliers and purchasing -----------------------------------------------------------
 
-export async function createBundle(input: BundleInput): Promise<Result<{ id: string }>> {
-  return attempt(async () => {
-    const bundle = await api.post<Bundle>("/inventory/bundles", input);
-    return { id: bundle.id };
-  });
+export async function saveSupplier(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("patch", `/inventory/suppliers/${enc(id)}`, input) : send<Id>("post", "/inventory/suppliers", input);
+}
+export async function deleteSupplier(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/suppliers/${enc(id)}`);
+}
+export async function savePurchaseOrder(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("put", `/inventory/purchase-orders/${enc(id)}`, input) : send<Numbered>("post", "/inventory/purchase-orders", input);
+}
+export async function setPurchaseOrderDates(id: string, input: Json): Promise<Result> {
+  return send("patch", `/inventory/purchase-orders/${enc(id)}`, input);
+}
+export async function purchaseOrderStep(id: string, step: "place" | "cancel"): Promise<Result> {
+  return send("post", `/inventory/purchase-orders/${enc(id)}/${step}`);
+}
+export async function deletePurchaseOrder(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/purchase-orders/${enc(id)}`);
+}
+export async function receiveDelivery(input: Json): Promise<Result<Numbered & { orderStatus: string | null }>> {
+  return send("post", "/inventory/receipts", input);
 }
 
-export async function updateBundle(id: string, input: BundleInput): Promise<Result> {
-  return attempt(async () => {
-    await api.put<Bundle>(`/inventory/bundles/${enc(id)}`, input);
-    refresh();
-    return null;
-  });
+// --- orders -----------------------------------------------------------------------------
+
+export async function saveOrder(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("put", `/inventory/orders/${enc(id)}`, input) : send<Numbered>("post", "/inventory/orders", input);
+}
+export async function orderStep(id: string, step: "confirm" | "pick" | "cancel"): Promise<Result> {
+  return send("post", `/inventory/orders/${enc(id)}/${step}`);
+}
+export async function issueOrder(id: string, input: Json): Promise<Result> {
+  return send("post", `/inventory/orders/${enc(id)}/issue`, input);
+}
+export async function deleteOrder(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/orders/${enc(id)}`);
 }
 
-export async function setBundleActive(id: string, isActive: boolean): Promise<Result> {
+// --- transfers --------------------------------------------------------------------------
+
+export async function saveTransfer(id: string | null, input: Json): Promise<Result<Id>> {
+  return id ? send<Id>("put", `/inventory/transfers/${enc(id)}`, input) : send<Numbered>("post", "/inventory/transfers", input);
+}
+export async function transferStep(id: string, step: "request" | "approve" | "cancel"): Promise<Result> {
+  return send("post", `/inventory/transfers/${enc(id)}/${step}`);
+}
+export async function dispatchTransfer(id: string, input: Json): Promise<Result> {
+  return send("post", `/inventory/transfers/${enc(id)}/dispatch`, input);
+}
+export async function receiveTransfer(id: string, input: Json): Promise<Result> {
+  return send("post", `/inventory/transfers/${enc(id)}/receive`, input);
+}
+export async function deleteTransfer(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/transfers/${enc(id)}`);
+}
+
+// --- adjustments and counts -------------------------------------------------------------
+
+export async function createAdjustment(input: Json): Promise<Result<Numbered & { status: string }>> {
+  return send("post", "/inventory/adjustments", input);
+}
+export async function adjustmentStep(id: string, step: "approve" | "reject"): Promise<Result> {
+  return send("post", `/inventory/adjustments/${enc(id)}/${step}`);
+}
+export async function withdrawAdjustment(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/adjustments/${enc(id)}`);
+}
+export async function startCount(input: Json): Promise<Result<Numbered>> {
+  return send("post", "/inventory/counts", input);
+}
+export async function recordCounts(id: string, lines: { lineId: string; counted: number | null }[]): Promise<Result> {
+  return send("put", `/inventory/counts/${enc(id)}/lines`, { lines });
+}
+export async function addCountLine(id: string, input: Json): Promise<Result<Id>> {
+  return send("post", `/inventory/counts/${enc(id)}/lines`, input);
+}
+export async function countStep(id: string, step: "submit" | "reopen" | "approve" | "cancel"): Promise<Result<{ adjustmentId?: string | null }>> {
+  return send("post", `/inventory/counts/${enc(id)}/${step}`);
+}
+
+// --- administration ---------------------------------------------------------------------
+
+export async function saveUser(id: string | null, input: Json): Promise<Result> {
+  return id ? send("patch", `/admin/users/${enc(id)}`, input) : send("post", "/admin/users", input);
+}
+export async function setUserPassword(id: string, password: string): Promise<Result> {
   return attempt(async () => {
-    await api.patch<Bundle>(`/inventory/bundles/${enc(id)}`, { isActive });
-    refresh();
-    return null;
+    await api.post(`/admin/users/${enc(id)}/password`, { password });
+    return {};
   });
+}
+export async function saveRole(id: string | null, input: Json): Promise<Result<Id & { name: string }>> {
+  return id ? send("patch", `/admin/roles/${enc(id)}`, input) : send("post", "/admin/roles", input);
+}
+export async function deleteRole(id: string): Promise<Result<null>> {
+  return send<null>("del", `/admin/roles/${enc(id)}`);
 }
