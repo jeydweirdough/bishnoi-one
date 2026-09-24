@@ -108,8 +108,13 @@ Every table the CRM makes is named `orcm_…` (`orcm_users`, `orcm_quotes`, and
 apart from any other app's.
 
 1. **Project:** import the repo, with the root directory `orbit-crm/backend`.
-2. **Database:** the project's **Storage** tab → **Create Database** → Neon
-   (Postgres) → connect it to this project. That sets `DATABASE_URL`.
+2. **Database:** any Postgres, as `DATABASE_URL`.
+   - **Supabase:** use the **pooler** address (Connect → Transaction pooler,
+     port 6543), not `db.<project>.supabase.co`: that direct one is IPv6
+     only, which Vercel can't reach. A `#`, `@` or `/` in the password is
+     written `%23`, `%40`, `%2F` in the address.
+   - **Neon:** the project's **Storage** tab → **Create Database** → Neon →
+     connect it to this project. That sets `DATABASE_URL` for you.
 3. **Environment variables** (Settings → Environment Variables):
 
    | Name | Value |

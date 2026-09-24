@@ -34,12 +34,16 @@ def make_engine(url: str) -> Engine:
     # Postgres (on Vercel: Neon). Its providers hand out postgres:// or
     # postgresql:// addresses; the driver installed here is psycopg 3.
     url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", url)
+    # No prepared statements: a pooler in transaction mode (Supabase's, on
+    # port 6543) hands each transaction to any of its connections, where a
+    # statement prepared on another one doesn't exist.
+    connect_args = {"prepare_threshold": None}
     if os.environ.get("VERCEL"):
         # A serverless function is frozen between requests, so a pooled
-        # connection may be dead by the next one. Connect per request; Neon's
-        # pooled address does the pooling on its side.
-        return create_engine(url, poolclass=NullPool)
-    return create_engine(url, pool_pre_ping=True)
+        # connection may be dead by the next one. Connect per request; the
+        # database's pooler does the pooling on its side.
+        return create_engine(url, poolclass=NullPool, connect_args=connect_args)
+    return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:
