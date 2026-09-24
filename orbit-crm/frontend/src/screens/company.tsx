@@ -1,4 +1,4 @@
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -11,7 +11,7 @@ import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
 import { layoutItems } from "../components/extra/extra-values";
 import { ActivityList } from "../components/crm/activity-list";
-import { DeleteRecord } from "../components/crm/list-controls";
+import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
 import { StatusTag, siteHref, siteLabel } from "../components/crm/words";
@@ -52,6 +52,24 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             <StatusTag status={company.status} types={types} />
           </span>
         }
+        // Edit and delete act on the customer itself, so they sit with its name.
+        tools={
+          <>
+            {company.can.edit && <EditRecord href={`/companies/${company.id}/edit`} what="customer" />}
+            {company.can.delete && (
+              <DeleteRecord
+                kind="company"
+                id={company.id}
+                name={company.name}
+                body={
+                  company.contactCount > 0
+                    ? `It has ${company.contactCount} ${company.contactCount === 1 ? "contact" : "contacts"}. Move or delete them first.`
+                    : "Its activities are deleted with it. This can't be undone."
+                }
+              />
+            )}
+          </>
+        }
         crumbs={[{ href: "/companies", label: "Customers" }]}
         actions={
           <>
@@ -68,23 +86,6 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                 people={people}
                 companyId={company.id}
                 contacts={company.contacts.map((c) => ({ id: c.id, name: c.name }))}
-              />
-            )}
-            {company.can.edit && (
-              <LinkButton href={`/companies/${company.id}/edit`} variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />}>
-                Edit
-              </LinkButton>
-            )}
-            {company.can.delete && (
-              <DeleteRecord
-                kind="company"
-                id={company.id}
-                name={company.name}
-                body={
-                  company.contactCount > 0
-                    ? `It has ${company.contactCount} ${company.contactCount === 1 ? "contact" : "contacts"}. Move or delete them first.`
-                    : "Its activities are deleted with it. This can't be undone."
-                }
               />
             )}
           </>

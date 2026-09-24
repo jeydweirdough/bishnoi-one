@@ -1,4 +1,4 @@
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -11,7 +11,7 @@ import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
 import { layoutItems } from "../components/extra/extra-values";
 import { ActivityList } from "../components/crm/activity-list";
-import { DeleteRecord } from "../components/crm/list-controls";
+import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
 
@@ -50,21 +50,10 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
     <>
       <PageHeader
         title={contact.name}
-        crumbs={[{ href: "/contacts", label: "Contacts" }]}
-        actions={
+        // Edit and delete act on the contact itself, so they sit with its name.
+        tools={
           <>
-            {/* The one solid button: what a customer's page is most often opened to do. */}
-            {can(me, "quotes.create") && (
-              <LinkButton href={`/contacts/${contact.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                New quote
-              </LinkButton>
-            )}
-            {mayLog && <LogActivityButton org={me.org} now={new Date().toISOString()} people={people} contactId={contact.id} companyId={contact.company?.id} />}
-            {contact.can.edit && (
-              <LinkButton href={`/contacts/${contact.id}/edit`} variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />}>
-                Edit
-              </LinkButton>
-            )}
+            {contact.can.edit && <EditRecord href={`/contacts/${contact.id}/edit`} what="contact" />}
             {contact.can.delete && (
               <DeleteRecord
                 kind="contact"
@@ -77,6 +66,18 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
                 }
               />
             )}
+          </>
+        }
+        crumbs={[{ href: "/contacts", label: "Contacts" }]}
+        actions={
+          <>
+            {/* The one solid button: what a customer's page is most often opened to do. */}
+            {can(me, "quotes.create") && (
+              <LinkButton href={`/contacts/${contact.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                New quote
+              </LinkButton>
+            )}
+            {mayLog && <LogActivityButton org={me.org} now={new Date().toISOString()} people={people} contactId={contact.id} companyId={contact.company?.id} />}
           </>
         }
       >

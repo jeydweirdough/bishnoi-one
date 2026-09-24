@@ -1,7 +1,8 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Pencil, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -96,11 +97,26 @@ export function Pager({ total, page, size, base }: { total: number; page: number
 }
 
 /** Deleting a company or a contact, from its own page. */
+/** What a record page's name can do to the record itself, as icons beside the name. */
+const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] text-ink-3 transition-colors";
+
+export function EditRecord({ href, what }: { href: string; what: string }) {
+  return (
+    <Link href={href} aria-label={`Edit ${what}`} title={`Edit ${what}`} className={`${ICON} hover:bg-hema-tint hover:text-hema`}>
+      <Pencil className="size-4" aria-hidden />
+    </Link>
+  );
+}
+
 export function DeleteRecord({ kind, id, name, body }: { kind: "company" | "contact"; id: string; name: string; body: string }) {
   const router = useRouter();
+  const what = kind === "company" ? "customer" : "contact";
   return (
     <ConfirmButton
-      label="Delete"
+      label={<span className="sr-only">Delete {what}</span>}
+      icon={<Trash2 className="size-4" aria-hidden />}
+      triggerTitle={`Delete ${what}`}
+      triggerClassName="!size-8 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
       title={`Delete ${name}?`}
       body={body}
       confirmLabel={`Delete ${kind === "company" ? "customer" : kind}`}
