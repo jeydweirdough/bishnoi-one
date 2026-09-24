@@ -37,7 +37,8 @@ def make_engine(url: str) -> Engine:
     # No prepared statements: a pooler in transaction mode (Supabase's, on
     # port 6543) hands each transaction to any of its connections, where a
     # statement prepared on another one doesn't exist.
-    connect_args = {"prepare_threshold": None}
+    # A database out of reach fails in 10 seconds, rather than hanging the request.
+    connect_args = {"prepare_threshold": None, "connect_timeout": 10}
     if os.environ.get("VERCEL"):
         # A serverless function is frozen between requests, so a pooled
         # connection may be dead by the next one. Connect per request; the
