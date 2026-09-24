@@ -109,3 +109,22 @@ def test_no_demo_accounts_in_production(tmp_path):
     settings = Settings(_env_file=None, environment="production", allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'p.db').as_posix()}")
     with TestClient(create_app(settings)) as c:
         assert c.get("/auth/demo-accounts").status_code == 404
+
+
+def test_the_first_administrator_comes_from_the_settings(tmp_path):
+    """FIRST_ADMIN_*: made into an empty database, and only into an empty one."""
+    from pydantic import SecretStr
+
+    from app.config import Settings
+    from app.main import create_app
+
+    url = f"sqlite:///{(tmp_path / 'first.db').as_posix()}"
+    first = dict(first_admin_email="Boss@Example.com", first_admin_name="The Boss", first_admin_password=SecretStr("a long first password"))
+    app = create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url, **first))
+    with TestClient(app) as c:
+        r = c.post("/auth/login", json={"email": "boss@example.com", "password": "a long first password"})
+        assert r.status_code == 200
+    # A second start, with other settings: someone exists, so nothing is made.
+    create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url, first_admin_email="x@example.com", first_admin_password=SecretStr("another long password")))
+    with app.state.sessions() as db:
+        assert [u.email for u in db.query(User)] == ["boss@example.com"]

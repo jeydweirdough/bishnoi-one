@@ -1,11 +1,13 @@
-"""This app's database. Tables are created on start-up if they're missing."""
+"""This app's database. Its tables come from migrations (app/migrate.py)."""
 
+import os
+import re
 from collections.abc import Iterator
-
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -29,17 +31,24 @@ def make_engine(url: str) -> Engine:
             cursor.close()
 
         return engine
-    return create_engine(url, pool_pre_ping=True)
+    # Postgres (on Vercel: Neon). Its providers hand out postgres:// or
+    # postgresql:// addresses; the driver installed here is psycopg 3.
+    url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", url)
+    # No prepared statements: a pooler in transaction mode (Supabase's, on
+    # port 6543) hands each transaction to any of its connections, where a
+    # statement prepared on another one doesn't exist.
+    # A database out of reach fails in 10 seconds, rather than hanging the request.
+    connect_args = {"prepare_threshold": None, "connect_timeout": 10}
+    if os.environ.get("VERCEL"):
+        # A serverless function is frozen between requests, so a pooled
+        # connection may be dead by the next one. Connect per request; the
+        # database's pooler does the pooling on its side.
+        return create_engine(url, poolclass=NullPool, connect_args=connect_args)
+    return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
-
-
-def create_tables(engine: Engine) -> None:
-    from app import models  # noqa: F401  (registers the tables)
-
-    Base.metadata.create_all(engine)
 
 
 def open_session(sessions: sessionmaker[Session]) -> Iterator[Session]:

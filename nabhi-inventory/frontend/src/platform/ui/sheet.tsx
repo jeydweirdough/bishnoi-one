@@ -38,11 +38,14 @@ export function PageHeader({
   crumbs,
   children,
   actions,
+  tools,
 }: {
   title: ReactNode;
   crumbs?: Crumb[];
   children?: ReactNode;
   actions?: ReactNode;
+  /** Small icon buttons that act on what the title names (edit it, delete it), drawn beside it. */
+  tools?: ReactNode;
 }) {
   return (
     <header className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -61,9 +64,16 @@ export function PageHeader({
             </ol>
           </nav>
         )}
-        <h1 className="text-title text-ink">
-          {title}
-        </h1>
+        {tools ? (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="text-title text-ink">{title}</h1>
+            <div className="flex items-center">{tools}</div>
+          </div>
+        ) : (
+          <h1 className="text-title text-ink">
+            {title}
+          </h1>
+        )}
         {children && <div className="mt-1.5 text-ink-2">{children}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

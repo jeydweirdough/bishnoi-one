@@ -51,6 +51,7 @@ def _unavailable(diagnosis: dict) -> FastAPI:
     def unavailable(request: Request, path: str) -> JSONResponse:
         return JSONResponse({"ok": False, "app": "crm", **diagnosis}, status_code=503)
 
+
     return fallback
 
 
@@ -63,4 +64,5 @@ else:
         app = create_app()
     except Exception as error:  # noqa: BLE001 (report it, whatever it is)
         log.exception("The API could not start")
-        app = _unavailable(_diagnose(error))
+        # The error's kind (e.g. ProgrammingError) but never its text.
+        app = _unavailable({**_diagnose(error), "error": f"{type(error).__module__}.{type(error).__name__}"})

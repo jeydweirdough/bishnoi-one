@@ -9,6 +9,7 @@ import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
+import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
 
@@ -51,19 +52,30 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 /** Above every company, so not a company's to grant. */
 const develops = (me: Me) => me.isDeveloperAdmin;
 
-/** The sales workspace: one set of pages over every division a person sells in. */
-function crmPages(sales: ModuleAccess[]): Page[] {
+/** The CRM's own pages. Each shows only for a role that may open it. Six at
+ *  most: each is a place, and what belongs to a place is a tab inside it. */
+function crmPages(me: Me): Page[] {
+  const may = (permission: string) => me.permissions?.includes(permission) ?? false;
+  if (THIS_APP === "crm" && me.isOwner) {
+    return [
+      { href: "/", label: "Dashboard", icon: "overview" },
+      { href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices"] },
+    ];
+  }
   return [
-    // The Sales app opens on its overview; in the shell that screen is a page
-    // of its own, because the shell's own root is the dashboard.
-    { href: THIS_APP === "crm" ? "/" : "/overview", label: "Overview", icon: "overview" },
-    // A quote is opened from its customer, so it counts as being in Customers.
-    { href: "/customers", label: "Customers", icon: "customers", also: ["/quotes"] },
-    { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
+    // The CRM opens on Home; in the shell that screen is a page of its
+    // own, because the shell's own root is the dashboard.
+    { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" },
+    // Customers are companies and the contacts in them.
+    { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] },
+    ...(may("quotes.view") ? [{ href: "/quotes", label: "Quotes", icon: "quotes" as const }] : []),
+    // To do and history; follow-ups are its To do list now.
+    { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
     { href: "/retention", label: "Retention", icon: "retention" },
-    // Only the leads who set what a team charges; a rep quoting from those
-    // prices has no use for the page.
-    ...(sales.some((m) => m.actions.includes("prices")) ? [{ href: "/prices", label: "Prices", icon: "pricing" as const }] : []),
+    // Products, promos, bundles, and a team's own prices, as tabs.
+    ...(may("products.view") || may("products.prices")
+      ? [{ href: may("products.view") ? "/products" : "/prices", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices", "/products"] }]
+      : []),
   ];
 }
 
@@ -153,7 +165,7 @@ function settingsFor(me: Me): PageGroup[] {
 }
 
 /**
- * Whether the sidebar offers the other Orbit apps.
+ * Whether the sidebar offers the other Nabhi apps.
  *
  * Off while each app is being built on its own: a panel of links into apps that
  * are half-built, or not built at all, is noise in the one place a person goes
@@ -527,8 +539,19 @@ function Links({ me }: { me: Me }) {
           same pages whether you sell in one of the seven or all of them. */}
       {crm.length > 0 && isOurs("crm") && (
         <Group label={appLabel("crm")}>
-          {crmPages(crm).map((page) => (
+          {crmPages(me).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
+              {page.label}
+            </Row>
+          ))}
+        </Group>
+      )}
+      {/* The CRM's own Administration: its users, roles, teams and audit log,
+          each page only for a role that may open it. */}
+      {THIS_APP === "crm" && adminPagesFor(me).length > 0 && (
+        <Group label="Administration">
+          {adminPagesFor(me).map((page) => (
+            <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href) || page.also.some((a) => within(pathname, a))}>
               {page.label}
             </Row>
           ))}
@@ -596,6 +619,10 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
+  if (THIS_APP === "crm" && within(pathname, "/admin")) {
+    const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
+    return page ? `Administration · ${page.label}` : "Administration";
+  }
   if (within(pathname, "/settings")) {
     const page = settingsFor(me).flatMap((g) => g.pages).find((p) => !isAway(p.href) && within(pathname, p.href));
     return page ? `Settings · ${page.label}` : "Settings";
@@ -610,8 +637,7 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  const crm = me.modules.filter((x) => x.kind === "crm");
-  return crmPages(crm).find((p) => isCurrent(p, pathname, false))?.label ?? null;
+  return crmPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }
 
 function Account({ me }: { me: Me }) {
@@ -660,7 +686,7 @@ export function Nav({ me }: { me: Me }) {
           saying a company name there would be saying something untrue. */}
       <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
       {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Orbit" alone leaves you working out from the port
+          its own address, so "Nabhi" alone leaves you working out from the port
           whether the screen in front of you is missing or simply elsewhere. */}
       <span className="block truncate text-base leading-tight font-semibold text-ink">
         {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}

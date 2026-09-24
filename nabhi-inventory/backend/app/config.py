@@ -22,8 +22,13 @@ class Settings(BaseSettings):
     login_attempts: int = 5
     login_lockout_minutes: int = 15
 
+    # A batch expiring within this many days is flagged as expiring soon.
+    expiry_warning_days: int = 90
+    # Stock with no outbound movement in this many days counts as dead stock.
+    dead_stock_days: int = 180
+
     # The company this app belongs to, as its screens show it.
-    org_name: str = "Orbit"
+    org_name: str = "Nabhi"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"
@@ -45,6 +50,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        if self.expiry_warning_days < 1 or self.dead_stock_days < 1:
+            raise ValueError("EXPIRY_WARNING_DAYS and DEAD_STOCK_DAYS must be at least 1.")
         return self
 
 

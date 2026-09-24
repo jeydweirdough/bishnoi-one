@@ -1,22 +1,21 @@
-"""What the screens are told about this app and the person signed in to it."""
+"""What the screens are told about the Pharmacy and the person signed in to it."""
 
+from app.access import access_of
 from app.config import Settings
 from app.models import User
+from app.permissions import ADMIN_PERMISSIONS
 
-# This app's module, as the screens' sidebar and door check read it. None: the
-# Platform app, which works above any one company.
-MODULE: dict | None = {"key": "pharmacy", "name": "Pharmacy", "kind": "department"}
-# The Platform app's people are its Developer Admins.
-DEVELOPER_ADMIN_APP = False
+MODULE = {"key": "pharmacy", "name": "Pharmacy", "kind": "department"}
 ORG_ID = "00000000-0000-4000-8000-000000004307"
 
-ALL_ACTIONS = ["view", "create", "edit", "delete"]
+# The actions the shared screens read off the module, from the role's permissions.
+MODULE_ACTIONS = ("view", "create", "edit", "delete")
 
 
 def org_out(settings: Settings) -> dict:
     return {
         "id": ORG_ID,
-        "slug": "orbit",
+        "slug": "nabhi",
         "name": settings.org_name,
         "brandName": settings.org_name,
         "currency": settings.org_currency,
@@ -27,15 +26,28 @@ def org_out(settings: Settings) -> dict:
 
 
 def me_out(user: User, settings: Settings) -> dict:
-    admin = user.role == "admin"
+    access = access_of(user)
     return {
         "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
-        "org": None if DEVELOPER_ADMIN_APP else org_out(settings),
-        "canManageSettings": admin and not DEVELOPER_ADMIN_APP,
-        "canRecover": DEVELOPER_ADMIN_APP,
+        "org": org_out(settings),
+        "role": {"id": user.role.id, "name": user.role.name, "scope": "all"},
+        "team": None,
+        "permissions": sorted(access.permissions),
+        "canManageSettings": bool(access.permissions & ADMIN_PERMISSIONS),
+        "canRecover": False,
         "viewedBy": None,
-        "isOwner": admin and not DEVELOPER_ADMIN_APP,
-        "isDeveloperAdmin": DEVELOPER_ADMIN_APP,
-        "modules": [] if MODULE is None else [{**MODULE, "built": True, "url": None, "actions": ALL_ACTIONS, "teams": []}],
+        "isOwner": user.role.is_system,
+        "isDeveloperAdmin": False,
+        "modules": [
+            {
+                **MODULE,
+                "built": True,
+                "url": None,
+                "actions": [a for a in MODULE_ACTIONS if access.can(f"medicines.{a}")] or ["view"],
+                "teams": [],
+            }
+        ],
         "lists": {"customer_kind": [], "activity_kind": [], "outcome": []},
+        # The pharmacy's own rules, for the screens to say them the same way the API applies them.
+        "pharmacy": {"expiryWarningDays": settings.expiry_warning_days, "prescriptionValidDays": settings.prescription_valid_days},
     }

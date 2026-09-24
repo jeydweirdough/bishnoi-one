@@ -13,11 +13,11 @@ import type {
 
 // The product. One name, whoever is using it — a company's own name is its
 // brandName (Settings → Company) and sits above this, never instead of it.
-export const APP_NAME = "Orbit";
+export const APP_NAME = "Nabhi";
 
 // Customer kinds, activity kinds and call outcomes are the company's own words,
 // written in Settings → Lists and carried on the session. Lead, active and
-// inactive stay Orbit's: the retention maths is built on those three.
+// inactive stay Nabhi's: the retention maths is built on those three.
 export const CUSTOMER_STATUSES: Record<CustomerStatus, string> = {
   lead: "Lead",
   active: "Active",
@@ -92,7 +92,7 @@ export const PROMO_KINDS: Record<PromoKind, string> = {
 };
 
 export const QUOTE_STATES: Record<Quote["state"], string> = {
-  waiting: "Waiting on Finance",
+  waiting: "Waiting for approval",
   ready: "Ready",
   rejected: "Rejected",
 };
@@ -118,7 +118,7 @@ export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
 };
 
 export function approvalReason(reason: ApprovalReason, quote: Pick<Quote, "priceTypeName">): string {
-  return reason === "price" ? `${quote.priceTypeName} needs Finance's approval` : "Discount is over the division's limit";
+  return reason === "price" ? `${quote.priceTypeName} needs approval` : "An extra discount is over the limit";
 }
 
 /** "10% off", "10.00 off each" in the company's money, "Buy 10, get 1 free", "5% from 20 · 8% from 50". */

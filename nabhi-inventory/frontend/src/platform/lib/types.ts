@@ -9,7 +9,7 @@ export type Action = "view" | "create" | "edit" | "delete" | "report" | "prices"
 // need when something is broken.
 export type SettingsAction = "manage" | "recover";
 
-// The steps of an order, taken in the Orders app; Orbit holds who may take which.
+// The steps of an order, taken in the Orders app; Nabhi holds who may take which.
 export type OrderAction =
   | "view"
   | "raise"
@@ -98,7 +98,7 @@ export type NewCompanyInput = {
 /** One choice on a company's own pick-list. `icon` is a name from the icon registry, where the list has icons. */
 export type ListItem = { code: string; name: string; icon: string | null; isActive: boolean };
 
-/** The pick-lists a company writes for itself. Everything else here is Orbit's own vocabulary. */
+/** The pick-lists a company writes for itself. Everything else here is Nabhi's own vocabulary. */
 export type ListKind = "customer_kind" | "activity_kind" | "outcome";
 export type CompanyLists = Record<ListKind, ListItem[]>;
 
@@ -124,6 +124,11 @@ export type Me = {
    *  grant it; it is set on the platform (api app/platform.py). */
   isDeveloperAdmin: boolean;
   modules: ModuleAccess[];
+  /** The CRM's own access (its Administration): the person's role, team, and
+   *  every permission the role gives, as "area.action". */
+  role?: { id: string; name: string; scope: Scope };
+  team?: { id: string; name: string } | null;
+  permissions?: string[];
   // The company's own words for its customers, its activities and how a call went.
   // Only the switched-on ones: a record holding a switched-off code falls back to the code.
   lists: CompanyLists;
@@ -234,7 +239,7 @@ export type HomeFollowUp = {
   bucket: Bucket;
 };
 
-export type Duplicate = { id: string; name: string; teamName: string | null; phone: string | null };
+export type Duplicate = { id: string; name: string; teamName: string | null; phone: string | null; canOpen?: boolean };
 
 export type Headquarters = { code: string; name: string; isActive: boolean };
 export type OrgTeam = { code: string; name: string; isActive: boolean; headquarters: Headquarters[] };
@@ -242,7 +247,7 @@ export type OrgDivision = {
   code: string;
   name: string;
   kind: "sales" | "department" | null;
-  /** Built-in divisions come with Orbit's modules: they have screens and can't be switched off. */
+  /** Built-in divisions come with Nabhi's modules: they have screens and can't be switched off. */
   isBuiltIn: boolean;
   /** An icon name an Admin picked; null leaves the built-in one. */
   icon: string | null;
@@ -314,7 +319,7 @@ export type DivisionPricing = {
   priceTypes: Record<string, PriceRule>;
 };
 
-/** Another application this company reaches from Orbit. Which applications it
+/** Another application this company reaches from Nabhi. Which applications it
  *  has and where they live is a company's own setting (Settings → Apps), so
  *  adding one later needs no deployment. */
 export type AppLink = {
@@ -323,7 +328,7 @@ export type AppLink = {
   url: string;
   description: string;
   icon: string | null;
-  /** Orbit ships with this one, so it can be renamed and moved but not removed:
+  /** Nabhi ships with this one, so it can be renamed and moved but not removed:
    *  its permissions live in code and are granted to people. */
   isBuiltIn: boolean;
   isActive: boolean;
@@ -350,12 +355,11 @@ export type TeamPriceCell = { company: number | null; team: number | null };
 export type TeamPricedProduct = { id: string; code: string; name: string; unit: string; prices: Record<string, TeamPriceCell> };
 
 export type TeamPrices = {
-  division: string;
-  divisionName: string;
+  /** The team's id. */
   team: string;
   teamName: string;
-  /** True while the team hasn't narrowed its price types: it quotes with whatever its division does. */
-  usesDivisionTypes: boolean;
+  /** True while the team hasn't narrowed its price types: it quotes with every one there is. */
+  usesAllTypes: boolean;
   priceTypes: TeamPriceType[];
   products: TeamPricedProduct[];
 };
@@ -408,6 +412,7 @@ export type Product = {
   unit: string;
   isActive: boolean;
   prices: Record<string, number>;
+  extra: ExtraValues;
   updatedAt: string | null;
 };
 
@@ -487,11 +492,13 @@ export type Quote = {
   id: string;
   rev: string | null;
   number: string;
-  division: string;
-  divisionName: string;
   team: string;
   teamName: string;
+  /** Who it's for: a company, or a contact (and the company they're in). */
+  company: Ref | null;
+  contact: Ref | null;
   customerId: string;
+  customerHref: string | null;
   customerName: string | null;
   priceType: string;
   priceTypeName: string;
@@ -523,8 +530,13 @@ export type Quote = {
     at: string | null;
   } | null;
   payment: { status: "none" | "unpaid" | "partial" | "paid"; paidCentavos: number; payments: Payment[] };
+  /** From the quote settings when it was made. */
+  validUntil: string | null;
+  terms: string | null;
+  extra: ExtraValues;
   createdAt: string;
   createdBy: Person;
+  owner: Person | null;
   can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean };
 };
 
@@ -582,13 +594,11 @@ export type NextFollowUp = { dueOn: string; title: string; assignee: string | nu
 export type WatchRow = {
   customerId: string;
   name: string;
-  division: string;
-  divisionName: string;
   team: string;
   teamName: string;
-  owner: Person;
+  owner: { id: string | null; name: string | null };
   health: Health;
-  status: CustomerStatus;
+  status: CompanyStatus;
   lastQuoteOn: string | null;
   daysSince: number;
   followUp: NextFollowUp;
@@ -602,6 +612,9 @@ export type DivisionRules = RetentionRules & { division: string; divisionName: s
 export type ModuleRetention = {
   view: "mine" | "team";
   canSeeTeam: boolean;
+  /** The teams to narrow "team" to: only for a role that reaches every record. */
+  teams: Ref[];
+  team: string | null;
   asOf: string;
   rules: DivisionRules[];
   summary: RetentionSummary;
@@ -736,3 +749,248 @@ export type AuditEntry = { id: string; at: string; actor: string; action: string
 export type AuditPage = { items: AuditEntry[]; more: boolean };
 
 export type AppModule = RolesPayload["modules"][number];
+
+// --- Administration (the CRM's own users, roles, teams and audit log) -------------
+
+/** Whose records a role's permissions reach. */
+export type Scope = "own" | "team" | "all";
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  role: { id: string; name: string; scope: Scope };
+  team: { id: string; name: string } | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+};
+
+export type PermissionArea = {
+  key: string;
+  name: string;
+  group: string;
+  actions: { key: string; label: string; permission: string }[];
+};
+
+export type RoleRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  scope: Scope;
+  isSystem: boolean;
+  permissions: string[];
+  userCount: number;
+};
+
+export type RolesData = {
+  roles: RoleRow[];
+  catalogue: PermissionArea[];
+  scopes: { key: Scope; label: string }[];
+};
+
+/** What a person can be given: for whoever manages users, who may not manage roles or teams. */
+export type UserOptions = {
+  roles: { id: string; name: string; description: string | null; scope: Scope }[];
+  teams: { id: string; name: string; isActive: boolean }[];
+};
+
+export type TeamRow = { id: string; name: string; description: string | null; headquarters: string[]; isActive: boolean; memberCount: number };
+
+export type AuditItem = {
+  id: number;
+  at: string;
+  actor: string;
+  actorId: string | null;
+  action: string;
+  target: string;
+  targetType: string | null;
+  fields: string[];
+};
+
+export type AuditLog = { items: AuditItem[]; more: boolean };
+
+// --- Customers and activities (the CRM's own) ---------------------------------------
+
+export type Ref = { id: string; name: string };
+/** A customer type's code ("prospect", "customer"...). The list is an administrator's to keep. */
+export type CompanyStatus = string;
+
+export type CustomerTypeColor = "gray" | "brand" | "green" | "blue" | "amber" | "red" | "purple" | "muted";
+
+export type CustomerType = { code: string; name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean; companies: number };
+export type Can = { edit: boolean; delete: boolean };
+
+export type CompanyRow = {
+  id: string;
+  name: string;
+  status: CompanyStatus;
+  industry: string | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  country: string | null;
+  owner: Ref;
+  team: Ref | null;
+  contactCount: number;
+  lastActivityAt: string | null;
+  updatedAt: string;
+  extra: ExtraValues;
+  can: Can;
+};
+
+export type CompanyDetail = CompanyRow & {
+  address: string | null;
+  notes: string | null;
+  createdAt: string;
+  contacts: { id: string; name: string; jobTitle: string | null; email: string | null; phone: string | null }[];
+  activities: ActivityItem[];
+};
+
+export type ContactRow = {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  name: string;
+  jobTitle: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  company: Ref | null;
+  owner: Ref;
+  team: Ref | null;
+  lastActivityAt: string | null;
+  updatedAt: string;
+  extra: ExtraValues;
+  can: Can;
+};
+
+export type ContactDetail = ContactRow & { notes: string | null; createdAt: string; activities: ActivityItem[] };
+
+export type CrmKind = "call" | "meeting" | "email" | "note" | "task";
+
+export type ActivityItem = {
+  id: string;
+  kind: CrmKind;
+  subject: string;
+  body: string | null;
+  at: string;
+  doneAt: string | null;
+  isPlanned: boolean;
+  isDone: boolean;
+  isOverdue: boolean;
+  durationMinutes: number | null;
+  direction: "in" | "out" | null;
+  company: Ref | null;
+  contact: Ref | null;
+  owner: Ref;
+  createdAt: string;
+  can: Can;
+};
+
+export type Paged<T> = { items: T[]; total: number };
+export type ActivitySummary = { overdue: number; today: number; upcoming: number; open: number };
+export type Assignable = { id: string; name: string; team: Ref | null; isMe: boolean };
+
+
+// --- the catalogue (Products, Promos, Bundles, Pricing rules) ---
+
+export type CatalogueProduct = Product & { can: { edit: boolean; delete: boolean } };
+
+export type SalesRules = {
+  priceTypes: (PriceType & { rule: PriceRule; sortOrder: number })[];
+  issuers: Issuer[];
+  settings: { discountApprovalBp: number; allowsGuaranteeLetters: boolean; atRiskDays: number; lostDays: number };
+  can: { edit: boolean };
+};
+
+export type PromoRow = Omit<Promo, "divisionCodes" | "startsOn"> & { startsOn: string | null };
+export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn: string | null };
+
+// --- Settings (Administration → Settings) ---
+
+export type CustomEntity = "product" | "company" | "contact" | "quote";
+/** Kinds an admin can add. Built-in fields also have their own (status, owner, company). */
+export type CustomFieldType = "text" | "long_text" | "number" | "money" | "date" | "choice" | "multi_choice" | "yes_no" | "email" | "phone" | "url";
+
+/** One field on a form (Administration → Settings → Forms): built in, or added.
+ *  An added field keeps its values in the record's `extra`, by `key`. */
+export type FormFieldDef = {
+  id: string;
+  key: string;
+  label: string;
+  type: CustomFieldType | "status" | "owner" | "company";
+  standard: boolean;
+  /** The record can't do without it: always shown, always required. */
+  locked: boolean;
+  required: boolean;
+  hidden: boolean;
+  inList: boolean;
+  options: string[];
+  helpText: string | null;
+  placeholder: string | null;
+  /** Only in Settings: how many records have a value in it. */
+  used?: number;
+};
+/** The name most places use: a field on a form. */
+export type CustomField = FormFieldDef;
+
+export type FormSectionDef = { id: string; title: string; columns: 1 | 2; fields: FormFieldDef[] };
+export type FormLayout = { entity: CustomEntity; sections: FormSectionDef[] };
+
+export type ExtraValues = Record<string, string | number | boolean | string[]>;
+
+export type CompanySettings = {
+  orgName: string;
+  currency: string;
+  locale: string;
+  timezone: string;
+  quotePrefix: string;
+  quoteValidDays: number;
+  quoteTerms: string | null;
+  currencies: string[];
+};
+
+// --- insights (a lead's team, the admin's dashboard) ---
+
+export type PersonInsight = {
+  id: string;
+  name: string;
+  role: string;
+  team: Ref | null;
+  isMe: boolean;
+  overdue: number;
+  dueToday: number;
+  upcoming: number;
+  doneThisWeek: number;
+  doneByKind: Partial<Record<CrmKind, number>>;
+  lastActivityAt: string | null;
+  customers: number;
+  newCustomersThisMonth: number;
+  quotesThisMonth: number;
+  quotedThisMonthCentavos: number;
+  quotesWaiting: number;
+  quotesRejectedThisMonth: number;
+  lastSignInAt: string | null;
+  signInsThisWeek: number;
+};
+
+export type PeopleInsights = {
+  asOf: string;
+  monthStart: string;
+  people: PersonInsight[];
+  totals: {
+    people: number;
+    signedInThisWeek: number;
+    activeThisWeek: number;
+    overdue: number;
+    dueToday: number;
+    doneThisWeek: number;
+    customers: number;
+    newCustomersThisMonth: number;
+    quotesThisMonth: number;
+    quotedThisMonthCentavos: number;
+    quotesWaiting: number;
+  };
+};

@@ -1,19 +1,19 @@
 import type { Org } from "./types";
 
-// Money, dates and times belong to the company, not to Orbit: its timezone
+// Money, dates and times belong to the company, not to Nabhi: its timezone
 // decides what "today" means, its locale how a date reads, its currency and
 // its minor units how money prints. Build a set of these with makeFormat(org)
 // wherever the company is in reach — a server component has it from getMe(),
 // a client component is handed it as a prop.
 
-/** Where Orbit started, for the few call sites that can't reach the company. */
+/** Where Nabhi started, for the few call sites that can't reach the company. */
 const FALLBACK = { currency: "PHP", locale: "en-PH", timezone: "Asia/Manila", minorUnits: 2 };
 
 type Company = Pick<Org, "currency" | "locale" | "timezone"> & { minorUnits?: number | null };
 
 // Intl refuses a locale, a zone or a currency it doesn't know, and one crooked
 // company record must not take every page down with it. Anything it won't take
-// is shown the way Orbit's first company saw it.
+// is shown the way Nabhi's first company saw it.
 function dates(locale: string, timeZone: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   try {
     return new Intl.DateTimeFormat(locale, { timeZone, ...options });
@@ -130,7 +130,8 @@ export function makeFormat(company: Company) {
       const diff = daysBetween(dayKey.format(at), today);
       if (diff === 0) return `Today, ${time.format(at)}`;
       if (diff === 1) return `Yesterday, ${time.format(at)}`;
-      if (diff < 7) return `${diff} days ago`;
+      if (diff === -1) return `Tomorrow, ${time.format(at)}`;
+      if (diff > 1 && diff < 7) return `${diff} days ago`;
       const sameYear = today.slice(0, 4) === dayKey.format(at).slice(0, 4);
       return (sameYear ? atDate : atDateYear).format(at);
     },
@@ -155,7 +156,7 @@ export function makeFormat(company: Company) {
       return dates(locale, options.timeZone ?? timeZone, options);
     },
 
-    // The four money ones are still named for the peso Orbit was born with;
+    // The four money ones are still named for the peso Nabhi was born with;
     // renaming them would touch a dozen screens for no one's benefit. What they
     // print is the company's own currency, to however many places it keeps.
 
@@ -198,7 +199,7 @@ export function makeFormat(company: Company) {
 export type Format = ReturnType<typeof makeFormat>;
 
 // The same functions for the call sites that can't reach the company. They show
-// Orbit's first company's pesos and Manila time, so nothing ever goes blank; as
+// Nabhi's first company's pesos and Manila time, so nothing ever goes blank; as
 // each of those screens finds its way to the company, it moves off these.
 const fallback = makeFormat(FALLBACK);
 

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parent.parent
@@ -16,14 +16,26 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'pharmacy.db').as_posix()}"
+    # The first administrator, made when the database has no accounts at all:
+    # for a host you can't run the users tool against (Vercel + a database it
+    # can reach and you can't). Once they exist these are ignored; remove the
+    # password afterwards.
+    first_admin_email: str | None = None
+    first_admin_name: str = "Administrator"
+    first_admin_password: SecretStr | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15
 
+    # A batch expiring within this many days is flagged as expiring soon.
+    expiry_warning_days: int = 90
+    # A prescription older than this many days is flagged when it is checked.
+    prescription_valid_days: int = 180
+
     # The company this app belongs to, as its screens show it.
-    org_name: str = "Orbit"
+    org_name: str = "Nabhi"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"
@@ -45,6 +57,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        if self.expiry_warning_days < 1 or self.prescription_valid_days < 1:
+            raise ValueError("EXPIRY_WARNING_DAYS and PRESCRIPTION_VALID_DAYS must be at least 1.")
         return self
 
 

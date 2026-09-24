@@ -1,5 +1,5 @@
 /**
- * Where each Orbit app lives.
+ * Where each Nabhi app lives.
  *
  * Every module runs as its own app on its own address, so a link from one to
  * another is not a path — it is a whole URL. This is the one place that knows
@@ -13,7 +13,7 @@
 import type { Me } from "./types";
 
 /**
- * The seven Orbit apps are the company's own modules, one each, as the API
+ * The seven Nabhi apps are the company's own modules, one each, as the API
  * lists them in app/modules.py — Executive Admin, Finance, In-Licensing,
  * Inventory, Pharmacy, Regulatory, and the CRM over the seven sales divisions.
  *
@@ -45,18 +45,18 @@ const DEFAULTS: Record<AppName, string> = {
 };
 
 const FROM_ENV: Record<AppName, string | undefined> = {
-  exec: process.env.NEXT_PUBLIC_ORBIT_EXEC_URL,
-  crm: process.env.NEXT_PUBLIC_ORBIT_CRM_URL,
-  finance: process.env.NEXT_PUBLIC_ORBIT_FINANCE_URL,
-  inventory: process.env.NEXT_PUBLIC_ORBIT_INVENTORY_URL,
-  platform: process.env.NEXT_PUBLIC_ORBIT_PLATFORM_URL,
-  inlicensing: process.env.NEXT_PUBLIC_ORBIT_INLICENSING_URL,
-  pharmacy: process.env.NEXT_PUBLIC_ORBIT_PHARMACY_URL,
-  regulatory: process.env.NEXT_PUBLIC_ORBIT_REGULATORY_URL,
+  exec: process.env.NEXT_PUBLIC_NABHI_EXEC_URL,
+  crm: process.env.NEXT_PUBLIC_NABHI_CRM_URL,
+  finance: process.env.NEXT_PUBLIC_NABHI_FINANCE_URL,
+  inventory: process.env.NEXT_PUBLIC_NABHI_INVENTORY_URL,
+  platform: process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL,
+  inlicensing: process.env.NEXT_PUBLIC_NABHI_INLICENSING_URL,
+  pharmacy: process.env.NEXT_PUBLIC_NABHI_PHARMACY_URL,
+  regulatory: process.env.NEXT_PUBLIC_NABHI_REGULATORY_URL,
 };
 
 /** Which app this one is. Each app sets it; unset means the shell, which has them all. */
-export const THIS_APP = (process.env.NEXT_PUBLIC_ORBIT_APP ?? "") as AppName | "";
+export const THIS_APP = (process.env.NEXT_PUBLIC_NABHI_APP ?? "") as AppName | "";
 
 export const appUrl = (app: AppName): string => (FROM_ENV[app] || DEFAULTS[app]).replace(/\/$/, "");
 

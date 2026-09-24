@@ -13,6 +13,8 @@ type Props = {
   triggerVariant?: "primary" | "default" | "quiet" | "danger";
   triggerSize?: "md" | "sm";
   triggerClassName?: string;
+  /** The trigger's tooltip, for a trigger that is only an icon. */
+  triggerTitle?: string;
   icon?: ReactNode;
   disabled?: boolean;
   /** Return false (or throw) to keep the dialog open, e.g. when the action failed. */
@@ -29,6 +31,7 @@ export function ConfirmButton({
   triggerVariant = "default",
   triggerSize = "md",
   triggerClassName,
+  triggerTitle,
   icon,
   disabled,
   onConfirm,
@@ -60,6 +63,7 @@ export function ConfirmButton({
         size={triggerSize}
         icon={icon}
         className={triggerClassName}
+        title={triggerTitle}
         onClick={show}
         disabled={disabled}
         aria-haspopup="dialog"

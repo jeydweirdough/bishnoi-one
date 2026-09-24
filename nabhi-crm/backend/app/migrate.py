@@ -59,13 +59,12 @@ def upgrade(engine: Engine) -> None:
         return
     # On Postgres several copies of the API may start at once (Vercel starts one
     # per burst of traffic). One migrates; the others wait for it, then find the
-    # database already up to date.
-    with engine.connect() as lock:
-        lock.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK})
-        try:
-            _upgrade(engine)
-        finally:
-            lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": MIGRATION_LOCK})
+    # database already up to date. The lock lasts one transaction: it ends with
+    # it, whatever happens, even behind a pooler (Supabase's) that hands the
+    # connection to someone else afterwards.
+    with engine.begin() as lock:
+        lock.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": MIGRATION_LOCK})
+        _upgrade(engine)
 
 
 def _upgrade(engine: Engine) -> None:
