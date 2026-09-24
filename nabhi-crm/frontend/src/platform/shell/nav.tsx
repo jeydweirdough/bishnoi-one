@@ -56,10 +56,21 @@ const develops = (me: Me) => me.isDeveloperAdmin;
  *  most: each is a place, and what belongs to a place is a tab inside it. */
 function crmPages(me: Me): Page[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
+  const fieldWork = { href: "/field", label: "Field work", icon: "goals" as const, also: ["/visits"] };
   if (THIS_APP === "crm" && me.isOwner) {
     return [
       { href: "/", label: "Dashboard", icon: "overview" },
       { href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices"] },
+      fieldWork,
+    ];
+  }
+  // A field agent visits doctors and collects: their doctors, their visits.
+  if (THIS_APP === "crm" && may("visits.create") && !may("quotes.view") && !may("goals.view")) {
+    return [
+      { href: "/", label: "Home", icon: "home" },
+      { href: "/field/doctors", label: "Doctors", icon: "customers", also: ["/companies", "/contacts"] },
+      { href: "/visits", label: "Visits", icon: "visit" },
+      { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
     ];
   }
   return [
@@ -72,6 +83,7 @@ function crmPages(me: Me): Page[] {
     // To do and history; follow-ups are its To do list now.
     { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
     { href: "/retention", label: "Retention", icon: "retention" },
+    ...(THIS_APP === "crm" && may("goals.view") ? [fieldWork] : []),
     // Products, promos, bundles, and a team's own prices, as tabs.
     ...(may("products.view") || may("products.prices")
       ? [{ href: may("products.view") ? "/products" : "/prices", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices", "/products"] }]

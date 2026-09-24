@@ -12,7 +12,15 @@ import { readImport, runImport, type ImportFile, type ImportKind, type ImportRes
 const WORDS: Record<ImportKind, { one: string; many: string; match: string }> = {
   products: { one: "product", many: "products", match: "A product already here (same code) is updated; the rest are added." },
   people: { one: "person", many: "people", match: "Someone already here (same email) is updated; the rest are added as new accounts." },
+  balances: {
+    one: "balance",
+    many: "balances",
+    match: "Each row is matched to its doctor by name. The balances are added as of the date below; earlier ones stay as the history.",
+  },
 };
+
+/** Today in the browser, as YYYY-MM-DD: where "as of" starts. */
+const today = () => new Date().toLocaleDateString("en-CA");
 
 /**
  * Importing from a spreadsheet, in three steps: pick the file, match its
@@ -26,6 +34,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
   const [mapping, setMapping] = useState<Record<string, number | null>>({});
   const [password, setPassword] = useState("");
   const [makeTeams, setMakeTeams] = useState(true);
+  const [asOf, setAsOf] = useState(today);
   const [check, setCheck] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -44,12 +53,18 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
   function run(dryRun: boolean) {
     if (!file) return;
     start(async () => {
-      const r = await runImport(kind, { mapping, rows: file.rows, dryRun, ...(kind === "people" ? { password: password || null, makeTeams } : {}) });
+      const r = await runImport(kind, {
+        mapping,
+        rows: file.rows,
+        dryRun,
+        ...(kind === "people" ? { password: password || null, makeTeams } : {}),
+        ...(kind === "balances" ? { asOf } : {}),
+      });
       if (!r.ok) return setError(r.error);
       setError(null);
       if (dryRun) return setCheck(r.data);
       const { added, updated, problems } = r.data;
-      toast.success(`${added} added, ${updated} updated`, { description: problems.length ? `${problems.length} rows skipped: see the list.` : `All ${words.many} imported.` });
+      toast.success(kind === "balances" ? `${added} balances added` : `${added} added, ${updated} updated`, { description: problems.length ? `${problems.length} rows skipped: see the list.` : `All ${words.many} imported.` });
       setCheck({ ...r.data });
       if (!problems.length) router.push(back);
       router.refresh();
@@ -138,6 +153,13 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             </table>
           </div>
           {unused.length > 0 && <p className="mt-2 text-meta text-ink-3">Left out: {unused.join(", ")}.</p>}
+          {kind === "balances" && (
+            <div className="mt-4 grid gap-4 border-t border-rule pt-4 sm:grid-cols-2">
+              <Field label="Balances as of" hint="Accounting's cut-off date. Collections logged after it come off these balances.">
+                {(p) => <Input {...p} type="date" value={asOf} max={today()} onChange={(e) => (setAsOf(e.target.value), setCheck(null))} />}
+              </Field>
+            </div>
+          )}
           {kind === "people" && (
             <div className="mt-4 grid gap-4 border-t border-rule pt-4 sm:grid-cols-2">
               <Field label="First password for new accounts" hint="At least 8 characters. Give it to them yourself; they change it under Account.">

@@ -8,7 +8,7 @@ import { attempt, type Result } from "@/src/platform/lib/result";
 // our fields, checked row by row, then saved. The API checks the permission
 // on each call.
 
-export type ImportKind = "products" | "people";
+export type ImportKind = "products" | "people" | "balances";
 
 export type ImportFile = {
   fileName: string;
@@ -37,7 +37,7 @@ export async function readImport(kind: ImportKind, form: FormData): Promise<Resu
 
 export async function runImport(
   kind: ImportKind,
-  input: { mapping: Record<string, number | null>; rows: string[][]; dryRun: boolean; password?: string | null; makeTeams?: boolean },
+  input: { mapping: Record<string, number | null>; rows: string[][]; dryRun: boolean; password?: string | null; makeTeams?: boolean; asOf?: string },
 ): Promise<Result<ImportResult>> {
   return attempt(async () => {
     const result = await api.post<ImportResult>(`/imports/${kind}`, input);

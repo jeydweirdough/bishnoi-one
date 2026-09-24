@@ -395,7 +395,7 @@ def read_goals(access: Manage, db: DB, settings: SettingsDep, month: str | None 
 @router.put("/field/goals")
 def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: GoalsIn, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
-    users = {u.id for u in db.scalars(select(User.id).where(User.id.in_([g.user_id for g in body.goals])))}
+    users = set(db.scalars(select(User.id).where(User.id.in_([g.user_id for g in body.goals]))))
     if missing := [g.user_id for g in body.goals if g.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
     existing = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}

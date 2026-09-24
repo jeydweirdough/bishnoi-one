@@ -15,6 +15,9 @@ import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
 import { StatusTag, siteHref, siteLabel } from "../components/crm/words";
+import { LogVisitButton } from "../components/field/log-visit";
+import type { DoctorBalance, Visit } from "../components/field/types";
+import { VisitList } from "../components/field/visit-list";
 
 type Params = Promise<{ id: string }>;
 
@@ -32,16 +35,22 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
-  const [company, people, quotes, types, fields] = await Promise.all([
+  const seesVisits = can(me, "visits.view");
+  const [company, people, quotes, types, fields, visits, owed] = await Promise.all([
     load<CompanyDetail>(`/companies/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
     load<CustomerType[]>("/customer-types"),
     formLayout("company"),
+    seesVisits ? load<Paged<Visit>>(`/visits?company=${enc(id)}&limit=30`) : null,
+    seesVisits ? load<DoctorBalance>(`/field/doctors/${enc(id)}`) : null,
   ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && company.can.edit;
-  const tab = (await searchParams).tab === "quotes" && quotes ? "quotes" : "activity";
+  const asked = (await searchParams).tab;
+  const tab = asked === "quotes" && quotes ? "quotes" : asked === "visits" && visits ? "visits" : "activity";
+  const mayVisit = can(me, "visits.create") && company.can.edit;
+  const isDoctor = company.status === "doctor" || !!owed?.balance;
 
   return (
     <>
@@ -79,6 +88,15 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                 New quote
               </LinkButton>
             )}
+            {/* A field agent's page for a doctor: the visit is what it's opened for. */}
+            {mayVisit && (
+              <LogVisitButton
+                variant={can(me, "quotes.create") ? "default" : "primary"}
+                org={me.org}
+                now={new Date().toISOString()}
+                doctor={{ id: company.id, name: company.name }}
+              />
+            )}
             {mayLog && (
               <LogActivityButton
                 org={me.org}
@@ -102,9 +120,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             tabs={[
               { key: "activity", label: "Activity", count: company.activities.length },
               ...(quotes ? [{ key: "quotes", label: "Quotes", count: quotes.total }] : []),
+              ...(visits && (isDoctor || visits.total) ? [{ key: "visits", label: "Visits", count: visits.total }] : []),
             ]}
           />
-          {tab === "quotes" && quotes ? (
+          {tab === "visits" && visits ? (
+            visits.items.length ? (
+              <VisitList visits={visits.items} fmt={fmt} today={fmt.todayKey()} showDoctor={false} />
+            ) : (
+              <p className="py-6 text-center text-meta text-ink-3">No visits yet. Use Log visit after each one.</p>
+            )
+          ) : tab === "quotes" && quotes ? (
             <>
               <QuotesPanel customerHref={`/companies/${company.id}`} quotes={quotes.items} canAdd={false} showWho />
               {quotes.total > quotes.items.length && (
@@ -124,6 +149,22 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
         </Sheet>
 
         <div className="space-y-5">
+          {owed && isDoctor && (
+            <Sheet className="px-5 pt-4 pb-5">
+              <SectionTitle icon="money">Owes</SectionTitle>
+              {owed.balance ? (
+                <>
+                  <p className="mt-2 text-figure text-ink">{fmt.peso(owed.balance.owedCentavos)}</p>
+                  <p className="mt-1 text-meta text-ink-3">
+                    {fmt.peso(owed.balance.balanceCentavos)} as of {fmt.dateLabel(owed.balance.asOf)}
+                    {owed.balance.collectedSinceCentavos > 0 && <>, less {fmt.peso(owed.balance.collectedSinceCentavos)} collected since</>}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-meta text-ink-3">No balance on file yet. It comes from accounting&apos;s upload.</p>
+              )}
+            </Sheet>
+          )}
           <Sheet className="px-5 pt-4 pb-5">
             <SectionTitle icon="particulars">Details</SectionTitle>
             <div className="mt-3">

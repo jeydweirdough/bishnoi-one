@@ -41,6 +41,8 @@ DEMO_ACCOUNTS: tuple[Demo, ...] = (
     Demo("Sales · HOS", "elmer@pharmacrm.test", "Elmer Tan", "Salesperson · HOS Telesales", "Salesperson", "HOS"),
     Demo("Sales · HOS", "vicky@pharmacrm.test", "Vicky Ong", "Team Lead · HOS Hospital", "Team Lead", "HOS"),
     Demo("Sales · BID", "rosa@pharmacrm.test", "Rosa Ferrer", "Salesperson · BID Bidding", "Salesperson", "BID"),
+    Demo("Field · B2C", "fay@pharmacrm.test", "Fay Dizon", "Field agent · visits doctors and collects", "Field agent", "B2C"),
+    Demo("Field · B2C", "gil@pharmacrm.test", "Gil Navarro", "Field agent · visits doctors and collects", "Field agent", "B2C"),
 )
 
 
