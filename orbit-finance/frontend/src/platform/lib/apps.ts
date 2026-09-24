@@ -15,7 +15,7 @@ import type { Me } from "./types";
 /**
  * The seven Orbit apps are the company's own modules, one each, as the API
  * lists them in app/modules.py — Executive Admin, Finance, In-Licensing,
- * Inventory, Pharmacy, Regulatory, and Sales over its seven divisions.
+ * Inventory, Pharmacy, Regulatory, and the CRM over the seven sales divisions.
  *
  * Admin and Platform are not modules and never appear in that seven: Admin is
  * the company's own controls, and Platform sits above every company at once.
@@ -25,7 +25,7 @@ import type { Me } from "./types";
  */
 export type AppName =
   | "exec"
-  | "sales"
+  | "crm"
   | "finance"
   | "inventory"
   | "regulatory"
@@ -35,7 +35,7 @@ export type AppName =
 
 const DEFAULTS: Record<AppName, string> = {
   exec: "http://localhost:4300",
-  sales: "http://localhost:4302",
+  crm: "http://localhost:4302",
   finance: "http://localhost:4303",
   inventory: "http://localhost:4304",
   platform: "http://localhost:4305",
@@ -46,7 +46,7 @@ const DEFAULTS: Record<AppName, string> = {
 
 const FROM_ENV: Record<AppName, string | undefined> = {
   exec: process.env.NEXT_PUBLIC_ORBIT_EXEC_URL,
-  sales: process.env.NEXT_PUBLIC_ORBIT_SALES_URL,
+  crm: process.env.NEXT_PUBLIC_ORBIT_CRM_URL,
   finance: process.env.NEXT_PUBLIC_ORBIT_FINANCE_URL,
   inventory: process.env.NEXT_PUBLIC_ORBIT_INVENTORY_URL,
   platform: process.env.NEXT_PUBLIC_ORBIT_PLATFORM_URL,
@@ -90,7 +90,7 @@ export const isOurs = (app: AppName): boolean => !THIS_APP || THIS_APP === app;
 
 const LABELS: Record<AppName, string> = {
   exec: "Executive Admin",
-  sales: "CRM",
+  crm: "CRM",
   finance: "Finance",
   inventory: "Inventory",
   regulatory: "Regulatory",
@@ -142,9 +142,9 @@ export function canUseApp(app: AppName, me: Me): boolean {
   switch (app) {
     case "platform":
       return me.isDeveloperAdmin;
-    // Sales is seven divisions over one workspace, so any one of them opens it.
-    case "sales":
-      return me.modules.some((m) => m.kind === "sales");
+    // The CRM is seven divisions over one workspace, so any one of them opens it.
+    case "crm":
+      return me.modules.some((m) => m.kind === "crm");
     // Executive Admin is a department like the rest, and also where the
     // company's own controls live, so either way in opens it.
     case "exec":
@@ -165,7 +165,7 @@ export const canUseThisApp = (me: Me): boolean => (THIS_APP ? canUseApp(THIS_APP
 // then the divisions that sell, then the departments behind them.
 const HOME_ORDER: readonly AppName[] = [
   "exec",
-  "sales",
+  "crm",
   "finance",
   "inventory",
   "regulatory",

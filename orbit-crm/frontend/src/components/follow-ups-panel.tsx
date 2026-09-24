@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { FollowUpItem } from "../components/follow-up-item";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
-import { addFollowUp } from "../actions/sales";
+import { addFollowUp } from "../actions/customers";
 import type { FollowUp, Org, Person } from "@/src/platform/lib/types";
 
 export function FollowUpsPanel({

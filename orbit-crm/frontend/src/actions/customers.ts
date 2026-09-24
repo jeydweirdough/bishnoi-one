@@ -67,21 +67,21 @@ export type CustomerInput = Record<string, string | boolean | null>;
 
 export async function createCustomer(input: CustomerInput): Promise<Result<{ id: string }>> {
   return attempt(async () => {
-    const customer = await api.post<Customer>(`/sales/customers`, input);
+    const customer = await api.post<Customer>(`/crm/customers`, input);
     return { id: customer.id };
   });
 }
 
 export async function updateCustomer(id: string, input: CustomerInput): Promise<Result<{ id: string }>> {
   return attempt(async () => {
-    await api.patch<Customer>(`/sales/customers/${enc(id)}`, input);
+    await api.patch<Customer>(`/crm/customers/${enc(id)}`, input);
     return { id };
   });
 }
 
 export async function deleteCustomer(id: string): Promise<Result> {
   return attempt(async () => {
-    await api.del(`/sales/customers/${enc(id)}`);
+    await api.del(`/crm/customers/${enc(id)}`);
     return null;
   });
 }
@@ -95,7 +95,7 @@ export type ActivityInput = {
 
 export async function logActivity(customerId: string, input: ActivityInput): Promise<Result> {
   return attempt(async () => {
-    await api.post<Activity>(`/sales/customers/${enc(customerId)}/activities`, input);
+    await api.post<Activity>(`/crm/customers/${enc(customerId)}/activities`, input);
     refresh();
     return null;
   });
@@ -103,7 +103,7 @@ export async function logActivity(customerId: string, input: ActivityInput): Pro
 
 export async function deleteActivity(id: string): Promise<Result> {
   return attempt(async () => {
-    await api.del(`/sales/activities/${enc(id)}`);
+    await api.del(`/crm/activities/${enc(id)}`);
     refresh();
     return null;
   });
@@ -114,7 +114,7 @@ export async function addFollowUp(
   input: { title: string; dueOn: string; assigneeId: string | null },
 ): Promise<Result> {
   return attempt(async () => {
-    await api.post<FollowUp>(`/sales/customers/${enc(customerId)}/follow-ups`, input);
+    await api.post<FollowUp>(`/crm/customers/${enc(customerId)}/follow-ups`, input);
     refresh();
     return null;
   });
@@ -122,7 +122,7 @@ export async function addFollowUp(
 
 export async function setFollowUpStatus(id: string, status: "open" | "done"): Promise<Result> {
   return attempt(async () => {
-    await api.patch<FollowUp>(`/sales/follow-ups/${enc(id)}`, { status });
+    await api.patch<FollowUp>(`/crm/follow-ups/${enc(id)}`, { status });
     refresh();
     return null;
   });

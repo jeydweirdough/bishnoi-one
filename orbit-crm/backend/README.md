@@ -18,7 +18,7 @@ uv run pytest
 The database is created, and brought up to date, on every start: migrations
 in `migrations/versions` run by themselves (SQLite in `.data/` unless
 `DATABASE_URL` says otherwise). Before a migration touches a SQLite file, a copy
-is kept beside it (`sales.db.before-<revision>`), and a failed migration puts
+is kept beside it (`crm.db.before-<revision>`), and a failed migration puts
 it back. To run them by hand: `uv run alembic upgrade head`. A change to the
 tables needs a new migration: `uv run alembic revision -m "what changed"`.
 
@@ -91,7 +91,7 @@ and activities, owned by the demo reps, into a database with no companies yet.
 
 | Setting | What it is | Default |
 |---|---|---|
-| `DATABASE_URL` | This app's own database | `sqlite:///.data/sales.db` |
+| `DATABASE_URL` | This app's own database | `sqlite:///.data/crm.db` |
 | `SESSION_HOURS` | How long a sign-in lasts | `10` |
 | `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Orbit, PHP, en-PH, Asia/Manila |
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
@@ -101,7 +101,7 @@ and activities, owned by the demo reps, into a database with no companies yet.
 
 | Path | What it's for |
 |---|---|
-| `app/routers/sales.py` | This app's endpoints, under `/sales` |
+| `app/routers/crm.py` | This app's endpoints, under `/crm` |
 | `app/routers/auth.py` | Sign-in and out |
 | `app/models.py` | Tables: `users`, `sessions` (add this app's own here) |
 | `app/deps.py` | `CurrentUser` / `AdminUser`, for endpoints that need a signed-in person |

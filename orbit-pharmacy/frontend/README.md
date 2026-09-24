@@ -17,7 +17,7 @@ Prescriptions checked, and batches tracked.
 
 ## What it asks other modules for
 
-- **sales** — which quotes carry an Rx?
+- **crm** — which quotes carry an Rx?
 - **inventory** — which product is this a batch of?
 
 A module never reads another module's tables. It asks across a counter — today a

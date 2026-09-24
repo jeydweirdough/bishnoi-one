@@ -54,18 +54,18 @@ const develops = (me: Me) => me.isDeveloperAdmin;
 
 /** The CRM's own pages. Each shows only for a role that may open it. Six at
  *  most: each is a place, and what belongs to a place is a tab inside it. */
-function salesPages(me: Me): Page[] {
+function crmPages(me: Me): Page[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
-  if (THIS_APP === "sales" && me.isOwner) {
+  if (THIS_APP === "crm" && me.isOwner) {
     return [
       { href: "/", label: "Dashboard", icon: "overview" },
       { href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices"] },
     ];
   }
   return [
-    // The Sales app opens on Home; in the shell that screen is a page of its
+    // The CRM opens on Home; in the shell that screen is a page of its
     // own, because the shell's own root is the dashboard.
-    { href: THIS_APP === "sales" ? "/" : "/overview", label: "Home", icon: "home" },
+    { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" },
     // Customers are companies and the contacts in them.
     { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] },
     ...(may("quotes.view") ? [{ href: "/quotes", label: "Quotes", icon: "quotes" as const }] : []),
@@ -464,7 +464,7 @@ function Links({ me }: { me: Me }) {
       </nav>
     );
   }
-  const sales = me.modules.filter((m) => m.kind === "sales");
+  const crm = me.modules.filter((m) => m.kind === "crm");
   // Only modules with screens: every link here is a choice, and "Soon" isn't one anyone can take.
   const departments = me.modules.filter((m) => m.kind === "department" && m.built);
   // Apps with their own screens, once they're live.
@@ -483,8 +483,8 @@ function Links({ me }: { me: Me }) {
   if (!isOurs("exec")) {
     elsewhere.push({ key: "exec", label: appLabel("exec"), icon: "reports", href: appUrl("exec") });
   }
-  if (sales.length > 0 && !isOurs("sales")) {
-    elsewhere.push({ key: "sales", label: appLabel("sales"), icon: moduleIcon("sales"), href: appUrl("sales") });
+  if (crm.length > 0 && !isOurs("crm")) {
+    elsewhere.push({ key: "crm", label: appLabel("crm"), icon: moduleIcon("crm"), href: appUrl("crm") });
   }
   for (const m of departments) {
     const app = appOf(m.key);
@@ -534,12 +534,12 @@ function Links({ me }: { me: Me }) {
           </Row>
         </Group>
       )}
-      {/* Sales, the department, as one set of pages. No division rows under it:
+      {/* The CRM, as one set of pages. No division rows under it:
           a division is a property of a record, not a place, so these are the
           same pages whether you sell in one of the seven or all of them. */}
-      {sales.length > 0 && isOurs("sales") && (
-        <Group label={appLabel("sales")}>
-          {salesPages(me).map((page) => (
+      {crm.length > 0 && isOurs("crm") && (
+        <Group label={appLabel("crm")}>
+          {crmPages(me).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
               {page.label}
             </Row>
@@ -548,7 +548,7 @@ function Links({ me }: { me: Me }) {
       )}
       {/* The CRM's own Administration: its users, roles, teams and audit log,
           each page only for a role that may open it. */}
-      {THIS_APP === "sales" && adminPagesFor(me).length > 0 && (
+      {THIS_APP === "crm" && adminPagesFor(me).length > 0 && (
         <Group label="Administration">
           {adminPagesFor(me).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href) || page.also.some((a) => within(pathname, a))}>
@@ -619,7 +619,7 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
-  if (THIS_APP === "sales" && within(pathname, "/admin")) {
+  if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
     return page ? `Administration · ${page.label}` : "Administration";
   }
@@ -637,7 +637,7 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  return salesPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
+  return crmPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }
 
 function Account({ me }: { me: Me }) {

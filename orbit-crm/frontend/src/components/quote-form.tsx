@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FileInput, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
-import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/sales";
+import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { promoTerms } from "@/src/platform/lib/labels";
 import type { CustomField, Org, PriceList, QuotePreview } from "@/src/platform/lib/types";

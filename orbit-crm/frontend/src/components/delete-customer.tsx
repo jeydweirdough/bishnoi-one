@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { deleteCustomer } from "../actions/sales";
+import { deleteCustomer } from "../actions/customers";
 
 export function DeleteCustomer({ id, name }: { id: string; name: string }) {
   const router = useRouter();

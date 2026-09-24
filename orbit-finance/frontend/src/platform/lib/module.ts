@@ -4,9 +4,9 @@ import { getMe } from "./api";
 import type { Action, ModuleAccess, TeamAccess } from "./types";
 
 /** The sales module a page belongs to. The module layout already turned away anyone without access. */
-export async function salesModule(key: string): Promise<ModuleAccess> {
+export async function crmModule(key: string): Promise<ModuleAccess> {
   const me = await getMe();
-  const mod = me.modules.find((m) => m.key === key && m.kind === "sales");
+  const mod = me.modules.find((m) => m.key === key && m.kind === "crm");
   if (!mod) notFound();
   return mod;
 }
@@ -33,7 +33,7 @@ export function teamsWhere(mod: ModuleAccess, action: Exclude<Action, "view">): 
  *  Customers, Follow-ups and Retention are the same pages whichever division a
  *  record is in, so they are one set of pages over one merged list. The
  *  division is something a record carries, not a place you navigate to. */
-export type SalesWorkspace = {
+export type CrmWorkspace = {
   divisions: ModuleAccess[];
   /** True when there is more than one, and so something to tell apart. */
   manyDivisions: boolean;
@@ -41,9 +41,9 @@ export type SalesWorkspace = {
   teams: (TeamAccess & { division: string; divisionName: string })[];
 };
 
-export async function salesWorkspace(): Promise<SalesWorkspace> {
+export async function crmWorkspace(): Promise<CrmWorkspace> {
   const me = await getMe();
-  const divisions = me.modules.filter((m) => m.kind === "sales");
+  const divisions = me.modules.filter((m) => m.kind === "crm");
   if (divisions.length === 0) notFound();
   return {
     divisions,
@@ -54,11 +54,11 @@ export async function salesWorkspace(): Promise<SalesWorkspace> {
 
 /** Whether they may do this in at least one of their divisions. The API checks
  *  again per record, against that record's own division and team. */
-export function mayAnywhere(ws: SalesWorkspace, action: Action): boolean {
+export function mayAnywhere(ws: CrmWorkspace, action: Action): boolean {
   return ws.divisions.some((d) => d.actions.includes(action));
 }
 
 /** The teams they may do this in, across every division. */
-export function teamsFor(ws: SalesWorkspace, action: Exclude<Action, "view">) {
+export function teamsFor(ws: CrmWorkspace, action: Exclude<Action, "view">) {
   return ws.teams.filter((t) => t.actions.includes(action));
 }

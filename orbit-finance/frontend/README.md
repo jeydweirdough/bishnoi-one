@@ -16,7 +16,7 @@ The money side of a quote.
 
 ## What it asks other modules for
 
-- **sales** — which quotes need deciding?
+- **crm** — which quotes need deciding?
 
 A module never reads another module's tables. It asks across a counter — today a
 function call, and a web call once either side moves. Anything it needs that is

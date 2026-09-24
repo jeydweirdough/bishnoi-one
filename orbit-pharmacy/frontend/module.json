@@ -14,7 +14,7 @@
     "batches (lot, made, expires, quantity)"
   ],
   "asks": {
-    "sales": "which quotes carry an Rx?",
+    "crm": "which quotes carry an Rx?",
     "inventory": "which product is this a batch of?"
   },
   "api": "shared"

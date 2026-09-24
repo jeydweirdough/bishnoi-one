@@ -52,11 +52,11 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 const develops = (me: Me) => me.isDeveloperAdmin;
 
 /** The sales workspace: one set of pages over every division a person sells in. */
-function salesPages(sales: ModuleAccess[]): Page[] {
+function crmPages(sales: ModuleAccess[]): Page[] {
   return [
     // The Sales app opens on its overview; in the shell that screen is a page
     // of its own, because the shell's own root is the dashboard.
-    { href: THIS_APP === "sales" ? "/" : "/overview", label: "Overview", icon: "overview" },
+    { href: THIS_APP === "crm" ? "/" : "/overview", label: "Overview", icon: "overview" },
     // A quote is opened from its customer, so it counts as being in Customers.
     { href: "/customers", label: "Customers", icon: "customers", also: ["/quotes"] },
     { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
@@ -452,7 +452,7 @@ function Links({ me }: { me: Me }) {
       </nav>
     );
   }
-  const sales = me.modules.filter((m) => m.kind === "sales");
+  const crm = me.modules.filter((m) => m.kind === "crm");
   // Only modules with screens: every link here is a choice, and "Soon" isn't one anyone can take.
   const departments = me.modules.filter((m) => m.kind === "department" && m.built);
   // Apps with their own screens, once they're live.
@@ -471,8 +471,8 @@ function Links({ me }: { me: Me }) {
   if (!isOurs("exec")) {
     elsewhere.push({ key: "exec", label: appLabel("exec"), icon: "reports", href: appUrl("exec") });
   }
-  if (sales.length > 0 && !isOurs("sales")) {
-    elsewhere.push({ key: "sales", label: appLabel("sales"), icon: moduleIcon("sales"), href: appUrl("sales") });
+  if (crm.length > 0 && !isOurs("crm")) {
+    elsewhere.push({ key: "crm", label: appLabel("crm"), icon: moduleIcon("crm"), href: appUrl("crm") });
   }
   for (const m of departments) {
     const app = appOf(m.key);
@@ -522,12 +522,12 @@ function Links({ me }: { me: Me }) {
           </Row>
         </Group>
       )}
-      {/* Sales, the department, as one set of pages. No division rows under it:
+      {/* The CRM, as one set of pages. No division rows under it:
           a division is a property of a record, not a place, so these are the
           same pages whether you sell in one of the seven or all of them. */}
-      {sales.length > 0 && isOurs("sales") && (
-        <Group label={appLabel("sales")}>
-          {salesPages(sales).map((page) => (
+      {crm.length > 0 && isOurs("crm") && (
+        <Group label={appLabel("crm")}>
+          {crmPages(crm).map((page) => (
             <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
               {page.label}
             </Row>
@@ -610,8 +610,8 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  const sales = me.modules.filter((x) => x.kind === "sales");
-  return salesPages(sales).find((p) => isCurrent(p, pathname, false))?.label ?? null;
+  const crm = me.modules.filter((x) => x.kind === "crm");
+  return crmPages(crm).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }
 
 function Account({ me }: { me: Me }) {

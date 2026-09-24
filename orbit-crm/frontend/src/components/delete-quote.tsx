@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { deleteQuote } from "../actions/sales";
+import { deleteQuote } from "../actions/customers";
 
 /**
  * `stay` is for the copy of this that sits in a customer's Quotes list: the

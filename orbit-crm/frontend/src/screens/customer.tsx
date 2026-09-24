@@ -11,26 +11,26 @@ import { PageHeader, Particulars, SectionTitle, Subheading, Sheet } from "@/src/
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { listName } from "@/src/platform/lib/labels";
-import { salesWorkspace } from "@/src/platform/lib/module";
+import { crmWorkspace } from "@/src/platform/lib/module";
 import type { CustomerDetail } from "@/src/platform/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
-  const customer = await load<CustomerDetail>(`/sales/customers/${enc(id)}`);
+  const customer = await load<CustomerDetail>(`/crm/customers/${enc(id)}`);
   return { title: customer.name };
 }
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
   const [ws, me, customer] = await Promise.all([
-    salesWorkspace(),
+    crmWorkspace(),
     getCompanyMe(),
-    load<CustomerDetail>(`/sales/customers/${enc(id)}`),
+    load<CustomerDetail>(`/crm/customers/${enc(id)}`),
   ]);
   // Who a follow-up can be given to: the customer's own team, wherever it is.
   const people = customer.can.log
     ? await load<{ id: string; name: string }[]>(
-        `/sales/people?division=${enc(customer.division)}&team=${enc(customer.team)}`,
+        `/crm/people?division=${enc(customer.division)}&team=${enc(customer.team)}`,
       )
     : [];
   const fmt = makeFormat(me.org);

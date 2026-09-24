@@ -67,7 +67,7 @@ export function RolesEditor({ data }: { data: RolesPayload }) {
     });
   }
 
-  const sales = data.modules.filter((m) => m.kind === "sales");
+  const sales = data.modules.filter((m) => m.kind === "crm");
   const departments = data.modules.filter((m) => m.kind === "department" && m.built);
   const unbuilt = data.modules.filter((m) => m.kind === "department" && !m.built);
   const orders = data.modules.some((m) => m.key === ORDERS);
@@ -185,7 +185,7 @@ function TriBox({ state, label, onChange }: { state: "all" | "some" | "none"; la
 
 function Cell({ role, module, action, grants, toggle }: { role: string; module: Module; action: string; grants: Grants; toggle: RowsProps["toggle"] }) {
   // Reports (team and per-rep figures) exist for sales modules only, for now.
-  if (action === "report" && module.kind !== "sales") {
+  if (action === "report" && module.kind !== "crm") {
     return (
       <span className="text-ink-3" aria-hidden>
         —

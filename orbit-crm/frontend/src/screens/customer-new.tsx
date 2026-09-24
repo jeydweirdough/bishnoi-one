@@ -1,12 +1,12 @@
 import { CustomerForm } from "../components/customer-form";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { salesWorkspace, teamsFor } from "@/src/platform/lib/module";
+import { crmWorkspace, teamsFor } from "@/src/platform/lib/module";
 import { orgLists, pickableTeams } from "@/src/platform/lib/org";
 
 export const metadata = { title: "Add customer" };
 
 export default async function NewCustomerPage() {
-  const ws = await salesWorkspace();
+  const ws = await crmWorkspace();
   // Every team they may add to, in any division they sell in. The form asks
   // which division only when there is more than one to ask about.
   const [teams, lists] = await Promise.all([pickableTeams(teamsFor(ws, "create")), orgLists()]);

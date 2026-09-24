@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
-import { createCustomer, updateCustomer, type CustomerInput } from "../actions/sales";
+import { createCustomer, updateCustomer, type CustomerInput } from "../actions/customers";
 import { CUSTOMER_STATUSES, pickable } from "@/src/platform/lib/labels";
 import type { Customer, CustomerStatus, Duplicate, ListItem, OrgTeam } from "@/src/platform/lib/types";
 

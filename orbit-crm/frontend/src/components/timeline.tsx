@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { isPending, useActivityFeed } from "../components/activity-feed";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Icon, listIcon } from "@/src/platform/ui/icons";
-import { deleteActivity } from "../actions/sales";
+import { deleteActivity } from "../actions/customers";
 import { makeFormat } from "@/src/platform/lib/format";
 import { listName } from "@/src/platform/lib/labels";
 import type { Activity, ListItem, Org } from "@/src/platform/lib/types";

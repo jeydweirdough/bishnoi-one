@@ -12,7 +12,7 @@ from tests.conftest import bearer, role_id, sign_in
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"ok": True, "app": "sales"}
+    assert client.get("/health").json() == {"ok": True, "app": "crm"}
 
 
 def test_sign_in_and_see_who_you_are(client):
@@ -22,7 +22,7 @@ def test_sign_in_and_see_who_you_are(client):
     me = client.get("/auth/me", headers=bearer(r)).json()
     assert me["user"]["email"] == "ana@example.com" and me["user"]["fullName"] == "Ana Reyes"
     assert me["isDeveloperAdmin"] is False
-    assert [m["key"] for m in me["modules"]] == ["sales"]
+    assert [m["key"] for m in me["modules"]] == ["crm"]
     assert me["role"]["name"] == "Administrator" and "admin.users" in me["permissions"]
 
 

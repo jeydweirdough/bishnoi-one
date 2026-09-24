@@ -12,7 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.migrate import upgrade
-from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, imports, insights, people, prices, quotes, retention, sales
+from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, imports, insights, people, prices, quotes, retention, crm
 from app.routers import settings as settings_router
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health() -> dict:
-        return {"ok": True, "app": "sales"}
+        return {"ok": True, "app": "crm"}
 
     app.include_router(auth.router)
     app.include_router(admin.router)
@@ -71,5 +71,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(quotes.router)
     app.include_router(retention.router)
     app.include_router(settings_router.router)
-    app.include_router(sales.router)
+    app.include_router(crm.router)
     return app

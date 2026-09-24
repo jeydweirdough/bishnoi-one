@@ -27,7 +27,7 @@ export type CustomersChange =
   | { action: "delete" };
 
 export async function bulkCustomers(ids: string[], change: CustomersChange): Promise<Result<Job>> {
-  return submit("/sales/bulk/customers", { ...change, ids });
+  return submit("/crm/bulk/customers", { ...change, ids });
 }
 
 export type FollowUpsChange =
@@ -36,7 +36,7 @@ export type FollowUpsChange =
   | { action: "assign"; assigneeId: string };
 
 export async function bulkFollowUps(ids: string[], change: FollowUpsChange): Promise<Result<Job>> {
-  return submit("/sales/bulk/follow-ups", { ...change, ids });
+  return submit("/crm/bulk/follow-ups", { ...change, ids });
 }
 
 
@@ -46,7 +46,7 @@ export async function customersMatching(filters: Record<string, string>): Promis
     const found: { id: string; name: string }[] = [];
     for (let offset = 0; offset < MAX_BULK; offset += 100) {
       const query = new URLSearchParams({ ...filters, limit: "100", offset: String(offset) });
-      const page = await api.get<CustomerList>(`/sales/customers?${query}`);
+      const page = await api.get<CustomerList>(`/crm/customers?${query}`);
       found.push(...page.items.map((c) => ({ id: c.id, name: c.name })));
       if (found.length >= page.total || page.items.length < 100) break;
     }
@@ -60,7 +60,7 @@ export async function divisionPeople(teams: { division: string; code: string }[]
   return attempt(async () => {
     const lists = await Promise.all(
       teams.map((t) =>
-        api.get<{ id: string; name: string }[]>(`/sales/people?division=${enc(t.division)}&team=${enc(t.code)}`),
+        api.get<{ id: string; name: string }[]>(`/crm/people?division=${enc(t.division)}&team=${enc(t.code)}`),
       ),
     );
     const byId = new Map(lists.flat().map((p) => [p.id, p]));

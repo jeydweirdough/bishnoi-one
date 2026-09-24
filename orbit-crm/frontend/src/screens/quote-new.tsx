@@ -5,7 +5,7 @@ import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import type { CompanyDetail, ContactDetail, PriceList } from "@/src/platform/lib/types";
-import type { QuoteFor } from "../actions/sales";
+import type { QuoteFor } from "../actions/customers";
 
 export const metadata = { title: "New quote" };
 

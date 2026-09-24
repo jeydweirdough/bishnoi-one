@@ -6,7 +6,7 @@ import { useActivityFeed } from "../components/activity-feed";
 import { Button } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Icon, listIcon } from "@/src/platform/ui/icons";
-import { logActivity } from "../actions/sales";
+import { logActivity } from "../actions/customers";
 import { makeFormat } from "@/src/platform/lib/format";
 import { listName, pickable } from "@/src/platform/lib/labels";
 import type { Activity, ListItem, Org, Person } from "@/src/platform/lib/types";

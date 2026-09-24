@@ -12,6 +12,11 @@ out/
 build/
 dist/
 
+# Cloudflare build output (OpenNext, wrangler)
+.open-next/
+.wrangler/
+.dev.vars*
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

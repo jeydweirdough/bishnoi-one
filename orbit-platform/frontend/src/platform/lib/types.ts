@@ -31,7 +31,7 @@ export type ModuleAccess = {
   key: string;
   name: string;
   // "app": its screens are another app's (Orders); `url` is where, once it's live.
-  kind: "sales" | "department" | "app";
+  kind: "crm" | "department" | "app";
   built: boolean;
   url?: string | null;
   actions: Action[];
@@ -279,7 +279,7 @@ export type Role = { key: string; name: string; description: string; assignmentC
 export type RolesPayload = {
   roles: Role[];
   // `reaches`: the divisions an app module (Orders) may be assigned in; null for the rest.
-  modules: { key: string; name: string; kind: "sales" | "department" | "app"; built: boolean; actions: string[]; reaches: string[] | null }[];
+  modules: { key: string; name: string; kind: "crm" | "department" | "app"; built: boolean; actions: string[]; reaches: string[] | null }[];
   actions: Action[];
   // The Orders module's steps, grouped as the role screen shows them.
   orderSteps: { group: string; steps: { action: OrderAction; label: string }[] }[];

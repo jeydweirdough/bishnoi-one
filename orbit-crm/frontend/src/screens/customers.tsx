@@ -9,7 +9,7 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { listName } from "@/src/platform/lib/labels";
-import { salesWorkspace, teamsFor } from "@/src/platform/lib/module";
+import { crmWorkspace, teamsFor } from "@/src/platform/lib/module";
 import type { Customer, CustomerList, ListItem } from "@/src/platform/lib/types";
 
 export const metadata = { title: "Customers" };
@@ -22,7 +22,7 @@ function describe(kinds: ListItem[], c: Customer) {
 
 export default async function CustomersPage({ searchParams }: { params: Promise<Record<string, never>>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const search = await searchParams;
-  const [ws, me] = await Promise.all([salesWorkspace(), getCompanyMe()]);
+  const [ws, me] = await Promise.all([crmWorkspace(), getCompanyMe()]);
   const fmt = makeFormat(me.org);
   const { org } = me;
   const kinds = me.lists.customer_kind;
@@ -32,7 +32,7 @@ export default async function CustomersPage({ searchParams }: { params: Promise<
   const query = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String((page - 1) * PAGE_SIZE) });
   for (const key of ["q", "division", "team", "status", "kind"]) if (pick(key)) query.set(key, pick(key));
 
-  const { items, total } = await load<CustomerList>(`/sales/customers?${query}`);
+  const { items, total } = await load<CustomerList>(`/crm/customers?${query}`);
   const filtered = ["q", "division", "team", "status", "kind"].some((k) => pick(k));
   // Only worth a column when there is something to tell apart.
   const showDivision = ws.manyDivisions;

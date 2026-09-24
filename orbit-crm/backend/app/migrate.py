@@ -25,7 +25,7 @@ from sqlalchemy.engine import Engine
 
 from app.config import API_DIR
 
-log = logging.getLogger("sales.migrate")
+log = logging.getLogger("crm.migrate")
 
 
 def _config(engine: Engine) -> Config:

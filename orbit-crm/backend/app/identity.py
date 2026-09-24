@@ -5,7 +5,7 @@ from app.config import Settings
 from app.models import User
 from app.permissions import ADMIN_PERMISSIONS
 
-MODULE = {"key": "sales", "name": "CRM", "kind": "sales"}
+MODULE = {"key": "crm", "name": "CRM", "kind": "crm"}
 ORG_ID = "00000000-0000-4000-8000-000000004302"
 
 # The actions the older screens read off the module, from the role's permissions.

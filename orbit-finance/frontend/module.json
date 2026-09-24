@@ -14,7 +14,7 @@
     "the approval trail on a quote"
   ],
   "asks": {
-    "sales": "which quotes need deciding?"
+    "crm": "which quotes need deciding?"
   },
   "api": "shared"
 }
