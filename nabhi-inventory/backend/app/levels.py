@@ -52,8 +52,9 @@ def by_product(db: Session, product_ids: list[str] | None = None, warehouse_id: 
 
 def state(product: Product, level: dict[str, int]) -> str | None:
     """out (nothing available), low (at or below the reorder point, or under
-    the minimum), over (above the maximum), ok. None for a service."""
-    if product.product_type == "service":
+    the minimum), over (above the maximum), ok. None for a service, and for
+    a product that only groups its variants."""
+    if product.product_type == "service" or product.variant_count:
         return None
     available = level["available"]
     if available <= 0:

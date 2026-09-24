@@ -46,7 +46,7 @@ orbit/
 ├── nabhi-crm/            screens :4302   API :8302
 ├── orbit-finance/        screens :4303   API :8303
 ├── orbit-inventory/      screens :4304   API :8304
-├── orbit-platform/       screens :4305   API :8305
+├── nabhi-platform/       screens :4305   API :8305
 ├── orbit-in-licensing/   screens :4306   API :8306   (screens not built yet)
 ├── orbit-pharmacy/       screens :4307   API :8307   (screens not built yet)
 └── orbit-regulatory/     screens :4308   API :8308   (screens not built yet)

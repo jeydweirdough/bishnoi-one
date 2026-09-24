@@ -39,6 +39,10 @@ def _config(engine: Engine) -> Config:
     # %% because the config file's reader treats a lone % as a placeholder,
     # and a password in an address may well have one.
     config.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False).replace("%", "%%"))
+    # The migrations run on this engine, not one of their own made from the
+    # address: its connections carry the app's settings (app/db.py), which a
+    # pooler like Supabase's needs (no prepared statements).
+    config.attributes["engine"] = engine
     return config
 
 

@@ -36,6 +36,14 @@ def not_found(what: str) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, f"That {what} doesn't exist.")
 
 
+def found(db, model, key, what: str):
+    """The record with this key, or a 404 naming what was looked for."""
+    record = db.get(model, key)
+    if record is None:
+        raise not_found(what)
+    return record
+
+
 def conflict(message: str) -> HTTPException:
     """The request is fine, but the records as they stand don't allow it."""
     return HTTPException(status.HTTP_409_CONFLICT, message)

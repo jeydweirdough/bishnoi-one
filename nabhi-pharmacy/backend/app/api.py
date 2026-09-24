@@ -40,6 +40,13 @@ def not_found(what: str) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, f"That {what} doesn't exist.")
 
 
+def get_or_404[T](db: Session, model: type[T], record_id: str, what: str) -> T:
+    record = db.get(model, record_id)
+    if record is None:
+        raise not_found(what)
+    return record
+
+
 def conflict(message: str) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, message)
 

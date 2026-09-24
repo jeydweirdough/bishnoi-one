@@ -24,8 +24,8 @@ How stock is kept:
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
+from sqlalchemy.orm import Mapped, aliased, column_property, mapped_column, relationship
 
 from app.db import Base
 
@@ -210,6 +210,14 @@ class Product(Stamped, Base):
     unit: Mapped[Unit] = relationship(lazy="joined")
     supplier: Mapped["Supplier | None"] = relationship(lazy="joined", foreign_keys=[supplier_id])
     parent: Mapped["Product | None"] = relationship(remote_side="Product.id", lazy="select")
+
+
+# How many variants a product has. A product with variants only groups them:
+# it holds no stock of its own, so it is never low or out.
+_variant = aliased(Product)
+Product.variant_count = column_property(
+    select(func.count(_variant.id)).where(_variant.parent_id == Product.id).correlate_except(_variant).scalar_subquery()
+)
 
 
 class ProductImage(Base):

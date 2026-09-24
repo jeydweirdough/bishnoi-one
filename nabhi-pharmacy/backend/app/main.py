@@ -1,4 +1,4 @@
-"""Orbit Pharmacy API.
+"""Nabhi Pharmacy API.
 
 Run with:  uv run main.py   (port 8307)
 """
@@ -10,8 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
-from app.db import create_tables, make_engine, make_sessions
-from app.routers import auth, pharmacy
+from app.db import make_engine, make_sessions
+from app.first_admin import make_first_admin
+from app.migrate import upgrade
+from app.routers import admin, auth, batches, dispensing, medicines, patients, prescriptions, reports, sales, stock, suppliers
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -25,13 +27,14 @@ SECURITY_HEADERS = {
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
-    create_tables(engine)
+    upgrade(engine)
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Orbit Pharmacy API", version="0.1.0", **docs)
+    app = FastAPI(title="Nabhi Pharmacy API", version="0.2.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    make_first_admin(app.state.sessions, settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -53,6 +56,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "pharmacy"}
 
-    app.include_router(auth.router)
-    app.include_router(pharmacy.router)
+    for module in (auth, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers):
+        app.include_router(module.router)
     return app

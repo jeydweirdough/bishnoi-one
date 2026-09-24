@@ -14,7 +14,11 @@ if not config.get_main_option("sqlalchemy.url"):
 
 
 def run() -> None:
-    engine = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool)
+    # The app's own engine when the app runs the migrations (app/migrate.py);
+    # one made from the address when alembic is run by hand.
+    engine = config.attributes.get("engine") or engine_from_config(
+        config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool
+    )
     with engine.connect() as connection:
         # render_as_batch: SQLite can only change a table by rebuilding it.
         context.configure(connection=connection, target_metadata=Base.metadata, render_as_batch=True, version_table=VERSION_TABLE)
