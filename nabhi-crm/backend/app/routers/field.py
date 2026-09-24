@@ -10,6 +10,12 @@ their goals.
   (their details changed), amount collected, visits that collected. Everyone
   sees their own; goals.view shows everyone within reach.
 - /field/goals: the month's goals per person (goals.manage).
+- /field/doctors/{id}/location: a clinic's pin, set by an agent standing there.
+- /field/trail: an agent's points, sent about every 15 minutes while the CRM
+  is open during work hours; /field/routes: a person's day on the map.
+
+Locations are only ever taken during work hours (WORK_HOURS, the company's
+own time): the phone doesn't send others, and the API drops any that come.
 
 Months are the company's own (its timezone), written YYYY-MM.
 """
@@ -25,12 +31,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.access import Access, CurrentAccess, permissions_of, require
-from app.api import Api, field_error, iso, not_found, person_out, team_out
+from app.api import Api, as_utc, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import AuditEntry, Balance, Company, FieldGoal, User, Visit
+from app.models import AuditEntry, Balance, Company, FieldGoal, RouteDay, TrailBatch, User, Visit
 from app.scope import reachable_people, reaches, within
+from app.trail import Point, decode, encode, metres, path_metres
 
 router = APIRouter(tags=["field work"])
 
@@ -43,6 +50,13 @@ Manage = Annotated[Access, Depends(require("goals.manage"))]
 Outcome = Literal["collected", "promised", "not_in", "updated", "other"]
 MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 DOCTOR = "doctor"
+# When locations are taken (hours, the company's own time): 6:00 to 20:00.
+WORK_HOURS = (6, 20)
+# A visit this close to its clinic's pin (less the phone's own uncertainty) was there.
+AT_CLINIC_M = 150
+# Points less sure than this aren't kept: they'd draw a route that wasn't taken.
+MAX_ACCURACY_M = 200
+TRAIL_DAYS = 90
 
 
 # --- months ----------------------------------------------------------------------------------
@@ -72,6 +86,12 @@ def month_bounds(month: str, settings: Settings) -> tuple[datetime, datetime]:
 # --- visits ----------------------------------------------------------------------------------
 
 
+class Where(Api):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    accuracy_m: int = Field(ge=0, le=100_000)
+
+
 class VisitFields(Api):
     visited_at: datetime | None = None
     amount_centavos: int | None = Field(None, ge=0, le=10**12)
@@ -82,6 +102,8 @@ class VisitFields(Api):
 class VisitIn(VisitFields):
     company_id: str = Field(max_length=36)
     outcome: Outcome
+    # Where the phone was, if it said (it asks the person first).
+    location: Where | None = None
 
 
 class VisitPatch(VisitFields):
@@ -100,8 +122,22 @@ def visit_out(visit: Visit, access: Access) -> dict:
         "notes": visit.notes,
         "owner": person_out(visit.owner),
         "createdAt": iso(visit.created_at),
+        "location": (
+            {"latitude": visit.latitude, "longitude": visit.longitude, "accuracyM": visit.accuracy_m}
+            if visit.latitude is not None
+            else None
+        ),
+        "distanceM": visit.distance_m,
+        "atClinic": at_clinic(visit),
         "can": {"edit": inside and access.can("visits.edit"), "delete": inside and access.can("visits.delete")},
     }
+
+
+def at_clinic(visit: Visit) -> bool | None:
+    """Whether the visit was logged at the clinic: None when there's no telling."""
+    if visit.distance_m is None:
+        return None
+    return visit.distance_m - (visit.accuracy_m or 0) <= AT_CLINIC_M
 
 
 def to_utc(moment: datetime, settings: Settings) -> datetime:
@@ -162,6 +198,7 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
     amount = body.amount_centavos or 0
     receipt = (body.receipt_no or "").strip() or None
     check_collection(body.outcome, amount, receipt)
+    where = body.location
     visit = Visit(
         company_id=doctor.id,
         visited_at=visited_at,
@@ -172,6 +209,14 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
         owner_id=me.id,
         team_id=me.team_id,
         created_by_id=me.id,
+        latitude=where.latitude if where else None,
+        longitude=where.longitude if where else None,
+        accuracy_m=where.accuracy_m if where else None,
+        distance_m=(
+            round(metres(where.latitude, where.longitude, doctor.latitude, doctor.longitude))
+            if where and doctor.latitude is not None and doctor.longitude is not None
+            else None
+        ),
     )
     db.add(visit)
     db.flush()
@@ -299,7 +344,44 @@ def read_doctor_balance(access: View, db: DB, settings: SettingsDep, company_id:
     return {
         "balance": owed_of(db, [doctor.id], settings).get(doctor.id),
         "history": [{"asOf": b.as_of, "balanceCentavos": b.amount_centavos, "note": b.note} for b in history],
+        "pin": pin_out(doctor),
+        "can": {"pin": access.can("visits.create") and reaches(doctor, access), "unpin": access.can("goals.view") and reaches(doctor, access)},
     }
+
+
+def pin_out(company: Company) -> dict | None:
+    if company.latitude is None or company.longitude is None:
+        return None
+    return {"latitude": company.latitude, "longitude": company.longitude, "pinnedAt": iso(company.pinned_at)}
+
+
+@router.put("/field/doctors/{company_id}/location")
+def pin_clinic(access: Create, me: CurrentUser, db: DB, company_id: str, body: Where) -> dict:
+    """The clinic is where the agent stands now. Only a sure reading will do:
+    a pin off by half a kilometre would mark every real visit as elsewhere."""
+    doctor = db.get(Company, company_id)
+    if doctor is None or not reaches(doctor, access):
+        raise not_found("customer")
+    if body.accuracy_m > 100:
+        raise field_error("accuracyM", f"Your phone is only sure of where you are to {body.accuracy_m} m. Step outside or wait a moment, then try again.")
+    doctor.latitude, doctor.longitude = body.latitude, body.longitude
+    doctor.pinned_at, doctor.pinned_by_id = datetime.now(UTC), me.id
+    # Its own action, not company.updated: pinning isn't changing the doctor's details.
+    audit(db, me, "company.pinned", target=doctor.name, target_type="company", target_id=doctor.id)
+    db.commit()
+    return {"pin": pin_out(doctor)}
+
+
+@router.delete("/field/doctors/{company_id}/location", status_code=status.HTTP_204_NO_CONTENT)
+def unpin_clinic(access: Annotated[Access, Depends(require("goals.view"))], me: CurrentUser, db: DB, company_id: str) -> Response:
+    """A wrong pin goes (a lead or the admin): the next agent there pins it again."""
+    doctor = db.get(Company, company_id)
+    if doctor is None or not reaches(doctor, access):
+        raise not_found("customer")
+    doctor.latitude = doctor.longitude = doctor.pinned_at = doctor.pinned_by_id = None
+    audit(db, me, "company.unpinned", target=doctor.name, target_type="company", target_id=doctor.id)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- the month against its goals ---------------------------------------------------------------
@@ -407,3 +489,141 @@ def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, bo
     audit(db, me, "goals.updated", target=f"Goals for {month} ({len(body.goals)} people)", target_type="goals")
     db.commit()
     return read_goals(access, db, settings, month)
+
+
+# --- trails: where agents went -----------------------------------------------------------------
+
+
+class TrailPoint(Where):
+    at: datetime
+
+
+class TrailIn(Api):
+    points: list[TrailPoint] = Field(max_length=2000)
+
+
+def local_day(moment: datetime, settings: Settings) -> str:
+    return moment.astimezone(ZoneInfo(settings.org_timezone)).strftime("%Y-%m-%d")
+
+
+def in_work_hours(moment: datetime, settings: Settings) -> bool:
+    hour = moment.astimezone(ZoneInfo(settings.org_timezone)).hour
+    return WORK_HOURS[0] <= hour < WORK_HOURS[1]
+
+
+@router.post("/field/trail")
+def upload_trail(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: TrailIn) -> dict:
+    """Points the phone kept since its last upload. Kept: ones from the last
+    day, in work hours, and sure enough to draw a route with. One row per
+    day they fall in; the day's summary moves on with them."""
+    now = datetime.now(UTC)
+    kept = sorted(
+        (Point(p.latitude, p.longitude, p.accuracy_m, to_utc(p.at, settings)) for p in body.points if p.accuracy_m <= MAX_ACCURACY_M),
+        key=lambda p: p.at,
+    )
+    kept = [p for p in kept if now - timedelta(days=1) <= p.at <= now + timedelta(minutes=5) and in_work_hours(p.at, settings)]
+    by_day: dict[str, list[Point]] = {}
+    for p in kept:
+        by_day.setdefault(local_day(p.at, settings), []).append(p)
+
+    for day, points in by_day.items():
+        start = points[0].at
+        db.add(
+            TrailBatch(
+                user_id=me.id,
+                day=day,
+                started_at=start,
+                ended_at=points[-1].at,
+                count=len(points),
+                points=encode(points, start),
+                min_lat=min(p.lat for p in points),
+                max_lat=max(p.lat for p in points),
+                min_lng=min(p.lng for p in points),
+                max_lng=max(p.lng for p in points),
+            )
+        )
+        summary = db.scalar(select(RouteDay).where(RouteDay.user_id == me.id, RouteDay.day == day))
+        gone = path_metres(points)
+        if summary is None:
+            summary = RouteDay(user_id=me.id, day=day, distance_m=0, points=0, first_at=start, last_at=start, last_lat=points[0].lat, last_lng=points[0].lng)
+            db.add(summary)
+        elif start >= as_utc(summary.last_at):
+            # Joined on from where the day's trail had got to.
+            gone += metres(summary.last_lat, summary.last_lng, points[0].lat, points[0].lng)
+        summary.distance_m = (summary.distance_m or 0) + round(gone)
+        summary.points = (summary.points or 0) + len(points)
+        summary.first_at = min(as_utc(summary.first_at), start)
+        if points[-1].at >= as_utc(summary.last_at):
+            summary.last_at, summary.last_lat, summary.last_lng = points[-1].at, points[-1].lat, points[-1].lng
+
+    # Detailed trails are kept 90 days; the days' summaries stay.
+    for batch in db.scalars(select(TrailBatch).where(TrailBatch.user_id == me.id, TrailBatch.started_at < now - timedelta(days=TRAIL_DAYS))):
+        db.delete(batch)
+    db.commit()
+    return {"received": len(body.points), "kept": len(kept)}
+
+
+def route_person(db: Session, access: Access, me: User, person: str | None) -> User:
+    """Whose route: one's own, or (goals.view) anyone within reach."""
+    if not person or person == me.id:
+        return me
+    if not access.can("goals.view"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role doesn't allow that.")
+    user = next((u for u in reachable_people(db, access) if u.id == person), None)
+    if user is None:
+        raise not_found("person")
+    return user
+
+
+def day_out(summary: RouteDay) -> dict:
+    return {"day": summary.day, "distanceM": summary.distance_m, "points": summary.points, "firstAt": iso(summary.first_at), "lastAt": iso(summary.last_at)}
+
+
+@router.get("/field/routes")
+def read_route(
+    access: CurrentAccess,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    person: str | None = Query(None, max_length=36),
+    day: str | None = Query(None, max_length=10),
+) -> dict:
+    """A person's day: their trail, and their visits with where each was logged."""
+    user = route_person(db, access, me, person)
+    day = day or local_day(datetime.now(UTC), settings)
+    try:
+        start_local = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(settings.org_timezone))
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Write the day as YYYY-MM-DD.") from None
+    points: list[Point] = []
+    for batch in db.scalars(select(TrailBatch).where(TrailBatch.user_id == user.id, TrailBatch.day == day).order_by(TrailBatch.started_at)):
+        points += decode(batch.points, as_utc(batch.started_at))
+    points.sort(key=lambda p: p.at)
+    start, end = start_local.astimezone(UTC), (start_local + timedelta(days=1)).astimezone(UTC)
+    visits = db.scalars(select(Visit).where(Visit.owner_id == user.id, Visit.visited_at >= start, Visit.visited_at < end).order_by(Visit.visited_at)).unique().all()
+    summary = db.scalar(select(RouteDay).where(RouteDay.user_id == user.id, RouteDay.day == day))
+    return {
+        "person": person_out(user),
+        "day": day,
+        "today": local_day(datetime.now(UTC), settings),
+        "summary": day_out(summary) if summary else None,
+        "points": [{"latitude": p.lat, "longitude": p.lng, "accuracyM": p.accuracy_m, "at": iso(p.at)} for p in points],
+        "visits": [{**visit_out(v, access), "clinic": pin_out(v.company)} for v in visits],
+        "keptDays": TRAIL_DAYS,
+    }
+
+
+@router.get("/field/routes/days")
+def route_days(
+    access: CurrentAccess,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    person: str | None = Query(None, max_length=36),
+    month: str | None = Query(None, max_length=7),
+) -> dict:
+    """A person's days on the road in a month, newest first."""
+    user = route_person(db, access, me, person)
+    month = month_or_now(month, settings)
+    days = db.scalars(select(RouteDay).where(RouteDay.user_id == user.id, RouteDay.day.like(f"{month}-%")).order_by(RouteDay.day.desc()))
+    return {"person": person_out(user), "month": month, "days": [day_out(d) for d in days]}

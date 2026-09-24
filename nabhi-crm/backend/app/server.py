@@ -13,6 +13,7 @@ import logging
 import os
 import re
 
+from alembic.util.exc import CommandError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
@@ -38,6 +39,20 @@ def _diagnose(error: Exception) -> dict:
         return {"problem": "database", "check": ["DATABASE_URL"],
                 "hint": "The database can't be reached or refused the sign-in. On Supabase use the pooler address "
                         "(port 6543), and write a # in the password as %23."}
+    if isinstance(error, CommandError):
+        # The migration tool's own words name revisions, never addresses or passwords.
+        newer = "Can't locate revision" in str(error)
+        return {
+            "problem": "migrations",
+            "check": ["the deployed code" if newer else "the migrations"],
+            "hint": (
+                "The database is on a newer migration than this code knows: something with newer code ran against it. "
+                "Deploy the latest code (push it), and it starts."
+                if newer
+                else "The migrations couldn't run. The full error is in the logs."
+            ),
+            "detail": str(error)[:300],
+        }
     if isinstance(error, OSError):
         return {"problem": "files", "check": ["DATABASE_URL"],
                 "hint": "It tried to write to the disk, which this host doesn't allow. Set DATABASE_URL to a Postgres database."}

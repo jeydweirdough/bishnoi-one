@@ -29,7 +29,10 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
           <LogVisitButton variant="primary" org={me.org} now={new Date().toISOString()} doctors={doctors.items.map((d) => ({ id: d.id, name: d.name }))} />
         }
       >
-        {fmt.monthLabel(month.month)}: your visits and collections against your goals.
+        {fmt.monthLabel(month.month)}: your visits and collections against your goals.{" "}
+        <Link href="/field/routes" className="text-hema hover:underline">
+          Your route today
+        </Link>
       </PageHeader>
 
       {mine && <Meters actual={mine.actual} goal={mine.goal} fmt={fmt} />}

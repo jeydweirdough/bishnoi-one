@@ -49,7 +49,13 @@ function Table({ people, month, fmt }: { people: PersonMonth[]; month: string; f
                 <Link href={`/visits?person=${p.person.id}&month=${month}`} className="text-hema hover:underline">
                   {p.person.name}
                 </Link>
-                <span className="block text-meta font-normal text-ink-3">{p.team?.name ?? "No team"}{!p.goal && " · no goals set"}</span>
+                <span className="block text-meta font-normal text-ink-3">
+                  {p.team?.name ?? "No team"}
+                  {!p.goal && " · no goals set"} ·{" "}
+                  <Link href={`/field/routes?person=${p.person.id}`} className="text-hema hover:underline">
+                    Route
+                  </Link>
+                </span>
               </th>
               {MEASURES.map((m) => (
                 <Cell key={m.key} actual={p.actual[m.key]} goal={p.goal?.[m.key]} money={m.money} fmt={fmt} />

@@ -15,6 +15,7 @@ import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
 import { StatusTag, siteHref, siteLabel } from "../components/crm/words";
+import { ClinicPin } from "../components/field/clinic-pin";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { DoctorBalance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
@@ -164,6 +165,15 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                 <p className="mt-2 text-meta text-ink-3">No balance on file yet. It comes from accounting&apos;s upload.</p>
               )}
             </Sheet>
+          )}
+          {owed && isDoctor && (
+            <ClinicPin
+              companyId={company.id}
+              pin={owed.pin}
+              canPin={owed.can.pin}
+              canUnpin={owed.can.unpin}
+              pinnedOn={owed.pin?.pinnedAt ? fmt.whenLabel(owed.pin.pinnedAt) : null}
+            />
           )}
           <Sheet className="px-5 pt-4 pb-5">
             <SectionTitle icon="particulars">Details</SectionTitle>

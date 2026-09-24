@@ -9,7 +9,7 @@ Accounts here are the CRM's own: nobody signed in here exists in any other Nabhi
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -167,6 +167,12 @@ class Company(Owned, Base):
     city: Mapped[str | None] = mapped_column(String(80), default=None)
     country: Mapped[str | None] = mapped_column(String(80), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
+    # Where the clinic is (a doctor's), pinned by a field agent standing there,
+    # so a visit can be told apart from one logged somewhere else.
+    latitude: Mapped[float | None] = mapped_column(Float, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, default=None)
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    pinned_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
 
     owner: Mapped[User] = relationship(foreign_keys="Company.owner_id", lazy="joined")
     team: Mapped[Team | None] = relationship(lazy="joined")
@@ -553,6 +559,12 @@ class Visit(Owned, Base):
     amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
     receipt_no: Mapped[str | None] = mapped_column(String(40), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
+    # Where the phone was when the visit was logged, if it said; and how far
+    # that was from the clinic's pin, if it has one.
+    latitude: Mapped[float | None] = mapped_column(Float, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, default=None)
+    accuracy_m: Mapped[int | None] = mapped_column(Integer, default=None)
+    distance_m: Mapped[int | None] = mapped_column(Integer, default=None)
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
@@ -572,4 +584,44 @@ class FieldGoal(Base):
     amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
     collection_visits: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class TrailBatch(Base):
+    """Where a field agent went while the CRM was open: one row per upload
+    (about every 15 minutes), its points packed (app/trail.py). Kept 90 days;
+    the day's RouteDay stays after that."""
+
+    __tablename__ = "nbcm_trail_batches"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD, the company's own
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    count: Mapped[int] = mapped_column(Integer)
+    points: Mapped[str] = mapped_column(Text)
+    # The box the points fall in, to find batches near a place without unpacking.
+    min_lat: Mapped[float] = mapped_column(Float)
+    max_lat: Mapped[float] = mapped_column(Float)
+    min_lng: Mapped[float] = mapped_column(Float)
+    max_lng: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RouteDay(Base):
+    """One person's day on the road, summed up as their trail comes in."""
+
+    __tablename__ = "nbcm_route_days"
+    __table_args__ = (UniqueConstraint("user_id", "day", name="route_day_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    distance_m: Mapped[int] = mapped_column(Integer, default=0)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    first_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # The day's last point so far, so the next batch's distance joins on.
+    last_lat: Mapped[float] = mapped_column(Float)
+    last_lng: Mapped[float] = mapped_column(Float)
 

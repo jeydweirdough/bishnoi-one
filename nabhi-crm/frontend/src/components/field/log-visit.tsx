@@ -11,6 +11,7 @@ import type { Org } from "@/src/platform/lib/types";
 import { logVisit } from "../../actions/field";
 import { localDateTime } from "../crm/words";
 import type { VisitOutcome } from "./types";
+import { whereNow } from "./where";
 import { OUTCOMES } from "./words";
 
 type Doctor = { id: string; name: string };
@@ -40,6 +41,9 @@ function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; no
       return;
     }
     start(async () => {
+      // Where the phone is now, if it says: the visit is placed at (or away
+      // from) the clinic by it. The browser asks the person the first time.
+      const location = await whereNow();
       const result = await logVisit({
         companyId,
         outcome,
@@ -47,6 +51,7 @@ function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; no
         amountCentavos: cents,
         receiptNo: collecting ? receipt.trim() || null : null,
         notes: notes.trim() || null,
+        location,
       });
       if (!result.ok) {
         setError(result.error);
@@ -105,9 +110,12 @@ function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; no
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={collecting ? "Anything about the payment" : "What happened, and what's next"} />}
       </Field>
       <FormError message={error} />
-      <Button type="submit" variant="primary" loading={pending} disabled={!companyId}>
-        {collecting ? "Log collection" : "Log visit"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" variant="primary" loading={pending} disabled={!companyId}>
+          {collecting ? "Log collection" : "Log visit"}
+        </Button>
+        <p className="text-meta text-ink-3">Where you are now is saved with the visit.</p>
+      </div>
     </form>
   );
 }
