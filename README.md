@@ -1,6 +1,6 @@
 # Orbit
 
-Orbit is a set of separate web apps (Admin, CRM, Finance, Inventory, and
+Orbit is a set of separate web apps (Admin, Nabhi CRM, Finance, Inventory, and
 more) kept in one GitHub repo. This page shows you how to:
 
 - get the code onto your computer
@@ -43,7 +43,7 @@ and sign-in.
 ```
 orbit/
 ├── orbit-admin/          screens :4300   API :8300
-├── orbit-crm/            screens :4302   API :8302
+├── nabhi-crm/            screens :4302   API :8302
 ├── orbit-finance/        screens :4303   API :8303
 ├── orbit-inventory/      screens :4304   API :8304
 ├── orbit-platform/       screens :4305   API :8305
@@ -57,7 +57,7 @@ orbit/
 | Branch | What's in it |
 |---|---|
 | `main` | **Everything**: every app, each in its own folder |
-| `orbit-admin`, `orbit-crm`, `orbit-finance`, … | **One app only**, named after it |
+| `orbit-admin`, `nabhi-crm`, `orbit-finance`, … | **One app only**, named after it |
 
 An app branch holds the same files as that app's folder on `main`. You can
 work on either one; GitHub keeps them matched for you
@@ -113,11 +113,11 @@ projects, then pick **one** option.
 Use this if you work on a single app. Example for CRM:
 
 ```
-git clone -b orbit-crm --single-branch https://github.com/jeydweirdough/orbit.git orbit-crm
-cd orbit-crm
+git clone -b nabhi-crm --single-branch https://github.com/jeydweirdough/orbit.git nabhi-crm
+cd nabhi-crm
 ```
 
-For another app, replace **both** `orbit-crm`s with its branch name
+For another app, replace **both** `nabhi-crm`s with its branch name
 (`orbit-admin`, `orbit-finance`, …). You get only that app, with `frontend/`
 and `backend/` right at the top.
 
@@ -233,7 +233,7 @@ pulled, and you can ask for help.
 ## 5. Run an app
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
-into the app's folder (`cd orbit-crm`).
+into the app's folder (`cd nabhi-crm`).
 
 **Terminal 1: the API**
 
@@ -256,7 +256,7 @@ Then open the screens in your browser:
 | App | Screens | API |
 |---|---|---|
 | Admin | http://localhost:4300 | http://127.0.0.1:8300 |
-| CRM | http://localhost:4302 | http://127.0.0.1:8302 |
+| Nabhi CRM | http://localhost:4302 | http://127.0.0.1:8302 |
 | Finance | http://localhost:4303 | http://127.0.0.1:8303 |
 | Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
@@ -306,7 +306,7 @@ Replace `hr` with your app's name.
 
 ### Step 2: Create the app's folder
 
-Name the folder **`orbit-<name>`**, using small letters, digits and dashes
+Name the folder **`nabhi-<name>`**, using small letters, digits and dashes
 only (e.g. `orbit-hr`, `orbit-field-sales`). This becomes your app's branch
 name. Inside it, add:
 
@@ -359,7 +359,7 @@ git clone -b orbit-hr --single-branch https://github.com/jeydweirdough/orbit.git
 **Nothing for you to do.** About a minute after any push to `main` or to an
 app branch, GitHub's **Sync branches** action runs:
 
-- Push to an **app branch** (e.g. `orbit-crm`): your work is copied into
+- Push to an **app branch** (e.g. `nabhi-crm`): your work is copied into
   that app's folder on `main`.
 - Push to **`main`**: each app's folder is copied to its app branch.
 
@@ -383,7 +383,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
    already does that. If GitHub shows a yellow "Compare & pull request"
    banner after you push to an app branch, ignore it. (Pull requests from an
    `add-app/…` or `feature/…` branch are fine.)
-5. **Don't create branches that start with `orbit-`.** Those are the app
+5. **Don't create branches that start with `orbit-` or `nabhi-`.** Those are the app
    branches, and the sync manages them.
 
 ---

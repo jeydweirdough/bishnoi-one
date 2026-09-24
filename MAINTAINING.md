@@ -18,8 +18,8 @@ The repo has two actions, in `.github/workflows/`:
 
 | Action | Runs when | What it does |
 |---|---|---|
-| **Sync branches** (`sync-branches.yml`) | any push to `main` or an `orbit-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `orbit-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Sync branches** (`sync-branches.yml`) | any push to `main` or an `orbit-*` / `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `orbit-*` / `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
 
 Set these once:
 
@@ -51,7 +51,7 @@ into `main` (README section 6). Before merging:
 
 1. **Check apps is green.**
 2. **The folder name is the branch name you want.** Once merged,
-   `orbit-<name>` becomes the app's branch, and renaming it later means
+   `nabhi-<name>` becomes the app's branch, and renaming it later means
    renaming the folder and deleting the old branch by hand. If you want a
    different name, ask them to rename the folder in the pull request.
 3. **The ports are free:** no other app uses them (the screens port + 4000 =
@@ -60,7 +60,7 @@ into `main` (README section 6). Before merging:
    no `.venv/`, no database files.
 
 Then **merge** it. About a minute later, Sync branches creates the
-`orbit-<name>` branch. Afterwards:
+`nabhi-<name>` branch. Afterwards:
 
 - Add the app to the layout, branch and port tables in `README.md`, and
   update the "next free ports" in README section 6.
@@ -95,7 +95,7 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
   Bash):
   ```
   bash scripts/sync-branches.sh                 # every app
-  bash scripts/sync-branches.sh orbit-crm       # just one app
+  bash scripts/sync-branches.sh nabhi-crm       # just one app
   ```
 
 ---
@@ -103,15 +103,15 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
 ## Changing the sync workflow
 
 `.github/workflows/sync-branches.yml` has a copy in each app folder
-(`orbit-*/.github/workflows/`). Each app branch needs its copy, because
+(`orbit-*/` and `nabhi-*/.github/workflows/`). Each app branch needs its copy, because
 GitHub only runs the workflows in the branch that was pushed. Keep all the
 copies identical: Check apps fails a pull request if they differ.
 
 After editing, copy it to every app, then stage them all:
 
 ```
-for d in orbit-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
-git add .github "orbit-*/.github/*"
+for d in orbit-*/ nabhi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
+git add .github "orbit-*/.github/*" "nabhi-*/.github/*"
 ```
 
 With `SYNC_TOKEN` set, pushing `main` is enough: the sync carries the copies

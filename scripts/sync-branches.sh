@@ -24,7 +24,8 @@ if [ "$#" -gt 0 ]; then
   apps=("$@")
 else
   apps=()
-  for d in orbit-*/; do apps+=("${d%/}"); done
+  # Every app folder: orbit-* for now, nabhi-* as each moves to the new name.
+  for d in orbit-*/ nabhi-*/; do [ -d "$d" ] && apps+=("${d%/}"); done
 fi
 
 git pull --ff-only "$remote" main
