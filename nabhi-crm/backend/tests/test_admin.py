@@ -131,7 +131,7 @@ def test_resetting_a_password_ends_their_sessions(client, ana, ben):
 def test_starting_roles_and_the_permission_catalogue(client, ana):
     data = client.get("/admin/roles", headers=ana).json()
     by_name = {r["name"]: r for r in data["roles"]}
-    assert list(by_name) == ["Administrator", "Team Lead", "Salesperson"]
+    assert list(by_name) == ["Administrator", "Team Lead", "Field agent", "Salesperson"]
     assert by_name["Administrator"]["isSystem"] and "admin.audit" in by_name["Administrator"]["permissions"]
     assert (by_name["Salesperson"]["scope"], by_name["Team Lead"]["scope"]) == ("own", "team")
     assert "customers.delete" not in by_name["Salesperson"]["permissions"]

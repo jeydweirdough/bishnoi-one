@@ -35,7 +35,11 @@ TEAM_LEAD_ADDS = {"visits.view", "visits.create", "visits.edit", "visits.delete"
 
 def upgrade() -> None:
     now = sa.DateTime(timezone=True)
-    op.create_table(
+    # Each table only if it isn't there yet: a database whose recorded revision
+    # fell behind its tables (a deploy that stopped partway) comes out right.
+    present = set(sa.inspect(op.get_bind()).get_table_names())
+    create = lambda name, *columns: name in present or op.create_table(name, *columns)  # noqa: E731
+    create(
         "nbcm_balances",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("company_id", sa.String(36), sa.ForeignKey("nbcm_companies.id", ondelete="CASCADE"), nullable=False, index=True),
@@ -45,7 +49,7 @@ def upgrade() -> None:
         sa.Column("uploaded_by_id", sa.String(36), sa.ForeignKey("nbcm_users.id", ondelete="SET NULL")),
         sa.Column("created_at", now, nullable=False),
     )
-    op.create_table(
+    create(
         "nbcm_visits",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("company_id", sa.String(36), sa.ForeignKey("nbcm_companies.id", ondelete="CASCADE"), nullable=False, index=True),
@@ -62,7 +66,7 @@ def upgrade() -> None:
         sa.CheckConstraint("outcome IN ('collected', 'promised', 'not_in', 'updated', 'other')", name="visit_outcome"),
         sa.CheckConstraint("amount_centavos >= 0", name="visit_amount"),
     )
-    op.create_table(
+    create(
         "nbcm_field_goals",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("user_id", sa.String(36), sa.ForeignKey("nbcm_users.id", ondelete="CASCADE"), nullable=False, index=True),

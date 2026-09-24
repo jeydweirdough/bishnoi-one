@@ -121,4 +121,10 @@ def test_table_names_are_put_right_whatever_the_recorded_revision_says(tmp_path)
     assert {"nbcm_teams", "nbcm_users", "nbcm_quotes"} <= tables
     assert not {"teams", "orcm_users", "orcm_teams"} & tables
     with engine.connect() as db:
-        assert db.execute(text(f"SELECT version_num FROM {VERSION_TABLE}")).scalar() == "0014"
+        # All the way to the newest migration.
+        from alembic.script import ScriptDirectory
+
+        from app.migrate import _config
+
+        head = ScriptDirectory.from_config(_config(engine)).get_current_head()
+        assert db.execute(text(f"SELECT version_num FROM {VERSION_TABLE}")).scalar() == head

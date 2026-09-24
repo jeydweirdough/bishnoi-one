@@ -231,7 +231,7 @@ def test_changes_are_audited(client, crew, ana):
 
 
 def test_an_administrator_keeps_the_customer_types(client, crew, ana):
-    assert [t["code"] for t in client.get("/customer-types", headers=crew["ria"]).json()] == ["prospect", "customer", "partner", "inactive"]
+    assert [t["code"] for t in client.get("/customer-types", headers=crew["ria"]).json()] == ["prospect", "customer", "partner", "inactive", "doctor"]
     assert client.post("/admin/customer-types", json={"name": "Distributor"}, headers=crew["max"]).status_code == 403
     types = client.post("/admin/customer-types", json={"name": "Key account", "color": "amber"}, headers=ana).json()
     key = next(t for t in types if t["name"] == "Key account")
