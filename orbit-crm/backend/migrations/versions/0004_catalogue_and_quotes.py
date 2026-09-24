@@ -158,7 +158,7 @@ def upgrade() -> None:
     # Setting a team's own prices: a lead's job, and a manager's.
     op.execute(
         "INSERT INTO role_permissions (role_id, permission) "
-        "SELECT id, 'products.prices' FROM roles WHERE name IN ('Team Lead', 'Manager') AND is_system = 0"
+        "SELECT id, 'products.prices' FROM roles WHERE name IN ('Team Lead', 'Manager') AND is_system = false"
     )
 
 

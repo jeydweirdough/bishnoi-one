@@ -32,7 +32,7 @@ TEAM_LEAD = (
 
 def upgrade() -> None:
     db = op.get_bind()
-    role = lambda name: db.execute(sa.text("SELECT id FROM roles WHERE name = :n AND is_system = 0"), {"n": name}).scalar()  # noqa: E731
+    role = lambda name: db.execute(sa.text("SELECT id FROM roles WHERE name = :n AND is_system = false"), {"n": name}).scalar()  # noqa: E731
     lead, manager = role("Team Lead"), role("Manager")
     if lead:
         db.execute(
@@ -56,4 +56,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # The name only: who was a Manager before isn't kept, so that part can't be undone.
-    op.execute("UPDATE roles SET name = 'Sales Rep' WHERE name = 'Salesperson' AND is_system = 0")
+    op.execute("UPDATE roles SET name = 'Sales Rep' WHERE name = 'Salesperson' AND is_system = false")

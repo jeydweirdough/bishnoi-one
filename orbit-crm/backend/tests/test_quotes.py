@@ -4,7 +4,9 @@ approver's decisions."""
 import json
 
 import pytest
+from sqlalchemy import func, select
 
+from app.models import StoredFile
 from app.tools.users import make_demo_catalogue
 from tests.test_customers import company, contact, crew  # noqa: F401 (crew is a fixture)
 
@@ -185,11 +187,16 @@ def test_deleting_a_quote_removes_its_letter(app, client, crew, ids):
     acme = company(client, crew["ria"])
     letter = {"number": "GL-1", "issuedOn": "2026-01-15", "amountCentavos": 100000}
     q = save(client, crew["ria"], acme, [line(ids["AMX-500"])], payer="PCSO", letter=letter, letter_file=PDF).json()
-    files = list(app.state.settings.files_dir.iterdir())
-    assert len(files) == 1
+    def letters() -> int:
+        with app.state.sessions() as db:
+            return db.scalar(select(func.count()).select_from(StoredFile))
+
+    assert letters() == 1
+    letter_file = client.get(f"/quotes/{q['id']}/letter", headers=crew["ria"])
+    assert (letter_file.status_code, letter_file.content, letter_file.headers["content-type"]) == (200, PDF, "application/pdf")
     assert client.delete(f"/quotes/{q['id']}", headers=crew["ria"]).status_code == 403  # reps don't delete quotes
     assert client.delete(f"/quotes/{q['id']}", headers=crew["lia"]).status_code == 204
-    assert not files[0].exists()
+    assert letters() == 0
     assert client.get(f"/quotes/{q['id']}", headers=crew["lia"]).status_code == 404
 
 

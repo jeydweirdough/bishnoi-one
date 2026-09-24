@@ -1,12 +1,15 @@
 """The CRM's tables. Changes to them go through a migration (migrations/versions).
 
+Every table's name starts with orcm_ (ORbit CRM), so it is plain which app a
+table belongs to, whatever database it ends up in.
+
 Accounts here are the CRM's own: nobody signed in here exists in any other Orbit app.
 """
 
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -21,7 +24,7 @@ def new_id() -> str:
 
 
 class Team(Base):
-    __tablename__ = "teams"
+    __tablename__ = "orcm_teams"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(80), unique=True)
@@ -34,7 +37,7 @@ class Team(Base):
 
 
 class Role(Base):
-    __tablename__ = "roles"
+    __tablename__ = "orcm_roles"
     __table_args__ = (CheckConstraint("scope IN ('own', 'team', 'all')", name="role_scope"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -56,23 +59,23 @@ class Role(Base):
 
 
 class RolePermission(Base):
-    __tablename__ = "role_permissions"
+    __tablename__ = "orcm_role_permissions"
 
-    role_id: Mapped[str] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+    role_id: Mapped[str] = mapped_column(ForeignKey("orcm_roles.id", ondelete="CASCADE"), primary_key=True)
     permission: Mapped[str] = mapped_column(String(64), primary_key=True)
 
     role: Mapped[Role] = relationship(back_populates="grants")
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "orcm_users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
-    role_id: Mapped[str] = mapped_column(ForeignKey("roles.id"), index=True)
-    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), index=True, default=None)
+    role_id: Mapped[str] = mapped_column(ForeignKey("orcm_roles.id"), index=True)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_teams.id", ondelete="SET NULL"), index=True, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
@@ -85,11 +88,11 @@ class User(Base):
 class SignInSession(Base):
     """One sign-in. The browser holds the token; only its hash is kept here."""
 
-    __tablename__ = "sessions"
+    __tablename__ = "orcm_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("orcm_users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -99,7 +102,7 @@ class AuditEntry(Base):
     """Who changed what, and when. Names the fields that changed, never their
     values, so it can be shown to admins without leaking what something was."""
 
-    __tablename__ = "audit_log"
+    __tablename__ = "orcm_audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
@@ -123,9 +126,9 @@ class Owned:
     """Who a record belongs to. `team_id` is the owner's team when it was last
     given to them, so moving someone to another team doesn't move their records."""
 
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), index=True, default=None)
-    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), default=None)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("orcm_users.id"), index=True)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_teams.id", ondelete="SET NULL"), index=True, default=None)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_users.id", ondelete="SET NULL"), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -137,7 +140,7 @@ class CustomerType(Base):
     """What kind of customer a company is: Prospect, Customer, Partner... The
     list is an administrator's to keep (Administration → Customer types)."""
 
-    __tablename__ = "customer_types"
+    __tablename__ = "orcm_customer_types"
 
     code: Mapped[str] = mapped_column(String(40), primary_key=True)
     name: Mapped[str] = mapped_column(String(60), unique=True)
@@ -148,7 +151,7 @@ class CustomerType(Base):
 
 
 class Company(Owned, Base):
-    __tablename__ = "companies"
+    __tablename__ = "orcm_companies"
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -170,13 +173,13 @@ class Company(Owned, Base):
 
 
 class Contact(Owned, Base):
-    __tablename__ = "contacts"
+    __tablename__ = "orcm_contacts"
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"), index=True, default=None)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_companies.id", ondelete="SET NULL"), index=True, default=None)
     first_name: Mapped[str] = mapped_column(String(80))
     last_name: Mapped[str | None] = mapped_column(String(80), default=None)
     job_title: Mapped[str | None] = mapped_column(String(120), default=None)
@@ -206,15 +209,15 @@ class Activity(Owned, Base):
     task). A meeting or task is open until `done_at` is set; the others are done
     when logged. The owner is who did it, or who it's assigned to."""
 
-    __tablename__ = "activities"
+    __tablename__ = "orcm_activities"
     __table_args__ = (CheckConstraint("kind IN ('call', 'meeting', 'email', 'note', 'task')", name="activity_kind"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     kind: Mapped[str] = mapped_column(String(8), index=True)
     subject: Mapped[str] = mapped_column(String(200))
     body: Mapped[str | None] = mapped_column(Text, default=None)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True, default=None)
-    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), index=True, default=None)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_companies.id", ondelete="CASCADE"), index=True, default=None)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_contacts.id", ondelete="SET NULL"), index=True, default=None)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, default=None)
     # Calls and meetings: how long, in minutes. Calls and emails: which way.
@@ -235,7 +238,7 @@ class Activity(Owned, Base):
 class PriceType(Base):
     """A way of pricing a quote: "Patient", "Drugstore/Hospital", "Requested price"."""
 
-    __tablename__ = "price_types"
+    __tablename__ = "orcm_price_types"
     __table_args__ = (
         CheckConstraint("entry IN ('list', 'entered')", name="price_type_entry"),
         CheckConstraint("rule IN ('always', 'with_rx')", name="price_type_rule"),
@@ -254,7 +257,7 @@ class PriceType(Base):
 
 
 class Product(Base):
-    __tablename__ = "products"
+    __tablename__ = "orcm_products"
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -276,30 +279,30 @@ class Product(Base):
 class ProductPrice(Base):
     """The company's price for a product under a price type."""
 
-    __tablename__ = "product_prices"
+    __tablename__ = "orcm_product_prices"
 
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
-    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("orcm_products.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("orcm_price_types.code", ondelete="CASCADE"), primary_key=True)
     amount_centavos: Mapped[int] = mapped_column(Integer)
 
 
 class TeamPriceType(Base):
     """The price types a team quotes with. None chosen: every one there is."""
 
-    __tablename__ = "team_price_types"
+    __tablename__ = "orcm_team_price_types"
 
-    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True)
-    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+    team_id: Mapped[str] = mapped_column(ForeignKey("orcm_teams.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("orcm_price_types.code", ondelete="CASCADE"), primary_key=True)
 
 
 class TeamPrice(Base):
     """A team's own price, standing over the company's for its quotes."""
 
-    __tablename__ = "team_prices"
+    __tablename__ = "orcm_team_prices"
 
-    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True)
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
-    price_type_code: Mapped[str] = mapped_column(ForeignKey("price_types.code", ondelete="CASCADE"), primary_key=True)
+    team_id: Mapped[str] = mapped_column(ForeignKey("orcm_teams.id", ondelete="CASCADE"), primary_key=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("orcm_products.id", ondelete="CASCADE"), primary_key=True)
+    price_type_code: Mapped[str] = mapped_column(ForeignKey("orcm_price_types.code", ondelete="CASCADE"), primary_key=True)
     amount_centavos: Mapped[int] = mapped_column(Integer)
 
 
@@ -310,7 +313,7 @@ class Promo(Base):
     """A price promotion. percent: off the line. amount: off each unit.
     free_goods: buy X, get Y free. tiered: a percent that grows with quantity."""
 
-    __tablename__ = "promos"
+    __tablename__ = "orcm_promos"
     __table_args__ = (CheckConstraint("kind IN ('percent', 'amount', 'free_goods', 'tiered')", name="promo_kind"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -333,7 +336,7 @@ class Promo(Base):
 class Bundle(Base):
     """Products sold together at one set price."""
 
-    __tablename__ = "bundles"
+    __tablename__ = "orcm_bundles"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     code: Mapped[str] = mapped_column(String(40), unique=True)
@@ -352,7 +355,7 @@ class Bundle(Base):
 class Issuer(Base):
     """Who may pay for a quote with a guarantee letter: DSWD, PCSO..."""
 
-    __tablename__ = "issuers"
+    __tablename__ = "orcm_issuers"
 
     code: Mapped[str] = mapped_column(String(40), primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
@@ -362,7 +365,7 @@ class Issuer(Base):
 class SalesSettings(Base):
     """The CRM's own rules. One row."""
 
-    __tablename__ = "sales_settings"
+    __tablename__ = "orcm_sales_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     # An extra discount above this, on a line, needs Finance's approval.
@@ -390,7 +393,7 @@ class Quote(Owned, Base):
     priced when it was made: changing a price later never changes a quote.
     The owner is who made it."""
 
-    __tablename__ = "quotes"
+    __tablename__ = "orcm_quotes"
     __table_args__ = (
         CheckConstraint("approval_status IN ('none', 'pending', 'approved', 'rejected')", name="quote_approval"),
         CheckConstraint("letter_status IN ('none', 'pending', 'verified', 'rejected')", name="quote_letter"),
@@ -399,8 +402,8 @@ class Quote(Owned, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     number: Mapped[str] = mapped_column(String(24), unique=True)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True, default=None)
-    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), index=True, default=None)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_companies.id", ondelete="CASCADE"), index=True, default=None)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_contacts.id", ondelete="SET NULL"), index=True, default=None)
     customer_name: Mapped[str] = mapped_column(String(200))
     price_type: Mapped[str] = mapped_column(String(40))
     price_type_name: Mapped[str] = mapped_column(String(80))
@@ -444,6 +447,19 @@ class Quote(Owned, Base):
     created_by: Mapped[User] = relationship(foreign_keys="Quote.created_by_id", lazy="joined")
 
 
+class StoredFile(Base):
+    """An uploaded file (a quote's guarantee letter), kept in the database
+    itself: a server without a lasting disk (Vercel) keeps it all the same, and
+    it is backed up with everything else. The quote's `letter.file.ref` names it."""
+
+    __tablename__ = "orcm_stored_files"
+
+    ref: Mapped[str] = mapped_column(String(32), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(100))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 
 # --- settings: the forms (Administration → Settings → Forms) --------------------------
 #
@@ -458,7 +474,7 @@ FIELD_TYPES = ("text", "long_text", "number", "money", "date", "choice", "multi_
 
 
 class FormSection(Base):
-    __tablename__ = "form_sections"
+    __tablename__ = "orcm_form_sections"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     entity: Mapped[str] = mapped_column(String(12), index=True)
@@ -469,7 +485,7 @@ class FormSection(Base):
 
 
 class FormField(Base):
-    __tablename__ = "form_fields"
+    __tablename__ = "orcm_form_fields"
     __table_args__ = (UniqueConstraint("entity", "key", name="uq_form_field_key"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -491,5 +507,5 @@ class FormField(Base):
     options: Mapped[list] = mapped_column(JSON, default=list)
     help_text: Mapped[str | None] = mapped_column(String(200), default=None)
     placeholder: Mapped[str | None] = mapped_column(String(80), default=None)
-    section_id: Mapped[str | None] = mapped_column(ForeignKey("form_sections.id", ondelete="SET NULL"), default=None)
+    section_id: Mapped[str | None] = mapped_column(ForeignKey("orcm_form_sections.id", ondelete="SET NULL"), default=None)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

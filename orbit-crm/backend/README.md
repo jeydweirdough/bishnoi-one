@@ -97,6 +97,40 @@ and activities, owned by the demo reps, into a database with no companies yet.
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 
+## Deploying on Vercel
+
+Vercel runs the API from `app/server.py` (`[tool.vercel]` in `pyproject.toml`).
+It has no lasting disk, so the data lives in Postgres: the database, and the
+guarantee letters, which are kept in it (`orcm_stored_files`).
+
+Every table the CRM makes is named `orcm_…` (`orcm_users`, `orcm_quotes`, and
+`orcm_alembic_version` for the migrations), so its tables are easy to tell
+apart from any other app's.
+
+1. **Project:** import the repo, with the root directory `orbit-crm/backend`.
+2. **Database:** the project's **Storage** tab → **Create Database** → Neon
+   (Postgres) → connect it to this project. That sets `DATABASE_URL`.
+3. **Environment variables** (Settings → Environment Variables):
+
+   | Name | Value |
+   |---|---|
+   | `ENVIRONMENT` | `production` (hides `/docs`) |
+   | `ALLOWED_HOSTS` | the API's address, as JSON: `["orbit-crm-backend.vercel.app"]` |
+
+4. **Redeploy.** The first request builds the tables (migrations run at start,
+   one copy at a time).
+5. **First account**, from this folder on your computer, with the database's
+   address from Vercel (Storage → the database → `.env.local` tab):
+
+   ```
+   DATABASE_URL="postgres://…" uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
+   ```
+
+   On PowerShell, set it first: `$env:DATABASE_URL="postgres://…"`.
+
+To run the tests on Postgres: `TEST_DATABASE_URL=postgresql://… uv run pytest`.
+That database is emptied before every test, so use a throwaway one.
+
 ## Where things go
 
 | Path | What it's for |

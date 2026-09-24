@@ -15,12 +15,12 @@ the customer it's for.
 
 import json
 import secrets
+from urllib.parse import quote as url_quote
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
-from fastapi.responses import FileResponse
 from pydantic import Field, ValidationError, model_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -31,7 +31,7 @@ from app.api import Api, iso, not_found, person_out
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import check_extra
-from app.models import Company, Contact, Quote, Team, User
+from app.models import Company, Contact, Quote, StoredFile, Team, User
 from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
@@ -307,9 +307,6 @@ async def create_quote(
     if issuer is not None:
         data, content_type, ext = await read_letter(letter_file)
         ref = secrets.token_hex(16)
-        folder = Path(settings.files_dir)
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / f"{ref}{ext}").write_bytes(data)
         name = Path(letter_file.filename).name[:120] or f"letter{ext}"
         stored = {"ref": ref, "ext": ext, "name": name, "contentType": content_type, "size": len(data)}
 
@@ -356,6 +353,9 @@ async def create_quote(
         record.number = next_number(db, on)
         db.add(record)
         db.flush()
+    if stored is not None:
+        # Kept in the database, with the quote: saved together or not at all.
+        db.add(StoredFile(ref=stored["ref"], content_type=stored["contentType"], data=data))
     audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
     db.commit()
     db.refresh(record)
@@ -412,32 +412,36 @@ def read_quote(access: View, db: DB, quote_id: str) -> dict:
     return quote_out(db, get_quote(db, access, quote_id), access)
 
 
-def letter_path(settings, quote: Quote) -> Path | None:
+def letter_file_of(db: Session, quote: Quote) -> StoredFile | None:
     f = (quote.letter or {}).get("file")
-    return Path(settings.files_dir) / f"{f['ref']}{f['ext']}" if f else None
+    return db.get(StoredFile, f["ref"]) if f else None
 
 
 @router.get("/quotes/{quote_id}/letter")
-def read_letter_file(access: View, db: DB, settings: SettingsDep, quote_id: str) -> FileResponse:
+def read_letter_file(access: View, db: DB, quote_id: str) -> Response:
     quote = get_quote(db, access, quote_id)
-    path = letter_path(settings, quote)
-    if path is None or not path.is_file():
+    stored = letter_file_of(db, quote)
+    if stored is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This quote has no letter on file.")
-    f = quote.letter["file"]
-    return FileResponse(path, media_type=f["contentType"], filename=f["name"], content_disposition_type="inline")
+    name = quote.letter["file"]["name"]
+    return Response(
+        stored.data,
+        media_type=stored.content_type,
+        headers={"Content-Disposition": f"inline; filename*=utf-8''{url_quote(name)}"},
+    )
 
 
 @router.delete("/quotes/{quote_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_quote(access: Delete, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> Response:
+def delete_quote(access: Delete, me: CurrentUser, db: DB, quote_id: str) -> Response:
     quote = get_quote(db, access, quote_id)
     if quote.paid_centavos:
         raise HTTPException(status.HTTP_409_CONFLICT, "Payments are recorded on this quote, so it stays.")
-    path = letter_path(settings, quote)
+    stored = letter_file_of(db, quote)
     audit(db, me, "quote.deleted", target=quote.number, target_type="quote", target_id=quote.id)
+    if stored is not None:
+        db.delete(stored)
     db.delete(quote)
     db.commit()
-    if path is not None:
-        path.unlink(missing_ok=True)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
