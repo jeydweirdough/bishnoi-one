@@ -10,7 +10,7 @@ from sqlalchemy import func, or_, select
 from app.access import allowed
 from app.api import iso
 from app.deps import DB, SettingsDep
-from app.levels import by_warehouse, state
+from app.levels import by_product, by_warehouse, state
 from app.models import Batch, Category, Location, Movement, Product, Serial, Stock, Warehouse
 from app.out import batch_ref, day, location_ref, product_ref, today, warehouse_ref
 
@@ -46,15 +46,16 @@ def stock_overview(
         query = query.where(Product.category_id.in_(in_category(db, category)))
     products = {p.id: p for p in db.scalars(query)}
     levels = by_warehouse(db, list(products), warehouse)
+    # Low and over are judged on the product as a whole, as the reorder point
+    # is; a warehouse row is flagged out on its own when nothing is free there.
+    overall = by_product(db, list(products))
     warehouses = {w.id: w for w in db.scalars(select(Warehouse))}
     rows = []
     for (pid, wid), level in levels.items():
         p = products.get(pid)
         if p is None or wid not in warehouses:
             continue
-        # The reorder point is the product's across all warehouses, so a
-        # warehouse row is judged by what it holds against the same line.
-        row_state = state(p, level)
+        row_state = "out" if level["available"] <= 0 and state(p, level) is not None else state(p, overall[pid])
         if state_ and row_state != state_:
             continue
         rows.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[wid]), **level, "reorderPoint": p.reorder_point, "state": row_state, "value": level["onHand"] * p.cost_price})

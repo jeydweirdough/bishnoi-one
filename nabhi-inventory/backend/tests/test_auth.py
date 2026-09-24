@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 from app.models import SignInSession, User
 from app.security import hash_password
-from tests.conftest import PASSWORD, bearer, settings_for, sign_in
+from tests.conftest import bearer, settings_for, sign_in
 
 
 def test_health(client):

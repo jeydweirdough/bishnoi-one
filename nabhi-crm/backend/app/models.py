@@ -509,3 +509,67 @@ class FormField(Base):
     placeholder: Mapped[str | None] = mapped_column(String(80), default=None)
     section_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_form_sections.id", ondelete="SET NULL"), default=None)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# --- field work: visiting doctors, collecting what they owe -----------------------------
+#
+# Field agents visit doctors (customers of the type "doctor") and collect
+# payments. What each doctor owes comes from accounting, uploaded now and then
+# as a balance "as of" a date; collections recorded on visits after that date
+# bring it down. Each agent has monthly goals, set by an administrator.
+
+VISIT_OUTCOMES = ("collected", "promised", "not_in", "updated", "other")
+
+
+class Balance(Base):
+    """What a doctor owed on a date, as accounting said (Field work → Upload
+    balances). The newest one counts; older ones stay as the history."""
+
+    __tablename__ = "nbcm_balances"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
+    as_of: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(String(200), default=None)
+    uploaded_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Visit(Owned, Base):
+    """A field agent's visit to a doctor, and what came of it: a payment
+    collected (with its receipt), a promise to pay, nobody in, details updated."""
+
+    __tablename__ = "nbcm_visits"
+    __table_args__ = (
+        CheckConstraint("outcome IN ('collected', 'promised', 'not_in', 'updated', 'other')", name="visit_outcome"),
+        CheckConstraint("amount_centavos >= 0", name="visit_amount"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
+    visited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    outcome: Mapped[str] = mapped_column(String(10), index=True)
+    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    receipt_no: Mapped[str | None] = mapped_column(String(40), default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+
+    company: Mapped[Company] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
+
+
+class FieldGoal(Base):
+    """One person's goals for one month (YYYY-MM), set by an administrator."""
+
+    __tablename__ = "nbcm_field_goals"
+    __table_args__ = (UniqueConstraint("user_id", "month", name="field_goal_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    doctors_visited: Mapped[int] = mapped_column(Integer, default=0)
+    doctors_updated: Mapped[int] = mapped_column(Integer, default=0)
+    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    collection_visits: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+

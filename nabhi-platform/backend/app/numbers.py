@@ -12,6 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
+# Each kind of ticket's number starts with its own letters: BUG-2026-00421.
+TICKET_PREFIXES = {"bug": "BUG", "complaint": "CMP", "issue": "SYS", "feature": "FEA", "support": "SUP"}
+
 
 def next_number(db: Session, column: InstrumentedAttribute, prefix: str, width: int) -> str:
     year = datetime.now(UTC).year

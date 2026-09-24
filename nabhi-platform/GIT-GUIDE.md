@@ -65,7 +65,8 @@ change it. Tests: `uv run pytest`.
 
 The app has **its own sign-in**: accounts live in its own database and sign in
 to this app only. There is no sign-up page. Make accounts with
-`uv run python -m app.tools.users` (see `backend/README.md`).
+`uv run python -m app.tools.users` (see `backend/README.md`). For development,
+`uv run python -m app.tools.users demo` makes demo accounts and sample records.
 
 **Screens** (`frontend/`, Next.js), in a second terminal:
 

@@ -30,6 +30,7 @@ ACTION_LABELS = {
     "types": "Customer types",
     "settings": "Settings",
     "audit": "Audit logs",
+    "import": "Upload",
 }
 
 
@@ -56,6 +57,10 @@ AREAS: tuple[Area, ...] = (
     Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("contracts", "Contracts", "Catalogue & paperwork", CRUD),
     Area("documents", "Documents", "Catalogue & paperwork", CRUD),
+    Area("visits", "Visits & collections", "Field work", CRUD),
+    # goals.view: the tracker for everyone within reach; goals.manage: setting
+    # goals; goals.import: uploading what doctors owe.
+    Area("goals", "Goals & balances", "Field work", ("view", "manage", "import")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("automations", "Automations", "Insight & tools", ("view", "manage")),
     Area("integrations", "Integrations", "Insight & tools", ("view", "manage")),
@@ -93,6 +98,7 @@ def _grant(*areas: str, actions: tuple[str, ...] = CRUD) -> set[str]:
 ADMINISTRATOR = "Administrator"
 TEAM_LEAD = "Team Lead"
 SALESPERSON = "Salesperson"
+FIELD_AGENT = "Field agent"
 STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     (ADMINISTRATOR, "Everything, including users, roles, teams, settings and the audit log.", "all", ALL_PERMISSIONS),
     (
@@ -106,6 +112,8 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
             | _grant("products", actions=("prices",))
             | _grant("reports", actions=("view", "export"))
             | _grant("automations", "integrations", actions=("view",))
+            | _grant("visits")
+            | _grant("goals", actions=("view",))
         ),
     ),
     (
@@ -115,6 +123,19 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         frozenset(
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
             | _grant("dashboard", "products", "contracts", "documents", actions=("view",))
+        ),
+    ),
+)
+STARTING_ROLES += (
+    (
+        FIELD_AGENT,
+        "Visits their own doctors and collects what they owe; sees their own goals.",
+        "own",
+        frozenset(
+            _grant("customers", actions=("view", "edit"))
+            | _grant("visits", actions=("view", "create", "edit"))
+            | _grant("activities", actions=("view", "create", "edit"))
+            | _grant("dashboard", actions=("view",))
         ),
     ),
 )

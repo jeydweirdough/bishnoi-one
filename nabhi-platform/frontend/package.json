@@ -2,12 +2,9 @@
   "name": "@nabhi/platform",
   "version": "0.1.0",
   "private": true,
-  "description": "The companies on Orbit. The Developer Admin's floor.",
+  "description": "The control tower above every Nabhi application: companies, users, access, health, support and incidents.",
   "exports": {
-    "./module.json": "./module.json",
-    "./actions": "./src/actions.ts",
-    "./screens/companies": "./src/screens/companies.tsx",
-    "./components/gate": "./src/components/gate.tsx"
+    "./module.json": "./module.json"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -152,8 +152,9 @@ def report(
         out |= {"items": items}
     elif name == "expiry":
         on = today(settings)
-        # The window is the days asked for, counted from today when they start before it.
-        window_end = max(end, on)
+        # Everything still on the shelf that has expired, or will by the day
+        # asked for: the warning window ahead, unless another day is chosen.
+        window_end = max(until, on) if until else on + timedelta(days=settings.expiry_warning_days)
         batches = list(
             db.scalars(
                 select(Batch).where(Batch.qty_on_hand > 0, Batch.expires_on <= window_end).order_by(Batch.expires_on)

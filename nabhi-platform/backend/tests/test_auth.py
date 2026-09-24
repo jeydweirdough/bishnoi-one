@@ -1,43 +1,6 @@
-"""Signing in and out of this app, with its own accounts."""
+"""Signing in and out, staff roles, sessions, and the security log."""
 
-from datetime import UTC, datetime, timedelta
-
-import pytest
-from fastapi.testclient import TestClient
-
-from app.config import Settings
-from app.main import create_app
-from app.models import SignInSession, User
-from app.routers.auth import attempts
-from app.security import hash_password
-
-PASSWORD = "correct horse battery"
-
-
-@pytest.fixture
-def app(tmp_path):
-    attempts.clear()
-    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
-    app = create_app(settings)
-    with app.state.sessions() as db:
-        db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role="admin"))
-        db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD)))
-        db.commit()
-    return app
-
-
-@pytest.fixture
-def client(app):
-    with TestClient(app) as c:
-        yield c
-
-
-def sign_in(client, email="ana@example.com", password=PASSWORD):
-    return client.post("/auth/login", json={"email": email, "password": password})
-
-
-def bearer(r) -> dict:
-    return {"Authorization": f"Bearer {r.json()['accessToken']}"}
+from tests.conftest import PASSWORD, bearer, sign_in
 
 
 def test_health(client):
@@ -49,91 +12,68 @@ def test_sign_in_and_see_who_you_are(client):
     assert r.status_code == 200, r.text
     assert r.json()["expiresIn"] == 10 * 3600
     me = client.get("/auth/me", headers=bearer(r)).json()
-    assert me["user"]["email"] == "ana@example.com" and me["user"]["fullName"] == "Ana Reyes"
-    assert me["isDeveloperAdmin"] is True
-    assert [m["key"] for m in me["modules"]] == []
+    assert me["user"]["email"] == "ana@example.com"
+    assert me["isDeveloperAdmin"] is True and me["org"] is None
+    assert me["platformRole"] == "admin" and me["canAdminister"] is True
 
 
-def test_admins_run_settings_members_dont(client):
-    ana = client.get("/auth/me", headers=bearer(sign_in(client))).json()
-    ben = client.get("/auth/me", headers=bearer(sign_in(client, "ben@example.com"))).json()
-    assert ana["canManageSettings"] is (not True)
-    assert ben["canManageSettings"] is False
+def test_support_sees_but_cannot_change_the_platform(client, ben):
+    me = client.get("/auth/me", headers=ben).json()
+    assert me["platformRoleName"] == "Support" and me["canAdminister"] is False
+    assert client.get("/platform/companies", headers=ben).status_code == 200
+    r = client.post("/platform/companies", json={"name": "Nope"}, headers=ben)
+    assert r.status_code == 403
 
 
-def test_wrong_password_and_unknown_email_look_the_same(client):
-    wrong = sign_in(client, password="nope")
-    nobody = sign_in(client, "who@example.com")
-    assert wrong.status_code == nobody.status_code == 401
-    assert wrong.json() == nobody.json()
+def test_wrong_passwords_are_security_events_and_lock_out(client, ana):
+    for _ in range(5):
+        assert sign_in(client, "ben@example.com", "wrong").status_code == 401
+    assert sign_in(client, "ben@example.com").status_code == 429
+    events = client.get("/platform/activity?category=security", headers=ana).json()["entries"]
+    assert sum(e["action"] == "auth.sign_in_failed" for e in events) == 5
+    assert any(e["action"] == "auth.signed_in" for e in events)
 
 
-def test_no_token_or_a_made_up_one(client):
-    assert client.get("/auth/me").status_code == 401
-    assert client.get("/auth/me", headers={"Authorization": "Bearer made-up"}).status_code == 401
+def test_session_length_comes_from_settings(client, ana):
+    r = client.put("/platform/settings/security", json={"sessionHours": 2, "loginAttempts": 5, "lockoutMinutes": 15}, headers=ana)
+    assert r.status_code == 200, r.text
+    assert sign_in(client, "ben@example.com").json()["expiresIn"] == 2 * 3600
 
 
-def test_signing_out_ends_the_session(client):
+def test_change_password_keeps_this_session_ends_others(client):
+    first = bearer(sign_in(client))
+    second = bearer(sign_in(client))
+    r = client.post("/auth/password", json={"currentPassword": PASSWORD, "newPassword": "a brand new one"}, headers=first)
+    assert r.status_code == 204, r.text
+    assert client.get("/auth/me", headers=first).status_code == 200
+    assert client.get("/auth/me", headers=second).status_code == 401
+    bad = client.post("/auth/password", json={"currentPassword": "nope", "newPassword": "another one!"}, headers=first)
+    assert bad.status_code == 422
+
+
+def test_admin_ends_someone_elses_session_support_cannot(client, ana, ben):
+    sessions = client.get("/platform/sessions", headers=ana).json()["sessions"]
+    bens = next(s for s in sessions if s["staff"]["name"] == "Ben Cruz")
+    anas = next(s for s in sessions if s["isYours"])
+    assert client.delete(f"/platform/sessions/{anas['id']}", headers=ben).status_code == 403
+    assert client.delete(f"/platform/sessions/{bens['id']}", headers=ana).status_code == 204
+    assert client.get("/auth/me", headers=ben).status_code == 401
+
+
+def test_staff_roles_and_not_yourself(client, ana, ben):
+    staff = client.get("/platform/staff", headers=ana).json()["staff"]
+    ana_id = next(s["id"] for s in staff if s["email"] == "ana@example.com")
+    ben_id = next(s["id"] for s in staff if s["email"] == "ben@example.com")
+    assert client.patch(f"/platform/staff/{ana_id}", json={"isActive": False}, headers=ana).status_code == 409
+    r = client.patch(f"/platform/staff/{ben_id}", json={"role": "admin"}, headers=ana)
+    assert r.json()["staff"]["roleName"] == "Platform Admin"
+    assert client.get("/auth/me", headers=ben).json()["canAdminister"] is True
+    roles = client.get("/platform/access/roles", headers=ana).json()
+    support = next(r for r in roles["staffRoles"] if r["role"] == "member")
+    assert support["holders"] == [] and all(p["action"] != "Change" for p in support["permissions"])
+
+
+def test_logout(client):
     headers = bearer(sign_in(client))
     assert client.post("/auth/logout", headers=headers).status_code == 204
     assert client.get("/auth/me", headers=headers).status_code == 401
-
-
-def test_an_expired_session_ends(client, app):
-    headers = bearer(sign_in(client))
-    with app.state.sessions() as db:
-        for s in db.query(SignInSession):
-            s.expires_at = datetime.now(UTC) - timedelta(minutes=1)
-        db.commit()
-    assert client.get("/auth/me", headers=headers).status_code == 401
-
-
-def test_switching_someone_off_or_changing_their_password_ends_their_sessions(client, app):
-    headers = bearer(sign_in(client, "ben@example.com"))
-    with app.state.sessions() as db:
-        db.query(User).filter_by(email="ben@example.com").one().password_changed_at = datetime.now(UTC) + timedelta(seconds=1)
-        db.commit()
-    assert client.get("/auth/me", headers=headers).status_code == 401
-
-    headers = bearer(sign_in(client))
-    with app.state.sessions() as db:
-        db.query(User).filter_by(email="ana@example.com").one().is_active = False
-        db.commit()
-    assert client.get("/auth/me", headers=headers).status_code == 401
-    assert sign_in(client).status_code == 401
-
-
-def test_too_many_wrong_passwords_waits(client):
-    for _ in range(5):
-        assert sign_in(client, password="nope").status_code == 401
-    blocked = sign_in(client)  # even the right one, for now
-    assert blocked.status_code == 429
-    assert int(blocked.headers["retry-after"]) > 60
-    assert sign_in(client, "ben@example.com").status_code == 200  # per email
-
-
-def test_tokens_are_not_stored(client, app):
-    token = sign_in(client).json()["accessToken"]
-    with app.state.sessions() as db:
-        stored = [s.token_hash for s in db.query(SignInSession)]
-    assert token not in stored and len(stored) == 1
-
-
-
-def test_demo_accounts_list_only_what_exists_here(client, app):
-    from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
-
-    assert client.get("/auth/demo-accounts").json()["items"] == []
-    first = DEMO_ACCOUNTS[0]
-    with app.state.sessions() as db:
-        db.add(User(email=first.email, full_name=first.name, password_hash=hash_password(DEMO_PASSWORD)))
-        db.commit()
-    listed = client.get("/auth/demo-accounts").json()
-    assert [d["email"] for d in listed["items"]] == [first.email]
-    assert sign_in(client, first.email, listed["password"]).status_code == 200
-
-
-def test_no_demo_accounts_in_production(tmp_path):
-    settings = Settings(_env_file=None, environment="production", allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'p.db').as_posix()}")
-    with TestClient(create_app(settings)) as c:
-        assert c.get("/auth/demo-accounts").status_code == 404

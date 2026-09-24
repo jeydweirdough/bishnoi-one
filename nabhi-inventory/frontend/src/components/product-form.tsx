@@ -1,0 +1,295 @@
+"use client";
+
+import { Plus, X } from "lucide-react";
+import { useState } from "react";
+import { Button, LinkButton } from "@/src/platform/ui/button";
+import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { makeFormat } from "@/src/platform/lib/format";
+import type { Org } from "@/src/platform/lib/types";
+import { saveProduct } from "../actions/inventory";
+import { PRODUCT_STATUSES, PRODUCT_TYPES } from "../lib/labels";
+import type { Product, ProductStatus, ProductType, Reference } from "../lib/types";
+import { useSave } from "./lines";
+
+type Draft = {
+  sku: string;
+  name: string;
+  description: string;
+  categoryId: string;
+  brandId: string;
+  productType: ProductType;
+  unitCode: string;
+  barcode: string;
+  supplierId: string;
+  costPrice: string;
+  sellingPrice: string;
+  taxRate: string;
+  taxInclusive: boolean;
+  minStock: string;
+  maxStock: string;
+  reorderPoint: string;
+  reorderQty: string;
+  status: ProductStatus;
+  trackBatches: boolean;
+  trackExpiry: boolean;
+  trackSerials: boolean;
+  parentId: string;
+  variantLabel: string;
+  attributes: [string, string][];
+};
+
+const whole = (s: string) => s.replace(/[^\d]/g, "");
+
+/** Adding a product, or changing one: what it is, what it costs, when to reorder, and how it's tracked. */
+export function ProductForm({ org, reference, product, parents, locked, preset }: {
+  org: Org;
+  reference: Reference;
+  product?: Product;
+  /** Products a new one could be a variant of. */
+  parents: { id: string; name: string; sku: string }[];
+  /** Stock has moved, so tracking and unit can't change. */
+  locked: boolean;
+  preset?: { parentId?: string };
+}) {
+  const fmt = makeFormat(org);
+  const { pending, error, fields, save } = useSave();
+  const parent = product ? null : parents.find((p) => p.id === preset?.parentId);
+  const [d, setD] = useState<Draft>(() => ({
+    sku: product?.sku ?? (parent ? `${parent.sku}-` : ""),
+    name: product?.name ?? (parent ? `${parent.name} ` : ""),
+    description: product?.description ?? "",
+    categoryId: product?.category?.id ?? "",
+    brandId: product?.brand?.id ?? "",
+    productType: product?.productType ?? "stock",
+    unitCode: product?.unit ?? "pc",
+    barcode: product?.barcode ?? "",
+    supplierId: product?.supplier?.id ?? "",
+    costPrice: product ? fmt.pesosText(product.costPrice) : "",
+    sellingPrice: product ? fmt.pesosText(product.sellingPrice) : "",
+    taxRate: product ? String(product.taxRateBp / 100) : "12",
+    taxInclusive: product?.taxInclusive ?? true,
+    minStock: String(product?.minStock ?? 0),
+    maxStock: product?.maxStock == null ? "" : String(product.maxStock),
+    reorderPoint: String(product?.reorderPoint ?? 0),
+    reorderQty: String(product?.reorderQty ?? 0),
+    status: product?.status ?? "active",
+    trackBatches: product?.trackBatches ?? false,
+    trackExpiry: product?.trackExpiry ?? false,
+    trackSerials: product?.trackSerials ?? false,
+    parentId: product?.parentId ?? preset?.parentId ?? "",
+    variantLabel: product?.variantLabel ?? "",
+    attributes: product ? Object.entries(product.attributes) : [["", ""]],
+  }));
+  const set = (change: Partial<Draft>) => setD({ ...d, ...change });
+
+  function submit() {
+    const input = {
+      sku: d.sku.trim(),
+      name: d.name.trim(),
+      description: d.description.trim() || null,
+      categoryId: d.categoryId || null,
+      brandId: d.brandId || null,
+      productType: d.productType,
+      unitCode: d.unitCode,
+      barcode: d.barcode.trim() || null,
+      supplierId: d.supplierId || null,
+      costPrice: fmt.toCentavos(d.costPrice) ?? 0,
+      sellingPrice: fmt.toCentavos(d.sellingPrice) ?? 0,
+      taxRateBp: Math.round((Number(d.taxRate) || 0) * 100),
+      taxInclusive: d.taxInclusive,
+      minStock: Number(d.minStock) || 0,
+      maxStock: d.maxStock === "" ? null : Number(d.maxStock),
+      reorderPoint: Number(d.reorderPoint) || 0,
+      reorderQty: Number(d.reorderQty) || 0,
+      status: d.status,
+      trackBatches: d.trackBatches || d.trackExpiry,
+      trackExpiry: d.trackExpiry,
+      trackSerials: d.trackSerials,
+      parentId: d.parentId || null,
+      variantLabel: d.variantLabel.trim() || null,
+      attributes: Object.fromEntries(d.attributes.filter(([k, v]) => k.trim() && v.trim()).map(([k, v]) => [k.trim(), v.trim()])),
+    };
+    save(() => saveProduct(product?.id ?? null, input), (out) => ({
+      message: product ? "Product saved" : `${input.name} added`,
+      go: `/products/${product?.id ?? out.id}`,
+    }));
+  }
+
+  const units = reference.units.filter((u) => u.isActive || u.code === d.unitCode);
+  const tracking = [
+    { key: "trackBatches" as const, label: "Batch / lot numbers", hint: "Each delivery's lot is kept apart." },
+    { key: "trackExpiry" as const, label: "Expiry dates", hint: "Per batch. Stock goes out first-expired-first-out." },
+    { key: "trackSerials" as const, label: "Serial numbers", hint: "One per unit, for equipment." },
+  ];
+
+  return (
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="products">What it is</SectionTitle>
+        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="SKU / item code" error={fields.sku}>
+            {(p) => <Input {...p} value={d.sku} onChange={(e) => set({ sku: e.target.value })} autoFocus={!product} />}
+          </Field>
+          <Field label="Product name" error={fields.name} className="lg:col-span-2">
+            {(p) => <Input {...p} value={d.name} onChange={(e) => set({ name: e.target.value })} />}
+          </Field>
+          <Field label="Category" optional error={fields.categoryId}>
+            {(p) => (
+              <Select {...p} value={d.categoryId} onChange={(e) => set({ categoryId: e.target.value })}>
+                <option value="">None</option>
+                {reference.categories.filter((c) => c.isActive || c.id === d.categoryId).map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Brand" optional error={fields.brandId}>
+            {(p) => (
+              <Select {...p} value={d.brandId} onChange={(e) => set({ brandId: e.target.value })}>
+                <option value="">None</option>
+                {reference.brands.filter((b) => b.isActive || b.id === d.brandId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Barcode" optional error={fields.barcode}>
+            {(p) => <Input {...p} value={d.barcode} onChange={(e) => set({ barcode: e.target.value })} inputMode="numeric" />}
+          </Field>
+          <Field label="Product type" error={fields.productType} hint={locked ? "Stock has moved, so this is fixed." : undefined}>
+            {(p) => (
+              <Select {...p} value={d.productType} disabled={locked} onChange={(e) => set({ productType: e.target.value as ProductType })}>
+                {Object.entries(PRODUCT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Unit of measure" error={fields.unitCode}>
+            {(p) => (
+              <Select {...p} value={d.unitCode} disabled={locked} onChange={(e) => set({ unitCode: e.target.value })}>
+                {units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Status" error={fields.status}>
+            {(p) => (
+              <Select {...p} value={d.status} onChange={(e) => set({ status: e.target.value as ProductStatus })}>
+                {Object.entries(PRODUCT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Description" optional error={fields.description} className="sm:col-span-2 lg:col-span-3">
+            {(p) => <Textarea {...p} rows={2} value={d.description} onChange={(e) => set({ description: e.target.value })} />}
+          </Field>
+        </div>
+      </Sheet>
+
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="pricing">Buying and selling</SectionTitle>
+        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Usual supplier" optional error={fields.supplierId} className="sm:col-span-2">
+            {(p) => (
+              <Select {...p} value={d.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
+                <option value="">None</option>
+                {reference.suppliers.filter((s) => s.isActive || s.id === d.supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label={`Cost price (${fmt.symbol})`} error={fields.costPrice} hint="Per unit. Stock is valued at this.">
+            {(p) => <Input {...p} inputMode="decimal" value={d.costPrice} onChange={(e) => set({ costPrice: e.target.value })} />}
+          </Field>
+          <Field label={`Selling price (${fmt.symbol})`} error={fields.sellingPrice}>
+            {(p) => <Input {...p} inputMode="decimal" value={d.sellingPrice} onChange={(e) => set({ sellingPrice: e.target.value })} />}
+          </Field>
+          <Field label="Tax rate (%)" error={fields.taxRateBp}>
+            {(p) => <Input {...p} inputMode="decimal" value={d.taxRate} onChange={(e) => set({ taxRate: e.target.value.replace(/[^\d.]/g, "") })} />}
+          </Field>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-2 sm:col-span-3">
+            <input type="checkbox" checked={d.taxInclusive} onChange={(e) => set({ taxInclusive: e.target.checked })} className="size-4 accent-hema" />
+            Prices include the tax
+          </label>
+        </div>
+      </Sheet>
+
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="stock">Stock levels</SectionTitle>
+        <p className="mt-1 text-meta text-ink-3">Counted across every warehouse, on what&apos;s available (not held for orders).</p>
+        <div className="mt-4 grid gap-5 sm:grid-cols-4">
+          <Field label="Minimum" error={fields.minStock}>
+            {(p) => <Input {...p} inputMode="numeric" value={d.minStock} onChange={(e) => set({ minStock: whole(e.target.value) })} />}
+          </Field>
+          <Field label="Reorder point" error={fields.reorderPoint} hint="At or below this, it's flagged low.">
+            {(p) => <Input {...p} inputMode="numeric" value={d.reorderPoint} onChange={(e) => set({ reorderPoint: whole(e.target.value) })} />}
+          </Field>
+          <Field label="Reorder quantity" error={fields.reorderQty}>
+            {(p) => <Input {...p} inputMode="numeric" value={d.reorderQty} onChange={(e) => set({ reorderQty: whole(e.target.value) })} />}
+          </Field>
+          <Field label="Maximum" optional error={fields.maxStock}>
+            {(p) => <Input {...p} inputMode="numeric" value={d.maxStock} onChange={(e) => set({ maxStock: whole(e.target.value) })} />}
+          </Field>
+        </div>
+        <fieldset className="mt-5" disabled={locked}>
+          <legend className="mb-2 text-meta font-medium text-ink-2">
+            Tracking{locked && <span className="font-normal text-ink-3"> · fixed once stock has moved</span>}
+          </legend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {tracking.map((t) => (
+              <label key={t.key} className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-hema"
+                  checked={d[t.key] || (t.key === "trackBatches" && d.trackExpiry)}
+                  onChange={(e) => set({ [t.key]: e.target.checked })}
+                />
+                <span>
+                  <span className="block text-ink">{t.label}</span>
+                  <span className="block text-meta text-ink-3">{t.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {fields.trackExpiry && <p className="mt-1 text-meta text-danger">{fields.trackExpiry}</p>}
+        </fieldset>
+      </Sheet>
+
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="lists">Variant and specifications</SectionTitle>
+        <div className="mt-4 grid gap-5 sm:grid-cols-2">
+          <Field label="A variant of" optional error={fields.parentId} hint="e.g. 3 mL is a variant of BD Syringe.">
+            {(p) => (
+              <Select {...p} value={d.parentId} onChange={(e) => set({ parentId: e.target.value })}>
+                <option value="">Not a variant</option>
+                {parents.filter((x) => x.id !== product?.id).map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Variant label" optional error={fields.variantLabel}>
+            {(p) => <Input {...p} value={d.variantLabel} placeholder="3 mL" disabled={!d.parentId} onChange={(e) => set({ variantLabel: e.target.value })} />}
+          </Field>
+        </div>
+        <p className="mt-5 mb-2 text-meta font-medium text-ink-2">Specifications</p>
+        <div className="space-y-2">
+          {d.attributes.map(([k, v], i) => (
+            <div key={i} className="flex items-end gap-3">
+              <Input aria-label={`Specification ${i + 1} name`} placeholder="Size" value={k} className="max-w-48" onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [e.target.value, a[1]] : a)) })} />
+              <Input aria-label={`Specification ${i + 1} value`} placeholder="Medium" value={v} onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [a[0], e.target.value] : a)) })} />
+              <button type="button" title="Remove this specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+          ))}
+        </div>
+        {fields.attributes && <p className="mt-1 text-meta text-danger">{fields.attributes}</p>}
+        <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => set({ attributes: [...d.attributes, ["", ""]] })}>
+          Add a specification
+        </Button>
+      </Sheet>
+
+      <FormError message={error} />
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="primary" loading={pending}>
+          {product ? "Save changes" : "Add product"}
+        </Button>
+        <LinkButton href={product ? `/products/${product.id}` : "/products"} variant="quiet">
+          Cancel
+        </LinkButton>
+      </div>
+    </form>
+  );
+}

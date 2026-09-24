@@ -1,50 +1,37 @@
+import "server-only";
 import type { ReactNode } from "react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { getMe } from "@/src/platform/lib/api";
+import type { StaffMe } from "../lib/types";
 
-// Who reaches which settings screen.
-//
-// Settings has two keys. `manage` runs the company — every screen, business
-// rules included. `recover` is the narrower one a Developer Admin holds: the
-// company record, its accounts, the applications it reaches and the audit log,
-// for when something is broken. Owning the company is neither; it is set on the
-// membership, so no admin can grant it to themselves.
-//
-// Each page says which it needs, the same way each route in app/deps.py does,
-// because the API is what actually decides. A page that only checked the
-// sidebar would 403 halfway through loading; this refuses first, in words.
+// Who may do what here. Everyone signed in is staff and sees everything;
+// changing the platform takes a Platform Admin. The API decides (app/deps.py);
+// the screens ask so they can hide what would only be refused.
 
-async function refuse(who: string): Promise<ReactNode | null> {
+/** Which kind of staff is signed in. */
+export async function getStaff(): Promise<StaffMe> {
+  const me = (await getMe()) as unknown as Partial<StaffMe>;
+  return {
+    platformRole: me.platformRole ?? "member",
+    platformRoleName: me.platformRoleName ?? "Support",
+    canAdminister: me.canAdminister ?? false,
+  };
+}
+
+/** A page only a Platform Admin can use. Null lets them through. */
+export async function adminsOnly(): Promise<ReactNode | null> {
+  const staff = await getStaff();
+  if (staff.canAdminister) return null;
   return (
     <Sheet className="px-6 py-10 text-center">
-      <h1 className="text-heading">This one is {who}</h1>
+      <h1 className="text-heading">This one is for Platform Admins</h1>
       <p className="mx-auto mt-1 max-w-md text-ink-2">
-        You reach the settings in your sidebar. If you need something that isn&apos;t there, ask whoever runs Orbit for your
-        company.
+        Support sees everything on the platform and works its tickets and incidents. Changing it takes a Platform Admin.
       </p>
       <LinkButton href="/" className="mt-5">
-        Go home
+        Go to the dashboard
       </LinkButton>
     </Sheet>
   );
-}
-
-/** A business screen: the company's own rules, for whoever runs it. */
-export async function managersOnly(): Promise<ReactNode | null> {
-  const me = await getMe();
-  return me.canManageSettings ? null : refuse("for admins");
-}
-
-/** The platform itself, above every company. Only a Developer Admin. */
-export async function developersOnly(): Promise<ReactNode | null> {
-  const me = await getMe();
-  return me.isDeveloperAdmin ? null : refuse("for developer admins");
-}
-
-/** What the company *is*. Its owner, or whoever was trusted with recovery —
- *  never a plain Admin, who runs the company without deciding it. */
-export async function ownersOnly(): Promise<ReactNode | null> {
-  const me = await getMe();
-  return me.isOwner || me.canRecover ? null : refuse("the company owner's");
 }

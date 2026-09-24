@@ -148,8 +148,9 @@ def list_users(
     for g, a in db.execute(
         select(IdentityApp, Application).join(Application).where(IdentityApp.identity_id.in_([p.id for p, _ in rows])).order_by(Application.sort_order)
     ):
-        grants.setdefault(g.identity_id, []).append({"key": a.key, "name": a.name, "role": g.role})
-    total = db.scalar(select(func.count()).select_from(Identity))
+        grants.setdefault(g.identity_id, []).append({"applicationId": a.id, "key": a.key, "name": a.name, "role": g.role})
+    # How many match, whether or not all of them fit in this answer.
+    total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
     return {"users": [user_out(p, c, applications=grants.get(p.id, [])) for p, c in rows], "total": total}
 
 
@@ -204,7 +205,7 @@ def get_user(user_id: str, db: DB, _: CurrentUser) -> dict:
             applications=[grant_out(g, a) for g, a in grants],
             canBeGiven=[{"id": a.id, "key": a.key, "name": a.name} for a in available if a.id not in granted],
             requests=[
-                {"id": r.id, "applicationName": name, "role": r.role, "status": r.status, "createdAt": iso(r.created_at)}
+                {"id": r.id, "applicationId": r.application_id, "applicationName": name, "role": r.role, "status": r.status, "createdAt": iso(r.created_at)}
                 for r, name in requests
             ],
             tickets=[
@@ -252,6 +253,8 @@ def grant_application(user_id: str, app_id: str, body: GrantIn, db: DB, me: Admi
     app = db.get(Application, app_id)
     if app is None:
         raise not_found("application")
+    if not app.is_active:
+        raise field_error("applicationId", f"{app.name} is retired, so nobody can be given it.")
     if app_id not in _company_apps(db, p.company_id):
         raise field_error("applicationId", f"Their company doesn't have {app.name}. Give it to the company first.")
     g = db.get(IdentityApp, (p.id, app.id))

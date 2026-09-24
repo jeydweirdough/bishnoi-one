@@ -1,6 +1,6 @@
 # Orbit
 
-Orbit is a set of separate web apps (Admin, Nabhi CRM, Finance, Inventory, and
+Orbit is a set of separate web apps (Admin, Nabhi CRM, Finance, Nabhi Inventory, and
 more) kept in one GitHub repo. This page shows you how to:
 
 - get the code onto your computer
@@ -45,7 +45,7 @@ orbit/
 ├── orbit-admin/          screens :4300   API :8300
 ├── nabhi-crm/            screens :4302   API :8302
 ├── orbit-finance/        screens :4303   API :8303
-├── orbit-inventory/      screens :4304   API :8304
+├── nabhi-inventory/      screens :4304   API :8304
 ├── nabhi-platform/       screens :4305   API :8305
 ├── orbit-in-licensing/   screens :4306   API :8306   (screens not built yet)
 ├── orbit-pharmacy/       screens :4307   API :8307   (screens not built yet)
@@ -258,7 +258,7 @@ Then open the screens in your browser:
 | Admin | http://localhost:4300 | http://127.0.0.1:8300 |
 | Nabhi CRM | http://localhost:4302 | http://127.0.0.1:8302 |
 | Finance | http://localhost:4303 | http://127.0.0.1:8303 |
-| Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
+| Nabhi Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
 | Licensing, Pharmacy, Regulatory | (not built) | 8306, 8307, 8308 |
 

@@ -1,5 +1,5 @@
-"""Imports: products (with their prices) and people's accounts, from a
-spreadsheet (.xlsx or .csv).
+"""Imports: products (with their prices), people's accounts, and what doctors
+owe (balances, from accounting), from a spreadsheet (.xlsx or .csv).
 
 1. /imports/{kind}/read: the file is read, never kept. What comes back is its
    headers, its rows, the fields they can go into, and a first guess at which
@@ -9,14 +9,19 @@ spreadsheet (.xlsx or .csv).
    that pass are saved and the ones that don't are listed with why.
 
 An existing product is matched by its code, an existing person by their email:
-those are updated, not added twice.
+those are updated, not added twice. A balance is matched to its doctor by name
+(upper or lower case alike); a name matching no customer, or more than one, is
+listed for fixing. Each upload adds balances as of one date; they never
+replace older ones, which stay as the history.
 
-Products need products.create and products.edit; people need admin.users.
+Products need products.create and products.edit; people need admin.users;
+balances need goals.import.
 """
 
 import csv
 import io
 import re
+from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -29,19 +34,19 @@ from app.api import EMAIL, Api
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.extra import _value, fields_for
-from app.models import PriceType, Product, ProductPrice, Role, Team, User
+from app.models import Balance, Company, PriceType, Product, ProductPrice, Role, Team, User
 from app.permissions import SALESPERSON
 from app.security import check_password_rules, hash_password
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
-Kind = Literal["products", "people"]
+Kind = Literal["products", "people", "balances"]
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 5000
 
 
 def allowed(access: Access, kind: str) -> None:
-    need = ("products.create", "products.edit") if kind == "products" else ("admin.users",)
+    need = {"products": ("products.create", "products.edit"), "people": ("admin.users",), "balances": ("goals.import",)}[kind]
     for permission in need:
         access.require(permission)
 
@@ -57,6 +62,12 @@ def normal(text: str) -> str:
 def fields_of(db: Session, kind: str) -> list[dict]:
     """Each field: its key, its label, whether it's required, and other names a
     header might call it."""
+    if kind == "balances":
+        return [
+            {"key": "doctor", "label": "Doctor", "required": True, "aliases": ["doctor", "name", "doctorname", "customer", "customername", "account", "accountname", "physician"]},
+            {"key": "amount", "label": "Balance", "required": True, "aliases": ["balance", "amount", "amountdue", "due", "owed", "outstanding", "receivable", "total"]},
+            {"key": "note", "label": "Note", "required": False, "aliases": ["note", "notes", "remarks", "memo"]},
+        ]
     if kind == "people":
         return [
             {"key": "email", "label": "Email", "required": True, "aliases": ["email", "emailaddress", "workemail", "mail"]},
@@ -155,6 +166,8 @@ class ImportIn(Api):
     # People: the first password for accounts made now; and whether to make teams not there yet.
     password: str | None = Field(None, max_length=256)
     make_teams: bool = True
+    # Balances: the date they're as of (accounting's cut-off). Today if not given.
+    as_of: date | None = None
 
 
 def money(text: str) -> int:
@@ -249,6 +262,54 @@ def import_products(db: Session, me: User, body: ImportIn, get) -> tuple[int, in
     return made, changed, problems
 
 
+def balance_amount(text: str) -> int:
+    """What's owed, in centavos. Zero is allowed: a doctor who has paid up."""
+    clean = re.sub(r"[^0-9.\-]", "", text)
+    try:
+        value = round(float(clean) * 100)
+    except ValueError:
+        raise ValueError(f"{text!r} isn't an amount.") from None
+    if value < 0:
+        raise ValueError("A balance can't be below zero.")
+    return value
+
+
+def import_balances(db: Session, me: User, body: ImportIn, get) -> tuple[int, int, list[dict]]:
+    by_name: dict[str, list[Company]] = {}
+    for company in db.scalars(select(Company)):
+        by_name.setdefault(normal(company.name), []).append(company)
+    as_of = (body.as_of or date.today()).isoformat()
+    seen: set[str] = set()
+    made = 0
+    problems: list[dict] = []
+    for n, row in enumerate(body.rows, start=2):
+        if not any(c.strip() for c in row):
+            continue
+        v = lambda key: get(row, key)  # noqa: E731
+        try:
+            name = v("doctor")
+            if not name:
+                raise ValueError("No doctor's name.")
+            found = by_name.get(normal(name), [])
+            if not found:
+                raise ValueError(f"No customer called {name}. Check the spelling, or add them first.")
+            if len(found) > 1:
+                raise ValueError(f"{len(found)} customers are called {name}. Rename one so each name is unique.")
+            if found[0].id in seen:
+                raise ValueError(f"{name} is on another row of this file too.")
+            amount = balance_amount(v("amount"))
+        except ValueError as e:
+            problems.append({"row": n, "message": str(e)})
+            continue
+        seen.add(found[0].id)
+        db.add(Balance(company_id=found[0].id, as_of=as_of, amount_centavos=amount, note=v("note")[:200] or None, uploaded_by_id=me.id))
+        made += 1
+    db.flush()
+    if made:
+        audit(db, me, "balances.imported", target=f"{made} balances as of {as_of}", target_type="balance")
+    return made, 0, problems
+
+
 def import_people(db: Session, me: User, body: ImportIn, get) -> tuple[int, int, list[dict]]:
     roles = {normal(r.name): r for r in db.scalars(select(Role))}
     teams = {normal(t.name): t for t in db.scalars(select(Team))}
@@ -320,6 +381,8 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, kind: Kind, body:
     missing = [f["label"] for f in keys.values() if f["required"] and body.mapping.get(f["key"]) is None]
     if kind == "products" and body.mapping.get("code") is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each product's code: it's how products are matched.")
+    if kind == "balances" and (body.mapping.get("doctor") is None or body.mapping.get("amount") is None):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the columns that hold each doctor's name and their balance.")
     if kind == "people" and body.mapping.get("email") is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each person's email: it's how people are matched.")
     if kind == "people" and body.password and (why := check_password_rules(body.password)):
@@ -329,7 +392,8 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, kind: Kind, body:
         i = body.mapping.get(key)
         return row[i].strip() if i is not None and 0 <= i < len(row) and row[i] is not None else ""
 
-    made, changed, problems = (import_products if kind == "products" else import_people)(db, me, body, get)
+    run = {"products": import_products, "people": import_people, "balances": import_balances}[kind]
+    made, changed, problems = run(db, me, body, get)
     if body.dry_run:
         db.rollback()
     else:
@@ -341,6 +405,6 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, kind: Kind, body:
         "problems": problems,
         # New products without some required column in the file still import when
         # every row that needs it has it; this names what wasn't picked at all.
-        "unmapped": [m for m in missing if m not in ("Code", "Email")],
+        "unmapped": [m for m in missing if m not in ("Code", "Email", "Doctor", "Balance")],
     }
 

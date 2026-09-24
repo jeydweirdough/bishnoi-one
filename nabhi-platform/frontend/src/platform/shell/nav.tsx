@@ -10,6 +10,7 @@ import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
+import { PLATFORM_GROUPS, platformPlace } from "@/src/lib/pages";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
 
@@ -454,6 +455,23 @@ function Links({ me }: { me: Me }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
+  if (me.org === null && THIS_APP === "platform") {
+    // The platform console's own pages: the control tower over every
+    // company and application.
+    return (
+      <nav aria-label="Main">
+        {PLATFORM_GROUPS.map((group) => (
+          <Group key={group.label} label={group.label}>
+            {group.pages.map((page) => (
+              <Row key={page.href} href={page.href} icon={page.icon} current={page.href === "/" ? pathname === "/" : within(pathname, page.href)}>
+                {page.label}
+              </Row>
+            ))}
+          </Group>
+        ))}
+      </nav>
+    );
+  }
   if (me.org === null) {
     const companies = platformHome();
     return (
@@ -525,15 +543,6 @@ function Links({ me }: { me: Me }) {
             Home
           </Row>
         ))}
-      {/* Platform's one screen, in Platform's own app. In the shell it is a
-          page of Settings instead, which is where it has always been. */}
-      {THIS_APP === "platform" && develops(me) && (
-        <Group label={appLabel("platform")}>
-          <Row href="/" icon="companies" current={pathname === "/"}>
-            Companies
-          </Row>
-        </Group>
-      )}
       {/* The CRM, as one set of pages. No division rows under it:
           a division is a property of a record, not a place, so these are the
           same pages whether you sell in one of the seven or all of them. */}
@@ -619,6 +628,7 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
+  if (THIS_APP === "platform") return platformPlace(pathname);
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
     return page ? `Administration · ${page.label}` : "Administration";

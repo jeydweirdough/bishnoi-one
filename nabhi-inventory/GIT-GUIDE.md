@@ -1,10 +1,10 @@
-# Git guide — Inventory app (`orbit-inventory`)
+# Git guide — Inventory app (`nabhi-inventory`)
 
 How to clone, pull and push **just the Inventory app**. For the whole repo and how
 the branches fit together, see `README.md` at the top of the `main` branch:
 https://github.com/jeydweirdough/orbit/blob/main/README.md
 
-Branch: **`orbit-inventory`**. It holds only this app, at the top level:
+Branch: **`nabhi-inventory`**. It holds only this app, at the top level:
 
 ```
 frontend/     the screens (Next.js)
@@ -13,7 +13,7 @@ GIT-GUIDE.md  this guide
 ```
 
 The app stands on its own: its own screens, its own API, its own database.
-The same files live in the `orbit-inventory/` folder on `main`, and the two are kept
+The same files live in the `nabhi-inventory/` folder on `main`, and the two are kept
 in sync.
 
 ---
@@ -35,14 +35,14 @@ instead, and `git who` to check which account is active.
 ## 2. Clone
 
 ```
-git clone -b orbit-inventory --single-branch https://github.com/jeydweirdough/orbit.git orbit-inventory
-cd orbit-inventory
+git clone -b nabhi-inventory --single-branch https://github.com/jeydweirdough/orbit.git nabhi-inventory
+cd nabhi-inventory
 ```
 
 This downloads only the Inventory app, not the other apps.
 
 Want everything instead? Run `git clone https://github.com/jeydweirdough/orbit.git`
-and work in the `orbit-inventory/` folder on `main`. Sections 3–4 still apply, but your
+and work in the `nabhi-inventory/` folder on `main`. Sections 3–4 still apply, but your
 pushes go to `main`.
 
 ---
@@ -98,7 +98,7 @@ git commit -m "Say what changed"
 git push
 ```
 
-`git push` sends your commits to the `orbit-inventory` branch on GitHub.
+`git push` sends your commits to the `nabhi-inventory` branch on GitHub.
 
 **Push rejected?** Someone pushed first. Pull their work, then push again:
 
@@ -117,7 +117,7 @@ markers in the listed files, then `git add .`, `git rebase --continue`,
 
 A GitHub action (**Sync branches**) runs by itself a minute after your push. It:
 
-- merges your pushes into the `orbit-inventory/` folder on `main`, and
+- merges your pushes into the `nabhi-inventory/` folder on `main`, and
 - brings any changes made on `main` back to this branch.
 
 After a sync, `git pull` gives you those changes. You don't need to do

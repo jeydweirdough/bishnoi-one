@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.numbers import TICKET_PREFIXES
 from app.models import (
     Announcement,
     Application,
@@ -120,7 +121,7 @@ def seed_sample(db: Session, by: str) -> bool:
     for kind, title, severity, status, app, slug, email, incident_id, affected in tickets:
         counts[kind] = counts.get(kind, 0) + 1
         person = people[email]
-        t = Ticket(number=f"{PREFIXES[kind]}-{now.year}-{counts[kind]:05d}", kind=kind, title=title, severity=severity, status=status,
+        t = Ticket(number=f"{TICKET_PREFIXES[kind]}-{now.year}-{counts[kind]:05d}", kind=kind, title=title, severity=severity, status=status,
                    application_id=apps[app].id if app else None, company_id=companies[slug].id, identity_id=person.id,
                    reporter_name=person.full_name, reporter_email=person.email, incident_id=incident_id, affected_users=affected,
                    assignee_id=lead.id if lead and status not in ("reported", "triaged") else None,
@@ -135,6 +136,3 @@ def seed_sample(db: Session, by: str) -> bool:
                         starts_at=now + timedelta(days=2), ends_at=now + timedelta(days=2, minutes=30), published_at=now, created_by=by))
     return True
 
-
-# Each kind of ticket's number starts with its own letters: BUG-2026-00421.
-PREFIXES = {"bug": "BUG", "complaint": "CMP", "issue": "SYS", "feature": "FEA", "support": "SUP"}

@@ -1,4 +1,4 @@
-"""Start the Platform API for development, reloading on code changes.
+"""Start the Nabhi Platform API for development, reloading on code changes.
 
     uv run main.py
     uv run main.py --port 8315

@@ -1,57 +1,40 @@
-# Inventory
+# Nabhi Inventory — screens
 
-What the company sells, and what it costs.
+What you have, where it is, how much you have, what is moving, and what needs
+attention. The API is in `../backend`.
 
-**Its screens are still in `orbit-frontend`, waiting to move in.**
+```
+cp .env.example .env.local
+npm install
+npm run dev        # http://localhost:4304
+```
 
 ## Screens
 
-- Products
-- Prices
-- Promos
-- Bundles
+| Place | Tabs |
+|---|---|
+| Dashboard, Alerts | |
+| Products | Products (with variants, specifications, pictures, supplier prices) · Categories · Brands · Units of measure |
+| Stock | Stock overview · Movements · Batches & expiry · Serial numbers |
+| Transfers | |
+| Adjustments & counts | Adjustments · Inventory counts |
+| Warehouses | each with its locations |
+| Purchase orders | Purchase orders · Receiving · Backorders |
+| Suppliers | |
+| Orders & issuance | Orders · Reservations · Issuance history |
+| Reports | 16 reports, each exportable to CSV |
+| Users & roles, Activity log | |
 
-## What it keeps
+The sidebar shows each person only the places their role opens; the API
+checks every permission again.
 
-- products
-- product_prices
-- price_types
-- division_pricing
-- division_price_types
-- promos
-- promo_products
-- promo_divisions
-- promo_tiers
-- bundles
-- bundle_items
-- bundle_divisions
-- pricing_settings
-- gl_issuers
+## Where things go
 
-## What it asks other modules for
-
-- nothing
-
-A module never reads another module's tables. It asks across a counter — today a
-function call, and a web call once either side moves. Anything it needs that is
-not listed above is a change to `module.json`, not a quiet import.
-
-## Where the API is
-
-`"api": "shared"` in `module.json`.
-
-`shared` means the one Orbit backend still holds this module's routes and tables,
-exactly where they were. It becomes `own` when they move into `api/` here.
-
-## Using it
-
-The shell (`orbit-frontend`) lists this package in `package.json` as
-`file:../orbit-inventory` and in `transpilePackages`, then re-exports each page from a
-route file:
-
-```tsx
-export { default, metadata } from "@orbit/inventory/screens/<page>";
-```
-
-Core — the sheet, the buttons, the fields, `lib/api`, `lib/types`,
-`lib/format` — comes from the shell with the usual `@/…` paths.
+| Path | What it's for |
+|---|---|
+| `app/(app)/…/page.tsx` | Routes. Each points at its screen in `src/screens` |
+| `src/screens/` | The screens (server components) |
+| `src/components/` | Forms and pieces the screens share |
+| `src/actions/inventory.ts` | Every change, as a server action. The browser never talks to the API |
+| `src/lib/types.ts`, `src/lib/labels.ts` | What the API sends, and its words |
+| `src/platform/` | The frame every Nabhi app shares (sidebar, sign-in, UI kit) |

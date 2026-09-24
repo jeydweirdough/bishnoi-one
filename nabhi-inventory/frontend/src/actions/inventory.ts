@@ -39,7 +39,7 @@ export async function uploadImage(id: string, form: FormData): Promise<Result<Id
 export async function deleteImage(productId: string, imageId: string): Promise<Result<null>> {
   return send<null>("del", `/inventory/products/${enc(productId)}/images/${enc(imageId)}`);
 }
-export async function setSupplierPrice(productId: string, supplierId: string, input: Json): Promise<Result> {
+export async function setSupplierPrice(productId: string, supplierId: string, input: Json): Promise<Result<unknown>> {
   return send("put", `/inventory/products/${enc(productId)}/suppliers/${enc(supplierId)}`, input);
 }
 export async function removeSupplierPrice(productId: string, supplierId: string): Promise<Result<null>> {
@@ -47,7 +47,7 @@ export async function removeSupplierPrice(productId: string, supplierId: string)
 }
 
 type CatalogList = "categories" | "brands" | "units";
-export async function saveCatalogItem(list: CatalogList, key: string | null, input: Json): Promise<Result> {
+export async function saveCatalogItem(list: CatalogList, key: string | null, input: Json): Promise<Result<unknown>> {
   return key ? send("patch", `/inventory/${list}/${enc(key)}`, input) : send("post", `/inventory/${list}`, input);
 }
 export async function deleteCatalogItem(list: CatalogList, key: string): Promise<Result<null>> {
@@ -81,10 +81,10 @@ export async function deleteSupplier(id: string): Promise<Result<null>> {
 export async function savePurchaseOrder(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("put", `/inventory/purchase-orders/${enc(id)}`, input) : send<Numbered>("post", "/inventory/purchase-orders", input);
 }
-export async function setPurchaseOrderDates(id: string, input: Json): Promise<Result> {
+export async function setPurchaseOrderDates(id: string, input: Json): Promise<Result<unknown>> {
   return send("patch", `/inventory/purchase-orders/${enc(id)}`, input);
 }
-export async function purchaseOrderStep(id: string, step: "place" | "cancel"): Promise<Result> {
+export async function purchaseOrderStep(id: string, step: "place" | "cancel"): Promise<Result<unknown>> {
   return send("post", `/inventory/purchase-orders/${enc(id)}/${step}`);
 }
 export async function deletePurchaseOrder(id: string): Promise<Result<null>> {
@@ -99,10 +99,10 @@ export async function receiveDelivery(input: Json): Promise<Result<Numbered & { 
 export async function saveOrder(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("put", `/inventory/orders/${enc(id)}`, input) : send<Numbered>("post", "/inventory/orders", input);
 }
-export async function orderStep(id: string, step: "confirm" | "pick" | "cancel"): Promise<Result> {
+export async function orderStep(id: string, step: "confirm" | "pick" | "cancel"): Promise<Result<unknown>> {
   return send("post", `/inventory/orders/${enc(id)}/${step}`);
 }
-export async function issueOrder(id: string, input: Json): Promise<Result> {
+export async function issueOrder(id: string, input: Json): Promise<Result<unknown>> {
   return send("post", `/inventory/orders/${enc(id)}/issue`, input);
 }
 export async function deleteOrder(id: string): Promise<Result<null>> {
@@ -114,13 +114,13 @@ export async function deleteOrder(id: string): Promise<Result<null>> {
 export async function saveTransfer(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("put", `/inventory/transfers/${enc(id)}`, input) : send<Numbered>("post", "/inventory/transfers", input);
 }
-export async function transferStep(id: string, step: "request" | "approve" | "cancel"): Promise<Result> {
+export async function transferStep(id: string, step: "request" | "approve" | "cancel"): Promise<Result<unknown>> {
   return send("post", `/inventory/transfers/${enc(id)}/${step}`);
 }
-export async function dispatchTransfer(id: string, input: Json): Promise<Result> {
+export async function dispatchTransfer(id: string, input: Json): Promise<Result<unknown>> {
   return send("post", `/inventory/transfers/${enc(id)}/dispatch`, input);
 }
-export async function receiveTransfer(id: string, input: Json): Promise<Result> {
+export async function receiveTransfer(id: string, input: Json): Promise<Result<unknown>> {
   return send("post", `/inventory/transfers/${enc(id)}/receive`, input);
 }
 export async function deleteTransfer(id: string): Promise<Result<null>> {
@@ -132,7 +132,7 @@ export async function deleteTransfer(id: string): Promise<Result<null>> {
 export async function createAdjustment(input: Json): Promise<Result<Numbered & { status: string }>> {
   return send("post", "/inventory/adjustments", input);
 }
-export async function adjustmentStep(id: string, step: "approve" | "reject"): Promise<Result> {
+export async function adjustmentStep(id: string, step: "approve" | "reject"): Promise<Result<unknown>> {
   return send("post", `/inventory/adjustments/${enc(id)}/${step}`);
 }
 export async function withdrawAdjustment(id: string): Promise<Result<null>> {
@@ -141,7 +141,7 @@ export async function withdrawAdjustment(id: string): Promise<Result<null>> {
 export async function startCount(input: Json): Promise<Result<Numbered>> {
   return send("post", "/inventory/counts", input);
 }
-export async function recordCounts(id: string, lines: { lineId: string; counted: number | null }[]): Promise<Result> {
+export async function recordCounts(id: string, lines: { lineId: string; counted: number | null }[]): Promise<Result<unknown>> {
   return send("put", `/inventory/counts/${enc(id)}/lines`, { lines });
 }
 export async function addCountLine(id: string, input: Json): Promise<Result<Id>> {
@@ -153,10 +153,10 @@ export async function countStep(id: string, step: "submit" | "reopen" | "approve
 
 // --- administration ---------------------------------------------------------------------
 
-export async function saveUser(id: string | null, input: Json): Promise<Result> {
+export async function saveUser(id: string | null, input: Json): Promise<Result<unknown>> {
   return id ? send("patch", `/admin/users/${enc(id)}`, input) : send("post", "/admin/users", input);
 }
-export async function setUserPassword(id: string, password: string): Promise<Result> {
+export async function setUserPassword(id: string, password: string): Promise<Result<unknown>> {
   return attempt(async () => {
     await api.post(`/admin/users/${enc(id)}/password`, { password });
     return {};

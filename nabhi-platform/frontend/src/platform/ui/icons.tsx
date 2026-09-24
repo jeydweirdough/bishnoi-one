@@ -1,5 +1,9 @@
 import {
   Boxes,
+  HeartPulse,
+  LifeBuoy,
+  Megaphone,
+  Siren,
   Activity,
   ArrowUpRight,
   BadgePercent,
@@ -90,6 +94,11 @@ export const ICONS = {
   companies: Globe, // every company on the platform, for a Developer Admin
   headquarters: MapPinHouse, // a team's office: a place with a building
   auditLog: ScrollText,
+  // the platform console's own places
+  monitoring: HeartPulse, // whether the applications are up, and the traffic
+  incidents: Siren, // something broken for many, now
+  support: LifeBuoy, // complaints, bugs, requests: one person's report
+  communications: Megaphone, // what the platform tells people
 
   // a module's sections
   overview: LayoutDashboard,

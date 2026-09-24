@@ -1,0 +1,81 @@
+import { Plus } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/button";
+import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { load } from "@/src/platform/lib/api";
+import { CatalogTabs } from "../components/catalog-tabs";
+import { FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
+import { PRODUCT_STATUSES, param, query } from "../lib/labels";
+import { context, type Search } from "../lib/page";
+import type { ProductRow, Reference } from "../lib/types";
+
+export const metadata = { title: "Products" };
+
+export default async function ProductsPage({ searchParams }: { searchParams: Search }) {
+  const { fmt, may, me } = await context();
+  if (!may("products.view")) return <NoAccess what="the product catalog" />;
+  const s = await searchParams;
+  const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock") };
+  const [products, ref] = await Promise.all([load<ProductRow[]>(`/inventory/products${query(f)}`), load<Reference>("/inventory/reference")]);
+  // Variants sit under their product, so the catalogue reads Product → 1 mL, 3 mL, 5 mL.
+  const ids = new Set(products.map((p) => p.id));
+  const tops = products.filter((p) => !p.parentId || !ids.has(p.parentId));
+  const under = (id: string) => products.filter((p) => p.parentId === id);
+
+  const row = (p: ProductRow, nested = false) => (
+    <tr key={p.id} className="relative hover:bg-bench/40">
+      <Td>
+        <div className={nested ? "pl-5" : ""}>
+          <RowLink href={`/products/${p.id}`} sub={[p.sku, p.category?.path, p.brand?.name].filter(Boolean).join(" · ")}>
+            {nested && p.variantLabel ? `↳ ${p.variantLabel}` : p.name}
+          </RowLink>
+        </div>
+      </Td>
+      <Td num>{p.variantCount ? <span className="text-ink-3">{p.variantCount} variants</span> : `${fmt.count(p.level.onHand)} ${p.unit}`}</Td>
+      <Td num>{p.variantCount ? "" : fmt.count(p.level.available)}</Td>
+      <Td num>{p.variantCount ? "" : fmt.count(p.reorderPoint)}</Td>
+      <Td num>{fmt.peso(p.costPrice)}</Td>
+      <Td num>{fmt.peso(p.sellingPrice)}</Td>
+      <Td>{p.status === "active" ? <StateMark state={p.state} /> : <span className="text-meta text-ink-3">{PRODUCT_STATUSES[p.status]}</span>}</Td>
+    </tr>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="Products"
+        actions={
+          may("products.create") && (
+            <LinkButton href="/products/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+              Add product
+            </LinkButton>
+          )
+        }
+      >
+        The catalog: every item you keep, what it costs and sells for, and when to order more.
+      </PageHeader>
+      <CatalogTabs me={me} current="/products" />
+      <Filters q={f.q} placeholder="Name, SKU or barcode">
+        <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "Every category" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
+        <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "Every brand" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />
+        <FilterSelect name="supplier" label="Supplier" value={f.supplier} options={[{ value: "", label: "Every supplier" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
+        <FilterSelect name="stock" label="Stock" value={f.stock} options={[{ value: "", label: "Any" }, { value: "low", label: "Low" }, { value: "out", label: "Out of stock" }, { value: "over", label: "Over maximum" }]} />
+        <FilterSelect name="status" label="Status" value={f.status} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "discontinued", label: "Discontinued" }, { value: "all", label: "All" }]} />
+      </Filters>
+      <Sheet>
+        {products.length === 0 ? (
+          <Empty icon="products" title={f.q ? "No products match" : "No products here"}>
+            {may("products.create") ? "Add the items you keep, with their SKU, unit and reorder point." : "Try other filters."}
+          </Empty>
+        ) : (
+          <Table head={["Product", " On hand", " Available", " Reorder at", " Cost", " Selling", "Stock"]} min="52rem">
+            {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}
+          </Table>
+        )}
+      </Sheet>
+      <p className="mt-3 text-meta text-ink-3">
+        {products.length} product{products.length === 1 ? "" : "s"}
+        {f.q && <> matching &ldquo;{f.q}&rdquo;</>}.
+      </p>
+    </>
+  );
+}
