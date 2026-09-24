@@ -95,6 +95,38 @@ For scripts, set `NABHI_NEW_PASSWORD` instead of typing the password.
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 
+## Deploying on Vercel
+
+Two Vercel projects from the same repo, like the CRM's: the API
+(root directory `nabhi-inventory/backend`, run from `app/server.py`) and the
+screens (root directory `nabhi-inventory/frontend`). Vercel has no lasting
+disk, so the data lives in Postgres, pictures included.
+
+**API project** (Settings → Environment Variables):
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | Postgres. On Supabase, the **Transaction pooler** address (port 6543); a `#`, `@` or `/` in the password is written `%23`, `%40`, `%2F`. On Neon, Storage → Create Database sets it for you. |
+| `ENVIRONMENT` | `production` (hides `/docs` and the demo accounts) |
+| `ALLOWED_HOSTS` | the API's own address, as JSON: `["nabhi-inventory-backend.vercel.app"]` |
+
+**Screens project:**
+
+| Name | Value |
+|---|---|
+| `API_URL` | the API's address: `https://nabhi-inventory-backend.vercel.app` |
+| `NEXT_PUBLIC_NABHI_APP` | `inventory` (read at build time: redeploy after changing it) |
+
+The first request builds the tables. Then make the first account from this
+folder, pointed at the same database:
+
+```
+DATABASE_URL="postgres://…" uv run python -m app.tools.users add --email you@example.com --name "Your Name"
+```
+
+On PowerShell, set it first: `$env:DATABASE_URL="postgres://…"`. Everyone
+else is added from Administration → Users.
+
 ## Where things go
 
 | Path | What it's for |
