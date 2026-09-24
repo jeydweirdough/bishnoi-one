@@ -2,20 +2,44 @@
   "name": "pharmacy",
   "label": "Pharmacy",
   "icon": "pharmacy",
-  "what": "Prescriptions checked, and batches tracked.",
-  "state": "to-build",
+  "what": "Prescriptions checked and verified, then dispensed from the right batch.",
+  "state": "moved",
   "screens": [
-    "Rx to check",
-    "Batches",
-    "Expiring soon"
+    "Dashboard",
+    "Prescriptions",
+    "Dispensing",
+    "Sales",
+    "Patients & customers",
+    "Medicines",
+    "Batch & expiry",
+    "Stock",
+    "Suppliers",
+    "Reports",
+    "Administration"
   ],
   "owns": [
-    "prescription checks (who checked, when, what they found)",
-    "batches (lot, made, expires, quantity)"
+    "nbph_roles",
+    "nbph_role_permissions",
+    "nbph_users",
+    "nbph_sessions",
+    "nbph_audit_log",
+    "nbph_counters",
+    "nbph_categories",
+    "nbph_brands",
+    "nbph_medicines",
+    "nbph_suppliers",
+    "nbph_receivings",
+    "nbph_batches",
+    "nbph_stock_movements",
+    "nbph_patients",
+    "nbph_prescriptions",
+    "nbph_prescription_items",
+    "nbph_dispensings",
+    "nbph_dispensing_lines",
+    "nbph_sales",
+    "nbph_sale_lines",
+    "nbph_returns"
   ],
-  "asks": {
-    "crm": "which quotes carry an Rx?",
-    "inventory": "which product is this a batch of?"
-  },
-  "api": "shared"
+  "asks": {},
+  "api": "own"
 }

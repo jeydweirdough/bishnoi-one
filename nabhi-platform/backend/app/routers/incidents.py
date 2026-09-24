@@ -196,8 +196,10 @@ def update_incident(incident_id: str, body: IncidentPatch, db: DB, me: CurrentUs
     _check_links(db, fields)
     touched = set()
     if "company_ids" in fields:
-        _set_companies(db, i.id, fields.pop("company_ids") or [])
-        touched.add("company_ids")
+        wanted = set(fields.pop("company_ids") or [])
+        if wanted != set(db.scalars(select(IncidentCompany.company_id).where(IncidentCompany.incident_id == i.id))):
+            _set_companies(db, i.id, list(wanted))
+            touched.add("company_ids")
     fields = {k: v for k, v in fields.items() if getattr(i, k) != v}
     for name, value in fields.items():
         setattr(i, name, value)

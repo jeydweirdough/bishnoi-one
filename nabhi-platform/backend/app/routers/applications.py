@@ -12,7 +12,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Response, status
 from pydantic import Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app import monitor, platform_settings
@@ -355,6 +355,7 @@ def update_integration(integration_id: str, body: IntegrationPatch, db: DB, me: 
 def delete_integration(integration_id: str, db: DB, me: AdminUser) -> Response:
     i = _integration(db, integration_id)
     audit(db, me, "integration.deleted", target=i.name, target_type="integration", target_id=i.id, application_id=i.application_id)
+    db.execute(delete(HealthCheck).where(HealthCheck.target_kind == "integration", HealthCheck.target_id == i.id))
     db.delete(i)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

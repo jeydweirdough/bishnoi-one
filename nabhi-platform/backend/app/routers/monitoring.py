@@ -105,7 +105,8 @@ def traffic_view(request: Request, db: DB, _: CurrentUser, hours: int = 6) -> di
     bars: dict[datetime, dict] = {}
     for r in rows:
         minute = as_utc(r.minute)
-        start = minute - timedelta(minutes=(minute.hour * 60 + minute.minute) % step)
+        # Counted from the epoch, so bars are the same length across midnight.
+        start = minute - timedelta(minutes=int(minute.timestamp() // 60) % step)
         b = bars.setdefault(start, {"at": iso(start), "requests": 0, "refused": 0, "failed": 0, "totalMs": 0})
         b["requests"] += r.requests
         b["refused"] += r.refused

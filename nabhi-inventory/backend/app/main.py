@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
+from app.first_admin import make_first_admin
 from app.migrate import upgrade
 from app.routers import adjustments, admin, auth, catalog, insight, orders, purchasing, stock, transfers, warehouses
 
@@ -33,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Nabhi Inventory API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    make_first_admin(app.state.sessions, settings)
 
     app.add_middleware(
         CORSMiddleware,

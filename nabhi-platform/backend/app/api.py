@@ -26,6 +26,9 @@ class Api(BaseModel):
 
 
 def field_error(field: str, message: str) -> HTTPException:
+    """A message for one field, named as the screens name it (camelCase)."""
+    if "_" in field:
+        field = to_camel(field)
     return HTTPException(
         status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", field], "msg": message}]
     )

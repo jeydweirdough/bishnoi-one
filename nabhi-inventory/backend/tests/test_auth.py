@@ -109,3 +109,21 @@ def test_demo_accounts_list_only_what_exists_here(client, app):
 def test_no_demo_accounts_in_production(tmp_path):
     with TestClient(create_app(settings_for(tmp_path, environment="production"))) as c:
         assert c.get("/auth/demo-accounts").status_code == 404
+
+
+def test_the_first_administrator_comes_from_the_settings(tmp_path):
+    """FIRST_ADMIN_*: made into an empty database, and only into an empty one."""
+    from pydantic import SecretStr
+
+    first = dict(first_admin_email="Boss@Example.com", first_admin_name="The Boss", first_admin_password=SecretStr("a long first password"))
+    settings = settings_for(tmp_path, **first)
+    app = create_app(settings)
+    with TestClient(app) as c:
+        r = c.post("/auth/login", json={"email": "boss@example.com", "password": "a long first password"})
+        assert r.status_code == 200
+        assert c.get("/auth/me", headers=bearer(r)).json()["role"]["name"] == "Administrator"
+    # A second start, with other settings: someone exists, so nothing is made.
+    create_app(settings.model_copy(update={"first_admin_email": "x@example.com", "first_admin_password": SecretStr("another long password")}))
+    with app.state.sessions() as db:
+        assert [u.email for u in db.query(User)] == ["boss@example.com"]
+    app.state.sessions.kw["bind"].dispose()

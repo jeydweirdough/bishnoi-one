@@ -1,10 +1,10 @@
-# Git guide — Pharmacy app (`orbit-pharmacy`)
+# Git guide — Pharmacy app (`nabhi-pharmacy`)
 
 How to clone, pull and push **just the Pharmacy app**. For the whole repo and how
 the branches fit together, see `README.md` at the top of the `main` branch:
 https://github.com/jeydweirdough/orbit/blob/main/README.md
 
-Branch: **`orbit-pharmacy`**. It holds only this app, at the top level:
+Branch: **`nabhi-pharmacy`**. It holds only this app, at the top level:
 
 ```
 frontend/     the screens (Next.js)
@@ -13,7 +13,7 @@ GIT-GUIDE.md  this guide
 ```
 
 The app stands on its own: its own screens, its own API, its own database.
-The same files live in the `orbit-pharmacy/` folder on `main`, and the two are kept
+The same files live in the `nabhi-pharmacy/` folder on `main`, and the two are kept
 in sync.
 
 ---
@@ -35,14 +35,14 @@ instead, and `git who` to check which account is active.
 ## 2. Clone
 
 ```
-git clone -b orbit-pharmacy --single-branch https://github.com/jeydweirdough/orbit.git orbit-pharmacy
-cd orbit-pharmacy
+git clone -b nabhi-pharmacy --single-branch https://github.com/jeydweirdough/orbit.git nabhi-pharmacy
+cd nabhi-pharmacy
 ```
 
 This downloads only the Pharmacy app, not the other apps.
 
 Want everything instead? Run `git clone https://github.com/jeydweirdough/orbit.git`
-and work in the `orbit-pharmacy/` folder on `main`. Sections 3–4 still apply, but your
+and work in the `nabhi-pharmacy/` folder on `main`. Sections 3–4 still apply, but your
 pushes go to `main`.
 
 ---
@@ -67,9 +67,20 @@ The app has **its own sign-in**: accounts live in its own database and sign in
 to this app only. There is no sign-up page. Make accounts with
 `uv run python -m app.tools.users` (see `backend/README.md`).
 
-**Screens** (`frontend/`): a placeholder, with no screens or `dev` script yet.
-See `frontend/README.md` for what it's meant to become. Port **4307** is
-reserved for it.
+For sample medicines, stock, patients and prescriptions in every state, run
+`uv run python -m app.tools.users demo` (development only; password `demo1234`).
+
+**Screens** (`frontend/`, Next.js), in a second terminal:
+
+```
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Opens on **http://localhost:4307**. `API_URL` in `.env.local` points at this
+app's API (port 8307).
 
 ---
 
@@ -90,7 +101,7 @@ git commit -m "Say what changed"
 git push
 ```
 
-`git push` sends your commits to the `orbit-pharmacy` branch on GitHub.
+`git push` sends your commits to the `nabhi-pharmacy` branch on GitHub.
 
 **Push rejected?** Someone pushed first. Pull their work, then push again:
 
@@ -109,7 +120,7 @@ markers in the listed files, then `git add .`, `git rebase --continue`,
 
 A GitHub action (**Sync branches**) runs by itself a minute after your push. It:
 
-- merges your pushes into the `orbit-pharmacy/` folder on `main`, and
+- merges your pushes into the `nabhi-pharmacy/` folder on `main`, and
 - brings any changes made on `main` back to this branch.
 
 After a sync, `git pull` gives you those changes. You don't need to do

@@ -28,7 +28,10 @@ export default async function PrescriptionPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const rx = await load<Prescription>(`/prescriptions/${enc(id)}`);
   const canCheck = may("prescriptions.verify");
-  const medicines = canCheck && rx.editable ? await load<Medicine[]>("/medicines?state=all") : [];
+  // The catalogue to match against, whenever the check can still change: a
+  // verified prescription can be sent back until something is dispensed on it.
+  const checkable = canCheck && rx.status !== "rejected" && rx.dispensed === "none";
+  const medicines = checkable ? await load<Medicine[]>("/medicines?state=all") : [];
   const patientAge = age(rx.patient.birthDate);
   const owed = rx.items.some((i) => i.remaining > 0);
 

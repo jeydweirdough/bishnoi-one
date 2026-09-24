@@ -55,6 +55,8 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
   const unmatched = rx.items.filter((i) => !matches[i.id]);
   const canVerify = open.length === 0 && unmatched.length === 0;
   const matchChanged = rx.items.some((i) => (i.medicine?.id ?? "") !== matches[i.id]);
+  // Already verified: it can be sent back (pending, clarification, rejected), not verified again.
+  const standing = rx.status === "verified" && verdict === "verified";
 
   function submit() {
     start(async () => {
@@ -88,7 +90,7 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
       className="space-y-6"
     >
       {/* Matching belongs to "Medicine name": what was written, and the catalogue medicine it is. */}
-      {!locked && (
+      {!locked && !standing && (
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-semibold text-ink">Match each medicine to the catalogue</legend>
           {rx.items.map((item, n) => (
@@ -119,7 +121,7 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
       <fieldset>
         <legend className="mb-2 flex w-full items-center justify-between gap-3 text-sm font-semibold text-ink">
           <span>Checks</span>
-          {!locked && (
+          {!locked && !standing && (
             <button
               type="button"
               className="text-meta font-semibold text-hema hover:underline"
@@ -132,12 +134,12 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
         <ul className="divide-y divide-rule rounded-[3px] border border-rule">
           {rx.checks.map((c) => (
             <li key={c.key} className="px-3 py-2.5">
-              <label className={`flex items-start gap-3 text-sm ${locked ? "" : "cursor-pointer"}`}>
+              <label className={`flex items-start gap-3 text-sm ${locked || standing ? "" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   className="mt-0.5 size-4 accent-[var(--color-hema)]"
                   checked={Boolean(ticks[c.key])}
-                  disabled={locked}
+                  disabled={locked || standing}
                   onChange={(e) => setTicks({ ...ticks, [c.key]: e.target.checked })}
                 />
                 <span className="min-w-0 flex-1">
@@ -169,13 +171,18 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
             onChange={setVerdict}
             options={VERDICTS.map((v) => ({ ...v, label: v.label }))}
           />
-          {verdict === "verified" && !canVerify && (
+          {standing && (
+            <p className="text-meta text-ink-2">
+              Verified. To change anything before it&apos;s dispensed, send it back: pick Pending, Needs clarification or Rejected.
+            </p>
+          )}
+          {verdict === "verified" && !standing && !canVerify && (
             <p className="text-meta text-ink-2">
               {unmatched.length > 0 ? `Match ${unmatched.length === 1 ? "the medicine" : `all ${rx.items.length} medicines`} and ` : ""}
               {open.length > 0 ? `tick the ${open.length} open check${open.length === 1 ? "" : "s"}` : "save"} to verify.
             </p>
           )}
-          {verdict === "verified" && canVerify && blocked && (
+          {verdict === "verified" && !standing && canVerify && blocked && (
             <p className="text-meta text-ink-2">A red flag above stops verification. Hold it for clarification instead.</p>
           )}
           <Field
@@ -191,10 +198,10 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
             type="submit"
             variant={verdict === "rejected" ? "danger" : "primary"}
             loading={pending}
-            disabled={verdict === "verified" && (!canVerify || blocked)}
+            disabled={standing || (verdict === "verified" && (!canVerify || blocked))}
             icon={verdict === "verified" ? <CheckCheck className="size-4" aria-hidden /> : undefined}
           >
-            {SUBMIT[verdict]}
+            {standing ? "Verified" : rx.status === "verified" && verdict !== "rejected" ? "Send back for checking" : SUBMIT[verdict]}
           </Button>
         </fieldset>
       )}
