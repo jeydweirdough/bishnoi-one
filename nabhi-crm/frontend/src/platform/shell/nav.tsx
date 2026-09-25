@@ -52,43 +52,67 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 /** Above every company, so not a company's to grant. */
 const develops = (me: Me) => me.isDeveloperAdmin;
 
-/** The CRM's own pages. Each shows only for a role that may open it. Six at
- *  most: each is a place, and what belongs to a place is a tab inside it. */
-function crmPages(me: Me): Page[] {
+type CrmPage = Page & { exact?: boolean };
+
+/** The CRM's own pages, in groups by what they're for, as Inventory's are.
+ *  Each shows only for a role that may open it (the same gate as the page
+ *  and the API); what belongs to a place (a customer's contacts, a product's
+ *  prices) is a tab inside it rather than another row here.
+ *
+ *  Two kinds of person see less than their permissions reach, on purpose:
+ *  - the Administrator runs the CRM rather than working its customers: a
+ *    dashboard, not the customer lists;
+ *  - a field agent's customers are their doctors: Doctors, not Customers. */
+function crmGroups(me: Me): { label: string; pages: CrmPage[] }[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
-  const fieldWork = { href: "/field", label: "Field work", icon: "goals" as const, also: ["/visits"] };
-  if (THIS_APP === "crm" && me.isOwner) {
-    return [
-      { href: "/", label: "Dashboard", icon: "overview" },
-      { href: "/products", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices"] },
-      fieldWork,
-    ];
-  }
-  // A field agent visits doctors and collects: their doctors, their visits.
-  if (THIS_APP === "crm" && may("visits.create") && !may("quotes.view") && !may("goals.view")) {
-    return [
-      { href: "/", label: "Home", icon: "home" },
-      { href: "/field/doctors", label: "Doctors", icon: "customers", also: ["/companies", "/contacts"] },
-      { href: "/visits", label: "Visits", icon: "visit" },
-      { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
-    ];
-  }
-  return [
-    // The CRM opens on Home; in the shell that screen is a page of its
-    // own, because the shell's own root is the dashboard.
-    { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" },
-    // Customers are companies and the contacts in them.
-    { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] },
-    ...(may("quotes.view") ? [{ href: "/quotes", label: "Quotes", icon: "quotes" as const }] : []),
-    // To do and history; follow-ups are its To do list now.
-    { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] },
-    { href: "/retention", label: "Retention", icon: "retention" },
-    ...(THIS_APP === "crm" && may("goals.view") ? [fieldWork] : []),
-    // Products, promos, bundles, and a team's own prices, as tabs.
-    ...(may("products.view") || may("products.prices")
-      ? [{ href: may("products.view") ? "/products" : "/prices", label: "Products", icon: "products" as const, also: ["/promos", "/bundles", "/prices", "/products"] }]
-      : []),
+  const only = (show: boolean, page: CrmPage) => (show ? [page] : []);
+  const admin = THIS_APP === "crm" && me.isOwner;
+  const agent = may("visits.create") && !may("quotes.view") && !may("goals.view");
+  const selling = !admin && !agent;
+  const groups = [
+    {
+      label: "CRM",
+      pages: [
+        admin
+          ? { href: "/", label: "Dashboard", icon: "overview" as const, exact: true }
+          : { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" as const, exact: true },
+        ...only(selling && may("customers.view"), { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] }),
+        ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
+        ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
+        ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
+      ],
+    },
+    {
+      label: "Field work",
+      pages: [
+        ...only(may("goals.view"), { href: "/field", label: "Team progress", icon: "goals", exact: true, also: ["/field/goals", "/field/balances"] }),
+        ...only(may("visits.view"), { href: "/field/doctors", label: "Doctors", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
+        ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
+        ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
+      ],
+    },
+    {
+      label: "Catalogue",
+      pages: [
+        ...only(may("products.view") || may("products.prices"), {
+          href: may("products.view") ? "/products" : "/prices",
+          label: "Products",
+          icon: "products",
+          also: ["/promos", "/bundles", "/prices", "/products"],
+        }),
+      ],
+    },
+    // The CRM's own Administration: its users, roles, teams and audit log.
+    { label: "Administration", pages: THIS_APP === "crm" ? adminPagesFor(me) : [] },
   ];
+  return groups.filter((g) => g.pages.length > 0);
+}
+
+/** A page with `exact` is current only on itself (and its `also`), not on
+ *  every address under it: Team progress (/field) isn't Doctors (/field/doctors). */
+function crmCurrent(page: CrmPage, pathname: string): boolean {
+  if (page.exact) return pathname === page.href || (page.also ?? []).some((a) => within(pathname, a));
+  return isCurrent(page, pathname, false);
 }
 
 function modulePages(m: ModuleAccess): Page[] {
@@ -546,29 +570,21 @@ function Links({ me }: { me: Me }) {
           </Row>
         </Group>
       )}
-      {/* The CRM, as one set of pages. No division rows under it:
-          a division is a property of a record, not a place, so these are the
-          same pages whether you sell in one of the seven or all of them. */}
-      {crm.length > 0 && isOurs("crm") && (
-        <Group label={appLabel("crm")}>
-          {crmPages(me).map((page) => (
-            <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)}>
-              {page.label}
-            </Row>
-          ))}
-        </Group>
-      )}
-      {/* The CRM's own Administration: its users, roles, teams and audit log,
-          each page only for a role that may open it. */}
-      {THIS_APP === "crm" && adminPagesFor(me).length > 0 && (
-        <Group label="Administration">
-          {adminPagesFor(me).map((page) => (
-            <Row key={page.href} href={page.href} icon={page.icon} current={within(pathname, page.href) || page.also.some((a) => within(pathname, a))}>
-              {page.label}
-            </Row>
-          ))}
-        </Group>
-      )}
+      {/* The CRM, in groups by purpose, each only with the pages this role
+          opens. No division rows: a division is a property of a record, not a
+          place, so these are the same pages whether you sell in one of the
+          seven divisions or all of them. */}
+      {crm.length > 0 &&
+        isOurs("crm") &&
+        crmGroups(me).map((g) => (
+          <Group key={g.label} label={g.label}>
+            {g.pages.map((page) => (
+              <Row key={page.href} href={page.href} icon={page.icon} current={crmCurrent(page, pathname)}>
+                {page.label}
+              </Row>
+            ))}
+          </Group>
+        ))}
       {departments.some(serves) && (
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
@@ -631,9 +647,12 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
-  if (THIS_APP === "crm" && within(pathname, "/admin")) {
-    const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
-    return page ? `Administration · ${page.label}` : "Administration";
+  if (THIS_APP === "crm") {
+    for (const g of crmGroups(me)) {
+      const page = g.pages.find((p) => crmCurrent(p, pathname));
+      if (page) return g.label === "CRM" ? page.label : `${g.label} · ${page.label}`;
+    }
+    if (within(pathname, "/admin")) return "Administration";
   }
   if (within(pathname, "/settings")) {
     const page = settingsFor(me).flatMap((g) => g.pages).find((p) => !isAway(p.href) && within(pathname, p.href));
@@ -649,7 +668,7 @@ function placeOf(pathname: string, me: Me): string | null {
     const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
-  return crmPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
+  return crmGroups(me).flatMap((g) => g.pages).find((p) => crmCurrent(p, pathname))?.label ?? null;
 }
 
 function Account({ me }: { me: Me }) {
