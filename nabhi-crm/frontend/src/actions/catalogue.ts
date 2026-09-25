@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { BundleRow, CatalogueProduct, PromoRow, SalesRules } from "@/src/platform/lib/types";
+import type { BundleRow, CatalogueProduct, InventoryLink, PromoRow, SalesRules } from "@/src/platform/lib/types";
 
 // The catalogue: products, promos, bundles and the pricing rules. The API
 // checks the person's role on every one of these and logs each change.
@@ -15,6 +15,7 @@ export type ProductInput = {
   strength: string | null;
   form: string | null;
   unit: string;
+  vatCategory?: "standard" | "zero_rated" | "exempt";
   isActive: boolean;
   /** price type code -> centavos; null clears that price. */
   prices: Record<string, number | null>;
@@ -30,6 +31,17 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
   });
 }
 
+export type Synced = { added: number; updated: number; switchedOff: number; total: number; inventory: InventoryLink };
+
+/** Bring the product list over from Inventory now. */
+export async function syncProducts(): Promise<Result<Synced>> {
+  return attempt(async () => {
+    const done = await api.post<Synced>("/products/sync", {});
+    refresh();
+    return done;
+  });
+}
+
 export async function deleteProduct(id: string): Promise<Result> {
   return attempt(async () => {
     await api.del(`/products/${enc(id)}`);
@@ -38,7 +50,7 @@ export async function deleteProduct(id: string): Promise<Result> {
   });
 }
 
-export type PromoInput = Omit<PromoRow, "id" | "state">;
+export type PromoInput = Omit<PromoRow, "id" | "state" | "teams">;
 
 export async function savePromo(id: string | null, input: PromoInput): Promise<Result<PromoRow>> {
   return attempt(async () => {
@@ -56,7 +68,7 @@ export async function deletePromo(id: string): Promise<Result> {
   });
 }
 
-export type BundleInput = Omit<BundleRow, "id" | "state">;
+export type BundleInput = Omit<BundleRow, "id" | "state" | "teams">;
 
 export async function saveBundle(id: string | null, input: BundleInput): Promise<Result<BundleRow>> {
   return attempt(async () => {

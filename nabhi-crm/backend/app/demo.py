@@ -138,3 +138,13 @@ DEMO_BUNDLES: tuple[tuple[str, str, int, bool, tuple[tuple[str, int], ...]], ...
     ("KIDS-KIT", "Pedia fever kit", 900, True, (("PCM-SYR", 4), ("ORS-SACH", 1))),
     ("MAINT-3", "Maintenance trio", 4200, False, (("MTF-500", 1), ("ALP-5", 1), ("OMP-20", 1))),
 )
+
+# The divisions each demo promo (by name) and bundle (by code) is for. A B2C
+# promo is B2C's alone: B2B, HOS and the rest never see it.
+DEMO_DIVISIONS: dict[str, tuple[str, ...]] = {
+    "Flu season 10% off": ("B2C", "B&B"),
+    "Buy 10, get 1": ("HOS",),
+    "Volume discount": ("B2B", "BID"),
+    "KIDS-KIT": ("B2C",),
+    "MAINT-3": ("B2B", "HOS"),
+}

@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API directly. None by default.
     cors_origins: list[str] = []
 
+    # Other Nabhi apps allowed to read the catalogue and stock levels (the
+    # /integration endpoints), as name:key pairs in JSON, e.g.
+    # ["crm:<a long random key>"]. The app sends its key in X-Nabhi-Key. Empty:
+    # nothing outside can read them.
+    integration_keys: list[SecretStr] = []
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
@@ -57,6 +63,10 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        for key in self.integration_keys:
+            name, _, secret = key.get_secret_value().partition(":")
+            if not name or len(secret) < 24:
+                raise ValueError("INTEGRATION_KEYS must list name:key pairs, each key at least 24 characters.")
         if self.expiry_warning_days < 1 or self.dead_stock_days < 1:
             raise ValueError("EXPIRY_WARNING_DAYS and DEAD_STOCK_DAYS must be at least 1.")
         return self

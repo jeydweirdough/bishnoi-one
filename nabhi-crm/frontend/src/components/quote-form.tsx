@@ -9,7 +9,10 @@ import { Field, FileInput, FormError, Input, Select, Textarea } from "@/src/plat
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { promoTerms } from "@/src/platform/lib/labels";
-import type { CustomField, Org, PriceList, QuotePreview } from "@/src/platform/lib/types";
+import type { CustomField, Org, PriceList, QuotePreview, StockAnswer } from "@/src/platform/lib/types";
+import { Flag } from "@/src/platform/ui/marks";
+import { TaxSummary } from "./tax-summary";
+import { StockBadge } from "./catalogue/stock";
 import { ExtraFields, extraChanges, toDraft, type ExtraDraft } from "./extra/extra-fields";
 import { FormEntityProvider, useCan } from "./quick-add/can";
 import { AddIssuer, AddProduct } from "./quick-add/forms";
@@ -88,7 +91,20 @@ function discountOf(fmt: Format, l: LineDraft): ManualDiscount {
   return value ? { kind: l.discountKind, value } : null;
 }
 
-export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: QuoteFor; priceList: PriceList; org: Org; fields?: CustomField[] }) {
+export function QuoteForm({
+  to,
+  priceList,
+  org,
+  fields: custom = [],
+  stock = null,
+}: {
+  to: QuoteFor;
+  priceList: PriceList;
+  org: Org;
+  fields?: CustomField[];
+  /** How much Inventory has of each product, by code, as the page opened. */
+  stock?: StockAnswer | null;
+}) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const can = useCan();
@@ -227,6 +243,30 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
         // is what the whole set comes to.
         (preview?.lines.filter((x) => x.bundleId === l.bundleId) ?? [])
       : (preview?.lines.filter((x) => x.productId === l.productId && !x.bundleId) ?? []);
+  const levelOf = (productId: string) => {
+    const code = priceList.products.find((p) => p.id === productId)?.code;
+    return stock?.linked && code ? stock.items[code] : undefined;
+  };
+  /** More asked for than Inventory has available: said, never blocked (more may come in before it ships). */
+  const shortOf = (l: LineDraft): string | null => {
+    const qty = /^\d+$/.test(l.quantity.trim()) ? Number(l.quantity) : 0;
+    if (!stock?.linked || qty < 1) return null;
+    const wants = l.bundleId
+      ? (priceList.bundles.find((b) => b.id === l.bundleId)?.items ?? []).map((i) => ({ id: i.productId, qty: i.qty * qty }))
+      : l.productId
+        ? [{ id: l.productId, qty }]
+        : [];
+    for (const w of wants) {
+      const level = levelOf(w.id);
+      if (level?.state && w.qty > level.available) {
+        const name = priceList.products.find((p) => p.id === w.id)?.name ?? "a product";
+        return level.available > 0
+          ? `Only ${level.available.toLocaleString()} of ${l.bundleId ? name : "these"} available now${level.inTransit ? `, ${level.inTransit.toLocaleString()} on the way` : ""}.`
+          : `${l.bundleId ? name : "It"} is out of stock${level.inTransit ? `: ${level.inTransit.toLocaleString()} on the way` : ""}.`;
+      }
+    }
+    return null;
+  };
   const lineTotal = (rows: QuotePreview["lines"]) => (rows.length ? rows.reduce((sum, r) => sum + r.totalCentavos, 0) : null);
   // A bundle is only offerable when every product in it can be priced this way.
   const bundlesFor = (code: string | undefined) =>
@@ -309,6 +349,7 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
                       <option key={p.id} value={p.id}>
                         {p.name} · {p.unit}
                         {!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}
+                        {levelOf(p.id)?.state === "out" ? " · out of stock" : ""}
                       </option>
                     ))}
                     {offeredBundles.length > 0 && (
@@ -322,6 +363,16 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
                     )}
                   </select>
                   {product?.genericName && <p className="mt-0.5 text-meta text-ink-3">{product.genericName}</p>}
+                  {product && stock?.linked && !stock.error && (
+                    <p className="mt-1">
+                      <StockBadge level={levelOf(product.id)} />
+                    </p>
+                  )}
+                  {shortOf(l) && (
+                    <p className="mt-1 text-meta text-due-today" role="status">
+                      {shortOf(l)} The quote can still be made.
+                    </p>
+                  )}
                   {bundle && (
                     <p className="mt-0.5 text-meta text-ink-3">
                       {bundle.items
@@ -471,7 +522,7 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
           </Button>
         )}
         {/* Not in the catalogue yet: made here, priced for this quote, and put on a line. */}
-        {can("products.create") && draft.lines.length < 50 && (
+        {can("products.create") && !stock?.linked && draft.lines.length < 50 && (
           <div className="-mt-1">
             <QuickAdd label="New product, not in the list yet" title="New product">
               {(done) => (
@@ -510,6 +561,25 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
               <p className="flex justify-between text-ink-2">
                 <span>Extra discounts</span>
                 <span className="tabular-nums">−{fmt.peso(preview.discountCentavos)}</span>
+              </p>
+            )}
+            {!!preview.volumeDiscountCentavos && (
+              <p className="flex justify-between text-ink-2">
+                <span>Volume discounts</span>
+                <span className="tabular-nums">−{fmt.peso(preview.volumeDiscountCentavos)}</span>
+              </p>
+            )}
+            {!!preview.surchargeCentavos && (
+              <p className="flex justify-between text-ink-2">
+                <span>Surcharges</span>
+                <span className="tabular-nums">+{fmt.peso(preview.surchargeCentavos)}</span>
+              </p>
+            )}
+            {preview.priceGroup && <p className="text-right text-meta text-ink-3">{preview.priceGroup.name} prices</p>}
+            {preview.tax && <TaxSummary tax={preview.tax} fmt={fmt} />}
+            {preview.taxError && (
+              <p className="mt-2">
+                <Flag letter="!">{preview.taxError}</Flag>
               </p>
             )}
           </>
@@ -591,7 +661,8 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
       <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
         <div className="min-w-0">
           <p className="text-meta text-ink-3">Total</p>
-          <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.totalCentavos) : "—"}</p>
+          <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.tax?.totalDueCentavos ?? preview.totalCentavos) : "—"}</p>
+          {preview?.tax && <p className="text-meta text-ink-3">Amount due, with tax from Finance</p>}
           {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes to your team lead for approval</p>}
         </div>
         <Button type="submit" variant="primary" loading={saving} className="!h-10 !px-6">

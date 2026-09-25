@@ -23,10 +23,12 @@ The rest of this page walks through them.
 3. [Clone: download the code](#3-clone-download-the-code)
 4. [Pull and push: everyday work](#4-pull-and-push-everyday-work)
 5. [Run an app](#5-run-an-app)
-6. [Add a new app](#6-add-a-new-app)
-7. [What happens after you push](#7-what-happens-after-you-push)
-8. [Rules](#8-rules)
-9. [Cheat sheet](#9-cheat-sheet)
+6. [Settings (`.env`) for every app](#6-settings-env-for-every-app)
+7. [Benchmarks: what we build to](#7-benchmarks-what-we-build-to)
+6. [Add a new app](#8-add-a-new-app)
+7. [What happens after you push](#9-what-happens-after-you-push)
+8. [Rules](#10-rules)
+9. [Cheat sheet](#11-cheat-sheet)
 
 ---
 
@@ -61,7 +63,7 @@ nabhi/
 
 An app branch holds the same files as that app's folder on `main`. You can
 work on either one; GitHub keeps them matched for you
-([section 7](#7-what-happens-after-you-push)).
+([section 9](#9-what-happens-after-you-push)).
 
 ---
 
@@ -123,7 +125,7 @@ and `backend/` right at the top.
 
 ### Option B: Everything
 
-Use this if you work across several apps, or to [add a new app](#6-add-a-new-app):
+Use this if you work across several apps, or to [add a new app](#8-add-a-new-app):
 
 ```
 git clone https://github.com/jeydweirdough/nabhi.git
@@ -142,7 +144,8 @@ example files instead. Copy them once per app:
 | `backend/.env.example` | `backend/.env` |
 | `frontend/.env.example` | `frontend/.env.local` |
 
-You're ready. See [Run an app](#5-run-an-app).
+What each setting means, and a complete file for every app, is in
+[section 6](#6-settings-env-for-every-app). You're ready. See [Run an app](#5-run-an-app).
 
 ---
 
@@ -192,7 +195,7 @@ git push
 ```
 
 That's it. Your work is on GitHub, and the other branch gets it too
-(see [section 7](#7-what-happens-after-you-push)).
+(see [section 9](#9-what-happens-after-you-push)).
 
 ### If `git push` is rejected
 
@@ -260,7 +263,8 @@ Then open the screens in your browser:
 | Finance | http://localhost:4303 | http://127.0.0.1:8303 |
 | Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
-| Licensing, Pharmacy, Regulatory | (not built) | 8306, 8307, 8308 |
+| Pharmacy | http://localhost:4307 | http://127.0.0.1:8307 |
+| In-Licensing, Regulatory | (not built) | 8306, 8308 |
 
 ### Your first account
 
@@ -276,7 +280,8 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
 ### Good to know
 
 - The database is set by `DATABASE_URL` in `backend/.env`. By default it's a
-  local SQLite file in `backend/.data/`.
+  local SQLite file in `backend/.data/`. Every setting is in
+  [section 6](#6-settings-env-for-every-app).
 - Every API has interactive docs at `/docs`
   (e.g. http://127.0.0.1:8302/docs).
 - Run an API's tests with `uv run pytest` in its `backend/` folder.
@@ -324,19 +329,28 @@ FIRST_ADMIN_PASSWORD=<at least 8 characters>
 
 ```
 API_URL=https://<this app's API address>.vercel.app
-NEXT_PUBLIC_NABHI_APP=<the app's key, below>
+NEXT_PUBLIC_NABHI_CRM_URL=https://<the CRM's screens address>.vercel.app
+NEXT_PUBLIC_NABHI_INVENTORY_URL=https://<Inventory's screens address>.vercel.app
 ```
 
-- `NEXT_PUBLIC_NABHI_APP` is read when the screens are built: redeploy after
-  you set or change it.
+- Add one `NEXT_PUBLIC_NABHI_<APP>_URL` for each other app you've put
+  online, so the sidebar's links between apps go to the right place
+  ([section 6](#screens-settings-every-app)). These are read when the
+  screens are built: redeploy after you set or change one.
+- Each app already knows which app it is: `NEXT_PUBLIC_NABHI_APP` isn't
+  needed.
 - Don't set `SHOW_DEMO_ACCOUNTS` online.
 
-| App | API root directory | Screens root directory | `NEXT_PUBLIC_NABHI_APP` |
-|---|---|---|---|
-| CRM | `nabhi-crm/backend` | `nabhi-crm/frontend` | `crm` |
-| Inventory | `nabhi-inventory/backend` | `nabhi-inventory/frontend` | `inventory` |
-| Pharmacy | `nabhi-pharmacy/backend` | `nabhi-pharmacy/frontend` | `pharmacy` |
-| Platform | `nabhi-platform/backend` | `nabhi-platform/frontend` | `platform` |
+**Linked apps:** the CRM's API also needs `INVENTORY_API_URL`/`KEY` and
+`FINANCE_API_URL`/`KEY` for the apps it uses, and each of those APIs needs
+the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
+
+| App | API root directory | Screens root directory |
+|---|---|---|
+| CRM | `nabhi-crm/backend` | `nabhi-crm/frontend` |
+| Inventory | `nabhi-inventory/backend` | `nabhi-inventory/frontend` |
+| Pharmacy | `nabhi-pharmacy/backend` | `nabhi-pharmacy/frontend` |
+| Platform | `nabhi-platform/backend` | `nabhi-platform/frontend` |
 
 Use the addresses Vercel actually gives your projects (e.g.
 `nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
@@ -348,7 +362,422 @@ full error is in the project's logs.
 
 ---
 
-## 6. Add a new app
+## 6. Settings (`.env`) for every app
+
+Each app reads its settings from two files. Git never stores them:
+
+| File | Read by | Starts from |
+|---|---|---|
+| `backend/.env` | the API | `backend/.env.example` |
+| `frontend/.env.local` | the screens | `frontend/.env.example` |
+
+On your computer, **every setting has a default that works**, so the
+copied example files are enough to run an app. Change a setting only when
+you need what it does. Online (Vercel), set the same names under
+**Settings → Environment Variables**
+([Put an app online](#put-an-app-online-vercel)).
+
+Lists are written as JSON: `["a", "b"]`. Restart the API (or `npm run dev`)
+after you change a file.
+
+### Backend settings every app has
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ENVIRONMENT` | `development` | Set `production` online. Production hides the API docs (`/docs`) and turns off demo accounts. |
+| `DATABASE_URL` | `sqlite:///.data/<app>.db` | The app's database. A local SQLite file by default; a `postgresql://…` address for Postgres (Supabase, Neon). Apps may share one database: each app's tables have its own prefix ([below](#table-prefixes)). |
+| `SESSION_HOURS` | `10` | How long a sign-in lasts. |
+| `LOGIN_ATTEMPTS` | `5` | Wrong passwords in a row before an account is locked for a while. |
+| `LOGIN_LOCKOUT_MINUTES` | `15` | How long that lock lasts. |
+| `ORG_NAME` | `Nabhi` | The company name the screens show. |
+| `ORG_CURRENCY` | `PHP` | The currency amounts are shown in. |
+| `ORG_MINOR_UNITS` | `2` | Decimal places of that currency (centavos). |
+| `ORG_LOCALE` | `en-PH` | How numbers and dates are written. |
+| `ORG_TIMEZONE` | `Asia/Manila` | The company's time zone: what counts as "today". |
+| `ALLOWED_HOSTS` | `["localhost", "127.0.0.1"]` | Addresses the API answers to. Online: its own Vercel address. |
+| `CORS_ORIGINS` | `[]` | Browser addresses allowed to call the API directly. Leave it empty: the screens' server calls the API, not the browser. |
+
+### Backend settings only some apps have
+
+| App | Setting | Default | What it does |
+|---|---|---|---|
+| CRM, Inventory, Pharmacy, Platform | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | not set | Makes the first administrator on start, **only** while the app has no accounts. For hosts where you can't run the users tool (Vercel). Remove the password after you've signed in. |
+| Inventory, Pharmacy | `EXPIRY_WARNING_DAYS` | `90` | A batch expiring within this many days is flagged "expiring soon". |
+| Inventory | `DEAD_STOCK_DAYS` | `180` | Stock with nothing issued or moved out for this long counts as dead stock. |
+| Pharmacy | `PRESCRIPTION_VALID_DAYS` | `180` | A prescription older than this can't be verified. |
+| CRM | `INVENTORY_API_URL`, `INVENTORY_API_KEY` | not set | Links the CRM to Inventory: the product list and stock levels come from there. Not set: products are added and priced in the CRM by hand. |
+| CRM | `INVENTORY_APP_URL` | not set | Inventory's screens, for the "Add it in Inventory" link on Products. |
+| CRM | `FINANCE_API_URL`, `FINANCE_API_KEY` | not set | Links the CRM to Finance, which works out tax as the last step of the price rules. Not set: quotes are priced without tax. |
+| Inventory, Finance | `INTEGRATION_KEYS` | `[]` | Which other apps may call this one, as `name:key` pairs. See [Linking apps](#linking-apps). |
+
+### Linking apps
+
+Some apps ask others for data: the CRM asks **Inventory** for products and
+stock, and **Finance** for tax. The app being asked lists a key for each
+caller, and the caller sends that key with every request.
+
+1. Make a key (at least 24 characters):
+
+   ```
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+2. In the app **being asked**, list it under the caller's name:
+
+   ```
+   INTEGRATION_KEYS=["crm:<the key>"]
+   ```
+
+3. In the **caller**, set the other app's API address and the same key:
+
+   ```
+   FINANCE_API_URL=http://127.0.0.1:8303
+   FINANCE_API_KEY=<the key>
+   ```
+
+Use a different key for each link: one for CRM → Inventory, another for
+CRM → Finance. Restart both APIs. If the key is missing or doesn't match,
+the CRM tells its users the other app can't be reached; nothing breaks.
+
+### Screens settings (every app)
+
+| Setting | Default | What it does |
+|---|---|---|
+| `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
+| `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
+| `NEXT_PUBLIC_NABHI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
+| `NEXT_PUBLIC_NABHI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |
+
+The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
+`PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
+`NEXT_PUBLIC_NABHI_FINANCE_URL=https://nabhi-finance.vercel.app`.
+`NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
+change one.
+
+### Complete files, app by app
+
+Ready to copy for your computer. Lines starting with `#` are optional:
+remove the `#` to use one.
+
+<details>
+<summary><b>Admin</b> (screens :4300, API :8300)</summary>
+
+`nabhi-admin/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/admin.db
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+```
+
+`nabhi-admin/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8300
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=exec
+```
+
+</details>
+
+<details>
+<summary><b>CRM</b> (screens :4302, API :8302)</summary>
+
+`nabhi-crm/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/crm.db
+# FIRST_ADMIN_EMAIL=you@example.com
+# FIRST_ADMIN_NAME=Your Name
+# FIRST_ADMIN_PASSWORD=
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+
+# Products and stock from Inventory (the key is "crm:<key>" in Inventory's INTEGRATION_KEYS)
+# INVENTORY_API_URL=http://127.0.0.1:8304
+# INVENTORY_API_KEY=
+# INVENTORY_APP_URL=http://localhost:4304
+
+# Tax from Finance (the key is "crm:<key>" in Finance's INTEGRATION_KEYS)
+# FINANCE_API_URL=http://127.0.0.1:8303
+# FINANCE_API_KEY=
+```
+
+`nabhi-crm/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8302
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=crm
+```
+
+</details>
+
+<details>
+<summary><b>Finance</b> (screens :4303, API :8303)</summary>
+
+`nabhi-finance/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/finance.db
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+
+# Apps allowed to ask Finance for tax
+# INTEGRATION_KEYS=["crm:<the CRM's FINANCE_API_KEY>"]
+```
+
+`nabhi-finance/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8303
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=finance
+```
+
+</details>
+
+<details>
+<summary><b>Inventory</b> (screens :4304, API :8304)</summary>
+
+`nabhi-inventory/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/inventory.db
+# FIRST_ADMIN_EMAIL=you@example.com
+# FIRST_ADMIN_NAME=Your Name
+# FIRST_ADMIN_PASSWORD=
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# EXPIRY_WARNING_DAYS=90
+# DEAD_STOCK_DAYS=180
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+
+# Apps allowed to read products and stock
+# INTEGRATION_KEYS=["crm:<the CRM's INVENTORY_API_KEY>"]
+```
+
+`nabhi-inventory/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8304
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=inventory
+```
+
+</details>
+
+<details>
+<summary><b>Platform</b> (screens :4305, API :8305)</summary>
+
+`nabhi-platform/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/platform.db
+# FIRST_ADMIN_EMAIL=you@example.com
+# FIRST_ADMIN_NAME=Your Name
+# FIRST_ADMIN_PASSWORD=
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+```
+
+The sign-in settings are only where Platform starts: after that, **Settings →
+Security** in the app changes them.
+
+`nabhi-platform/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8305
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=platform
+```
+
+</details>
+
+<details>
+<summary><b>Pharmacy</b> (screens :4307, API :8307)</summary>
+
+`nabhi-pharmacy/backend/.env`
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/pharmacy.db
+# FIRST_ADMIN_EMAIL=you@example.com
+# FIRST_ADMIN_NAME=Your Name
+# FIRST_ADMIN_PASSWORD=
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# EXPIRY_WARNING_DAYS=90
+# PRESCRIPTION_VALID_DAYS=180
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+```
+
+`nabhi-pharmacy/frontend/.env.local`
+
+```
+API_URL=http://127.0.0.1:8307
+SHOW_DEMO_ACCOUNTS=1
+# NEXT_PUBLIC_NABHI_APP=pharmacy
+```
+
+</details>
+
+<details>
+<summary><b>In-Licensing</b> (API :8306) and <b>Regulatory</b> (API :8308)</summary>
+
+Only the API exists so far. Their screens have no settings yet.
+
+`nabhi-in-licensing/backend/.env` (for Regulatory, use
+`sqlite:///.data/regulatory.db`)
+
+```
+ENVIRONMENT=development
+# DATABASE_URL=sqlite:///.data/licensing.db
+# SESSION_HOURS=10
+# LOGIN_ATTEMPTS=5
+# LOGIN_LOCKOUT_MINUTES=15
+# ORG_NAME=Nabhi
+# ORG_CURRENCY=PHP
+# ORG_MINOR_UNITS=2
+# ORG_LOCALE=en-PH
+# ORG_TIMEZONE=Asia/Manila
+# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
+# CORS_ORIGINS=[]
+```
+
+</details>
+
+### Table prefixes
+
+Every table name starts with its app's prefix, so all the apps can share one
+database without clashing:
+
+| App | Prefix | | App | Prefix |
+|---|---|---|---|---|
+| Admin | `nbad_` | | Inventory | `nbin_` |
+| CRM | `nbcm_` | | Platform | `nbpl_` |
+| Finance | `nbfi_` | | Pharmacy | `nbph_` |
+| In-Licensing | `nbil_` | | Regulatory | `nbrg_` |
+
+---
+
+## 7. Benchmarks: what we build to
+
+Every app is built and reviewed against the [`benchmarks/`](benchmarks/README.md)
+folder. It says, feature by feature, **which product does it best**, where
+each of our apps stands today, and what we decided to do about it.
+
+### The five benchmarks
+
+Nabhi is built for **pharma distribution** first. Each benchmark is the
+reference for what it does best:
+
+| Benchmark | The reference for |
+|---|---|
+| **Salesforce** | Custom fields, layouts, sharing, validation, reporting, the sales pipeline |
+| **SAP** | Master data and pricing: one party with roles, condition-based pricing, dated org structures |
+| **Odoo** | The closest match to how we're built: one timeline per record, one filter shown as table, board or chart; tax set per country |
+| **Marg ERP** | Pharma distribution: keyboard entry, batches and expiry, trade schemes, receivables |
+| **Veeva** | Pharma field work: structured doctor visits, call plans, offline, records locked once submitted |
+
+### The files
+
+| File | What it's for |
+|---|---|
+| [benchmark-matrix.md](benchmarks/benchmark-matrix.md) | **The benchmark.** One row per capability: the reference product, "Ours today" per app, and the decision |
+| [patterns-to-adopt.md](benchmarks/patterns-to-adopt.md) | Patterns every app is built to, whichever app it is |
+| [decisions.md](benchmarks/decisions.md) | The product decisions the rows depend on |
+| [best-of-breed.md](benchmarks/best-of-breed.md) | Notes on what each benchmark does, and why it matters to us |
+
+Each row's decision is **ADOPT** (build it the benchmark's way), **ADAPT**
+(our own version; the row says why), **HAVE** (we already do it well
+enough), **SKIP** (not for us), or **open** (not decided yet: get the
+decision before building it).
+
+### Decided so far (2026-09-25)
+
+| Question | Decided |
+|---|---|
+| Who we mainly build for | **Pharma distribution** |
+| Country and tax | **Several countries**: a tax engine with a pack per country. **The Philippines first** (VAT, BIR invoices). |
+| Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Nabhi Orders**, outside this repo. |
+| Leads and the pipeline | **Deals on customers**: a stage, an expected value, a forecast category. No separate lead record. |
+| Working without signal | **Offline visits and collections** on the phone, synced when there's signal. |
+
+### Where the build is
+
+| Step | Status |
+|---|---|
+| 1. Tax engine with the Philippines pack (Finance → **Tax**) | Done |
+| 2. Price rules in the CRM (**Settings → Price rules**), tax from Finance | Done |
+| 3. Invoices, payments and receivables ageing (Finance) | Next |
+| 4. Deals (CRM) and offline visits and collections | Can be built alongside |
+
+### How to use it
+
+1. **Before you build a feature**, find its row in
+   [benchmark-matrix.md](benchmarks/benchmark-matrix.md). If it's `open`,
+   get the decision first. If it's ADOPT or ADAPT, build it to the reference
+   and to [patterns-to-adopt.md](benchmarks/patterns-to-adopt.md).
+2. **When you finish**, update the row's "Ours today" for your app in the
+   same pull request.
+3. **No row for it?** Add one, with its reference product and "Ours today",
+   and leave the decision `open`.
+
+---
+
+## 8. Add a new app
 
 A new app goes in through a **pull request**. You propose it, and GitHub
 checks it. The repo owner then reviews and merges it, and your app gets its
@@ -419,7 +848,7 @@ git clone -b nabhi-hr --single-branch https://github.com/jeydweirdough/nabhi.git
 
 ---
 
-## 7. What happens after you push
+## 9. What happens after you push
 
 **Nothing for you to do.** About a minute after any push to `main` or to an
 app branch, GitHub's **Sync branches** action runs:
@@ -437,7 +866,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 
 ---
 
-## 8. Rules
+## 10. Rules
 
 1. **Pull before you start, and pull before you push.**
 2. **Never force-push** (`git push --force`). It deletes other people's work.
@@ -450,10 +879,14 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
    `add-app/…` or `feature/…` branch are fine.)
 5. **Don't create branches that start with `nabhi-`.** Those are the app
    branches, and the sync manages them.
+6. **Build features to the benchmark.** Every app is measured against
+   [`benchmarks/`](benchmarks/README.md) ([section 7](#7-benchmarks-what-we-build-to)): find the feature's row in
+   `benchmark-matrix.md` before you build it, follow `patterns-to-adopt.md`,
+   and update the row's "Ours today" in the same pull request.
 
 ---
 
-## 9. Cheat sheet
+## 11. Cheat sheet
 
 | I want to… | Command |
 |---|---|
@@ -468,7 +901,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` |
-| Start a new app | `git switch -c add-app/<name>`, then [section 6](#6-add-a-new-app) |
+| Start a new app | `git switch -c add-app/<name>`, then [section 8](#8-add-a-new-app) |
 
 ---
 

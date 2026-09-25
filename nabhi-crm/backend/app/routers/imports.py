@@ -32,8 +32,9 @@ from sqlalchemy.orm import Session
 from app.access import Access, CurrentAccess, keep_an_administrator
 from app.api import EMAIL, Api
 from app.audit import audit
-from app.deps import DB, CurrentUser
+from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import _value, fields_for
+from app.inventory import SRP
 from app.models import Balance, Company, PriceType, Product, ProductPrice, Role, Team, User
 from app.permissions import SALESPERSON
 from app.security import check_password_rules, hash_password
@@ -193,7 +194,9 @@ def yes_no(text: str) -> bool:
     raise ValueError(f"{text!r}: write yes or no.")
 
 
-def import_products(db: Session, me: User, body: ImportIn, get) -> tuple[int, int, list[dict]]:
+def import_products(db: Session, me: User, body: ImportIn, get, linked: bool = False) -> tuple[int, int, list[dict]]:
+    """linked: the product list comes from Inventory, so new products and
+    changes to what's Inventory's (name, unit, on sale, SRP) are made there."""
     added = {f.key: f for f in fields_for(db, "product", added_only=True, shown_only=True)}
     existing = {p.code.upper(): p for p in db.scalars(select(Product))}
     seen: set[str] = set()
@@ -214,6 +217,8 @@ def import_products(db: Session, me: User, body: ImportIn, get) -> tuple[int, in
             if code in seen:
                 raise ValueError(f"Code {code} is on another row of this file too.")
             product = existing.get(code)
+            if product is None and linked:
+                raise ValueError(f"Code {code} isn't in Inventory: products are added there.")
             if product is None:
                 for key, label in (("name", "name"), ("unit", "unit (what it's sold by)")):
                     if not v(key):
@@ -221,6 +226,16 @@ def import_products(db: Session, me: User, body: ImportIn, get) -> tuple[int, in
             texts = {attr: v(key)[:160] for key, attr in (("name", "name"), ("genericName", "generic_name"), ("strength", "strength"), ("form", "form"), ("unit", "unit")) if mapped(key)}
             active = yes_no(v("isActive")) if mapped("isActive") else None
             prices = {key.removeprefix("price:"): money(v(key)) for key in body.mapping if key.startswith("price:") and mapped(key)}
+            if product is not None and product.inventory_id:
+                have = {pp.price_type_code: pp.amount_centavos for pp in product.prices}
+                theirs = [label for label, differs in (
+                    ("name", "name" in texts and texts["name"] != product.name),
+                    ("unit", "unit" in texts and texts["unit"] != product.unit),
+                    ("on sale", active is not None and active != product.is_active),
+                    ("SRP", SRP in prices and prices[SRP] != have.get(SRP)),
+                ) if differs]
+                if theirs:
+                    raise ValueError(f"Code {code}: its {', '.join(theirs)} come{'s' if len(theirs) == 1 else ''} from Inventory; change {'it' if len(theirs) == 1 else 'them'} there.")
             extras = {}
             for key in body.mapping:
                 field = added.get(key.removeprefix("extra:")) if key.startswith("extra:") else None
@@ -375,7 +390,7 @@ def import_people(db: Session, me: User, body: ImportIn, get) -> tuple[int, int,
 
 
 @router.post("/{kind}")
-def run_import(access: CurrentAccess, me: CurrentUser, db: DB, kind: Kind, body: ImportIn) -> dict:
+def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, kind: Kind, body: ImportIn) -> dict:
     allowed(access, kind)
     keys = {f["key"]: f for f in fields_of(db, kind)}
     missing = [f["label"] for f in keys.values() if f["required"] and body.mapping.get(f["key"]) is None]
@@ -393,7 +408,7 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, kind: Kind, body:
         return row[i].strip() if i is not None and 0 <= i < len(row) and row[i] is not None else ""
 
     run = {"products": import_products, "people": import_people, "balances": import_balances}[kind]
-    made, changed, problems = run(db, me, body, get)
+    made, changed, problems = run(db, me, body, get, settings.inventory_linked) if kind == "products" else run(db, me, body, get)
     if body.dry_run:
         db.rollback()
     else:

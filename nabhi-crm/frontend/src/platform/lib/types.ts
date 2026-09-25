@@ -410,11 +410,31 @@ export type Product = {
   strength: string | null;
   form: string | null;
   unit: string;
+  /** For VAT, as Finance's tax pack names it (the price rules' tax step). */
+  vatCategory?: "standard" | "zero_rated" | "exempt";
   isActive: boolean;
+  /** Its code, name, unit, state and SRP are Nabhi Inventory's, changed there. */
+  fromInventory?: boolean;
   prices: Record<string, number>;
   extra: ExtraValues;
   updatedAt: string | null;
 };
+
+/** The link to Nabhi Inventory, where the product list comes from when it's set up. */
+export type InventoryLink = { linked: boolean; syncedAt: string | null; error: string | null; appUrl: string | null };
+
+/** How much Inventory has of a product: out, low, ok, over (null for a service). */
+export type StockLevel = {
+  sku: string;
+  state: "out" | "low" | "ok" | "over" | null;
+  available: number;
+  onHand: number;
+  inTransit: number;
+  warehouses: { id: string; code: string; name: string; available: number; onHand: number; inTransit: number }[];
+};
+
+/** Stock by product code; null for a product Inventory doesn't have. `error`: Inventory couldn't be asked. */
+export type StockAnswer = { linked: boolean; items: Record<string, StockLevel | null>; error: string | null };
 
 export type BundleItem = { productId: string; qty: number };
 
@@ -471,12 +491,33 @@ export type QuoteLine = {
   discountKind: "percent" | "amount" | null;
   discountValue: number | null;
   discountCentavos: number;
+  /** From the price rules (Settings → Price rules). */
+  volumeDiscountCentavos?: number;
+  volumeName?: string | null;
+  surchargeCentavos?: number;
+  surchargeName?: string | null;
+  /** Where the price came from: group_price, team_price, list_price, entered. */
+  priceSource?: string | null;
+  /** Finance's tax on the line, when the price rules add tax. */
+  taxCentavos?: number;
   totalCentavos: number;
   /** Set when the line came from a bundle. On a one-line bundle `productId` is
    *  empty and `contents` names what is in the set. */
   bundleId: string | null;
   bundleName: string | null;
   contents: string;
+};
+
+/** Finance's tax on a quote, as the invoice will show it. */
+export type QuoteTax = {
+  document: string;
+  regime: string;
+  regimeName: string;
+  pricesIncludeTax: boolean;
+  summary: { key: string; label: string; amountCentavos: number }[];
+  notice: string | null;
+  totalDueCentavos: number;
+  on: string;
 };
 
 export type Payment = {
@@ -511,6 +552,8 @@ export type Quote = {
   promoDiscountCentavos: number;
   discountCentavos: number;
   totalCentavos: number;
+  /** None: priced without the tax step. */
+  tax?: QuoteTax | null;
   state: "waiting" | "ready" | "rejected";
   approval: {
     status: "none" | "pending" | "approved" | "rejected";
@@ -551,6 +594,12 @@ export type QuotePreview = {
     | "grossCentavos"
     | "promoDiscountCentavos"
     | "discountCentavos"
+    | "volumeDiscountCentavos"
+    | "volumeName"
+    | "surchargeCentavos"
+    | "surchargeName"
+    | "priceSource"
+    | "taxCentavos"
     | "totalCentavos"
     | "productCode"
     | "productName"
@@ -561,8 +610,14 @@ export type QuotePreview = {
   grossCentavos: number;
   promoDiscountCentavos: number;
   discountCentavos: number;
+  volumeDiscountCentavos?: number;
+  surchargeCentavos?: number;
   totalCentavos: number;
   approvalReasons: ApprovalReason[];
+  priceGroup?: { code: string; name: string } | null;
+  tax?: QuoteTax;
+  /** Why there's no tax yet (Finance couldn't be asked): saving waits for it. */
+  taxError?: string;
 };
 
 export type FinanceTask = "approvals" | "letters" | "payments";
@@ -825,6 +880,7 @@ export type CompanyRow = {
   id: string;
   name: string;
   status: CompanyStatus;
+  priceGroupCode?: string | null;
   industry: string | null;
   website: string | null;
   email: string | null;
@@ -905,8 +961,14 @@ export type SalesRules = {
   can: { edit: boolean };
 };
 
-export type PromoRow = Omit<Promo, "divisionCodes" | "startsOn"> & { startsOn: string | null };
-export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn: string | null };
+/** A division (a team) a promo or bundle is for. */
+export type DivisionOption = { id: string; name: string };
+
+/** Promos and bundles are per division: only these teams see and quote them. */
+type Divided = { teamIds: string[]; teams: DivisionOption[] };
+
+export type PromoRow = Omit<Promo, "divisionCodes" | "startsOn"> & { startsOn: string | null } & Divided;
+export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn: string | null } & Divided;
 
 // --- Settings (Administration → Settings) ---
 

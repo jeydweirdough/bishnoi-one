@@ -2,7 +2,8 @@
 
 The screens show a live total while the rep types, but it is always this that
 decides: the preview and the saved quote are priced by the same code, so the
-two never disagree.
+two never disagree. The order a line is priced in is the admin's, from the
+price rules (app/conditions.py); tax comes from Finance (app/finance.py).
 
 Money is whole centavos; percentages are basis points (1250 = 12.5%).
 """
@@ -15,7 +16,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Bundle, Issuer, PriceType, Product, Promo, SalesSettings, TeamPrice, TeamPriceType
+from app.conditions import Conditions, load as load_conditions, procedure_of, volume_bp
+from app.models import Bundle, Issuer, PriceGroup, PriceType, Product, Promo, SalesSettings, TeamPrice, TeamPriceType
 
 FULL = 10_000  # 100%, in basis points
 
@@ -65,6 +67,13 @@ class PriceBook:
     promos: dict[str, Promo]
     bundles: dict[str, Bundle]
     issuers: list = field(default_factory=list)
+    # product id -> price type code -> where that price came from (a PRICE_SOURCES key)
+    sources: dict[str, dict[str, str]] = field(default_factory=dict)
+    conditions: Conditions = field(default_factory=Conditions)
+    procedure: dict = field(default_factory=dict)
+    # The customer's price group, and its name for the screens.
+    group: str | None = None
+    group_name: str | None = None
 
     def price_type(self, code: str) -> PriceType | None:
         return next((t for t in self.price_types if t.code == code), None)
@@ -80,29 +89,60 @@ def team_price_types(db: Session, team_id: str | None) -> list[PriceType]:
     return types
 
 
-def price_book(db: Session, team_id: str | None, on: str) -> PriceBook:
+def price_book(db: Session, team_id: str | None, on: str, group: str | None = None) -> PriceBook:
+    """Everything a quote for this team's customer, in this price group, may
+    use today. Each product's price at each price type is the first the
+    procedure's price sources have (app/conditions.py)."""
+    settings = sales_settings(db)
+    procedure = procedure_of(settings)
+    conditions = load_conditions(db, on)
     types = team_price_types(db, team_id)
     listed = {t.code for t in types if t.entry == "list"}
     products = {p.id: p for p in db.scalars(select(Product).where(Product.is_active).order_by(Product.name))}
-    prices: dict[str, dict[str, int]] = {
-        p.id: {pp.price_type_code: pp.amount_centavos for pp in p.prices if pp.price_type_code in listed} for p in products.values()
+    by_source: dict[str, dict[str, dict[str, int]]] = {
+        "list_price": {
+            p.id: {pp.price_type_code: pp.amount_centavos for pp in p.prices if pp.price_type_code in listed} for p in products.values()
+        },
+        "team_price": {p: {} for p in products},
+        "group_price": {p: {} for p in products},
     }
     if team_id:
         for own in db.scalars(select(TeamPrice).where(TeamPrice.team_id == team_id)):
-            if own.product_id in prices and own.price_type_code in listed:
-                prices[own.product_id][own.price_type_code] = own.amount_centavos
+            if own.product_id in products and own.price_type_code in listed:
+                by_source["team_price"][own.product_id][own.price_type_code] = own.amount_centavos
+    if group:
+        for product_id in products:
+            for code in listed:
+                c = conditions.group_price(product_id, group, code)
+                if c is not None and c.amount_centavos is not None:
+                    by_source["group_price"][product_id][code] = c.amount_centavos
+    prices: dict[str, dict[str, int]] = {p: {} for p in products}
+    sources: dict[str, dict[str, str]] = {p: {} for p in products}
+    for product_id in products:
+        for code in listed:
+            for source in procedure["price"]:
+                amount = by_source[source][product_id].get(code)
+                if amount is not None:
+                    prices[product_id][code], sources[product_id][code] = amount, source
+                    break
     promos = {
         p.id: p
         for p in db.scalars(select(Promo).where(Promo.is_active).order_by(Promo.name))
-        if running(p.starts_on, p.ends_on, on)
+        # Per division: only the quote's own team's, and none for a quote with no team.
+        if running(p.starts_on, p.ends_on, on) and team_id in (p.team_ids or [])
     }
     bundles = {
         b.id: b
         for b in db.scalars(select(Bundle).where(Bundle.is_active).order_by(Bundle.name))
-        if running(b.starts_on, b.ends_on, on) and all(i["productId"] in products for i in b.items)
+        if running(b.starts_on, b.ends_on, on) and team_id in (b.team_ids or []) and all(i["productId"] in products for i in b.items)
     }
     issuers = list(db.scalars(select(Issuer).where(Issuer.is_active).order_by(Issuer.name)))
-    return PriceBook(sales_settings(db), types, products, prices, promos, bundles, issuers)
+    group_row = db.get(PriceGroup, group) if group else None
+    return PriceBook(
+        settings, types, products, prices, promos, bundles, issuers,
+        sources=sources, conditions=conditions, procedure=procedure,
+        group=group if group_row else None, group_name=group_row.name if group_row else None,
+    )
 
 
 def promo_terms(p: Promo) -> dict:
@@ -121,6 +161,8 @@ def promo_terms(p: Promo) -> dict:
 
 def price_list_out(book: PriceBook) -> dict:
     return {
+        "procedure": book.procedure,
+        "priceGroup": {"code": book.group, "name": book.group_name} if book.group else None,
         "usesPriceList": bool(book.price_types),
         "allowsGuaranteeLetters": book.settings.allows_guarantee_letters,
         "discountApprovalBp": book.settings.discount_approval_bp,
@@ -139,6 +181,8 @@ def price_list_out(book: PriceBook) -> dict:
                 "form": p.form,
                 "unit": p.unit,
                 "prices": book.prices[p.id],
+                # Where each price comes from: "group_price", "team_price" or "list_price".
+                "priceSources": book.sources.get(p.id, {}),
             }
             for p in book.products.values()
         ],
@@ -197,6 +241,9 @@ def blank_line() -> dict:
         "discountKind": None,
         "discountValue": None,
         "discountCentavos": 0,
+        "volumeDiscountCentavos": 0,
+        "surchargeCentavos": 0,
+        "priceSource": None,
         "totalCentavos": 0,
         "bundleId": None,
         "bundleName": None,
@@ -314,33 +361,66 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
             "quantity": quantity,
             "unitPriceCentavos": unit,
             "grossCentavos": gross,
+            "priceSource": "entered" if entered else book.sources.get(product.id, {}).get(kind.code, "list_price"),
         }
-        promo_id = raw.get("promoId")
-        if promo_id:
-            promo = book.promos.get(promo_id)
-            if promo is None or (promo.product_ids is not None and product.id not in promo.product_ids):
-                problems.add(["lines", i, "promoId"], "That promo doesn't apply to this product now.")
-                continue
-            off, free = promo_off(promo, quantity, gross)
-            line |= {"promoId": promo.id, "promoName": promo.name, "promoDiscountCentavos": off, "freeQuantity": free}
-        after_promo = gross - line["promoDiscountCentavos"]
-        discount = raw.get("discount")
-        if discount:
-            value = discount["value"]
-            if discount["kind"] == "percent":
-                if not 0 < value <= FULL:
-                    problems.add(["lines", i, "discount"], "A percent from 0.01 to 100.")
-                    continue
-                off = share(after_promo, value)
-                over_limit |= value > limit
-            else:
-                if not 0 < value <= after_promo:
-                    problems.add(["lines", i, "discount"], "More than the line comes to.")
-                    continue
-                off = value
-                over_limit |= after_promo > 0 and value * FULL > limit * after_promo
-            line |= {"discountKind": discount["kind"], "discountValue": value, "discountCentavos": off}
-        line["totalCentavos"] = after_promo - line["discountCentavos"]
+        steps = book.procedure.get("adjust", [])
+        promo_id, discount = raw.get("promoId"), raw.get("discount")
+        if promo_id and "promo" not in steps:
+            problems.add(["lines", i, "promoId"], "Promos are switched off in the price rules.")
+            continue
+        if discount and "manual" not in steps:
+            problems.add(["lines", i, "discount"], "Reps' own discounts are switched off in the price rules.")
+            continue
+        amount = gross
+        broken = False
+        # The adjustments, in the admin's order, each on what the line comes to so far.
+        for step in steps:
+            if step == "volume":
+                c = book.conditions.volume(product.id, book.group)
+                bp = volume_bp(c, quantity) if c else 0
+                if bp:
+                    line["volumeDiscountCentavos"] = share(amount, bp)
+                    line["volumeName"] = c.name
+                    amount -= line["volumeDiscountCentavos"]
+            elif step == "promo" and promo_id:
+                promo = book.promos.get(promo_id)
+                if promo is None or (promo.product_ids is not None and product.id not in promo.product_ids):
+                    problems.add(["lines", i, "promoId"], "That promo doesn't apply to this product now.")
+                    broken = True
+                    break
+                off, free = promo_off(promo, quantity, amount)
+                off = min(off, amount)
+                line |= {"promoId": promo.id, "promoName": promo.name, "promoDiscountCentavos": off, "freeQuantity": free}
+                amount -= off
+            elif step == "manual" and discount:
+                value = discount["value"]
+                if discount["kind"] == "percent":
+                    if not 0 < value <= FULL:
+                        problems.add(["lines", i, "discount"], "A percent from 0.01 to 100.")
+                        broken = True
+                        break
+                    off = share(amount, value)
+                    over_limit |= value > limit
+                else:
+                    if not 0 < value <= amount:
+                        problems.add(["lines", i, "discount"], "More than the line comes to.")
+                        broken = True
+                        break
+                    off = value
+                    over_limit |= amount > 0 and value * FULL > limit * amount
+                line |= {"discountKind": discount["kind"], "discountValue": value, "discountCentavos": off}
+                amount -= off
+            elif step == "surcharge":
+                c = book.conditions.surcharge(product.id, book.group)
+                if c:
+                    added = (c.amount_centavos or 0) * quantity if c.amount_centavos is not None else share(amount, c.percent_bp or 0)
+                    if added:
+                        line["surchargeCentavos"] = added
+                        line["surchargeName"] = c.name
+                        amount += added
+        if broken:
+            continue
+        line["totalCentavos"] = amount
         out.append(line)
 
     problems.raise_if_any()
@@ -352,6 +432,9 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
         "grossCentavos": sum(x["grossCentavos"] for x in out),
         "promoDiscountCentavos": sum(x["promoDiscountCentavos"] for x in out),
         "discountCentavos": sum(x["discountCentavos"] for x in out),
+        "volumeDiscountCentavos": sum(x["volumeDiscountCentavos"] for x in out),
+        "surchargeCentavos": sum(x["surchargeCentavos"] for x in out),
         "totalCentavos": sum(x["totalCentavos"] for x in out),
         "approvalReasons": reasons,
+        "priceGroup": {"code": book.group, "name": book.group_name} if book.group else None,
     }

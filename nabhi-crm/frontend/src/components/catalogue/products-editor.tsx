@@ -2,21 +2,25 @@
 
 import { Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
-import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules } from "@/src/platform/lib/types";
+import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules, StockLevel } from "@/src/platform/lib/types";
 import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
 import { extraText } from "../extra/extra-values";
 import { deleteProduct, saveProduct, type ProductInput } from "../../actions/catalogue";
+import { StockBadge, StockWhere } from "./stock";
 
 type PriceType = SalesRules["priceTypes"][number];
 const TEXT = ["code", "name", "genericName", "strength", "form", "unit"] as const;
 type Text = (typeof TEXT)[number];
+// What Inventory keeps, for a product that comes from there: changed there, shown here.
+const INVENTORYS = new Set(["code", "name", "unit", "isActive"]);
+const SRP = "SRP";
 
 /** The product list, with adding and changing one in a panel above it. */
 export function ProductsEditor({
@@ -25,6 +29,8 @@ export function ProductsEditor({
   org,
   mayCreate,
   layout,
+  stock,
+  addInInventory,
 }: {
   products: CatalogueProduct[];
   priceTypes: PriceType[];
@@ -32,6 +38,10 @@ export function ProductsEditor({
   mayCreate: boolean;
   /** The product form as an admin laid it out (Settings → Forms). */
   layout: FormLayout;
+  /** How much Inventory has, by code; null when the CRM isn't linked to Inventory. */
+  stock: Record<string, StockLevel | null> | null;
+  /** When the products come from Inventory: the way there to add one. */
+  addInInventory: ReactNode;
 }) {
   const fields = layout.sections.flatMap((s) => s.fields).filter((f) => !f.standard);
   const fmt = makeFormat(org);
@@ -50,18 +60,22 @@ export function ProductsEditor({
           layout={layout}
           onDone={() => setEditing(null)}
         />
+      ) : mayCreate ? (
+        <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
+          Add product
+        </Button>
       ) : (
-        mayCreate && (
-          <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
-            Add product
-          </Button>
-        )
+        addInInventory
       )}
 
       <Sheet className="overflow-x-auto">
         {products.length === 0 ? (
           <Empty icon="products" title="No products here">
-            {mayCreate ? "Add the products and services you quote, with their prices." : "Nothing matches."}
+            {mayCreate
+              ? "Add the products and services you quote, with their prices."
+              : stock
+                ? "Products are added in Inventory, and show up here within 15 minutes (or at once with Sync now)."
+                : "Nothing matches."}
           </Empty>
         ) : (
           <table className="w-full min-w-[44rem] text-sm">
@@ -69,6 +83,11 @@ export function ProductsEditor({
               <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                 <th scope="col" className="px-5 py-2.5 font-semibold">Product</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Unit</th>
+                {stock && (
+                  <th scope="col" className="px-3 py-2.5 font-semibold">
+                    Stock
+                  </th>
+                )}
                 {fields
                   .filter((f) => f.inList)
                   .map((f) => (
@@ -97,6 +116,18 @@ export function ProductsEditor({
                     <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form].filter(Boolean).join(" · ")}</p>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{p.unit}</td>
+                  {stock && (
+                    <td className="px-3 py-2.5">
+                      {p.fromInventory ? (
+                        <>
+                          <StockBadge level={stock[p.code]} />
+                          <StockWhere level={stock[p.code]} />
+                        </>
+                      ) : (
+                        <span className="text-meta text-ink-3">Kept here only</span>
+                      )}
+                    </td>
+                  )}
                   {fields
                     .filter((f) => f.inList)
                     .map((f) => (
@@ -149,10 +180,13 @@ function ProductForm({
     Object.fromEntries(listed.map((t) => [t.code, fmt.pesosText(product?.prices[t.code] ?? null)])),
   );
   const [isActive, setActive] = useState(product?.isActive ?? true);
+  const [vatCategory, setVatCategory] = useState<NonNullable<ProductInput["vatCategory"]>>(product?.vatCategory ?? "standard");
   const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(custom, product?.extra));
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
+  const fromInventory = product?.fromInventory ?? false;
+  const locked = (key: string) => fromInventory && INVENTORYS.has(key);
 
   function submit() {
     const problems: Record<string, string> = {};
@@ -176,6 +210,7 @@ function ProductForm({
       strength: values.strength.trim() || null,
       form: values.form.trim() || null,
       unit: values.unit.trim(),
+      vatCategory,
       isActive,
       prices: amounts,
       extra: extraChanges(custom, extra, product?.extra),
@@ -195,6 +230,14 @@ function ProductForm({
 
   /** A built-in field, drawn with the label and hints the admin gave it. */
   function standard(f: FormFieldDef) {
+    if (locked(f.key)) {
+      const shown = f.key === "isActive" ? (isActive ? "On sale" : "Switched off") : values[f.key as Text];
+      return (
+        <Field label={f.label} hint="From Inventory: change it there.">
+          {(p) => <Input {...p} value={shown} readOnly disabled />}
+        </Field>
+      );
+    }
     if (f.key === "isActive") {
       return (
         <label className="flex h-full items-end gap-2 pb-2 text-sm">
@@ -228,14 +271,38 @@ function ProductForm({
       >
         <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
 
+        <Field label="VAT" error={fields.vatCategory} hint="How Finance taxes it on quotes and invoices. Exempt: e.g. medicines on the FDA's VAT-exempt lists.">
+          {(p) => (
+            <Select {...p} value={vatCategory} onChange={(e) => setVatCategory(e.target.value as typeof vatCategory)}>
+              <option value="standard">VATable (12%)</option>
+              <option value="zero_rated">Zero-rated (0%)</option>
+              <option value="exempt">VAT-exempt</option>
+            </Select>
+          )}
+        </Field>
+
         {listed.length > 0 && (
           <fieldset>
             <legend className="mb-2 text-sm font-semibold">Prices</legend>
             <div className="grid gap-4 sm:grid-cols-3">
               {listed.map((t) => (
-                <Field key={t.code} label={`${t.name} (${fmt.symbol})`} optional error={fields[`price.${t.code}`] ?? fields.prices}>
+                <Field
+                  key={t.code}
+                  label={`${t.name} (${fmt.symbol})`}
+                  optional={!(fromInventory && t.code === SRP)}
+                  hint={fromInventory && t.code === SRP ? "From Inventory. A team's own price goes in Special prices." : undefined}
+                  error={fields[`price.${t.code}`] ?? fields.prices}
+                >
                   {(p) => (
-                    <Input {...p} inputMode="decimal" value={prices[t.code]} onChange={(e) => setPrices({ ...prices, [t.code]: e.target.value })} placeholder="0.00" />
+                    <Input
+                      {...p}
+                      inputMode="decimal"
+                      value={prices[t.code]}
+                      onChange={(e) => setPrices({ ...prices, [t.code]: e.target.value })}
+                      placeholder="0.00"
+                      readOnly={fromInventory && t.code === SRP}
+                      disabled={fromInventory && t.code === SRP}
+                    />
                   )}
                 </Field>
               ))}
@@ -252,7 +319,7 @@ function ProductForm({
           <Button variant="quiet" onClick={onDone}>
             Cancel
           </Button>
-          {product?.can.delete && (
+          {product?.can.delete && !fromInventory && (
             <span className="ml-auto">
               <ConfirmButton
                 label="Delete"

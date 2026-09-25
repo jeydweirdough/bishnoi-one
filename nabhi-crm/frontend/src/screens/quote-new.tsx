@@ -4,7 +4,7 @@ import { customFields } from "../components/extra/load";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
-import type { CompanyDetail, ContactDetail, PriceList } from "@/src/platform/lib/types";
+import type { CompanyDetail, ContactDetail, PriceList, StockAnswer } from "@/src/platform/lib/types";
 import type { QuoteFor } from "../actions/customers";
 
 export const metadata = { title: "New quote" };
@@ -22,14 +22,22 @@ async function NewQuote({ to }: { to: QuoteFor }) {
     load<PriceList>(`${base}/price-list`),
     customFields("quote"),
   ]);
+  // How much Inventory has, as the quote is started (a product it doesn't have is left out).
+  const codes = priceList.products.map((p) => p.code);
+  const stock = codes.length ? await load<StockAnswer>(`/stock?codes=${encodeURIComponent(codes.join(","))}`) : null;
   const list = to.kind === "companies" ? { href: "/companies", label: "Customers" } : { href: "/contacts", label: "Contacts" };
   return (
     <>
       <PageHeader crumbs={[list, { href: `/${to.kind}/${to.id}`, label: customer.name }]} title={`New quote for ${customer.name}`}>
         {customer.team ? `Priced with ${customer.team.name}'s prices. ` : ""}Promos and extra discounts are per product line.
+        {stock?.linked && (
+          <span className={`mt-1 block ${stock.error ? "text-danger" : "text-ink-3"}`}>
+            {stock.error ? `Stock can't be shown: ${stock.error}` : "Stock is from Inventory, as of when this page opened."}
+          </span>
+        )}
       </PageHeader>
       <Sheet className="max-w-[70rem] px-5 py-6 sm:px-8">
-        <QuoteForm to={to} priceList={priceList} org={me.org} fields={fields} />
+        <QuoteForm to={to} priceList={priceList} org={me.org} fields={fields} stock={stock} />
       </Sheet>
     </>
   );

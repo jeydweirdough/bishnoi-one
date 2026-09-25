@@ -5,7 +5,10 @@ rules for quotes.
 Reading any of it needs products.view. Adding products needs
 products.create, deleting them products.delete, and everything else here
 (changing products, prices, promos, bundles and the rules) products.edit.
-The catalogue is the company's, so a role's scope doesn't narrow it.
+The catalogue is the company's, so a role's scope doesn't narrow it, except
+for promos and bundles: those belong to divisions (teams). Someone who reaches
+every record sees them all; anyone else sees, and quotes, only their own
+division's.
 """
 
 import re
@@ -22,7 +25,8 @@ from app.api import Api, camel, changed, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import check_extra, check_required
-from app.models import Bundle, Issuer, PriceType, Product, ProductPrice, Promo
+from app.inventory import SRP, Unreachable, link_out, linked_codes, stock, sync_if_stale, try_sync
+from app.models import Bundle, Issuer, PriceType, Product, ProductPrice, Promo, Team
 from app.pricing import FULL, promo_terms, sales_settings, state_of, today
 
 router = APIRouter(tags=["catalogue"])
@@ -204,7 +208,10 @@ def product_out(p: Product, access: Access) -> dict:
         "strength": p.strength,
         "form": p.form,
         "unit": p.unit,
+        "vatCategory": p.vat_category,
         "isActive": p.is_active,
+        # Its code, name, unit, state and SRP are Inventory's, changed there.
+        "fromInventory": p.inventory_id is not None,
         "prices": {pp.price_type_code: pp.amount_centavos for pp in p.prices},
         "extra": p.extra or {},
         "updatedAt": iso(p.updated_at),
@@ -223,11 +230,13 @@ def get_product(db: Session, product_id: str) -> Product:
 def list_products(
     access: View,
     db: DB,
+    settings: SettingsDep,
     q: str | None = Query(None, max_length=100),
     active: bool | None = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict:
+    sync_if_stale(db, settings)
     query = select(Product)
     if q:
         like = f"%{q.lower()}%"
@@ -238,7 +247,33 @@ def list_products(
     products = db.scalars(query.order_by(func.lower(Product.name)).limit(limit).offset(offset)).all()
     listed = [t.code for t in db.scalars(select(PriceType).where(PriceType.entry == "list", PriceType.is_active))]
     missing = sum(1 for p in db.scalars(select(Product).where(Product.is_active)) if any(c not in {x.price_type_code for x in p.prices} for c in listed))
-    return {"items": [product_out(p, access) for p in products], "total": total, "missingPrices": missing}
+    return {"items": [product_out(p, access) for p in products], "total": total, "missingPrices": missing, "inventory": link_out(db, settings)}
+
+
+@router.post("/products/sync")
+def sync_products(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep) -> dict:
+    """Bring the product list over from Inventory now."""
+    if not settings.inventory_linked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The CRM isn't linked to Inventory (INVENTORY_API_URL, INVENTORY_API_KEY).")
+    result = try_sync(db, settings)
+    if result is None:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, link_out(db, settings)["error"])
+    audit(db, me, "product.synced", target=f"From Inventory: {result['added']} added, {result['updated']} changed, {result['switchedOff']} switched off", target_type="product")
+    db.commit()
+    return result | {"inventory": link_out(db, settings)}
+
+
+@router.get("/stock")
+def product_stock(access: View, db: DB, settings: SettingsDep, codes: str = Query(..., max_length=20000)) -> dict:
+    """How much of these products Inventory has, overall and per warehouse,
+    by code. A product kept only here has none listed."""
+    if not settings.inventory_linked:
+        return {"linked": False, "items": {}, "error": None}
+    wanted = linked_codes(db, [c for c in codes.split(",") if c.strip()][:500])
+    try:
+        return {"linked": True, "items": stock(settings, wanted) if wanted else {}, "error": None}
+    except Unreachable as e:
+        return {"linked": True, "items": {}, "error": str(e)}
 
 
 class ProductFields(Api):
@@ -248,6 +283,8 @@ class ProductFields(Api):
     strength: str | None = Field(None, max_length=60)
     form: str | None = Field(None, max_length=60)
     unit: str | None = Field(None, min_length=1, max_length=30)
+    # For VAT, as Finance's tax pack names it (the price rules' tax step).
+    vat_category: Literal["standard", "zero_rated", "exempt"] | None = None
     is_active: bool | None = None
     # price type code -> centavos; null clears that price.
     prices: dict[str, int | None] | None = None
@@ -301,7 +338,9 @@ def code_taken(db: Session, model, code: str, not_id: str | None = None) -> bool
 
 
 @router.post("/products", status_code=status.HTTP_201_CREATED)
-def create_product(access: Create, me: CurrentUser, db: DB, body: ProductIn) -> dict:
+def create_product(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: ProductIn) -> dict:
+    if settings.inventory_linked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Products are added in Inventory: the CRM brings them over from there.")
     if code_taken(db, Product, body.code):
         raise field_error("code", "Another product has this code.")
     product = Product(**body.model_dump(exclude={"prices", "extra"}, exclude_none=True), extra=check_extra(db, "product", body.extra))
@@ -325,7 +364,13 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
     product = get_product(db, product_id)
     wanted = changed(body)
     prices = wanted.pop("prices", None)
-    for required in ("code", "name", "unit", "is_active"):
+    if product.inventory_id:
+        for k in ("code", "name", "unit", "is_active"):
+            if k in wanted and wanted[k] != getattr(product, k):
+                raise field_error(camel([k])[0], "This comes from Inventory: change it there.")
+        if prices and SRP in prices:
+            raise field_error("prices", "The SRP comes from Inventory: change it there, or give a team its own price.")
+    for required in ("code", "name", "unit", "is_active", "vat_category"):
         if required in wanted and wanted[required] is None:
             raise field_error(camel([required])[0], "This is required.")
     if wanted.get("code") and code_taken(db, Product, wanted["code"], product.id):
@@ -347,6 +392,8 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(access: Delete, me: CurrentUser, db: DB, product_id: str) -> Response:
     product = get_product(db, product_id)
+    if product.inventory_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "It comes from Inventory: discontinue it there, and it's switched off here.")
     in_bundles = [b.name for b in db.scalars(select(Bundle)) if any(i["productId"] == product.id for i in b.items)]
     if in_bundles:
         raise HTTPException(status.HTTP_409_CONFLICT, f"It's in the bundle {in_bundles[0]}. Take it out of bundles first, or switch it off instead.")
@@ -355,6 +402,57 @@ def delete_product(access: Delete, me: CurrentUser, db: DB, product_id: str) -> 
     db.delete(product)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- divisions: whose promos and bundles are whose -----------------------------------------
+
+
+def reach_of(access: Access) -> set[str] | None:
+    """The divisions this person's promos and bundles come from. None: every one."""
+    if access.scope == "all":
+        return None
+    return {access.team_id} if access.team_id else set()
+
+
+def sees(record: Promo | Bundle, access: Access) -> bool:
+    reach = reach_of(access)
+    return reach is None or bool(reach & set(record.team_ids or []))
+
+
+def reachable(db: Session, model, record_id: str, what: str, access: Access):
+    """A promo or bundle this person may see; outside their division it doesn't exist for them."""
+    record = db.get(model, record_id)
+    if record is None or not sees(record, access):
+        raise not_found(what)
+    return record
+
+
+def team_names(db: Session) -> dict[str, str]:
+    return dict(db.execute(select(Team.id, Team.name)).all())
+
+
+def divisions_out(team_ids: list[str] | None, names: dict[str, str]) -> dict:
+    ids = [t for t in team_ids or [] if t in names]
+    return {"teamIds": ids, "teams": [{"id": t, "name": names[t]} for t in ids]}
+
+
+def team_options(db: Session, access: Access) -> list[dict]:
+    """The divisions this person may give a promo or bundle to."""
+    reach = reach_of(access)
+    q = select(Team).where(Team.is_active).order_by(func.lower(Team.name))
+    return [{"id": t.id, "name": t.name} for t in db.scalars(q) if reach is None or t.id in reach]
+
+
+def check_teams(db: Session, access: Access, team_ids: list[str], current: list[str] | None = None) -> list[str]:
+    ids = list(dict.fromkeys(team_ids))
+    teams = {t.id: t for t in db.scalars(select(Team).where(Team.id.in_(ids)))}
+    # A switched-off division keeps what it had, but gets nothing new.
+    if len(teams) != len(ids) or any(not t.is_active and t.id not in (current or []) for t in teams.values()):
+        raise field_error("teamIds", "Pick divisions from the list.")
+    reach = reach_of(access)
+    if reach is not None and not set(ids) <= reach:
+        raise field_error("teamIds", "You can only set them for your own division.")
+    return ids
 
 
 # --- promos --------------------------------------------------------------------------------
@@ -375,6 +473,8 @@ class PromoIn(Api):
     tiers: list[Tier] = Field(default_factory=list, max_length=10)
     # None: every product.
     product_ids: list[str] | None = Field(None, max_length=500)
+    # The divisions it's for: at least one.
+    team_ids: list[str] = Field(min_length=1, max_length=50)
     starts_on: date | None = None
     ends_on: date | None = None
     is_active: bool = True
@@ -390,12 +490,17 @@ class PromoIn(Api):
         return self
 
 
-def promo_out(p: Promo, on: str) -> dict:
-    return promo_terms(p) | {"startsOn": p.starts_on, "endsOn": p.ends_on, "isActive": p.is_active, "state": state_of(p.is_active, p.starts_on, p.ends_on, on)}
+def promo_out(p: Promo, on: str, names: dict[str, str]) -> dict:
+    return (
+        promo_terms(p)
+        | divisions_out(p.team_ids, names)
+        | {"startsOn": p.starts_on, "endsOn": p.ends_on, "isActive": p.is_active, "state": state_of(p.is_active, p.starts_on, p.ends_on, on)}
+    )
 
 
-def promo_values(db: Session, body: PromoIn) -> dict:
+def promo_values(db: Session, access: Access, body: PromoIn, current: list[str] | None = None) -> dict:
     check_dates(body.starts_on, body.ends_on)
+    team_ids = check_teams(db, access, body.team_ids, current)
     if body.product_ids is not None:
         body.product_ids = list(dict.fromkeys(body.product_ids))
         known = set(db.scalars(select(Product.id).where(Product.id.in_(body.product_ids))))
@@ -411,6 +516,7 @@ def promo_values(db: Session, body: PromoIn) -> dict:
         "free_qty": body.free_qty if "free_qty" in keep else None,
         "tiers": sorted(({"minQty": t.min_qty, "percentBp": t.percent_bp} for t in body.tiers), key=lambda t: t["minQty"]) if body.kind == "tiered" else [],
         "product_ids": body.product_ids,
+        "team_ids": team_ids,
         "starts_on": body.starts_on.isoformat() if body.starts_on else None,
         "ends_on": body.ends_on.isoformat() if body.ends_on else None,
         "is_active": body.is_active,
@@ -419,36 +525,37 @@ def promo_values(db: Session, body: PromoIn) -> dict:
 
 @router.get("/promos")
 def list_promos(access: View, db: DB, settings: SettingsDep) -> dict:
-    on = today(settings.org_timezone)
-    return {"items": [promo_out(p, on) for p in db.scalars(select(Promo).order_by(Promo.created_at.desc()))], "can": {"edit": access.can("products.edit")}}
+    on, names = today(settings.org_timezone), team_names(db)
+    promos = [p for p in db.scalars(select(Promo).order_by(Promo.created_at.desc())) if sees(p, access)]
+    return {"items": [promo_out(p, on, names) for p in promos], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
 
 
 @router.post("/promos", status_code=status.HTTP_201_CREATED)
 def create_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: PromoIn) -> dict:
-    promo = Promo(**promo_values(db, body))
+    promo = Promo(**promo_values(db, access, body))
     db.add(promo)
     db.flush()
     audit(db, me, "promo.created", target=promo.name, target_type="promo", target_id=promo.id)
     db.commit()
-    return promo_out(promo, today(settings.org_timezone))
+    return promo_out(promo, today(settings.org_timezone), team_names(db))
 
 
 @router.put("/promos/{promo_id}")
 def replace_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, promo_id: str, body: PromoIn) -> dict:
-    promo = found(db.get(Promo, promo_id), "promo")
-    values = promo_values(db, body)
+    promo = reachable(db, Promo, promo_id, "promo", access)
+    values = promo_values(db, access, body, promo.team_ids)
     fields = [k for k, v in values.items() if getattr(promo, k) != v]
     for k in fields:
         setattr(promo, k, values[k])
     if fields:
         audit(db, me, "promo.updated", target=promo.name, target_type="promo", target_id=promo.id, fields=camel(fields))
         db.commit()
-    return promo_out(promo, today(settings.org_timezone))
+    return promo_out(promo, today(settings.org_timezone), team_names(db))
 
 
 @router.delete("/promos/{promo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_promo(access: Edit, me: CurrentUser, db: DB, promo_id: str) -> Response:
-    promo = found(db.get(Promo, promo_id), "promo")
+    promo = reachable(db, Promo, promo_id, "promo", access)
     audit(db, me, "promo.deleted", target=promo.name, target_type="promo", target_id=promo.id)
     db.delete(promo)
     db.commit()
@@ -469,6 +576,8 @@ class BundleIn(Api):
     price_centavos: int = Field(ge=1)
     as_one_line: bool = True
     items: list[BundleItem] = Field(min_length=1, max_length=30)
+    # The divisions it's for: at least one.
+    team_ids: list[str] = Field(min_length=1, max_length=50)
     starts_on: date | None = None
     ends_on: date | None = None
     is_active: bool = True
@@ -479,8 +588,8 @@ class BundleIn(Api):
         return check_code(value)
 
 
-def bundle_out(b: Bundle, on: str) -> dict:
-    return {
+def bundle_out(b: Bundle, on: str, names: dict[str, str]) -> dict:
+    return divisions_out(b.team_ids, names) | {
         "id": b.id,
         "code": b.code,
         "name": b.name,
@@ -494,8 +603,9 @@ def bundle_out(b: Bundle, on: str) -> dict:
     }
 
 
-def bundle_values(db: Session, body: BundleIn, not_id: str | None = None) -> dict:
+def bundle_values(db: Session, access: Access, body: BundleIn, not_id: str | None = None, current: list[str] | None = None) -> dict:
     check_dates(body.starts_on, body.ends_on)
+    team_ids = check_teams(db, access, body.team_ids, current)
     if code_taken(db, Bundle, body.code, not_id):
         raise field_error("code", "Another bundle has this code.")
     ids = [i.product_id for i in body.items]
@@ -509,6 +619,7 @@ def bundle_values(db: Session, body: BundleIn, not_id: str | None = None) -> dic
         "price_centavos": body.price_centavos,
         "as_one_line": body.as_one_line,
         "items": [{"productId": i.product_id, "qty": i.qty} for i in body.items],
+        "team_ids": team_ids,
         "starts_on": body.starts_on.isoformat() if body.starts_on else None,
         "ends_on": body.ends_on.isoformat() if body.ends_on else None,
         "is_active": body.is_active,
@@ -517,36 +628,37 @@ def bundle_values(db: Session, body: BundleIn, not_id: str | None = None) -> dic
 
 @router.get("/bundles")
 def list_bundles(access: View, db: DB, settings: SettingsDep) -> dict:
-    on = today(settings.org_timezone)
-    return {"items": [bundle_out(b, on) for b in db.scalars(select(Bundle).order_by(func.lower(Bundle.name)))], "can": {"edit": access.can("products.edit")}}
+    on, names = today(settings.org_timezone), team_names(db)
+    bundles = [b for b in db.scalars(select(Bundle).order_by(func.lower(Bundle.name))) if sees(b, access)]
+    return {"items": [bundle_out(b, on, names) for b in bundles], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
 
 
 @router.post("/bundles", status_code=status.HTTP_201_CREATED)
 def create_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: BundleIn) -> dict:
-    bundle = Bundle(**bundle_values(db, body))
+    bundle = Bundle(**bundle_values(db, access, body))
     db.add(bundle)
     db.flush()
     audit(db, me, "bundle.created", target=bundle.name, target_type="bundle", target_id=bundle.id)
     db.commit()
-    return bundle_out(bundle, today(settings.org_timezone))
+    return bundle_out(bundle, today(settings.org_timezone), team_names(db))
 
 
 @router.put("/bundles/{bundle_id}")
 def replace_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, bundle_id: str, body: BundleIn) -> dict:
-    bundle = found(db.get(Bundle, bundle_id), "bundle")
-    values = bundle_values(db, body, bundle.id)
+    bundle = reachable(db, Bundle, bundle_id, "bundle", access)
+    values = bundle_values(db, access, body, bundle.id, bundle.team_ids)
     fields = [k for k, v in values.items() if getattr(bundle, k) != v]
     for k in fields:
         setattr(bundle, k, values[k])
     if fields:
         audit(db, me, "bundle.updated", target=bundle.name, target_type="bundle", target_id=bundle.id, fields=camel(fields))
         db.commit()
-    return bundle_out(bundle, today(settings.org_timezone))
+    return bundle_out(bundle, today(settings.org_timezone), team_names(db))
 
 
 @router.delete("/bundles/{bundle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bundle(access: Edit, me: CurrentUser, db: DB, bundle_id: str) -> Response:
-    bundle = found(db.get(Bundle, bundle_id), "bundle")
+    bundle = reachable(db, Bundle, bundle_id, "bundle", access)
     audit(db, me, "bundle.deleted", target=bundle.name, target_type="bundle", target_id=bundle.id)
     db.delete(bundle)
     db.commit()

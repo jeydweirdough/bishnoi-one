@@ -9,9 +9,10 @@ import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
-import type { BundleRow, Org } from "@/src/platform/lib/types";
+import type { BundleRow, DivisionOption, Org } from "@/src/platform/lib/types";
 import { deleteBundle, saveBundle, type BundleInput } from "../../actions/catalogue";
 import { StateTag } from "./catalogue-tabs";
+import { DivisionPicker, DivisionTags } from "./divisions";
 
 type ProductRef = { id: string; name: string; code: string; unit: string; prices: Record<string, number> };
 
@@ -19,12 +20,15 @@ type ProductRef = { id: string; name: string; code: string; unit: string; prices
 export function BundlesEditor({
   bundles,
   products,
+  teams,
   firstPrice,
   org,
   mayEdit,
 }: {
   bundles: BundleRow[];
   products: ProductRef[];
+  /** The divisions this person may give a bundle. */
+  teams: DivisionOption[];
   /** The price type a bundle's items are valued at, to show what the set saves. */
   firstPrice: { code: string; name: string } | null;
   org: Org;
@@ -42,6 +46,7 @@ export function BundlesEditor({
           fmt={fmt}
           bundle={editing === "new" ? null : editing}
           products={products}
+          teams={teams}
           firstPrice={firstPrice}
           onDone={() => setEditing(null)}
         />
@@ -69,6 +74,9 @@ export function BundlesEditor({
                     {b.items.map((i) => `${i.qty} × ${product(i.productId)?.name ?? "a product no longer here"}`).join(", ")}
                   </p>
                   <p className="text-meta text-ink-3">{b.asOneLine ? "One line on the quote" : "Shown as its items on the quote"}</p>
+                  <p className="mt-0.5">
+                    <DivisionTags teams={b.teams} />
+                  </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="font-semibold tabular-nums">{fmt.peso(b.priceCentavos)}</span>
@@ -93,12 +101,14 @@ function BundleForm({
   fmt,
   bundle,
   products,
+  teams,
   firstPrice,
   onDone,
 }: {
   fmt: Format;
   bundle: BundleRow | null;
   products: ProductRef[];
+  teams: DivisionOption[];
   firstPrice: { code: string; name: string } | null;
   onDone: () => void;
 }) {
@@ -112,6 +122,8 @@ function BundleForm({
   const [startsOn, setStartsOn] = useState(bundle?.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(bundle?.endsOn ?? "");
   const [isActive, setActive] = useState(bundle?.isActive ?? true);
+  // Someone with one division starts with it; nobody else gets one picked for them.
+  const [teamIds, setTeamIds] = useState<string[]>(bundle?.teamIds ?? (teams.length === 1 ? [teams[0].id] : []));
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -129,9 +141,11 @@ function BundleForm({
       items: items.filter((i) => i.productId).map((i) => ({ productId: i.productId, qty: /^\d+$/.test(i.qty.trim()) ? Number(i.qty) : 0 })),
       startsOn: startsOn || null,
       endsOn: endsOn || null,
+      teamIds,
       isActive,
     };
     if (!input.code) problems.code = "Give it a code.";
+    if (teamIds.length === 0) problems.teamIds = "Pick the divisions it's for.";
     if (!input.name) problems.name = "Give it a name.";
     if (!input.priceCentavos) problems.priceCentavos = "An amount like 900.00.";
     if (input.items.length === 0 || input.items.some((i) => i.qty < 1)) problems.items = "Pick at least one product, each with a whole-number quantity.";
@@ -179,6 +193,8 @@ function BundleForm({
             {(p) => <Input {...p} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />}
           </Field>
         </div>
+
+        <DivisionPicker what="bundle" options={teams} value={teamIds} onChange={setTeamIds} error={fields.teamIds} />
 
         <fieldset>
           <legend className="mb-2 text-sm font-semibold">What&apos;s in it</legend>

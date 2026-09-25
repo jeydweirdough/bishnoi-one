@@ -31,6 +31,7 @@ from app.demo import (
     DEMO_BUNDLES,
     DEMO_COMPANIES,
     DEMO_CONTACTS,
+    DEMO_DIVISIONS,
     DEMO_ISSUERS,
     DEMO_PASSWORD,
     RENAMED_TEAMS,
@@ -113,6 +114,33 @@ def make_demo(db: Session) -> None:
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
     make_demo_records(db)
     make_demo_catalogue(db)
+    divide_demo_catalogue(db)
+
+
+def demo_divisions(db: Session, key: str) -> list[str]:
+    """The ids of a demo promo's or bundle's divisions. Where none of them
+    exist (a database with other teams), every team there."""
+    teams = {t.name: t.id for t in db.scalars(select(Team))}
+    named = [teams[n] for n in DEMO_DIVISIONS.get(key, ()) if n in teams]
+    return named or list(teams.values())
+
+
+def divide_demo_catalogue(db: Session) -> None:
+    """Gives demo promos and bundles made before divisions (migration 0018)
+    their divisions. Only ones that have none, so nothing chosen is undone."""
+    changed = 0
+    for promo in db.scalars(select(Promo).where(Promo.name.in_([name for name, *_ in DEMO_PROMOS]))):
+        if not promo.team_ids:
+            promo.team_ids = demo_divisions(db, promo.name)
+            changed += 1
+    for bundle in db.scalars(select(Bundle).where(Bundle.code.in_([code for code, *_ in DEMO_BUNDLES]))):
+        if not bundle.team_ids:
+            bundle.team_ids = demo_divisions(db, bundle.code)
+            changed += 1
+    if changed:
+        audit(db, TOOL, "demo.catalogue_divided", target=f"{changed} promos and bundles given their divisions")
+        db.commit()
+        print(f"Demo promos and bundles: {changed} given their divisions.")
 
 
 def make_demo_catalogue(db: Session) -> None:
@@ -138,9 +166,12 @@ def make_demo_catalogue(db: Session) -> None:
     db.add_all(products.values())
     db.flush()
     for name, kind, terms, codes in DEMO_PROMOS:
-        db.add(Promo(name=name, kind=kind, product_ids=[products[c].id for c in codes] if codes else None, **terms))
+        db.add(Promo(name=name, kind=kind, product_ids=[products[c].id for c in codes] if codes else None, team_ids=demo_divisions(db, name), **terms))
     for code, name, pesos, one_line, items in DEMO_BUNDLES:
-        db.add(Bundle(code=code, name=name, price_centavos=pesos * 100, as_one_line=one_line, items=[{"productId": products[c].id, "qty": q} for c, q in items]))
+        db.add(Bundle(
+            code=code, name=name, price_centavos=pesos * 100, as_one_line=one_line,
+            items=[{"productId": products[c].id, "qty": q} for c, q in items], team_ids=demo_divisions(db, code),
+        ))
     summary = f"{len(DEMO_PRICE_TYPES)} price types, {len(products)} products, {len(DEMO_PROMOS)} promos, {len(DEMO_BUNDLES)} bundles"
     audit(db, TOOL, "demo.catalogue_made", target=summary)
     db.commit()

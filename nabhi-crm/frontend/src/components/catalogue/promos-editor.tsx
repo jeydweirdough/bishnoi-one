@@ -10,14 +10,28 @@ import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, percentText, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { PROMO_KINDS, promoTerms } from "@/src/platform/lib/labels";
-import type { Org, PromoKind, PromoRow } from "@/src/platform/lib/types";
+import type { DivisionOption, Org, PromoKind, PromoRow } from "@/src/platform/lib/types";
 import { deletePromo, savePromo, type PromoInput } from "../../actions/catalogue";
 import { StateTag } from "./catalogue-tabs";
+import { DivisionPicker, DivisionTags } from "./divisions";
 
 type ProductRef = { id: string; name: string; code: string };
 
 /** Promos: what's running, what's coming, and adding or changing one. */
-export function PromosEditor({ promos, products, org, mayEdit }: { promos: PromoRow[]; products: ProductRef[]; org: Org; mayEdit: boolean }) {
+export function PromosEditor({
+  promos,
+  products,
+  teams,
+  org,
+  mayEdit,
+}: {
+  promos: PromoRow[];
+  products: ProductRef[];
+  /** The divisions this person may give a promo. */
+  teams: DivisionOption[];
+  org: Org;
+  mayEdit: boolean;
+}) {
   const fmt = makeFormat(org);
   const [editing, setEditing] = useState<PromoRow | "new" | null>(null);
   const name = (id: string) => products.find((p) => p.id === id)?.name ?? "a product no longer here";
@@ -25,7 +39,7 @@ export function PromosEditor({ promos, products, org, mayEdit }: { promos: Promo
   return (
     <div className="space-y-5">
       {editing ? (
-        <PromoForm key={editing === "new" ? "new" : editing.id} fmt={fmt} promo={editing === "new" ? null : editing} products={products} onDone={() => setEditing(null)} />
+        <PromoForm key={editing === "new" ? "new" : editing.id} fmt={fmt} promo={editing === "new" ? null : editing} products={products} teams={teams} onDone={() => setEditing(null)} />
       ) : (
         mayEdit && (
           <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
@@ -47,6 +61,9 @@ export function PromosEditor({ promos, products, org, mayEdit }: { promos: Promo
                     {p.name} <StateTag state={p.state} />
                   </p>
                   <p className="text-meta text-ink-2">{promoTerms(fmt, p)}</p>
+                  <p className="mt-0.5">
+                    <DivisionTags teams={p.teams} />
+                  </p>
                   <p className="text-meta text-ink-3">
                     {p.productIds === null ? "Every product" : p.productIds.map(name).join(", ")}
                     {" · "}
@@ -71,7 +88,7 @@ export function PromosEditor({ promos, products, org, mayEdit }: { promos: Promo
 
 type Tier = { minQty: string; percent: string };
 
-function PromoForm({ fmt, promo, products, onDone }: { fmt: Format; promo: PromoRow | null; products: ProductRef[]; onDone: () => void }) {
+function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo: PromoRow | null; products: ProductRef[]; teams: DivisionOption[]; onDone: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [name, setName] = useState(promo?.name ?? "");
@@ -85,6 +102,8 @@ function PromoForm({ fmt, promo, products, onDone }: { fmt: Format; promo: Promo
   );
   const [every, setEvery] = useState(promo ? promo.productIds === null : true);
   const [picked, setPicked] = useState<string[]>(promo?.productIds ?? []);
+  // Someone with one division starts with it; nobody else gets one picked for them.
+  const [teamIds, setTeamIds] = useState<string[]>(promo?.teamIds ?? (teams.length === 1 ? [teams[0].id] : []));
   const [startsOn, setStartsOn] = useState(promo?.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(promo?.endsOn ?? "");
   const [isActive, setActive] = useState(promo?.isActive ?? true);
@@ -106,6 +125,7 @@ function PromoForm({ fmt, promo, products, onDone }: { fmt: Format; promo: Promo
           ? tiers.filter((t) => t.minQty.trim() || t.percent.trim()).map((t) => ({ minQty: whole(t.minQty) ?? 0, percentBp: toBasisPoints(t.percent) ?? 0 }))
           : [],
       productIds: every ? null : picked,
+      teamIds,
       startsOn: startsOn || null,
       endsOn: endsOn || null,
       isActive,
@@ -117,6 +137,7 @@ function PromoForm({ fmt, promo, products, onDone }: { fmt: Format; promo: Promo
     if (kind === "free_goods" && !input.freeQty) problems.free = "A whole number.";
     if (kind === "tiered" && (!input.tiers.length || input.tiers.some((t) => !t.minQty || !t.percentBp))) problems.tiers = "Each tier needs a quantity and a percent.";
     if (!every && picked.length === 0) problems.productIds = "Pick at least one product, or choose every product.";
+    if (teamIds.length === 0) problems.teamIds = "Pick the divisions it's for.";
     if (Object.keys(problems).length) {
       setFields(problems);
       setError("Some fields need a look.");
@@ -222,6 +243,8 @@ function PromoForm({ fmt, promo, products, onDone }: { fmt: Format; promo: Promo
             {fields.tiers && <p className="mt-1 text-meta text-danger">{fields.tiers}</p>}
           </fieldset>
         )}
+
+        <DivisionPicker what="promo" options={teams} value={teamIds} onChange={setTeamIds} error={fields.teamIds} />
 
         <fieldset>
           <legend className="mb-2 text-sm font-semibold">Products</legend>

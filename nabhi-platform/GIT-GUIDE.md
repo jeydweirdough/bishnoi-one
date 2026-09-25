@@ -4,6 +4,10 @@ How to clone, pull and push **just the Nabhi Platform (Platform Admin)**. For th
 the branches fit together, see `README.md` at the top of the `main` branch:
 https://github.com/jeydweirdough/nabhi/blob/main/README.md
 
+Every feature you build here is measured against the benchmark in
+`benchmarks/` on `main`; check its row before you build:
+https://github.com/jeydweirdough/nabhi/blob/main/benchmarks/README.md
+
 Branch: **`nabhi-platform`**. It holds only this app, at the top level:
 
 ```

@@ -159,6 +159,8 @@ class Company(Owned, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(160), index=True)
     status: Mapped[str] = mapped_column(String(16), default="prospect")
+    # Which price group's prices it gets (Hospital, Drugstore chain...). None: none.
+    price_group_code: Mapped[str | None] = mapped_column(ForeignKey("nbcm_price_groups.code", ondelete="SET NULL"), index=True, default=None)
     industry: Mapped[str | None] = mapped_column(String(80), default=None)
     website: Mapped[str | None] = mapped_column(String(200), default=None)
     email: Mapped[str | None] = mapped_column(String(254), default=None)
@@ -275,7 +277,12 @@ class Product(Base):
     strength: Mapped[str | None] = mapped_column(String(60), default=None)
     form: Mapped[str | None] = mapped_column(String(60), default=None)
     unit: Mapped[str] = mapped_column(String(30), default="piece")
+    # For VAT, as Finance's tax pack names it: standard, zero_rated or exempt.
+    vat_category: Mapped[str] = mapped_column(String(20), default="standard")
     is_active: Mapped[bool] = mapped_column(default=True)
+    # The product in Nabhi Inventory this one is, when the list comes from there:
+    # then its code, name, unit, state and SRP are Inventory's.
+    inventory_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -333,6 +340,8 @@ class Promo(Base):
     tiers: Mapped[list] = mapped_column(JSON, default=list)
     # None: every product.
     product_ids: Mapped[list | None] = mapped_column(JSON, default=None)
+    # The divisions (teams) it's for. Nobody outside them sees it or quotes it.
+    team_ids: Mapped[list] = mapped_column(JSON, default=list)
     starts_on: Mapped[str | None] = mapped_column(String(10), default=None)
     ends_on: Mapped[str | None] = mapped_column(String(10), default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -352,6 +361,8 @@ class Bundle(Base):
     as_one_line: Mapped[bool] = mapped_column(default=True)
     # [{"productId": "...", "qty": 2}, ...]
     items: Mapped[list] = mapped_column(JSON, default=list)
+    # The divisions (teams) it's for. Nobody outside them sees it or quotes it.
+    team_ids: Mapped[list] = mapped_column(JSON, default=list)
     starts_on: Mapped[str | None] = mapped_column(String(10), default=None)
     ends_on: Mapped[str | None] = mapped_column(String(10), default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -389,6 +400,15 @@ class SalesSettings(Base):
     quote_prefix: Mapped[str] = mapped_column(String(10), default="Q")
     quote_valid_days: Mapped[int] = mapped_column(Integer, default=30)
     quote_terms: Mapped[str | None] = mapped_column(Text, default=None)
+    # The last time the product list was brought over from Inventory, and why
+    # the last try failed (None: it didn't).
+    inventory_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    inventory_error: Mapped[str | None] = mapped_column(String(300), default=None)
+    # How a line is priced, in order (app/conditions.py): where its price comes
+    # from, the adjustments after it, and whether Finance adds tax.
+    pricing_procedure: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # Whether catalogue prices already include VAT.
+    prices_include_tax: Mapped[bool] = mapped_column(default=True)
 
 
 # --- quotes --------------------------------------------------------------------------------
@@ -423,6 +443,9 @@ class Quote(Owned, Base):
     promo_discount_centavos: Mapped[int] = mapped_column(Integer, default=0)
     discount_centavos: Mapped[int] = mapped_column(Integer, default=0)
     total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    # Finance's tax on it, as the invoice will show it: its summary rows and
+    # the amount due. None: priced without the tax step.
+    tax: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     approval_status: Mapped[str] = mapped_column(String(10), default="none", index=True)
     approval_reasons: Mapped[list] = mapped_column(JSON, default=list)
@@ -625,3 +648,47 @@ class RouteDay(Base):
     last_lat: Mapped[float] = mapped_column(Float)
     last_lng: Mapped[float] = mapped_column(Float)
 
+
+# --- price rules (app/conditions.py) ------------------------------------------------------------
+
+
+class PriceGroup(Base):
+    """A group of customers priced alike: Hospital, Drugstore chain, Clinic."""
+
+    __tablename__ = "nbcm_price_groups"
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+CONDITION_KINDS = ("group_price", "volume", "surcharge")
+
+
+class PriceCondition(Base):
+    """One pricing rule, over the days it applies.
+
+    group_price: a unit price for a price group (and optionally one price type).
+    volume: a percent off that grows with quantity (tiers).
+    surcharge: an amount added per unit, or a percent of the line.
+    A product of None: every product. A group of None: every customer."""
+
+    __tablename__ = "nbcm_price_conditions"
+    __table_args__ = (CheckConstraint("kind IN ('group_price', 'volume', 'surcharge')", name="condition_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(12), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    product_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_products.id", ondelete="CASCADE"), index=True, default=None)
+    price_group_code: Mapped[str | None] = mapped_column(ForeignKey("nbcm_price_groups.code", ondelete="CASCADE"), index=True, default=None)
+    price_type_code: Mapped[str | None] = mapped_column(ForeignKey("nbcm_price_types.code", ondelete="CASCADE"), default=None)
+    amount_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
+    percent_bp: Mapped[int | None] = mapped_column(Integer, default=None)
+    # volume: [{"minQty": 20, "percentBp": 300}, ...]
+    tiers: Mapped[list] = mapped_column(JSON, default=list)
+    starts_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    ends_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

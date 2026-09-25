@@ -31,7 +31,9 @@ from app.api import Api, iso, not_found, person_out
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import check_extra
+from app.inventory import sync_if_stale
 from app.models import Company, Contact, Quote, StoredFile, Team, User
+from app.finance import TaxUnavailable, add_tax
 from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
@@ -112,6 +114,23 @@ def customer_of(db: Session, access: Access, kind: str, record_id: str) -> tuple
 def pricing_team(company: Company | None, contact: Contact | None) -> str | None:
     """Whose prices apply: the team of whoever looks after the customer."""
     return (contact or company).team_id
+
+
+def pricing_group(company: Company | None, contact: Contact | None) -> str | None:
+    """The customer's price group: its company's (a contact is priced as their company)."""
+    owner = company or (contact.company if contact else None)
+    return owner.price_group_code if owner else None
+
+
+def book_for(db: Session, company: Company | None, contact: Contact | None, on: str):
+    return price_book(db, pricing_team(company, contact), on, pricing_group(company, contact))
+
+
+def with_tax(settings, book, priced: dict) -> dict:
+    """The tax step, when the price rules have it on (app/finance.py)."""
+    if not book.procedure.get("tax"):
+        return priced
+    return add_tax(settings, priced, book.products, book.bundles, book.settings.prices_include_tax)
 
 
 def reachable(query, access: Access):
@@ -195,6 +214,8 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         "promoDiscountCentavos": q.promo_discount_centavos,
         "discountCentavos": q.discount_centavos,
         "totalCentavos": q.total_centavos,
+        # Finance's tax, as the invoice will show it; None when priced without the tax step.
+        "tax": q.tax,
         "state": state_of(q),
         "approval": {
             "status": q.approval_status,
@@ -229,14 +250,20 @@ Kind = Literal["companies", "contacts"]
 @router.get("/{kind}/{record_id}/price-list")
 def read_price_list(access: View, db: DB, settings: SettingsDep, kind: Kind, record_id: str) -> dict:
     company, contact = customer_of(db, access, kind, record_id)
-    return price_list_out(price_book(db, pricing_team(company, contact), today(settings.org_timezone)))
+    sync_if_stale(db, settings)
+    return price_list_out(book_for(db, company, contact, today(settings.org_timezone)))
 
 
 @router.post("/{kind}/{record_id}/quotes/preview")
 def preview_quote(access: Create, db: DB, settings: SettingsDep, kind: Kind, record_id: str, body: QuoteIn) -> dict:
     company, contact = customer_of(db, access, kind, record_id)
-    book = price_book(db, pricing_team(company, contact), today(settings.org_timezone))
-    return price_lines(book, body.price_type, body.rx, lines_in(body))
+    book = book_for(db, company, contact, today(settings.org_timezone))
+    priced = price_lines(book, body.price_type, body.rx, lines_in(body))
+    try:
+        return with_tax(settings, book, priced)
+    except TaxUnavailable as problem:
+        # The preview still shows the prices; saving waits for the tax.
+        return priced | {"taxError": str(problem)}
 
 
 def next_number(db: Session, on: str) -> str:
@@ -280,8 +307,12 @@ async def create_quote(
 
     company, contact = customer_of(db, access, kind, record_id)
     on = today(settings.org_timezone)
-    book = price_book(db, pricing_team(company, contact), on)
+    book = book_for(db, company, contact, on)
     priced = price_lines(book, body.price_type, body.rx, lines_in(body))
+    try:
+        priced = with_tax(settings, book, priced)
+    except TaxUnavailable as problem:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"{problem} The quote wasn't saved; try again in a moment.") from None
     kind_ = book.price_type(body.price_type)
 
     problems = Problems()
@@ -328,6 +359,7 @@ async def create_quote(
         promo_discount_centavos=priced["promoDiscountCentavos"],
         discount_centavos=priced["discountCentavos"],
         total_centavos=priced["totalCentavos"],
+        tax=priced.get("tax"),
         approval_status="pending" if reasons else "none",
         approval_reasons=reasons,
         letter=(

@@ -13,7 +13,7 @@ from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
-from app.routers import adjustments, admin, auth, catalog, insight, orders, purchasing, stock, transfers, warehouses
+from app.routers import adjustments, admin, auth, catalog, insight, integration, orders, purchasing, stock, transfers, warehouses
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -56,6 +56,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "inventory"}
 
-    for module in (auth, admin, catalog, warehouses, stock, purchasing, orders, transfers, adjustments, insight):
+    for module in (auth, admin, catalog, warehouses, stock, purchasing, orders, transfers, adjustments, insight, integration):
         app.include_router(module.router)
     return app

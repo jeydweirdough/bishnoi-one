@@ -259,14 +259,58 @@ def test_a_product_in_a_bundle_stays(client, ana, ids):
     assert client.delete(f"/products/{ids['PCM-SYR']}", headers=ana).status_code == 409
 
 
+def divisions(client, headers) -> dict[str, str]:
+    """The divisions (teams) a promo or bundle can be given, by name."""
+    return {t["name"]: t["id"] for t in client.get("/promos", headers=headers).json()["teams"]}
+
+
 def test_promos_and_bundles_are_checked(client, ana, ids):
-    assert client.post("/promos", json={"name": "Half off", "kind": "percent"}, headers=ana).status_code == 422
-    r = client.post("/promos", json={"name": "Half off", "kind": "percent", "percentBp": 5000, "startsOn": "2099-01-01"}, headers=ana)
+    north = divisions(client, ana)["North"]
+    assert client.post("/promos", json={"name": "Half off", "kind": "percent", "teamIds": [north]}, headers=ana).status_code == 422
+    # A division is required.
+    assert "teamIds" in errors(client.post("/promos", json={"name": "Half off", "kind": "percent", "percentBp": 5000}, headers=ana))
+    r = client.post("/promos", json={"name": "Half off", "kind": "percent", "percentBp": 5000, "startsOn": "2099-01-01", "teamIds": [north]}, headers=ana)
     assert r.status_code == 201 and r.json()["state"] == "upcoming"
-    r = client.post("/promos", json={"name": "Old", "kind": "amount", "amountCentavos": 100, "startsOn": "2025-02-01", "endsOn": "2025-01-01"}, headers=ana)
+    assert [t["name"] for t in r.json()["teams"]] == ["North"]
+    r = client.post("/promos", json={"name": "Old", "kind": "amount", "amountCentavos": 100, "startsOn": "2025-02-01", "endsOn": "2025-01-01", "teamIds": [north]}, headers=ana)
     assert "endsOn" in errors(r)
-    bundle = {"code": "duo", "name": "Duo", "priceCentavos": 1000, "items": [{"productId": ids["AMX-500"], "qty": 1}, {"productId": ids["AMX-500"], "qty": 2}]}
+    bundle = {"code": "duo", "name": "Duo", "priceCentavos": 1000, "teamIds": [north], "items": [{"productId": ids["AMX-500"], "qty": 1}, {"productId": ids["AMX-500"], "qty": 2}]}
     assert "items" in errors(client.post("/bundles", json=bundle, headers=ana))
+
+
+def test_promos_and_bundles_are_per_division(client, ana, crew, ids):
+    """North's promo and bundle: North sees and quotes them; South never does."""
+    teams = divisions(client, ana)
+    promo = client.post("/promos", json={"name": "North only", "kind": "percent", "percentBp": 1000, "teamIds": [teams["North"]]}, headers=ana).json()
+    bundle = client.post(
+        "/bundles",
+        json={"code": "NORTH-KIT", "name": "North kit", "priceCentavos": 5000, "teamIds": [teams["North"]], "items": [{"productId": ids["AMX-500"], "qty": 1}]},
+        headers=ana,
+    ).json()
+
+    # The lists: North's people see them, South's don't; someone over every team sees all.
+    for who, sees in (("ria", True), ("lia", True), ("sam", False), ("max", True)):
+        promos = {p["id"] for p in client.get("/promos", headers=crew[who]).json()["items"]}
+        bundles = {b["id"] for b in client.get("/bundles", headers=crew[who]).json()["items"]}
+        assert (promo["id"] in promos, bundle["id"] in bundles) == (sees, sees), who
+    assert client.get("/promos", headers=crew["sam"]).json()["teams"] == [{"id": teams["South"], "name": "South"}]
+
+    # Quoting: only on a North customer's quote.
+    north_customer = company(client, crew["ria"], name="Northwind")
+    south_customer = company(client, crew["sam"], name="Southport")
+    offered = client.get(f"/companies/{north_customer['id']}/price-list", headers=crew["ria"]).json()
+    assert promo["id"] in {p["id"] for p in offered["promos"]} and bundle["id"] in {b["id"] for b in offered["bundles"]}
+    offered = client.get(f"/companies/{south_customer['id']}/price-list", headers=crew["sam"]).json()
+    assert promo["id"] not in {p["id"] for p in offered["promos"]} and bundle["id"] not in {b["id"] for b in offered["bundles"]}
+    r = preview(client, crew["sam"], south_customer, [line(ids["AMX-500"], 1, promoId=promo["id"])])
+    assert "lines.0.promoId" in errors(r)
+    r = preview(client, crew["sam"], south_customer, [{"bundleId": bundle["id"], "quantity": 1}])
+    assert "lines.0.bundleId" in errors(r)
+    assert preview(client, crew["ria"], north_customer, [line(ids["AMX-500"], 1, promoId=promo["id"])]).status_code == 200
+
+    # Outside your division it doesn't exist for you.
+    change = {"name": "Mine now", "kind": "percent", "percentBp": 1000, "teamIds": [teams["North"]]}
+    assert client.put(f"/promos/{promo['id']}", json=change, headers=crew["sam"]).status_code in (403, 404)
 
 
 def test_the_rules_can_be_changed(client, ana, crew, catalogue):

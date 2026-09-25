@@ -16,6 +16,8 @@ from app.routers.auth import attempts
 from app.security import hash_password
 
 PASSWORD = "correct horse battery"
+# The key the CRM reads the product list and stock with.
+INTEGRATION_KEY = "k" * 32
 PEOPLE = {
     "ana": "Administrator",
     "wes": "Warehouse",
@@ -47,7 +49,7 @@ def settings_for(tmp_path, **extra) -> Settings:
 @pytest.fixture
 def app(tmp_path):
     attempts.clear()
-    app = create_app(settings_for(tmp_path))
+    app = create_app(settings_for(tmp_path, integration_keys=[f"crm:{INTEGRATION_KEY}"]))
     with app.state.sessions() as db:
         for name, role in PEOPLE.items():
             role_id = db.scalar(select(Role.id).where(Role.name == role))

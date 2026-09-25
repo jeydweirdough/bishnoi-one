@@ -43,6 +43,28 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API directly. None by default.
     cors_origins: list[str] = []
 
+    # Nabhi Inventory, where the product list and stock come from: its API
+    # (https://...), and the key it gave this app (one of its INTEGRATION_KEYS,
+    # the part after "crm:"). Unset: products are kept here, by hand.
+    inventory_api_url: str | None = None
+    inventory_api_key: SecretStr | None = None
+    # Inventory's screens, for the "Add it in Inventory" link. Optional.
+    inventory_app_url: str | None = None
+
+    # Nabhi Finance, which works out tax (the price rules' last step): its API,
+    # and the key it gave this app (one of its INTEGRATION_KEYS, the part after
+    # "crm:"). Unset: quotes are priced without tax.
+    finance_api_url: str | None = None
+    finance_api_key: SecretStr | None = None
+
+    @property
+    def inventory_linked(self) -> bool:
+        return bool(self.inventory_api_url and self.inventory_api_key)
+
+    @property
+    def finance_linked(self) -> bool:
+        return bool(self.finance_api_url and self.finance_api_key)
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
@@ -52,6 +74,11 @@ class Settings(BaseSettings):
         for origin in self.cors_origins:
             if "*" in origin or not origin.startswith(("https://", "http://")) or origin.rstrip("/") != origin:
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
+        for url in (self.inventory_api_url, self.inventory_app_url):
+            if url and (not url.startswith(("https://", "http://")) or url.endswith("/")):
+                raise ValueError(f"INVENTORY_API_URL and INVENTORY_APP_URL are addresses like https://inventory-api.example.com, with no / at the end, not {url!r}.")
+        if self.finance_api_url and (not self.finance_api_url.startswith(("https://", "http://")) or self.finance_api_url.endswith("/")):
+            raise ValueError(f"FINANCE_API_URL is an address like https://finance-api.example.com, with no / at the end, not {self.finance_api_url!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
         return self

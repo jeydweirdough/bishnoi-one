@@ -21,9 +21,9 @@ class Demo:
 
 
 DEMO_ACCOUNTS: tuple[Demo, ...] = (
-    Demo("Pharmacy", "ruth@pharmacrm.test", "Ruth Sarmiento", "Pharmacist · checks, verifies and dispenses", "Pharmacist", "PRC-0048213"),
-    Demo("Pharmacy", "migs@pharmacrm.test", "Miguel Santos", "Pharmacy Assistant · takes prescriptions in, sells", "Pharmacy Assistant"),
-    Demo("Pharmacy", "tess@pharmacrm.test", "Tess Villanueva", "Administrator · users, roles, everything", "Administrator", "PRC-0031977"),
+    Demo("Pharmacist", "ruth@pharmacrm.test", "Ruth Sarmiento", "Pharmacist · checks, verifies and dispenses", "Pharmacist", "PRC-0048213"),
+    Demo("Pharmacy Assistant", "migs@pharmacrm.test", "Miguel Santos", "Pharmacy Assistant · takes prescriptions in, sells", "Pharmacy Assistant"),
+    Demo("Administrator", "tess@pharmacrm.test", "Tess Villanueva", "Administrator · users, roles, everything", "Administrator", "PRC-0031977"),
 )
 
 DEMO_CATEGORIES = ("Antibiotics", "Analgesics", "Antihypertensives", "Antidiabetics", "Vitamins & supplements", "Cough & cold")

@@ -58,6 +58,10 @@ into `main` (README section 6). Before merging:
    the API port).
 4. **Nothing is committed that shouldn't be:** no `.env`, no `node_modules/`,
    no `.venv/`, no database files.
+5. **It meets the benchmark** ([`benchmarks/`](benchmarks/README.md)): each
+   feature it adds follows its row's decision in `benchmark-matrix.md` (an
+   `open` row needs deciding first) and the rules in `patterns-to-adopt.md`,
+   and its "Ours today" cells are filled in.
 
 Then **merge** it. About a minute later, Sync branches creates the
 `nabhi-<name>` branch. Afterwards:
@@ -95,6 +99,43 @@ Set up once:
 
 To deploy one project now, changed or not: **Actions → Deploy → Run
 workflow**, and type its project name (e.g. `nabhi-crm-backend`).
+
+---
+
+## Linking the CRM to Inventory
+
+The CRM's products come from Inventory, with their SRP, and it shows
+Inventory's stock on Products and on new quotes. The two APIs talk through a
+shared key. Set up once, on Vercel (each project → **Settings → Environment
+Variables**, then redeploy it):
+
+1. Make a key: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+2. **nabhi-inventory-backend:** `INTEGRATION_KEYS` = `["crm:<the key>"]`.
+3. **nabhi-crm-backend:**
+   - `INVENTORY_API_URL` = the Inventory API's address, e.g.
+     `https://nabhi-inventory-backend.vercel.app` (no `/` at the end).
+   - `INVENTORY_API_KEY` = the key.
+   - `INVENTORY_APP_URL` = Inventory's screens, for the "Add it in Inventory"
+     button (optional).
+
+Afterwards:
+
+- Products are added and changed in Inventory. The CRM brings the list over
+  every 15 minutes, when someone opens Products or a new quote, or at once
+  with **Sync now** on Products. It matches products by SKU = product code.
+  A product the CRM had before the link, with the same code, is taken over
+  rather than copied.
+- The SRP comes from Inventory's selling price, as the CRM's **SRP** price
+  type. Each team (division) can still quote its own price over it under
+  **Products → Special prices**. The other price types are still set in the
+  CRM.
+- A product discontinued in Inventory, or removed there, is switched off in
+  the CRM, not deleted: old quotes keep it.
+- Without these settings, the CRM keeps its own product list, as before.
+
+To change the key, add the new one to `INTEGRATION_KEYS` next to the old one
+(`["crm:<new>", "crm:<old>"]`), switch the CRM to the new one, then remove the
+old one.
 
 ---
 
