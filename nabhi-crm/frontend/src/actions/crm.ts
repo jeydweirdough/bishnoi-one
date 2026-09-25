@@ -13,6 +13,8 @@ export type CompanyInput = {
   name: string;
   allowDuplicate?: boolean;
   status: CompanyStatus;
+  /** The price group whose prices it gets (Settings → Price rules). */
+  priceGroupCode?: string | null;
   industry: string | null;
   website: string | null;
   email: string | null;

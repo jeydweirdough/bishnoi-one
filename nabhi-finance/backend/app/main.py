@@ -12,7 +12,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.migrate import upgrade
-from app.routers import auth, finance
+from app.routers import auth, finance, integration, tax
+from app.tax import rates as tax_rates
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -33,6 +34,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Nabhi Finance API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    # Each country pack's dated rates, and the company's tax registration row.
+    tax_rates.seed(app.state.sessions)
 
     app.add_middleware(
         CORSMiddleware,
@@ -56,4 +59,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(finance.router)
+    app.include_router(tax.router)
+    app.include_router(integration.router)
     return app

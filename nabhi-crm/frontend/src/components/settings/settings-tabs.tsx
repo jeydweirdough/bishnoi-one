@@ -8,6 +8,7 @@ export const SETTINGS_TABS = [
   { href: "/admin/settings/company", label: "Business & quotes", permission: "admin.settings" },
   { href: "/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
   { href: "/admin/settings/pricing", label: "Pricing & retention", permission: "products.view" },
+  { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
 ] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["href"];

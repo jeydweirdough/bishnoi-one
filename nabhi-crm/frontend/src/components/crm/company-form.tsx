@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { createCompany, updateCompany, type CompanyInput } from "../../actions/crm";
 import type { Assignable, CompanyDetail, CompanyStatus, CustomerType, Duplicate, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
@@ -19,7 +19,20 @@ const TEXT = ["name", "industry", "website", "email", "phone", "address", "city"
 type Text = (typeof TEXT)[number];
 
 /** Adding a company, or changing one. The form is laid out as an admin set it (Settings → Forms). */
-export function CompanyForm({ people, types, layout, company }: { people: Assignable[]; types: CustomerType[]; layout: FormLayout; company?: CompanyDetail }) {
+export function CompanyForm({
+  people,
+  types,
+  layout,
+  company,
+  priceGroups = [],
+}: {
+  people: Assignable[];
+  types: CustomerType[];
+  layout: FormLayout;
+  company?: CompanyDetail;
+  /** Settings → Price rules. None: the field isn't shown. */
+  priceGroups?: { code: string; name: string; isActive: boolean }[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const allFields = layout.sections.flatMap((s) => s.fields);
@@ -28,6 +41,7 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
   );
   const can = useCan();
   const [status, setStatus] = useState<CompanyStatus>(company?.status ?? types.find((t) => t.isActive)?.code ?? "");
+  const [priceGroup, setPriceGroup] = useState(company?.priceGroupCode ?? "");
   const [ownerId, setOwnerId] = useState(company?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -43,6 +57,7 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
       ...(Object.fromEntries(TEXT.filter((k) => shown.has(k)).map((k) => [k, values[k].trim() || null])) as Record<Text, string | null>),
       name: values.name.trim(),
       status,
+      ...(priceGroups.length ? { priceGroupCode: priceGroup || null } : {}),
       ownerId: ownerId || null,
       extra: extraChanges(allFields, extra),
     };
@@ -52,6 +67,7 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
         const change: Partial<CompanyInput> = {};
         for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
         if (status !== company.status) change.status = status;
+        if (priceGroups.length && (priceGroup || null) !== (company.priceGroupCode ?? null)) change.priceGroupCode = priceGroup || null;
         if (ownerId !== company.owner.id) change.ownerId = ownerId;
         const extraChange = extraChanges(allFields, extra, company.extra);
         if (extraChange) change.extra = extraChange;
@@ -138,6 +154,24 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
       className="space-y-7"
     >
       <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
+
+      {priceGroups.length > 0 && (
+        <Field label="Price group" optional error={fields.priceGroupCode} hint="Its group's prices come first on quotes (Settings → Price rules).">
+          {(p) => (
+            <Select {...p} value={priceGroup} onChange={(e) => setPriceGroup(e.target.value)}>
+              <option value="">No group: list prices</option>
+              {priceGroups
+                .filter((g) => g.isActive || g.code === company?.priceGroupCode)
+                .map((g) => (
+                  <option key={g.code} value={g.code}>
+                    {g.name}
+                    {g.isActive ? "" : " (switched off)"}
+                  </option>
+                ))}
+            </Select>
+          )}
+        </Field>
+      )}
 
       <FormError message={error} />
       {duplicates.length > 0 && (

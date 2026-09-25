@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API directly. None by default.
     cors_origins: list[str] = []
 
+    # Other Nabhi apps allowed to ask for tax (the /integration endpoints), as
+    # name:key pairs in JSON, e.g. ["crm:<a long random key>"]. The app sends
+    # its key in X-Nabhi-Key. Empty: nothing outside can ask.
+    integration_keys: list[SecretStr] = []
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
@@ -45,6 +50,10 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        for key in self.integration_keys:
+            name, _, secret = key.get_secret_value().partition(":")
+            if not name or len(secret) < 24:
+                raise ValueError("INTEGRATION_KEYS must list name:key pairs, each key at least 24 characters.")
         return self
 
 

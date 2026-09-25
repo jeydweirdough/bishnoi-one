@@ -77,6 +77,8 @@ function modulePages(m: ModuleAccess): Page[] {
       { href: `${base}/approvals`, label: "Approvals", icon: "approvals" },
       { href: `${base}/letters`, label: "Guarantee letters", icon: "letters" },
       { href: `${base}/payments`, label: "Letter payments", icon: "payments" },
+      // Tax is Finance's for every Nabhi app: registration, rates, and what a sale comes to.
+      { href: `${base}/tax`, label: "Tax", icon: "money" },
     ];
   }
   if (m.key === "inventory") {

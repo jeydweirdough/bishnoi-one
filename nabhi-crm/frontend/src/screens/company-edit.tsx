@@ -6,6 +6,7 @@ import type { Assignable, CompanyDetail, CustomerType } from "@/src/platform/lib
 import { NoAccess } from "../components/admin/words";
 import { CompanyForm } from "../components/crm/company-form";
 import { formLayout } from "../components/extra/load";
+import { priceGroupsFor } from "../components/catalogue/price-groups";
 
 export const metadata = { title: "Edit customer" };
 
@@ -13,11 +14,12 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
   const me = await getCompanyMe();
   if (!can(me, "customers.edit")) return <NoAccess what="changing customers" />;
   const { id } = await params;
-  const [company, people, types, layout] = await Promise.all([
+  const [company, people, types, layout, priceGroups] = await Promise.all([
     load<CompanyDetail>(`/companies/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     load<CustomerType[]>("/customer-types"),
     formLayout("company"),
+    priceGroupsFor(me),
   ]);
   if (!company.can.edit) notFound();
   return (
@@ -30,7 +32,7 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
         ]}
       />
       <Sheet className="px-5 pt-5 pb-6">
-        <CompanyForm people={people} types={types} layout={layout} company={company} />
+        <CompanyForm people={people} types={types} layout={layout} company={company} priceGroups={priceGroups} />
       </Sheet>
     </>
   );

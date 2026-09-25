@@ -69,3 +69,19 @@ one email make it wait 15 minutes (`LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`).
 | `tests/` | Tests (`uv run pytest`) |
 
 Port: screens on 4303, this API on 8303 (screens + 4000).
+
+## Tax
+
+Finance owns tax for every Nabhi app (benchmarks/decisions.md, D8): quotes,
+pharmacy sales and invoices are all taxed by the rules here.
+
+| Path | What it's for |
+|---|---|
+| `app/tax/engine.py` | The engine: a sale's lines in, what its invoice shows out. Knows no country |
+| `app/tax/packs/ph.py` | The Philippines: VAT, zero-rated, exempt, senior citizen and PWD, percentage tax, the Sales Invoice summary. **Confirm with your accountant before filing** |
+| `app/tax/rates.py` | Dated rates in `nbfi_tax_rates`: seeded from the packs on start; a change in the law is a new row from its first day |
+| `app/routers/tax.py` | `/tax/setup`, `/tax/profile` (admins), `/tax/rates` (admins), `/tax/compute` |
+| `app/routers/integration.py` | `/integration/tax/setup` and `/integration/tax/compute` for the other apps, with `X-Nabhi-Key` |
+
+Other apps get a key in `INTEGRATION_KEYS` (see `.env.example`). Screens: **Tax** in the sidebar,
+with Registration, Rates and Try a sale.

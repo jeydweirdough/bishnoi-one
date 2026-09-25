@@ -17,7 +17,7 @@ from app.api import Api, camel, changed, check_email, digits, duplicates_error, 
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.extra import check_extra, check_required
-from app.models import Activity, Company, Contact
+from app.models import Activity, Company, Contact, PriceGroup
 from app.routers.activities import activity_out
 from app.routers.customer_types import check_type, first_type
 from app.scope import owner_for, reaches, within
@@ -33,6 +33,8 @@ Delete = Annotated[Access, Depends(require("customers.delete"))]
 
 class CompanyFields(Api):
     status: str | None = Field(None, max_length=40)
+    # The price group whose prices it gets (Settings → Price rules). A null: none.
+    price_group_code: str | None = Field(None, max_length=40)
     industry: str | None = Field(None, max_length=80)
     website: str | None = Field(None, max_length=200)
     email: str | None = Field(None, max_length=254)
@@ -68,6 +70,15 @@ class CompanyPatch(CompanyFields):
     name: str | None = Field(None, min_length=1, max_length=160)
 
 
+def check_price_group(db: Session, code: str | None) -> None:
+    """A price group that's switched on (a customer already in a switched-off one stays)."""
+    if code is None:
+        return
+    group = db.get(PriceGroup, code)
+    if group is None or not group.is_active:
+        raise field_error("priceGroupCode", "Pick a price group from the list.")
+
+
 def can_of(company: Company, access: Access) -> dict:
     inside = reaches(company, access)
     return {"edit": inside and access.can("customers.edit"), "delete": inside and access.can("customers.delete")}
@@ -78,6 +89,7 @@ def company_row(company: Company, access: Access, contacts: int = 0, last_activi
         "id": company.id,
         "name": company.name,
         "status": company.status,
+        "priceGroupCode": company.price_group_code,
         "industry": company.industry,
         "website": company.website,
         "email": company.email,
@@ -163,6 +175,7 @@ def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> 
     owner = owner_for(db, access, body.owner_id)
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     values["status"] = check_type(db, body.status) if body.status else first_type(db)
+    check_price_group(db, body.price_group_code)
     values["extra"] = check_extra(db, "company", body.extra)
     company = Company(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
     check_required(db, "company", company)
@@ -208,6 +221,8 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
         raise field_error("status", "Pick a type.")
     if wanted.get("status") and wanted["status"] != company.status:
         check_type(db, wanted["status"])
+    if wanted.get("price_group_code") and wanted["price_group_code"] != company.price_group_code:
+        check_price_group(db, wanted["price_group_code"])
     if "extra" in wanted:
         wanted["extra"] = check_extra(db, "company", wanted["extra"], company.extra)
     if "owner_id" in wanted:

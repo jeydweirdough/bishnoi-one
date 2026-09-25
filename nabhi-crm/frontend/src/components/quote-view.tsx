@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import { PriceSource, RuleAdjustments, TaxSummary } from "./tax-summary";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Flag } from "@/src/platform/ui/marks";
@@ -76,7 +77,10 @@ export async function QuoteView({
                       {line.quantity}
                       {line.freeQuantity > 0 && <span className="block text-meta text-ink-2">+{line.freeQuantity} free</span>}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{fmt.peso(line.unitPriceCentavos)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {fmt.peso(line.unitPriceCentavos)}
+                      <PriceSource source={line.priceSource} />
+                    </td>
                     <td className="px-3 py-2.5 text-meta text-ink-2">
                       {line.promoName && (
                         <span className="block">
@@ -89,9 +93,12 @@ export async function QuoteView({
                           Extra {discountLabel(fmt, line)} (−{fmt.peso(line.discountCentavos)})
                         </span>
                       )}
+                      <RuleAdjustments line={line} fmt={fmt} />
                       {/* A set is its own deal; it takes no promo and no manual discount. */}
                       {line.bundleId && !line.contents && <span className="block">From {line.bundleName}</span>}
-                      {!line.promoName && !discountLabel(fmt, line) && !line.bundleId && <span className="text-ink-3">—</span>}
+                      {!line.promoName && !discountLabel(fmt, line) && !line.bundleId && !line.volumeDiscountCentavos && !line.surchargeCentavos && (
+                        <span className="text-ink-3">—</span>
+                      )}
                       {line.bundleId && line.contents && <span className="text-ink-3">The set price</span>}
                     </td>
                     <td className="py-2.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(line.totalCentavos)}</td>
@@ -121,6 +128,7 @@ export async function QuoteView({
               <span>Total</span>
               <span className="tabular-nums">{fmt.peso(quote.totalCentavos)}</span>
             </p>
+            {quote.tax && <TaxSummary tax={quote.tax} fmt={fmt} />}
           </div>
         </Sheet>
 
