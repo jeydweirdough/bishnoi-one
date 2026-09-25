@@ -38,3 +38,12 @@ export async function saveCompanySettings(change: Partial<Omit<CompanySettings, 
     return saved;
   });
 }
+
+/** One more choice on a pick-list, from the form it's missing from. Answers with the choice as kept. */
+export async function addChoice(entity: CustomEntity, key: string, label: string): Promise<Result<{ option: string }>> {
+  return attempt(async () => {
+    const added = await api.post<{ option: string }>(`/admin/forms/${enc(entity)}/fields/${enc(key)}/options`, { label });
+    refresh();
+    return { option: added.option };
+  });
+}

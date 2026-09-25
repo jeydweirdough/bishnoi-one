@@ -10,6 +10,7 @@ import type { Org } from "@/src/platform/lib/types";
 import { receiveDelivery } from "../actions/inventory";
 import type { PO, Reference } from "../lib/types";
 import { useSave } from "./lines";
+import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; orderLineId: string | null; quantity: string; cost: string; batchNo: string; manufacturedOn: string; expiresOn: string; serials: string; outstanding: number | null };
 
@@ -20,10 +21,18 @@ const cell = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm 
  * filled in; each line takes its batch, expiry and serial numbers as the
  * product needs them.
  */
-export function ReceiveForm({ org, reference, order }: { org: Org; reference: Reference; order?: PO }) {
+export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; reference: Reference; order?: PO; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
   const { pending, error, fields, save } = useSave();
-  const byId = new Map(reference.products.map((p) => [p.id, p]));
+  // Added from here ("+ New …"), listed until the page's own lists have them.
+  const [added, setAdded] = useState<Added[]>([]);
+  const remember = (a: Added) => setAdded((list) => [...list, a]);
+  const addedOf = (kind: Added["kind"], have: Set<string>) => added.filter((a) => a.kind === kind && !have.has(a.value));
+  const products = [
+    ...reference.products,
+    ...addedOf("product", new Set(reference.products.map((p) => p.id))).map((a) => ({ id: a.value, sku: a.product!.sku, name: a.product!.name, unit: a.product!.unit, costPrice: a.product!.costPrice, sellingPrice: a.product!.sellingPrice, status: "active" as const, supplierId: null, trackBatches: a.product!.trackBatches, trackExpiry: a.product!.trackExpiry, trackSerials: a.product!.trackSerials })),
+  ];
+  const byId = new Map(products.map((p) => [p.id, p]));
   const [supplierId, setSupplierId] = useState(order?.supplier.id ?? "");
   const [warehouseId, setWarehouseId] = useState(order?.warehouse.id ?? reference.warehouses.find((w) => w.isActive)?.id ?? "");
   const [locationId, setLocationId] = useState("");
@@ -35,7 +44,20 @@ export function ReceiveForm({ org, reference, order }: { org: Org; reference: Re
       ? order.lines.filter((l) => l.outstanding > 0).map((l) => ({ ...blank(), productId: l.product.id, orderLineId: l.id, quantity: String(l.outstanding), cost: fmt.pesosText(l.unitCost), outstanding: l.outstanding }))
       : [blank()],
   );
-  const locations = reference.warehouses.find((w) => w.id === warehouseId)?.locations.filter((l) => l.isActive) ?? [];
+  const locations = [
+    ...(reference.warehouses.find((w) => w.id === warehouseId)?.locations.filter((l) => l.isActive) ?? []),
+    ...added.filter((a) => a.kind === "location").map((a) => ({ id: a.value, code: a.label.split(" · ")[0], name: a.label.split(" · ").slice(1).join(" · "), isDefault: false, isActive: true })),
+  ];
+  const suppliers = [...reference.suppliers.filter((s) => s.isActive).map((s) => ({ value: s.id, label: s.name })), ...addedOf("supplier", new Set(reference.suppliers.map((s) => s.id))).map((a) => ({ value: a.value, label: a.label }))];
+  const warehouses = [...reference.warehouses.filter((w) => w.isActive).map((w) => ({ value: w.id, label: w.name })), ...addedOf("warehouse", new Set(reference.warehouses.map((w) => w.id))).map((a) => ({ value: a.value, label: a.label }))];
+
+  /** A product made from here goes on the first empty line. */
+  function productAdded(a: Added) {
+    remember(a);
+    const empty = rows.findIndex((r) => !r.productId);
+    const row = { ...blank(), productId: a.value, cost: fmt.pesosText(a.product?.costPrice ?? 0) };
+    setRows(empty >= 0 ? rows.map((r, j) => (j === empty ? { ...row, quantity: r.quantity } : r)) : [...rows, row]);
+  }
 
   const set = (i: number, change: Partial<Row>) =>
     setRows(rows.map((r, j) => {
@@ -67,22 +89,27 @@ export function ReceiveForm({ org, reference, order }: { org: Org; reference: Re
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-4">
           {!order && (
-            <Field label="Supplier" optional error={fields.supplierId}>
+            <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
+              <Field label="Supplier" optional error={fields.supplierId}>
+                {(p) => (
+                  <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                    <option value="">None</option>
+                    {suppliers.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </Select>
+                )}
+              </Field>
+            </WithAdd>
+          )}
+          <WithAdd can={canAdd.warehouse && !order} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); setLocationId(""); }} />}>
+            <Field label="Into warehouse" error={fields.warehouseId}>
               {(p) => (
-                <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                  <option value="">None</option>
-                  {reference.suppliers.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLocationId(""); }}>
+                  {warehouses.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
                 </Select>
               )}
             </Field>
-          )}
-          <Field label="Into warehouse" error={fields.warehouseId}>
-            {(p) => (
-              <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLocationId(""); }}>
-                {reference.warehouses.filter((w) => w.isActive).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </Select>
-            )}
-          </Field>
+          </WithAdd>
+          <WithAdd can={canAdd.location} add={<QuickAdd kind="location" label="New" context={{ warehouseId }} onAdded={(a) => { remember(a); setLocationId(a.value); }} />}>
           <Field label="Location" error={fields.locationId}>
             {(p) => (
               <Select {...p} value={locationId} onChange={(e) => setLocationId(e.target.value)}>
@@ -90,6 +117,7 @@ export function ReceiveForm({ org, reference, order }: { org: Org; reference: Re
               </Select>
             )}
           </Field>
+          </WithAdd>
           <Field label="Delivery receipt / invoice no." optional error={fields.deliveryRef}>{(p) => <Input {...p} value={deliveryRef} onChange={(e) => setDeliveryRef(e.target.value)} />}</Field>
         </div>
       </Sheet>
@@ -120,7 +148,7 @@ export function ReceiveForm({ org, reference, order }: { org: Org; reference: Re
                       ) : (
                         <select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value })} className={`${cell} w-full`}>
                           <option value="">Pick a product…</option>
-                          {reference.products.filter((x) => x.status !== "discontinued").map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
+                          {products.filter((x) => x.status !== "discontinued").map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
                         </select>
                       )}
                       {p?.trackSerials && (
@@ -157,9 +185,12 @@ export function ReceiveForm({ org, reference, order }: { org: Org; reference: Re
           </table>
         </div>
         {!order && (
-          <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>
-            Add a line
-          </Button>
+          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+            <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>
+              Add a line
+            </Button>
+            {canAdd.product && <QuickAdd kind="product" label="New product (not in the list)" context={{ org, units: reference.units.filter((u) => u.isActive) }} onAdded={productAdded} />}
+          </div>
         )}
         {order && <p className="mt-2 text-meta text-ink-3">Received less than what&apos;s owed? Put what came: the rest stays on backorder.</p>}
       </Sheet>

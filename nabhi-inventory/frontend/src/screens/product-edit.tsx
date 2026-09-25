@@ -2,7 +2,7 @@ import { PageHeader } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { ProductForm } from "../components/product-form";
 import { NoAccess } from "../components/ui";
-import { context, type Params, type Search } from "../lib/page";
+import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import type { Product, ProductRow, Reference } from "../lib/types";
 
 // Adding a product, and changing one: the same form.
@@ -24,7 +24,7 @@ export async function NewProductPage({ searchParams }: { searchParams: Search })
       <PageHeader crumbs={[{ href: "/products", label: "Products" }]} title="Add a product">
         Its code and name, what it costs, when to reorder, and how it&apos;s tracked. Stock comes in by receiving it.
       </PageHeader>
-      <ProductForm org={me.org} reference={ref} parents={parents} locked={false} preset={{ parentId: typeof parent === "string" ? parent : undefined }} />
+      <ProductForm org={me.org} reference={ref} parents={parents} locked={false} canAdd={canAddFrom(may)} preset={{ parentId: typeof parent === "string" ? parent : undefined }} />
     </>
   );
 }
@@ -39,7 +39,7 @@ export async function EditProductPage({ params }: { params: Params<{ id: string 
   return (
     <>
       <PageHeader crumbs={[{ href: "/products", label: "Products" }, { href: `/products/${product.id}`, label: product.name }]} title={`Edit ${product.name}`} />
-      <ProductForm key={product.updatedAt} org={me.org} reference={ref} product={product} parents={parents} locked={locked} />
+      <ProductForm key={product.updatedAt} org={me.org} reference={ref} product={product} parents={parents} locked={locked} canAdd={canAddFrom(may)} />
     </>
   );
 }

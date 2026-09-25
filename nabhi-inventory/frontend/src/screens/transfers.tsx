@@ -11,7 +11,7 @@ import { TransferStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
-import { context, type Params, type Search } from "../lib/page";
+import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import type { BatchRow, Reference, Transfer, TransferBrief } from "../lib/types";
 import { availability } from "./orders";
 
@@ -148,7 +148,7 @@ export async function NewTransferPage() {
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }]} title="New transfer" />
-      <TransferForm org={me.org} reference={ref} available={available} />
+      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
     </>
   );
 }
@@ -161,7 +161,7 @@ export async function EditTransferPage({ params }: { params: Params<{ id: string
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }, { href: `/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />
-      <TransferForm org={me.org} reference={ref} transfer={t} available={available} />
+      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} transfer={t} available={available} />
     </>
   );
 }

@@ -121,6 +121,30 @@ def clean_options(options: list[str]) -> list[str]:
     return list(seen.values())
 
 
+class OptionIn(Api):
+    label: str = Field(min_length=1, max_length=80)
+
+
+@router.post("/admin/forms/{entity}/fields/{key}/options")
+def add_option(access: Manage, me: CurrentUser, db: DB, entity: Entity, key: str, body: OptionIn) -> dict:
+    """One more choice on a pick-list, added from the form it's missing from
+    (a record being filled in), without opening the forms editor. Already
+    there (upper or lower case alike): nothing changes, and it's picked."""
+    field = db.scalar(select(FormField).where(FormField.entity == entity, FormField.key == key))
+    if field is None or field.type not in WITH_OPTIONS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That field has no list to add to.")
+    label = body.label.strip()
+    current = field.options or []
+    same = next((o for o in current if o.lower() == label.lower()), None)
+    if same is None:
+        if len(current) >= 100:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "label"], "msg": "This list is full (100 choices)."}])
+        field.options = [*current, label]
+        audit(db, me, "form.option_added", target=f"{field.label}: {label}", target_type="form", target_id=entity, fields=[key])
+        db.commit()
+    return {"option": same or label, "field": field_out(field)}
+
+
 @router.put("/admin/forms/{entity}")
 def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: LayoutIn) -> dict:
     """The whole form, as the editor shows it. Built-in fields must all be on it

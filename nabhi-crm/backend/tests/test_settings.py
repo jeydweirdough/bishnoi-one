@@ -155,3 +155,17 @@ def test_company_and_quote_settings(client, crew, ana, ids):
     body = {"priceType": "PATIENT", "lines": [line(ids["AMX-500"])]}
     q = client.post(f"/companies/{acme['id']}/quotes", data={"quote": json.dumps(body)}, headers=crew["ria"]).json()
     assert q["number"].startswith("GM-") and q["terms"] == "Prices include VAT." and q["validUntil"]
+
+
+def test_a_choice_is_added_from_the_form_it_is_missing_from(client, crew, ana):
+    """Filling in a customer, the industry isn't on the list: an admin adds it
+    there and then (once, however it's capitalised)."""
+    industry = next(f for s in client.get("/forms/company", headers=ana).json()["sections"] for f in s["fields"] if f["key"] == "industry")
+    before = len(industry["options"])
+    added = client.post("/admin/forms/company/fields/industry/options", json={"label": "Veterinary clinic"}, headers=ana).json()
+    assert added["option"] == "Veterinary clinic" and len(added["field"]["options"]) == before + 1
+    again = client.post("/admin/forms/company/fields/industry/options", json={"label": "veterinary CLINIC"}, headers=ana).json()
+    assert again["option"] == "Veterinary clinic" and len(again["field"]["options"]) == before + 1
+    # Not an admin's settings to change otherwise; and only lists take choices.
+    assert client.post("/admin/forms/company/fields/industry/options", json={"label": "X"}, headers=crew["ria"]).status_code == 403
+    assert client.post("/admin/forms/company/fields/name/options", json={"label": "X"}, headers=ana).status_code == 404

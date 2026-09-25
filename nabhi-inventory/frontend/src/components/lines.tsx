@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { CellInput } from "@/src/platform/ui/field";
 import type { Format } from "@/src/platform/lib/format";
+import type { Org } from "@/src/platform/lib/types";
+import { QuickAdd, type Added } from "./quick-add";
 
 export type PickableProduct = { id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string };
 export type Line = { productId: string; quantity: string; money: string };
@@ -56,6 +58,7 @@ export function LinesEditor({
   money,
   fmt,
   note,
+  addProduct,
 }: {
   products: PickableProduct[];
   lines: Line[];
@@ -66,9 +69,24 @@ export function LinesEditor({
   fmt: Format;
   /** Something to say under a line: what's available, for example. */
   note?: (productId: string) => string | null;
+  /** "+ New product", for someone who may add one: it goes on the first empty line. */
+  addProduct?: { org: Org; units: { code: string; name: string }[] };
 }) {
-  const byId = new Map(products.map((p) => [p.id, p]));
-  const offered = products.filter((p) => p.status === "active");
+  // Products added from here, listed until the page's own list has them.
+  const [fresh, setFresh] = useState<PickableProduct[]>([]);
+  const known = new Set(products.map((p) => p.id));
+  const all = [...products, ...fresh.filter((p) => !known.has(p.id))];
+  const byId = new Map(all.map((p) => [p.id, p]));
+  const offered = all.filter((p) => p.status === "active");
+
+  function added(a: Added) {
+    if (!a.product) return;
+    const p: PickableProduct = { id: a.value, sku: a.product.sku, name: a.product.name, unit: a.product.unit, costPrice: a.product.costPrice, sellingPrice: a.product.sellingPrice, status: "active" };
+    setFresh((list) => [...list, p]);
+    const line = { productId: p.id, quantity: "", money: money ? fmt.pesosText(p[money.from]) : "" };
+    const empty = lines.findIndex((l) => !l.productId);
+    onChange(empty >= 0 ? lines.map((l, j) => (j === empty ? { ...line, quantity: l.quantity } : l)) : [...lines, line]);
+  }
 
   function set(i: number, change: Partial<Line>) {
     const next = lines.map((line, j) => (j === i ? { ...line, ...change } : line));
@@ -173,9 +191,12 @@ export function LinesEditor({
           )}
         </table>
       </div>
-      <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
-        Add a line
-      </Button>
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+        <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
+          Add a line
+        </Button>
+        {addProduct && <QuickAdd kind="product" onAdded={added} context={{ org: addProduct.org, units: addProduct.units }} label="New product (not in the list)" />}
+      </div>
     </div>
   );
 }

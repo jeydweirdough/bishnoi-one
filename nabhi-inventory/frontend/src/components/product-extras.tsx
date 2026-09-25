@@ -10,6 +10,7 @@ import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 import { deleteImage, removeSupplierPrice, setSupplierPrice, uploadImage } from "../actions/inventory";
 import type { Product, Ref } from "../lib/types";
+import { QuickAdd } from "./quick-add";
 
 /** A product's pictures: shown, added, removed. */
 export function ProductImages({ productId, images, canEdit }: { productId: string; images: string[]; canEdit: boolean }) {
@@ -66,13 +67,14 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
 }
 
 /** What each supplier charges for this product, editable in place. */
-export function SupplierPrices({ org, product, suppliers, canEdit }: { org: Org; product: Product; suppliers: (Ref & { isActive: boolean })[]; canEdit: boolean }) {
+export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplier = false }: { org: Org; product: Product; suppliers: (Ref & { isActive: boolean })[]; canEdit: boolean; canAddSupplier?: boolean }) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState({ supplierId: "", price: "", sku: "", lead: "" });
   const listed = new Set(product.supplierPrices.map((p) => p.supplier.id));
+  const [newSuppliers, setNewSuppliers] = useState<{ id: string; name: string }[]>([]);
   const cheapest = product.supplierPrices[0]?.price;
 
   function add() {
@@ -132,7 +134,11 @@ export function SupplierPrices({ org, product, suppliers, canEdit }: { org: Org;
           >
             <option value="">Supplier…</option>
             {suppliers.filter((s) => s.isActive && !listed.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {newSuppliers.filter((n) => !suppliers.some((s) => s.id === n.id)).map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
+          {canAddSupplier && (
+            <QuickAdd kind="supplier" label="New" onAdded={(a) => { setNewSuppliers((l) => [...l, { id: a.value, name: a.label }]); setAdding((x) => ({ ...x, supplierId: a.value })); }} />
+          )}
           <CellInput aria-label="Their price" placeholder="Price" inputMode="decimal" value={adding.price} onChange={(e) => setAdding({ ...adding, price: e.target.value })} className="w-24" />
           <CellInput aria-label="Their code" placeholder="Their code" value={adding.sku} onChange={(e) => setAdding({ ...adding, sku: e.target.value })} className="w-28 !text-left" />
           <CellInput aria-label="Lead time in days" placeholder="Days" inputMode="numeric" value={adding.lead} onChange={(e) => setAdding({ ...adding, lead: e.target.value.replace(/\D/g, "") })} className="w-16" />

@@ -14,3 +14,17 @@ export async function context() {
   const stamp = fmt.on({ dateStyle: "medium", timeStyle: "short" });
   return { me, fmt, may, at: (iso: string | null) => (iso ? stamp.format(new Date(iso)) : "—"), day: (key: string | null) => (key ? fmt.dateLabel(key) : "—") };
 }
+
+/** What this person may add from inside a form ("+ New …"), by their role. */
+export function canAddFrom(may: (permission: string) => boolean) {
+  const catalog = may("products.create");
+  return {
+    category: catalog,
+    brand: catalog,
+    unit: catalog,
+    product: catalog,
+    supplier: may("suppliers.create"),
+    warehouse: may("warehouses.manage"),
+    location: may("warehouses.manage"),
+  };
+}

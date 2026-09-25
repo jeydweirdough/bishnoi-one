@@ -11,6 +11,9 @@ import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/
 import { promoTerms } from "@/src/platform/lib/labels";
 import type { CustomField, Org, PriceList, QuotePreview } from "@/src/platform/lib/types";
 import { ExtraFields, extraChanges, toDraft, type ExtraDraft } from "./extra/extra-fields";
+import { FormEntityProvider, useCan } from "./quick-add/can";
+import { AddIssuer, AddProduct } from "./quick-add/forms";
+import { QuickAdd } from "./quick-add/quick-add";
 
 const MAX_LETTER_BYTES = 8 * 1024 * 1024;
 
@@ -88,6 +91,7 @@ function discountOf(fmt: Format, l: LineDraft): ManualDiscount {
 export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: QuoteFor; priceList: PriceList; org: Org; fields?: CustomField[] }) {
   const fmt = makeFormat(org);
   const router = useRouter();
+  const can = useCan();
   const always = priceList.priceTypes.filter((t) => t.rule === "always");
   const withRx = priceList.priceTypes.filter((t) => t.rule === "with_rx");
   const [draft, setDraft] = useState<Draft>({
@@ -466,6 +470,26 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
             {priceList.bundles.length > 0 ? "Add product or bundle" : "Add product"}
           </Button>
         )}
+        {/* Not in the catalogue yet: made here, priced for this quote, and put on a line. */}
+        {can("products.create") && draft.lines.length < 50 && (
+          <div className="-mt-1">
+            <QuickAdd label="New product, not in the list yet" title="New product">
+              {(done) => (
+                <AddProduct
+                  org={org}
+                  priceType={priceType && priceType.entry !== "entered" ? { code: priceType.code, name: priceType.name } : null}
+                  onAdded={(id) => {
+                    const empty = draft.lines.find((l) => !l.productId && !l.bundleId);
+                    const key = empty ? empty.key : Math.max(...draft.lines.map((l) => l.key)) + 1;
+                    const lines = empty ? draft.lines : [...draft.lines, blankLine(key)];
+                    update({ ...draft, lines: lines.map((l) => (l.key === key ? { ...l, productId: id, bundleId: "" } : l)) });
+                  }}
+                  done={done}
+                />
+              )}
+            </QuickAdd>
+          </div>
+        )}
       </fieldset>
 
       {/* Totals */}
@@ -504,7 +528,8 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
       )}
 
       {/* Who pays */}
-      {priceList.allowsGuaranteeLetters && priceList.issuers.length > 0 && (
+      {priceList.allowsGuaranteeLetters && (priceList.issuers.length > 0 || can("products.edit")) && (
+        <div>
         <Field label="Who pays" error={errorFor("payer")}>
           {(p) => (
             <Select {...p} value={draft.payer} onChange={(e) => update({ ...draft, payer: e.target.value })}>
@@ -517,6 +542,12 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
             </Select>
           )}
         </Field>
+        {can("products.edit") && (
+          <QuickAdd label="New issuer" title="Who issues guarantee letters">
+            {(done) => <AddIssuer onAdded={(code) => update({ ...draft, payer: code })} done={done} />}
+          </QuickAdd>
+        )}
+        </div>
       )}
       {withLetter && (
         <fieldset className="animate-reshape space-y-4 border-l-2 border-rule pl-4">
@@ -549,7 +580,9 @@ export function QuoteForm({ to, priceList, org, fields: custom = [] }: { to: Quo
       {custom.length > 0 && (
         <fieldset>
           <legend className="mb-2 text-meta font-medium text-ink-2">More about this quote</legend>
-          <ExtraFields fields={custom} draft={extra} onChange={setExtra} errors={fields} />
+          <FormEntityProvider entity="quote">
+            <ExtraFields fields={custom} draft={extra} onChange={setExtra} errors={fields} />
+          </FormEntityProvider>
         </fieldset>
       )}
 

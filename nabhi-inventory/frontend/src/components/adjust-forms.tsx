@@ -10,6 +10,7 @@ import { Sheet } from "@/src/platform/ui/sheet";
 import { addCountLine, countStep, createAdjustment, recordCounts, startCount } from "../actions/inventory";
 import type { AdjustmentReason, BatchRow, Count, ReasonOption, Reference } from "../lib/types";
 import { useSave } from "./lines";
+import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; locationId: string; batchId: string; batchNo: string; expiresOn: string; quantity: string; serials: string };
 const blank = (): Row => ({ productId: "", locationId: "", batchId: "", batchNo: "", expiresOn: "", quantity: "", serials: "" });
@@ -19,7 +20,8 @@ const cell = "h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 t
  * Writing up an adjustment: where, why, and what changes. Someone who may
  * approve adjustments posts it at once; anyone else's waits for them.
  */
-export function AdjustmentForm({ reference, reasons, batches, approves, preset }: {
+export function AdjustmentForm({ reference, reasons, batches, approves, preset, canAdd = {} }: {
+  canAdd?: CanAdd;
   reference: Reference;
   reasons: ReasonOption[];
   /** Every batch with stock, for picking which one. */
@@ -33,7 +35,13 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset }
   const [reason, setReason] = useState<AdjustmentReason>((reasons.find((r) => r.key === preset?.reason)?.key ?? "count") as AdjustmentReason);
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<Row[]>([blank()]);
-  const byId = new Map(reference.products.map((p) => [p.id, p]));
+  // Products added from here, listed until the page's own list has them.
+  const [fresh, setFresh] = useState<Added[]>([]);
+  const products = [
+    ...reference.products,
+    ...fresh.filter((a) => !reference.products.some((p) => p.id === a.value)).map((a) => ({ id: a.value, sku: a.product!.sku, name: a.product!.name, unit: a.product!.unit, costPrice: a.product!.costPrice, sellingPrice: a.product!.sellingPrice, status: "active" as const, supplierId: null, trackBatches: a.product!.trackBatches, trackExpiry: a.product!.trackExpiry, trackSerials: a.product!.trackSerials })),
+  ];
+  const byId = new Map(products.map((p) => [p.id, p]));
   const warehouse = reference.warehouses.find((w) => w.id === warehouseId);
   const direction = reasons.find((r) => r.key === reason)?.direction ?? "either";
   const adds = direction === "adds";
@@ -62,9 +70,11 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset }
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Warehouse" error={fields.warehouseId}>
-            {(p) => <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setRows([blank()]); }}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select>}
-          </Field>
+          <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setFresh((l) => [...l, a]); setWarehouseId(a.value); setRows([blank()]); }} />}>
+            <Field label="Warehouse" error={fields.warehouseId}>
+              {(p) => <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setRows([blank()]); }}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}{fresh.filter((a) => a.kind === "warehouse").map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</Select>}
+            </Field>
+          </WithAdd>
           <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Sets stock aside as damaged: still on hand, no longer available." : "Removes stock.") : "Either way: a minus removes, a plus adds."}>
             {(p) => <Select {...p} value={reason} onChange={(e) => setReason(e.target.value as AdjustmentReason)}>{reasons.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</Select>}
           </Field>
@@ -92,7 +102,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset }
                     <td className="py-2 pr-2 align-top">
                       <select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value, batchId: "", batchNo: "" })} className={cell}>
                         <option value="">Pick a product…</option>
-                        {reference.products.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
+                        {products.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
                       </select>
                       {p?.trackSerials && (
                         <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder="Their serial numbers, one per unit" value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
@@ -134,7 +144,21 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset }
             </tbody>
           </table>
         </div>
-        <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add a line</Button>
+        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add a line</Button>
+          {canAdd.product && adds && (
+            <QuickAdd
+              kind="product"
+              label="New product (not in the list)"
+              context={{ units: reference.units.filter((u) => u.isActive) }}
+              onAdded={(a) => {
+                setFresh((list) => [...list, a]);
+                const empty = rows.findIndex((r) => !r.productId);
+                setRows(empty >= 0 ? rows.map((r, j) => (j === empty ? { ...r, productId: a.value } : r)) : [...rows, { ...blank(), productId: a.value }]);
+              }}
+            />
+          )}
+        </div>
       </Sheet>
       <Field label="Notes" optional error={fields.notes} hint="What happened. It goes on the movement trail.">
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
@@ -149,15 +173,21 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset }
 }
 
 /** Starting a count of one warehouse, or of one category in it. */
-export function StartCount({ reference, warehouseId }: { reference: Reference; warehouseId?: string }) {
+export function StartCount({ reference, warehouseId, canAdd = {} }: { reference: Reference; warehouseId?: string; canAdd?: CanAdd }) {
   const { pending, error, fields, save } = useSave();
   const [w, setW] = useState(warehouseId || reference.warehouses.find((x) => x.isActive)?.id || "");
   const [category, setCategory] = useState("");
+  const [added, setAdded] = useState<Added[]>([]);
+  const newOnes = (kind: Added["kind"]) => added.filter((a) => a.kind === kind).map((a) => <option key={a.value} value={a.value}>{a.label}</option>);
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <Field label="Warehouse" error={fields.warehouseId} className="min-w-48">
-        {(p) => <Select {...p} value={w} onChange={(e) => setW(e.target.value)}>{reference.warehouses.filter((x) => x.isActive).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>}
-      </Field>
+      <div className="min-w-48">
+        <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setAdded((l) => [...l, a]); setW(a.value); }} />}>
+          <Field label="Warehouse" error={fields.warehouseId}>
+            {(p) => <Select {...p} value={w} onChange={(e) => setW(e.target.value)}>{reference.warehouses.filter((x) => x.isActive).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}{newOnes("warehouse")}</Select>}
+          </Field>
+        </WithAdd>
+      </div>
       <Field label="Only" optional className="min-w-56">
         {(p) => <Select {...p} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Everything in it</option>{reference.categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}</Select>}
       </Field>

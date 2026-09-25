@@ -8,6 +8,9 @@ import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { createUser, updateUser, type UserChange } from "../../actions/admin";
 import type { AdminUserRow, UserOptions } from "@/src/platform/lib/types";
 import { SCOPE_WORDS } from "./words";
+import { useCan } from "../quick-add/can";
+import { AddTeam } from "../quick-add/forms";
+import { QuickAdd } from "../quick-add/quick-add";
 
 type Props = UserOptions & {
   user?: AdminUserRow; // editing when present
@@ -21,6 +24,8 @@ export function UserForm({ roles, teams, user }: Props) {
   const [email, setEmail] = useState(user?.email ?? "");
   const [roleId, setRoleId] = useState(user?.role.id ?? roles.find((r) => r.name === "Salesperson")?.id ?? roles[0]?.id ?? "");
   const [teamId, setTeamId] = useState(user?.team?.id ?? "");
+  const can = useCan();
+  const [madeTeams, setMadeTeams] = useState<{ id: string; name: string }[]>([]);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -86,10 +91,18 @@ export function UserForm({ roles, teams, user }: Props) {
             </Select>
           )}
         </Field>
+        <div>
         <Field label="Team" optional error={fields.teamId}>
           {(p) => (
             <Select {...p} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
               <option value="">No team</option>
+              {madeTeams
+                .filter((m) => !pickableTeams.some((t) => t.id === m.id))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
               {pickableTeams.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -99,6 +112,12 @@ export function UserForm({ roles, teams, user }: Props) {
             </Select>
           )}
         </Field>
+        {can("admin.teams") && (
+          <QuickAdd label="New team" title="New team">
+            {(done) => <AddTeam onAdded={(t) => (setMadeTeams([t, ...madeTeams]), setTeamId(t.id))} done={done} />}
+          </QuickAdd>
+        )}
+        </div>
         {!user && (
           <Field label="First password" error={fields.password} hint="At least 8 characters. Give it to them yourself; they can't reset it here.">
             {(p) => <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />}

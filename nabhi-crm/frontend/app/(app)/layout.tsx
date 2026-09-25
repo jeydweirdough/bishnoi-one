@@ -6,13 +6,14 @@ import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
 import { getMe } from "@/src/platform/lib/api";
 import { FieldTracker } from "@/src/components/field/tracker";
+import { CanProvider } from "@/src/components/quick-add/can";
 import { isFieldAgent } from "@/src/components/field/words";
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const me = await getMe();
   return (
     <ShellLayout>
-      {children}
+      <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
       {isFieldAgent(me) && me.org && <FieldTracker userId={me.user.id} timeZone={me.org.timezone} />}
     </ShellLayout>
   );

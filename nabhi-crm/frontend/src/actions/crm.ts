@@ -164,3 +164,12 @@ export async function findCustomers(words: string): Promise<Result<{ id: string;
     return found.items.map((c) => ({ id: c.id, name: c.name }));
   });
 }
+
+/** A customer by name alone, from a form that needs one picked (the rest can follow on their page). */
+export async function quickCustomer(name: string): Promise<Result<{ id: string; name: string }>> {
+  return attempt(async () => {
+    const made = await api.post<CompanyDetail>("/companies", { name });
+    refresh();
+    return { id: made.id, name: made.name };
+  });
+}

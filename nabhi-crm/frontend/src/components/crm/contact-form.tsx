@@ -10,6 +10,9 @@ import type { Assignable, ContactDetail, Duplicate, FormFieldDef, FormLayout, Re
 import { LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
 import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
+import { useCan } from "../quick-add/can";
+import { AddCustomer } from "../quick-add/forms";
+import { QuickAdd } from "../quick-add/quick-add";
 
 const TEXT = ["firstName", "lastName", "jobTitle", "email", "phone", "mobile", "notes"] as const;
 type Text = (typeof TEXT)[number];
@@ -46,7 +49,11 @@ export function ContactForm({
   const shown = new Set(allFields.map((f) => f.key));
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
   // Their current company stays offered even if it's no longer on the list.
-  const options = contact?.company && !companies.some((c) => c.id === contact.company!.id) ? [contact.company, ...companies] : companies;
+  const can = useCan();
+  // Customers made here (+ New customer) are on the list before the page reloads it.
+  const [made, setMade] = useState<Ref[]>([]);
+  const known = [...made.filter((m) => !companies.some((c) => c.id === m.id)), ...companies];
+  const options = contact?.company && !known.some((c) => c.id === contact.company!.id) ? [contact.company, ...known] : known;
 
   function submit(allowDuplicate = false) {
     const input: ContactInput = {
@@ -93,6 +100,7 @@ export function ContactForm({
     if (f.key === "ownerId") return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
     if (f.key === "companyId") {
       return (
+        <div>
         <Field label={f.label} optional={!f.required} error={fields.companyId} hint={f.helpText ?? undefined}>
           {(p) => (
             <Select {...p} value={company} onChange={(e) => setCompany(e.target.value)}>
@@ -105,6 +113,12 @@ export function ContactForm({
             </Select>
           )}
         </Field>
+        {can("customers.create") && (
+          <QuickAdd label="New customer" title="New customer">
+            {(done) => <AddCustomer onAdded={(c) => (setMade([c, ...made]), setCompany(c.id))} done={done} />}
+          </QuickAdd>
+        )}
+        </div>
       );
     }
     if (!(TEXT as readonly string[]).includes(f.key)) return null;

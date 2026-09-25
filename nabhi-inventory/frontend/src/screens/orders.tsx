@@ -12,7 +12,7 @@ import { OrderStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Stamp, Table, Td, Trail } from "../components/ui";
 import { ORDER_KINDS, param, query } from "../lib/labels";
-import { context, type Params, type Search } from "../lib/page";
+import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import type { BatchRow, Order, OrderBrief, Reference, Reservation, StockOverview } from "../lib/types";
 
 export async function OrdersPage({ searchParams }: { searchParams: Search }) {
@@ -161,7 +161,7 @@ export async function NewOrderPage() {
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order" />
-      <OrderForm org={me.org} reference={ref} available={available} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
     </>
   );
 }
@@ -174,7 +174,7 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
-      <OrderForm org={me.org} reference={ref} order={o} available={available} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} />
     </>
   );
 }

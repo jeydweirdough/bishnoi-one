@@ -8,6 +8,9 @@ import { Icon } from "@/src/platform/ui/icons";
 import { createActivity, type ActivityInput } from "../../actions/crm";
 import type { Assignable, CrmKind, Org, Ref } from "@/src/platform/lib/types";
 import { OwnerField } from "./owner-field";
+import { useCan } from "../quick-add/can";
+import { AddCustomer } from "../quick-add/forms";
+import { QuickAdd } from "../quick-add/quick-add";
 import { KINDS, kindOf, localDateTime, tomorrowMorning } from "./words";
 
 const PLACEHOLDERS: Record<CrmKind, string> = {
@@ -56,6 +59,8 @@ export function LogActivity({
   const [direction, setDirection] = useState<"out" | "in">("out");
   const [contact, setContact] = useState(contactId ?? "");
   const [company, setCompany] = useState(companyId ?? "");
+  const can = useCan();
+  const [made, setMade] = useState<Ref[]>([]);
   const [ownerId, setOwnerId] = useState(people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -146,11 +151,12 @@ export function LogActivity({
           />
         )}
         {companies && (
+          <div>
           <Field label="Customer" optional error={fields.companyId}>
             {(p) => (
               <Select {...p} value={company} onChange={(e) => setCompany(e.target.value)}>
                 <option value="">None</option>
-                {companies.map((c) => (
+                {[...made, ...companies.filter((c) => !made.some((m) => m.id === c.id))].map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -158,6 +164,12 @@ export function LogActivity({
               </Select>
             )}
           </Field>
+          {can("customers.create") && (
+            <QuickAdd label="New customer" title="New customer">
+              {(done) => <AddCustomer onAdded={(c) => (setMade([c, ...made]), setCompany(c.id))} done={done} />}
+            </QuickAdd>
+          )}
+          </div>
         )}
         {contacts.length > 0 && !contactId && (
           <Field label="With" optional error={fields.contactId}>

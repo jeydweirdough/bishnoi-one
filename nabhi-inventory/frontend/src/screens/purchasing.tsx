@@ -12,7 +12,7 @@ import { POStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, ExpiryMark, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
-import { context, type Params, type Search } from "../lib/page";
+import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import type { Backorder, PO, POBrief, Receipt, ReceiptBrief, Reference } from "../lib/types";
 
 export async function PurchaseOrdersPage({ searchParams }: { searchParams: Search }) {
@@ -141,7 +141,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
       {open && may("receiving.receive") && (
         <section className="mt-6">
           <h2 className="mb-3 text-heading">Receive a delivery</h2>
-          <ReceiveForm org={me.org} reference={ref} order={po} />
+          <ReceiveForm org={me.org} reference={ref} order={po} canAdd={canAddFrom(may)} />
         </section>
       )}
 
@@ -181,7 +181,7 @@ export async function NewPurchaseOrderPage({ searchParams }: { searchParams: Sea
   return (
     <>
       <PageHeader crumbs={[{ href: "/purchase-orders", label: "Purchase orders" }]} title="New purchase order" />
-      <PurchaseOrderForm org={me.org} reference={ref} preset={{ supplierId: param(s, "supplier") || undefined, productId: param(s, "product") || undefined, quantity: param(s, "quantity") || undefined }} />
+      <PurchaseOrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} preset={{ supplierId: param(s, "supplier") || undefined, productId: param(s, "product") || undefined, quantity: param(s, "quantity") || undefined }} />
     </>
   );
 }
@@ -194,7 +194,7 @@ export async function EditPurchaseOrderPage({ params }: { params: Params<{ id: s
   return (
     <>
       <PageHeader crumbs={[{ href: "/purchase-orders", label: "Purchase orders" }, { href: `/purchase-orders/${po.id}`, label: po.number }]} title={`Edit ${po.number}`} />
-      <PurchaseOrderForm org={me.org} reference={ref} order={po} />
+      <PurchaseOrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={po} />
     </>
   );
 }
@@ -268,7 +268,7 @@ export async function NewReceiptPage() {
       <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title="Receive stock">
         A delivery with no purchase order: a donation, a return, stock found. For an order, receive it from the order.
       </PageHeader>
-      <ReceiveForm org={me.org} reference={ref} />
+      <ReceiveForm org={me.org} reference={ref} canAdd={canAddFrom(may)} />
     </>
   );
 }

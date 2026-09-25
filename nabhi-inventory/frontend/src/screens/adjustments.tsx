@@ -11,7 +11,7 @@ import { AdjustmentStamp, CountStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query, signed } from "../lib/labels";
-import { context, type Params, type Search } from "../lib/page";
+import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, ReasonOption, Reference } from "../lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
@@ -114,7 +114,7 @@ export async function NewAdjustmentPage({ searchParams }: { searchParams: Search
       <PageHeader crumbs={[{ href: "/adjustments", label: "Adjustments" }]} title="New adjustment">
         {may("adjustments.approve") ? "It's posted as soon as you save it." : "It waits for someone who may approve adjustments before stock changes."}
       </PageHeader>
-      <AdjustmentForm reference={ref} reasons={reasons} batches={batches} approves={may("adjustments.approve")} preset={{ reason: param(s, "reason"), warehouseId: param(s, "warehouse") }} />
+      <AdjustmentForm canAdd={canAddFrom(may)} reference={ref} reasons={reasons} batches={batches} approves={may("adjustments.approve")} preset={{ reason: param(s, "reason"), warehouseId: param(s, "warehouse") }} />
     </>
   );
 }
@@ -133,7 +133,7 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
       <AdjustTabs me={me} current="/counts" />
       {may("counts.create") && (
         <Sheet className="mb-5 px-5 py-4">
-          <StartCount reference={ref} warehouseId={param(s, "warehouse")} />
+          <StartCount canAdd={canAddFrom(may)} reference={ref} warehouseId={param(s, "warehouse")} />
         </Sheet>
       )}
       <Sheet>

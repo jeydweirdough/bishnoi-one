@@ -11,6 +11,9 @@ import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from
 import { Duplicates } from "./duplicates";
 import { OwnerField } from "./owner-field";
 import { typeOptions } from "./words";
+import { useCan } from "../quick-add/can";
+import { AddCustomerType } from "../quick-add/forms";
+import { QuickAdd } from "../quick-add/quick-add";
 
 const TEXT = ["name", "industry", "website", "email", "phone", "address", "city", "country", "notes"] as const;
 type Text = (typeof TEXT)[number];
@@ -23,6 +26,7 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
   const [values, setValues] = useState<Record<Text, string>>(() =>
     Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? ""])) as Record<Text, string>,
   );
+  const can = useCan();
   const [status, setStatus] = useState<CompanyStatus>(company?.status ?? types.find((t) => t.isActive)?.code ?? "");
   const [ownerId, setOwnerId] = useState(company?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +84,16 @@ export function CompanyForm({ people, types, layout, company }: { people: Assign
     const placeholder = f.placeholder ?? undefined;
     switch (f.key) {
       case "status":
-        return <Choice<CompanyStatus> name="status" legend={f.label} value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />;
+        return (
+          <div>
+            <Choice<CompanyStatus> name="status" legend={f.label} value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />
+            {can("admin.types") && (
+              <QuickAdd label="New customer type" title="New customer type">
+                {(done) => <AddCustomerType onAdded={setStatus} done={done} />}
+              </QuickAdd>
+            )}
+          </div>
+        );
       case "ownerId":
         return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
       case "industry":

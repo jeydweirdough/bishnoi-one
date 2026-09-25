@@ -205,7 +205,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
           <Sheet className="px-5 pt-4 pb-4">
             <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
             <div className="mt-2">
-              <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} />
+              <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
             </div>
           </Sheet>
         </div>

@@ -11,6 +11,7 @@ import { saveProduct } from "../actions/inventory";
 import { PRODUCT_STATUSES, PRODUCT_TYPES } from "../lib/labels";
 import type { Product, ProductStatus, ProductType, Reference } from "../lib/types";
 import { useSave } from "./lines";
+import { QuickAdd, WithAdd, withAdded, type Added, type CanAdd } from "./quick-add";
 
 type Draft = {
   sku: string;
@@ -42,8 +43,10 @@ type Draft = {
 const whole = (s: string) => s.replace(/[^\d]/g, "");
 
 /** Adding a product, or changing one: what it is, what it costs, when to reorder, and how it's tracked. */
-export function ProductForm({ org, reference, product, parents, locked, preset }: {
+export function ProductForm({ org, reference, product, parents, locked, preset, canAdd = {} }: {
   org: Org;
+  /** What this person may add from here without leaving the form. */
+  canAdd?: CanAdd;
   reference: Reference;
   product?: Product;
   /** Products a new one could be a variant of. */
@@ -82,6 +85,13 @@ export function ProductForm({ org, reference, product, parents, locked, preset }
     attributes: product ? Object.entries(product.attributes) : [["", ""]],
   }));
   const set = (change: Partial<Draft>) => setD({ ...d, ...change });
+  // Added from here ("+ New …"): picked at once, and listed until the page's own lists have them.
+  const [added, setAdded] = useState<Added[]>([]);
+  const took = (field: "categoryId" | "brandId" | "unitCode" | "supplierId") => (a: Added) => {
+    setAdded((list) => [...list, a]);
+    setD((current) => ({ ...current, [field]: a.value }));
+  };
+  const opt = (a: Added) => ({ value: a.value, label: a.label });
 
   function submit() {
     const input = {
@@ -116,7 +126,11 @@ export function ProductForm({ org, reference, product, parents, locked, preset }
     }));
   }
 
-  const units = reference.units.filter((u) => u.isActive || u.code === d.unitCode);
+  const categories = withAdded(reference.categories.filter((c) => c.isActive || c.id === d.categoryId).map((c) => ({ value: c.id, label: c.path })), added, "category", opt);
+  const brands = withAdded(reference.brands.filter((b) => b.isActive || b.id === d.brandId).map((b) => ({ value: b.id, label: b.name })), added, "brand", opt);
+  const units = withAdded(reference.units.filter((u) => u.isActive || u.code === d.unitCode).map((u) => ({ value: u.code, label: `${u.name} (${u.code})` })), added, "unit", opt);
+  const suppliers = withAdded(reference.suppliers.filter((x) => x.isActive || x.id === d.supplierId).map((x) => ({ value: x.id, label: x.name })), added, "supplier", opt);
+  const pickFrom = (list: { value: string; label: string }[]) => list.map((o) => <option key={o.value} value={o.value}>{o.label}</option>);
   const tracking = [
     { key: "trackBatches" as const, label: "Batch / lot numbers", hint: "Each delivery's lot is kept apart." },
     { key: "trackExpiry" as const, label: "Expiry dates", hint: "Per batch. Stock goes out first-expired-first-out." },
@@ -134,22 +148,26 @@ export function ProductForm({ org, reference, product, parents, locked, preset }
           <Field label="Product name" error={fields.name} className="lg:col-span-2">
             {(p) => <Input {...p} value={d.name} onChange={(e) => set({ name: e.target.value })} />}
           </Field>
-          <Field label="Category" optional error={fields.categoryId}>
-            {(p) => (
-              <Select {...p} value={d.categoryId} onChange={(e) => set({ categoryId: e.target.value })}>
-                <option value="">None</option>
-                {reference.categories.filter((c) => c.isActive || c.id === d.categoryId).map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}
-              </Select>
-            )}
-          </Field>
-          <Field label="Brand" optional error={fields.brandId}>
-            {(p) => (
-              <Select {...p} value={d.brandId} onChange={(e) => set({ brandId: e.target.value })}>
-                <option value="">None</option>
-                {reference.brands.filter((b) => b.isActive || b.id === d.brandId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </Select>
-            )}
-          </Field>
+          <WithAdd can={canAdd.category} add={<QuickAdd kind="category" onAdded={took("categoryId")} context={{ categories: reference.categories.map((c) => ({ id: c.id, path: c.path })) }} label="New" />}>
+            <Field label="Category" optional error={fields.categoryId}>
+              {(p) => (
+                <Select {...p} value={d.categoryId} onChange={(e) => set({ categoryId: e.target.value })}>
+                  <option value="">None</option>
+                  {pickFrom(categories)}
+                </Select>
+              )}
+            </Field>
+          </WithAdd>
+          <WithAdd can={canAdd.brand} add={<QuickAdd kind="brand" onAdded={took("brandId")} label="New" />}>
+            <Field label="Brand" optional error={fields.brandId}>
+              {(p) => (
+                <Select {...p} value={d.brandId} onChange={(e) => set({ brandId: e.target.value })}>
+                  <option value="">None</option>
+                  {pickFrom(brands)}
+                </Select>
+              )}
+            </Field>
+          </WithAdd>
           <Field label="Barcode" optional error={fields.barcode}>
             {(p) => <Input {...p} value={d.barcode} onChange={(e) => set({ barcode: e.target.value })} inputMode="numeric" />}
           </Field>
@@ -160,13 +178,15 @@ export function ProductForm({ org, reference, product, parents, locked, preset }
               </Select>
             )}
           </Field>
-          <Field label="Unit of measure" error={fields.unitCode}>
-            {(p) => (
-              <Select {...p} value={d.unitCode} disabled={locked} onChange={(e) => set({ unitCode: e.target.value })}>
-                {units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}
-              </Select>
-            )}
-          </Field>
+          <WithAdd can={canAdd.unit && !locked} add={<QuickAdd kind="unit" onAdded={took("unitCode")} label="New" />}>
+            <Field label="Unit of measure" error={fields.unitCode}>
+              {(p) => (
+                <Select {...p} value={d.unitCode} disabled={locked} onChange={(e) => set({ unitCode: e.target.value })}>
+                  {pickFrom(units)}
+                </Select>
+              )}
+            </Field>
+          </WithAdd>
           <Field label="Status" error={fields.status}>
             {(p) => (
               <Select {...p} value={d.status} onChange={(e) => set({ status: e.target.value as ProductStatus })}>
@@ -183,14 +203,18 @@ export function ProductForm({ org, reference, product, parents, locked, preset }
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="pricing">Buying and selling</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Usual supplier" optional error={fields.supplierId} className="sm:col-span-2">
-            {(p) => (
-              <Select {...p} value={d.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
-                <option value="">None</option>
-                {reference.suppliers.filter((s) => s.isActive || s.id === d.supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-            )}
-          </Field>
+          <div className="sm:col-span-2">
+            <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" onAdded={took("supplierId")} label="New" />}>
+              <Field label="Usual supplier" optional error={fields.supplierId}>
+                {(p) => (
+                  <Select {...p} value={d.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
+                    <option value="">None</option>
+                    {pickFrom(suppliers)}
+                  </Select>
+                )}
+              </Field>
+            </WithAdd>
+          </div>
           <Field label={`Cost price (${fmt.symbol})`} error={fields.costPrice} hint="Per unit. Stock is valued at this.">
             {(p) => <Input {...p} inputMode="decimal" value={d.costPrice} onChange={(e) => set({ costPrice: e.target.value })} />}
           </Field>

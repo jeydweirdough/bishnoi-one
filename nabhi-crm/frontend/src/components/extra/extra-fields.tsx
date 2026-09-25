@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { FormEntityProvider } from "../quick-add/can";
+import { ChoiceAdd } from "../quick-add/choice-add";
 import type { ExtraValues, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 
 // A record's form, drawn from its layout (Administration → Settings → Forms):
@@ -88,6 +90,7 @@ export function FieldInput({ field, value, onChange, error }: { field: FormField
   }
   const text = String(value ?? "");
   return (
+    <>
     <Field label={f.label} optional={!f.required} error={error} hint={f.helpText ?? undefined}>
       {(p) =>
         f.type === "long_text" ? (
@@ -114,6 +117,8 @@ export function FieldInput({ field, value, onChange, error }: { field: FormField
         )
       }
     </Field>
+    {f.type === "choice" && <ChoiceAdd field={f} onAdded={onChange} />}
+    </>
   );
 }
 
@@ -121,6 +126,7 @@ export function FieldInput({ field, value, onChange, error }: { field: FormField
  *  record already had stays offered even if it's no longer an option. */
 export function ChoiceSelect({ field, value, onChange, error }: { field: FormFieldDef; value: string; onChange: (v: string) => void; error?: string }) {
   return (
+    <>
     <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
       {(p) => (
         <Select {...p} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -134,6 +140,8 @@ export function ChoiceSelect({ field, value, onChange, error }: { field: FormFie
         </Select>
       )}
     </Field>
+    <ChoiceAdd field={field} onAdded={onChange} />
+    </>
   );
 }
 
@@ -155,7 +163,7 @@ export function LayoutForm({
   errors: Record<string, string>;
 }) {
   return (
-    <>
+    <FormEntityProvider entity={layout.entity}>
       {layout.sections.map((s) => (
         <fieldset key={s.id} className={`grid gap-5 ${s.columns === 2 ? "sm:grid-cols-2" : ""}`}>
           <legend className="mb-3 text-sm font-semibold text-ink">{s.title}</legend>
@@ -174,7 +182,7 @@ export function LayoutForm({
           })}
         </fieldset>
       ))}
-    </>
+    </FormEntityProvider>
   );
 }
 
