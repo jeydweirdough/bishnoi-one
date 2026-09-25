@@ -96,7 +96,7 @@ export default async function Page() {
           </div>
           <div>
             <dt className="font-semibold">The company itself</dt>
-            <dd className="text-ink-2">Its name and the other Orbit apps it reaches, with the log of what changed.</dd>
+            <dd className="text-ink-2">Its name and the other Nabhi apps it reaches, with the log of what changed.</dd>
           </div>
         </dl>
       </Sheet>

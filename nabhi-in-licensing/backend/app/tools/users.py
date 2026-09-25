@@ -8,7 +8,7 @@
     uv run python -m app.tools.users enable --email ana@example.com
 
 Passwords are asked for, never passed on the command line (it would sit in
-the shell's history). For scripts, set ORBIT_NEW_PASSWORD instead.
+the shell's history). For scripts, set NABHI_NEW_PASSWORD instead.
 """
 
 import argparse
@@ -20,14 +20,15 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 
 from app.config import get_settings
-from app.db import create_tables, make_engine, make_sessions
+from app.db import make_engine, make_sessions
+from app.migrate import upgrade
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.models import User
 from app.security import check_password_rules, hash_password
 
 
 def ask_password() -> str:
-    password = os.environ.get("ORBIT_NEW_PASSWORD")
+    password = os.environ.get("NABHI_NEW_PASSWORD")
     if password is None:
         password = getpass.getpass("Password: ")
         if getpass.getpass("Again: ") != password:
@@ -52,7 +53,7 @@ def main() -> int:
     args = parser.parse_args()
 
     engine = make_engine(get_settings().database_url)
-    create_tables(engine)
+    upgrade(engine)
     with make_sessions(engine)() as db:
         if args.command == "list":
             for u in db.scalars(select(User).order_by(User.email)):

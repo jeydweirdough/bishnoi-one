@@ -57,13 +57,13 @@ export function CompanySettings({ data }: { data: Company }) {
           <Field label="Name" error={problems.name} hint="The company's full legal name, for letters and reports.">
             {(p) => <Input {...p} value={draft.name} maxLength={120} onChange={(e) => change({ name: e.target.value })} />}
           </Field>
-          <Field label="Short name" error={problems.brandName} hint="What the top of every screen says, above Orbit's own name.">
+          <Field label="Short name" error={problems.brandName} hint="What the top of every screen says, above Nabhi's own name.">
             {(p) => (
               <Input {...p} value={draft.brandName} maxLength={80} onChange={(e) => change({ brandName: e.target.value })} className="max-w-xs" />
             )}
           </Field>
           <div className="border-t border-rule pt-4">
-            <Particulars items={[["Address in Orbit", <span key="slug" className="font-medium">{data.slug}</span>]]} />
+            <Particulars items={[["Address in Nabhi", <span key="slug" className="font-medium">{data.slug}</span>]]} />
             <p className="mt-2.5 text-meta text-ink-3">That one can&apos;t change: other things already point at it.</p>
           </div>
         </div>

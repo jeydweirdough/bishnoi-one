@@ -1,4 +1,4 @@
-"""Orbit Licensing API.
+"""Nabhi Licensing API.
 
 Run with:  uv run main.py   (port 8306)
 """
@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
-from app.db import create_tables, make_engine, make_sessions
+from app.db import make_engine, make_sessions
+from app.migrate import upgrade
 from app.routers import auth, licensing
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -25,11 +26,11 @@ SECURITY_HEADERS = {
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
-    create_tables(engine)
+    upgrade(engine)
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Orbit Licensing API", version="0.1.0", **docs)
+    app = FastAPI(title="Nabhi Licensing API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
 

@@ -28,17 +28,17 @@ not listed above is a change to `module.json`, not a quiet import.
 
 `"api": "shared"` in `module.json`.
 
-`shared` means the one Orbit backend still holds this module's routes and tables,
+`shared` means the one Nabhi backend still holds this module's routes and tables,
 exactly where they were. It becomes `own` when they move into `api/` here.
 
 ## Using it
 
-The shell (`orbit-frontend`) lists this package in `package.json` as
-`file:../orbit-in-licensing` and in `transpilePackages`, then re-exports each page from a
+The shell (`nabhi-frontend`) lists this package in `package.json` as
+`file:../nabhi-in-licensing` and in `transpilePackages`, then re-exports each page from a
 route file:
 
 ```tsx
-export { default, metadata } from "@orbit/in-licensing/screens/<page>";
+export { default, metadata } from "@nabhi/in-licensing/screens/<page>";
 ```
 
 Core — the sheet, the buttons, the fields, `lib/api`, `lib/types`,

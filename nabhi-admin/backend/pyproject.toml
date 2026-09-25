@@ -1,9 +1,10 @@
 [project]
-name = "orbit-admin-api"
+name = "nabhi-admin-api"
 version = "0.1.0"
-description = "Orbit Executive Admin API"
+description = "Nabhi Executive Admin API"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.20.0",
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.0",

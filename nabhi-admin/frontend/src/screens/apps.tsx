@@ -10,7 +10,7 @@ export default async function AppsPage() {
   return (
     <>
       <PageHeader title="Apps">
-        The other applications your people use beside Orbit, and where each one lives. Add one here and it turns up in the sidebar
+        The other applications your people use beside Nabhi, and where each one lives. Add one here and it turns up in the sidebar
         of everyone whose role reaches it, already signed in — nobody has to change any code. What an app lets someone do is still
         set in Roles &amp; permissions.
       </PageHeader>

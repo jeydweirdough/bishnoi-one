@@ -18,7 +18,7 @@ except ImportError:
 API_DIR = Path(__file__).resolve().parent
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the Orbit Finance API with auto-reload.")
+    parser = argparse.ArgumentParser(description="Run the Nabhi Finance API with auto-reload.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8303)
     args = parser.parse_args()

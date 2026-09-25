@@ -20,7 +20,7 @@ async function refuse(who: string): Promise<ReactNode | null> {
     <Sheet className="px-6 py-10 text-center">
       <h1 className="text-heading">This one is {who}</h1>
       <p className="mx-auto mt-1 max-w-md text-ink-2">
-        You reach the settings in your sidebar. If you need something that isn&apos;t there, ask whoever runs Orbit for your
+        You reach the settings in your sidebar. If you need something that isn&apos;t there, ask whoever runs Nabhi for your
         company.
       </p>
       <LinkButton href="/" className="mt-5">

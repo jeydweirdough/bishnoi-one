@@ -1,5 +1,5 @@
 {
-  "name": "@orbit/regulatory",
+  "name": "@nabhi/regulatory",
   "version": "0.1.0",
   "private": true,
   "description": "Keeping every product legal to sell.",
@@ -27,6 +27,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@orbit/platform": "file:../orbit-core"
+    "@nabhi/platform": "file:../nabhi-core"
   }
 }

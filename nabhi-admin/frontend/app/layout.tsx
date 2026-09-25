@@ -1,4 +1,4 @@
-// The frame is core's, so every Orbit app looks and behaves the same.
+// The frame is core's, so every Nabhi app looks and behaves the same.
 import type { ReactNode } from "react";
 import { RootLayout } from "@/src/platform/app/root-layout";
 import "./globals.css";

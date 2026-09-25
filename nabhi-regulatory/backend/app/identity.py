@@ -16,7 +16,7 @@ ALL_ACTIONS = ["view", "create", "edit", "delete"]
 def org_out(settings: Settings) -> dict:
     return {
         "id": ORG_ID,
-        "slug": "orbit",
+        "slug": "nabhi",
         "name": settings.org_name,
         "brandName": settings.org_name,
         "currency": settings.org_currency,

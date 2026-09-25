@@ -299,7 +299,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
             ))}
         </div>
         {d.isBuiltIn ? (
-          <p className="text-meta text-ink-3">Comes with Orbit&apos;s modules: it keeps its icon and stays switched on.</p>
+          <p className="text-meta text-ink-3">Comes with Nabhi&apos;s modules: it keeps its icon and stays switched on.</p>
         ) : (
           <IconChoice
             value={departmentIcon(d)}
@@ -560,7 +560,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
         directly. Pick a department, team or headquarters to rename it or switch it off, and{" "}
         <Plus className="inline size-3.5 align-[-2px]" aria-label="Add" /> where a branch ends adds one there. A department you add
         holds teams and people; a sales division you add gets the sales screens too, and needs its price types choosing in Settings
-        &rarr; Pricing. The ones that came with Orbit can be renamed but not switched off.
+        &rarr; Pricing. The ones that came with Nabhi can be renamed but not switched off.
       </p>
       <div
         className={s.tree}

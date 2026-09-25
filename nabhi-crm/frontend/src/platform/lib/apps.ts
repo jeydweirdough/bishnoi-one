@@ -79,7 +79,7 @@ const NAMES = new Set<string>(Object.keys(DEFAULTS));
 
 /**
  * The app that owns a module's screens, by its key — `finance` is
- * `orbit-finance`'s. Null when no app of ours has them, which is every module
+ * `nabhi-finance`'s. Null when no app of ours has them, which is every module
  * that only ever lived in the shell, and the outside apps (Orders) that carry
  * their own address from the API instead.
  */

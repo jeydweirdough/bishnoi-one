@@ -2,7 +2,7 @@
 
 How to clone, pull and push **just the Nabhi Platform (Platform Admin)**. For the whole repo and how
 the branches fit together, see `README.md` at the top of the `main` branch:
-https://github.com/jeydweirdough/orbit/blob/main/README.md
+https://github.com/jeydweirdough/nabhi/blob/main/README.md
 
 Branch: **`nabhi-platform`**. It holds only this app, at the top level:
 
@@ -35,13 +35,13 @@ instead, and `git who` to check which account is active.
 ## 2. Clone
 
 ```
-git clone -b nabhi-platform --single-branch https://github.com/jeydweirdough/orbit.git nabhi-platform
+git clone -b nabhi-platform --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-platform
 cd nabhi-platform
 ```
 
 This downloads only the Nabhi Platform (Platform Admin), not the other apps.
 
-Want everything instead? Run `git clone https://github.com/jeydweirdough/orbit.git`
+Want everything instead? Run `git clone https://github.com/jeydweirdough/nabhi.git`
 and work in the `nabhi-platform/` folder on `main`. Sections 3–4 still apply, but your
 pushes go to `main`.
 

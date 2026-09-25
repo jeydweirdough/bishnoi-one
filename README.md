@@ -1,6 +1,6 @@
-# Orbit
+# Nabhi
 
-Orbit is a set of separate web apps (Admin, Nabhi CRM, Finance, Nabhi Inventory, and
+Nabhi is a set of separate web apps (Admin, CRM, Finance, Inventory, and
 more) kept in one GitHub repo. This page shows you how to:
 
 - get the code onto your computer
@@ -9,7 +9,7 @@ more) kept in one GitHub repo. This page shows you how to:
 - run an app
 - add a new app
 
-Repo: **https://github.com/jeydweirdough/orbit**
+Repo: **https://github.com/jeydweirdough/nabhi**
 
 Everyday Git is three commands: **clone** once, then **pull** and **push**.
 The rest of this page walks through them.
@@ -41,15 +41,15 @@ The apps don't depend on each other. Each one has its own settings, database
 and sign-in.
 
 ```
-orbit/
-├── orbit-admin/          screens :4300   API :8300
+nabhi/
+├── nabhi-admin/          screens :4300   API :8300
 ├── nabhi-crm/            screens :4302   API :8302
-├── orbit-finance/        screens :4303   API :8303
+├── nabhi-finance/        screens :4303   API :8303
 ├── nabhi-inventory/      screens :4304   API :8304
 ├── nabhi-platform/       screens :4305   API :8305
-├── orbit-in-licensing/   screens :4306   API :8306   (screens not built yet)
+├── nabhi-in-licensing/   screens :4306   API :8306   (screens not built yet)
 ├── nabhi-pharmacy/       screens :4307   API :8307
-└── orbit-regulatory/     screens :4308   API :8308   (screens not built yet)
+└── nabhi-regulatory/     screens :4308   API :8308   (screens not built yet)
 ```
 
 ### Branches
@@ -57,7 +57,7 @@ orbit/
 | Branch | What's in it |
 |---|---|
 | `main` | **Everything**: every app, each in its own folder |
-| `orbit-admin`, `nabhi-crm`, `orbit-finance`, … | **One app only**, named after it |
+| `nabhi-admin`, `nabhi-crm`, `nabhi-finance`, … | **One app only**, named after it |
 
 An app branch holds the same files as that app's folder on `main`. You can
 work on either one; GitHub keeps them matched for you
@@ -113,12 +113,12 @@ projects, then pick **one** option.
 Use this if you work on a single app. Example for CRM:
 
 ```
-git clone -b nabhi-crm --single-branch https://github.com/jeydweirdough/orbit.git nabhi-crm
+git clone -b nabhi-crm --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-crm
 cd nabhi-crm
 ```
 
 For another app, replace **both** `nabhi-crm`s with its branch name
-(`orbit-admin`, `orbit-finance`, …). You get only that app, with `frontend/`
+(`nabhi-admin`, `nabhi-finance`, …). You get only that app, with `frontend/`
 and `backend/` right at the top.
 
 ### Option B: Everything
@@ -126,8 +126,8 @@ and `backend/` right at the top.
 Use this if you work across several apps, or to [add a new app](#6-add-a-new-app):
 
 ```
-git clone https://github.com/jeydweirdough/orbit.git
-cd orbit
+git clone https://github.com/jeydweirdough/nabhi.git
+cd nabhi
 ```
 
 You get `main`, with every app in its own folder.
@@ -256,9 +256,9 @@ Then open the screens in your browser:
 | App | Screens | API |
 |---|---|---|
 | Admin | http://localhost:4300 | http://127.0.0.1:8300 |
-| Nabhi CRM | http://localhost:4302 | http://127.0.0.1:8302 |
+| CRM | http://localhost:4302 | http://127.0.0.1:8302 |
 | Finance | http://localhost:4303 | http://127.0.0.1:8303 |
-| Nabhi Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
+| Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
 | Platform | http://localhost:4305 | http://127.0.0.1:8305 |
 | Licensing, Pharmacy, Regulatory | (not built) | 8306, 8307, 8308 |
 
@@ -301,13 +301,13 @@ git switch -c add-app/hr
 
 Replace `hr` with your app's name.
 
-> Name your branch `add-app/<name>`. **Don't** start it with `orbit-`: those
+> Name your branch `add-app/<name>`. **Don't** start it with `nabhi-`: those
 > names are kept for the app branches.
 
 ### Step 2: Create the app's folder
 
 Name the folder **`nabhi-<name>`**, using small letters, digits and dashes
-only (e.g. `orbit-hr`, `orbit-field-sales`). This becomes your app's branch
+only (e.g. `nabhi-hr`, `nabhi-field-sales`). This becomes your app's branch
 name. Inside it, add:
 
 | What | How |
@@ -346,10 +346,10 @@ runs again by itself.
 
 The repo owner reviews your app and merges it into `main`. About a minute
 later, your app has **its own branch, named after its folder**
-(`orbit-hr`). From then on, anyone can clone just your app:
+(`nabhi-hr`). From then on, anyone can clone just your app:
 
 ```
-git clone -b orbit-hr --single-branch https://github.com/jeydweirdough/orbit.git orbit-hr
+git clone -b nabhi-hr --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-hr
 ```
 
 ---
@@ -383,7 +383,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
    already does that. If GitHub shows a yellow "Compare & pull request"
    banner after you push to an app branch, ignore it. (Pull requests from an
    `add-app/…` or `feature/…` branch are fine.)
-5. **Don't create branches that start with `orbit-` or `nabhi-`.** Those are the app
+5. **Don't create branches that start with `nabhi-`.** Those are the app
    branches, and the sync manages them.
 
 ---
@@ -392,8 +392,8 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 
 | I want to… | Command |
 |---|---|
-| Clone one app | `git clone -b <app> --single-branch https://github.com/jeydweirdough/orbit.git <app>` |
-| Clone everything | `git clone https://github.com/jeydweirdough/orbit.git` |
+| Clone one app | `git clone -b <app> --single-branch https://github.com/jeydweirdough/nabhi.git <app>` |
+| Clone everything | `git clone https://github.com/jeydweirdough/nabhi.git` |
 | Get the latest | `git pull` |
 | See what I changed | `git status` / `git diff` |
 | Save my changes | `git add .` then `git commit -m "what changed"` |

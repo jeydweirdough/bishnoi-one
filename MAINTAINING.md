@@ -1,4 +1,4 @@
-# Looking after the Orbit repo
+# Looking after the Nabhi repo
 
 This page is for the repo owner. Everyone else only needs
 [README.md](README.md).
@@ -18,8 +18,8 @@ The repo has two actions, in `.github/workflows/`:
 
 | Action | Runs when | What it does |
 |---|---|---|
-| **Sync branches** (`sync-branches.yml`) | any push to `main` or an `orbit-*` / `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `orbit-*` / `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Sync branches** (`sync-branches.yml`) | any push to `main` or a `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
 
 Set these once:
 
@@ -30,7 +30,7 @@ Set these once:
    branch.
    1. Create the token: your profile → **Settings → Developer settings →
       Personal access tokens → Fine-grained tokens → Generate new token**.
-   2. Repository access: only `jeydweirdough/orbit`.
+   2. Repository access: only `jeydweirdough/nabhi`.
    3. Permissions: **Contents: Read and write**, **Workflows: Read and write**.
    4. Save it on the repo: **Settings → Secrets and variables → Actions →
       New repository secret**, named `SYNC_TOKEN`.
@@ -103,15 +103,15 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
 ## Changing the sync workflow
 
 `.github/workflows/sync-branches.yml` has a copy in each app folder
-(`orbit-*/` and `nabhi-*/.github/workflows/`). Each app branch needs its copy, because
+(`nabhi-*/.github/workflows/`). Each app branch needs its copy, because
 GitHub only runs the workflows in the branch that was pushed. Keep all the
 copies identical: Check apps fails a pull request if they differ.
 
 After editing, copy it to every app, then stage them all:
 
 ```
-for d in orbit-*/ nabhi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
-git add .github "orbit-*/.github/*" "nabhi-*/.github/*"
+for d in nabhi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
+git add .github "nabhi-*/.github/*"
 ```
 
 With `SYNC_TOKEN` set, pushing `main` is enough: the sync carries the copies

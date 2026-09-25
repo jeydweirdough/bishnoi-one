@@ -1,5 +1,5 @@
 {
-  "name": "@orbit/in-licensing",
+  "name": "@nabhi/in-licensing",
   "version": "0.1.0",
   "private": true,
   "description": "Products being taken on from a principal.",
@@ -27,6 +27,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@orbit/platform": "file:../orbit-core"
+    "@nabhi/platform": "file:../nabhi-core"
   }
 }

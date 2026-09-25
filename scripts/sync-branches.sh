@@ -2,7 +2,7 @@
 # Keep main and the per-app branches in step, both ways. See GIT-GUIDE.md.
 #
 #   bash scripts/sync-branches.sh              # every app
-#   bash scripts/sync-branches.sh orbit-admin  # just one
+#   bash scripts/sync-branches.sh nabhi-admin  # just one
 #
 # For each app it:
 #   1. merges anything pushed to the app's branch into main (its folder), then
@@ -24,8 +24,8 @@ if [ "$#" -gt 0 ]; then
   apps=("$@")
 else
   apps=()
-  # Every app folder: orbit-* for now, nabhi-* as each moves to the new name.
-  for d in orbit-*/ nabhi-*/; do [ -d "$d" ] && apps+=("${d%/}"); done
+  # Every app folder: nabhi-<name>.
+  for d in nabhi-*/; do [ -d "$d" ] && apps+=("${d%/}"); done
 fi
 
 git pull --ff-only "$remote" main

@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import { api, ApiError } from "../lib/api";
 
-// One sign-in for the apps around Orbit (the Orders app). The app sends the
+// One sign-in for the apps around Nabhi (the Orders app). The app sends the
 // browser here; someone not signed in gets the sign-in page first (proxy.ts),
-// then comes back. Orbit's API makes a one-time code for this person's
+// then comes back. Nabhi's API makes a one-time code for this person's
 // session, and only for an address registered to that app, and the browser
 // goes back with it.
 
@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
       redirect(`/login?expired=1&next=${encodeURIComponent(back)}`);
     }
     if (error instanceof ApiError && (error.status === 400 || error.status === 422)) {
-      return refuse("That app isn't set up to sign in through Orbit. Ask your admin.");
+      return refuse("That app isn't set up to sign in through Nabhi. Ask your admin.");
     }
-    return refuse("Orbit couldn't sign you in just now. Try again in a minute.", 503);
+    return refuse("Nabhi couldn't sign you in just now. Try again in a minute.", 503);
   }
 
   // The API only answers with the exact address registered for this app.

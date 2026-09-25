@@ -106,7 +106,7 @@ export function MoneySettings({ data, now }: { data: Company; now: string }) {
             <Field
               label="Money"
               error={problems.currency}
-              hint={`A three-letter code. Orbit draws a symbol for ${data.knownCurrencies.length} of them; any other is written as its code.`}
+              hint={`A three-letter code. Nabhi draws a symbol for ${data.knownCurrencies.length} of them; any other is written as its code.`}
             >
               {(p) => (
                 <>

@@ -153,7 +153,7 @@ function settingsFor(me: Me): PageGroup[] {
 }
 
 /**
- * Whether the sidebar offers the other Orbit apps.
+ * Whether the sidebar offers the other Nabhi apps.
  *
  * Off while each app is being built on its own: a panel of links into apps that
  * are half-built, or not built at all, is noise in the one place a person goes
@@ -660,7 +660,7 @@ export function Nav({ me }: { me: Me }) {
           saying a company name there would be saying something untrue. */}
       <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
       {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Orbit" alone leaves you working out from the port
+          its own address, so "Nabhi" alone leaves you working out from the port
           whether the screen in front of you is missing or simply elsewhere. */}
       <span className="block truncate text-base leading-tight font-semibold text-ink">
         {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}

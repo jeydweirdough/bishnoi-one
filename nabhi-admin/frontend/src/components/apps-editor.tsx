@@ -10,9 +10,9 @@ import { saveApps } from "../actions/admin";
 import type { AppLink } from "@/src/platform/lib/types";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 
-// Settings → Apps: the other applications this company reaches from Orbit.
+// Settings → Apps: the other applications this company reaches from Nabhi.
 //
-// Orbit is the hub — people, customers, products, prices and roles live here —
+// Nabhi is the hub — people, customers, products, prices and roles live here —
 // and other applications do their own work beside it. Which ones a company has,
 // and where they are, is the company's own setting: adding another one later is
 // a name and a link typed here, not a deployment.
@@ -154,7 +154,7 @@ export function AppsEditor({ apps }: { apps: AppLink[] }) {
             <Sheet className="px-6 py-10 text-center">
               <h2 className="text-heading">No apps yet</h2>
               <p className="mx-auto mt-1 max-w-md text-sm text-ink-2">
-                Add the applications your people use beside Orbit. Each one appears in the sidebar of everyone whose role reaches
+                Add the applications your people use beside Nabhi. Each one appears in the sidebar of everyone whose role reaches
                 it, and opens already signed in.
               </p>
             </Sheet>
@@ -163,8 +163,8 @@ export function AppsEditor({ apps }: { apps: AppLink[] }) {
               <SectionTitle icon="apps">{current.name.trim() || "New app"}</SectionTitle>
               <p className="mb-5 text-meta text-ink-3">
                 {builtIn.has(current.code ?? "")
-                  ? "This one comes with Orbit. It can be renamed, pointed somewhere else or switched off, but not removed: its order steps are granted in Roles & permissions whether or not there is a link."
-                  : "An app of your own. Orbit sends people to it already signed in; what they may do once they are there is up to the app."}
+                  ? "This one comes with Nabhi. It can be renamed, pointed somewhere else or switched off, but not removed: its order steps are granted in Roles & permissions whether or not there is a link."
+                  : "An app of your own. Nabhi sends people to it already signed in; what they may do once they are there is up to the app."}
               </p>
 
               <div className="space-y-5">

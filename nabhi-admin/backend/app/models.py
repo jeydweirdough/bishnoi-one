@@ -1,4 +1,8 @@
-"""This app's own accounts. Nobody signed in here exists in any other Orbit app."""
+"""This app's own accounts. Nobody signed in here exists in any other Nabhi app.
+
+Every table's name starts with nbad_ (Admin), so it is plain which app a
+table belongs to, whatever database it ends up in. Changes to them go through
+a migration (migrations/versions)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -18,7 +22,7 @@ def new_id() -> str:
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "nbad_users"
     __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -36,11 +40,11 @@ class User(Base):
 class SignInSession(Base):
     """One sign-in. The browser holds the token; only its hash is kept here."""
 
-    __tablename__ = "sessions"
+    __tablename__ = "nbad_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbad_users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

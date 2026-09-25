@@ -2,7 +2,7 @@
 
 Customers, and everything that happens with them.
 
-**Its screens are still in `orbit-frontend`, waiting to move in.**
+**Its screens are still in `nabhi-frontend`, waiting to move in.**
 
 ## Screens
 
@@ -40,7 +40,7 @@ exactly where they were. It becomes `own` when they move into `api/` here.
 
 ## Using it
 
-The shell (`orbit-frontend`) lists this package in `package.json` as
+The shell (`nabhi-frontend`) lists this package in `package.json` as
 `file:../nabhi-crm` and in `transpilePackages`, then re-exports each page from a
 route file:
 

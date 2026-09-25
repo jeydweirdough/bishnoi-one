@@ -1,4 +1,4 @@
-# Root ignore rules for the whole Orbit repo. Each project also keeps its own
+# Root ignore rules for the whole Nabhi repo. Each project also keeps its own
 # .gitignore so it still works if it is ever split into a separate repo.
 
 # Secrets. Never commit these; .env.example documents the names instead.
@@ -33,7 +33,7 @@ venv/
 .mypy_cache/
 *.egg-info/
 
-# Backend local data in every orbit-*/backend: databases, the records file
+# Backend local data in every nabhi-*/backend: databases, the records file
 # store, pre-migration backups, virtual environments
 env/
 .data/

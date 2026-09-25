@@ -31,7 +31,7 @@ function NoCompany() {
 
 export async function ShellLayout({ children }: { children: React.ReactNode }) {
   const me = await getMe();
-  // Every page, not only the sign-in. One session opens every Orbit app —
+  // Every page, not only the sign-in. One session opens every Nabhi app —
   // the cookie is shared — so somebody signed in to an app that is theirs
   // arrives here already authenticated, and nothing else would ask whether
   // this one is. Asked once, above every screen, before any of them load.
