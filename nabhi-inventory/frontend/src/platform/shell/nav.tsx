@@ -79,61 +79,168 @@ function crmPages(me: Me): Page[] {
   ];
 }
 
-/** Inventory's own pages, in its groups. Each shows only for a role that may
- *  open it; what belongs to a place (a product's categories, the stock's
- *  movements) is a tab inside it rather than another row here. */
-function inventoryGroups(me: Me): PageGroup[] {
+/** How many things are waiting on this person, by kind (the API's alerts,
+ *  already limited to what their role may act on). */
+export type Waiting = Record<string, number>;
+
+type Place = Page & {
+  /** Any of these, and the place is part of their work. */
+  does: string[];
+  /** Any of these, and they may at least look. */
+  sees: string[];
+  /** The alerts that count as waiting on them here. */
+  waiting?: string[];
+};
+
+/**
+ * Inventory's sidebar, built from what the person does rather than from
+ * everything they may see. Every role may look at nearly everything, and a
+ * list of eleven places reads as eleven jobs. So:
+ *
+ * - Home first: what needs them today.
+ * - "Your work": only the places where their role acts (writes, approves,
+ *   receives, issues, counts...), each with how many things wait on them.
+ * - "Look up": the places they may only view, folded away until wanted.
+ */
+function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place[]; admin: Page[] } {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
-  const only = (show: boolean, page: Page) => (show ? [page] : []);
-  const groups: PageGroup[] = [
-    {
-      label: "Inventory",
-      pages: [
-        ...only(may("dashboard.view"), { href: "/", label: "Dashboard", icon: "overview" }),
-        ...only(may("dashboard.view"), { href: "/alerts", label: "Alerts", icon: "alerts" }),
-        ...only(may("products.view"), { href: "/products", label: "Products", icon: "products", also: ["/catalog"] }),
-        ...only(may("stock.view"), { href: "/stock", label: "Stock", icon: "stock", also: ["/movements", "/batches", "/serials"] }),
-        ...only(may("transfers.view"), { href: "/transfers", label: "Transfers", icon: "transfers" }),
-        ...only(may("adjustments.view") || may("counts.view"), {
-          href: may("adjustments.view") ? "/adjustments" : "/counts",
-          label: "Adjustments & counts",
-          icon: "adjustments",
-          also: ["/adjustments", "/counts"],
-        }),
-        ...only(may("warehouses.view"), { href: "/warehouses", label: "Warehouses", icon: "warehouses" }),
-      ],
-    },
-    {
-      label: "Purchasing",
-      pages: [
-        ...only(may("purchasing.view") || may("receiving.view"), {
+  const any = (list: string[]) => list.some(may);
+  // Receiving without buying: the warehouse's side of purchase orders.
+  const receivesOnly = may("receiving.receive") && !any(["purchasing.create", "purchasing.edit", "purchasing.approve"]);
+  // Moving stock makes looking at it part of the job.
+  const movesStock = any(["receiving.receive", "transfers.dispatch", "transfers.receive", "adjustments.create", "counts.create", "orders.issue"]);
+  const places: Place[] = [
+    { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"], does: ["orders.create", "orders.edit", "orders.approve", "orders.issue"], sees: ["orders.view"], waiting: ["issue"] },
+    receivesOnly
+      ? { href: "/purchase-orders?status=ordered,partial", label: "Receiving", icon: "receiving", also: ["/purchase-orders", "/receipts", "/backorders"], does: ["receiving.receive"], sees: ["receiving.view"], waiting: ["receiving"] }
+      : {
           href: may("purchasing.view") ? "/purchase-orders" : "/receipts",
           label: "Purchase orders",
           icon: "purchaseOrders",
           also: ["/purchase-orders", "/receipts", "/backorders"],
-        }),
-        ...only(may("suppliers.view"), { href: "/suppliers", label: "Suppliers", icon: "suppliers" }),
-      ],
-    },
+          does: ["purchasing.create", "purchasing.edit", "purchasing.approve", "receiving.receive"],
+          sees: ["purchasing.view", "receiving.view"],
+          waiting: may("purchasing.approve") ? ["drafts", "receiving"] : ["receiving"],
+        },
+    { href: "/transfers", label: "Transfers", icon: "transfers", does: ["transfers.create", "transfers.approve", "transfers.dispatch", "transfers.receive"], sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
     {
-      label: "Orders",
-      pages: [...only(may("orders.view"), { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"] })],
+      href: may("adjustments.view") ? "/adjustments" : "/counts",
+      label: "Adjustments & counts",
+      icon: "adjustments",
+      also: ["/adjustments", "/counts"],
+      does: ["adjustments.create", "adjustments.approve", "counts.create", "counts.approve"],
+      sees: ["adjustments.view", "counts.view"],
+      waiting: ["adjustments", "counts"],
     },
-    { label: "Insight", pages: [...only(may("reports.view"), { href: "/reports", label: "Reports", icon: "report" })] },
-    {
-      label: "Administration",
-      pages: [
-        ...only(may("admin.users") || may("admin.roles"), {
-          href: may("admin.users") ? "/admin/users" : "/admin/roles",
-          label: "Users & roles",
-          icon: "people",
-          also: ["/admin/users", "/admin/roles"],
-        }),
-        ...only(may("admin.audit"), { href: "/admin/audit", label: "Activity log", icon: "auditLog" }),
-      ],
-    },
+    { href: "/stock", label: "Stock", icon: "stock", also: ["/movements", "/batches", "/serials"], does: movesStock ? ["stock.view"] : [], sees: ["stock.view"] },
+    { href: "/products", label: "Products", icon: "products", also: ["/catalog"], does: ["products.create", "products.edit", "products.delete"], sees: ["products.view"] },
+    { href: "/suppliers", label: "Suppliers", icon: "suppliers", does: ["suppliers.create", "suppliers.edit", "suppliers.delete"], sees: ["suppliers.view"] },
+    { href: "/warehouses", label: "Warehouses", icon: "warehouses", does: ["warehouses.manage"], sees: ["warehouses.view"] },
+    { href: "/reports", label: "Reports", icon: "report", does: ["reports.export"], sees: ["reports.view"] },
   ];
-  return groups.filter((g) => g.pages.length > 0);
+  const admin: Page[] = [
+    ...(may("admin.users") || may("admin.roles")
+      ? [{ href: may("admin.users") ? "/admin/users" : "/admin/roles", label: "Users & roles", icon: "people" as const, also: ["/admin/users", "/admin/roles"] }]
+      : []),
+    ...(may("admin.audit") ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
+  ];
+  return {
+    home: may("dashboard.view") ? { href: "/", label: "Home", icon: "home" } : null,
+    work: places.filter((p) => any(p.does)),
+    lookUp: places.filter((p) => !any(p.does) && any(p.sees)),
+    admin,
+  };
+}
+
+/** How many wait on them in a place, as the row's trailing mark. */
+function WaitingMark({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> waiting on you</span>
+    </span>
+  );
+}
+
+/** "Look up": the places they may only view, folded until wanted, and open
+ *  while they are in one. Remembered in this browser. */
+function LookUp({ places, pathname }: { places: Place[]; pathname: string }) {
+  const inside = places.some((p) => isCurrent(p, pathname, false));
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem("nav.lookUp") === "open");
+    } catch {
+      // No storage (a private window): it starts folded.
+    }
+  }, []);
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem("nav.lookUp", next ? "open" : "closed");
+    } catch {
+      // Remembering is a nicety; without it the toggle still works.
+    }
+  }
+  const shown = open || inside;
+  return (
+    <div className="mt-5">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={shown}
+        className="mb-1 flex w-full items-center justify-between rounded-[3px] px-3 py-1 text-caps text-ink-3 uppercase hover:text-ink"
+      >
+        <span>Look up</span>
+        <ChevronRight className={`size-3.5 transition-transform ${shown ? "rotate-90" : ""}`} aria-hidden />
+      </button>
+      {shown && (
+        <div className="space-y-0.5">
+          {places.map((p) => (
+            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)}>
+              {p.label}
+            </Row>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InventoryLinks({ me, waiting }: { me: Me; waiting: Waiting }) {
+  const pathname = usePathname();
+  const { home, work, lookUp, admin } = inventoryNav(me);
+  const count = (p: Place) => (p.waiting ?? []).reduce((n, key) => n + (waiting[key] ?? 0), 0);
+  return (
+    <nav aria-label="Main">
+      {home && (
+        <Row href={home.href} icon={home.icon} current={pathname === "/" || within(pathname, "/alerts")}>
+          {home.label}
+        </Row>
+      )}
+      {work.length > 0 && (
+        <Group label="Your work">
+          {work.map((p) => (
+            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)} trailing={<WaitingMark count={count(p)} />}>
+              {p.label}
+            </Row>
+          ))}
+        </Group>
+      )}
+      {lookUp.length > 0 && <LookUp places={lookUp} pathname={pathname} />}
+      {admin.length > 0 && (
+        <Group label="Administration">
+          {admin.map((p) => (
+            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)}>
+              {p.label}
+            </Row>
+          ))}
+        </Group>
+      )}
+    </nav>
+  );
 }
 
 function modulePages(m: ModuleAccess): Page[] {
@@ -605,17 +712,6 @@ function Links({ me }: { me: Me }) {
           ))}
         </Group>
       )}
-      {/* Inventory's own groups, each only with the pages this role opens. */}
-      {THIS_APP === "inventory" &&
-        inventoryGroups(me).map((g) => (
-          <Group key={g.label} label={g.label!}>
-            {g.pages.map((page) => (
-              <Row key={page.href} href={page.href} icon={page.icon} current={isCurrent(page, pathname, page.href === "/")}>
-                {page.label}
-              </Row>
-            ))}
-          </Group>
-        ))}
       {THIS_APP !== "inventory" && departments.some(serves) && (
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
@@ -679,11 +775,9 @@ function Links({ me }: { me: Me }) {
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
   if (THIS_APP === "inventory") {
-    for (const g of inventoryGroups(me)) {
-      const page = g.pages.find((p) => isCurrent(p, pathname, p.href === "/"));
-      if (page) return page.label;
-    }
-    return null;
+    const { home, work, lookUp, admin } = inventoryNav(me);
+    if (home && (pathname === "/" || within(pathname, "/alerts"))) return home.label;
+    return [...work, ...lookUp, ...admin].find((p) => isCurrent(p, pathname, false))?.label ?? null;
   }
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
@@ -739,7 +833,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -766,7 +860,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} /> : <Links me={me} />}
         </div>
         <Account me={me} />
       </aside>
@@ -789,7 +883,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} /> : <Links me={me} />}
             <div className="mt-5">
               <Account me={me} />
             </div>

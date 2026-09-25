@@ -69,6 +69,24 @@ Then **merge** it. About a minute later, Sync branches creates the
 
 ---
 
+## Deployments on Vercel: one app at a time
+
+Each app's `frontend/` and `backend/` is its own Vercel project (Root
+Directory `nabhi-<app>/frontend` or `/backend`). Their `vercel.json` makes
+each one build only when it has something new:
+
+- **Only from `main`.** The app branches the sync keeps (`nabhi-*`) get no
+  deployments (`git.deploymentEnabled`).
+- **Only when its own folder changed** since its last deployment
+  (`ignoreCommand`: `git diff` of that folder). A commit to `nabhi-crm/backend`
+  builds the CRM API and nothing else; the other projects show "Canceled by
+  Ignored Build Step", which costs nothing.
+
+A new app's `vercel.json` needs the same two settings: copy it from another
+app. To force a build anyway: the project → Deployments → Redeploy.
+
+---
+
 ## When a sync fails
 
 A red ✗ on **Actions → Sync branches** almost always means the same lines
