@@ -69,21 +69,32 @@ Then **merge** it. About a minute later, Sync branches creates the
 
 ---
 
-## Deployments on Vercel: one app at a time
+## Deployments on Vercel: only what changed
 
-Each app's `frontend/` and `backend/` is its own Vercel project (Root
-Directory `nabhi-<app>/frontend` or `/backend`). Their `vercel.json` makes
-each one build only when it has something new:
+Vercel doesn't build anything from Git by itself (each `vercel.json`:
+`git.deploymentEnabled: false`). The **Deploy** action
+(`.github/workflows/deploy.yml`) does, after every push to `main` and every
+sync:
 
-- **Only from `main`.** The app branches the sync keeps (`nabhi-*`) get no
-  deployments (`git.deploymentEnabled`).
-- **Only when its own folder changed** since its last deployment
-  (`ignoreCommand`: `git diff` of that folder). A commit to `nabhi-crm/backend`
-  builds the CRM API and nothing else; the other projects show "Canceled by
-  Ignored Build Step", which costs nothing.
+- It deploys only the Vercel projects whose folder changed since that
+  project's last deploy, to production. A commit to `nabhi-crm/backend`
+  deploys the CRM API and nothing else. Commits get no Vercel checks, and the
+  app branches get no preview builds.
+- Each project's last deployed commit is the tag `deployed/<project>` (the
+  repo's Tags show what's live). A deploy that fails (Vercel down, the day's
+  limit reached) is tried again by the next run.
+- Which folder goes to which project: `.github/deploy.json`. When an app gets
+  a Vercel project, add its line there (a folder not listed is never deployed).
 
-A new app's `vercel.json` needs the same two settings: copy it from another
-app. To force a build anyway: the project → Deployments → Redeploy.
+Set up once:
+
+1. Vercel → your avatar → **Account Settings → Tokens → Create**: scope it
+   to the team (Jade Atyla's projects), no expiry or a long one.
+2. GitHub → the repo → **Settings → Secrets and variables → Actions → New
+   repository secret**: `VERCEL_TOKEN`, the token.
+
+To deploy one project now, changed or not: **Actions → Deploy → Run
+workflow**, and type its project name (e.g. `nabhi-crm-backend`).
 
 ---
 

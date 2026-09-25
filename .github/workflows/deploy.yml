@@ -1,0 +1,123 @@
+# Deploys to Vercel only the apps whose folder changed, from main only.
+#
+# Vercel's own Git builds are off (each vercel.json: git.deploymentEnabled
+# false), so a push makes no deployment by itself: no failed checks on
+# commits, no preview builds of the app branches the sync keeps, and none of
+# the day's deployments used up by apps that didn't change.
+#
+# Which folder goes to which Vercel project: .github/deploy.json.
+#
+# For each project it remembers the last commit it deployed, as a tag
+# (deployed/<project>: the repo's Tags say what's live). A run deploys
+# the projects whose folder changed since theirs, then moves its tag on. So a
+# deploy that failed (Vercel down, the day's limit reached) is simply tried
+# again by the next run, and a push that comes in through the sync (an app
+# branch merged into main) is picked up too.
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  # The sync merges app-branch work into main with GitHub's own token, which
+  # starts no push workflows; this catches those.
+  workflow_run:
+    workflows: ["Sync branches"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Deploy this Vercel project now, changed or not (e.g. nabhi-crm-backend). Empty: only what changed."
+        required: false
+        default: ""
+
+# One run at a time; a push that lands meanwhile waits, then deploys whatever is still new.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write # move the deployed/<project> tag on after a deploy
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: What changed since each project's last deploy
+        id: plan
+        env:
+          FORCE: ${{ github.event.inputs.project }}
+        run: |
+          git fetch -q --force origin 'refs/tags/deployed/*:refs/tags/deployed/*' || true
+          python3 - <<'PY'
+          import json, os, subprocess
+
+          cfg = json.load(open(".github/deploy.json"))
+          force = os.environ.get("FORCE", "").strip()
+          head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+          todo = []
+          for folder, project in cfg["projects"].items():
+              if not os.path.isdir(folder):
+                  continue
+              last = subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/deployed/{project}^{{commit}}"], capture_output=True, text=True).stdout.strip()
+              if project == force:
+                  why = "asked for by hand"
+              elif not last:
+                  why = "never deployed from here yet"
+              elif subprocess.run(["git", "diff", "--quiet", last, head, "--", folder]).returncode != 0:
+                  why = f"{folder} changed since {last[:7]}"
+              else:
+                  print(f"skip  {project}: nothing new in {folder}")
+                  continue
+              print(f"DEPLOY {project}: {why}")
+              todo.append({"project": project, "folder": folder})
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"matrix={json.dumps({'include': todo})}\n")
+              out.write(f"any={'true' if todo else 'false'}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write("### Deploying\n" + ("".join(f"- {t['project']} ({t['folder']})\n" for t in todo) or "Nothing: no app's folder changed.\n"))
+          PY
+
+  deploy:
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Deploy ${{ matrix.project }} to production
+        # bash (-eo pipefail): a failed deploy fails the step, so it isn't marked deployed.
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::Add the VERCEL_TOKEN secret (Settings > Secrets and variables > Actions). See MAINTAINING.md."
+            exit 1
+          fi
+          scope="$(python3 -c 'import json; print(json.load(open(".github/deploy.json"))["scope"])')"
+          # From the repo's root: the project's own Root Directory (on Vercel)
+          # says which folder it builds, as it did when Vercel built it itself.
+          npx --yes vercel@latest link --yes --project "${{ matrix.project }}" --scope "$scope" --token "$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prod --yes --scope "$scope" --token "$VERCEL_TOKEN" | tee deploy.log
+          echo "Deployed: $(tail -n 1 deploy.log)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remember this commit as deployed
+        run: git push -f origin "HEAD:refs/tags/deployed/${{ matrix.project }}"

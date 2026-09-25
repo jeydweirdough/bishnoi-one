@@ -1,0 +1,10 @@
+{
+  "_what": "Which folder deploys to which Vercel project (.github/workflows/deploy.yml). Add a line when an app gets a Vercel project; a folder not listed here is never deployed.",
+  "scope": "jade-atylas-projects-de1cd194",
+  "projects": {
+    "nabhi-crm/frontend": "nabhi-crm",
+    "nabhi-crm/backend": "nabhi-crm-backend",
+    "nabhi-inventory/frontend": "nabhi-inventory",
+    "nabhi-inventory/backend": "nabhi-inventory-backend"
+  }
+}
