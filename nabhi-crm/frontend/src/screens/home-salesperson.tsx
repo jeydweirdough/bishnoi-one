@@ -83,7 +83,13 @@ export async function SalespersonHome() {
                 {counts.upcoming} coming up
               </p>
               {due.length === 0 ? (
-                <Empty icon="followUps" title="Nothing due today">
+                <Empty icon="followUps" title="Nothing due today" actions={can(me, "activities.create") && <LogActivityButton
+                      label="Plan a follow-up"
+                      org={me.org}
+                      now={new Date().toISOString()}
+                      people={people}
+                      companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
+                    />}>
                   {counts.upcoming ? `${counts.upcoming} coming up later. ` : ""}Meetings and tasks you plan show up here on the day.
                 </Empty>
               ) : (
@@ -152,7 +158,15 @@ export async function SalespersonHome() {
             Recent activity
           </SectionTitle>
           {recent.items.length === 0 ? (
-            <Empty icon="activity" title="No activity yet">Whatever your team logs against a customer shows up here.</Empty>
+            <Empty icon="activity" title="No activity yet" actions={can(me, "activities.create") && <LogActivityButton
+                  label="Log activity"
+                  org={me.org}
+                  now={new Date().toISOString()}
+                  people={people}
+                  companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
+                />}>
+              Whatever your team logs against a customer shows up here.
+            </Empty>
           ) : (
             <ul className="divide-y divide-rule">
               {recent.items.map((a) => {

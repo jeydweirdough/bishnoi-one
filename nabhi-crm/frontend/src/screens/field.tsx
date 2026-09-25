@@ -133,7 +133,17 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
 
       <Sheet className="px-5 pt-2 pb-3">
         {data.people.length === 0 ? (
-          <Empty title="No field agents here yet" icon="people">
+          <Empty
+            title="No field agents here yet"
+            icon="people"
+            actions={
+              can(me, "admin.users") && (
+                <LinkButton href="/admin/users/new" variant="primary">
+                  Add a person
+                </LinkButton>
+              )
+            }
+          >
             Give someone the Field agent role (People &amp; access) and they show up here.
           </Empty>
         ) : (

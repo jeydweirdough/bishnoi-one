@@ -1,4 +1,5 @@
 import { Download } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/button";
 import Link from "next/link";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import { WinBackBulk } from "../components/win-back-bulk";
@@ -129,7 +130,15 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
           <SectionTitle icon="worthACall">Worth a call</SectionTitle>
           <p className="text-meta text-ink-3">At risk first, the ones closest to lost at the top; then those lost lately, while they&apos;re still winnable.</p>
           {data.watch.length === 0 ? (
-            <Empty icon="retention" title="Nobody slipping away">
+            <Empty
+              icon="retention"
+              title="Nobody slipping away"
+              actions={
+                <LinkButton href="/companies" variant="quiet">
+                  See your customers
+                </LinkButton>
+              }
+            >
               Customers with no quote in {rules.atRiskDays} days show up here.
             </Empty>
           ) : (

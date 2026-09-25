@@ -85,7 +85,11 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
             Your recent visits
           </SectionTitle>
           {visits.items.length === 0 ? (
-            <Empty title="No visits yet" icon="visit">
+            <Empty
+              title="No visits yet"
+              icon="visit"
+              actions={<LogVisitButton requireLocation org={me.org} now={new Date().toISOString()} doctors={doctors.items.map((d) => ({ id: d.id, name: d.name }))} />}
+            >
               After each visit, use Log visit: what came of it, and any payment collected.
             </Empty>
           ) : (

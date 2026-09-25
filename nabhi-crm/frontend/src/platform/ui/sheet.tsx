@@ -81,7 +81,8 @@ export function PageHeader({
   );
 }
 
-export function Empty({ title, children, icon = "inbox" }: { title: string; children?: ReactNode; icon?: IconName }) {
+/** Nothing here yet, and (`actions`) what to do about it: only what this person may do. */
+export function Empty({ title, children, icon = "inbox", actions }: { title: string; children?: ReactNode; icon?: IconName; actions?: ReactNode }) {
   return (
     <div className="px-5 py-10 text-center">
       <span className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-bench text-ink-3">
@@ -89,6 +90,7 @@ export function Empty({ title, children, icon = "inbox" }: { title: string; chil
       </span>
       <p className="font-semibold text-ink-2">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-meta text-ink-3">{children}</div>}
+      {actions && <div className="mt-4 flex flex-wrap items-center justify-center gap-2 empty:hidden">{actions}</div>}
     </div>
   );
 }

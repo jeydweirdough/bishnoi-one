@@ -126,7 +126,13 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
             </SelectAllBox>
           </div>
           {rows.length === 0 ? (
-            <Empty icon="followUps" title="Nothing to do">
+            <Empty icon="followUps" title="Nothing to do" actions={can(me, "activities.create") && <LogActivityButton
+                    label="Plan a meeting or task"
+                    org={me.org}
+                    now={new Date().toISOString()}
+                    people={people}
+                    companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
+                  />}>
               Meetings and tasks you plan show up here, from Log activity or from a customer&apos;s page.
             </Empty>
           ) : (

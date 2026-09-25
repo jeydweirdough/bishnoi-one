@@ -67,7 +67,21 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
       <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
         <Sheet>
           {list.items.length === 0 ? (
-            <Empty icon="customers" title={filtered ? "No contacts match" : "No contacts yet"}>
+            <Empty
+              icon="customers"
+              title={filtered ? "No contacts match" : "No contacts yet"}
+              actions={
+                filtered ? (
+                  <LinkButton href="/contacts">Clear filters</LinkButton>
+                ) : (
+                  can(me, "customers.create") && (
+                    <LinkButton href="/contacts/new" variant="primary">
+                      Add contact
+                    </LinkButton>
+                  )
+                )
+              }
+            >
               {filtered ? "Try another search, or clear the filters." : "Add the people you talk to, and the customer each works for."}
             </Empty>
           ) : (

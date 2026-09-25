@@ -77,7 +77,21 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
       <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
         <Sheet>
           {list.items.length === 0 ? (
-            <Empty icon="company" title={filtered ? "No customers match" : "No customers yet"}>
+            <Empty
+              icon="company"
+              title={filtered ? "No customers match" : "No customers yet"}
+              actions={
+                filtered ? (
+                  <LinkButton href="/companies">Clear filters</LinkButton>
+                ) : (
+                  can(me, "customers.create") && (
+                    <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                      Add customer
+                    </LinkButton>
+                  )
+                )
+              }
+            >
               {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
             </Empty>
           ) : (

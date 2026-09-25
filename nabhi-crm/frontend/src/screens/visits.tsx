@@ -5,10 +5,12 @@ import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Paged } from "@/src/platform/lib/types";
+import { LinkButton } from "@/src/platform/ui/button";
 import { NoAccess } from "../components/admin/words";
-import type { Performance, Visit } from "../components/field/types";
+import { LogVisitButton } from "../components/field/log-visit";
+import type { Doctors, Performance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
-import { shiftMonth } from "../components/field/words";
+import { isFieldAgent, shiftMonth } from "../components/field/words";
 
 export const metadata = { title: "Visits" };
 
@@ -20,7 +22,12 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
   const person = typeof sp.person === "string" ? sp.person : "";
   const perf = await load<Performance>(`/field/performance${typeof sp.month === "string" ? `?month=${enc(sp.month)}` : ""}`);
   const month = perf.month;
-  const visits = await load<Paged<Visit>>(`/visits?limit=200&month=${month}${person ? `&person=${enc(person)}` : ""}`);
+  const agent = isFieldAgent(me);
+  const [visits, doctors] = await Promise.all([
+    load<Paged<Visit>>(`/visits?limit=200&month=${month}${person ? `&person=${enc(person)}` : ""}`),
+    // Only a field agent logs visits from here; the list is theirs to pick from.
+    agent ? load<Doctors>("/field/doctors?limit=500") : null,
+  ]);
   const fmt = makeFormat(me.org);
   const who = person ? perf.people.find((p) => p.person.id === person)?.person.name : null;
   const collected = visits.items.filter((v) => v.outcome === "collected").reduce((sum, v) => sum + v.amountCentavos, 0);
@@ -51,7 +58,17 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
       </nav>
       <Sheet className="px-5 pt-1 pb-2">
         {visits.items.length === 0 ? (
-          <Empty title="No visits this month" icon="visit">
+          <Empty
+            title="No visits this month"
+            icon="visit"
+            actions={
+              doctors ? (
+                <LogVisitButton requireLocation variant="primary" org={me.org} now={new Date().toISOString()} doctors={doctors.items.map((d) => ({ id: d.id, name: d.name }))} />
+              ) : (
+                can(me, "goals.view") && <LinkButton href={`/field?month=${month}`}>See the team&apos;s progress</LinkButton>
+              )
+            }
+          >
             Visits show up here as they&apos;re logged.
           </Empty>
         ) : (

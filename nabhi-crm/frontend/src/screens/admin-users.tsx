@@ -55,7 +55,17 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
 
       <Sheet>
         {people.length === 0 ? (
-          <Empty icon="people" title={inTeam ? "Nobody in this team" : "No one yet"} />
+          <Empty
+            icon="people"
+            title={inTeam ? "Nobody in this team" : "No one yet"}
+            actions={
+              can(me, "admin.users") && (
+                <LinkButton href="/admin/users/new" variant="primary">
+                  Add a person
+                </LinkButton>
+              )
+            }
+          />
         ) : (
           <ul className="divide-y divide-rule">
             {people.map((p) => (

@@ -4,6 +4,7 @@ import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { NoAccess } from "../components/admin/words";
+import { LinkButton } from "@/src/platform/ui/button";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { Doctors } from "../components/field/types";
 import { isFieldAgent } from "../components/field/words";
@@ -54,7 +55,24 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
 
       <Sheet className="px-5 pt-2 pb-3">
         {data.items.length === 0 ? (
-          <Empty title="No doctors here" icon="customers">
+          <Empty
+            title="No doctors here"
+            icon="customers"
+            actions={
+              search || onlyOwed ? (
+                <LinkButton href="/field/doctors">Clear the search</LinkButton>
+              ) : (
+                <>
+                  {can(me, "customers.create") && (
+                    <LinkButton href="/companies/new" variant="primary">
+                      Add a doctor
+                    </LinkButton>
+                  )}
+                  {can(me, "goals.import") && <LinkButton href="/field/balances/import">Upload balances</LinkButton>}
+                </>
+              )
+            }
+          >
             {search || onlyOwed ? "Nothing matches. Clear the search to see them all." : "Doctors are customers of the type Doctor, given to you by your lead or the admin."}
           </Empty>
         ) : (

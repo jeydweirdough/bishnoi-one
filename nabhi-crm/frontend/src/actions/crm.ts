@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { ActivityItem, CompanyDetail, CompanyStatus, ContactDetail, CrmKind, Job } from "@/src/platform/lib/types";
+import type { ActivityItem, CompanyDetail, CompanyRow, CompanyStatus, ContactDetail, CrmKind, Job, Paged } from "@/src/platform/lib/types";
 
 // Companies, contacts and activities. The API decides whose records someone
 // reaches and what their role lets them do; these carry the request and hand
@@ -154,5 +154,13 @@ export async function recordsMatching(kind: "companies" | "contacts", filters: R
       if (found.length >= page.total) break;
     }
     return found.slice(0, 500);
+  });
+}
+
+/** Customers whose name has these words: for pickers, past the first page. */
+export async function findCustomers(words: string): Promise<Result<{ id: string; name: string }[]>> {
+  return attempt(async () => {
+    const found = await api.get<Paged<CompanyRow>>(`/companies?q=${enc(words)}&limit=30`);
+    return found.items.map((c) => ({ id: c.id, name: c.name }));
   });
 }

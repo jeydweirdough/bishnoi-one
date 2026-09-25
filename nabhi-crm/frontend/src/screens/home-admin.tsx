@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -92,7 +93,17 @@ export async function AdminDashboard({ me }: { me: Me & { org: Org } }) {
       <Sheet className="px-5 pt-4 pb-2">
         <SectionTitle icon="people">By person</SectionTitle>
         {people.length === 0 ? (
-          <Empty icon="people" title="Nobody else yet">Add people under People &amp; access.</Empty>
+          <Empty
+            icon="people"
+            title="Nobody else yet"
+            actions={
+              <LinkButton href="/admin/users/new" variant="primary">
+                Add a person
+              </LinkButton>
+            }
+          >
+            Add the people who use the CRM, and give each a role.
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] text-sm">

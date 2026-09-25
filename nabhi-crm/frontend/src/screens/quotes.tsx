@@ -1,10 +1,13 @@
+import { Users } from "lucide-react";
 import Link from "next/link";
+import { LinkButton } from "@/src/platform/ui/button";
 import { QuoteStateMark } from "@/src/platform/ui/marks";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Paged, Quote } from "@/src/platform/lib/types";
+import type { CompanyRow, Paged, Quote } from "@/src/platform/lib/types";
+import { NewQuoteButton } from "../components/crm/new-quote-button";
 import { NoAccess } from "../components/admin/words";
 import { Filters, Pager } from "../components/crm/list-controls";
 
@@ -33,8 +36,10 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
   for (const [k, v] of Object.entries({ task: task?.key ?? "", q, state, owner })) if (v) query.set(k, v);
 
-  const [list, ...waiting] = await Promise.all([
+  const quotes = can(me, "quotes.create");
+  const [list, customers, ...waiting] = await Promise.all([
     load<Paged<Quote>>(`/quotes?${query}`),
+    quotes && can(me, "customers.view") ? load<Paged<CompanyRow>>("/companies?limit=200") : Promise.resolve({ items: [], total: 0 } as Paged<CompanyRow>),
     ...(approver ? TASKS.map((t) => load<Paged<Quote>>(`/quotes?task=${t.key}&limit=1`)) : []),
   ]);
   const tab = (key: string) => (key ? `/quotes?task=${key}` : "/quotes");
@@ -55,11 +60,12 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
     );
   };
   const here = new URLSearchParams(Object.entries({ task: task?.key ?? "", q, state, owner }).filter(([, v]) => v));
+  const picker = quotes ? customers.items.map((c) => ({ id: c.id, name: c.name })) : null;
 
   return (
     <>
-      <PageHeader title="Quotes">
-        {task ? "Waiting on you as an approver." : "Every quote you can see. New quotes are made from a customer's or a contact's page."}
+      <PageHeader title="Quotes" actions={picker && <NewQuoteButton customers={picker} />}>
+        {task ? "Waiting on you as an approver." : "Every quote you can see, newest first."}
       </PageHeader>
 
       {approver && (
@@ -94,8 +100,28 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
 
       <Sheet className="overflow-hidden">
         {list.items.length === 0 ? (
-          <Empty icon="quotes" title={task ? task.empty : q || state || owner ? "No quotes match." : "No quotes yet."}>
-            {!task && !q && !state && !owner && "Open a customer or a contact and choose New quote."}
+          <Empty
+            icon="quotes"
+            title={task ? task.empty : q || state || owner ? "No quotes match." : "No quotes yet."}
+            actions={
+              q || state || owner ? (
+                <LinkButton href={tab(task?.key ?? "")} variant="default">
+                  Clear filters
+                </LinkButton>
+              ) : (
+                !task &&
+                picker && (
+                  <>
+                    <NewQuoteButton customers={picker} label="Make the first quote" />
+                    <LinkButton href="/companies" variant="quiet" icon={<Users className="size-4" aria-hidden />}>
+                      Go to customers
+                    </LinkButton>
+                  </>
+                )
+              )
+            }
+          >
+            {!task && !q && !state && !owner && "A quote is always for a customer: pick one, then add the products."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">

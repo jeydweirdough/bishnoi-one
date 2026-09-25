@@ -177,7 +177,15 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
             What the team did
           </SectionTitle>
           {teamDone.items.length === 0 ? (
-            <Empty icon="activity" title="Nothing logged yet">Calls, meetings, emails and notes your team logs show up here.</Empty>
+            <Empty icon="activity" title="Nothing logged yet" actions={can(me, "activities.create") && <LogActivityButton
+                  label="Log activity"
+                  org={me.org}
+                  now={new Date().toISOString()}
+                  people={people}
+                  companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
+                />}>
+              Calls, meetings, emails and notes your team logs show up here.
+            </Empty>
           ) : (
             <ul className="divide-y divide-rule">
               {teamDone.items.map((a) => {
