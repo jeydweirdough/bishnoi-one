@@ -9,7 +9,7 @@ import { FormError } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { pinClinic, unpinClinic } from "../../actions/field";
 import type { Pin } from "./types";
-import { mapLink, whereNow } from "./where";
+import { locate, mapLink, NO_LOCATION } from "./where";
 
 /**
  * Where the clinic is. An agent pins it standing there, once; after that each
@@ -22,11 +22,12 @@ export function ClinicPin({ companyId, pin, canPin, canUnpin, pinnedOn }: { comp
 
   function pinHere() {
     start(async () => {
-      const where = await whereNow(15_000);
-      if (!where) {
-        setError("Your phone didn't say where you are. Allow location for this site, then try again.");
+      const found = await locate(15_000);
+      if (!found.ok) {
+        setError(`${NO_LOCATION[found.why]} Turn it on, then pin the clinic again.`);
         return;
       }
+      const where = found.where;
       const result = await pinClinic(companyId, where);
       if (!result.ok) return setError(result.fields?.accuracyM ?? result.error);
       setError(null);

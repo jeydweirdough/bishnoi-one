@@ -10,6 +10,8 @@ from app.security import hash_password
 from tests.conftest import PASSWORD, bearer, role_id, sign_in
 
 MONTH = "2026-09"
+# Field agents' visits always carry where they were logged.
+HERE = {"latitude": 14.5547, "longitude": 121.0244, "accuracyM": 15}
 
 
 @pytest.fixture
@@ -38,7 +40,7 @@ def doctor(client, field, name: str, agent: str) -> dict:
 
 
 def visit(client, headers, doc: dict, **body) -> dict:
-    r = client.post("/visits", json={"companyId": doc["id"], "outcome": "promised", "visitedAt": f"{MONTH}-10T10:00:00", **body}, headers=headers)
+    r = client.post("/visits", json={"companyId": doc["id"], "outcome": "promised", "visitedAt": f"{MONTH}-10T10:00:00", "location": HERE, **body}, headers=headers)
     assert r.status_code == 201, r.text
     return r.json()
 

@@ -26,7 +26,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
       <PageHeader
         title={`${fmt.greeting()}, ${me.user.fullName.split(" ")[0]}`}
         actions={
-          <LogVisitButton variant="primary" org={me.org} now={new Date().toISOString()} doctors={doctors.items.map((d) => ({ id: d.id, name: d.name }))} />
+          <LogVisitButton requireLocation variant="primary" org={me.org} now={new Date().toISOString()} doctors={doctors.items.map((d) => ({ id: d.id, name: d.name }))} />
         }
       >
         {fmt.monthLabel(month.month)}: your visits and collections against your goals.{" "}

@@ -6,6 +6,7 @@ import { makeFormat } from "@/src/platform/lib/format";
 import { NoAccess } from "../components/admin/words";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { Doctors } from "../components/field/types";
+import { isFieldAgent } from "../components/field/words";
 
 export const metadata = { title: "Doctors" };
 
@@ -27,7 +28,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
         title="Doctors"
         actions={
           can(me, "visits.create") && (
-            <LogVisitButton variant="primary" org={me.org} now={new Date().toISOString()} doctors={data.items.map((d) => ({ id: d.id, name: d.name }))} />
+            <LogVisitButton requireLocation={isFieldAgent(me)} variant="primary" org={me.org} now={new Date().toISOString()} doctors={data.items.map((d) => ({ id: d.id, name: d.name }))} />
           )
         }
       >

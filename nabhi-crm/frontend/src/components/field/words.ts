@@ -1,4 +1,9 @@
+import { can } from "@/src/platform/lib/access";
+import type { Me } from "@/src/platform/lib/types";
 import type { FieldCounts, VisitOutcome } from "./types";
+
+/** A field agent: logs visits, doesn't quote, doesn't watch others. Their location is required. */
+export const isFieldAgent = (me: Me) => can(me, "visits.create") && !can(me, "quotes.view") && !can(me, "goals.view");
 
 // How field work is said on screen. Not a client module, so server pages can use it too.
 

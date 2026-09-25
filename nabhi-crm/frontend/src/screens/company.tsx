@@ -19,6 +19,7 @@ import { ClinicPin } from "../components/field/clinic-pin";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { DoctorBalance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
+import { isFieldAgent } from "../components/field/words";
 
 type Params = Promise<{ id: string }>;
 
@@ -92,6 +93,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             {/* A field agent's page for a doctor: the visit is what it's opened for. */}
             {mayVisit && (
               <LogVisitButton
+                requireLocation={isFieldAgent(me)}
                 variant={can(me, "quotes.create") ? "default" : "primary"}
                 org={me.org}
                 now={new Date().toISOString()}

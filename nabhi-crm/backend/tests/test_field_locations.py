@@ -47,8 +47,11 @@ def test_a_visit_is_told_at_the_clinic_or_elsewhere(client, field):
     near, far = visit_at(client, field["fay"], doc, NEAR), visit_at(client, field["fay"], doc, FAR)
     assert near["atClinic"] is True and near["distanceM"] < 100
     assert far["atClinic"] is False and 1100 < far["distanceM"] < 1300
-    # No location sent: nothing claimed either way.
-    plain = client.post("/visits", json={"companyId": doc["id"], "outcome": "not_in"}, headers=field["fay"]).json()
+    # An agent can't log a visit without a location...
+    bare = client.post("/visits", json={"companyId": doc["id"], "outcome": "not_in"}, headers=field["fay"])
+    assert bare.status_code == 422 and bare.json()["detail"][0]["loc"] == ["body", "location"]
+    # ...their lead, logging one for them, can: then nothing is claimed either way.
+    plain = client.post("/visits", json={"companyId": doc["id"], "outcome": "not_in"}, headers=field["lia"]).json()
     assert (plain["location"], plain["atClinic"]) == (None, None)
     # Pinning isn't updating the doctor's details: it doesn't count toward the goal.
     assert client.get("/field/performance", headers=field["fay"]).json()["people"][0]["actual"]["doctorsUpdated"] == 0

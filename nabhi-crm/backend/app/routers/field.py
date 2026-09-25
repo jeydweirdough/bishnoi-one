@@ -199,6 +199,10 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
     receipt = (body.receipt_no or "").strip() or None
     check_collection(body.outcome, amount, receipt)
     where = body.location
+    # A field agent's visit always says where it was logged: that's what makes
+    # it a visit, not a note. Leads and the admin, logging for them, needn't.
+    if where is None and is_field_person(me):
+        raise field_error("location", "Turn on your phone's location to log a visit: it's saved with each one.")
     visit = Visit(
         company_id=doctor.id,
         visited_at=visited_at,

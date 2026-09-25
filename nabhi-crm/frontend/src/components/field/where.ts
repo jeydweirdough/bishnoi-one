@@ -10,17 +10,45 @@ export function inWorkHours(timeZone: string, now = new Date()): boolean {
   return hour >= WORK_HOURS[0] && hour < WORK_HOURS[1];
 }
 
-/** The phone's position now, or null if it can't or won't say within the time. */
-export function whereNow(timeoutMs = 10_000): Promise<Where | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+/**
+ * Why there's no location, which decides what the person is told to do:
+ * - denied: this site was blocked from it (the browser's site settings);
+ * - off: the phone's own location is switched off;
+ * - slow: it's on, but no fix came in time (indoors, weak signal);
+ * - unsupported: this browser can't give one;
+ * - insecure: the page isn't on https, where browsers never give one.
+ */
+export type NoLocation = "denied" | "off" | "slow" | "unsupported" | "insecure";
+
+export type Located = { ok: true; where: Where } | { ok: false; why: NoLocation };
+
+/** The phone's position now, or why not. */
+export function locate(timeoutMs = 10_000): Promise<Located> {
+  if (typeof window !== "undefined" && !window.isSecureContext) return Promise.resolve({ ok: false, why: "insecure" });
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve({ ok: false, why: "unsupported" });
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyM: Math.round(p.coords.accuracy) }),
-      () => resolve(null),
+      (p) => resolve({ ok: true, where: { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracyM: Math.round(p.coords.accuracy) } }),
+      (e) => resolve({ ok: false, why: e.code === e.PERMISSION_DENIED ? "denied" : e.code === e.POSITION_UNAVAILABLE ? "off" : "slow" }),
       { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60_000 },
     );
   });
 }
+
+/** The phone's position now, or null if it can't or won't say within the time. */
+export async function whereNow(timeoutMs = 10_000): Promise<Where | null> {
+  const found = await locate(timeoutMs);
+  return found.ok ? found.where : null;
+}
+
+/** What to say, in a sentence, when there's no location. */
+export const NO_LOCATION: Record<NoLocation, string> = {
+  denied: "Location is blocked for Nabhi in your browser.",
+  off: "Your phone's location is switched off.",
+  slow: "Your phone couldn't find where you are yet. Step near a window or outside, then try again.",
+  unsupported: "This browser can't share your location. Use Chrome or Safari on your phone.",
+  insecure: "Location only works on the secure (https) address of Nabhi.",
+};
 
 /** How far apart two places are, in metres, along the ground. */
 export function metres(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {

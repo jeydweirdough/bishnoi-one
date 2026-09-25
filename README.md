@@ -281,6 +281,71 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
   (e.g. http://127.0.0.1:8302/docs).
 - Run an API's tests with `uv run pytest` in its `backend/` folder.
 
+### Put an app online (Vercel)
+
+Each app is **two Vercel projects** from this repo: its API and its screens.
+When you import the repo, set the project's **Root Directory** to the app's
+`backend/` or `frontend/` folder.
+
+Ready for Vercel today: **CRM, Inventory, Pharmacy, Platform**. Admin,
+Finance, In-Licensing and Regulatory don't have the Postgres driver, the
+Vercel entry point (`app/server.py`) or the first-admin settings yet, so they
+run on your computer only.
+
+In each project: **Settings → Environment Variables**. Paste a block like the
+ones below into the first field, and Vercel splits it into one variable per
+line.
+
+**Every API project:**
+
+```
+DATABASE_URL=postgresql://postgres.<project>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+ENVIRONMENT=production
+ALLOWED_HOSTS=["<this API's address>.vercel.app"]
+FIRST_ADMIN_EMAIL=you@yourcompany.com
+FIRST_ADMIN_NAME=Your Name
+FIRST_ADMIN_PASSWORD=<at least 8 characters>
+```
+
+- `DATABASE_URL`: on Supabase, the **Transaction pooler** address (Connect →
+  Transaction pooler, port 6543). The direct `db.<project>.supabase.co`
+  address doesn't work from Vercel. In the password, write `#` as `%23`, `@`
+  as `%40` and `/` as `%2F`. Don't put quotes around it.
+- The apps can share one database: every app's tables start with its own
+  prefix (`nbcm_`, `nbin_`, `nbph_`, `nbpl_`…), so they never collide.
+- `ALLOWED_HOSTS`: the API's own address, as JSON. A request to any other
+  address is refused.
+- `FIRST_ADMIN_*`: makes the first administrator on start, but only when that
+  app has no accounts yet; after that it's ignored. Remove
+  `FIRST_ADMIN_PASSWORD` once you've signed in, and add everyone else from
+  the app itself.
+
+**Every screens project:**
+
+```
+API_URL=https://<this app's API address>.vercel.app
+NEXT_PUBLIC_NABHI_APP=<the app's key, below>
+```
+
+- `NEXT_PUBLIC_NABHI_APP` is read when the screens are built: redeploy after
+  you set or change it.
+- Don't set `SHOW_DEMO_ACCOUNTS` online.
+
+| App | API root directory | Screens root directory | `NEXT_PUBLIC_NABHI_APP` |
+|---|---|---|---|
+| CRM | `nabhi-crm/backend` | `nabhi-crm/frontend` | `crm` |
+| Inventory | `nabhi-inventory/backend` | `nabhi-inventory/frontend` | `inventory` |
+| Pharmacy | `nabhi-pharmacy/backend` | `nabhi-pharmacy/frontend` | `pharmacy` |
+| Platform | `nabhi-platform/backend` | `nabhi-platform/frontend` | `platform` |
+
+Use the addresses Vercel actually gives your projects (e.g.
+`nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
+screens' `API_URL` must both name it.
+
+If an API can't start, every request to it answers `503` with what's wrong
+and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
+full error is in the project's logs.
+
 ---
 
 ## 6. Add a new app

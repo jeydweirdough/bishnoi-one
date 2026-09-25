@@ -11,7 +11,7 @@ import type { Org } from "@/src/platform/lib/types";
 import { logVisit } from "../../actions/field";
 import { localDateTime } from "../crm/words";
 import type { VisitOutcome } from "./types";
-import { whereNow } from "./where";
+import { locate, NO_LOCATION } from "./where";
 import { OUTCOMES } from "./words";
 
 type Doctor = { id: string; name: string };
@@ -21,7 +21,22 @@ type Doctor = { id: string; name: string };
  * and the receipt; anything else, just a note. On a doctor's page the doctor
  * is fixed; elsewhere it's picked from the agent's own.
  */
-function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; now: string; doctor?: Doctor; doctors?: Doctor[]; onDone: () => void }) {
+function LogVisitForm({
+  org,
+  now,
+  doctor,
+  doctors = [],
+  requireLocation = false,
+  onDone,
+}: {
+  org: Org;
+  now: string;
+  doctor?: Doctor;
+  doctors?: Doctor[];
+  /** A field agent's visit can't be logged without where they are. */
+  requireLocation?: boolean;
+  onDone: () => void;
+}) {
   const fmt = useMemo(() => makeFormat(org), [org]);
   const [companyId, setCompanyId] = useState(doctor?.id ?? "");
   const [outcome, setOutcome] = useState<VisitOutcome>("collected");
@@ -43,7 +58,12 @@ function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; no
     start(async () => {
       // Where the phone is now, if it says: the visit is placed at (or away
       // from) the clinic by it. The browser asks the person the first time.
-      const location = await whereNow();
+      const found = await locate();
+      if (!found.ok && requireLocation) {
+        setError(`${NO_LOCATION[found.why]} Your location is needed to log a visit: turn it on, then log it again.`);
+        return;
+      }
+      const location = found.ok ? found.where : null;
       const result = await logVisit({
         companyId,
         outcome,
@@ -114,7 +134,7 @@ function LogVisitForm({ org, now, doctor, doctors = [], onDone }: { org: Org; no
         <Button type="submit" variant="primary" loading={pending} disabled={!companyId}>
           {collecting ? "Log collection" : "Log visit"}
         </Button>
-        <p className="text-meta text-ink-3">Where you are now is saved with the visit.</p>
+        <p className="text-meta text-ink-3">{requireLocation ? "Where you are now is saved with the visit (required)." : "Where you are now is saved with the visit."}</p>
       </div>
     </form>
   );
@@ -132,6 +152,7 @@ export function LogVisitButton({
   now: string;
   doctor?: Doctor;
   doctors?: Doctor[];
+  requireLocation?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { inWorkHours, metres, type Where } from "./where";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LocationGuide } from "./location-guide";
+import { inWorkHours, locate, metres, type NoLocation, type Where } from "./where";
 
 type TrailPoint = Where & { at: string };
 
-// A field agent's trail while the CRM is open, in work hours only.
+// A field agent's location while the CRM is open, in work hours only. It's
+// required: without it, a guide stands in front of the CRM until it's on.
 //
+// The trail:
 // - A point is kept when they've moved 50 m from the last one, or 5 minutes
 //   have passed: parked at a clinic that's one point in five minutes.
 // - Kept points wait on the phone (this browser's storage), so a dropped
@@ -23,20 +26,29 @@ const EVERY_MS = 5 * 60_000;
 const SEND_EVERY_MS = 15 * 60_000;
 const WORST_ACCURACY_M = 200;
 const MOST_WAITING = 2000;
+// What stops the CRM until it's fixed. "slow" doesn't: a clinic's thick walls
+// shouldn't lock an agent out; the pill says it's still looking.
+const BLOCKING: NoLocation[] = ["denied", "off", "unsupported", "insecure"];
 
-type State = "starting" | "on" | "after-hours" | "denied" | "unsupported";
+type State = "starting" | "on" | "after-hours" | NoLocation;
 
-const WORDS: Record<State, { text: string; hint: string }> = {
-  starting: { text: "Location starting", hint: "Asking your phone where you are." },
+const PILL: Record<State, { text: string; hint: string }> = {
+  starting: { text: "Finding your location", hint: "Asking your phone where you are." },
   on: { text: "Location on", hint: "Your route is saved while Nabhi is open, 6:00 to 20:00. Your lead and the admin can see it." },
   "after-hours": { text: "Location off after hours", hint: "Nothing is saved outside 6:00 to 20:00." },
-  denied: { text: "Location blocked", hint: "Allow location for this site in your browser, so your visits and route are saved." },
+  slow: { text: "Finding your location", hint: "Your phone hasn't found you yet. Near a window or outside helps." },
+  denied: { text: "Location blocked", hint: "Allow location for this site." },
+  off: { text: "Location off", hint: "Turn on your phone's location." },
   unsupported: { text: "No location", hint: "This browser can't share your location." },
+  insecure: { text: "No location", hint: "Open Nabhi from its https address." },
 };
 
 export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: string }) {
   const [state, setState] = useState<State>("starting");
+  const [retrying, setRetrying] = useState(false);
   const sending = useRef(false);
+  // Starts (or restarts) following the phone; set once the effect has run.
+  const restart = useRef<() => void>(() => {});
 
   useEffect(() => {
     const key = `nabhi-trail:${userId}`;
@@ -84,59 +96,101 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
       write([...read(), point]);
     }
 
-    if (!("geolocation" in navigator)) {
-      setState("unsupported");
-      return;
-    }
     let watch: number | null = null;
+    const stop = () => {
+      if (watch !== null) navigator.geolocation.clearWatch(watch);
+      watch = null;
+    };
     const follow = () => {
       if (!inWorkHours(timeZone)) {
-        if (watch !== null) navigator.geolocation.clearWatch(watch);
-        watch = null;
+        stop();
         setState("after-hours");
         return;
       }
+      if (!window.isSecureContext) return setState("insecure");
+      if (!("geolocation" in navigator)) return setState("unsupported");
       if (watch !== null) return;
       watch = navigator.geolocation.watchPosition(
         keep,
         (error) => {
-          if (error.code === error.PERMISSION_DENIED) setState("denied");
+          if (error.code === error.PERMISSION_DENIED || error.code === error.POSITION_UNAVAILABLE) {
+            // Stopped, so the next try (Try again, or coming back to the tab) asks afresh.
+            stop();
+            setState(error.code === error.PERMISSION_DENIED ? "denied" : "off");
+          } else {
+            setState((now) => (now === "on" ? now : "slow"));
+          }
         },
         { enableHighAccuracy: true, maximumAge: 30_000, timeout: 60_000 },
       );
     };
+    restart.current = () => {
+      stop();
+      follow();
+    };
     follow();
     send();
 
+    // When they allow it in the browser's settings, carry on by itself.
+    let permission: PermissionStatus | null = null;
+    navigator.permissions
+      ?.query({ name: "geolocation" })
+      .then((p) => {
+        permission = p;
+        p.onchange = () => p.state === "granted" && restart.current();
+      })
+      .catch(() => {});
+
     const hours = window.setInterval(follow, 60_000);
     const upload = window.setInterval(() => send(), SEND_EVERY_MS);
-    const onHide = () => document.visibilityState === "hidden" && send(true);
+    const onVisible = () => {
+      if (document.visibilityState === "hidden") return send(true);
+      // Back from the phone's Settings: look again.
+      if (watch === null) follow();
+    };
     const onLeave = () => send(true);
     const onOnline = () => send();
-    document.addEventListener("visibilitychange", onHide);
+    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pagehide", onLeave);
     window.addEventListener("online", onOnline);
     return () => {
-      if (watch !== null) navigator.geolocation.clearWatch(watch);
+      stop();
+      if (permission) permission.onchange = null;
       window.clearInterval(hours);
       window.clearInterval(upload);
-      document.removeEventListener("visibilitychange", onHide);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onLeave);
       window.removeEventListener("online", onOnline);
     };
   }, [userId, timeZone]);
 
-  const words = WORDS[state];
-  const dot = state === "on" ? "bg-hema" : state === "denied" ? "bg-danger" : "bg-ink-3";
+  const retry = useCallback(async () => {
+    setRetrying(true);
+    // Asking once directly shows the browser's prompt again where it still can.
+    const found = await locate(15_000);
+    setRetrying(false);
+    if (found.ok) {
+      setState("on");
+      restart.current();
+    } else {
+      setState(found.why);
+    }
+  }, []);
+
+  const pill = PILL[state];
+  const dot = state === "on" ? "bg-hema" : BLOCKING.includes(state as NoLocation) ? "bg-danger" : "bg-ink-3";
   return (
-    <div
-      role="status"
-      title={words.hint}
-      className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-[3px] bg-sheet px-3 py-1.5 text-meta text-ink-2 shadow-overlay"
-    >
-      <span aria-hidden className={`size-2 rounded-full ${dot}`} />
-      {words.text}
-      <span className="sr-only">. {words.hint}</span>
-    </div>
+    <>
+      {BLOCKING.includes(state as NoLocation) && <LocationGuide why={state as NoLocation} onRetry={retry} retrying={retrying} />}
+      <div
+        role="status"
+        title={pill.hint}
+        className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-[3px] bg-sheet px-3 py-1.5 text-meta text-ink-2 shadow-overlay"
+      >
+        <span aria-hidden className={`size-2 rounded-full ${dot}`} />
+        {pill.text}
+        <span className="sr-only">. {pill.hint}</span>
+      </div>
+    </>
   );
 }
