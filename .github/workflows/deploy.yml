@@ -1,37 +1,68 @@
-# Deploys to Vercel only the apps whose folder changed, from main only.
+# Deploys to Vercel only when you ask: Actions → Deploy → Run workflow, then
+# tick the apps to put online. Nothing deploys on a push.
 #
-# Vercel's own Git builds are off (each vercel.json: git.deploymentEnabled
-# false), so a push makes no deployment by itself: no failed checks on
-# commits, no preview builds of the app branches the sync keeps, and none of
-# the day's deployments used up by apps that didn't change.
+# Vercel's own Git builds are off too (every vercel.json: git.deploymentEnabled
+# false), so a push, a sync or a merge never starts a deployment anywhere.
 #
-# Which folder goes to which Vercel project: .github/deploy.json.
+# Which folder goes to which Vercel project: .github/deploy.json. An app with
+# no line there isn't on Vercel yet; ticking it only says so in the run's
+# summary. When an app gets its Vercel projects, add them to deploy.json and
+# change its "(not on Vercel yet)" below.
 #
 # For each project it remembers the last commit it deployed, as a tag
-# (deployed/<project>: the repo's Tags say what's live). A run deploys
-# the projects whose folder changed since theirs, then moves its tag on. So a
-# deploy that failed (Vercel down, the day's limit reached) is simply tried
-# again by the next run, and a push that comes in through the sync (an app
-# branch merged into main) is picked up too.
+# (deployed/<project>: the repo's Tags say what's live), so "Only what changed"
+# can skip a project whose folder hasn't changed since.
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
-  # The sync merges app-branch work into main with GitHub's own token, which
-  # starts no push workflows; this catches those.
-  workflow_run:
-    workflows: ["Sync branches"]
-    types: [completed]
   workflow_dispatch:
     inputs:
-      project:
-        description: "Deploy this Vercel project now, changed or not (e.g. nabhi-crm-backend). Empty: only what changed."
-        required: false
-        default: ""
+      nabhi-admin:
+        description: "Admin (not on Vercel yet)"
+        type: boolean
+        default: false
+      nabhi-crm:
+        description: "CRM (on Vercel: screens + API)"
+        type: boolean
+        default: false
+      nabhi-finance:
+        description: "Finance (not on Vercel yet)"
+        type: boolean
+        default: false
+      nabhi-in-licensing:
+        description: "In-Licensing (not on Vercel yet)"
+        type: boolean
+        default: false
+      nabhi-inventory:
+        description: "Inventory (on Vercel: screens + API)"
+        type: boolean
+        default: false
+      nabhi-pharmacy:
+        description: "Pharmacy (not on Vercel yet)"
+        type: boolean
+        default: false
+      nabhi-platform:
+        description: "Platform (not on Vercel yet)"
+        type: boolean
+        default: false
+      nabhi-regulatory:
+        description: "Regulatory (not on Vercel yet)"
+        type: boolean
+        default: false
+      part:
+        description: "Which part of each app"
+        type: choice
+        options:
+          - screens and API
+          - screens only
+          - API only
+        default: screens and API
+      only_changed:
+        description: "Skip a part that hasn't changed since its last deploy"
+        type: boolean
+        default: false
 
-# One run at a time; a push that lands meanwhile waits, then deploys whatever is still new.
+# One run at a time; a second one waits, then deploys what it was asked to.
 concurrency:
   group: deploy
   cancel-in-progress: false
@@ -52,39 +83,55 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: What changed since each project's last deploy
+      - name: What to deploy
         id: plan
         env:
-          FORCE: ${{ github.event.inputs.project }}
+          ASKED: ${{ toJSON(inputs) }}
         run: |
           git fetch -q --force origin 'refs/tags/deployed/*:refs/tags/deployed/*' || true
           python3 - <<'PY'
           import json, os, subprocess
 
           cfg = json.load(open(".github/deploy.json"))
-          force = os.environ.get("FORCE", "").strip()
+          asked = json.loads(os.environ["ASKED"])
+          part = asked.get("part", "screens and API")
+          only_changed = str(asked.get("only_changed")).lower() == "true"
           head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-          todo = []
-          for folder, project in cfg["projects"].items():
-              if not os.path.isdir(folder):
-                  continue
-              last = subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/deployed/{project}^{{commit}}"], capture_output=True, text=True).stdout.strip()
-              if project == force:
-                  why = "asked for by hand"
-              elif not last:
-                  why = "never deployed from here yet"
-              elif subprocess.run(["git", "diff", "--quiet", last, head, "--", folder]).returncode != 0:
-                  why = f"{folder} changed since {last[:7]}"
-              else:
-                  print(f"skip  {project}: nothing new in {folder}")
-                  continue
-              print(f"DEPLOY {project}: {why}")
-              todo.append({"project": project, "folder": folder})
+          apps = sorted(d for d in os.listdir(".") if d.startswith("nabhi-") and os.path.isdir(d))
+          wanted_side = {"screens and API": ("frontend", "backend"), "screens only": ("frontend",), "API only": ("backend",)}[part]
+
+          todo, rows = [], []
+          for app in apps:
+              ticked = str(asked.get(app)).lower() == "true"
+              projects = {folder: name for folder, name in cfg["projects"].items() if folder.split("/")[0] == app}
+              on_vercel = ", ".join(f"{'screens' if f.endswith('frontend') else 'API'} → `{n}`" for f, n in sorted(projects.items())) or "not on Vercel yet"
+              result = ""
+              if ticked and not projects:
+                  result = "skipped: not on Vercel yet (add it to .github/deploy.json)"
+              elif ticked:
+                  done = []
+                  for folder, project in sorted(projects.items()):
+                      if folder.split("/")[1] not in wanted_side:
+                          continue
+                      last = subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/deployed/{project}^{{commit}}"],
+                                            capture_output=True, text=True).stdout.strip()
+                      if only_changed and last and subprocess.run(["git", "diff", "--quiet", last, head, "--", folder]).returncode == 0:
+                          done.append(f"`{project}` unchanged, skipped")
+                          continue
+                      todo.append({"project": project, "folder": folder})
+                      done.append(f"`{project}` deploying")
+                  result = "; ".join(done) or f"nothing: no {part.replace(' only', '')} on Vercel"
+              rows.append(f"| {app} | {'✅' if ticked else ''} | {on_vercel} | {result} |")
+              print(f"{app}: {'ticked' if ticked else '-'} | {on_vercel} | {result}")
+
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"matrix={json.dumps({'include': todo})}\n")
               out.write(f"any={'true' if todo else 'false'}\n")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
-              s.write("### Deploying\n" + ("".join(f"- {t['project']} ({t['folder']})\n" for t in todo) or "Nothing: no app's folder changed.\n"))
+              s.write(f"### Deploy: {part}{' (only what changed)' if only_changed else ''}\n\n")
+              s.write("| App | Asked | On Vercel | This run |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")
+              if not todo:
+                  s.write("\nNothing to deploy: tick an app that's on Vercel.\n")
           PY
 
   deploy:

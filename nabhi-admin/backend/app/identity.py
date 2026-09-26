@@ -1,7 +1,9 @@
 """What the screens are told about this app and the person signed in to it."""
 
+from app.access import access_of
 from app.config import Settings
 from app.models import User
+from app.permissions import ADMIN_PERMISSIONS
 
 # This app's module, as the screens' sidebar and door check read it. None: the
 # Platform app, which works above any one company.
@@ -27,14 +29,18 @@ def org_out(settings: Settings) -> dict:
 
 
 def me_out(user: User, settings: Settings) -> dict:
-    admin = user.role == "admin"
+    access = access_of(user)
+    has_admin = bool(access.permissions & ADMIN_PERMISSIONS)
     return {
         "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
         "org": None if DEVELOPER_ADMIN_APP else org_out(settings),
-        "canManageSettings": admin and not DEVELOPER_ADMIN_APP,
+        "role": {"id": user.role.id, "name": user.role.name, "scope": "all"},
+        "team": None,
+        "permissions": sorted(access.permissions),
+        "canManageSettings": has_admin and not DEVELOPER_ADMIN_APP,
         "canRecover": DEVELOPER_ADMIN_APP,
         "viewedBy": None,
-        "isOwner": admin and not DEVELOPER_ADMIN_APP,
+        "isOwner": has_admin and not DEVELOPER_ADMIN_APP,
         "isDeveloperAdmin": DEVELOPER_ADMIN_APP,
         "modules": [] if MODULE is None else [{**MODULE, "built": True, "url": None, "actions": ALL_ACTIONS, "teams": []}],
         "lists": {"customer_kind": [], "activity_kind": [], "outcome": []},

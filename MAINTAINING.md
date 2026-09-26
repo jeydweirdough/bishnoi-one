@@ -20,7 +20,7 @@ The repo has three actions, in `.github/workflows/`:
 |---|---|---|
 | **Sync branches** (`sync-branches.yml`) | any push to `main` or a `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
 | **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
-| **Deploy** (`deploy.yml`) | any push to `main`, after each sync, or by hand | Deploys to Vercel only the apps whose folder changed ([below](#deployments-on-vercel-only-what-changed)). |
+| **Deploy** (`deploy.yml`) | only by hand: **Run workflow** | Deploys to Vercel the apps you tick ([below](#deployments-on-vercel-only-when-you-ask)). |
 
 Set these once:
 
@@ -74,22 +74,29 @@ Then **merge** it. About a minute later, Sync branches creates the
 
 ---
 
-## Deployments on Vercel: only what changed
+## Deployments on Vercel: only when you ask
 
-Vercel doesn't build anything from Git by itself (each `vercel.json`:
-`git.deploymentEnabled: false`). The **Deploy** action
-(`.github/workflows/deploy.yml`) does, after every push to `main` and every
-sync:
+Nothing deploys by itself. Vercel doesn't build from Git (every app's
+`vercel.json`, screens and API: `git.deploymentEnabled: false`), and the
+**Deploy** action (`.github/workflows/deploy.yml`) runs only when you press
+its button:
 
-- It deploys only the Vercel projects whose folder changed since that
-  project's last deploy, to production. A commit to `nabhi-crm/backend`
-  deploys the CRM API and nothing else. Commits get no Vercel checks, and the
-  app branches get no preview builds.
+1. **Actions → Deploy → Run workflow** (branch `main`).
+2. Tick the apps to put online. Each says whether it's on Vercel, e.g. "CRM
+   (on Vercel: screens + API)" or "Pharmacy (not on Vercel yet)".
+3. Pick **screens and API**, **screens only** or **API only**. Tick **Skip a
+   part that hasn't changed** to leave out any that are already up to date.
+4. **Run workflow.** The run's summary is a table of every app: whether you
+   ticked it, its Vercel projects, and what this run did with it. An app
+   that isn't on Vercel is listed as skipped, never an error.
+
+- It deploys `main` as it is, to production. Commits get no Vercel checks,
+  and the app branches get no preview builds.
 - Each project's last deployed commit is the tag `deployed/<project>` (the
-  repo's Tags show what's live). A deploy that fails (Vercel down, the day's
-  limit reached) is tried again by the next run.
+  repo's Tags show what's live).
 - Which folder goes to which project: `.github/deploy.json`. When an app gets
-  a Vercel project, add its line there (a folder not listed is never deployed).
+  its Vercel projects, add them there, and change its "(not on Vercel yet)"
+  in `deploy.yml` to "(on Vercel: screens + API)".
 
 Set up once:
 
@@ -108,8 +115,9 @@ If a deploy fails, the run's error says why: the token is wrong or expired
 (make a new one), or it can't see the scope set (the error lists what it can
 see).
 
-To deploy one project now, changed or not: **Actions → Deploy → Run
-workflow**, and type its project name (e.g. `nabhi-crm-backend`).
+If a whole app is being set up on Vercel for the first time: make its two
+projects on Vercel (Root Directory `nabhi-<app>/frontend` and
+`nabhi-<app>/backend`), add them to `deploy.json`, then tick it here.
 
 ---
 
@@ -202,6 +210,73 @@ The same link carries **fund requests** (cash advances):
 Finance's demo admin is Rhea Castillo (`rhea@pharmacrm.test`, demo1234). The
 admin changes the chart of accounts, expense categories, default accounts and
 tax setup; Finance Staff (Joy, Fely) do everything else.
+
+---
+
+## Connecting Discord
+
+Discord is where **announcements** are kept, and where **every app's log**
+goes, the way the Getmeds orders app kept its orders there
+(`app/discord.py`, the same file in every backend).
+
+- **Announcements** are written in Platform (Communications). Each one is a
+  thread in the announcements channel, named with its id,
+  `ANN-YYYYMMDD-NNNN` (numbered from 0001 each day, Manila time), holding
+  the announcement as JSON in one message that's edited on every change. On
+  start, Platform reads the channel back. Every app shows the ones for it,
+  and for everyone, above every page.
+- **Logs**: each app posts a thread a day in the logs channel,
+  `LOG-CRM-20260926`, `LOG-FINANCE-20260926`…, one line per change: what,
+  to what, who, when. Never values or passwords. The CRM, Inventory,
+  Pharmacy and Platform send their audit log. Admin, Finance, In-Licensing
+  and Regulatory have none yet, so they send every change and sign-in.
+
+Set up once:
+
+1. Make two channels, e.g. `#nabhi-announcements` and `#nabhi-logs`. Keep
+   them private: only people who may read the logs.
+2. In each, **Edit Channel → Integrations → Webhooks → New Webhook**, and
+   copy its URL. The announcements one goes in Platform's
+   `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL`; the logs one in every app's
+   `DISCORD_LOGS_WEBHOOK_URL`. Don't use one channel for both.
+3. In the [Discord Developer Portal](https://discord.com/developers/applications),
+   **New Application** → **Bot** → **Reset Token**: that's
+   `DISCORD_BOT_TOKEN`, the same in every app. On the same page, turn on
+   **Message Content Intent** and save; without it Discord gives the
+   messages back blank.
+4. **OAuth2 → URL Generator**: tick `bot`, then **View Channels**, **Read
+   Message History**, **Create Public Threads** and **Send Messages in
+   Threads**. Open the URL and add the bot to the server, with access to both
+   channels.
+5. In each app's `backend/.env` (on Vercel: its environment variables), set
+   `DISCORD_ENABLED=true` and `DISCORD_MODE=live`, and restart. Platform's
+   log says how many announcements it read back.
+
+Until then (`DISCORD_ENABLED` off, or `DISCORD_MODE=mock`), nothing leaves
+the machine: announcements are kept in `backend/.data/discord-mock/`, and log
+lines are printed.
+
+Moving over: announcements made before this were in Platform's database. On
+its first start with Discord on, Platform copies them into the channel,
+keeping their ids, and takes them out of the database.
+
+What Discord as the database costs, as with the orders app:
+
+- **Anyone who can manage messages in the channel can delete an
+  announcement.** Keep the channel's permissions tight.
+- **Every start reads the whole announcements channel**, then again at most
+  once a minute, so several servers (Vercel) stay in step.
+- **If Discord can't be reached**, a new or changed announcement isn't saved
+  and the admin is told to try again; nothing is half-saved. Log lines wait
+  and are tried again (up to 5 times); on Vercel they may go out with the
+  next request.
+- **About 30 messages a minute per channel.** More wait their turn
+  (`DISCORD_MAX_PER_MINUTE`).
+
+For each app's screens to show announcements, Platform must know the app:
+**Platform → Applications**, with its key `crm`, `inventory`, `finance`,
+`pharmacy`, `exec` (Admin) or `platform`, and the screens' `PLATFORM_API_URL`
+must point at Platform's API.
 
 ---
 

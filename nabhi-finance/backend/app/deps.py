@@ -43,6 +43,7 @@ def current_session(
 
 
 def current_user(
+    request: Request,
     record: Annotated[SignInSession, Depends(current_session)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
@@ -51,6 +52,7 @@ def current_user(
     user = db.get(User, record.user_id)
     if user is None or not user.is_active or as_utc(record.created_at) < as_utc(user.password_changed_at):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SIGN_IN_AGAIN)
+    request.state.actor = f"{user.full_name} · {user.email}"  # for the Discord log (app/discord.py)
     return user
 
 

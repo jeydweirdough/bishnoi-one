@@ -3,6 +3,7 @@
 Run with:  uv run main.py   (port 8305)
 """
 
+import logging
 import time
 from collections.abc import Awaitable, Callable
 
@@ -11,10 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.announcements import import_from_database, make_table
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
+from app.discord import DiscordError, logs_for, mirror_audit
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
+from app.models import AuditEntry
 from app.routers import (
     access,
     activity,
@@ -52,6 +56,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     make_first_admin(app.state.sessions, settings)
+    # The log goes to Discord too, a thread a day; announcements are kept there (app/announcements.py).
+    app.state.logs = logs_for("PLATFORM", settings)
+    mirror_audit(app.state.sessions, AuditEntry, app.state.logs)
+    app.state.notices = make_table(settings)
+    try:
+        app.state.notices.load()
+        moved = import_from_database(app.state.notices, app.state.sessions)
+        if moved:
+            logging.getLogger("nabhi.discord").info("[discord:announcements] moved %d announcement(s) out of the database", moved)
+    except DiscordError as e:
+        logging.getLogger("nabhi.discord").warning("[discord:announcements] couldn't read them yet, trying again in a minute: %s", e)
 
     app.add_middleware(
         CORSMiddleware,

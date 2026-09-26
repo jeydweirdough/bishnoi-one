@@ -11,6 +11,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
+from app.discord import logs_for, mirror_audit
+from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
 from app.routers import admin, auth, batches, dispensing, medicines, patients, prescriptions, reports, sales, stock, suppliers
@@ -34,6 +36,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Nabhi Pharmacy API", version="0.2.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    # The audit log goes to Discord too, a thread a day (app/discord.py).
+    app.state.logs = logs_for("PHARMACY", settings)
+    mirror_audit(app.state.sessions, AuditEntry, app.state.logs)
     make_first_admin(app.state.sessions, settings)
 
     app.add_middleware(

@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
+from app.discord import log_requests, logs_for
 from app.migrate import upgrade
 from app.routers import auth, regulatory
 
@@ -33,6 +34,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Nabhi Regulatory API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    # Every change and sign-in goes to Discord as a line, a thread a day (app/discord.py).
+    app.state.logs = logs_for("REGULATORY", settings)
+    log_requests(app, app.state.logs)
 
     app.add_middleware(
         CORSMiddleware,

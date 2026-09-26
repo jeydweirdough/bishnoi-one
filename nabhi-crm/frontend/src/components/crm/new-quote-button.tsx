@@ -1,9 +1,10 @@
 "use client";
 
-import { FilePlus2, Search, X } from "lucide-react";
+import { FilePlus2, Search, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/src/platform/ui/button";
+import { useCan } from "../quick-add/can";
 import { findCustomers } from "../../actions/crm";
 
 type Customer = { id: string; name: string };
@@ -12,6 +13,7 @@ type Customer = { id: string; name: string };
  * "New quote" from anywhere: a quote is always for a customer, so this asks
  * which one first (type to find them), then opens that customer's quote form.
  * The first page of customers is at hand; typed words search them all.
+ * Someone not on the list yet can be added from here, and the quote follows.
  */
 export function NewQuoteButton({ customers, variant = "primary", label = "New quote" }: { customers: Customer[]; variant?: "primary" | "default"; label?: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -34,6 +36,19 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
     return () => clearTimeout(wait);
   }, [q]);
   const shown = found ?? local;
+  const mayAdd = useCan()("customers.create");
+  const typed = q.trim();
+  // Adding someone new, then straight on to their quote (the new-customer form carries it through).
+  const addNew = () => {
+    dialog.current?.close();
+    router.push(`/companies/new?then=quote${typed ? `&name=${encodeURIComponent(typed)}` : ""}`);
+  };
+  const addButton = (text: string) =>
+    mayAdd && (
+      <Button variant="primary" size="sm" icon={<UserPlus className="size-4" aria-hidden />} onClick={addNew}>
+        {text}
+      </Button>
+    );
 
   return (
     <>
@@ -61,10 +76,16 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
               className="w-full bg-transparent text-sm outline-none"
             />
           </label>
-          {customers.length === 0 ? (
-            <p className="py-6 text-center text-meta text-ink-3">You have no customers yet. Add one first, then quote them.</p>
+          {customers.length === 0 && !typed ? (
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-meta text-ink-3">You have no customers yet. Add the first one, and their quote opens next.</p>
+              {addButton("Add a customer")}
+            </div>
           ) : shown.length === 0 ? (
-            <p className="py-6 text-center text-meta text-ink-3">No customer called that.</p>
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-meta text-ink-3">No customer called &ldquo;{typed}&rdquo; yet.</p>
+              {addButton(`Add “${typed}” as a customer`) || <p className="text-meta text-ink-3">Ask someone who can add customers to add them.</p>}
+            </div>
           ) : (
             <ul className="mt-2 max-h-80 overflow-y-auto">
               {shown.map((c) => (
@@ -82,6 +103,12 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
                 </li>
               ))}
             </ul>
+          )}
+          {shown.length > 0 && typed && mayAdd && (
+            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-[3px] border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-hema hover:underline">
+              <UserPlus className="size-4" aria-hidden />
+              Not in the list? Add &ldquo;{typed}&rdquo; as a new customer
+            </button>
           )}
         </div>
       </dialog>

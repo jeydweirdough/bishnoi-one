@@ -388,6 +388,10 @@ Use the addresses Vercel actually gives your projects (e.g.
 `nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
 screens' `API_URL` must both name it.
 
+**Pushing doesn't deploy.** To put apps online, the repo owner opens
+**Actions → Deploy → Run workflow** on GitHub and ticks the apps; each one
+says whether it's on Vercel yet (MAINTAINING.md, "Deployments on Vercel").
+
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
 full error is in the project's logs.
@@ -428,6 +432,11 @@ after you change a file.
 | `ORG_TIMEZONE` | `Asia/Manila` | The company's time zone: what counts as "today". |
 | `ALLOWED_HOSTS` | `["localhost", "127.0.0.1"]` | Addresses the API answers to. Online: its own Vercel address. |
 | `CORS_ORIGINS` | `[]` | Browser addresses allowed to call the API directly. Leave it empty: the screens' server calls the API, not the browser. |
+| `DISCORD_ENABLED` | `false` | `true` sends this app's log to Discord (and, in Platform, keeps announcements there). See MAINTAINING.md, "Connecting Discord". |
+| `DISCORD_MODE` | `mock` | `live` really posts; `mock` keeps everything on this machine. |
+| `DISCORD_BOT_TOKEN` | not set | The Discord bot: reads the channels back and starts the threads. The same in every app. |
+| `DISCORD_LOGS_WEBHOOK_URL` | not set | A webhook in the logs channel. This app's log goes there, a thread a day (`LOG-CRM-20260926`). |
+| `DISCORD_MAX_PER_MINUTE` | `30` | Most Discord messages a minute; more wait their turn. |
 
 ### Backend settings only some apps have
 
@@ -441,6 +450,7 @@ after you change a file.
 | CRM | `INVENTORY_APP_URL` | not set | Inventory's screens, for the "Add it in Inventory" link on Products. |
 | CRM | `FINANCE_API_URL`, `FINANCE_API_KEY` | not set | Links the CRM to Finance, which works out tax as the last step of the price rules. Not set: quotes are priced without tax. |
 | Inventory, Finance | `INTEGRATION_KEYS` | `[]` | Which other apps may call this one, as `name:key` pairs. See [Linking apps](#linking-apps). |
+| Platform | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | not set | A webhook in the announcements channel, where announcements are kept, a thread each (`ANN-20260926-0001`). |
 
 ### Linking apps
 
@@ -476,6 +486,7 @@ the CRM tells its users the other app can't be reached; nothing breaks.
 | Setting | Default | What it does |
 |---|---|---|
 | `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
+| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Nabhi Platform's API, for the announcements above every page. Unreachable: none show. |
 | `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
 | `NEXT_PUBLIC_NABHI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
 | `NEXT_PUBLIC_NABHI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |

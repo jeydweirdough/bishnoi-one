@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from app import platform_settings
 from app.api import iso
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import TICKET_STATUSES, AccessRequest, Announcement, Application, AuditEntry, Company, Identity, Incident, Ticket, User
+from app.models import TICKET_STATUSES, AccessRequest, Application, AuditEntry, Company, Identity, Incident, Ticket, User
 from app.routers.activity import entry_out
 from app.routers.communications import names_for as notice_names, notice_out, state_of
 from app.routers.incidents import _companies, _names, incident_out
@@ -58,10 +58,10 @@ def dashboard(request: Request, db: DB, settings: SettingsDep, _: CurrentUser) -
     active = db.scalars(select(Incident).where(Incident.status != "resolved").order_by(Incident.started_at.desc())).all()
     names = _names(db, active)
     companies = _companies(db, [i.id for i in active])
-    notices = [
-        n for n in db.scalars(select(Announcement).where(Announcement.published_at.is_not(None)).order_by(Announcement.starts_at))
-        if state_of(n, now) in ("showing", "scheduled")
-    ][:5]
+    notices = sorted(
+        (n for n in request.app.state.notices.all() if state_of(n, now) in ("showing", "scheduled")),
+        key=lambda n: n["startsAt"],
+    )[:5]
     recent = db.scalars(select(AuditEntry).order_by(AuditEntry.created_at.desc()).limit(10)).all()
     return {
         "counts": {

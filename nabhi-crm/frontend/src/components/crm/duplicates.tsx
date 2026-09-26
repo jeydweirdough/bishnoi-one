@@ -14,12 +14,15 @@ export function Duplicates({
   base,
   onAddAnyway,
   pending,
+  quote = false,
 }: {
   message: string;
   found: Duplicate[];
   base: "/companies" | "/contacts";
   onAddAnyway: () => void;
   pending: boolean;
+  /** They were being added to quote: offer to quote the one already here instead. */
+  quote?: boolean;
 }) {
   return (
     <div role="alert" className="animate-reshape space-y-3 rounded-[3px] border border-rule-strong bg-bench/60 px-4 py-3">
@@ -38,6 +41,11 @@ export function Duplicates({
               {[d.teamName, d.phone].filter(Boolean).map((x) => ` · ${x}`)}
               {d.canOpen === false ? " · someone else's" : ""}
             </span>
+            {quote && d.canOpen !== false && (
+              <Link href={`/companies/${d.id}/quotes/new`} className="ml-2 font-medium text-hema hover:underline">
+                Quote them instead
+              </Link>
+            )}
           </li>
         ))}
       </ul>

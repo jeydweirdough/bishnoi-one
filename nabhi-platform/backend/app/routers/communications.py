@@ -5,6 +5,9 @@ A notice is a draft until published, and shows from its start until its end
 (a maintenance window, or open-ended). The applications read what's showing
 from /public/notices (app/routers/public.py); writing notices takes a
 Platform Admin.
+
+They're kept in Discord, not in the database: app/announcements.py. Each has
+an id like ANN-20260926-0001 and its own thread in the announcements channel.
 """
 
 from datetime import UTC, datetime
@@ -12,13 +15,14 @@ from typing import Literal
 
 from fastapi import APIRouter, Response, status
 from pydantic import Field, model_validator
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import Api, as_utc, camel, changed, field_error, iso, not_found
+from app.announcements import Notices, next_id, remove, save, state_of, when
+from app.api import Api, camel, changed, field_error, iso, not_found
 from app.audit import audit
-from app.deps import DB, AdminUser, CurrentUser
-from app.models import Announcement, Application, Company
+from app.deps import DB, AdminUser, CurrentUser, SettingsDep
+from app.models import Application, Company
 
 router = APIRouter(prefix="/platform/announcements", tags=["communications"])
 
@@ -57,40 +61,32 @@ class NoticePatch(Api):
     publish: bool | None = None
 
 
-def state_of(n: Announcement, now: datetime | None = None) -> str:
-    """draft, scheduled, showing or ended."""
-    now = now or datetime.now(UTC)
-    if n.published_at is None:
-        return "draft"
-    if as_utc(n.starts_at) > now:
-        return "scheduled"
-    if n.ends_at and as_utc(n.ends_at) <= now:
-        return "ended"
-    return "showing"
+SNAKE_TO_ROW = {"level": "level", "title": "title", "body": "body", "company_id": "companyId", "application_id": "applicationId",
+                "starts_at": "startsAt", "ends_at": "endsAt"}
 
 
-def notice_out(n: Announcement, names: dict[str, str]) -> dict:
+def notice_out(n: dict, names: dict[str, str]) -> dict:
     return {
-        "id": n.id,
-        "kind": n.kind,
-        "level": n.level,
-        "title": n.title,
-        "body": n.body,
-        "company": {"id": n.company_id, "name": names.get(n.company_id, "")} if n.company_id else None,
-        "application": {"id": n.application_id, "name": names.get(n.application_id, "")} if n.application_id else None,
-        "startsAt": iso(n.starts_at),
-        "endsAt": iso(n.ends_at),
-        "publishedAt": iso(n.published_at),
+        "id": n["id"],
+        "kind": n["kind"],
+        "level": n["level"],
+        "title": n["title"],
+        "body": n.get("body"),
+        "company": {"id": n["companyId"], "name": names.get(n["companyId"], "")} if n.get("companyId") else None,
+        "application": {"id": n["applicationId"], "name": names.get(n["applicationId"], "")} if n.get("applicationId") else None,
+        "startsAt": n["startsAt"],
+        "endsAt": n.get("endsAt"),
+        "publishedAt": n.get("publishedAt"),
         "state": state_of(n),
-        "createdBy": n.created_by,
-        "updatedAt": iso(n.updated_at),
+        "createdBy": n.get("createdBy"),
+        "updatedAt": n.get("updatedAt"),
     }
 
 
-def names_for(db: Session, notices: list[Announcement]) -> dict[str, str]:
+def names_for(db: Session, notices: list[dict]) -> dict[str, str]:
     names: dict[str, str] = {}
-    companies = {n.company_id for n in notices if n.company_id}
-    apps = {n.application_id for n in notices if n.application_id}
+    companies = {n["companyId"] for n in notices if n.get("companyId")}
+    apps = {n["applicationId"] for n in notices if n.get("applicationId")}
     if companies:
         names.update(db.execute(select(Company.id, Company.name).where(Company.id.in_(companies))).all())
     if apps:
@@ -105,85 +101,93 @@ def _check(db: Session, fields: dict) -> None:
         raise field_error("applicationId", "That application doesn't exist.")
 
 
-def _notice(db: Session, notice_id: str) -> Announcement:
-    n = db.get(Announcement, notice_id)
+def _notice(notices, notice_id: str) -> dict:
+    n = notices.get(notice_id)
     if n is None:
         raise not_found("notice")
-    return n
+    return dict(n)
 
 
 @router.get("")
-def list_notices(db: DB, _: CurrentUser, kind: str | None = None, state: str | None = None) -> dict:
-    query = select(Announcement).order_by(Announcement.starts_at.desc()).limit(300)
+def list_notices(db: DB, notices: Notices, _: CurrentUser, kind: str | None = None, state: str | None = None) -> dict:
+    rows = sorted(notices.all(), key=lambda n: n["startsAt"], reverse=True)
     if kind in ("announcement", "notification", "maintenance"):
-        query = query.where(Announcement.kind == kind)
-    notices = db.scalars(query).all()
+        rows = [n for n in rows if n["kind"] == kind]
     if state:
-        notices = [n for n in notices if state_of(n) == state]
-    names = names_for(db, notices)
-    return {"notices": [notice_out(n, names) for n in notices]}
+        rows = [n for n in rows if state_of(n) == state]
+    rows = rows[:300]
+    names = names_for(db, rows)
+    return {"notices": [notice_out(n, names) for n in rows]}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def add_notice(body: NoticeIn, db: DB, me: AdminUser) -> dict:
+def add_notice(body: NoticeIn, db: DB, notices: Notices, me: AdminUser, settings: SettingsDep) -> dict:
     fields = body.model_dump()
     _check(db, fields)
     publish = fields.pop("publish")
     now = datetime.now(UTC)
-    fields["starts_at"] = fields["starts_at"] or now
-    n = Announcement(**fields, published_at=now if publish else None, created_by=me.email, created_at=now, updated_at=now)
-    db.add(n)
-    db.flush()
-    audit(db, me, f"{n.kind}.{'published' if publish else 'drafted'}", target=n.title, target_type="notice", target_id=n.id,
-          company_id=n.company_id, application_id=n.application_id)
+    n = {
+        "id": next_id(notices, settings), "kind": fields["kind"], "level": fields["level"], "title": fields["title"],
+        "body": fields["body"], "companyId": fields["company_id"], "applicationId": fields["application_id"],
+        "startsAt": iso(fields["starts_at"] or now), "endsAt": iso(fields["ends_at"]), "publishedAt": iso(now) if publish else None,
+        "createdBy": me.email, "createdAt": iso(now), "updatedAt": iso(now),
+    }
+    save(notices, n["id"], n)
+    audit(db, me, f"{n['kind']}.{'published' if publish else 'drafted'}", target=n["title"], target_type="notice", target_id=n["id"],
+          company_id=n["companyId"], application_id=n["applicationId"])
     db.commit()
     return {"notice": notice_out(n, names_for(db, [n]))}
 
 
 @router.patch("/{notice_id}")
-def update_notice(notice_id: str, body: NoticePatch, db: DB, me: AdminUser) -> dict:
-    n = _notice(db, notice_id)
+def update_notice(notice_id: str, body: NoticePatch, db: DB, notices: Notices, me: AdminUser) -> dict:
+    n = _notice(notices, notice_id)
     fields = changed(body)
     _check(db, fields)
     publish = fields.pop("publish", None)
     for required in ("level", "title", "starts_at"):
         if required in fields and fields[required] is None:
             raise field_error(required, "This can't be empty.")
-    fields = {k: v for k, v in fields.items() if getattr(n, k) != v}
-    for name, value in fields.items():
-        setattr(n, name, value)
-    if n.ends_at and as_utc(n.ends_at) <= as_utc(n.starts_at):
+    values = {k: (iso(v) if isinstance(v, datetime) else v) for k, v in fields.items()}
+    values = {k: v for k, v in values.items() if n.get(SNAKE_TO_ROW[k]) != v}
+    for name, value in values.items():
+        n[SNAKE_TO_ROW[name]] = value
+    if n.get("endsAt") and when(n["endsAt"]) <= when(n["startsAt"]):
         raise field_error("endsAt", "It has to end after it starts.")
-    if n.kind == "maintenance" and n.ends_at is None:
+    if n["kind"] == "maintenance" and not n.get("endsAt"):
         raise field_error("endsAt", "A maintenance notice needs its end.")
     action = "updated"
-    if publish is True and n.published_at is None:
-        n.published_at, action = datetime.now(UTC), "published"
-    elif publish is False and n.published_at is not None:
-        n.published_at, action = None, "withdrawn"
-    if fields or action != "updated":
-        n.updated_at = datetime.now(UTC)
-        audit(db, me, f"{n.kind}.{action}", target=n.title, target_type="notice", target_id=n.id,
-              company_id=n.company_id, application_id=n.application_id, fields=camel(fields))
-    db.commit()
+    if publish is True and not n.get("publishedAt"):
+        n["publishedAt"], action = iso(datetime.now(UTC)), "published"
+    elif publish is False and n.get("publishedAt"):
+        n["publishedAt"], action = None, "withdrawn"
+    if values or action != "updated":
+        n["updatedAt"] = iso(datetime.now(UTC))
+        save(notices, n["id"], n)
+        audit(db, me, f"{n['kind']}.{action}", target=n["title"], target_type="notice", target_id=n["id"],
+              company_id=n.get("companyId"), application_id=n.get("applicationId"), fields=camel(values))
+        db.commit()
     return {"notice": notice_out(n, names_for(db, [n]))}
 
 
 @router.delete("/{notice_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_notice(notice_id: str, db: DB, me: AdminUser) -> Response:
-    n = _notice(db, notice_id)
-    audit(db, me, f"{n.kind}.deleted", target=n.title, target_type="notice", target_id=n.id)
-    db.delete(n)
+def delete_notice(notice_id: str, db: DB, notices: Notices, me: AdminUser) -> Response:
+    n = _notice(notices, notice_id)
+    remove(notices, notice_id)
+    audit(db, me, f"{n['kind']}.deleted", target=n["title"], target_type="notice", target_id=n["id"])
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-def showing(db: Session, application_key: str | None = None, company_slug: str | None = None) -> list[Announcement]:
+def showing(db: Session, notices, application_key: str | None = None, company_slug: str | None = None) -> list[dict]:
     """Published notices showing now or coming up, for one app and company."""
     now = datetime.now(UTC)
-    query = select(Announcement).where(Announcement.published_at.is_not(None), or_(Announcement.ends_at.is_(None), Announcement.ends_at > now))
     app = db.scalar(select(Application).where(Application.key == application_key)) if application_key else None
     company = db.scalar(select(Company).where(Company.slug == company_slug)) if company_slug else None
-    query = query.where(or_(Announcement.application_id.is_(None), Announcement.application_id == (app.id if app else None)))
-    query = query.where(or_(Announcement.company_id.is_(None), Announcement.company_id == (company.id if company else None)))
-    return list(db.scalars(query.order_by(Announcement.starts_at)))
+    found = [
+        n for n in notices.all()
+        if n.get("publishedAt") and (not n.get("endsAt") or when(n["endsAt"]) > now)
+        and n.get("applicationId") in (None, app.id if app else None)
+        and n.get("companyId") in (None, company.id if company else None)
+    ]
+    return sorted(found, key=lambda n: n["startsAt"])

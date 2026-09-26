@@ -25,6 +25,8 @@ export function CompanyForm({
   layout,
   company,
   priceGroups = [],
+  initialName = "",
+  thenQuote = false,
 }: {
   people: Assignable[];
   types: CustomerType[];
@@ -32,12 +34,16 @@ export function CompanyForm({
   company?: CompanyDetail;
   /** Settings → Price rules. None: the field isn't shown. */
   priceGroups?: { code: string; name: string; isActive: boolean }[];
+  /** A new customer's name, as typed where they weren't found. */
+  initialName?: string;
+  /** Added from "New quote": open their quote once they're saved. */
+  thenQuote?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const allFields = layout.sections.flatMap((s) => s.fields);
   const [values, setValues] = useState<Record<Text, string>>(() =>
-    Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? ""])) as Record<Text, string>,
+    Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? (k === "name" ? initialName : "")])) as Record<Text, string>,
   );
   const can = useCan();
   const [status, setStatus] = useState<CompanyStatus>(company?.status ?? types.find((t) => t.isActive)?.code ?? "");
@@ -80,8 +86,8 @@ export function CompanyForm({
         result = await createCompany({ ...input, allowDuplicate });
       }
       if (result.ok) {
-        toast.success(company ? "Changes saved" : "Customer added", { description: result.data.name });
-        router.push(`/companies/${result.data.id}`);
+        toast.success(company ? "Changes saved" : "Customer added", { description: thenQuote ? `Now their quote: ${result.data.name}` : result.data.name });
+        router.push(thenQuote && !company ? `/companies/${result.data.id}/quotes/new` : `/companies/${result.data.id}`);
         router.refresh();
         return;
       }
@@ -175,13 +181,13 @@ export function CompanyForm({
 
       <FormError message={error} />
       {duplicates.length > 0 && (
-        <Duplicates message={dupMessage} found={duplicates} base="/companies" pending={pending} onAddAnyway={() => submit(true)} />
+        <Duplicates message={dupMessage} found={duplicates} base="/companies" pending={pending} onAddAnyway={() => submit(true)} quote={thenQuote} />
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
           {company ? "Save changes" : "Add customer"}
         </Button>
-        <LinkButton href={company ? `/companies/${company.id}` : "/companies"} variant="quiet">
+        <LinkButton href={company ? `/companies/${company.id}` : thenQuote ? "/quotes" : "/companies"} variant="quiet">
           Cancel
         </LinkButton>
       </div>

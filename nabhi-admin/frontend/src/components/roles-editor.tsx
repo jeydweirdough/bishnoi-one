@@ -451,13 +451,14 @@ function NewRole({ onCreated }: { onCreated: (key: string) => void }) {
         start(async () => {
           const result = await createRole({ name: name.trim(), description: "" });
           if (!result.ok) return setError(result.error);
-          const created = result.data.roles.find((r) => r.name === name.trim());
+          const created = (result.data as any)?.roles?.find((r: any) => r.name === name.trim());
           toast.success(`${name.trim()} created`, { description: "Tick what it can do, then save." });
           setOpen(false);
           setName("");
           if (created) onCreated(created.key);
         });
       }}
+
     >
       <Field label="Role name">{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />}</Field>
       <FormError message={error} />

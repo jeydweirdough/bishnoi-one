@@ -7,8 +7,8 @@ a migration (migrations/versions)."""
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -21,20 +21,65 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+class Role(Base):
+    __tablename__ = "nbad_roles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Administrator: always every permission, can't be changed or deleted.
+    is_system: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    grants: Mapped[list["RolePermission"]] = relationship(back_populates="role", cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def permissions(self) -> set[str]:
+        return {g.permission for g in self.grants}
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            if other == "admin":
+                return self.is_system or self.name == "Administrator"
+            return self.name.lower() == other.lower()
+        return super().__eq__(other)
+
+
+class RolePermission(Base):
+    __tablename__ = "nbad_role_permissions"
+
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbad_roles.id", ondelete="CASCADE"), primary_key=True)
+    permission: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+    role: Mapped[Role] = relationship(back_populates="grants")
+
+
 class User(Base):
     __tablename__ = "nbad_users"
-    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
-    # admin: runs this app's settings. member: uses it.
-    role: Mapped[str] = mapped_column(String(16), default="member")
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbad_roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    role: Mapped[Role] = relationship(lazy="joined")
+
+    def __init__(self, **kwargs):
+        role_val = kwargs.pop("role", None)
+        if "role_id" not in kwargs:
+            from app.permissions import ROLE_ADMIN_ID, ROLE_EXEC_ASST_ID
+            if isinstance(role_val, str):
+                kwargs["role_id"] = ROLE_ADMIN_ID if role_val == "admin" else ROLE_EXEC_ASST_ID
+            elif isinstance(role_val, Role):
+                kwargs["role"] = role_val
+            else:
+                kwargs["role_id"] = ROLE_EXEC_ASST_ID
+        super().__init__(**kwargs)
+
 
 
 class SignInSession(Base):
@@ -48,6 +93,23 @@ class SignInSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class AuditEntry(Base):
+    """The activity log: who changed what, and when."""
+
+    __tablename__ = "nbad_audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    actor_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    actor: Mapped[str] = mapped_column(String(254))
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target_type: Mapped[str | None] = mapped_column(String(32), default=None)
+    target_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    target: Mapped[str] = mapped_column(String(200), default="")
+    fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+
 
 
 # --- Executive Office & Administration Tables ----------------------------------------

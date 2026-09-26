@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API directly. None by default.
     cors_origins: list[str] = []
 
+    # Discord (app/discord.py): this app's log goes to a thread per day in the
+    # logs channel. Off until DISCORD_ENABLED=true; DISCORD_MODE=live
+    # really posts, mock keeps everything on this machine. See .env.example.
+    discord_enabled: bool = False
+    discord_mode: str = "mock"
+    discord_bot_token: SecretStr | None = None
+    discord_logs_webhook_url: SecretStr | None = None
+    discord_max_per_minute: int = 30
+
     # Nabhi Inventory, where the product list and stock come from: its API
     # (https://...), and the key it gave this app (one of its INTEGRATION_KEYS,
     # the part after "crm:"). Unset: products are kept here, by hand.
@@ -66,6 +75,17 @@ class Settings(BaseSettings):
         return bool(self.finance_api_url and self.finance_api_key)
 
     @property
+    def discord_mock_dir(self) -> Path:
+        """Where mock mode keeps its tables: beside a SQLite database (so each test has its own), else .data/."""
+        if self.database_url.startswith("sqlite:///"):
+            return Path(self.database_url.removeprefix("sqlite:///")).parent / "discord-mock"
+        return DATA_DIR / "discord-mock"
+
+    @staticmethod
+    def secret(value: SecretStr | None) -> str | None:
+        return value.get_secret_value() if value else None
+
+    @property
     def is_production(self) -> bool:
         return self.environment == "production"
 
@@ -81,6 +101,8 @@ class Settings(BaseSettings):
             raise ValueError(f"FINANCE_API_URL is an address like https://finance-api.example.com, with no / at the end, not {self.finance_api_url!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        if self.discord_mode.lower() not in ("mock", "live"):
+            raise ValueError("DISCORD_MODE is mock or live.")
         return self
 
 

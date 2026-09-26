@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
+from app.discord import log_requests, logs_for
 from app.migrate import upgrade
 from app.routers import auth, finance, funds, integration, ledger, tax
 from app.tax import rates as tax_rates
@@ -34,6 +35,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Nabhi Finance API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    # Every change and sign-in goes to Discord as a line, a thread a day (app/discord.py).
+    app.state.logs = logs_for("FINANCE", settings)
+    log_requests(app, app.state.logs)
     # Each country pack's dated rates, and the company's tax registration row.
     tax_rates.seed(app.state.sessions)
 

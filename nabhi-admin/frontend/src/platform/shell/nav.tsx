@@ -448,7 +448,23 @@ const EXECUTIVE_PAGES: Page[] = [
   { href: "/tickets", label: "Office Concerns", icon: "tickets" },
 ];
 
+function adminPagesFor(me: Me): Page[] {
+  const may = (permission: string) => me.permissions?.includes(permission) ?? me.canManageSettings;
+  return [
+    ...(may("admin.users")
+      ? [{ href: "/admin/users", label: "Users", icon: "people" as const, also: ["/admin/users"] }]
+      : []),
+    ...(may("admin.roles")
+      ? [{ href: "/admin/roles", label: "Roles & permissions", icon: "roles" as const, also: ["/admin/roles"] }]
+      : []),
+    ...(may("admin.audit")
+      ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const, also: ["/admin/audit"] }]
+      : []),
+  ];
+}
+
 function Links({ me }: { me: Me }) {
+
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -560,15 +576,19 @@ function Links({ me }: { me: Me }) {
             )}
           </Group>
         ))}
-      {settings.length > 0 && isOurs("exec") && (
-        <Group label="Access & Settings">
-          <Parent
-            href="/settings/people"
-            base="/settings"
-            icon="settings"
-            label="Settings"
-            groups={settings}
-          />
+      {/* Administration (Users, Roles & Permissions, Activity log) */}
+      {adminPagesFor(me).length > 0 && isOurs("exec") && (
+        <Group label="Administration">
+          {adminPagesFor(me).map((page) => (
+            <Row
+              key={page.href}
+              href={page.href}
+              icon={page.icon}
+              current={within(pathname, page.href) || (page.also ?? []).some((a) => within(pathname, a))}
+            >
+              {page.label}
+            </Row>
+          ))}
         </Group>
       )}
     </nav>
@@ -577,14 +597,20 @@ function Links({ me }: { me: Me }) {
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, me: Me): string | null {
+  if (within(pathname, "/admin")) {
+    const page = adminPagesFor(me).find(
+      (p) => within(pathname, p.href) || (p.also ?? []).some((a) => within(pathname, a)),
+    );
+    return page ? `Administration · ${page.label}` : "Administration";
+  }
   if (within(pathname, "/settings")) {
-    const page = settingsFor(me).flatMap((g) => g.pages).find((p) => !isAway(p.href) && within(pathname, p.href));
-    return page ? `Settings · ${page.label}` : "Settings";
+    return "Administration";
   }
   const execPage = EXECUTIVE_PAGES.find((p) => isCurrent(p, pathname, p.href === "/"));
   if (execPage) {
     return `Executive Admin · ${execPage.label}`;
   }
+
   // In a module's own app every path below it is that module's; in the shell
   // it is whichever module's mount the path sits under.
   const m = THIS_APP

@@ -110,9 +110,12 @@ export type Me = {
   // Everything else here is within whichever company that is.
   org: Org | null;
   canManageSettings: boolean;
+  role?: { id: string; name: string; scope: string };
+  permissions?: string[];
   // Holds the recovery key itself (a Developer Admin). Not "can reach the
   // recovery screens" -- each screen's rule combines this with the two below.
   canRecover: boolean;
+
   // Set when a Developer Admin is looking through this person's eyes. The
   // screens resolve as the person; this says who is really at the keyboard,
   // and every change is refused while it is set.
@@ -893,4 +896,6 @@ export type ExecutiveDashboardSummary = {
   };
   countdownHighlights: CountdownHighlight[];
 };
+
+
 
