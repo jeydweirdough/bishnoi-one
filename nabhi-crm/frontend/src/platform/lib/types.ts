@@ -113,6 +113,8 @@ export type Me = {
   // Holds the recovery key itself (a Developer Admin). Not "can reach the
   // recovery screens" -- each screen's rule combines this with the two below.
   canRecover: boolean;
+  /** Nabhi Order is connected, so ready quotes can be raised as orders. */
+  ordersLinked?: boolean;
   // Set when a Developer Admin is looking through this person's eyes. The
   // screens resolve as the person; this says who is really at the keyboard,
   // and every change is refused while it is set.
@@ -529,6 +531,8 @@ export type Payment = {
   at: string;
 };
 
+export type QuoteOrder = { id: string; number: string; url: string | null; status: string | null; by: { id: string; name: string }; at: string };
+
 export type Quote = {
   id: string;
   rev: string | null;
@@ -581,6 +585,8 @@ export type Quote = {
   createdBy: Person;
   owner: Person | null;
   can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean };
+  /** The order raised from it in Nabhi Order; null until then. */
+  order?: QuoteOrder | null;
 };
 
 export type QuotePreview = {
@@ -1011,6 +1017,9 @@ export type CompanySettings = {
   quotePrefix: string;
   quoteValidDays: number;
   quoteTerms: string | null;
+  companyAddress: string | null;
+  companyTin: string | null;
+  companyContact: string | null;
   currencies: string[];
 };
 

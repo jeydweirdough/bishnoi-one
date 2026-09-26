@@ -1,0 +1,23 @@
+import { PageHeader } from "@/src/platform/ui/sheet";
+import { can } from "@/src/platform/lib/access";
+import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
+import { NoAccess } from "../components/admin/words";
+import { TemplateEditor } from "../quote-templates/editor";
+import type { QuoteTemplate, TemplateList } from "../quote-templates/types";
+
+export const metadata = { title: "Quotation template" };
+
+export default async function QuoteTemplatePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const me = await getCompanyMe();
+  if (!can(me, "admin.settings")) return <NoAccess what="settings" />;
+  const [template, list] = await Promise.all([load<QuoteTemplate>(`/admin/quote-templates/${enc(id)}`), load<TemplateList>("/admin/quote-templates")]);
+  return (
+    <>
+      <PageHeader title={template.name} crumbs={[{ href: "/admin/settings/quote-templates", label: "Quotation templates" }]}>
+        {template.kind === "excel" ? "An uploaded Excel form, filled in for each quote." : "A quotation designed here, printed from the quote."}
+      </PageHeader>
+      <TemplateEditor initial={template} options={{ issuers: list.issuers, teams: list.teams, placeholders: list.placeholders }} />
+    </>
+  );
+}

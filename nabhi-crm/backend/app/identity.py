@@ -36,6 +36,8 @@ def me_out(user: User, settings: Settings) -> dict:
         "permissions": sorted(access.permissions),
         "canManageSettings": administers,
         "canRecover": False,
+        # Nabhi Order is connected: ready quotes show "Raise order".
+        "ordersLinked": settings.orders_linked,
         "viewedBy": None,
         "isOwner": user.role.is_system,
         "isDeveloperAdmin": False,

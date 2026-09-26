@@ -31,6 +31,9 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
     quotePrefix: initial.quotePrefix,
     quoteValidDays: String(initial.quoteValidDays),
     quoteTerms: initial.quoteTerms ?? "",
+    companyAddress: initial.companyAddress ?? "",
+    companyTin: initial.companyTin ?? "",
+    companyContact: initial.companyContact ?? "",
   });
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +52,9 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
         quotePrefix: v.quotePrefix.trim().toUpperCase(),
         quoteValidDays: days,
         quoteTerms: v.quoteTerms.trim() || null,
+        companyAddress: v.companyAddress.trim() || null,
+        companyTin: v.companyTin.trim() || null,
+        companyContact: v.companyContact.trim() || null,
       });
       if (!r.ok) {
         setError(r.fields ? null : r.error);
@@ -125,6 +131,15 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
           </Field>
           <Field label="Terms" optional error={fields.quoteTerms} className="sm:col-span-2" hint="Printed on every new quote: payment, delivery, what the price includes.">
             {(p) => <Textarea {...p} rows={5} value={v.quoteTerms} onChange={set("quoteTerms")} maxLength={5000} />}
+          </Field>
+          <Field label="Business address" optional error={fields.companyAddress} className="sm:col-span-2" hint="On the letterhead of a printed quotation.">
+            {(p) => <Textarea {...p} rows={2} value={v.companyAddress} onChange={set("companyAddress")} maxLength={300} />}
+          </Field>
+          <Field label="TIN" optional error={fields.companyTin}>
+            {(p) => <Input {...p} value={v.companyTin} onChange={set("companyTin")} maxLength={40} placeholder="000-000-000-000" />}
+          </Field>
+          <Field label="Phone or email" optional error={fields.companyContact}>
+            {(p) => <Input {...p} value={v.companyContact} onChange={set("companyContact")} maxLength={200} />}
           </Field>
         </div>
       </Sheet>

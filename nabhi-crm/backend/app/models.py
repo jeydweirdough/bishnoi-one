@@ -760,3 +760,52 @@ class PriceCondition(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# --- quotation templates: how a printed quote looks, per guarantee-letter issuer ---------------
+
+
+class QuoteTemplate(Base):
+    """A quotation form an admin set up: designed here ("form"), or their own
+    Excel form uploaded and filled in ("excel"). Picked for a quote by who pays
+    (an issuer's code, "self" for the customer, None for any) and its team."""
+
+    __tablename__ = "nbcm_quote_templates"
+    __table_args__ = (CheckConstraint("kind IN ('form', 'excel')", name="quote_template_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(8), default="form")
+    payer: Mapped[str | None] = mapped_column(String(40), default=None)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="SET NULL"), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    # Control numbers: PREFIX-YYYY-MM-00001, counting on from control_next.
+    control_prefix: Mapped[str | None] = mapped_column(String(20), default=None)
+    control_next: Mapped[int] = mapped_column(Integer, default=1)
+    control_digits: Mapped[int] = mapped_column(Integer, default=4)
+    # The form's words and letterhead (app/quote_templates.py DESIGN).
+    design: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Stored files (nbcm_stored_files refs).
+    logo_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    signature_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    excel_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    excel_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    excel_sheet: Mapped[str | None] = mapped_column(String(120), default=None)
+    # Where the form's parts were found on the sheet (app/quote_templates.py find()).
+    excel_map: Mapped[dict | None] = mapped_column(JSON, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class QuoteControl(Base):
+    """The control number a quote got on a template, the first time it was
+    printed or downloaded with it; the same number every time after."""
+
+    __tablename__ = "nbcm_quote_controls"
+    __table_args__ = (UniqueConstraint("template_id", "quote_id", name="quote_control_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    template_id: Mapped[str] = mapped_column(ForeignKey("nbcm_quote_templates.id", ondelete="CASCADE"), index=True)
+    quote_id: Mapped[str] = mapped_column(ForeignKey("nbcm_quotes.id", ondelete="CASCADE"), index=True)
+    number: Mapped[str] = mapped_column(String(60))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

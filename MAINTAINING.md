@@ -213,6 +213,29 @@ tax setup; Finance Staff (Joy, Fely) do everything else.
 
 ---
 
+## Linking the CRM to Nabhi Order
+
+Nabhi Order is its own application. On a quote, **Raise order** sends the quote
+to it; the CRM keeps the order number it answers with, so a quote is ordered
+once. The button is off until the quote is approved and its guarantee letter is
+checked.
+
+On the CRM API (`nabhi-crm/backend`, and Vercel):
+
+| Variable | Value |
+|---|---|
+| `ORDERS_API_URL` | Nabhi Order's API, e.g. `https://orders-api.example.com` |
+| `ORDERS_API_KEY` | The key Nabhi Order gave the CRM |
+
+The CRM calls `POST {ORDERS_API_URL}/orders` with the headers `X-Nabhi-Key`
+and `Idempotency-Key` (the quote's id, the same on a retry), and expects
+`{"id", "number"}` back, with an optional `"url"` for the "Order SO-..." link.
+The payload is described at the top of `nabhi-crm/backend/app/orders.py`; to
+see it for a real quote, call `GET /quotes/{id}/order-payload` on the CRM API.
+
+The printed quotation (**Print** on a quote) takes its letterhead from
+Settings, Company and quotes: business address, TIN, and phone or email.
+
 ## Connecting Discord
 
 Discord is where **announcements** are kept, and where **every app's log**

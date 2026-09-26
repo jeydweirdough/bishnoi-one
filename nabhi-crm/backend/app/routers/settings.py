@@ -238,6 +238,9 @@ def company_out(db: Session, settings) -> dict:
         "quotePrefix": s.quote_prefix,
         "quoteValidDays": s.quote_valid_days,
         "quoteTerms": s.quote_terms,
+        "companyAddress": s.company_address,
+        "companyTin": s.company_tin,
+        "companyContact": s.company_contact,
         "currencies": list(CURRENCIES),
     }
 
@@ -255,6 +258,9 @@ class CompanyIn(Api):
     quote_prefix: str | None = Field(None, pattern=r"^[A-Z0-9]{1,10}$")
     quote_valid_days: int | None = Field(None, ge=1, le=365)
     quote_terms: str | None = Field(None, max_length=5000)
+    company_address: str | None = Field(None, max_length=300)
+    company_tin: str | None = Field(None, max_length=40)
+    company_contact: str | None = Field(None, max_length=200)
 
     @field_validator("timezone")
     @classmethod
@@ -272,13 +278,14 @@ class CompanyIn(Api):
 def update_company(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: CompanyIn) -> dict:
     s = sales_settings(db)
     wanted = changed(body)
-    # Terms can be cleared; the rest can only be changed.
-    wanted = {k: v for k, v in wanted.items() if v is not None or k == "quote_terms"}
+    # Terms and the letterhead can be cleared; the rest can only be changed.
+    clearable = {"quote_terms", "company_address", "company_tin", "company_contact"}
+    wanted = {k: v for k, v in wanted.items() if v is not None or k in clearable}
     fields = [k for k, v in wanted.items() if getattr(s, k) != v]
     for k in fields:
         setattr(s, k, wanted[k])
     if fields:
-        audit(db, me, "company_settings.updated", target="Company & quotes", target_type="settings", fields=camel(fields))
+        audit(db, me, "company_settings.updated", target="Company and quotes", target_type="settings", fields=camel(fields))
     db.commit()
     names = {"org_name": "org_name", "currency": "org_currency", "locale": "org_locale", "timezone": "org_timezone"}
     fresh = settings.model_copy(update={names[k]: v for k, v in wanted.items() if k in names and v})

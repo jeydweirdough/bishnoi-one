@@ -1,9 +1,11 @@
+import { Printer } from "lucide-react";
 import { ApprovalActions, LetterActions, PaymentForm } from "@/src/vendor-finance/components/finance-actions";
 import { DeleteQuote } from "../components/delete-quote";
 import { RaiseOrder } from "../components/raise-order";
 import { QuoteView } from "../components/quote-view";
 import { customFields } from "../components/extra/load";
 import { QuoteStateMark } from "@/src/platform/ui/marks";
+import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -56,7 +58,10 @@ export default async function QuotePage({ params, searchParams }: { params: Para
         actions={
           <>
             {/* The common next step after a quote is agreed, so it sits where the eye lands first. */}
-            <RaiseOrder quote={quote} ordersUrl={me.modules.find((m) => m.key === "orders")?.url} />
+            <LinkButton href={`/print/quotes/${id}`} icon={<Printer className="size-4" aria-hidden />} prefetch={false}>
+              Print
+            </LinkButton>
+            <RaiseOrder quote={quote} linked={!!me.ordersLinked} mayOrder={!!me.permissions?.includes("orders.create")} />
             {quote.can.delete && <DeleteQuote id={id} number={quote.number} leaveTo={quote.customerHref ?? "/quotes"} />}
           </>
         }

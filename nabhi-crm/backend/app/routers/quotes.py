@@ -34,6 +34,9 @@ from app.extra import check_extra
 from app.inventory import sync_if_stale
 from app.models import Company, Contact, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
+from app.orders import OrdersUnavailable
+from app.orders import payload as order_payload
+from app.orders import send as send_order
 from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
@@ -229,6 +232,8 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         "validUntil": q.valid_until,
         "terms": q.terms,
         "extra": q.extra or {},
+        # The order raised from it in Nabhi Order, or None.
+        "order": q.sales_order,
         "createdAt": iso(q.created_at),
         "createdBy": person_out(q.created_by) or {"id": "", "name": "Someone no longer here"},
         "owner": person_out(db.get(User, q.owner_id)),
@@ -237,7 +242,7 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
             "approve": approver and q.approval_status == "pending",
             "checkLetter": approver and q.letter_status == "pending",
             "recordPayment": approver and q.letter_status == "verified" and q.payment_status in ("unpaid", "partial") and ready,
-            "order": ready and access.can("orders.create"),
+            "order": ready and access.can("orders.create") and q.sales_order is None,
         },
     }
 
@@ -461,6 +466,53 @@ def read_letter_file(access: View, db: DB, quote_id: str) -> Response:
         media_type=stored.content_type,
         headers={"Content-Disposition": f"inline; filename*=utf-8''{url_quote(name)}"},
     )
+
+
+Order = Annotated[Access, Depends(require("orders.create"))]
+
+
+def orderable(quote: Quote, access: Access) -> None:
+    if quote.sales_order is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Order {quote.sales_order.get('number')} was already raised from this quote.")
+    if state_of(quote) != "ready":
+        raise HTTPException(status.HTTP_409_CONFLICT, "An order is raised once the quote is approved and its letter is checked.")
+
+
+@router.get("/quotes/{quote_id}/order-payload")
+def preview_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> dict:
+    """What "Raise order" sends to Nabhi Order for this quote (app/orders.py)."""
+    return order_payload(db, get_quote(db, access, quote_id), me, settings)
+
+
+@router.post("/quotes/{quote_id}/order")
+def raise_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> dict:
+    """Sends the quote to Nabhi Order and keeps the order it made on the quote."""
+    quote = get_quote(db, access, quote_id)
+    orderable(quote, access)
+    if not settings.orders_linked:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Nabhi Order isn't connected yet: set ORDERS_API_URL and ORDERS_API_KEY.")
+    try:
+        made = send_order(settings, quote.id, order_payload(db, quote, me, settings))
+    except OrdersUnavailable as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    quote.sales_order = {
+        "id": str(made["id"]),
+        "number": str(made["number"]),
+        "url": made.get("url") if isinstance(made.get("url"), str) and made["url"].startswith(("https://", "http://")) else None,
+        "status": made.get("status") if isinstance(made.get("status"), str) else None,
+        "by": {"id": me.id, "name": me.full_name},
+        "at": iso(datetime.now(UTC)),
+    }
+    audit(db, me, "quote.ordered", target=f"{quote.number} to {quote.sales_order['number']}", target_type="quote", target_id=quote.id)
+    db.commit()
+    return quote_out(db, quote, access)
+
+
+@router.get("/quote-letterhead")
+def letterhead(access: View, db: DB, settings: SettingsDep) -> dict:
+    """The company as a printed quotation shows it."""
+    s = sales_settings(db)
+    return {"name": settings.org_name, "address": s.company_address, "tin": s.company_tin, "contact": s.company_contact}
 
 
 @router.delete("/quotes/{quote_id}", status_code=status.HTTP_204_NO_CONTENT)
