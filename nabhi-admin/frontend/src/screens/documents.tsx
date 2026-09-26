@@ -7,6 +7,7 @@ import { DocumentModal } from "@/src/components/executive-modals";
 import type { CorporateDocument } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
+import { Figure } from "@/src/platform/ui/figure";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
@@ -17,16 +18,20 @@ export function DocumentsScreen({ documents: initialDocuments }: { documents: Co
 
   const categories = [
     { key: "all", label: "All Documents" },
-    { key: "insurance", label: "Corporate Insurance (D&O, CGL)" },
-    { key: "commercial_contract", label: "Commercial Agreements" },
+    { key: "insurance", label: "Insurance (D&O, CGL)" },
+    { key: "commercial_contract", label: "Commercial Contracts" },
     { key: "nda", label: "NDAs" },
     { key: "board_resolution", label: "Board Resolutions" },
     { key: "legal_retainer", label: "Legal Retainers" },
   ];
 
-  const filtered = initialDocuments.filter(
+  const filtered = documents.filter(
     (d) => selectedCategory === "all" || d.category === selectedCategory
   );
+
+  const totalCount = documents.length;
+  const insuranceCount = documents.filter((d) => d.category === "insurance").length;
+  const autoRenewCount = documents.filter((d) => d.autoRenews).length;
 
   return (
     <>
@@ -43,105 +48,114 @@ export function DocumentsScreen({ documents: initialDocuments }: { documents: Co
         Directors & Officers (D&O) liability, comprehensive general liability, commercial warehousing contracts, auto-renewal clauses & cancellation deadlines.
       </PageHeader>
 
-      {/* Category Tabs */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5 border-b border-rule pb-2">
-        {categories.map((cat) => (
-          <button
-            key={cat.key}
-            type="button"
-            onClick={() => setSelectedCategory(cat.key)}
-            className={`rounded-[2px] px-3 py-1 text-meta font-medium transition-colors ${
-              selectedCategory === cat.key
-                ? "bg-hema text-white"
-                : "text-ink-2 hover:bg-bench hover:text-ink"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
+      {/* Top Figure KPI Metrics Strip */}
+      <Sheet className="mb-5 grid divide-y divide-rule sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <Figure label="Total Corporate Documents" value={totalCount} />
+        <Figure label="Corporate Insurance Policies" value={insuranceCount} />
+        <Figure label="Auto-Renewing Contracts" value={autoRenewCount} />
+      </Sheet>
+
+      {/* Filter Tabs */}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <div className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
+          {categories.map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => setSelectedCategory(cat.key)}
+              className={`rounded-[2px] px-3 py-1 text-meta transition-colors ${
+                selectedCategory === cat.key
+                  ? "bg-hema-tint font-semibold text-hema"
+                  : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Sheet className="overflow-hidden">
+      <Sheet>
         {filtered.length === 0 ? (
           <Empty title="No documents found in this category" icon="documents">
             Record corporate insurance policies, vendor master agreements, or board resolutions.
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-rule bg-bench/60 text-caps text-ink-3 uppercase">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Document / Policy Title</th>
-                  <th className="px-4 py-3 font-semibold">Counterparty / Underwriter</th>
-                  <th className="px-4 py-3 font-semibold">Policy / Ref #</th>
-                  <th className="px-4 py-3 font-semibold">Expiration & Notice Deadline</th>
-                  <th className="px-4 py-3 font-semibold">Annual Value</th>
-                  <th className="px-4 py-3 font-semibold">Custodian</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {filtered.map((d) => (
-                  <tr key={d.id} className="transition-colors hover:bg-bench/20">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-ink">{d.title}</div>
-                      <div className="flex items-center gap-2 text-meta text-ink-3">
-                        <span className="capitalize">{d.category.replace("_", " ")}</span>
-                        {d.autoRenews && (
-                          <span className="inline-flex items-center rounded-[2px] bg-hema-tint px-1 text-stamp font-semibold text-hema uppercase">
-                            Auto-renews ({d.noticePeriodDays}d notice)
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-ink-2">{d.counterparty}</td>
-                    <td className="px-4 py-3 font-mono text-meta text-ink-2">{d.referenceNumber || "—"}</td>
-                    <td className="px-4 py-3">
-                      {d.expirationDate ? (
-                        <div className="flex items-center gap-2">
-                          <CountdownBadge daysRemaining={d.daysRemaining} urgencyTier={d.urgencyTier} />
-                          <span className="text-meta text-ink-3">
-                            {new Date(d.expirationDate).toLocaleDateString("en-PH", { dateStyle: "medium" })}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-meta text-ink-3">Ongoing / No Expiry</span>
+          <ul className="divide-y divide-rule">
+            {filtered.map((d) => (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3.5 transition-colors hover:bg-bench/40"
+              >
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="mt-0.5 shrink-0">
+                    {d.expirationDate ? (
+                      <CountdownBadge daysRemaining={d.daysRemaining} urgencyTier={d.urgencyTier} />
+                    ) : (
+                      <span className="inline-flex items-center rounded-[2px] border border-rule px-1.5 py-0.5 text-stamp font-medium text-ink-3 uppercase">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-semibold text-sm text-ink">{d.title}</span>
+                      <span className="text-meta text-ink-2">· {d.counterparty}</span>
+                      {d.autoRenews && (
+                        <span className="rounded-[2px] bg-hema-tint px-1.5 py-0.2 text-stamp font-semibold text-hema uppercase">
+                          Auto-renews ({d.noticePeriodDays}d notice)
+                        </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-ink">
-                      {d.annualValue
-                        ? `PHP ${d.annualValue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-meta text-ink-2">{d.custodian || "Executive Office"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setModalDocument(d)}
-                          className="rounded-[2px] px-2 py-1 text-meta font-medium text-hema hover:bg-hema-tint"
-                        >
-                          Edit
-                        </button>
-                        <ConfirmButton
-                          label="Delete"
-                          title="Delete Document Record?"
-                          body={`Are you sure you want to delete ${d.title}?`}
-                          confirmLabel="Delete Record"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                            await deleteDocument(d.id);
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+
+                    <p className="mt-0.5 text-meta text-ink-3">
+                      Category: <span className="capitalize text-ink-2">{d.category.replace("_", " ")}</span>
+                      {d.referenceNumber && <> · Ref: <span className="font-mono text-ink-2">{d.referenceNumber}</span></>}
+                      {d.annualValue ? <> · Value: <span className="font-medium text-ink tabular-nums">PHP {d.annualValue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></> : null}
+                      {d.custodian && <> · Custodian: <span className="text-ink-2">{d.custodian}</span></>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <span className="block text-meta font-medium text-ink tabular-nums">
+                      {d.expirationDate
+                        ? new Date(d.expirationDate).toLocaleDateString("en-PH", { dateStyle: "medium" })
+                        : "Ongoing"}
+                    </span>
+                    <span className="inline-flex items-center rounded-[2px] px-1.5 py-0.5 text-stamp uppercase border border-rule text-ink-3">
+                      {d.status.replace("_", " ")}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setModalDocument(d)}
+                      className="rounded-[3px] border border-rule-strong bg-sheet px-2.5 py-1 text-meta font-medium text-ink hover:border-control"
+                    >
+                      Edit
+                    </button>
+                    <ConfirmButton
+                      label="Delete"
+                      title="Delete Document Record?"
+                      body={`Are you sure you want to delete ${d.title}?`}
+                      confirmLabel="Delete Record"
+                      danger
+                      triggerVariant="quiet"
+                      triggerSize="sm"
+                      onConfirm={async () => {
+                        await deleteDocument(d.id);
+                        setDocuments((prev) => prev.filter((item) => item.id !== d.id));
+                      }}
+                    />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </Sheet>
 

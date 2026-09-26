@@ -7,6 +7,7 @@ import { ImmigrationModal } from "@/src/components/executive-modals";
 import type { ImmigrationRecord } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
+import { Figure } from "@/src/platform/ui/figure";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
@@ -16,15 +17,15 @@ export function ImmigrationScreen({ records: initialRecords }: { records: Immigr
   const [modalRecord, setModalRecord] = useState<ImmigrationRecord | null | "new">(null);
 
   const types = [
-    { key: "all", label: "All Expat Documents" },
-    { key: "acr_card", label: "ACR I-Card (BI)" },
+    { key: "all", label: "All Expat Credentials" },
+    { key: "acr_card", label: "ACR I-Card" },
     { key: "aep_permit", label: "DOLE AEP" },
-    { key: "visa", label: "Visas (9g / 47a2)" },
+    { key: "visa", label: "9(g) Visas" },
     { key: "passport", label: "Passports" },
     { key: "exec_id", label: "Executive IDs" },
   ];
 
-  const filtered = initialRecords.filter(
+  const filtered = records.filter(
     (r) => selectedType === "all" || r.documentType === selectedType
   );
 
@@ -45,6 +46,13 @@ export function ImmigrationScreen({ records: initialRecords }: { records: Immigr
     }
   };
 
+  const totalCount = records.length;
+  const overdueCount = records.filter((r) => (r.daysRemaining ?? 100) < 0).length;
+  const expiringCount = records.filter((r) => {
+    const d = r.daysRemaining ?? 100;
+    return d >= 0 && d <= 30;
+  }).length;
+
   return (
     <>
       <PageHeader
@@ -60,110 +68,115 @@ export function ImmigrationScreen({ records: initialRecords }: { records: Immigr
         Manage Bureau of Immigration Alien Certificates of Registration (ACR I-Card), DOLE Alien Employment Permits (AEP), 9(g) visas, and passports.
       </PageHeader>
 
+      {/* Top Figure KPI Metrics Strip */}
+      <Sheet className="mb-5 grid divide-y divide-rule sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <Figure label="Expatriate Personnel Registered" value={totalCount} />
+        <Figure label="Overdue Visas & Work Permits" value={overdueCount} flag={overdueCount > 0} />
+        <Figure label="Expiring within 30 Days" value={expiringCount} flag={expiringCount > 0} />
+      </Sheet>
+
       {/* Filter Tabs */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5 border-b border-rule pb-2">
-        {types.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setSelectedType(t.key)}
-            className={`rounded-[2px] px-3 py-1 text-meta font-medium transition-colors ${
-              selectedType === t.key
-                ? "bg-hema text-white"
-                : "text-ink-2 hover:bg-bench hover:text-ink"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <div className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
+          {types.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setSelectedType(t.key)}
+              className={`rounded-[2px] px-3 py-1 text-meta transition-colors ${
+                selectedType === t.key
+                  ? "bg-hema-tint font-semibold text-hema"
+                  : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Sheet className="overflow-hidden">
+      <Sheet>
         {filtered.length === 0 ? (
           <Empty title="No expatriate records in this category" icon="immigration">
             Record Alien Certificates of Registration (ACR), DOLE work permits, or expat executive passports.
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-rule bg-bench/60 text-caps text-ink-3 uppercase">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Expatriate / Executive</th>
-                  <th className="px-4 py-3 font-semibold">Nationality</th>
-                  <th className="px-4 py-3 font-semibold">Document Type</th>
-                  <th className="px-4 py-3 font-semibold">Card / Document #</th>
-                  <th className="px-4 py-3 font-semibold">Expiration & Countdown</th>
-                  <th className="px-4 py-3 font-semibold">Assigned Assistant</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {filtered.map((r) => (
-                  <tr key={r.id} className="transition-colors hover:bg-bench/20">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-ink">{r.individualName}</div>
-                      <div className="text-meta text-ink-3">{r.designation}</div>
-                    </td>
-                    <td className="px-4 py-3 text-ink-2">{r.nationality}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-[2px] border border-rule px-2 py-0.5 text-stamp font-semibold text-ink-2 uppercase">
-                        {docTypeLabel(r.documentType)}
+          <ul className="divide-y divide-rule">
+            {filtered.map((r) => (
+              <li
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3.5 transition-colors hover:bg-bench/40"
+              >
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="mt-0.5 shrink-0">
+                    <CountdownBadge daysRemaining={r.daysRemaining} urgencyTier={r.urgencyTier} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-semibold text-sm text-ink">{r.individualName}</span>
+                      <span className="text-meta text-ink-2">· {r.designation}</span>
+                      <span className="rounded-[2px] border border-rule px-1.5 py-0.2 text-stamp font-medium text-ink-3 uppercase">
+                        {r.nationality}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-meta text-ink-2">{r.documentNumber}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CountdownBadge daysRemaining={r.daysRemaining} urgencyTier={r.urgencyTier} />
-                        <span className="text-meta text-ink-3">
-                          {new Date(r.expirationDate).toLocaleDateString("en-PH", { dateStyle: "medium" })}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-meta text-ink-2">{r.assignedAssistant || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-[2px] px-1.5 py-0.5 text-stamp uppercase ${
-                          r.status === "valid"
-                            ? "bg-hema-tint text-hema font-semibold"
-                            : r.status === "expiring_soon"
-                              ? "bg-eosin-tint text-eosin font-semibold"
-                              : r.status === "in_renewal"
-                                ? "border border-dashed border-ink-2 text-ink-2 font-medium"
-                                : "bg-danger-tint text-danger font-semibold"
-                        }`}
-                      >
-                        {r.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setModalRecord(r)}
-                          className="rounded-[2px] px-2 py-1 text-meta font-medium text-hema hover:bg-hema-tint"
-                        >
-                          Edit
-                        </button>
-                        <ConfirmButton
-                          label="Delete"
-                          title="Delete Expatriate Record?"
-                          body={`Are you sure you want to delete ${r.individualName}'s ${docTypeLabel(r.documentType)} record?`}
-                          confirmLabel="Delete Record"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                            await deleteImmigration(r.id);
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+
+                    <p className="mt-0.5 text-meta text-ink-3">
+                      <span className="font-semibold text-ink-2">{docTypeLabel(r.documentType)}</span>:{" "}
+                      <span className="font-mono text-ink-2">{r.documentNumber}</span>
+                      {r.sponsoringEntity && <> · Sponsor: <span className="text-ink-2">{r.sponsoringEntity}</span></>}
+                      {r.assignedAssistant && <> · Assistant: <span className="text-ink-2">{r.assignedAssistant}</span></>}
+                      {r.notes && <> · <span className="italic">{r.notes}</span></>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <span className="block text-meta font-medium text-ink tabular-nums">
+                      {new Date(r.expirationDate).toLocaleDateString("en-PH", { dateStyle: "medium" })}
+                    </span>
+                    <span
+                      className={`inline-flex items-center rounded-[2px] px-1.5 py-0.5 text-stamp uppercase ${
+                        r.status === "valid"
+                          ? "bg-hema-tint text-hema font-semibold"
+                          : r.status === "expiring_soon"
+                            ? "bg-eosin-tint text-eosin font-semibold"
+                            : r.status === "in_renewal"
+                              ? "border border-dashed border-ink-2 text-ink-2 font-medium"
+                              : "bg-danger-tint text-danger font-semibold"
+                      }`}
+                    >
+                      {r.status.replace("_", " ")}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setModalRecord(r)}
+                      className="rounded-[3px] border border-rule-strong bg-sheet px-2.5 py-1 text-meta font-medium text-ink hover:border-control"
+                    >
+                      Edit
+                    </button>
+                    <ConfirmButton
+                      label="Delete"
+                      title="Delete Expatriate Record?"
+                      body={`Are you sure you want to delete ${r.individualName}'s ${docTypeLabel(r.documentType)} record?`}
+                      confirmLabel="Delete Record"
+                      danger
+                      triggerVariant="quiet"
+                      triggerSize="sm"
+                      onConfirm={async () => {
+                        await deleteImmigration(r.id);
+                        setRecords((prev) => prev.filter((item) => item.id !== r.id));
+                      }}
+                    />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </Sheet>
 

@@ -5,9 +5,9 @@ export const can = (me: Me, permission: string): boolean => me.permissions?.incl
 
 /** Who's who: users, their roles, their teams. One place in the sidebar, a sub-page each. */
 export const PEOPLE_PAGES = [
-  { href: "/admin/users", label: "Users", permission: "admin.users" },
-  { href: "/admin/roles", label: "Roles & permissions", permission: "admin.roles" },
-  { href: "/admin/teams", label: "Teams", permission: "admin.teams" },
+  { href: "/admin/users", label: "User Directory", permission: "admin.users" },
+  { href: "/admin/roles", label: "Roles & Permissions", permission: "admin.roles" },
+  { href: "/admin/teams", label: "Commercial Teams", permission: "admin.teams" },
 ] as const;
 
 export const peoplePagesFor = (me: Me) => PEOPLE_PAGES.filter((t) => can(me, t.permission));
@@ -15,12 +15,12 @@ export const peoplePagesFor = (me: Me) => PEOPLE_PAGES.filter((t) => can(me, t.p
 /** Everything an admin sets up for everyone, a sub-page each. The pricing two
  *  are gated on the catalogue, as their pages and the API are. */
 export const SETTINGS_PAGES = [
-  { href: "/admin/settings", label: "Forms", permission: "admin.settings" },
-  { href: "/admin/settings/company", label: "Business & quotes", permission: "admin.settings" },
-  { href: "/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
-  { href: "/admin/settings/pricing", label: "Pricing & retention", permission: "products.view" },
-  { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
-  { href: "/admin/settings/funds", label: "Fund purposes", permission: "admin.settings" },
+  { href: "/admin/settings", label: "Form Configuration", permission: "admin.settings" },
+  { href: "/admin/settings/company", label: "Corporate & Quotation Rules", permission: "admin.settings" },
+  { href: "/admin/settings/customer-types", label: "Account Classifications", permission: "admin.types" },
+  { href: "/admin/settings/pricing", label: "Pricing & Retention Policy", permission: "products.view" },
+  { href: "/admin/settings/price-rules", label: "Pricing Approval Thresholds", permission: "products.view" },
+  { href: "/admin/settings/funds", label: "Expense Advance Categories", permission: "admin.settings" },
 ] as const;
 
 export const settingsPagesFor = (me: Me) => SETTINGS_PAGES.filter((t) => can(me, t.permission));
@@ -36,11 +36,11 @@ export function adminPagesFor(me: Me): AdminPage[] {
   const pages: AdminPage[] = [];
   const people = peoplePagesFor(me);
   // It opens on the first sub-page this person may see.
-  if (people.length) pages.push({ href: people[0].href, label: "People & access", icon: "people", also: PEOPLE_PAGES.map((t) => t.href), subpages: people.map(sub) });
+  if (people.length) pages.push({ href: people[0].href, label: "Personnel & RBAC", icon: "people", also: PEOPLE_PAGES.map((t) => t.href), subpages: people.map(sub) });
   if (can(me, "admin.settings") || can(me, "admin.types")) {
     const settings = settingsPagesFor(me);
-    pages.push({ href: settings[0].href, label: "Settings", icon: "settings", also: ["/admin/settings"], subpages: settings.map(sub) });
+    pages.push({ href: settings[0].href, label: "Commercial Governance", icon: "settings", also: ["/admin/settings"], subpages: settings.map(sub) });
   }
-  if (can(me, "admin.audit")) pages.push({ href: "/admin/audit", label: "Audit log", icon: "auditLog", also: [] });
+  if (can(me, "admin.audit")) pages.push({ href: "/admin/audit", label: "Compliance Audit Log", icon: "auditLog", also: [] });
   return pages;
 }

@@ -19,14 +19,20 @@ import type {
 } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
 
-function FormField({ label, children }: { label: string; children: ReactNode }) {
+function FormField({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <label className="mb-1 block text-meta font-medium text-ink-2">{label}</label>
+      <label className="mb-1 block text-meta font-medium text-ink-2">
+        {label}
+        {optional && <span className="font-normal text-ink-3"> (optional)</span>}
+      </label>
       {children}
     </div>
   );
 }
+
+const inputClass =
+  "block w-full min-w-0 bg-transparent border-0 border-b border-control rounded-none px-0 py-1.5 text-sm text-ink placeholder:text-ink-3/70 focus:outline-none focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:border-hema aria-[invalid=true]:border-danger disabled:text-ink-3";
 
 function ModalFrame({
   title,
@@ -42,18 +48,18 @@ function ModalFrame({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-ink/40 backdrop-blur-xs" onClick={onClose} aria-hidden />
-      <div className="relative z-10 w-full max-w-xl rounded-[3px] border border-rule bg-sheet p-6 shadow-2xl max-h-[92dvh] overflow-y-auto">
-        <div className="mb-4 flex items-start justify-between gap-4 border-b border-rule pb-3">
+      <div className="relative z-10 w-full max-w-xl rounded-[3px] border border-rule bg-sheet p-6 shadow-overlay max-h-[92dvh] overflow-y-auto">
+        <div className="mb-5 flex items-start justify-between gap-4 border-b border-rule pb-3.5">
           <div>
             <h2 className="text-heading text-ink">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-meta text-ink-3">{subtitle}</p>}
+            {subtitle && <p className="mt-1 text-meta text-ink-3">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[2px] p-1 text-ink-3 hover:bg-bench hover:text-ink"
+            className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink"
           >
-            <X className="size-5" />
+            <X className="size-4" />
             <span className="sr-only">Close</span>
           </button>
         </div>
