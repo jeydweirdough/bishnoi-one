@@ -14,12 +14,13 @@ invitation, and can push once they accept it. Point them to the README.
 
 ## One-time GitHub setup for the actions
 
-The repo has two actions, in `.github/workflows/`:
+The repo has three actions, in `.github/workflows/`:
 
 | Action | Runs when | What it does |
 |---|---|---|
 | **Sync branches** (`sync-branches.yml`) | any push to `main` or a `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
 | **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Deploy** (`deploy.yml`) | any push to `main`, after each sync, or by hand | Deploys to Vercel only the apps whose folder changed ([below](#deployments-on-vercel-only-what-changed)). |
 
 Set these once:
 
@@ -47,7 +48,7 @@ Set these once:
 ## Reviewing a new app
 
 Someone proposes a new app as a pull request from an `add-app/<name>` branch
-into `main` (README section 6). Before merging:
+into `main` (README section 8). Before merging:
 
 1. **Check apps is green.**
 2. **The folder name is the branch name you want.** Once merged,
@@ -67,7 +68,7 @@ Then **merge** it. About a minute later, Sync branches creates the
 `nabhi-<name>` branch. Afterwards:
 
 - Add the app to the layout, branch and port tables in `README.md`, and
-  update the "next free ports" in README section 6.
+  update the "next free ports" in README section 8.
 - Tell the author its branch name, and delete the `add-app/<name>` branch
   (GitHub offers a button after the merge).
 
@@ -92,10 +93,20 @@ sync:
 
 Set up once:
 
-1. Vercel → your avatar → **Account Settings → Tokens → Create**: scope it
-   to the team (Jade Atyla's projects), no expiry or a long one.
+1. Vercel → your avatar → **Account Settings → Tokens → Create**, on the
+   account the Nabhi projects are in, with no expiry or a long one.
 2. GitHub → the repo → **Settings → Secrets and variables → Actions → New
    repository secret**: `VERCEL_TOKEN`, the token.
+
+The projects are on a personal account, so `scope` in `.github/deploy.json`
+is empty (`""`): the action deploys to the token owner's own projects. If
+they ever move into a Vercel team, set `scope` to the team's slug (the
+`<slug>` in `vercel.com/<slug>/<project>`), or add a repository **variable**
+`VERCEL_SCOPE` with it (same page, **Variables** tab; no commit needed).
+
+If a deploy fails, the run's error says why: the token is wrong or expired
+(make a new one), or it can't see the scope set (the error lists what it can
+see).
 
 To deploy one project now, changed or not: **Actions → Deploy → Run
 workflow**, and type its project name (e.g. `nabhi-crm-backend`).
@@ -136,6 +147,61 @@ Afterwards:
 To change the key, add the new one to `INTEGRATION_KEYS` next to the old one
 (`["crm:<new>", "crm:<old>"]`), switch the CRM to the new one, then remove the
 old one.
+
+---
+
+## Linking the CRM to Finance
+
+Finance works out the tax on CRM quotes (the Philippines: VAT, exempt,
+zero-rated, senior citizen and PWD), as the last step of the CRM's price
+rules. Finance isn't on Vercel yet, so today this link works when both run on
+the same computer or network.
+
+1. Make a key, as above. Use a different one from the Inventory link.
+2. **Finance API** (`nabhi-finance/backend/.env`): `INTEGRATION_KEYS` =
+   `["crm:<the key>"]`.
+3. **CRM API** (`nabhi-crm/backend/.env`): `FINANCE_API_URL` = Finance's API
+   address (e.g. `http://127.0.0.1:8303`) and `FINANCE_API_KEY` = the key.
+4. Restart both. In Finance, an admin fills in **Tax → Registration** (VAT
+   status, registered name, TIN and address, as the invoice shows them).
+5. In the CRM, an admin ticks **Add tax from Finance** under **Settings →
+   Price rules** and saves. The box stays greyed out until the CRM has
+   `FINANCE_API_URL` and `FINANCE_API_KEY`.
+
+Afterwards:
+
+- Each quote shows the invoice's tax summary (VATable sales, VAT, amount due)
+  and keeps it, so a later rate change doesn't alter old quotes.
+- Each product's VAT category (standard, zero-rated, exempt) is set on the
+  CRM's product page. Existing products start as standard.
+- If Finance can't be reached, the quote isn't saved and the rep is told to
+  try again. Untick the box to quote without tax.
+
+The same link carries **fund requests** (cash advances):
+
+- **In the CRM:** a salesperson or field agent submits a request, and their
+  Team Lead approves or declines it (**Field work → Fund requests**). An
+  admin sets the purposes, and whether each is subject to liquidation, under
+  **Settings → Fund purposes**.
+- **In Finance:** an approved request goes to Finance (**Fund requests**),
+  which releases the cash advance (*For release*), reviews the liquidation
+  expense by expense (*For review*), and records the refund due from the
+  employee or the reimbursement due to them (*For settlement*). Released
+  advances not yet liquidated are under *Outstanding*; settled and cancelled
+  requests under *History*.
+- **Expense categories:** Finance's admin manages the categories and
+  sub-categories (Food › Dining) under **Accounting**. Each category posts to
+  an expense account, and only reimbursable ones are charged to the company.
+- **Accounting:** every step that moves money posts a balanced journal entry.
+  Accounting has the journal entries (with manual journals and reversals),
+  the chart of accounts, account ledgers, the trial balance, the expense
+  categories, and the default accounts the automatic entries use.
+- **If Finance is down:** an approval made while Finance can't be reached
+  waits in the CRM, and is sent the next time anyone opens it.
+
+Finance's demo admin is Rhea Castillo (`rhea@pharmacrm.test`, demo1234). The
+admin changes the chart of accounts, expense categories, default accounts and
+tax setup; Finance Staff (Joy, Fely) do everything else.
 
 ---
 

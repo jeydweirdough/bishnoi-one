@@ -7,7 +7,6 @@ import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow } from "@/src/platform/lib/types";
 import { NoAccess, OffTag } from "../components/admin/words";
-import { PeopleTabs } from "../components/admin/people-tabs";
 
 export const metadata = { title: "Users" };
 
@@ -51,7 +50,6 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
           </>
         )}
       </PageHeader>
-      <PeopleTabs me={me} current="/admin/users" />
 
       <Sheet>
         {people.length === 0 ? (

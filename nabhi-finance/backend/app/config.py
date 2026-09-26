@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # its key in X-Nabhi-Key. Empty: nothing outside can ask.
     integration_keys: list[SecretStr] = []
 
+    # A released fund that's liquidated is due back, with its receipts, this
+    # many days after it's released.
+    liquidate_within_days: int = 7
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"

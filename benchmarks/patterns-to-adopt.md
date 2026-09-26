@@ -145,9 +145,15 @@ per-division promos and bundles).
 How the apps already agree, kept that way:
 
 - **Money** is in the currency's minor units (centavos), as whole numbers,
-  never floats.
+  never floats. **Percentages** are basis points (12% is `1200`).
+- **Rates that the law sets** (tax) are dated rows, not constants: a change
+  in the law is a new row from its start date, and old documents keep theirs.
 - **Record numbers** people can say out loud: `PREFIX-YEAR-NUMBER`.
 - **Tables** carry their app's prefix (`nbcm_`, `nbin_`, `nbph_`…).
 - **Migrations** run on start and each step checks it isn't already done.
+- **Apps talk to each other** through their `/integration/…` endpoints,
+  with a key per calling app (`INTEGRATION_KEYS` on the app being asked,
+  sent in the `X-Nabhi-Key` header). If the other app can't be reached, the
+  caller says so plainly and never saves a half-done record.
 - **The shared kit** (`frontend/src/platform/`) is one design across apps: a
   pattern adopted in one app goes into the kit for the rest.

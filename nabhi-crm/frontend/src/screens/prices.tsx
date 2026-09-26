@@ -1,5 +1,4 @@
 import { TeamPricesEditor, type PricedTeam } from "../components/team-prices";
-import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
@@ -36,7 +35,6 @@ export default async function PricesPage() {
         Your team&apos;s special prices: what the team charges for each product, over the standard price list. A price you don&apos;t set follows the standard one, so nothing
         changes until you say so.
       </PageHeader>
-      <CatalogueTabs me={me} current="/prices" />
       <TeamPricesEditor teams={teams} initial={sheet} org={me.org} />
     </>
   );

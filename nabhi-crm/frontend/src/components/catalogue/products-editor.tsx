@@ -1,10 +1,10 @@
 "use client";
 
-import { Pencil, Plus } from "lucide-react";
+import { ExternalLink, Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, buttonClass } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
@@ -30,7 +30,7 @@ export function ProductsEditor({
   mayCreate,
   layout,
   stock,
-  addInInventory,
+  inventoryUrl,
 }: {
   products: CatalogueProduct[];
   priceTypes: PriceType[];
@@ -40,8 +40,8 @@ export function ProductsEditor({
   layout: FormLayout;
   /** How much Inventory has, by code; null when the CRM isn't linked to Inventory. */
   stock: Record<string, StockLevel | null> | null;
-  /** When the products come from Inventory: the way there to add one. */
-  addInInventory: ReactNode;
+  /** When the products come from Inventory: its screens, to add one there. */
+  inventoryUrl: string | null;
 }) {
   const fields = layout.sections.flatMap((s) => s.fields).filter((f) => !f.standard);
   const fmt = makeFormat(org);
@@ -65,7 +65,12 @@ export function ProductsEditor({
           Add product
         </Button>
       ) : (
-        addInInventory
+        inventoryUrl && (
+          <a href={`${inventoryUrl}/products`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
+            <ExternalLink className="size-4" aria-hidden />
+            Add it in Inventory
+          </a>
+        )
       )}
 
       <Sheet className="overflow-x-auto">

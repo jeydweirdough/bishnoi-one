@@ -4,7 +4,6 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { TeamRow } from "@/src/platform/lib/types";
 import { TeamsEditor } from "../components/admin/teams-editor";
 import { NoAccess } from "../components/admin/words";
-import { PeopleTabs } from "../components/admin/people-tabs";
 
 export const metadata = { title: "Teams" };
 
@@ -17,7 +16,6 @@ export default async function TeamsPage() {
       <PageHeader title="People & access">
         People work in teams. A role that reaches &ldquo;their team&apos;s records&rdquo; means the records of everyone in the same team.
       </PageHeader>
-      <PeopleTabs me={me} current="/admin/teams" />
       <TeamsEditor teams={teams} />
     </>
   );

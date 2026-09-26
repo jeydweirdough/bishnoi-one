@@ -2,7 +2,6 @@ import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
-import { StockTabs } from "../components/catalog-tabs";
 import { Chips, ExpiryMark, FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
 import { MOVEMENT_FILTERS, MOVEMENT_KINDS, param, query, referenceHref, signed } from "../lib/labels";
 import { context, type Search } from "../lib/page";
@@ -27,7 +26,6 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
       >
         How much you have, where. Available is what&apos;s on hand, less damaged stock and what orders hold.
       </PageHeader>
-      <StockTabs current="/stock" />
       <Chips label="Stock" current={f.state} options={[chip("", "Everything"), chip("low", "Low"), chip("out", "Out of stock"), chip("over", "Over maximum")]} />
       <Filters q={f.q} placeholder="Product, SKU or barcode" keep={{ state: f.state }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
@@ -89,7 +87,6 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
       <PageHeader title="Stock movements">
         The trail: every change to stock, who made it, and the document behind it. Newest first.
       </PageHeader>
-      <StockTabs current="/movements" />
       <Chips label="Kind" current={f.kind} options={MOVEMENT_FILTERS.map((k) => ({ value: k.key, label: k.label, href: `/movements${query({ ...f, kind: k.key })}` }))} />
       <Filters q={f.q} placeholder="Product, SKU or reference" keep={{ kind: f.kind, product: f.product }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
@@ -167,7 +164,6 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
       >
         Every lot on hand, soonest to expire first: the order stock goes out in (first expired, first out).
       </PageHeader>
-      <StockTabs current="/batches" />
       <Chips label="Expiry" current={f.expiry} options={[chip("", "Everything"), chip("expired", "Expired"), chip("expiring", "Expiring soon"), chip("ok", "Good")]} />
       <Filters q={f.q} placeholder="Batch number or product" keep={{ expiry: f.expiry }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
@@ -206,7 +202,6 @@ export async function SerialsPage({ searchParams }: { searchParams: Search }) {
   return (
     <>
       <PageHeader title="Serial numbers">Find a serial-numbered unit: where it is now, and everywhere it has been.</PageHeader>
-      <StockTabs current="/serials" />
       <Filters q={q} placeholder="Serial number, or part of one" />
       {!q ? (
         <Sheet><Empty icon="stock" title="Type a serial number to find it" /></Sheet>

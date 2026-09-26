@@ -1,0 +1,16 @@
+{
+  "name": "nabhi",
+  "private": true,
+  "description": "Runs a Nabhi app, API and screens together: npm run nabhi-crm. See README section 5.",
+  "scripts": {
+    "nabhi-admin": "node scripts/run-app.mjs nabhi-admin",
+    "nabhi-crm": "node scripts/run-app.mjs nabhi-crm",
+    "nabhi-finance": "node scripts/run-app.mjs nabhi-finance",
+    "nabhi-in-licensing": "node scripts/run-app.mjs nabhi-in-licensing",
+    "nabhi-inventory": "node scripts/run-app.mjs nabhi-inventory",
+    "nabhi-pharmacy": "node scripts/run-app.mjs nabhi-pharmacy",
+    "nabhi-platform": "node scripts/run-app.mjs nabhi-platform",
+    "nabhi-regulatory": "node scripts/run-app.mjs nabhi-regulatory",
+    "setup": "node scripts/setup-all.mjs"
+  }
+}

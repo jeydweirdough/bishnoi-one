@@ -438,6 +438,16 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
+const EXECUTIVE_PAGES: Page[] = [
+  { href: "/", label: "Overview", icon: "overview" },
+  { href: "/notifications", label: "Renewal Alerts", icon: "notifications" },
+  { href: "/permits", label: "Registrations & Permits", icon: "permits" },
+  { href: "/immigration", label: "Expatriate & Visas", icon: "immigration" },
+  { href: "/documents", label: "Corporate Documents", icon: "documents" },
+  { href: "/properties", label: "Properties & Leases", icon: "properties" },
+  { href: "/tickets", label: "Office Concerns", icon: "tickets" },
+];
+
 function Links({ me }: { me: Me }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
@@ -495,26 +505,7 @@ function Links({ me }: { me: Me }) {
 
   return (
     <nav aria-label="Main">
-      {/* The dashboard is Analytics' screen, so the row is Analytics' own app's
-          and the shell's. Everywhere else Analytics is a link like any app. */}
-      {isOurs("exec") &&
-        (THIS_APP ? (
-          // In its own app Analytics is a section like any other, with a
-          // heading of its own. The dashboard is its screen, not this app's
-          // front door, and the sidebar should not say otherwise.
-          <Group label={appLabel("exec")}>
-            <Row href="/" icon="home" current={pathname === "/"}>
-              Home
-            </Row>
-          </Group>
-        ) : (
-          // The shell's own front door, which is every app at once.
-          <Row href="/" icon="home" current={pathname === "/"}>
-            Home
-          </Row>
-        ))}
-      {/* Platform's one screen, in Platform's own app. In the shell it is a
-          page of Settings instead, which is where it has always been. */}
+      {/* Platform's one screen, in Platform's own app. */}
       {THIS_APP === "platform" && develops(me) && (
         <Group label={appLabel("platform")}>
           <Row href="/" icon="companies" current={pathname === "/"}>
@@ -522,9 +513,16 @@ function Links({ me }: { me: Me }) {
           </Row>
         </Group>
       )}
-      {/* The CRM, as one set of pages. No division rows under it:
-          a division is a property of a record, not a place, so these are the
-          same pages whether you sell in one of the seven or all of them. */}
+      {/* Executive Admin's primary operational workspace */}
+      {isOurs("exec") && (
+        <Group label={appLabel("exec")}>
+          <Flat
+            groups={[{ pages: EXECUTIVE_PAGES }]}
+            overviewHref="/"
+          />
+        </Group>
+      )}
+      {/* The CRM, as one set of pages. */}
       {crm.length > 0 && isOurs("crm") && (
         <Group label={appLabel("crm")}>
           {crmPages(crm).map((page) => (
@@ -545,10 +543,6 @@ function Links({ me }: { me: Me }) {
           )}
         </Group>
       )}
-      {/* The apps this person has but is not in. The shell keeps them as the
-          plain list they have always been, in the slot they have always had;
-          a module app has more of them, so there they fold into one row that
-          opens beside itself. */}
       {SHOW_OTHER_APPS &&
         elsewhere.length > 0 &&
         (THIS_APP ? (
@@ -567,27 +561,14 @@ function Links({ me }: { me: Me }) {
           </Group>
         ))}
       {settings.length > 0 && isOurs("exec") && (
-        <Group label={appLabel("exec")}>
-          {THIS_APP ? (
-            /* Its own overview first, the way every other app opens on one.
-               Only in the Admin app: in the shell "/" is the shell's own
-               dashboard, which is Analytics' screen and nothing to do with
-               Settings. */
-            <Flat
-              groups={[{ pages: [{ href: "/", label: "Overview", icon: "overview" }] }, ...settings]}
-              overviewHref="/"
-            />
-          ) : (
-            /* Opens on the first page this person reaches, which is People for
-               an Admin and for a Developer Admin alike. */
-            <Parent
-              href={settings[0].pages[0].href}
-              base="/settings"
-              icon="settings"
-              label="Settings"
-              groups={settings}
-            />
-          )}
+        <Group label="Access & Settings">
+          <Parent
+            href="/settings/people"
+            base="/settings"
+            icon="settings"
+            label="Settings"
+            groups={settings}
+          />
         </Group>
       )}
     </nav>
@@ -599,6 +580,10 @@ function placeOf(pathname: string, me: Me): string | null {
   if (within(pathname, "/settings")) {
     const page = settingsFor(me).flatMap((g) => g.pages).find((p) => !isAway(p.href) && within(pathname, p.href));
     return page ? `Settings · ${page.label}` : "Settings";
+  }
+  const execPage = EXECUTIVE_PAGES.find((p) => isCurrent(p, pathname, p.href === "/"));
+  if (execPage) {
+    return `Executive Admin · ${execPage.label}`;
   }
   // In a module's own app every path below it is that module's; in the shell
   // it is whichever module's mount the path sits under.

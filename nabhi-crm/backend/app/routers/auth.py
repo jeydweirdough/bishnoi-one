@@ -17,8 +17,10 @@ from sqlalchemy import func, select
 from app.audit import audit
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
+from app.access import access_of
 from app.identity import me_out
 from app.models import SignInSession, User
+from app.permissions import ACTION_LABELS, AREAS, NOT_BUILT
 from app.security import DUMMY_HASH, MAX_PASSWORD, new_token, token_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["sign-in"])
@@ -107,6 +109,36 @@ def logout(record: CurrentSession, user: CurrentUser, db: DB) -> Response:
 @router.get("/me")
 def me(user: CurrentUser, settings: SettingsDep) -> dict:
     return me_out(user, settings)
+
+
+@router.get("/account")
+def account(user: CurrentUser, record: CurrentSession, db: DB) -> dict:
+    """Everything about the person signed in, for their account page: the role,
+    the team, whose records they reach, what they may do, and their sign-ins."""
+    permissions = access_of(user).permissions
+    previous = db.scalar(
+        select(SignInSession.created_at)
+        .where(SignInSession.user_id == user.id, SignInSession.id != record.id)
+        .order_by(SignInSession.created_at.desc())
+        .limit(1)
+    )
+    def at(when: datetime) -> str:  # SQLite hands times back without their zone: they're UTC
+        return (when if when.tzinfo else when.replace(tzinfo=UTC)).isoformat()
+
+    areas = []
+    for area in (a for a in AREAS if a.key not in NOT_BUILT):
+        allowed = [a for a in area.actions if f"{area.key}.{a}" in permissions]
+        if allowed:
+            areas.append({"key": area.key, "name": area.name, "group": area.group, "actions": [ACTION_LABELS.get(a, a) for a in allowed]})
+    return {
+        "role": {"name": user.role.name, "description": user.role.description, "scope": user.role.scope},
+        "team": {"name": user.team.name, "description": user.team.description} if user.team else None,
+        "memberSince": at(user.created_at),
+        "passwordChangedAt": at(user.password_changed_at),
+        "signedInAt": at(record.created_at),
+        "previousSignIn": at(previous) if previous else None,
+        "areas": areas,
+    }
 
 
 @router.get("/demo-accounts")

@@ -87,15 +87,36 @@ datetime field gives) is the company's own local time (`ORG_TIMEZONE`).
 `uv run python -m app.tools.users demo` also adds sample companies, contacts
 and activities, owned by the demo reps, into a database with no companies yet.
 
+## Price rules and tax
+
+How a quote line is priced is set by an admin under **Settings → Price
+rules** (`/pricing/...`, `app/conditions.py`, `app/pricing.py`):
+
+1. **The price:** the first of customer-group price, team price and list
+   price that has one. The admin sets the order.
+2. **Then the adjustments**, in the admin's order: volume scale, promo,
+   rep's discount, surcharge. Each can be switched off.
+3. **Tax, last**, from Nabhi Finance (`app/finance.py`), kept on the quote.
+
+A customer is put in a **price group** on its own page. Rules are dated;
+when several match a line, the most specific wins (product and group, then
+product, then group, then everything). Promos and bundles are per division:
+a team sees only its own. Quotes already made keep their prices.
+
 ## Settings (`.env`)
 
-| Setting | What it is | Default |
-|---|---|---|
-| `DATABASE_URL` | This app's own database | `sqlite:///.data/crm.db` |
-| `SESSION_HOURS` | How long a sign-in lasts | `10` |
-| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Nabhi, PHP, en-PH, Asia/Manila |
-| `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
-| `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
+Every setting, with defaults, is in the root README
+([section 6](../../README.md#6-settings-env-for-every-app)). The ones only
+the CRM has:
+
+| Setting | What it is |
+|---|---|
+| `INVENTORY_API_URL`, `INVENTORY_API_KEY`, `INVENTORY_APP_URL` | Products and stock from Nabhi Inventory. Unset: products are kept here |
+| `FINANCE_API_URL`, `FINANCE_API_KEY` | Tax from Nabhi Finance. Unset: quotes are priced without tax |
+| `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator, made on start while there are no accounts (Vercel) |
+
+Setting up the links: [MAINTAINING.md](../../MAINTAINING.md), "Linking the
+CRM to Inventory" and "Linking the CRM to Finance".
 
 ## Deploying on Vercel
 

@@ -17,18 +17,16 @@ they're known.
 | D2 | Where does a lead live, and can we see expected sales? | **B: add deals to customers** | A lead stays a company status (prospect). Customers get **deals**, each with a stage, an expected value and a forecast category kept apart from the stage (Salesforce's pipeline idea). A won deal leads to a quote. There's no separate Lead record and no lead conversion. |
 | D7 | Do field agents need to work without signal? | **B: offline visits and collections** | Logging a visit and recording a collection work offline on the phone, wait there, and sync when there's signal, with clashes flagged. Everything else still needs a connection. Full offline (Veeva-style) and van/route orders are out for now. |
 
-## What has to come first
+## What has to come first, and where it stands
 
 The decisions depend on each other, so the build follows this order:
 
-1. **The tax engine (D8), with the Philippines pack**, comes before
-   invoices: an invoice can't be made without the tax rules for its country.
-2. **Pricing conditions (D4)** come before invoices too: the tax step is the
-   last condition in the price.
-3. **Invoices, payments and ageing (D4)** then go into the Finance app, which
-   has only sign-in today.
-4. **Deals (D2)** and **offline visits (D7)** stand on their own, and can be
-   built alongside the rest.
+| Step | Why it's in this place | Status |
+|---|---|---|
+| 1. **The tax engine (D8), with the Philippines pack** | An invoice can't be made without the tax rules for its country | **Done** 2026-09-25: Finance → **Tax** (matrix F8, F9) |
+| 2. **Pricing conditions (D4)** | The tax step is the last condition in the price | **Done** 2026-09-25: CRM → Settings → **Price rules**, tax from Finance (matrix F4, F5) |
+| 3. **Invoices, payments and ageing (D4)**, in the Finance app | Needs steps 1 and 2 | **Next** (matrix E5) |
+| 4. **Deals (D2)** and **offline visits and collections (D7)** | Stand on their own | Not started; can be built alongside the rest (matrix F1, G3, G4) |
 
 ## Follow-ups, decided on 2026-09-25
 

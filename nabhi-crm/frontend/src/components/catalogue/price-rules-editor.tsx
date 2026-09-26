@@ -10,7 +10,7 @@ import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, percentText, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 import { addPriceGroup, deletePriceGroup, deleteRule, saveRule, updatePriceGroup, type RuleInput } from "../../actions/price-rules";
-import { StateTag } from "./catalogue-tabs";
+import { StateTag } from "./state-tag";
 import type { ConditionKind, PriceRule, PriceRules } from "./price-rules-types";
 
 type ProductRef = { id: string; name: string; code: string };

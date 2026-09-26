@@ -5,7 +5,6 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { CustomEntity, FormLayout } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { FormEditor } from "../components/settings/form-editor";
-import { SettingsTabs } from "../components/settings/settings-tabs";
 import { ENTITY_WORDS } from "../components/settings/words";
 
 export const metadata = { title: "Forms" };
@@ -21,7 +20,6 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader title="Settings">Lay out each form: its sections, the fields on it, and what each one asks. Everyone gets the form as saved here.</PageHeader>
-      <SettingsTabs me={me} current="/admin/settings" />
       <div className="mb-4">
         <ToggleLinks current={entity} options={ENTITIES.map((e) => ({ value: e, label: ENTITY_WORDS[e].many, href: `/admin/settings?entity=${e}` }))} />
       </div>

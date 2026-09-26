@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: import.meta.dirname,
   poweredByHeader: false,
+  // A receipt or a guarantee letter goes up through a server action, and the
+  // default (1 MB) is less than a phone photo. Vercel takes up to 4.5 MB.
+  experimental: {
+    serverActions: { bodySizeLimit: "4.5mb" },
+  },
   // Which app this is, for the sidebar. Built into the screens, so it is set
   // here and not left to each machine's .env.local or the host's settings.
   env: {

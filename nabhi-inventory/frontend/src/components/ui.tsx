@@ -10,26 +10,6 @@ import { STOCK_STATES } from "../lib/labels";
 // The pieces every Inventory screen is built from. Server components: the
 // interactive ones are in their own "use client" files.
 
-/** A place's tabs, as links so the tab lives in the address. Only the ones this person may open. */
-export function Tabs({ label, tabs, current }: { label: string; tabs: { href: string; label: string; show?: boolean }[]; current: string }) {
-  const shown = tabs.filter((t) => t.show !== false);
-  if (shown.length < 2) return null;
-  return (
-    <nav aria-label={label} className="mb-5 flex flex-wrap gap-x-6 gap-y-1 border-b border-rule">
-      {shown.map((t) => (
-        <Link
-          key={t.href}
-          href={t.href}
-          aria-current={t.href === current ? "page" : undefined}
-          className={`-mb-px border-b-2 px-1 pb-2 text-sm ${t.href === current ? "border-hema font-semibold text-hema" : "border-transparent text-ink-2 hover:text-ink"}`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
 export type Tone = "neutral" | "active" | "done" | "attention" | "muted";
 
 const TONES: Record<Tone, string> = {

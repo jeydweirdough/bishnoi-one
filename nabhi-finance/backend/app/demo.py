@@ -20,6 +20,7 @@ class Demo:
 
 
 DEMO_ACCOUNTS: tuple[Demo, ...] = (
+    Demo("Finance", "rhea@pharmacrm.test", "Rhea Castillo", "Finance Admin · chart of accounts, categories, tax", admin=True),
     Demo("Finance", "joy@pharmacrm.test", "Joy Navarro", "Department Staff · Finance"),
     Demo("Finance", "fely@pharmacrm.test", "Fely Domingo", "Finance Staff · verifies order payments"),
 )

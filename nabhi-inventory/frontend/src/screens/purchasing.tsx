@@ -4,7 +4,6 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { deletePurchaseOrder, purchaseOrderStep } from "../actions/inventory";
-import { PurchasingTabs } from "../components/catalog-tabs";
 import { PurchaseOrderForm } from "../components/document-forms";
 import { ReceiveForm } from "../components/receive-form";
 import { RecordTools } from "../components/record-tools";
@@ -35,7 +34,6 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
       >
         Purchase order → supplier delivers → receiving → stock.
       </PageHeader>
-      <PurchasingTabs me={me} current="/purchase-orders" />
       <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("ordered,partial", "Pending delivery"), chip("partial", "Partly received"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />
       <Filters q={f.q} placeholder="PO number or supplier" keep={{ status: f.status }} />
       <Sheet>
@@ -212,7 +210,6 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
       >
         Every delivery taken in. To receive against a purchase order, open the order.
       </PageHeader>
-      <PurchasingTabs me={me} current="/receipts" />
       <Filters q={q} placeholder="Receipt or delivery number" />
       <Sheet>
         {receipts.length === 0 ? <Empty icon="receiving" title="Nothing received yet" /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
@@ -280,7 +277,6 @@ export async function BackordersPage() {
   return (
     <>
       <PageHeader title="Backorders">Everything still owed on placed purchase orders, soonest expected first.</PageHeader>
-      <PurchasingTabs me={me} current="/backorders" />
       <Sheet>
         {rows.length === 0 ? (
           <Empty icon="purchaseOrders" title="Nothing is owed" />

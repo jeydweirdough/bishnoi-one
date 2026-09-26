@@ -3,7 +3,6 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
 import { RolesEditor, UsersEditor } from "../components/admin";
-import { PeopleTabs } from "../components/catalog-tabs";
 import { Chips, NoAccess } from "../components/ui";
 import { param, query, referenceHref } from "../lib/labels";
 import { context, type Search } from "../lib/page";
@@ -17,7 +16,6 @@ export async function UsersPage() {
   return (
     <>
       <PageHeader title="Users & roles">Who can sign in to Inventory, and what their role lets them do. A change applies on their next click.</PageHeader>
-      <PeopleTabs me={me} current="/admin/users" />
       <UsersEditor data={data} meId={me.user.id} when={when} />
     </>
   );
@@ -30,7 +28,6 @@ export async function RolesPage() {
   return (
     <>
       <PageHeader title="Users & roles">Each role is a set of permissions, area by area. Give people the role that fits their job.</PageHeader>
-      <PeopleTabs me={me} current="/admin/roles" />
       <RolesEditor data={data} />
     </>
   );

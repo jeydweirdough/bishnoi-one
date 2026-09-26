@@ -4,7 +4,6 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { CompanySettings } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { CompanySettingsForm } from "../components/settings/company-settings-form";
-import { SettingsTabs } from "../components/settings/settings-tabs";
 
 export const metadata = { title: "Business & quotes" };
 
@@ -15,7 +14,6 @@ export default async function CompanySettingsPage() {
   return (
     <>
       <PageHeader title="Settings">Your business as every screen shows it, and how quotes are numbered and worded.</PageHeader>
-      <SettingsTabs me={me} current="/admin/settings/company" />
       <CompanySettingsForm initial={settings} />
     </>
   );

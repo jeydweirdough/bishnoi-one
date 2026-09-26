@@ -3,7 +3,6 @@ import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { CatalogueProduct, DivisionOption, Paged, PromoRow } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
 import { DivisionFilter, inDivision } from "../components/catalogue/division-filter";
 import { PromosEditor } from "../components/catalogue/promos-editor";
 
@@ -23,7 +22,6 @@ export default async function PromosPage({ searchParams }: { searchParams: Promi
       <PageHeader title="Products & services">
         Promos a rep can pick on a quote line, while they run. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
-      <CatalogueTabs me={me} current="/promos" />
       <DivisionFilter base="/promos" teams={promos.teams} current={current} />
       <PromosEditor
         promos={inDivision(promos.items, current)}

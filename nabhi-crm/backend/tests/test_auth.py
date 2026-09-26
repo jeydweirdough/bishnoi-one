@@ -26,6 +26,20 @@ def test_sign_in_and_see_who_you_are(client):
     assert me["role"]["name"] == "Administrator" and "admin.users" in me["permissions"]
 
 
+def test_account_says_role_reach_rights_and_sign_ins(client):
+    sign_in(client, "ben@example.com")  # an earlier sign-in
+    ben = client.get("/auth/account", headers=bearer(sign_in(client, "ben@example.com"))).json()
+    assert ben["role"]["scope"] in ("own", "team", "all") and ben["role"]["name"]
+    assert ben["previousSignIn"] and ben["previousSignIn"] <= ben["signedInAt"]
+    assert ben["signedInAt"].endswith("+00:00")  # UTC, whatever the database hands back
+    keys = [a["key"] for a in ben["areas"]]
+    assert "admin" not in keys and "deals" not in keys  # not his, and not built yet
+    ana = client.get("/auth/account", headers=bearer(sign_in(client))).json()
+    admin = next(a for a in ana["areas"] if a["key"] == "admin")
+    assert "Users" in admin["actions"] and "Audit logs" in admin["actions"]
+    assert client.get("/auth/account").status_code == 401
+
+
 def test_admins_run_settings_members_dont(client):
     ana = client.get("/auth/me", headers=bearer(sign_in(client))).json()
     ben = client.get("/auth/me", headers=bearer(sign_in(client, "ben@example.com"))).json()

@@ -48,3 +48,154 @@ class SignInSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+# --- Executive Office & Administration Tables ----------------------------------------
+
+
+class ComplianceRecord(Base):
+    """Corporate and regulatory registrations, permits, and accreditations (BOC, SEC, BIR, LGU, FDA)."""
+
+    __tablename__ = "nbad_compliance_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(40))  # boc, lgu, sec, bir, fda, sanitary_fire, other
+    agency: Mapped[str] = mapped_column(String(100))  # e.g. Bureau of Customs (BOC), LGU Makati, SEC, BIR, FDA
+    reference_number: Mapped[str] = mapped_column(String(80))
+    issuance_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    expiration_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # countdown target
+    renewal_window_days: Mapped[int] = mapped_column(default=60)
+    status: Mapped[str] = mapped_column(String(24), default="active")  # active, pending_renewal, under_review, expired
+    responsible_person: Mapped[str | None] = mapped_column(String(120), default=None)
+    estimated_cost: Mapped[float | None] = mapped_column(default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ImmigrationRecord(Base):
+    """Expatriate, executive visas, Alien Certificate of Registration (ACR I-Card), DOLE AEP, and passports."""
+
+    __tablename__ = "nbad_immigration_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    individual_name: Mapped[str] = mapped_column(String(120))
+    designation: Mapped[str] = mapped_column(String(120))
+    nationality: Mapped[str] = mapped_column(String(60))
+    document_type: Mapped[str] = mapped_column(String(40))  # visa, acr_card, aep_permit, passport, exec_id
+    document_number: Mapped[str] = mapped_column(String(80))
+    issuance_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    expiration_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # countdown target
+    renewal_lead_days: Mapped[int] = mapped_column(default=60)
+    sponsoring_entity: Mapped[str | None] = mapped_column(String(120), default=None)
+    status: Mapped[str] = mapped_column(String(24), default="valid")  # valid, expiring_soon, in_renewal, expired
+    assigned_assistant: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class CorporateDocument(Base):
+    """Commercial contracts, corporate insurance policies (D&O, CGL, property), and board resolutions."""
+
+    __tablename__ = "nbad_corporate_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(40))  # insurance, contract, nda, board_resolution, sla, legal_retainer
+    counterparty: Mapped[str] = mapped_column(String(140))
+    reference_number: Mapped[str | None] = mapped_column(String(80), default=None)
+    effective_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    expiration_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    auto_renews: Mapped[bool] = mapped_column(default=False)
+    notice_period_days: Mapped[int] = mapped_column(default=30)
+    custodian: Mapped[str | None] = mapped_column(String(120), default=None)
+    status: Mapped[str] = mapped_column(String(24), default="active")  # active, in_review, renewed, terminated
+    annual_value: Mapped[float | None] = mapped_column(default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class PropertyRecord(Base):
+    """Corporate facilities, office leases, pharma warehouses, depot facilities, and utilities."""
+
+    __tablename__ = "nbad_properties"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(140))
+    property_type: Mapped[str] = mapped_column(String(40))  # office, warehouse, depot, parking, expat_housing
+    address: Mapped[str] = mapped_column(String(250))
+    lessor_name: Mapped[str] = mapped_column(String(140))
+    lessor_contact: Mapped[str | None] = mapped_column(String(140), default=None)
+    lease_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    lease_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # countdown target
+    notice_deadline_days: Mapped[int] = mapped_column(default=90)
+    monthly_rent: Mapped[float | None] = mapped_column(default=None)
+    escalation_rate_pct: Mapped[float | None] = mapped_column(default=None)
+    security_deposit: Mapped[float | None] = mapped_column(default=None)
+    utilities_info: Mapped[str | None] = mapped_column(String(500), default=None)
+    status: Mapped[str] = mapped_column(String(24), default="active")  # active, renewal_negotiation, expiring_soon, terminated
+    assigned_manager: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Ticket(Base):
+    """Office concerns, administrative service desk requests, facilities, and executive VIP logistics."""
+
+    __tablename__ = "nbad_tickets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    ticket_number: Mapped[str] = mapped_column(String(24), unique=True)
+    title: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(40))  # facilities, vip_logistics, supplies, it_security, boardroom, courier_dispatch, general
+    priority: Mapped[str] = mapped_column(String(16), default="normal")  # urgent, high, normal, low
+    status: Mapped[str] = mapped_column(String(24), default="open")  # open, in_progress, pending_vendor, resolved, closed
+    requester_name: Mapped[str] = mapped_column(String(120))
+    requester_email: Mapped[str | None] = mapped_column(String(254), default=None)
+    executive_sponsor: Mapped[str | None] = mapped_column(String(120), default=None)
+    assigned_to: Mapped[str | None] = mapped_column(String(120), default=None)
+    sla_due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    description: Mapped[str] = mapped_column(String(1000))
+    resolution_notes: Mapped[str | None] = mapped_column(String(1000), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class TicketUpdate(Base):
+    """Updates and comments on office concern tickets."""
+
+    __tablename__ = "nbad_ticket_updates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    ticket_id: Mapped[str] = mapped_column(ForeignKey("nbad_tickets.id", ondelete="CASCADE"), index=True)
+    author_name: Mapped[str] = mapped_column(String(120))
+    author_email: Mapped[str | None] = mapped_column(String(254), default=None)
+    update_type: Mapped[str] = mapped_column(String(24), default="comment")  # comment, status_change, resolution
+    content: Mapped[str] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Notification(Base):
+    """Proactive expiration countdowns, renewal alerts, and milestone warnings."""
+
+    __tablename__ = "nbad_notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    entity_type: Mapped[str] = mapped_column(String(32))  # permit, immigration, document, property, ticket
+    entity_id: Mapped[str] = mapped_column(String(36), index=True)
+    severity: Mapped[str] = mapped_column(String(16), default="warning")  # critical, urgent, warning, info
+    title: Mapped[str] = mapped_column(String(160))
+    message: Mapped[str] = mapped_column(String(500))
+    days_remaining: Mapped[int] = mapped_column(default=0)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    is_read: Mapped[bool] = mapped_column(default=False)
+    is_acknowledged: Mapped[bool] = mapped_column(default=False)
+    is_resolved: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+

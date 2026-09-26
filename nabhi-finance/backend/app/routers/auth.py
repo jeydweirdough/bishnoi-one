@@ -104,6 +104,53 @@ def me(user: CurrentUser, settings: SettingsDep) -> dict:
     return me_out(user, settings)
 
 
+# What each of Finance's two roles may do, for the account page. The API's own
+# gates (deps.require_admin) are the ones that count; this says the same.
+ROLES = {
+    "admin": ("Finance Admin", "Administers Finance: chart of accounts, expense categories, default accounts and tax setup, plus all Finance Staff duties."),
+    "member": ("Finance Staff", "Releases cash advances, reviews liquidations, records refunds and reimbursements, and posts journal entries."),
+}
+AREAS = (
+    ("Fund requests", "Fund requests", ("Release", "Review liquidations", "Record refunds and reimbursements"), ()),
+    ("Accounting", "Journal entries", ("View", "Post manual journals", "Reverse entries"), ()),
+    ("Accounting", "Chart of accounts", ("View",), ("Add and edit",)),
+    ("Accounting", "Expense categories", ("View",), ("Add and edit",)),
+    ("Accounting", "Default accounts", ("View",), ("Edit",)),
+    ("Accounting", "Reports", ("Account ledgers", "Trial balance"), ()),
+    ("Tax", "Tax setup", ("View", "Compute tax on a sale"), ("Registration", "Rate changes")),
+)
+
+
+@router.get("/account")
+def account(user: CurrentUser, record: CurrentSession, db: DB) -> dict:
+    """Everything about the person signed in, for their account page: the role,
+    what it allows, and their sign-ins."""
+    previous = db.scalar(
+        select(SignInSession.created_at)
+        .where(SignInSession.user_id == user.id, SignInSession.id != record.id)
+        .order_by(SignInSession.created_at.desc())
+        .limit(1)
+    )
+
+    def at(when: datetime) -> str:  # SQLite hands times back without their zone: they're UTC
+        return (when if when.tzinfo else when.replace(tzinfo=UTC)).isoformat()
+
+    admin = user.role == "admin"
+    name, description = ROLES[user.role]
+    return {
+        "role": {"name": name, "description": description, "scope": "all"},
+        "team": None,
+        "memberSince": at(user.created_at),
+        "passwordChangedAt": at(user.password_changed_at),
+        "signedInAt": at(record.created_at),
+        "previousSignIn": at(previous) if previous else None,
+        "areas": [
+            {"key": area.lower().replace(" ", "_"), "name": area, "group": group, "actions": [*everyone, *(admins if admin else ())]}
+            for group, area, everyone, admins in AREAS
+        ],
+    }
+
+
 @router.get("/demo-accounts")
 def demo_accounts(db: DB, settings: SettingsDep) -> dict:
     """The demo accounts that exist here, for the sign-in page. Development only."""

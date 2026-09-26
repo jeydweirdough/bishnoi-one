@@ -8,7 +8,6 @@ import { makeFormat } from "@/src/platform/lib/format";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import type { Assignable, ContactRow, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { CustomerTabs } from "../components/crm/customer-tabs";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { RecordsBulk } from "../components/crm/records-bulk";
 
@@ -53,7 +52,6 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
         {filtered ? " match" : ""}.
       </PageHeader>
 
-      <CustomerTabs current="contacts" />
 
       <Filters
         search="Search by name, email or customer"

@@ -2,7 +2,6 @@ import { Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
-import { CatalogTabs } from "../components/catalog-tabs";
 import { FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
 import { PRODUCT_STATUSES, param, query } from "../lib/labels";
 import { context, type Search } from "../lib/page";
@@ -53,7 +52,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       >
         The catalog: every item you keep, what it costs and sells for, and when to order more.
       </PageHeader>
-      <CatalogTabs me={me} current="/products" />
       <Filters q={f.q} placeholder="Name, SKU or barcode">
         <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "Every category" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
         <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "Every brand" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />

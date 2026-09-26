@@ -736,3 +736,161 @@ export type AuditEntry = { id: string; at: string; actor: string; action: string
 export type AuditPage = { items: AuditEntry[]; more: boolean };
 
 export type AppModule = RolesPayload["modules"][number];
+
+// --- Executive Office & Administration types ---
+
+export type UrgencyTier = "overdue" | "urgent" | "approaching" | "upcoming" | "good_standing" | "none";
+
+export type ComplianceRecord = {
+  id: string;
+  title: string;
+  category: string;
+  agency: string;
+  referenceNumber: string;
+  issuanceDate: string | null;
+  expirationDate: string;
+  renewalWindowDays: number;
+  status: string;
+  responsiblePerson: string | null;
+  estimatedCost: number | null;
+  notes: string | null;
+  daysRemaining: number | null;
+  urgencyTier: UrgencyTier;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ImmigrationRecord = {
+  id: string;
+  individualName: string;
+  designation: string;
+  nationality: string;
+  documentType: string;
+  documentNumber: string;
+  issuanceDate: string | null;
+  expirationDate: string;
+  renewalLeadDays: number;
+  sponsoringEntity: string | null;
+  status: string;
+  assignedAssistant: string | null;
+  notes: string | null;
+  daysRemaining: number | null;
+  urgencyTier: UrgencyTier;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CorporateDocument = {
+  id: string;
+  title: string;
+  category: string;
+  counterparty: string;
+  referenceNumber: string | null;
+  effectiveDate: string | null;
+  expirationDate: string | null;
+  autoRenews: boolean;
+  noticePeriodDays: number;
+  custodian: string | null;
+  status: string;
+  annualValue: number | null;
+  notes: string | null;
+  daysRemaining: number | null;
+  urgencyTier: UrgencyTier;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PropertyRecord = {
+  id: string;
+  name: string;
+  propertyType: string;
+  address: string;
+  lessorName: string;
+  lessorContact: string | null;
+  leaseStart: string | null;
+  leaseEnd: string;
+  noticeDeadlineDays: number;
+  monthlyRent: number | null;
+  escalationRatePct: number | null;
+  securityDeposit: number | null;
+  utilitiesInfo: string | null;
+  status: string;
+  assignedManager: string | null;
+  notes: string | null;
+  daysRemaining: number | null;
+  urgencyTier: UrgencyTier;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketUpdate = {
+  id: string;
+  authorName: string;
+  authorEmail: string | null;
+  updateType: string;
+  content: string;
+  createdAt: string;
+};
+
+export type OfficeTicket = {
+  id: string;
+  ticketNumber: string;
+  title: string;
+  category: string;
+  priority: "urgent" | "high" | "normal" | "low";
+  status: "open" | "in_progress" | "pending_vendor" | "resolved" | "closed";
+  requesterName: string;
+  requesterEmail: string | null;
+  executiveSponsor: string | null;
+  assignedTo: string | null;
+  slaDueDate: string | null;
+  description: string;
+  resolutionNotes: string | null;
+  daysRemaining: number | null;
+  urgencyTier: UrgencyTier;
+  createdAt: string;
+  resolvedAt: string | null;
+  updatedAt: string;
+  updates?: TicketUpdate[];
+};
+
+export type ExecutiveNotification = {
+  id: string;
+  entityType: "permit" | "immigration" | "document" | "property" | "ticket";
+  entityId: string;
+  severity: "critical" | "urgent" | "warning" | "info";
+  title: string;
+  message: string;
+  daysRemaining: number;
+  dueDate: string | null;
+  isRead: boolean;
+  isAcknowledged: boolean;
+  isResolved: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CountdownHighlight = {
+  entityType: "permit" | "immigration" | "document" | "property" | "ticket";
+  entityId: string;
+  title: string;
+  subtitle: string;
+  reference: string;
+  dueDate: string;
+  daysRemaining: number;
+  urgencyTier: UrgencyTier;
+  actionPath: string;
+};
+
+export type ExecutiveDashboardSummary = {
+  stats: {
+    permits: { total: number; overdue: number; urgent: number; approaching: number };
+    immigration: { total: number; expiringSoon: number; overdue: number };
+    documents: { total: number; insurancePolicies: number };
+    properties: { total: number; leasesExpiring: number };
+    tickets: { totalOpen: number; urgent: number };
+    notifications: { totalActive: number; unread: number; critical: number };
+  };
+  countdownHighlights: CountdownHighlight[];
+};
+

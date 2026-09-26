@@ -6,7 +6,6 @@ import { NoAccess } from "../components/admin/words";
 import { PriceGroupsEditor, PriceRulesEditor } from "../components/catalogue/price-rules-editor";
 import type { PriceRules } from "../components/catalogue/price-rules-types";
 import { ProcedureEditor } from "../components/catalogue/procedure-editor";
-import { SettingsTabs } from "../components/settings/settings-tabs";
 
 export const metadata = { title: "Price rules" };
 
@@ -27,7 +26,6 @@ export default async function PriceRulesPage() {
   return (
     <>
       <PageHeader title="Settings">How every quote line is priced, in order. New quotes follow it; quotes already made keep their prices.</PageHeader>
-      <SettingsTabs me={me} current="/admin/settings/price-rules" />
       <div className="space-y-6">
         <Sheet className="px-5 pt-4 pb-5">
           <SectionTitle icon="pricing">How a line is priced</SectionTitle>

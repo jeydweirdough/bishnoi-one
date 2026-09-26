@@ -1,12 +1,11 @@
-import { ExternalLink, Upload } from "lucide-react";
-import { LinkButton, buttonClass } from "@/src/platform/ui/button";
+import { Upload } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { CatalogueProduct, InventoryLink, Paged, SalesRules, StockAnswer } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
 import { ProductsEditor } from "../components/catalogue/products-editor";
 import { SyncNow } from "../components/catalogue/stock";
 import { Filters, Pager } from "../components/crm/list-controls";
@@ -37,12 +36,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const codes = list.items.filter((p) => p.fromInventory).map((p) => p.code);
   const stock: StockAnswer | null = link.linked && codes.length ? await load<StockAnswer>(`/stock?codes=${encodeURIComponent(codes.join(","))}`) : null;
   const fmt = makeFormat(me.org);
-  const addInInventory = link.appUrl && (
-    <a href={`${link.appUrl}/products`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
-      <ExternalLink className="size-4" aria-hidden />
-      Add it in Inventory
-    </a>
-  );
   const here = new URLSearchParams(Object.entries({ q, active }).filter(([, v]) => v));
 
   return (
@@ -83,7 +76,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           </span>
         )}
       </PageHeader>
-      <CatalogueTabs me={me} current="/products" />
       <Filters
         search="Name, code or generic name"
         selects={[
@@ -105,7 +97,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         mayCreate={can(me, "products.create") && !link.linked}
         layout={layout}
         stock={link.linked ? (stock?.items ?? {}) : null}
-        addInInventory={link.linked ? (addInInventory || null) : null}
+        inventoryUrl={link.linked ? (link.appUrl ?? null) : null}
       />
       <Pager total={list.total} page={page} size={SIZE} base={`/products${here.size ? `?${here}` : ""}`} />
     </>

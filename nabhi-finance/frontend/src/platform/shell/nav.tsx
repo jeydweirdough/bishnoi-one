@@ -32,8 +32,17 @@ type Page = {
    *  page offered to someone the API will then refuse is worse than no page,
    *  so these mirror the gates in app/deps.py rather than approximating them. */
   reach?: (me: Me) => boolean;
+  /** Its sibling pages, opening under it while you're on one of them. */
+  subpages?: SubPage[];
+  /** How many things there wait on this person. */
+  count?: number;
 };
 type PageGroup = { label?: string; pages: Page[] };
+/** A page of a page, drawn indented under it without an icon of its own. */
+type SubPage = { href: string; label: string; count?: number };
+
+/** How many things wait on this person, by kind (Finance's /finance/funds/counts). */
+export type Waiting = Record<string, number>;
 
 // The three keys to Settings, and what each unlocks.
 //
@@ -67,16 +76,43 @@ function crmPages(sales: ModuleAccess[]): Page[] {
   ];
 }
 
-function modulePages(m: ModuleAccess): Page[] {
+function modulePages(m: ModuleAccess, waiting: Waiting = {}): Page[] {
   const base = moduleBase(m.key);
   // In the module's own app the prefix is empty, so its root is plain "/".
   const root = base || "/";
   if (m.key === "finance") {
+    // Approvals, guarantee letters and letter payments have screens here
+    // (src/screens) but no API behind them yet, so they stay out of the
+    // sidebar until they do: a link that opens to "not found" is worse than none.
     return [
       { href: root, label: "Overview", icon: "overview" },
-      { href: `${base}/approvals`, label: "Approvals", icon: "approvals" },
-      { href: `${base}/letters`, label: "Guarantee letters", icon: "letters" },
-      { href: `${base}/payments`, label: "Letter payments", icon: "payments" },
+      // Cash advances to the CRM's people: what Finance does next, one queue per step.
+      {
+        href: `${base}/funds`,
+        label: "Fund requests",
+        icon: "payments",
+        count: (waiting.to_release ?? 0) + (waiting.to_check ?? 0) + (waiting.to_settle ?? 0),
+        subpages: [
+          { href: `${base}/funds`, label: "For release", count: waiting.to_release },
+          { href: `${base}/funds/review`, label: "For review", count: waiting.to_check },
+          { href: `${base}/funds/settlement`, label: "For settlement", count: waiting.to_settle },
+          { href: `${base}/funds/outstanding`, label: "Outstanding", count: waiting.overdue },
+          { href: `${base}/funds/history`, label: "History" },
+        ],
+      },
+      // The books: every entry, the accounts, and what they add up to.
+      {
+        href: `${base}/ledger`,
+        label: "Accounting",
+        icon: "lists",
+        subpages: [
+          { href: `${base}/ledger`, label: "Journal entries" },
+          { href: `${base}/ledger/accounts`, label: "Chart of accounts" },
+          { href: `${base}/ledger/trial-balance`, label: "Trial balance" },
+          { href: `${base}/ledger/categories`, label: "Expense categories" },
+          { href: `${base}/ledger/posting`, label: "Default accounts" },
+        ],
+      },
       // Tax is Finance's for every Nabhi app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money" },
     ];
@@ -296,19 +332,90 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
       {groups.map((group, i) => (
         <div key={group.label ?? i} role={group.label ? "group" : undefined} aria-label={group.label}>
           {group.label && <p className="px-3 pt-1.5 pb-0.5 text-meta text-ink-3">{group.label}</p>}
-          {group.pages.map((page) => (
-            <Row
-              key={page.href}
-              href={page.href}
-              icon={page.icon}
-              current={isCurrent(page, pathname, page.href === overviewHref)}
-            >
-              {page.label}
-            </Row>
-          ))}
+          {group.pages.map((page) =>
+            page.subpages ? (
+              <WithSubpages key={page.href} page={page} />
+            ) : (
+              <Row
+                key={page.href}
+                href={page.href}
+                icon={page.icon}
+                current={isCurrent(page, pathname, page.href === overviewHref)}
+                trailing={page.count ? <WaitingMark count={page.count} /> : undefined}
+              >
+                {page.label}
+              </Row>
+            ),
+          )}
         </div>
       ))}
     </>
+  );
+}
+
+/** How many things wait on this person there: a count, or nothing. */
+function WaitingMark({ count }: { count?: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> waiting on you</span>
+    </span>
+  );
+}
+
+/** A page with siblings: one row, open to them (indented under it) while
+ *  you're on one. The one you're on is the most specific address you're in,
+ *  so a request (/funds/<id>) sits under the first. */
+function WithSubpages({ page }: { page: Page }) {
+  const pathname = usePathname();
+  const subs = page.subpages ?? [];
+  const open = within(pathname, page.href);
+  let here: SubPage | undefined;
+  for (const sub of subs) {
+    // The section's own address is current only on itself: a request under it
+    // (/funds/<id>) may be at any step.
+    const on = sub.href === page.href ? pathname === sub.href : within(pathname, sub.href);
+    if (on && sub.href.length > (here?.href.length ?? -1)) here = sub;
+  }
+  return (
+    <div>
+      <Row
+        href={page.href}
+        icon={page.icon}
+        current={false}
+        open={open}
+        trailing={
+          <>
+            {/* Closed, the row carries the count; open, each sub-page its own. */}
+            {!open && <WaitingMark count={page.count} />}
+            <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
+          </>
+        }
+      >
+        {page.label}
+      </Row>
+      {open && (
+        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2" role="group" aria-label={page.label}>
+          {subs.map((sub) => (
+            <SubRow key={sub.href} sub={sub} current={sub === here} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubRow({ sub, current }: { sub: SubPage; current: boolean }) {
+  return (
+    <Link
+      href={sub.href}
+      aria-current={current ? "page" : undefined}
+      className={`flex h-8 items-center gap-2.5 rounded-[3px] px-3 text-sm ${current ? "bg-hema-tint font-semibold text-hema" : "text-ink-2 hover:bg-sheet hover:text-ink"}`}
+    >
+      <span className="min-w-0 flex-1 truncate">{sub.label}</span>
+      <WaitingMark count={sub.count} />
+    </Link>
   );
 }
 
@@ -440,7 +547,7 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-function Links({ me }: { me: Me }) {
+function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -540,7 +647,7 @@ function Links({ me }: { me: Me }) {
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (
-              <Flat key={m.key} groups={[{ pages: modulePages(m) }]} overviewHref={moduleBase(m.key) || "/"} />
+              <Flat key={m.key} groups={[{ pages: modulePages(m, waiting) }]} overviewHref={moduleBase(m.key) || "/"} />
             ) : (
               <ModuleEntry key={m.key} m={m} />
             ),
@@ -609,7 +716,10 @@ function placeOf(pathname: string, me: Me): string | null {
     : me.modules.find((x) => within(pathname, `/m/${x.key}`));
   if (m) {
     const root = moduleBase(m.key) || "/";
-    const page = modulePages(m).find((p) => isCurrent(p, pathname, p.href === root));
+    const pages = modulePages(m);
+    const page = pages.find((p) => isCurrent(p, pathname, p.href === root));
+    const sub = page?.subpages?.filter((x) => within(pathname, x.href)).sort((a, b) => b.href.length - a.href.length)[0];
+    if (page && sub) return `${page.label} · ${sub.label}`;
     return page && page.href !== root ? `${m.name} · ${page.label}` : m.name;
   }
   const crm = me.modules.filter((x) => x.kind === "crm");
@@ -649,7 +759,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -676,7 +786,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          <Links me={me} waiting={waiting} />
         </div>
         <Account me={me} />
       </aside>
@@ -699,7 +809,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            <Links me={me} waiting={waiting} />
             <div className="mt-5">
               <Account me={me} />
             </div>

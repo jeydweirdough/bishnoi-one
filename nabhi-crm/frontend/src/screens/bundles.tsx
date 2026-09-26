@@ -4,7 +4,6 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { BundleRow, CatalogueProduct, DivisionOption, Paged, SalesRules } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { BundlesEditor } from "../components/catalogue/bundles-editor";
-import { CatalogueTabs } from "../components/catalogue/catalogue-tabs";
 import { DivisionFilter, inDivision } from "../components/catalogue/division-filter";
 
 export const metadata = { title: "Bundles" };
@@ -25,7 +24,6 @@ export default async function BundlesPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Products & services">
         Sets of products sold together at one price. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
-      <CatalogueTabs me={me} current="/bundles" />
       <DivisionFilter base="/bundles" teams={bundles.teams} current={current} />
       <BundlesEditor
         bundles={inDivision(bundles.items, current)}

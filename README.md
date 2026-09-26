@@ -25,10 +25,10 @@ The rest of this page walks through them.
 5. [Run an app](#5-run-an-app)
 6. [Settings (`.env`) for every app](#6-settings-env-for-every-app)
 7. [Benchmarks: what we build to](#7-benchmarks-what-we-build-to)
-6. [Add a new app](#8-add-a-new-app)
-7. [What happens after you push](#9-what-happens-after-you-push)
-8. [Rules](#10-rules)
-9. [Cheat sheet](#11-cheat-sheet)
+8. [Add a new app](#8-add-a-new-app)
+9. [What happens after you push](#9-what-happens-after-you-push)
+10. [Rules](#10-rules)
+11. [Cheat sheet](#11-cheat-sheet)
 
 ---
 
@@ -137,7 +137,8 @@ You get `main`, with every app in its own folder.
 ### Then: create your settings files
 
 Passwords and other secrets are never stored in Git. Each app includes
-example files instead. Copy them once per app:
+example files instead. On a full clone, `npm run <app>` copies them for you
+([section 5](#5-run-an-app)); otherwise copy them once per app:
 
 | Copy this… | …to this |
 |---|---|
@@ -234,6 +235,37 @@ pulled, and you can ask for help.
 ---
 
 ## 5. Run an app
+
+### The quick way (full clone)
+
+From the top of the repo, one command runs an app's API and screens
+together:
+
+```
+npm run nabhi-crm
+```
+
+The first time, it gets the app ready by itself: it copies the `.env`
+example files, makes the API's Python environment (`backend/.venv`, with
+`uv sync`) and installs the screens' packages (`npm install`). After that it
+only redoes what changed. Each line of output is marked `[api]` or `[web]`,
+and **Ctrl+C** stops both.
+
+Every app has one: `npm run nabhi-admin`, `nabhi-crm`, `nabhi-finance`,
+`nabhi-inventory`, `nabhi-pharmacy`, `nabhi-platform`, `nabhi-in-licensing`,
+`nabhi-regulatory` (the last two run their API only: no screens yet).
+
+| Also | Does |
+|---|---|
+| `npm run nabhi-crm -- --api` | The API only |
+| `npm run nabhi-crm -- --web` | The screens only |
+| `npm run nabhi-crm -- --setup` | Gets it ready, starts nothing |
+| `npm run setup` | Gets **every** app ready |
+
+It needs only Node.js and uv (step 2): the root `package.json` has no
+packages of its own to install.
+
+### By hand (or on a one-app clone)
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
 into the app's folder (`cd nabhi-crm`).
@@ -901,6 +933,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` |
+| Run an app (API + screens) | `npm run nabhi-crm` (from the top of a full clone) |
 | Start a new app | `git switch -c add-app/<name>`, then [section 8](#8-add-a-new-app) |
 
 ---

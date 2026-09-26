@@ -52,23 +52,41 @@ const ownsOrRecovers = (me: Me) => me.isOwner || me.canRecover;
 /** Above every company, so not a company's to grant. */
 const develops = (me: Me) => me.isDeveloperAdmin;
 
-type CrmPage = Page & { exact?: boolean };
+/** A page of a page: a sibling that used to be a tab across the top of it. */
+type SubPage = { href: string; label: string; also?: string[]; count?: number; exact?: boolean };
+/** `count`: how many things there wait on this person. */
+type CrmPage = Page & { exact?: boolean; subpages?: SubPage[]; count?: number };
+
+/** How many things wait on this person, by kind (the API's /funds/waiting). */
+export type Waiting = Record<string, number>;
 
 /** The CRM's own pages, in groups by what they're for, as Inventory's are.
  *  Each shows only for a role that may open it (the same gate as the page
  *  and the API); what belongs to a place (a customer's contacts, a product's
- *  prices) is a tab inside it rather than another row here.
+ *  prices) is a tab inside it rather than another row here. Pages that are
+ *  siblings (Products, Promos, Bundles) are one row that opens to them while
+ *  you're in one, so the sidebar stays short and says where you are.
  *
  *  Two kinds of person see less than their permissions reach, on purpose:
  *  - the Administrator runs the CRM rather than working its customers: a
  *    dashboard, not the customer lists;
  *  - a field agent's customers are their doctors: Doctors, not Customers. */
-function crmGroups(me: Me): { label: string; pages: CrmPage[] }[] {
+function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPage[] }[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
   const only = (show: boolean, page: CrmPage) => (show ? [page] : []);
   const admin = THIS_APP === "crm" && me.isOwner;
   const agent = may("visits.create") && !may("quotes.view") && !may("goals.view");
   const selling = !admin && !agent;
+  // Products and everything about their price. The rules they're priced by
+  // are an admin's, in Settings.
+  const catalogue: SubPage[] = [
+    { href: "/products", label: "Products", permission: "products.view" },
+    { href: "/promos", label: "Promos", permission: "products.view" },
+    { href: "/bundles", label: "Bundles", permission: "products.view" },
+    { href: "/prices", label: "Special prices", permission: "products.prices" },
+  ]
+    .filter((p) => may(p.permission))
+    .map(({ href, label }) => ({ href, label }));
   const groups = [
     {
       label: "CRM",
@@ -76,7 +94,16 @@ function crmGroups(me: Me): { label: string; pages: CrmPage[] }[] {
         admin
           ? { href: "/", label: "Dashboard", icon: "overview" as const, exact: true }
           : { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" as const, exact: true },
-        ...only(selling && may("customers.view"), { href: "/companies", label: "Customers", icon: "customers", also: ["/contacts", "/customers"] }),
+        ...only(selling && may("customers.view"), {
+          href: "/companies",
+          label: "Customers",
+          icon: "customers",
+          also: ["/contacts", "/customers"],
+          subpages: [
+            { href: "/companies", label: "Customers", also: ["/customers"] },
+            { href: "/contacts", label: "Contacts" },
+          ],
+        }),
         ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
         ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
@@ -89,16 +116,36 @@ function crmGroups(me: Me): { label: string; pages: CrmPage[] }[] {
         ...only(may("visits.view"), { href: "/field/doctors", label: "Doctors", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
         ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
         ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
+        // Money asked for ahead of spending it. Counted: what waits on the
+        // Team Lead's decision, and the requester's own money to account for.
+        ...only(may("funds.view"), {
+          href: "/funds",
+          label: "Fund requests",
+          icon: "payments",
+          count: (waiting.toApprove ?? 0) + (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0),
+          subpages: [
+            // Only on itself: a request (/funds/<id>) may be someone else's.
+            { href: "/funds", label: "My requests", exact: true, count: (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0) },
+            ...(may("funds.approve")
+              ? [
+                  { href: "/funds/approve", label: "For approval", count: waiting.toApprove ?? 0 },
+                  { href: "/funds/team", label: me.role?.scope === "all" ? "All requests" : "Team requests" },
+                ]
+              : []),
+          ],
+        }),
       ],
     },
     {
       label: "Catalogue",
       pages: [
-        ...only(may("products.view") || may("products.prices"), {
-          href: may("products.view") ? "/products" : "/prices",
+        // It opens on the first sub-page this person may see.
+        ...only(catalogue.length > 0, {
+          href: catalogue[0]?.href ?? "/products",
           label: "Products",
           icon: "products",
           also: ["/promos", "/bundles", "/prices", "/products"],
+          subpages: catalogue,
         }),
       ],
     },
@@ -113,6 +160,23 @@ function crmGroups(me: Me): { label: string; pages: CrmPage[] }[] {
 function crmCurrent(page: CrmPage, pathname: string): boolean {
   if (page.exact) return pathname === page.href || (page.also ?? []).some((a) => within(pathname, a));
   return isCurrent(page, pathname, false);
+}
+
+/** The sub-pages a page opens to. One alone is the page itself, so it isn't repeated under it. */
+const subpagesOf = (page: CrmPage): SubPage[] => ((page.subpages?.length ?? 0) > 1 ? page.subpages! : []);
+
+/** The sub-page you're on: the most specific one the address sits in, so
+ *  Forms (/admin/settings) isn't also on under /admin/settings/company. */
+function currentSub(page: CrmPage, pathname: string): SubPage | undefined {
+  let found: SubPage | undefined;
+  let length = -1;
+  for (const sub of subpagesOf(page)) {
+    for (const href of [sub.href, ...(sub.also ?? [])]) {
+      const on = sub.exact ? pathname === href : within(pathname, href);
+      if (on && href.length > length) [found, length] = [sub, href.length];
+    }
+  }
+  return found;
 }
 
 function modulePages(m: ModuleAccess): Page[] {
@@ -231,7 +295,8 @@ function Row({
   children,
 }: {
   href: string;
-  icon: IconName;
+  /** Left out on a sub-page: it hangs off its parent's icon, and a second one would be noise. */
+  icon?: IconName;
   current: boolean;
   open?: boolean;
   nested?: boolean;
@@ -247,7 +312,7 @@ function Row({
   }`;
   const inside = (
     <>
-      <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />
+      {icon && <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -303,6 +368,64 @@ function Parent({ href, base, icon, label, groups, overviewHref }: {
                 </Row>
               ))}
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** How many things wait on this person there: a count, or nothing. */
+function WaitingMark({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> waiting on you</span>
+    </span>
+  );
+}
+
+/**
+ * One of the CRM's rows. A row with sub-pages opens to them, indented under
+ * it, only while you're on one of them: everywhere else it is one line.
+ */
+function CrmEntry({ page }: { page: CrmPage }) {
+  const pathname = usePathname();
+  const subs = subpagesOf(page);
+  if (subs.length === 0) {
+    return (
+      <Row href={page.href} icon={page.icon} current={crmCurrent(page, pathname)} trailing={page.count ? <WaitingMark count={page.count} /> : undefined}>
+        {page.label}
+      </Row>
+    );
+  }
+  const here = currentSub(page, pathname);
+  const open = here !== undefined || crmCurrent(page, pathname);
+  return (
+    <div>
+      <Row
+        href={page.href}
+        icon={page.icon}
+        current={false}
+        open={open}
+        trailing={
+          <>
+            {/* Closed, the row carries the count; open, each sub-page carries its own. */}
+            {!open && <WaitingMark count={page.count ?? 0} />}
+            <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
+          </>
+        }
+      >
+        {page.label}
+      </Row>
+      {open && (
+        // The same guide line as a section's pages: these are the row's own.
+        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2" role="group" aria-label={page.label}>
+          {subs.map((sub) => (
+            <Row key={sub.href} href={sub.href} nested current={sub === here} trailing={sub.count ? <WaitingMark count={sub.count} /> : undefined}>
+              {sub.label}
+            </Row>
           ))}
         </div>
       )}
@@ -486,7 +609,7 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-function Links({ me }: { me: Me }) {
+function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -576,12 +699,10 @@ function Links({ me }: { me: Me }) {
           seven divisions or all of them. */}
       {crm.length > 0 &&
         isOurs("crm") &&
-        crmGroups(me).map((g) => (
+        crmGroups(me, waiting).map((g) => (
           <Group key={g.label} label={g.label}>
             {g.pages.map((page) => (
-              <Row key={page.href} href={page.href} icon={page.icon} current={crmCurrent(page, pathname)}>
-                {page.label}
-              </Row>
+              <CrmEntry key={page.href} page={page} />
             ))}
           </Group>
         ))}
@@ -649,8 +770,16 @@ function Links({ me }: { me: Me }) {
 function placeOf(pathname: string, me: Me): string | null {
   if (THIS_APP === "crm") {
     for (const g of crmGroups(me)) {
-      const page = g.pages.find((p) => crmCurrent(p, pathname));
-      if (page) return g.label === "CRM" ? page.label : `${g.label} · ${page.label}`;
+      const page = g.pages.find((p) => crmCurrent(p, pathname) || currentSub(p, pathname));
+      if (!page) continue;
+      // A sub-page is named under its row, "Settings · Forms", unless the row
+      // is named for its first sub-page: then the group says it better,
+      // "Catalogue · Promos" rather than "Products · Promos".
+      const sub = currentSub(page, pathname);
+      const namedForOne = g.label !== "CRM" && subpagesOf(page).some((s) => s.label === page.label);
+      const where = namedForOne ? g.label : page.label;
+      if (sub) return sub.label === where ? where : `${where} · ${sub.label}`;
+      return g.label === "CRM" ? page.label : `${g.label} · ${page.label}`;
     }
     if (within(pathname, "/admin")) return "Administration";
   }
@@ -704,7 +833,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -731,7 +860,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          <Links me={me} waiting={waiting} />
         </div>
         <Account me={me} />
       </aside>
@@ -754,7 +883,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            <Links me={me} waiting={waiting} />
             <div className="mt-5">
               <Account me={me} />
             </div>

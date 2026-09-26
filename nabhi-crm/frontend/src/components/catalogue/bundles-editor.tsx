@@ -11,7 +11,7 @@ import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { BundleRow, DivisionOption, Org } from "@/src/platform/lib/types";
 import { deleteBundle, saveBundle, type BundleInput } from "../../actions/catalogue";
-import { StateTag } from "./catalogue-tabs";
+import { StateTag } from "./state-tag";
 import { DivisionPicker, DivisionTags } from "./divisions";
 
 type ProductRef = { id: string; name: string; code: string; unit: string; prices: Record<string, number> };

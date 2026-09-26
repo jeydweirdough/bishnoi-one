@@ -28,5 +28,9 @@ def test_an_old_database_keeps_its_accounts(tmp_path):
     engine = app.state.sessions.kw["bind"]
     with engine.connect() as c:
         assert c.execute(text("SELECT email FROM nbad_users")).scalars().all() == ["old@example.com"]
-    assert set(inspect(engine).get_table_names()) == {"nbad_users", "nbad_sessions", "nbad_alembic_version"}
+    tables = set(inspect(engine).get_table_names())
+    # The old names are gone, and every table is Admin's.
+    assert {"nbad_users", "nbad_sessions", "nbad_alembic_version"} <= tables
+    assert all(t.startswith("nbad_") for t in tables), tables
     engine.dispose()
+

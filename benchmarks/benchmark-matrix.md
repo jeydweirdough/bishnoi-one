@@ -12,10 +12,13 @@ settled by one of them names it.
 
 ## Where each app stands
 
-"Ours today" names the four apps with features: **CRM**, **Inv**entory,
-**Ph**armacy and **Plat**form. **Admin, Finance, In-Licensing and
-Regulatory** only have sign-in so far, so every row is *none* for them; they
-start from this matrix.
+"Ours today" names the apps with features: **CRM**, **Inv**entory,
+**Ph**armacy, **Plat**form, and **Finance**, which so far has only the tax
+engine (F8, F9). **Admin, In-Licensing and Regulatory** only have sign-in,
+so every row is *none* for them; they start from this matrix.
+
+Links between apps today: the CRM takes its products and stock from
+Inventory, and its tax from Finance.
 
 Checked against the code on 2026-09-25. Update a cell in the same pull
 request that changes what it describes.
@@ -76,7 +79,7 @@ request that changes what it describes.
 | F5 | Price lists per customer or customer group | Marg ★ | CRM: price groups (a customer is in one), with group prices per product, optionally per price type; still per team and per price type too. Inv: buying prices per supplier. | **ADOPT** (decided 2026-09-25, D4): per customer group, as a condition in F4 |
 | F6 | Trade schemes: buy X get Y, slabs, validity windows | Marg ★ | CRM: promos (percent, amount, buy X get Y, tiered), dated, per division; bundles. | open (proposed HAVE) |
 | F7 | Approvals by discount depth or value | SAP | CRM: quotes over the discount limit, or at a price type that needs it, wait for approval. Inv: adjustments wait for an approver (not by value). | open (proposed HAVE) |
-| F8 | Tax engine: rules, groups, inclusive/exclusive | Odoo ★ | **Finance: the engine** (`app/tax/engine.py`): country packs, dated rates in `nbfi_tax_rates`, prices with or without tax, buyer treatments, the company's registration; asked by other apps at `/integration/tax` (none ask yet). Inv partial: a tax rate and inclusive flag per product. | **ADOPT** (decided 2026-09-25, D4, D8): one engine, a tax set per country; each company picks its country |
+| F8 | Tax engine: rules, groups, inclusive/exclusive | Odoo ★ | **Finance: the engine** (`app/tax/engine.py`): country packs, dated rates in `nbfi_tax_rates`, prices with or without tax, buyer treatments, the company's registration; asked by other apps at `/integration/tax`: the CRM asks it for every quote when its price rules add tax. Inv partial: a tax rate and inclusive flag per product. | **ADOPT** (decided 2026-09-25, D4, D8): one engine, a tax set per country; each company picks its country |
 | F9 | Country tax rules | Marg ★ (GST) | **Finance: the Philippines pack** (`app/tax/packs/ph.py`): VAT 12%, zero-rated, VAT-exempt, senior citizen and PWD 20% with VAT exemption, percentage tax for non-VAT sellers with its dated history, and the Sales Invoice summary. No other country yet. | **ADAPT** (decided 2026-09-25, D8): country packs on F8's engine. **The Philippines first** (VAT, BIR invoices); others like India's GST, e-invoicing and e-way bills when a company there needs them |
 
 ## G. Stock and the field

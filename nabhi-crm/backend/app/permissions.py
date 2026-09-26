@@ -61,6 +61,9 @@ AREAS: tuple[Area, ...] = (
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.
     Area("goals", "Goals & balances", "Field work", ("view", "manage", "import")),
+    # Money asked for ahead of spending it (a partnership dinner): funds.create
+    # asks, funds.approve approves the requests in reach; Finance releases it.
+    Area("funds", "Fund requests", "Field work", ("view", "create", "approve")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("automations", "Automations", "Insight & tools", ("view", "manage")),
     Area("integrations", "Integrations", "Insight & tools", ("view", "manage")),
@@ -68,6 +71,10 @@ AREAS: tuple[Area, ...] = (
 )
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
+
+# Areas with no screens yet: roles can already allow them, but nothing uses
+# them, so a person's account page leaves them out. Take one off as it lands.
+NOT_BUILT: frozenset[str] = frozenset({"leads", "opportunities", "deals", "contracts", "documents", "automations", "integrations"})
 ADMIN_PERMISSIONS: frozenset[str] = frozenset(p for p in ALL_PERMISSIONS if p.startswith("admin."))
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
@@ -114,6 +121,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
             | _grant("automations", "integrations", actions=("view",))
             | _grant("visits")
             | _grant("goals", actions=("view",))
+            | _grant("funds", actions=("view", "create", "approve"))
         ),
     ),
     (
@@ -123,6 +131,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         frozenset(
             _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
             | _grant("dashboard", "products", "contracts", "documents", actions=("view",))
+            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )
@@ -136,6 +145,7 @@ STARTING_ROLES += (
             | _grant("visits", actions=("view", "create", "edit"))
             | _grant("activities", actions=("view", "create", "edit"))
             | _grant("dashboard", actions=("view",))
+            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )

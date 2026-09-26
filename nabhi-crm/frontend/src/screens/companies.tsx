@@ -8,7 +8,6 @@ import { makeFormat } from "@/src/platform/lib/format";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import type { Assignable, CompanyRow, CustomerType, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { CustomerTabs } from "../components/crm/customer-tabs";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { RecordsBulk } from "../components/crm/records-bulk";
 import { StatusTag, typeOptions } from "../components/crm/words";
@@ -62,7 +61,6 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : ""}.
       </PageHeader>
 
-      <CustomerTabs current="companies" />
 
       <Filters
         search="Search by name, city or industry"

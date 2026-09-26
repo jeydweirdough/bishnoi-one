@@ -107,16 +107,42 @@ jobs:
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # Where the projects are: empty (deploy.json's "scope": "") means the
+          # token owner's own account, not a team. A repo variable VERCEL_SCOPE
+          # (Settings > Secrets and variables > Actions > Variables) overrides
+          # deploy.json, so a wrong scope is fixed without a commit.
+          VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "::error::Add the VERCEL_TOKEN secret (Settings > Secrets and variables > Actions). See MAINTAINING.md."
             exit 1
           fi
-          scope="$(python3 -c 'import json; print(json.load(open(".github/deploy.json"))["scope"])')"
+          scope="${VERCEL_SCOPE:-$(python3 -c 'import json; print(json.load(open(".github/deploy.json")).get("scope", ""))')}"
+
+          # Check the token first, and say what it can see when it can't
+          # (Vercel itself only says "The specified scope does not exist").
+          api() { curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1"; }
+          user="$(api /v2/user | python3 -c 'import json,sys; print(json.load(sys.stdin)["user"]["username"])')" || {
+            echo "::error::Vercel refused VERCEL_TOKEN: it's wrong or has expired. Make a new one (MAINTAINING.md) and replace the secret."
+            exit 1
+          }
+          flags=()
+          if [ -n "$scope" ] && [ "$scope" != "$user" ]; then
+            teams="$(api '/v2/teams?limit=100' | python3 -c 'import json,sys; print(" ".join(t["slug"] for t in json.load(sys.stdin).get("teams", [])))' || true)"
+            case " $teams " in
+              *" $scope "*) flags=(--scope "$scope") ;;
+              *)
+                echo "::error::VERCEL_TOKEN (account '$user') can't see '$scope'. It can see: your own account${teams:+, and the teams $teams}. If the projects are on your own account, set \"scope\" to \"\" in .github/deploy.json (or the repo variable VERCEL_SCOPE to $user)."
+                exit 1
+                ;;
+            esac
+          fi
+          echo "Deploying as $user${flags[1]:+ to team ${flags[1]}}"
+
           # From the repo's root: the project's own Root Directory (on Vercel)
           # says which folder it builds, as it did when Vercel built it itself.
-          npx --yes vercel@latest link --yes --project "${{ matrix.project }}" --scope "$scope" --token "$VERCEL_TOKEN"
-          npx --yes vercel@latest deploy --prod --yes --scope "$scope" --token "$VERCEL_TOKEN" | tee deploy.log
+          npx --yes vercel@latest link --yes --project "${{ matrix.project }}" "${flags[@]}" --token "$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prod --yes "${flags[@]}" --token "$VERCEL_TOKEN" | tee deploy.log
           echo "Deployed: $(tail -n 1 deploy.log)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remember this commit as deployed

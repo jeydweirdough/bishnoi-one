@@ -2,7 +2,7 @@
 
 import { ChevronRight, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
 import { ConfirmButton } from "../ui/confirm";
@@ -33,7 +33,12 @@ type Page = {
    *  page offered to someone the API will then refuse is worse than no page,
    *  so these mirror the gates in app/deps.py rather than approximating them. */
   reach?: (me: Me) => boolean;
+  /** Its sibling pages, which used to be tabs across the top of each: the row
+   *  opens to them, indented under it, while you're on one of them. */
+  subpages?: SubPage[];
 };
+/** A page of a page. It may carry a query (/orders?status=issued) when that is what makes it a page of its own. */
+type SubPage = { href: string; label: string };
 type PageGroup = { label?: string; pages: Page[] };
 
 // The three keys to Settings, and what each unlocks.
@@ -109,10 +114,24 @@ function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place
   const receivesOnly = may("receiving.receive") && !any(["purchasing.create", "purchasing.edit", "purchasing.approve"]);
   // Moving stock makes looking at it part of the job.
   const movesStock = any(["receiving.receive", "transfers.dispatch", "transfers.receive", "adjustments.create", "counts.create", "orders.issue"]);
+  // Each place's own pages, only the ones this role opens.
+  const shown = (list: (SubPage & { show?: boolean })[]): SubPage[] =>
+    list.filter((t) => t.show !== false).map(({ href, label }) => ({ href, label }));
+  const buying = shown([
+    { href: "/purchase-orders", label: "Purchase orders", show: may("purchasing.view") },
+    { href: "/receipts", label: "Receiving", show: may("receiving.view") },
+    { href: "/backorders", label: "Backorders", show: may("purchasing.view") },
+  ]);
   const places: Place[] = [
-    { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"], does: ["orders.create", "orders.edit", "orders.approve", "orders.issue"], sees: ["orders.view"], waiting: ["issue"] },
+    { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"], does: ["orders.create", "orders.edit", "orders.approve", "orders.issue"], sees: ["orders.view"], waiting: ["issue"],
+      subpages: [
+        { href: "/orders", label: "Orders" },
+        { href: "/reservations", label: "Reservations" },
+        { href: "/orders?status=issued", label: "Issuance history" },
+      ],
+    },
     receivesOnly
-      ? { href: "/purchase-orders?status=ordered,partial", label: "Receiving", icon: "receiving", also: ["/purchase-orders", "/receipts", "/backorders"], does: ["receiving.receive"], sees: ["receiving.view"], waiting: ["receiving"] }
+      ? { href: "/purchase-orders?status=ordered,partial", label: "Receiving", icon: "receiving", also: ["/purchase-orders", "/receipts", "/backorders"], does: ["receiving.receive"], sees: ["receiving.view"], waiting: ["receiving"], subpages: buying }
       : {
           href: may("purchasing.view") ? "/purchase-orders" : "/receipts",
           label: "Purchase orders",
@@ -121,6 +140,7 @@ function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place
           does: ["purchasing.create", "purchasing.edit", "purchasing.approve", "receiving.receive"],
           sees: ["purchasing.view", "receiving.view"],
           waiting: may("purchasing.approve") ? ["drafts", "receiving"] : ["receiving"],
+          subpages: buying,
         },
     { href: "/transfers", label: "Transfers", icon: "transfers", does: ["transfers.create", "transfers.approve", "transfers.dispatch", "transfers.receive"], sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
     {
@@ -131,16 +151,57 @@ function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place
       does: ["adjustments.create", "adjustments.approve", "counts.create", "counts.approve"],
       sees: ["adjustments.view", "counts.view"],
       waiting: ["adjustments", "counts"],
+      subpages: shown([
+        { href: "/adjustments", label: "Adjustments", show: may("adjustments.view") },
+        { href: "/counts", label: "Inventory counts", show: may("counts.view") },
+      ]),
     },
-    { href: "/stock", label: "Stock", icon: "stock", also: ["/movements", "/batches", "/serials"], does: movesStock ? ["stock.view"] : [], sees: ["stock.view"] },
-    { href: "/products", label: "Products", icon: "products", also: ["/catalog"], does: ["products.create", "products.edit", "products.delete"], sees: ["products.view"] },
+    {
+      href: "/stock",
+      label: "Stock",
+      icon: "stock",
+      also: ["/movements", "/batches", "/serials"],
+      does: movesStock ? ["stock.view"] : [],
+      sees: ["stock.view"],
+      subpages: [
+        { href: "/stock", label: "Stock overview" },
+        { href: "/movements", label: "Movements" },
+        { href: "/batches", label: "Batches & expiry" },
+        { href: "/serials", label: "Serial numbers" },
+      ],
+    },
+    {
+      href: "/products",
+      label: "Products",
+      icon: "products",
+      also: ["/catalog"],
+      does: ["products.create", "products.edit", "products.delete"],
+      sees: ["products.view"],
+      subpages: [
+        { href: "/products", label: "Products" },
+        { href: "/catalog/categories", label: "Categories" },
+        { href: "/catalog/brands", label: "Brands" },
+        { href: "/catalog/units", label: "Units of measure" },
+      ],
+    },
     { href: "/suppliers", label: "Suppliers", icon: "suppliers", does: ["suppliers.create", "suppliers.edit", "suppliers.delete"], sees: ["suppliers.view"] },
     { href: "/warehouses", label: "Warehouses", icon: "warehouses", does: ["warehouses.manage"], sees: ["warehouses.view"] },
     { href: "/reports", label: "Reports", icon: "report", does: ["reports.export"], sees: ["reports.view"] },
   ];
   const admin: Page[] = [
     ...(may("admin.users") || may("admin.roles")
-      ? [{ href: may("admin.users") ? "/admin/users" : "/admin/roles", label: "Users & roles", icon: "people" as const, also: ["/admin/users", "/admin/roles"] }]
+      ? [
+          {
+            href: may("admin.users") ? "/admin/users" : "/admin/roles",
+            label: "Users & roles",
+            icon: "people" as const,
+            also: ["/admin/users", "/admin/roles"],
+            subpages: shown([
+              { href: "/admin/users", label: "Users", show: may("admin.users") },
+              { href: "/admin/roles", label: "Roles & permissions", show: may("admin.roles") },
+            ]),
+          },
+        ]
       : []),
     ...(may("admin.audit") ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
   ];
@@ -199,8 +260,72 @@ function LookUp({ places, pathname }: { places: Place[]; pathname: string }) {
       {shown && (
         <div className="space-y-0.5">
           {places.map((p) => (
-            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)}>
-              {p.label}
+            <Entry key={p.href} page={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The sub-pages a page opens to. One alone is the page itself, so it isn't repeated under it. */
+const subpagesOf = (page: Page): SubPage[] => ((page.subpages?.length ?? 0) > 1 ? page.subpages! : []);
+
+/**
+ * The sub-page you're on: the most specific one the address is in. A query
+ * counts, so Issuance history (/orders?status=issued) is on rather than
+ * Orders (/orders) when the address asks for issued orders.
+ */
+function currentSub(page: Page, pathname: string, search: URLSearchParams): SubPage | undefined {
+  let found: SubPage | undefined;
+  for (const sub of subpagesOf(page)) {
+    const [path, query] = sub.href.split("?");
+    const asks = [...new URLSearchParams(query ?? "")];
+    if (!within(pathname, path) || asks.some(([k, v]) => search.get(k) !== v)) continue;
+    if (!found || sub.href.length > found.href.length) found = sub;
+  }
+  return found;
+}
+
+/**
+ * A place in the sidebar. One with sub-pages opens to them, indented under
+ * it, only while you're on one of them: everywhere else it is one line.
+ */
+function Entry({ page, mark }: { page: Page; mark?: ReactNode }) {
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const subs = subpagesOf(page);
+  if (subs.length === 0) {
+    return (
+      <Row href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)} trailing={mark}>
+        {page.label}
+      </Row>
+    );
+  }
+  const here = currentSub(page, pathname, search);
+  const open = here !== undefined || isCurrent(page, pathname, false);
+  return (
+    <div>
+      <Row
+        href={page.href}
+        icon={page.icon}
+        current={false}
+        open={open}
+        trailing={
+          <>
+            {mark}
+            <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
+          </>
+        }
+      >
+        {page.label}
+      </Row>
+      {open && (
+        // The same guide line as a section's pages: these are the row's own.
+        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2" role="group" aria-label={page.label}>
+          {subs.map((sub) => (
+            <Row key={sub.href} href={sub.href} nested current={sub === here}>
+              {sub.label}
             </Row>
           ))}
         </div>
@@ -223,9 +348,7 @@ function InventoryLinks({ me, waiting }: { me: Me; waiting: Waiting }) {
       {work.length > 0 && (
         <Group label="Your work">
           {work.map((p) => (
-            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)} trailing={<WaitingMark count={count(p)} />}>
-              {p.label}
-            </Row>
+            <Entry key={p.href} page={p} mark={<WaitingMark count={count(p)} />} />
           ))}
         </Group>
       )}
@@ -233,9 +356,7 @@ function InventoryLinks({ me, waiting }: { me: Me; waiting: Waiting }) {
       {admin.length > 0 && (
         <Group label="Administration">
           {admin.map((p) => (
-            <Row key={p.href} href={p.href} icon={p.icon} current={isCurrent(p, pathname, false)}>
-              {p.label}
-            </Row>
+            <Entry key={p.href} page={p} />
           ))}
         </Group>
       )}
@@ -350,7 +471,8 @@ function Row({
   children,
 }: {
   href: string;
-  icon: IconName;
+  /** Left out on a sub-page: it hangs off its parent's icon, and a second one would be noise. */
+  icon?: IconName;
   current: boolean;
   open?: boolean;
   nested?: boolean;
@@ -366,7 +488,7 @@ function Row({
   }`;
   const inside = (
     <>
-      <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />
+      {icon && <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -773,11 +895,15 @@ function Links({ me }: { me: Me }) {
 }
 
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
-function placeOf(pathname: string, me: Me): string | null {
+function placeOf(pathname: string, search: URLSearchParams, me: Me): string | null {
   if (THIS_APP === "inventory") {
     const { home, work, lookUp, admin } = inventoryNav(me);
     if (home && (pathname === "/" || within(pathname, "/alerts"))) return home.label;
-    return [...work, ...lookUp, ...admin].find((p) => isCurrent(p, pathname, false))?.label ?? null;
+    const page = [...work, ...lookUp, ...admin].find((p) => isCurrent(p, pathname, false) || currentSub(p, pathname, search));
+    if (!page) return null;
+    // A sub-page under its place, "Stock · Movements"; not "Products · Products".
+    const sub = currentSub(page, pathname, search);
+    return sub && sub.label !== page.label ? `${page.label} · ${sub.label}` : page.label;
   }
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
@@ -838,7 +964,8 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
-  const place = placeOf(pathname, me);
+  const search = useSearchParams();
+  const place = placeOf(pathname, search, me);
 
   const brand = (
     <Link href="/" className="block border-b-[3px] border-double border-ink pb-2">

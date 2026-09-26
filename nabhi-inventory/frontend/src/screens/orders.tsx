@@ -4,7 +4,6 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { deleteOrder, orderStep } from "../actions/inventory";
-import { OrderTabs } from "../components/catalog-tabs";
 import { OrderForm } from "../components/document-forms";
 import { PickForm, type PickLine } from "../components/pick-form";
 import { RecordTools } from "../components/record-tools";
@@ -31,7 +30,6 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
       >
         Stock going out: customer orders, and issues to departments and projects. Order → reserved → picked → issued.
       </PageHeader>
-      <OrderTabs current={issued ? "/orders?status=issued" : "/orders"} />
       {!issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
       <Filters q={f.q} placeholder="Order number or who it's for" keep={{ status: f.status }} />
       <Sheet>
@@ -186,7 +184,6 @@ export async function ReservationsPage() {
   return (
     <>
       <PageHeader title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>
-      <OrderTabs current="/reservations" />
       <Sheet>
         {rows.length === 0 ? (
           <Empty icon="issuance" title="Nothing is held" />

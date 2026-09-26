@@ -12,7 +12,7 @@ import { makeFormat, percentText, toBasisPoints, type Format } from "@/src/platf
 import { PROMO_KINDS, promoTerms } from "@/src/platform/lib/labels";
 import type { DivisionOption, Org, PromoKind, PromoRow } from "@/src/platform/lib/types";
 import { deletePromo, savePromo, type PromoInput } from "../../actions/catalogue";
-import { StateTag } from "./catalogue-tabs";
+import { StateTag } from "./state-tag";
 import { DivisionPicker, DivisionTags } from "./divisions";
 
 type ProductRef = { id: string; name: string; code: string };

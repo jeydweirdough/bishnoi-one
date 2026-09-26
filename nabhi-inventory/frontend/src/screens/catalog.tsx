@@ -1,7 +1,6 @@
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
 import { CatalogList, type CatalogItem } from "../components/catalog-list";
-import { CatalogTabs } from "../components/catalog-tabs";
 import { NoAccess } from "../components/ui";
 import { context } from "../lib/page";
 import type { BrandRow, CategoryRow, UnitRow } from "../lib/types";
@@ -15,7 +14,6 @@ async function page(kind: "categories" | "brands" | "units", title: string, blur
   return (
     <>
       <PageHeader title={title}>{blurb}</PageHeader>
-      <CatalogTabs me={me} current={`/catalog/${kind}`} />
       <Sheet className="max-w-3xl">
         <CatalogList kind={kind} items={items(raw)} canEdit={may("products.edit") && may("products.create")} canDelete={may("products.delete")} />
       </Sheet>

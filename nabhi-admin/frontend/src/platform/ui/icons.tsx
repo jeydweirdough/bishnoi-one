@@ -51,6 +51,8 @@ import {
   UserPlus,
   Users,
   UsersRound,
+  Bell,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 
@@ -58,6 +60,15 @@ import {
 // so the same thing always wears the same picture: a page's tab, its sidebar
 // link and its section heading agree. Pick by meaning, never by looks.
 export const ICONS = {
+  // executive admin
+  permits: FileBadge,
+  immigration: IdCard,
+  properties: Building2,
+  documents: FileSignature,
+  tickets: Ticket,
+  notifications: Bell,
+  countdown: Hourglass,
+
   // places
   home: House,
   salesDivision: Briefcase, // every sales division: the name says which one

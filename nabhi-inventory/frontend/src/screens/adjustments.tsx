@@ -5,7 +5,6 @@ import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet"
 import { enc, load } from "@/src/platform/lib/api";
 import { adjustmentStep, countStep, withdrawAdjustment } from "../actions/inventory";
 import { AdjustmentForm, CountSheet, StartCount } from "../components/adjust-forms";
-import { AdjustTabs } from "../components/catalog-tabs";
 import { RecordTools } from "../components/record-tools";
 import { AdjustmentStamp, CountStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
@@ -29,7 +28,6 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
         When what&apos;s on the shelf doesn&apos;t match the system. Every one has a reason and goes on the trail.
         {!may("adjustments.approve") && may("adjustments.create") && " Yours wait for someone who may approve them."}
       </PageHeader>
-      <AdjustTabs me={me} current="/adjustments" />
       <Chips label="Status" current={status} options={[chip("", "All"), chip("pending", "Waiting for approval"), chip("posted", "Posted"), chip("rejected", "Rejected")]} />
       <Sheet>
         {rows.length === 0 ? (
@@ -130,7 +128,6 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
       <PageHeader title="Inventory counts">
         A physical count: the system writes down what it expects, people count what&apos;s there, and once approved every difference becomes an adjustment.
       </PageHeader>
-      <AdjustTabs me={me} current="/counts" />
       {may("counts.create") && (
         <Sheet className="mb-5 px-5 py-4">
           <StartCount canAdd={canAddFrom(may)} reference={ref} warehouseId={param(s, "warehouse")} />

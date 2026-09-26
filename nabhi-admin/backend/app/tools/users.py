@@ -68,8 +68,10 @@ def main() -> int:
                 if db.scalar(select(User).where(func.lower(User.email) == d.email)) is None:
                     db.add(User(email=d.email, full_name=d.name, password_hash=hash_password(DEMO_PASSWORD), role="admin" if d.admin else "member"))
                     made += 1
+            from app.demo import seed_demo_data
+            seed_demo_data(db, get_settings())
             db.commit()
-            print(f"Made {made} demo account(s); {len(DEMO_ACCOUNTS) - made} already there. Password: {DEMO_PASSWORD}")
+            print(f"Made {made} demo account(s); {len(DEMO_ACCOUNTS) - made} already there. Demo data seeded. Password: {DEMO_PASSWORD}")
             return 0
 
         email = args.email.strip().lower()
