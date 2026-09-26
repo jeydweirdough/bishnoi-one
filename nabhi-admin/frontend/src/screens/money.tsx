@@ -4,7 +4,7 @@ import { PageHeader } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
 import type { Company } from "@/src/platform/lib/types";
 
-export const metadata = { title: "Money & formats" };
+export const metadata = { title: "Money and formats" };
 
 export default async function MoneyFormatsPage() {
   const stop = await managersOnly();
@@ -15,7 +15,7 @@ export default async function MoneyFormatsPage() {
   const now = new Date().toISOString();
   return (
     <>
-      <PageHeader title="Money &amp; formats">
+      <PageHeader title="Money and formats">
         How this company writes money, dates and times. Every screen reads them from here, so a change shows up everywhere at once.
       </PageHeader>
       {/* Keyed on what's stored, so a save starts the form from the saved record. */}

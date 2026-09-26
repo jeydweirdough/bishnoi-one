@@ -112,14 +112,14 @@ export function PermitModal({
 
   return (
     <ModalFrame
-      title={permit ? "Edit Registration / Permit" : "Record Registration or Permit"}
-      subtitle="BOC CPRS accreditation, LGU Mayor's Permit, SEC GIS, BIR, FDA licenses"
+      title={permit ? "Edit permit" : "New permit"}
+      subtitle="A government registration or permit the company must keep current."
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
         {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
-        <FormField label="Registration / Permit Title">
+        <FormField label="Permit name">
           <input
             name="title"
             required
@@ -130,23 +130,23 @@ export function PermitModal({
         </FormField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Category / Scope">
+          <FormField label="Type">
             <select
               name="category"
               defaultValue={permit?.category ?? "boc"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="boc">Bureau of Customs (BOC)</option>
-              <option value="lgu">LGU Mayor's Business Permit</option>
-              <option value="sec">SEC Annual GIS & Filings</option>
-              <option value="bir">BIR Form 0605 / 2303 Registration</option>
-              <option value="fda">FDA License to Operate (LTO)</option>
-              <option value="sanitary_fire">Fire Safety (FSIC) & Sanitary</option>
-              <option value="other">Other Regulatory Clearance</option>
+              <option value="lgu">Mayor's business permit</option>
+              <option value="sec">SEC GIS and filings</option>
+              <option value="bir">BIR registration</option>
+              <option value="fda">FDA license to operate</option>
+              <option value="sanitary_fire">Fire safety and sanitary</option>
+              <option value="other">Other</option>
             </select>
           </FormField>
 
-          <FormField label="Issuing Body / Agency">
+          <FormField label="Issuing agency">
             <input
               name="agency"
               required
@@ -158,7 +158,7 @@ export function PermitModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="License / Reference Number">
+          <FormField label="Reference number">
             <input
               name="referenceNumber"
               required
@@ -174,16 +174,16 @@ export function PermitModal({
               defaultValue={permit?.status ?? "active"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="active">Active / Valid</option>
-              <option value="pending_renewal">Pending Renewal</option>
-              <option value="under_review">Under Agency Review</option>
+              <option value="active">Active</option>
+              <option value="pending_renewal">For renewal</option>
+              <option value="under_review">Under agency review</option>
               <option value="expired">Expired</option>
             </select>
           </FormField>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label="Issuance Date (Optional)">
+          <FormField label="Issue date" optional>
             <input
               type="date"
               name="issuanceDate"
@@ -192,7 +192,7 @@ export function PermitModal({
             />
           </FormField>
 
-          <FormField label="Expiration Date">
+          <FormField label="Expiry date">
             <input
               type="date"
               name="expirationDate"
@@ -202,7 +202,7 @@ export function PermitModal({
             />
           </FormField>
 
-          <FormField label="Renewal Window (Days)">
+          <FormField label="Alert before expiry (days)">
             <input
               type="number"
               name="renewalWindowDays"
@@ -213,7 +213,7 @@ export function PermitModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Responsible Executive / Assistant">
+          <FormField label="Person responsible">
             <input
               name="responsiblePerson"
               defaultValue={permit?.responsiblePerson ?? ""}
@@ -222,7 +222,7 @@ export function PermitModal({
             />
           </FormField>
 
-          <FormField label="Estimated Cost (PHP)">
+          <FormField label="Estimated cost (PHP)" optional>
             <input
               type="number"
               step="0.01"
@@ -234,12 +234,12 @@ export function PermitModal({
           </FormField>
         </div>
 
-        <FormField label="Compliance Notes & Action Items">
+        <FormField label="Notes" optional>
           <textarea
             name="notes"
             rows={2}
             defaultValue={permit?.notes ?? ""}
-            placeholder="Special instructions, broker contact, liaison tracking..."
+            placeholder="Broker contact, filing instructions"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -249,7 +249,7 @@ export function PermitModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            {permit ? "Save Changes" : "Create Record"}
+            {permit ? "Save changes" : "Add permit"}
           </Button>
         </div>
       </form>
@@ -301,15 +301,15 @@ export function ImmigrationModal({
 
   return (
     <ModalFrame
-      title={record ? "Edit Immigration Document" : "Record Expatriate Compliance"}
-      subtitle="ACR I-Card, DOLE AEP, 9(g)/47(a)(2) Visas, Passports & Executive IDs"
+      title={record ? "Edit expatriate document" : "New expatriate document"}
+      subtitle="A foreign employee's ACR I-Card, work permit, visa, passport or company ID."
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
         {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Individual Full Name">
+          <FormField label="Full name">
             <input
               name="individualName"
               required
@@ -319,7 +319,7 @@ export function ImmigrationModal({
             />
           </FormField>
 
-          <FormField label="Designation / Executive Role">
+          <FormField label="Position">
             <input
               name="designation"
               required
@@ -347,15 +347,15 @@ export function ImmigrationModal({
               defaultValue={record?.documentType ?? "acr_card"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="acr_card">Alien Cert. of Registration (ACR I-Card)</option>
-              <option value="aep_permit">DOLE Alien Employment Permit (AEP)</option>
-              <option value="visa">Executive Visa (9g / 47a2 / PEZA)</option>
+              <option value="acr_card">ACR I-Card</option>
+              <option value="aep_permit">DOLE work permit (AEP)</option>
+              <option value="visa">Visa (9(g), 47(a)(2), PEZA)</option>
               <option value="passport">Passport</option>
-              <option value="exec_id">Official Executive ID</option>
+              <option value="exec_id">Company ID</option>
             </select>
           </FormField>
 
-          <FormField label="Document / Card Number">
+          <FormField label="Document number">
             <input
               name="documentNumber"
               required
@@ -367,7 +367,7 @@ export function ImmigrationModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label="Issuance Date (Optional)">
+          <FormField label="Issue date" optional>
             <input
               type="date"
               name="issuanceDate"
@@ -376,7 +376,7 @@ export function ImmigrationModal({
             />
           </FormField>
 
-          <FormField label="Expiration Date">
+          <FormField label="Expiry date">
             <input
               type="date"
               name="expirationDate"
@@ -386,7 +386,7 @@ export function ImmigrationModal({
             />
           </FormField>
 
-          <FormField label="Lead Time (Days)">
+          <FormField label="Alert before expiry (days)">
             <input
               type="number"
               name="renewalLeadDays"
@@ -397,7 +397,7 @@ export function ImmigrationModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Sponsoring Entity">
+          <FormField label="Sponsoring company">
             <input
               name="sponsoringEntity"
               defaultValue={record?.sponsoringEntity ?? "Nabhi Pharma Philippines Inc."}
@@ -405,7 +405,7 @@ export function ImmigrationModal({
             />
           </FormField>
 
-          <FormField label="Assigned Executive Assistant">
+          <FormField label="Person responsible">
             <input
               name="assignedAssistant"
               defaultValue={record?.assignedAssistant ?? ""}
@@ -415,25 +415,25 @@ export function ImmigrationModal({
           </FormField>
         </div>
 
-        <FormField label="Immigration Status">
+        <FormField label="Status">
           <select
             name="status"
             defaultValue={record?.status ?? "valid"}
             className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
           >
-            <option value="valid">Valid / In Good Standing</option>
-            <option value="expiring_soon">Expiring Soon (Within Window)</option>
-            <option value="in_renewal">Petition / Renewal Filed</option>
-            <option value="expired">Expired / Urgent Regularisation</option>
+            <option value="valid">Valid</option>
+            <option value="expiring_soon">Expiring soon</option>
+            <option value="in_renewal">Renewal filed</option>
+            <option value="expired">Expired</option>
           </select>
         </FormField>
 
-        <FormField label="Notes / Counsel Instructions">
+        <FormField label="Notes" optional>
           <textarea
             name="notes"
             rows={2}
             defaultValue={record?.notes ?? ""}
-            placeholder="Embassy or Bureau of Immigration notes, biometrics appointment, legal counsel contact..."
+            placeholder="Biometrics appointment, counsel contact"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -443,7 +443,7 @@ export function ImmigrationModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            {record ? "Save Changes" : "Save Expatriate Record"}
+            {record ? "Save changes" : "Add document"}
           </Button>
         </div>
       </form>
@@ -489,19 +489,19 @@ export function DocumentModal({
 
   return (
     <ModalFrame
-      title={document ? "Edit Corporate Document" : "Record Corporate Document & Insurance"}
-      subtitle="D&O liability, general insurance policies, commercial contracts, board resolutions"
+      title={document ? "Edit document" : "New document"}
+      subtitle="An insurance policy, contract, NDA, board resolution or retainer."
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
         {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
-        <FormField label="Document / Policy Title">
+        <FormField label="Document name">
           <input
             name="title"
             required
             defaultValue={document?.title ?? ""}
-            placeholder="e.g. Directors & Officers (D&O) Liability Insurance Policy"
+            placeholder="e.g. Directors and officers liability insurance"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -513,16 +513,16 @@ export function DocumentModal({
               defaultValue={document?.category ?? "insurance"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="insurance">Corporate Insurance Policy</option>
-              <option value="commercial_contract">Commercial Contract / Vendor Agreement</option>
-              <option value="nda">Non-Disclosure Agreement (NDA)</option>
-              <option value="board_resolution">Board Resolution / Sec. Certificate</option>
-              <option value="legal_retainer">Legal / Consultant Retainer</option>
-              <option value="sla">Service Level Agreement (SLA)</option>
+              <option value="insurance">Insurance policy</option>
+              <option value="commercial_contract">Contract</option>
+              <option value="nda">NDA</option>
+              <option value="board_resolution">Board resolution or secretary's certificate</option>
+              <option value="legal_retainer">Legal or consultant retainer</option>
+              <option value="sla">Service level agreement</option>
             </select>
           </FormField>
 
-          <FormField label="Counterparty / Underwriter / Institution">
+          <FormField label="Other party">
             <input
               name="counterparty"
               required
@@ -534,7 +534,7 @@ export function DocumentModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label="Policy / Contract Reference">
+          <FormField label="Reference number">
             <input
               name="referenceNumber"
               defaultValue={document?.referenceNumber ?? ""}
@@ -543,7 +543,7 @@ export function DocumentModal({
             />
           </FormField>
 
-          <FormField label="Expiration Date (if applicable)">
+          <FormField label="Expiry date" optional>
             <input
               type="date"
               name="expirationDate"
@@ -552,7 +552,7 @@ export function DocumentModal({
             />
           </FormField>
 
-          <FormField label="Notice Required (Days)">
+          <FormField label="Notice period (days)">
             <input
               type="number"
               name="noticePeriodDays"
@@ -563,7 +563,7 @@ export function DocumentModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Annual Premium / Value (PHP)">
+          <FormField label="Annual amount (PHP)" optional>
             <input
               type="number"
               step="0.01"
@@ -574,7 +574,7 @@ export function DocumentModal({
             />
           </FormField>
 
-          <FormField label="Internal Custodian">
+          <FormField label="Custodian">
             <input
               name="custodian"
               defaultValue={document?.custodian ?? "Corporate Secretary"}
@@ -596,12 +596,12 @@ export function DocumentModal({
           </label>
         </div>
 
-        <FormField label="Notes / Renewal Conditions">
+        <FormField label="Notes" optional>
           <textarea
             name="notes"
             rows={2}
             defaultValue={document?.notes ?? ""}
-            placeholder="Coverage terms, renewal broker details, arbitration clauses..."
+            placeholder="Coverage, renewal terms, broker"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -611,7 +611,7 @@ export function DocumentModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            {document ? "Save Changes" : "Save Document"}
+            {document ? "Save changes" : "Add document"}
           </Button>
         </div>
       </form>
@@ -666,39 +666,39 @@ export function PropertyModal({
 
   return (
     <ModalFrame
-      title={property ? "Edit Property / Lease" : "Record Corporate Property & Lease"}
-      subtitle="Corporate offices, pharma warehouses, regional depots, lease countdowns, utilities"
+      title={property ? "Edit property" : "New property"}
+      subtitle="An office, warehouse, depot or residence the company leases or owns."
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
         {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
-        <FormField label="Property Name">
+        <FormField label="Property name">
           <input
             name="name"
             required
             defaultValue={property?.name ?? ""}
-            placeholder="e.g. Nabhi Corporate Headquarters — Ayala Triangle Tower One"
+            placeholder="e.g. Head office, Makati"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Property Type">
+          <FormField label="Type">
             <select
               name="propertyType"
               defaultValue={property?.propertyType ?? "office"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="office">Corporate Head Office / Branch</option>
-              <option value="warehouse">Central Pharma Distribution Warehouse</option>
-              <option value="depot">Regional Distribution Depot</option>
-              <option value="parking">Dedicated Fleet / Executive Parking</option>
-              <option value="expat_housing">Expatriate Executive Residence</option>
+              <option value="office">Office</option>
+              <option value="warehouse">Warehouse</option>
+              <option value="depot">Depot</option>
+              <option value="parking">Parking</option>
+              <option value="expat_housing">Staff residence</option>
             </select>
           </FormField>
 
-          <FormField label="Lessor / Landlord Entity">
+          <FormField label="Lessor">
             <input
               name="lessorName"
               required
@@ -709,18 +709,18 @@ export function PropertyModal({
           </FormField>
         </div>
 
-        <FormField label="Full Physical Address">
+        <FormField label="Address">
           <input
             name="address"
             required
             defaultValue={property?.address ?? ""}
-            placeholder="e.g. 24th Floor, Tower One & Exchange Plaza, Ayala Ave, Makati City"
+            placeholder="e.g. 24th Floor, Tower One, Ayala Ave, Makati City"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label="Lease Start Date">
+          <FormField label="Lease start">
             <input
               type="date"
               name="leaseStart"
@@ -729,7 +729,7 @@ export function PropertyModal({
             />
           </FormField>
 
-          <FormField label="Lease Expiration Date">
+          <FormField label="Lease end">
             <input
               type="date"
               name="leaseEnd"
@@ -739,7 +739,7 @@ export function PropertyModal({
             />
           </FormField>
 
-          <FormField label="Notice Required (Days)">
+          <FormField label="Notice period (days)">
             <input
               type="number"
               name="noticeDeadlineDays"
@@ -750,7 +750,7 @@ export function PropertyModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label="Monthly Rent (PHP)">
+          <FormField label="Monthly rent (PHP)">
             <input
               type="number"
               step="0.01"
@@ -761,7 +761,7 @@ export function PropertyModal({
             />
           </FormField>
 
-          <FormField label="Escalation Rate (%/yr)">
+          <FormField label="Yearly rent increase (%)">
             <input
               type="number"
               step="0.1"
@@ -771,7 +771,7 @@ export function PropertyModal({
             />
           </FormField>
 
-          <FormField label="Security Deposit (PHP)">
+          <FormField label="Security deposit (PHP)" optional>
             <input
               type="number"
               step="0.01"
@@ -783,12 +783,12 @@ export function PropertyModal({
           </FormField>
         </div>
 
-        <FormField label="Utilities & Meter Accounts">
+        <FormField label="Utility accounts" optional>
           <textarea
             name="utilitiesInfo"
             rows={2}
             defaultValue={property?.utilitiesInfo ?? ""}
-            placeholder="Meralco CIN, Manila Water account, Leased-line telecom account, Building association dues..."
+            placeholder="Meralco, Manila Water, telecom, association dues"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -798,7 +798,7 @@ export function PropertyModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            {property ? "Save Changes" : "Save Property"}
+            {property ? "Save changes" : "Add property"}
           </Button>
         </div>
       </form>
@@ -843,19 +843,19 @@ export function TicketModal({
 
   return (
     <ModalFrame
-      title={ticket ? `Edit Ticket ${ticket.ticketNumber}` : "Raise Office Concern / Service Request"}
-      subtitle="Facilities maintenance, executive VIP transport, supplies procurement, messenger dispatch"
+      title={ticket ? `Edit ${ticket.ticketNumber}` : "New office request"}
+      subtitle="A repair, supplies, transport, courier or other request to the administration office."
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
         {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
-        <FormField label="Concern / Request Title">
+        <FormField label="Request">
           <input
             name="title"
             required
             defaultValue={ticket?.title ?? ""}
-            placeholder="e.g. Boardroom A HVAC Inverter Malfunction prior to Board Session"
+            placeholder="e.g. Boardroom A air conditioning not cooling"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -867,32 +867,32 @@ export function TicketModal({
               defaultValue={ticket?.category ?? "facilities"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="facilities">Facilities & Maintenance (Aircon, Plumbing, Power)</option>
-              <option value="vip_logistics">Executive VIP Transport & Protocol</option>
-              <option value="supplies">Office Supplies & Asset Procurement</option>
-              <option value="boardroom">Boardroom & Executive Meeting Concierge</option>
-              <option value="courier_dispatch">Emergency Courier & Government Liaison</option>
-              <option value="it_security">IT Hardware & Building Access Badges</option>
-              <option value="general">General Administrative Concern</option>
+              <option value="facilities">Facilities and repairs</option>
+              <option value="vip_logistics">Guest transport</option>
+              <option value="supplies">Office supplies</option>
+              <option value="boardroom">Meeting rooms</option>
+              <option value="courier_dispatch">Courier and government liaison</option>
+              <option value="it_security">IT equipment and access cards</option>
+              <option value="general">Other</option>
             </select>
           </FormField>
 
-          <FormField label="Priority / Urgency">
+          <FormField label="Priority">
             <select
               name="priority"
               defaultValue={ticket?.priority ?? "normal"}
               className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
-              <option value="urgent">Urgent / Emergency (Immediate SLA)</option>
-              <option value="high">High (24-48 Hours)</option>
+              <option value="urgent">Urgent (same day)</option>
+              <option value="high">High (within 2 days)</option>
               <option value="normal">Normal</option>
-              <option value="low">Low / Scheduled</option>
+              <option value="low">Low</option>
             </select>
           </FormField>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Requester Name">
+          <FormField label="Requested by">
             <input
               name="requesterName"
               required
@@ -902,18 +902,18 @@ export function TicketModal({
             />
           </FormField>
 
-          <FormField label="Executive Sponsor (Optional)">
+          <FormField label="On behalf of" optional>
             <input
               name="executiveSponsor"
               defaultValue={ticket?.executiveSponsor ?? "CEO Office"}
-              placeholder="e.g. Managing Director Office"
+              placeholder="e.g. Office of the Managing Director"
               className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Assigned Assistant / Administrator">
+          <FormField label="Assigned to">
             <input
               name="assignedTo"
               defaultValue={ticket?.assignedTo ?? "Deo Castillo"}
@@ -922,7 +922,7 @@ export function TicketModal({
             />
           </FormField>
 
-          <FormField label="Target SLA Completion Date">
+          <FormField label="Target date">
             <input
               type="date"
               name="slaDueDate"
@@ -932,13 +932,13 @@ export function TicketModal({
           </FormField>
         </div>
 
-        <FormField label="Detailed Description">
+        <FormField label="Details">
           <textarea
             name="description"
             rows={3}
             required
             defaultValue={ticket?.description ?? ""}
-            placeholder="State exact requirements, room location, flight number for VIP pickup, or courier destination..."
+            placeholder="What is needed, where, and by when"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
@@ -952,18 +952,18 @@ export function TicketModal({
                 className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
               >
                 <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="pending_vendor">Pending External Vendor</option>
+                <option value="in_progress">In progress</option>
+                <option value="pending_vendor">Waiting on supplier</option>
                 <option value="resolved">Resolved</option>
                 <option value="closed">Closed</option>
               </select>
             </FormField>
 
-            <FormField label="Resolution Notes">
+            <FormField label="Resolution" optional>
               <input
                 name="resolutionNotes"
                 defaultValue={ticket.resolutionNotes ?? ""}
-                placeholder="Technician details, completion remarks..."
+                placeholder="What was done"
                 className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
               />
             </FormField>
@@ -975,7 +975,7 @@ export function TicketModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            {ticket ? "Save Changes" : "Log Ticket"}
+            {ticket ? "Save changes" : "Submit request"}
           </Button>
         </div>
       </form>
@@ -1019,7 +1019,7 @@ export function TicketUpdateModal({
 
   return (
     <ModalFrame
-      title={`Update on Ticket ${ticket.ticketNumber}`}
+      title={`Update ${ticket.ticketNumber}`}
       subtitle={ticket.title}
       onClose={onClose}
     >
@@ -1031,7 +1031,7 @@ export function TicketUpdateModal({
           <p className="mt-1 line-clamp-3 text-ink-3">{ticket.description}</p>
         </div>
 
-        <FormField label="Your Name / Role">
+        <FormField label="Your name">
           <input
             name="authorName"
             required
@@ -1040,27 +1040,27 @@ export function TicketUpdateModal({
           />
         </FormField>
 
-        <FormField label="Action Taken / Status Note">
+        <FormField label="Update">
           <textarea
             name="content"
             rows={3}
             required
-            placeholder="e.g. Contacted building administration; technician arriving at 2:00 PM today..."
+            placeholder="e.g. Technician arriving at 2:00 PM today"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
-        <FormField label="Update Ticket Status">
+        <FormField label="Status">
           <select
             name="newStatus"
             defaultValue={ticket.status}
             className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
           >
-            <option value="open">Keep as Open</option>
-            <option value="in_progress">Set to In Progress</option>
-            <option value="pending_vendor">Set to Pending External Vendor</option>
-            <option value="resolved">Mark Resolved</option>
-            <option value="closed">Close Ticket</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="pending_vendor">Waiting on supplier</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
           </select>
         </FormField>
 
@@ -1069,7 +1069,7 @@ export function TicketUpdateModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit">
-            Post Update
+            Post update
           </Button>
         </div>
       </form>

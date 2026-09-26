@@ -88,7 +88,7 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
               </Select>
             )}
           </Field>
-          <Field label="Number & date style" error={fields.locale}>
+          <Field label="Number and date format" error={fields.locale}>
             {(p) => (
               <Select {...p} value={v.locale} onChange={set("locale")}>
                 {[...LOCALES, ...(LOCALES.some((l) => l.value === v.locale) ? [] : [{ value: v.locale, label: v.locale }])].map((l) => (

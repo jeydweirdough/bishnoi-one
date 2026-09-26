@@ -1,3 +1,3 @@
 export { UsersPage as default } from "@/src/screens/admin";
 
-export const metadata = { title: "Users & Access" };
+export const metadata = { title: "Users" };

@@ -92,29 +92,29 @@ export const PROMO_KINDS: Record<PromoKind, string> = {
 };
 
 export const QUOTE_STATES: Record<Quote["state"], string> = {
-  waiting: "Pending Approval",
-  ready: "Authorized & Ready",
-  rejected: "Declined",
+  waiting: "Waiting for approval",
+  ready: "Ready",
+  rejected: "Rejected",
 };
 
 export const APPROVAL_STATUSES: Record<Quote["approval"]["status"], string> = {
-  none: "Exempt",
-  pending: "Pending Review",
-  approved: "Authorized",
-  rejected: "Declined",
+  none: "Not needed",
+  pending: "Waiting",
+  approved: "Approved",
+  rejected: "Rejected",
 };
 
 export const LETTER_STATUSES: Record<NonNullable<Quote["letter"]>["status"], string> = {
-  pending: "Pending Audit",
-  verified: "Verified & Compliant",
-  rejected: "Non-Compliant",
+  pending: "To check",
+  verified: "Verified",
+  rejected: "Rejected",
 };
 
 export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
   none: "—",
-  unpaid: "Outstanding",
-  partial: "Partially Settled",
-  paid: "Settled in Full",
+  unpaid: "Unpaid",
+  partial: "Part paid",
+  paid: "Paid",
 };
 
 export function approvalReason(reason: ApprovalReason, quote: Pick<Quote, "priceTypeName">): string {

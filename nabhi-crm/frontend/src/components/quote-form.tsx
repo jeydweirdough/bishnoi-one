@@ -228,7 +228,7 @@ export function QuoteForm({
   if (!priceList.usesPriceList || priceList.priceTypes.length === 0) {
     return (
       <p className="text-ink-2">
-        There are no prices to quote with yet. An administrator sets them up in Administration → Settings → Pricing &amp; retention.
+        There are no prices to quote with yet. An administrator sets them up in Administration → Settings → Pricing and retention.
       </p>
     );
   }
@@ -303,7 +303,7 @@ export function QuoteForm({
 
       {/* Lines, set out like an invoice: product, quantity, promo, extra discount, line total. */}
       <fieldset>
-        <legend className="mb-2 text-meta font-medium text-ink-2">{priceList.bundles.length > 0 ? "Products & bundles" : "Products"}</legend>
+        <legend className="mb-2 text-meta font-medium text-ink-2">{priceList.bundles.length > 0 ? "Products and bundles" : "Products"}</legend>
         <div aria-hidden className={`hidden gap-x-3 border-b border-rule pb-1.5 text-caps text-ink-3 uppercase sm:grid ${LINE_GRID}`}>
           <span>{priceList.bundles.length > 0 ? "Product or bundle" : "Product"}</span>
           <span className="text-right">Qty</span>

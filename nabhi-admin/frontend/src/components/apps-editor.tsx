@@ -163,7 +163,7 @@ export function AppsEditor({ apps }: { apps: AppLink[] }) {
               <SectionTitle icon="apps">{current.name.trim() || "New app"}</SectionTitle>
               <p className="mb-5 text-meta text-ink-3">
                 {builtIn.has(current.code ?? "")
-                  ? "This one comes with Nabhi. It can be renamed, pointed somewhere else or switched off, but not removed: its order steps are granted in Roles & permissions whether or not there is a link."
+                  ? "This one comes with Nabhi. It can be renamed, pointed somewhere else or switched off, but not removed: its order steps are granted in Roles and permissions whether or not there is a link."
                   : "An app of your own. Nabhi sends people to it already signed in; what they may do once they are there is up to the app."}
               </p>
 

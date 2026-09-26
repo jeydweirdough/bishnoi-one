@@ -31,7 +31,7 @@ export default async function PricesPage() {
   const sheet = await load<TeamPrices>(`/prices?team=${enc(teams.find((t) => t.id === me.team?.id)?.id ?? teams[0].id)}`);
   return (
     <>
-      <PageHeader title="Products & services">
+      <PageHeader title="Products and services">
         Your team&apos;s special prices: what the team charges for each product, over the standard price list. A price you don&apos;t set follows the standard one, so nothing
         changes until you say so.
       </PageHeader>

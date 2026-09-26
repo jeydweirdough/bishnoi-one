@@ -19,7 +19,7 @@ export function CountdownBadge({
     return (
       <Flag letter="!">
         <span className="font-semibold text-danger">
-          OVERDUE · {overdueDays}d {compact ? "" : "ago"}
+          Overdue · {overdueDays === 1 ? "1 day" : `${overdueDays} days`}
         </span>
       </Flag>
     );
@@ -27,32 +27,32 @@ export function CountdownBadge({
 
   if (daysRemaining <= 15) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-[2px] bg-eosin-tint px-1.5 py-0.5 text-stamp font-semibold text-eosin uppercase">
+      <span className="inline-flex items-center gap-1 rounded-[2px] bg-eosin-tint px-1.5 py-0.5 text-meta font-semibold text-eosin">
         <span className="size-1.5 rounded-full bg-eosin" />
-        {daysRemaining === 0 ? "Due Today" : `${daysRemaining}d left`}
+        {daysRemaining === 0 ? "Due today" : daysRemaining === 1 ? "1 day left" : `${daysRemaining} days left`}
       </span>
     );
   }
 
   if (daysRemaining <= 30) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-[2px] bg-hema-tint px-1.5 py-0.5 text-stamp font-semibold text-hema uppercase">
+      <span className="inline-flex items-center gap-1 rounded-[2px] bg-hema-tint px-1.5 py-0.5 text-meta font-semibold text-hema">
         <span className="size-1.5 rounded-full bg-hema" />
-        {daysRemaining}d left
+        {daysRemaining} days left
       </span>
     );
   }
 
   if (daysRemaining <= 60) {
     return (
-      <span className="inline-flex items-center rounded-[2px] border border-rule-strong px-1.5 py-0.5 text-stamp font-medium text-ink-2 uppercase">
-        {daysRemaining}d left
+      <span className="inline-flex items-center rounded-[2px] border border-rule-strong px-1.5 py-0.5 text-meta font-medium text-ink-2">
+        {daysRemaining} days left
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center rounded-[2px] px-1 text-stamp text-ink-3 uppercase">
+    <span className="inline-flex items-center rounded-[2px] px-1 text-meta text-ink-3">
       {daysRemaining}d left
     </span>
   );
@@ -62,32 +62,32 @@ export function UrgencyMark({ tier }: { tier: UrgencyTier }) {
   switch (tier) {
     case "overdue":
       return (
-        <span className="inline-flex items-center rounded-[2px] bg-danger-tint px-1.5 py-0.5 text-stamp font-bold text-danger uppercase">
+        <span className="inline-flex items-center rounded-[2px] bg-danger-tint px-1.5 py-0.5 text-meta font-bold text-danger">
           Overdue
         </span>
       );
     case "urgent":
       return (
-        <span className="inline-flex items-center rounded-[2px] bg-eosin-tint px-1.5 py-0.5 text-stamp font-semibold text-eosin uppercase">
-          Urgent (&le;15d)
+        <span className="inline-flex items-center rounded-[2px] bg-eosin-tint px-1.5 py-0.5 text-meta font-semibold text-eosin">
+          Within 15 days
         </span>
       );
     case "approaching":
       return (
-        <span className="inline-flex items-center rounded-[2px] bg-hema-tint px-1.5 py-0.5 text-stamp font-semibold text-hema uppercase">
-          Approaching (&le;30d)
+        <span className="inline-flex items-center rounded-[2px] bg-hema-tint px-1.5 py-0.5 text-meta font-semibold text-hema">
+          Within 30 days
         </span>
       );
     case "upcoming":
       return (
-        <span className="inline-flex items-center rounded-[2px] border border-rule px-1.5 py-0.5 text-stamp text-ink-2 uppercase">
-          Upcoming (&le;60d)
+        <span className="inline-flex items-center rounded-[2px] border border-rule px-1.5 py-0.5 text-meta text-ink-2">
+          Within 60 days
         </span>
       );
     case "good_standing":
       return (
-        <span className="inline-flex items-center rounded-[2px] px-1 text-stamp text-ink-3 uppercase">
-          Good Standing
+        <span className="inline-flex items-center rounded-[2px] px-1 text-meta text-ink-3">
+          Current
         </span>
       );
     default:

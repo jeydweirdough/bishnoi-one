@@ -172,7 +172,7 @@ export async function QuoteView({
       </div>
 
       <Sheet className="px-5 pt-4 pb-5">
-        <SectionTitle icon="approvals">Approval & payment</SectionTitle>
+        <SectionTitle icon="approvals">Approval and payment</SectionTitle>
         <div className="mt-1 divide-y divide-rule text-sm">
           <section className="py-3" aria-label="Approval">
             <h3 className="text-meta text-ink-3">Approval</h3>

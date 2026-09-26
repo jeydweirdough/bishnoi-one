@@ -41,7 +41,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   return (
     <>
       <PageHeader
-        title="Products & services"
+        title="Products and services"
         actions={
           <>
             {link.linked && can(me, "products.edit") && <SyncNow />}

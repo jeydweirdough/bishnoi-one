@@ -1,26 +1,28 @@
 "use client";
 
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deleteProperty } from "@/src/actions/executive";
+import { ExportButton, ImportButton } from "@/src/components/sheet-actions";
 import { CountdownBadge } from "@/src/components/countdown-badge";
 import { PropertyModal } from "@/src/components/executive-modals";
 import type { PropertyRecord } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Figure } from "@/src/platform/ui/figure";
+import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
-export function PropertiesScreen({ properties: initialProperties }: { properties: PropertyRecord[] }) {
+export function PropertiesScreen({ properties: initialProperties, canImport = false }: { properties: PropertyRecord[]; canImport?: boolean }) {
   const [properties, setProperties] = useState<PropertyRecord[]>(initialProperties);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [modalProperty, setModalProperty] = useState<PropertyRecord | null | "new">(null);
 
   const types = [
-    { key: "all", label: "All Real Estate" },
-    { key: "office", label: "Offices & Branches" },
-    { key: "warehouse", label: "Central Warehouses" },
-    { key: "depot", label: "Regional Depots" },
+    { key: "all", label: "All" },
+    { key: "office", label: "Offices" },
+    { key: "warehouse", label: "Warehouses" },
+    { key: "depot", label: "Depots" },
     { key: "parking", label: "Parking" },
   ];
 
@@ -28,39 +30,25 @@ export function PropertiesScreen({ properties: initialProperties }: { properties
     (p) => selectedType === "all" || p.propertyType === selectedType
   );
 
-  const totalCount = properties.length;
-  const expiringCount = properties.filter((p) => {
-    const d = p.daysRemaining ?? 100;
-    return d <= 90;
-  }).length;
-  const totalMonthlyCommitment = properties.reduce((acc, curr) => acc + (curr.monthlyRent ?? 0), 0);
-
   return (
     <>
       <PageHeader
-        title="Corporate Real Estate, Leases & Utilities"
-        crumbs={[{ href: "/", label: "Executive Admin" }, { href: "/properties", label: "Properties" }]}
+        title="Properties"
         actions={
-          <Button variant="primary" onClick={() => setModalProperty("new")}>
-            <Icon name="properties" className="mr-1.5 size-4" />
-            Record Property / Lease
-          </Button>
+          <>
+            <ExportButton kind="properties" />
+            {canImport && <ImportButton href="/properties/import" />}
+            <Button variant="primary" onClick={() => setModalProperty("new")}>
+              <Icon name="properties" className="mr-1.5 size-4" />
+              New property
+            </Button>
+          </>
         }
       >
-        Corporate headquarters, warehouse spaces, lease expiration countdowns, rental escalations, utility meters & building dues.
+        Offices, warehouses and depots the company leases or owns, with lease end dates, rent and utility accounts.
       </PageHeader>
 
-      {/* Top Figure KPI Metrics Strip */}
-      <Sheet className="mb-5 grid divide-y divide-rule sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <Figure label="Total Properties & Leases" value={totalCount} />
-        <Figure label="Leases Expiring in 90 Days" value={expiringCount} flag={expiringCount > 0} />
-        <div className="min-w-0 px-5 py-4">
-          <span className="block text-figure text-ink tabular-nums">
-            PHP {totalMonthlyCommitment.toLocaleString("en-PH", { maximumFractionDigits: 0 })}
-          </span>
-          <span className="mt-0.5 block text-meta text-ink-3">Total Monthly Lease Commitment</span>
-        </div>
-      </Sheet>
+      <HealthStrip label="leases" {...healthOf(properties.map((pr) => pr.daysRemaining), 90)} />
 
       {/* Filter Tabs */}
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
@@ -84,8 +72,8 @@ export function PropertiesScreen({ properties: initialProperties }: { properties
 
       <Sheet>
         {filtered.length === 0 ? (
-          <Empty title="No properties found in this category" icon="properties">
-            Record corporate head offices, pharmaceutical distribution warehouses, or regional depots.
+          <Empty title="No properties here" icon="properties">
+            Choose another category, or add a property.
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
@@ -102,7 +90,36 @@ export function PropertiesScreen({ properties: initialProperties }: { properties
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-semibold text-sm text-ink">{pr.name}</span>
-                      <span className="rounded-[2px] border border-rule px-1.5 py-0.2 text-stamp font-medium text-ink-3 uppercase">
+                      {/* Edit and delete sit with the record they act on. */}
+                      <span className="inline-flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setModalProperty(pr)}
+                          aria-label="Edit property"
+                          title="Edit property"
+                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                        >
+                          <Pencil className="size-3.5" aria-hidden />
+                        </button>
+                        <ConfirmButton
+                          label={<span className="sr-only">Delete property</span>}
+                          icon={<Trash2 className="size-3.5" aria-hidden />}
+                          triggerTitle="Delete property"
+                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                title={`Delete ${pr.name}?`}
+                          body="This property and its lease alerts are deleted. This cannot be undone."
+                          confirmLabel="Delete property"
+                          danger
+                          triggerVariant="quiet"
+                          triggerSize="sm"
+                          onConfirm={async () => {
+                          await deleteProperty(pr.id);
+                          setProperties((prev) => prev.filter((item) => item.id !== pr.id));
+                          }}
+                          
+                        />
+                      </span>
+                      <span className="inline-block rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3 first-letter:uppercase">
                         {pr.propertyType}
                       </span>
                     </div>
@@ -125,29 +142,6 @@ export function PropertiesScreen({ properties: initialProperties }: { properties
                       Lease ends {new Date(pr.leaseEnd).toLocaleDateString("en-PH", { dateStyle: "medium" })}
                       {pr.escalationRatePct ? ` · +${pr.escalationRatePct}% esc.` : ""}
                     </span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setModalProperty(pr)}
-                      className="rounded-[3px] border border-rule-strong bg-sheet px-2.5 py-1 text-meta font-medium text-ink hover:border-control"
-                    >
-                      Edit
-                    </button>
-                    <ConfirmButton
-                      label="Delete"
-                      title="Delete Property Record?"
-                      body={`Are you sure you want to delete ${pr.name}?`}
-                      confirmLabel="Delete Property"
-                      danger
-                      triggerVariant="quiet"
-                      triggerSize="sm"
-                      onConfirm={async () => {
-                        await deleteProperty(pr.id);
-                        setProperties((prev) => prev.filter((item) => item.id !== pr.id));
-                      }}
-                    />
                   </div>
                 </div>
               </li>

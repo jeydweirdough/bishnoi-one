@@ -1,10 +1,11 @@
-import { load } from "@/src/platform/lib/api";
+import { getMe, load } from "@/src/platform/lib/api";
 import type { ComplianceRecord } from "@/src/platform/lib/types";
 import { PermitsScreen } from "@/src/screens/permits";
 
-export const metadata = { title: "Registrations & Permits · Executive Admin" };
+export const metadata = { title: "Permits" };
 
 export default async function Page() {
-  const permits = await load<ComplianceRecord[]>("/admin/permits");
-  return <PermitsScreen permits={permits} />;
+  const [permits, me] = await Promise.all([load<ComplianceRecord[]>("/admin/permits"), getMe()]);
+  const may = (p: string) => me.permissions?.includes(p) ?? me.canManageSettings;
+  return <PermitsScreen permits={permits} canImport={may("permits.create") && may("permits.edit")} />;
 }

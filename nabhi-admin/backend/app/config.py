@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'admin.db').as_posix()}"
+    # The first administrator, made when the database has no accounts at all:
+    # for a host you can't run the users tool against (Vercel + Supabase).
+    # Once anyone exists these are ignored; remove the password afterwards.
+    first_admin_email: str | None = None
+    first_admin_name: str = "Administrator"
+    first_admin_password: SecretStr | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
     # Wrong passwords allowed per email before sign-in waits, and for how long.

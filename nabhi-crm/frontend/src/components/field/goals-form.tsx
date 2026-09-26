@@ -57,7 +57,7 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
   }
 
   if (data.people.length === 0) {
-    return <p className="py-6 text-center text-meta text-ink-3">Nobody has the Field agent role yet. Give it to someone under People &amp; access first.</p>;
+    return <p className="py-6 text-center text-meta text-ink-3">Nobody has the Field agent role yet. Give it to someone under People and access first.</p>;
   }
 
   return (

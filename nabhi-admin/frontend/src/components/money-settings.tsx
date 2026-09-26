@@ -84,7 +84,7 @@ export function MoneySettings({ data, now }: { data: Company; now: string }) {
         return setError(result.error);
       }
       setError(null);
-      toast.success("Money & formats saved", { description: "Every screen reads its money, dates and times from them." });
+      toast.success("Money and formats saved", { description: "Every screen reads its money, dates and times from them." });
     });
   }
 

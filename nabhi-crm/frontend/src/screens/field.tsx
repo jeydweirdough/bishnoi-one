@@ -144,7 +144,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
               )
             }
           >
-            Give someone the Field agent role (People &amp; access) and they show up here.
+            Give someone the Field agent role (People and access) and they show up here.
           </Empty>
         ) : (
           <Table people={data.people} month={month} fmt={fmt} />

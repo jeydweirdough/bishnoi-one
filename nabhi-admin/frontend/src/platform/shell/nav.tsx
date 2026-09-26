@@ -82,8 +82,8 @@ function modulePages(m: ModuleAccess): Page[] {
   if (m.key === "inventory") {
     return [
       { href: root, label: "Overview", icon: "overview" },
-      { href: `${base}/products`, label: "Products & prices", icon: "products" },
-      { href: `${base}/promos`, label: "Promos & discounts", icon: "promos" },
+      { href: `${base}/products`, label: "Products and prices", icon: "products" },
+      { href: `${base}/promos`, label: "Promos and discounts", icon: "promos" },
       // Beside promos, because a person looks for both in the same place.
       { href: `${base}/bundles`, label: "Bundles", icon: "bundles" },
     ];
@@ -109,7 +109,7 @@ const SETTINGS: PageGroup[] = [
     label: "Access",
     pages: [
       { href: "/settings/people", label: "People", icon: "people", reach: recovers },
-      { href: "/settings/roles", label: "Roles & permissions", icon: "roles" },
+      { href: "/settings/roles", label: "Roles and permissions", icon: "roles" },
       { href: "/settings/teams", label: "Teams", icon: "teams" },
       { href: "/settings/audit", label: "Audit log", icon: "auditLog", reach: recovers },
     ],
@@ -119,7 +119,7 @@ const SETTINGS: PageGroup[] = [
     pages: [
       { href: "/settings/lists", label: "Lists", icon: "lists" },
       { href: "/settings/pricing", label: "Pricing", icon: "pricing" },
-      { href: "/settings/money", label: "Money & formats", icon: "money" },
+      { href: "/settings/money", label: "Money and formats", icon: "money" },
       { href: "/settings/orders", label: "Orders", icon: "orders" },
       { href: "/settings/retention", label: "Retention", icon: "retention" },
       { href: "/settings/goals", label: "Goals", icon: "goals" },
@@ -440,12 +440,12 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
 
 const EXECUTIVE_PAGES: Page[] = [
   { href: "/", label: "Overview", icon: "overview" },
-  { href: "/notifications", label: "Renewal Alerts", icon: "notifications" },
-  { href: "/permits", label: "Registrations & Permits", icon: "permits" },
-  { href: "/immigration", label: "Expatriate & Visas", icon: "immigration" },
-  { href: "/documents", label: "Corporate Documents", icon: "documents" },
-  { href: "/properties", label: "Properties & Leases", icon: "properties" },
-  { href: "/tickets", label: "Office Concerns", icon: "tickets" },
+  { href: "/notifications", label: "Renewal alerts", icon: "notifications" },
+  { href: "/permits", label: "Permits", icon: "permits" },
+  { href: "/immigration", label: "Expatriates", icon: "immigration" },
+  { href: "/documents", label: "Documents", icon: "documents" },
+  { href: "/properties", label: "Properties", icon: "properties" },
+  { href: "/tickets", label: "Office requests", icon: "tickets" },
 ];
 
 function adminPagesFor(me: Me): Page[] {
@@ -455,7 +455,7 @@ function adminPagesFor(me: Me): Page[] {
       ? [{ href: "/admin/users", label: "Users", icon: "people" as const, also: ["/admin/users"] }]
       : []),
     ...(may("admin.roles")
-      ? [{ href: "/admin/roles", label: "Roles & permissions", icon: "roles" as const, also: ["/admin/roles"] }]
+      ? [{ href: "/admin/roles", label: "Roles and permissions", icon: "roles" as const, also: ["/admin/roles"] }]
       : []),
     ...(may("admin.audit")
       ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const, also: ["/admin/audit"] }]
@@ -548,7 +548,8 @@ function Links({ me }: { me: Me }) {
           ))}
         </Group>
       )}
-      {departments.some(serves) && (
+      {/* Executive Admin's own module is the group above, so it isn't listed again. */}
+      {departments.some(serves) && THIS_APP !== "exec" && (
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (

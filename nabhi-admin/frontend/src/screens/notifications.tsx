@@ -23,11 +23,11 @@ export function NotificationsScreen({
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
 
   const severities = [
-    { key: "all", label: "All Alerts" },
-    { key: "critical", label: "Critical (<7d / Overdue)" },
-    { key: "urgent", label: "Urgent (<15d)" },
-    { key: "warning", label: "Warning (<60d)" },
-    { key: "info", label: "Notice (<90d)" },
+    { key: "all", label: "All" },
+    { key: "critical", label: "Overdue or within 7 days" },
+    { key: "urgent", label: "Within 15 days" },
+    { key: "warning", label: "Within 60 days" },
+    { key: "info", label: "Within 90 days" },
   ];
 
   const filtered = notifications.filter((n) => {
@@ -72,8 +72,7 @@ export function NotificationsScreen({
   return (
     <>
       <PageHeader
-        title="Proactive Renewal Alerts & Notification Matrix"
-        crumbs={[{ href: "/", label: "Executive Admin" }, { href: "/notifications", label: "Alerts" }]}
+        title="Renewal alerts"
         actions={
           <AsyncButton
             variant="default"
@@ -82,18 +81,18 @@ export function NotificationsScreen({
             }}
           >
             <Icon name="history" className="mr-1.5 size-4" />
-            Re-scan Expiration Deadlines
+            Check for new alerts
           </AsyncButton>
         }
       >
-        Automated multi-tier notification engine (90, 60, 30, 15, 7 days and overdue escalation) for Executive Administrators and Assistants.
+        Alerts raised 90, 60, 30, 15 and 7 days before a permit, document or lease expires, and again when it's overdue.
       </PageHeader>
 
       {/* Top Figure KPI Metrics Strip */}
       <Sheet className="mb-5 grid divide-y divide-rule sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <Figure label="Active Expiration Alerts" value={totalActive} />
-        <Figure label="Critical & Urgent Attention" value={criticalCount} flag={criticalCount > 0} />
-        <Figure label="Unread Notifications" value={unreadCount} flag={unreadCount > 0} />
+        <Figure label="Active alerts" value={totalActive} />
+        <Figure label="Within 15 days or overdue" value={criticalCount} flag={criticalCount > 0} />
+        <Figure label="Unread" value={unreadCount} flag={unreadCount > 0} />
       </Sheet>
 
       {/* Filter Tabs */}
@@ -118,8 +117,8 @@ export function NotificationsScreen({
 
       <Sheet>
         {filtered.length === 0 ? (
-          <Empty title="No active notifications in this category" icon="notifications">
-            All compliance deadlines and service tickets have been resolved or acknowledged.
+          <Empty title="No alerts here" icon="notifications">
+            Everything in this range has been renewed or acknowledged.
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
@@ -138,14 +137,14 @@ export function NotificationsScreen({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-semibold text-sm text-ink">{n.title}</span>
-                      <span className={`inline-flex items-center rounded-[2px] px-1.5 py-0.2 text-stamp uppercase ${severityBadge(n.severity)}`}>
+                      <span className={`inline-block rounded-[2px] px-1.5 py-0.2 text-meta first-letter:uppercase ${severityBadge(n.severity)}`}>
                         {n.severity}
                       </span>
-                      <span className="rounded-[2px] border border-rule px-1.5 py-0.2 text-stamp font-medium text-ink-3 uppercase">
+                      <span className="rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3">
                         {n.entityType}
                       </span>
                       {n.isAcknowledged && (
-                        <span className="rounded-[2px] bg-bench px-1.5 py-0.2 text-stamp uppercase text-ink-3">
+                        <span className="rounded-[2px] bg-bench px-1.5 py-0.2 text-meta text-ink-3">
                           Acknowledged
                         </span>
                       )}

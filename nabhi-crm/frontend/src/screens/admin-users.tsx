@@ -26,7 +26,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
   return (
     <>
       <PageHeader
-        title="People & access"
+        title="People and access"
         actions={
           <>
             <LinkButton href="/admin/users/import" icon={<Upload className="size-4" aria-hidden />}>

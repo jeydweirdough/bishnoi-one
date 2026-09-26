@@ -27,10 +27,9 @@ export async function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users & Access"
-        crumbs={[{ href: "/", label: "Executive Admin" }, { href: "/admin/users", label: "Users" }]}
+        title="Users"
       >
-        Manage executive team members, assign corporate roles, and control sign-in access.
+        Who can sign in to Executive Admin, and the role each one has.
       </PageHeader>
       <UsersEditor data={data} meId={me.user.id} when={when} />
     </>
@@ -44,7 +43,7 @@ export async function RolesPage() {
     return (
       <Sheet className="p-8 text-center">
         <h2 className="text-base font-semibold text-ink">Access restricted</h2>
-        <p className="mt-1 text-sm text-ink-3">Your role does not have permission to configure roles & permissions.</p>
+        <p className="mt-1 text-sm text-ink-3">Your role cannot change roles and permissions.</p>
       </Sheet>
     );
   }
@@ -52,10 +51,9 @@ export async function RolesPage() {
   return (
     <>
       <PageHeader
-        title="Roles & Permissions (RBAC)"
-        crumbs={[{ href: "/", label: "Executive Admin" }, { href: "/admin/roles", label: "Roles" }]}
+        title="Roles and permissions"
       >
-        Configure role-based access control across permits, visas, documents, leases, tickets, and administration.
+        What each role can see and do in permits, expatriates, documents, properties, office requests and administration.
       </PageHeader>
       <RolesEditor data={data} />
     </>
@@ -94,10 +92,10 @@ const FILTERS = [
   { key: "user.", label: "People" },
   { key: "role.", label: "Roles" },
   { key: "permit.", label: "Permits" },
-  { key: "immigration.", label: "Immigration" },
+  { key: "immigration.", label: "Expatriates" },
   { key: "document.", label: "Documents" },
   { key: "property.", label: "Properties" },
-  { key: "ticket.", label: "Tickets" },
+  { key: "ticket.", label: "Office requests" },
 ];
 
 export async function AuditPage({
@@ -130,10 +128,9 @@ export async function AuditPage({
   return (
     <>
       <PageHeader
-        title="Activity Audit Log"
-        crumbs={[{ href: "/", label: "Executive Admin" }, { href: "/admin/audit", label: "Activity Log" }]}
+        title="Activity log"
       >
-        Complete audit trail of all corporate compliance, immigration, property, ticket, and access changes.
+        Every change made in Executive Admin, and who made it.
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
         <span className="text-meta font-semibold text-ink-2 mr-1">Show:</span>

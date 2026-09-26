@@ -13,7 +13,7 @@ export default async function TeamsPage() {
   const teams = await load<TeamRow[]>("/admin/teams");
   return (
     <>
-      <PageHeader title="People & access">
+      <PageHeader title="People and access">
         People work in teams. A role that reaches &ldquo;their team&apos;s records&rdquo; means the records of everyone in the same team.
       </PageHeader>
       <TeamsEditor teams={teams} />

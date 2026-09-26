@@ -14,7 +14,7 @@ import { StatusTag, typeOptions } from "../components/crm/words";
 import { customFields } from "../components/extra/load";
 import { extraText } from "../components/extra/extra-values";
 
-export const metadata = { title: "Client Accounts" };
+export const metadata = { title: "Customers" };
 
 const SIZE = 50;
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -47,16 +47,16 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   return (
     <>
       <PageHeader
-        title="Client Accounts"
+        title="Customers"
         actions={
           can(me, "customers.create") && (
             <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add Account
+              Add customer
             </LinkButton>
           )
         }
       >
-        {list.total} {list.total === 1 ? "account" : "accounts"}
+        {list.total} {list.total === 1 ? "customer" : "customers"}
         {filtered ? " match" : ""}
         {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : ""}.
       </PageHeader>

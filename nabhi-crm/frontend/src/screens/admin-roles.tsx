@@ -5,7 +5,7 @@ import type { RolesData } from "@/src/platform/lib/types";
 import { RolesEditor } from "../components/admin/roles-editor";
 import { NoAccess } from "../components/admin/words";
 
-export const metadata = { title: "Roles & permissions" };
+export const metadata = { title: "Roles and permissions" };
 
 export default async function RolesPage() {
   const me = await getCompanyMe();
@@ -13,7 +13,7 @@ export default async function RolesPage() {
   const data = await load<RolesData>("/admin/roles");
   return (
     <>
-      <PageHeader title="People & access">
+      <PageHeader title="People and access">
         A role is what someone may do, and whose records it reaches: their own, their team&apos;s, or everyone&apos;s. Each person has one.
       </PageHeader>
       <RolesEditor data={data} />

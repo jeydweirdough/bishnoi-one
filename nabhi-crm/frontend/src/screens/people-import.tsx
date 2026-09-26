@@ -11,7 +11,7 @@ export default async function PeopleImportPage() {
   if (!can(me, "admin.users")) return <NoAccess what="importing people" />;
   return (
     <>
-      <PageHeader title="Import people" crumbs={[{ href: "/admin/users", label: "People & access" }]}>
+      <PageHeader title="Import people" crumbs={[{ href: "/admin/users", label: "People and access" }]}>
         Accounts from a spreadsheet, with each person&apos;s role and team: new ones added, people already here (same email) updated.
       </PageHeader>
       <ImportWizard kind="people" back="/admin/users" />

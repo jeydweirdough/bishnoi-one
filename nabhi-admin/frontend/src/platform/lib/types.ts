@@ -885,7 +885,16 @@ export type CountdownHighlight = {
   actionPath: string;
 };
 
+/** One area on the overview: its records as current, due within its renewal window, or overdue. */
+export type AreaHealth = { key: string; label: string; href: string; windowDays: number; total: number; current: number; dueSoon: number; overdue: number };
+
+/** Renewals falling due in a month ("YYYY-MM"), or already overdue ("overdue"), per area. */
+export type RenewalMonth = { month: string; permits: number; expatriates: number; documents: number; properties: number };
+
 export type ExecutiveDashboardSummary = {
+  health: AreaHealth[];
+  requests: { open: number; late: number; onTime: number };
+  renewalsByMonth: RenewalMonth[];
   stats: {
     permits: { total: number; overdue: number; urgent: number; approaching: number };
     immigration: { total: number; expiringSoon: number; overdue: number };

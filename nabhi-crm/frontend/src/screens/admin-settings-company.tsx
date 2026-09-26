@@ -5,7 +5,7 @@ import type { CompanySettings } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { CompanySettingsForm } from "../components/settings/company-settings-form";
 
-export const metadata = { title: "Business & quotes" };
+export const metadata = { title: "Company and quotes" };
 
 export default async function CompanySettingsPage() {
   const me = await getCompanyMe();

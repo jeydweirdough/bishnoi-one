@@ -21,7 +21,7 @@ export default async function BundlesPage({ searchParams }: { searchParams: Prom
   const current = typeof division === "string" ? division : "";
   return (
     <>
-      <PageHeader title="Products & services">
+      <PageHeader title="Products and services">
         Sets of products sold together at one price. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
       <DivisionFilter base="/bundles" teams={bundles.teams} current={current} />

@@ -400,6 +400,10 @@ class SalesSettings(Base):
     quote_prefix: Mapped[str] = mapped_column(String(10), default="Q")
     quote_valid_days: Mapped[int] = mapped_column(Integer, default=30)
     quote_terms: Mapped[str | None] = mapped_column(Text, default=None)
+    # The letterhead of a printed quotation.
+    company_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    company_tin: Mapped[str | None] = mapped_column(String(40), default=None)
+    company_contact: Mapped[str | None] = mapped_column(String(200), default=None)
     # The last time the product list was brought over from Inventory, and why
     # the last try failed (None: it didn't).
     inventory_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -472,6 +476,9 @@ class Quote(Owned, Base):
     terms: Mapped[str | None] = mapped_column(Text, default=None)
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
+    # The order Nabhi Order made from it: {"id", "number", "url", "status", "by": {"id", "name"}, "at"}.
+    # None: not ordered yet. A quote is ordered once.
+    sales_order: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     created_by: Mapped[User] = relationship(foreign_keys="Quote.created_by_id", lazy="joined")
 

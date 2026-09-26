@@ -80,56 +80,56 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
   // Products and everything about their price. The rules they're priced by
   // are an admin's, in Settings.
   const catalogue: SubPage[] = [
-    { href: "/products", label: "Products & Formulations", permission: "products.view" },
-    { href: "/promos", label: "Promotional Schemes", permission: "products.view" },
-    { href: "/bundles", label: "Product Bundles", permission: "products.view" },
-    { href: "/prices", label: "Special Pricing Schedules", permission: "products.prices" },
+    { href: "/products", label: "Products", permission: "products.view" },
+    { href: "/promos", label: "Promos", permission: "products.view" },
+    { href: "/bundles", label: "Bundles", permission: "products.view" },
+    { href: "/prices", label: "Special prices", permission: "products.prices" },
   ]
     .filter((p) => may(p.permission))
     .map(({ href, label }) => ({ href, label }));
   const groups = [
     {
-      label: "Commercial Operations",
+      label: "CRM",
       pages: [
         admin
-          ? { href: "/", label: "Executive Dashboard", icon: "overview" as const, exact: true }
-          : { href: THIS_APP === "crm" ? "/" : "/overview", label: "Commercial Overview", icon: "home" as const, exact: true },
+          ? { href: "/", label: "Dashboard", icon: "overview" as const, exact: true }
+          : { href: THIS_APP === "crm" ? "/" : "/overview", label: "Home", icon: "home" as const, exact: true },
         ...only(selling && may("customers.view"), {
           href: "/companies",
-          label: "Client Accounts",
+          label: "Customers",
           icon: "customers",
           also: ["/contacts", "/customers"],
           subpages: [
-            { href: "/companies", label: "Corporate Accounts", also: ["/customers"] },
-            { href: "/contacts", label: "Key Contacts" },
+            { href: "/companies", label: "Customers", also: ["/customers"] },
+            { href: "/contacts", label: "Contacts" },
           ],
         }),
-        ...only(selling && may("quotes.view"), { href: "/quotes", label: "Sales Quotations", icon: "quotes" }),
-        ...only(!admin && may("activities.view"), { href: "/activities", label: "Client Engagements", icon: "activity", also: ["/follow-ups"] }),
-        ...only(selling && may("customers.view"), { href: "/retention", label: "Account Retention", icon: "retention" }),
+        ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
+        ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
+        ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
       ],
     },
     {
-      label: "Field & Territory Operations",
+      label: "Field work",
       pages: [
-        ...only(may("goals.view"), { href: "/field", label: "Territory Quotas & Progress", icon: "goals", exact: true, also: ["/field/goals", "/field/balances"] }),
-        ...only(may("visits.view"), { href: "/field/doctors", label: "Medical Practitioners", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
-        ...only(may("visits.view"), { href: "/visits", label: "Field Engagements", icon: "visit" }),
-        ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My Territory Itinerary" : "Territory Itineraries", icon: "trend" }),
+        ...only(may("goals.view"), { href: "/field", label: "Team progress", icon: "goals", exact: true, also: ["/field/goals", "/field/balances"] }),
+        ...only(may("visits.view"), { href: "/field/doctors", label: "Doctors", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
+        ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
+        ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
         // Money asked for ahead of spending it. Counted: what waits on the
         // Team Lead's decision, and the requester's own money to account for.
         ...only(may("funds.view"), {
           href: "/funds",
-          label: "Expense Advances",
+          label: "Fund requests",
           icon: "payments",
           count: (waiting.toApprove ?? 0) + (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0),
           subpages: [
             // Only on itself: a request (/funds/<id>) may be someone else's.
-            { href: "/funds", label: "My Expense Requisitions", exact: true, count: (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0) },
+            { href: "/funds", label: "My requests", exact: true, count: (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0) },
             ...(may("funds.approve")
               ? [
-                  { href: "/funds/approve", label: "Requisitions for Approval", count: waiting.toApprove ?? 0 },
-                  { href: "/funds/team", label: me.role?.scope === "all" ? "All Requisitions" : "Department Requisitions" },
+                  { href: "/funds/approve", label: "For approval", count: waiting.toApprove ?? 0 },
+                  { href: "/funds/team", label: me.role?.scope === "all" ? "All requests" : "Team requests" },
                 ]
               : []),
           ],
@@ -137,12 +137,12 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
       ],
     },
     {
-      label: "Product Portfolio",
+      label: "Catalogue",
       pages: [
         // It opens on the first sub-page this person may see.
         ...only(catalogue.length > 0, {
           href: catalogue[0]?.href ?? "/products",
-          label: "Commercial Catalogue",
+          label: "Products",
           icon: "products",
           also: ["/promos", "/bundles", "/prices", "/products"],
           subpages: catalogue,
@@ -150,7 +150,7 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
       ],
     },
     // The CRM's own Administration: its users, roles, teams and audit log.
-    { label: "Corporate Administration", pages: THIS_APP === "crm" ? adminPagesFor(me) : [] },
+    { label: "Administration", pages: THIS_APP === "crm" ? adminPagesFor(me) : [] },
   ];
   return groups.filter((g) => g.pages.length > 0);
 }
@@ -185,17 +185,17 @@ function modulePages(m: ModuleAccess): Page[] {
   const root = base || "/";
   if (m.key === "finance") {
     return [
-      { href: root, label: "Treasury Overview", icon: "overview" },
-      { href: `${base}/approvals`, label: "Credit Approvals", icon: "approvals" },
-      { href: `${base}/letters`, label: "Guarantee Letters", icon: "letters" },
-      { href: `${base}/payments`, label: "Receivables & Settlements", icon: "payments" },
+      { href: root, label: "Overview", icon: "overview" },
+      { href: `${base}/approvals`, label: "Approvals", icon: "approvals" },
+      { href: `${base}/letters`, label: "Guarantee letters", icon: "letters" },
+      { href: `${base}/payments`, label: "Letter payments", icon: "payments" },
     ];
   }
   if (m.key === "inventory") {
     return [
       { href: root, label: "Overview", icon: "overview" },
-      { href: `${base}/products`, label: "Products & prices", icon: "products" },
-      { href: `${base}/promos`, label: "Promos & discounts", icon: "promos" },
+      { href: `${base}/products`, label: "Products and prices", icon: "products" },
+      { href: `${base}/promos`, label: "Promos and discounts", icon: "promos" },
       // Beside promos, because a person looks for both in the same place.
       { href: `${base}/bundles`, label: "Bundles", icon: "bundles" },
     ];
@@ -221,7 +221,7 @@ const SETTINGS: PageGroup[] = [
     label: "Access",
     pages: [
       { href: "/settings/people", label: "People", icon: "people", reach: recovers },
-      { href: "/settings/roles", label: "Roles & permissions", icon: "roles" },
+      { href: "/settings/roles", label: "Roles and permissions", icon: "roles" },
       { href: "/settings/teams", label: "Teams", icon: "teams" },
       { href: "/settings/audit", label: "Audit log", icon: "auditLog", reach: recovers },
     ],
@@ -231,7 +231,7 @@ const SETTINGS: PageGroup[] = [
     pages: [
       { href: "/settings/lists", label: "Lists", icon: "lists" },
       { href: "/settings/pricing", label: "Pricing", icon: "pricing" },
-      { href: "/settings/money", label: "Money & formats", icon: "money" },
+      { href: "/settings/money", label: "Money and formats", icon: "money" },
       { href: "/settings/orders", label: "Orders", icon: "orders" },
       { href: "/settings/retention", label: "Retention", icon: "retention" },
       { href: "/settings/goals", label: "Goals", icon: "goals" },
@@ -675,13 +675,13 @@ function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
           // front door, and the sidebar should not say otherwise.
           <Group label={appLabel("exec")}>
             <Row href="/" icon="home" current={pathname === "/"}>
-              Executive Office
+              Home
             </Row>
           </Group>
         ) : (
           // The shell's own front door, which is every app at once.
           <Row href="/" icon="home" current={pathname === "/"}>
-            Executive Office
+            Home
           </Row>
         ))}
       {/* Platform's one screen, in Platform's own app. In the shell it is a

@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     finance_api_url: str | None = None
     finance_api_key: SecretStr | None = None
 
+    # Nabhi Order, where orders are made: its API (https://...), and the key it
+    # gave this app (sent as X-Nabhi-Key). "Raise order" on a ready quote sends
+    # it there (app/orders.py has the payload). Unset: the button is not shown.
+    orders_api_url: str | None = None
+    orders_api_key: SecretStr | None = None
+
     @property
     def inventory_linked(self) -> bool:
         return bool(self.inventory_api_url and self.inventory_api_key)
@@ -73,6 +79,10 @@ class Settings(BaseSettings):
     @property
     def finance_linked(self) -> bool:
         return bool(self.finance_api_url and self.finance_api_key)
+
+    @property
+    def orders_linked(self) -> bool:
+        return bool(self.orders_api_url and self.orders_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:

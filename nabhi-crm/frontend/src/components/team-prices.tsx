@@ -111,7 +111,7 @@ export function TeamPricesEditor({
     return (
       <Sheet>
         <Empty icon="pricing" title="There's no price list yet">
-          An administrator sets up price types in Administration → Settings → Pricing &amp; retention. Until then there is nothing for{" "}
+          An administrator sets up price types in Administration → Settings → Pricing and retention. Until then there is nothing for{" "}
           {teams.length > 1 ? "your teams" : teamName} to charge over.
         </Empty>
       </Sheet>

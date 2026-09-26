@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { CountdownBadge } from "@/src/components/countdown-badge";
-import { Bars } from "@/src/platform/ui/bars";
-import { Figure } from "@/src/platform/ui/figure";
+import { HealthChart, RenewalsChart } from "@/src/components/overview-charts";
+import { ExportButton } from "@/src/components/sheet-actions";
+import { LinkButton } from "@/src/platform/ui/button";
 import { Icon } from "@/src/platform/ui/icons";
-import { Flag } from "@/src/platform/ui/marks";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { getCompanyMe, load } from "@/src/platform/lib/api";
+import { load } from "@/src/platform/lib/api";
 import type { ExecutiveDashboardSummary } from "@/src/platform/lib/types";
 
-export const metadata = { title: "Executive Office · Dashboard" };
+export const metadata = { title: "Overview" };
 
+/** What needs attention: how current each area is against its target, when
+ *  renewals fall due, and the next ones to act on. Each area's own page has
+ *  the rest, so nothing is repeated here. */
 export default async function ExecutiveDashboardPage() {
-  const me = await getCompanyMe();
-  const data = await load<ExecutiveDashboardSummary>("/admin/dashboard");
-
-  const { stats, countdownHighlights } = data;
+  const { stats, countdownHighlights, health, requests, renewalsByMonth } = await load<ExecutiveDashboardSummary>("/admin/dashboard");
 
   const urgentCount =
     (stats.permits?.overdue ?? 0) +
@@ -22,273 +22,90 @@ export default async function ExecutiveDashboardPage() {
     (stats.immigration?.overdue ?? 0) +
     (stats.tickets?.urgent ?? 0) +
     (stats.notifications?.critical ?? 0);
-
-  const barRows = [
-    {
-      label: "Permits & Accreditations",
-      value: (stats.permits?.overdue ?? 0) + (stats.permits?.urgent ?? 0) + (stats.permits?.approaching ?? 0),
-      href: "/permits",
-      flag: Boolean((stats.permits?.overdue ?? 0) > 0 || (stats.permits?.urgent ?? 0) > 0),
-    },
-    {
-      label: "Expat Visas & AEP/ACR",
-      value: (stats.immigration?.overdue ?? 0) + (stats.immigration?.expiringSoon ?? 0),
-      href: "/immigration",
-      flag: Boolean((stats.immigration?.overdue ?? 0) > 0 || (stats.immigration?.expiringSoon ?? 0) > 0),
-    },
-    {
-      label: "Leases & Renewal Notices",
-      value: stats.properties?.leasesExpiring ?? 0,
-      href: "/properties",
-      flag: Boolean((stats.properties?.leasesExpiring ?? 0) > 0),
-    },
-    {
-      label: "Open Office Concerns",
-      value: stats.tickets?.totalOpen ?? 0,
-      href: "/tickets",
-      flag: Boolean((stats.tickets?.urgent ?? 0) > 0),
-    },
-    {
-      label: "Unacknowledged Alerts",
-      value: stats.notifications?.unread ?? 0,
-      href: "/notifications",
-      flag: Boolean((stats.notifications?.critical ?? 0) > 0),
-    },
-  ];
+  const unread = stats.notifications?.unread ?? 0;
 
   return (
     <>
       <PageHeader
-        title={`${me.org.name} · Executive Administration`}
+        title="Overview"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/tickets"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[3px] bg-hema px-3.5 text-sm font-semibold text-white transition-colors hover:bg-hema-hover"
-            >
-              <Icon name="tickets" className="size-4" />
-              <span>Raise Concern</span>
-            </Link>
-            <Link
-              href="/notifications"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[3px] border border-rule-strong bg-sheet px-3.5 text-sm font-semibold text-ink transition-colors hover:border-control"
-            >
-              <Icon name="notifications" className="size-4 text-ink-3" />
-              <span>Renewal Alerts ({stats.notifications?.unread ?? 0})</span>
-            </Link>
-          </div>
+          <>
+            <ExportButton kind="overview" label="Export report" />
+            <LinkButton href="/notifications" icon={<Icon name="notifications" className="size-4" />}>
+              Renewal alerts{unread ? ` (${unread})` : ""}
+            </LinkButton>
+            <LinkButton href="/tickets" variant="primary" icon={<Icon name="tickets" className="size-4" />}>
+              New office request
+            </LinkButton>
+          </>
         }
       >
-        Executive administration cockpit, statutory filings, regulatory accreditations, expat visas, corporate agreements & office logistics.
+        Permits, expatriates, documents, properties and office requests that need attention.
       </PageHeader>
 
-      {/* Top Figure KPI Metrics Grid */}
-      <Sheet className="mb-5 grid divide-y divide-rule sm:grid-cols-2 lg:grid-cols-5 sm:divide-x sm:divide-y-0">
-        <Figure
-          label="Permits & Accreditations"
-          value={stats.permits?.total ?? 0}
-          flag={Boolean((stats.permits?.overdue ?? 0) > 0 || (stats.permits?.urgent ?? 0) > 0)}
-          href="/permits"
-        />
-        <Figure
-          label="Expatriate Compliance"
-          value={stats.immigration?.total ?? 0}
-          flag={Boolean((stats.immigration?.overdue ?? 0) > 0 || (stats.immigration?.expiringSoon ?? 0) > 0)}
-          href="/immigration"
-        />
-        <Figure
-          label="Corporate Documents"
-          value={stats.documents?.total ?? 0}
-          href="/documents"
-        />
-        <Figure
-          label="Properties & Leases"
-          value={stats.properties?.total ?? 0}
-          flag={Boolean((stats.properties?.leasesExpiring ?? 0) > 0)}
-          href="/properties"
-        />
-        <Figure
-          label="Open Office Concerns"
-          value={stats.tickets?.totalOpen ?? 0}
-          flag={Boolean((stats.tickets?.urgent ?? 0) > 0)}
-          href="/tickets"
-        />
-      </Sheet>
-
-      {/* Urgent Attention Alert Banner (if any) */}
       {urgentCount > 0 && (
-        <Sheet className="mb-5 border-l-4 border-eosin bg-sheet px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-eosin-tint text-eosin">
-                <Icon name="countdown" className="size-4" />
-              </span>
-              <div>
-                <h3 className="text-sm font-semibold text-ink">
-                  {urgentCount} compliance milestone{urgentCount === 1 ? "" : "s"} require executive intervention
-                </h3>
-                <p className="text-meta text-ink-3">
-                  Urgent expirations under 15 days, overdue regulatory filings, or high-priority office concerns.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/notifications"
-              className="inline-flex h-8 items-center gap-1.5 rounded-[3px] bg-eosin px-3 text-meta font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              <span>Review Urgent Alerts</span>
-            </Link>
+        <Sheet className="mb-5 flex flex-wrap items-center justify-between gap-4 border-l-4 border-eosin px-5 py-3.5">
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              {urgentCount} {urgentCount === 1 ? "item needs" : "items need"} action
+            </p>
+            <p className="text-meta text-ink-3">Overdue, or due within 15 days, and urgent office requests.</p>
           </div>
+          <LinkButton href="/notifications" size="sm">
+            Review alerts
+          </LinkButton>
         </Sheet>
       )}
 
-      {/* Comparative Visuals and Countdowns Grid */}
-      <div className="mb-5 grid gap-5 lg:grid-cols-3">
-        {/* Left: Attention Distribution Bars */}
-        <Sheet className="px-5 pt-4 pb-4">
-          <SectionTitle icon="approvals">Attention Distribution</SectionTitle>
-          <p className="mt-1 text-meta text-ink-3">Items expiring or pending action across operational divisions.</p>
-          <div className="mt-3">
-            <Bars rows={barRows} unit="pending" />
-          </div>
+      <div className="mb-5 grid gap-5 lg:grid-cols-5">
+        <Sheet className="px-5 pt-4 pb-4 lg:col-span-3">
+          <SectionTitle icon="approvals">Compliance health</SectionTitle>
+          <HealthChart areas={health} requests={requests} />
         </Sheet>
-
-        {/* Right 2 cols: Proactive Expiration Countdowns Queue */}
         <Sheet className="px-5 pt-4 pb-4 lg:col-span-2">
-          <SectionTitle
-            icon="countdown"
-            action={
-              <Link href="/notifications" className="text-meta font-medium text-hema hover:underline">
-                View all alerts &rarr;
-              </Link>
-            }
-          >
-            Renewal Countdowns & Milestones
-          </SectionTitle>
-
-          {countdownHighlights.length === 0 ? (
-            <Empty title="All compliance records in good standing" icon="approvals">
-              No permits, expatriate credentials, or property leases expiring within the 60-day window.
-            </Empty>
-          ) : (
-            <ul className="mt-2 divide-y divide-rule">
-              {countdownHighlights.map((item) => (
-                <li
-                  key={`${item.entityType}-${item.entityId}`}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 transition-colors hover:bg-bench/40 -mx-2 px-2 rounded-[2px]"
-                >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="mt-0.5 shrink-0">
-                      <CountdownBadge daysRemaining={item.daysRemaining} urgencyTier={item.urgencyTier} />
-                    </div>
-                    <div className="min-w-0">
-                      <Link
-                        href={item.actionPath}
-                        className="font-semibold text-sm text-hema hover:underline truncate block"
-                      >
-                        {item.title}
-                      </Link>
-                      <p className="truncate text-meta text-ink-3">
-                        {item.subtitle} · Ref: {item.reference} · Target: {new Date(item.dueDate).toLocaleDateString("en-PH", { dateStyle: "medium" })}
-                      </p>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={item.actionPath}
-                    className="inline-flex h-7 shrink-0 items-center rounded-[3px] border border-rule-strong bg-sheet px-2.5 text-stamp font-semibold text-ink-2 hover:border-control hover:text-ink uppercase"
-                  >
-                    Manage
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SectionTitle icon="calendar">Renewals by month</SectionTitle>
+          <p className="-mt-1 mb-2 text-meta text-ink-3">Permits, expatriate documents, contracts and leases falling due.</p>
+          <RenewalsChart months={renewalsByMonth} />
         </Sheet>
       </div>
 
-      {/* Corporate Executive Office Operational Navigation Grid */}
-      <Sheet className="px-5 py-4">
-        <SectionTitle icon="exec">Executive Administration Domains</SectionTitle>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            href="/permits"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="permits" className="size-4 text-hema" />
-              <span>Registrations & Permits</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              BOC CPRS accreditation, LGU Mayor's Business Permit, SEC Annual GIS, BIR Form 0605, and FDA Licenses to Operate.
-            </p>
-          </Link>
-
-          <Link
-            href="/immigration"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="immigration" className="size-4 text-hema" />
-              <span>Expatriate & Visas</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              Bureau of Immigration ACR I-Card, DOLE Alien Employment Permit (AEP), 9(g) visas, and executive passports.
-            </p>
-          </Link>
-
-          <Link
-            href="/documents"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="documents" className="size-4 text-hema" />
-              <span>Corporate Documents</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              Directors & Officers (D&O) liability, commercial insurance policies, commercial contracts, and board resolutions.
-            </p>
-          </Link>
-
-          <Link
-            href="/properties"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="properties" className="size-4 text-hema" />
-              <span>Properties & Leases</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              Corporate headquarters, pharma warehouses, rental escalation terms, utility accounts, and 90-day renewal notice deadlines.
-            </p>
-          </Link>
-
-          <Link
-            href="/tickets"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="tickets" className="size-4 text-hema" />
-              <span>Office Concerns</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              Executive service desk, facilities repair, VIP airport transport, office supplies procurement, and courier dispatch.
-            </p>
-          </Link>
-
-          <Link
-            href="/notifications"
-            className="group block rounded-[3px] border border-rule p-4 transition-colors hover:border-hema hover:bg-bench/20"
-          >
-            <div className="flex items-center gap-2 font-semibold text-ink group-hover:text-hema">
-              <Icon name="notifications" className="size-4 text-hema" />
-              <span>Renewal Alerts Matrix</span>
-            </div>
-            <p className="mt-1 text-meta text-ink-3">
-              Centralized expiration milestone engine (90d, 60d, 30d, 15d, 7d, Overdue) with acknowledgment workflows.
-            </p>
-          </Link>
-        </div>
+      <Sheet className="px-5 pt-4 pb-2">
+        <SectionTitle
+          icon="countdown"
+          action={
+            <Link href="/notifications" className="text-meta font-medium text-hema hover:underline">
+              All alerts
+            </Link>
+          }
+        >
+          Due next
+        </SectionTitle>
+        {countdownHighlights.length === 0 ? (
+          <Empty title="Nothing due in the next 60 days" icon="approvals">
+            Permits, expatriate documents and leases are all current.
+          </Empty>
+        ) : (
+          <ul className="divide-y divide-rule">
+            {countdownHighlights.map((item) => (
+              <li key={`${item.entityType}-${item.entityId}`} className="flex items-center gap-3 py-3">
+                <span className="w-32 shrink-0">
+                  <CountdownBadge daysRemaining={item.daysRemaining} urgencyTier={item.urgencyTier} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link href={item.actionPath} className="block truncate text-sm font-semibold text-ink hover:text-hema hover:underline">
+                    {item.title}
+                  </Link>
+                  <p className="truncate text-meta text-ink-3">
+                    {item.subtitle} · Due {new Date(item.dueDate).toLocaleDateString("en-PH", { dateStyle: "medium" })}
+                  </p>
+                </div>
+                <LinkButton href={item.actionPath} size="sm" variant="quiet">
+                  Open
+                </LinkButton>
+              </li>
+            ))}
+          </ul>
+        )}
       </Sheet>
     </>
   );

@@ -202,7 +202,7 @@ function SettingsForm({ rules }: { rules: SalesRules }) {
 
   return (
     <Sheet className="px-5 pt-4 pb-5">
-      <SectionTitle icon="approvals">Approvals & retention</SectionTitle>
+      <SectionTitle icon="approvals">Approvals and retention</SectionTitle>
       <form
         noValidate
         onSubmit={(e) => {

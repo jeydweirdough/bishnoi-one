@@ -308,7 +308,7 @@ def executive_dashboard(user: CurrentUser, db: DB, settings: SettingsDep) -> dic
                     "entityType": "property",
                     "entityId": pr.id,
                     "title": pr.name,
-                    "subtitle": f"Lessor: {pr.lessor_name}",
+                    "subtitle": f"Lease with {pr.lessor_name}",
                     "reference": f"{pr.notice_deadline_days}d Notice",
                     "dueDate": pr.lease_end.isoformat(),
                     "daysRemaining": days,
@@ -343,8 +343,8 @@ def executive_dashboard(user: CurrentUser, db: DB, settings: SettingsDep) -> dic
                     {
                         "entityType": "ticket",
                         "entityId": tk.id,
-                        "title": f"Ticket {tk.ticket_number}: {tk.title}",
-                        "subtitle": f"Priority: {tk.priority.upper()} | Req: {tk.requester_name}",
+                        "title": f"{tk.ticket_number}: {tk.title}",
+                        "subtitle": f"{tk.priority.capitalize()} priority · requested by {tk.requester_name}",
                         "reference": tk.category,
                         "dueDate": tk.sla_due_date.isoformat(),
                         "daysRemaining": days,
@@ -356,7 +356,42 @@ def executive_dashboard(user: CurrentUser, db: DB, settings: SettingsDep) -> dic
     # Sort countdown highlights by urgency (most overdue first, then fewest days remaining)
     highlights.sort(key=lambda x: x["daysRemaining"])
 
+    # 8. Health per area: current, due soon (inside the area's own renewal
+    # window) or overdue, for the overview's status bars.
+    dated = {
+        "permits": ("Permits", "/permits", 30, [p.expiration_date.date() for p in all_permits]),
+        "expatriates": ("Expatriates", "/immigration", 60, [im.expiration_date.date() for im in all_immig]),
+        "documents": ("Documents", "/documents", 60, [d.expiration_date.date() for d in all_docs if d.expiration_date]),
+        "properties": ("Leases", "/properties", 90, [pr.lease_end.date() for pr in all_props]),
+    }
+    health = []
+    for key, (label, href, window, dates) in dated.items():
+        overdue = sum(1 for due in dates if due < today)
+        due_soon = sum(1 for due in dates if 0 <= (due - today).days <= window)
+        health.append({
+            "key": key, "label": label, "href": href, "windowDays": window,
+            "total": len(dates), "current": len(dates) - overdue - due_soon, "dueSoon": due_soon, "overdue": overdue,
+        })
+    open_tickets = [t for t in all_tickets if t.status in ["open", "in_progress", "pending_vendor"]]
+    late = sum(1 for t in open_tickets if t.sla_due_date and t.sla_due_date.date() < today)
+
+    # 9. Renewals falling due per month: anything overdue, then the next six months.
+    months = []
+    first = today.replace(day=1)
+    for i in range(6):
+        y, m = divmod(first.month - 1 + i, 12)
+        months.append(f"{first.year + y}-{m + 1:02d}")
+    by_month = {"overdue": dict.fromkeys(dated, 0), **{mo: dict.fromkeys(dated, 0) for mo in months}}
+    for key, (_, _, _, dates) in dated.items():
+        for due in dates:
+            bucket = "overdue" if due < today else f"{due.year}-{due.month:02d}"
+            if bucket in by_month:
+                by_month[bucket][key] += 1
+
     return {
+        "health": health,
+        "requests": {"open": len(open_tickets), "late": late, "onTime": len(open_tickets) - late},
+        "renewalsByMonth": [{"month": mo, **counts} for mo, counts in by_month.items()],
         "stats": {
             "permits": {
                 "total": permits_total,

@@ -127,7 +127,7 @@ export function AddCustomer({ onAdded, done }: { onAdded: (customer: { id: strin
   );
 }
 
-/** A team (People & access → Teams). */
+/** A team (People and access → Teams). */
 export function AddTeam({ onAdded, done }: { onAdded: (team: { id: string; name: string }) => void; done: () => void }) {
   const [name, setName] = useState("");
   const { pending, failed, run } = useSave();
@@ -146,7 +146,7 @@ export function AddTeam({ onAdded, done }: { onAdded: (team: { id: string; name:
         })
       }
     >
-      <Field label="Team's name" hint="Its headquarters can be added later, in People & access → Teams." error={failed?.fields?.name}>
+      <Field label="Team's name" hint="Its headquarters can be added later, in People and access → Teams." error={failed?.fields?.name}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />}
       </Field>
     </Shell>

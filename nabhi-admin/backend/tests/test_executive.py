@@ -191,3 +191,21 @@ def test_demo_seeding(app, client, auth_header):
     assert data["stats"]["properties"]["total"] > 0
     assert data["stats"]["tickets"]["totalOpen"] > 0
     assert len(data["countdownHighlights"]) > 0
+
+
+def test_dashboard_health_and_renewals_by_month(client, auth_header):
+    """Each area's records as current, due soon or overdue, and renewals per month."""
+    def permit(days, ref):
+        due = (datetime.now(UTC) + timedelta(days=days)).date().isoformat()
+        body = {"title": f"Permit {ref}", "category": "lgu", "agency": "City Hall", "referenceNumber": ref, "expirationDate": due, "status": "active"}
+        assert client.post("/admin/permits", json=body, headers=auth_header).status_code == 201
+
+    permit(-5, "P-1")  # overdue
+    permit(10, "P-2")  # within the 30-day window
+    permit(200, "P-3")  # current
+    data = client.get("/admin/dashboard", headers=auth_header).json()
+    permits = next(h for h in data["health"] if h["key"] == "permits")
+    assert (permits["total"], permits["current"], permits["dueSoon"], permits["overdue"]) == (3, 1, 1, 1)
+    months = data["renewalsByMonth"]
+    assert months[0]["month"] == "overdue" and months[0]["permits"] == 1
+    assert len(months) == 7 and sum(m["permits"] for m in months[1:]) == 1  # 200 days out is past the six months

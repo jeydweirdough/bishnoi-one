@@ -19,7 +19,7 @@ export default async function PromosPage({ searchParams }: { searchParams: Promi
   const current = typeof division === "string" ? division : "";
   return (
     <>
-      <PageHeader title="Products & services">
+      <PageHeader title="Products and services">
         Promos a rep can pick on a quote line, while they run. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
       <DivisionFilter base="/promos" teams={promos.teams} current={current} />

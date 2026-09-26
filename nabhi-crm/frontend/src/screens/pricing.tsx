@@ -5,7 +5,7 @@ import type { SalesRules } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { RulesEditor } from "../components/catalogue/rules-editor";
 
-export const metadata = { title: "Pricing & retention" };
+export const metadata = { title: "Pricing and retention" };
 
 export default async function PricingPage() {
   const me = await getCompanyMe();

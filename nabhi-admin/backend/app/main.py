@@ -12,8 +12,9 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.discord import log_requests, logs_for
+from app.first_admin import make_first_admin
 from app.migrate import upgrade
-from app.routers import auth, admin
+from app.routers import admin, auth, sheets
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Every change and sign-in goes to Discord as a line, a thread a day (app/discord.py).
     app.state.logs = logs_for("ADMIN", settings)
     log_requests(app, app.state.logs)
+    make_first_admin(app.state.sessions, settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -60,4 +62,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(sheets.router)
     return app
