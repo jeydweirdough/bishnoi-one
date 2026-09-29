@@ -120,7 +120,8 @@ def flags(rx: Prescription, settings: Settings, available: dict[str, int]) -> li
         if m.rx_class == "otc":
             add("warn", "medicine", f"{m.label} is sold over the counter; it doesn't need a prescription.")
         have = available.get(m.id, 0)
-        if item.remaining and have < item.remaining:
+        # A check sent by another app is filled by that app's order, not from the counter's stock.
+        if item.remaining and have < item.remaining and rx.source is None:
             add("warn", "availability", f"Only {have} {m.unit}(s) of {m.label} can be given out today; {item.remaining} prescribed.")
     return out
 
@@ -162,6 +163,8 @@ def summary_out(rx: Prescription) -> dict:
         "checkedAt": iso(rx.checked_at),
         "checkedBy": person_out(rx.checked_by),
         "itemCount": len(rx.items),
+        # Sent by another app for checking, or None when taken in here.
+        "source": {"app": rx.source, "reference": rx.source_ref, "sentBy": rx.source_by} if rx.source else None,
         "items": [{"writtenAs": i.written_as, "quantity": i.quantity, "remaining": i.remaining} for i in rx.items],
     }
 

@@ -58,7 +58,11 @@ export function RaiseOrder({
       ? "Available once the quote is approved and its guarantee letter is checked."
       : quote.state === "rejected"
         ? "A rejected quote can't be ordered."
-        : undefined;
+        : quote.pharmacy?.outcome === "rejected"
+          ? "The pharmacist rejected this quote's prescription, so it can't be ordered."
+          : quote.pharmacy && quote.pharmacy.outcome !== "verified"
+            ? "Available once a pharmacist verifies it in Pharmacy."
+            : undefined;
   return (
     // The reason sits on a wrapper too: a switched-off button shows no tooltip in some browsers.
     <span title={why} className="inline-flex">

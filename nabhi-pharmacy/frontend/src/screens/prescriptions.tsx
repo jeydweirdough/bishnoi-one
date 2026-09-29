@@ -2,6 +2,7 @@ import { ClipboardPlus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { SourceMark } from "../components/bits";
 import { enc, load } from "@/src/platform/lib/api";
 import { DispenseMark, Head, NoAccess, RxStatusMark, SearchBar, Tabs } from "../components/bits";
 import { pageFor, param, type Search } from "../lib/page";
@@ -75,6 +76,7 @@ export default async function PrescriptionsPage({ searchParams }: { searchParams
                         {rx.number}
                       </Link>
                       <span className="block text-meta text-ink-3">{rx.prescriberName}</span>
+                      {rx.source && <SourceMark source={rx.source} />}
                     </td>
                     <td className="px-3 py-3 align-top">
                       {rx.patient.fullName}

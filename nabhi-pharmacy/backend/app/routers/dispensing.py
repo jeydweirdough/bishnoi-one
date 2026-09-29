@@ -71,7 +71,12 @@ def queue(
 ) -> list[dict]:
     """Verified prescriptions by how much of them has been handed over:
     none yet (the queue), some (partial), or all (dispensed)."""
-    query = select(Prescription).join(Patient, Prescription.patient_id == Patient.id).where(Prescription.status == "verified")
+    # A check sent by another app is filled by that app's order, so it never queues here.
+    query = (
+        select(Prescription)
+        .join(Patient, Prescription.patient_id == Patient.id)
+        .where(Prescription.status == "verified", Prescription.source.is_(None))
+    )
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Prescription.number).like(like), func.lower(Patient.full_name).like(like)))
@@ -98,6 +103,8 @@ def prepare(_: Can("dispensing.view"), db: DB, settings: SettingsDep, prescripti
     rx = get_or_404(db, Prescription, prescription_id, "prescription")
     if rx.status != "verified":
         raise conflict(f"{rx.number} isn't verified, so nothing can be dispensed on it yet. Check it first.")
+    if rx.source:
+        raise conflict(f"{rx.number} was checked for {rx.source.upper()} {rx.source_ref}, which fills it from its own order, so it isn't dispensed here.")
     on = today(settings)
     return {
         **summary_out(rx),
@@ -127,6 +134,8 @@ def dispense(access: Can("dispensing.create"), db: DB, settings: SettingsDep, bo
     rx = get_or_404(db, Prescription, body.prescription_id, "prescription")
     if rx.status != "verified":
         raise conflict(f"{rx.number} isn't verified, so nothing can be dispensed on it. Check it first.")
+    if rx.source:
+        raise conflict(f"{rx.number} was checked for {rx.source.upper()} {rx.source_ref}, which fills it from its own order, so it isn't dispensed here.")
     on = today(settings)
     items = {i.id: i for i in rx.items}
     asked: dict[str, int] = {}

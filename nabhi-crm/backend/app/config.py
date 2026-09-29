@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     orders_api_url: str | None = None
     orders_api_key: SecretStr | None = None
 
+    # Nabhi Pharmacy, where a pharmacist checks a quote marked Rx before it's
+    # ordered (app/pharmacy.py): its API, and the key it gave this app (one of
+    # its INTEGRATION_KEYS, the part after "crm:"). Unset: an Rx quote can't be
+    # sent for checking, so it can't be ordered.
+    pharmacy_api_url: str | None = None
+    pharmacy_api_key: SecretStr | None = None
+
     @property
     def inventory_linked(self) -> bool:
         return bool(self.inventory_api_url and self.inventory_api_key)
@@ -86,6 +93,10 @@ class Settings(BaseSettings):
     @property
     def orders_linked(self) -> bool:
         return bool(self.orders_api_url and self.orders_api_key)
+
+    @property
+    def pharmacy_linked(self) -> bool:
+        return bool(self.pharmacy_api_url and self.pharmacy_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:
@@ -112,6 +123,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"INVENTORY_API_URL and INVENTORY_APP_URL are addresses like https://inventory-api.example.com, with no / at the end, not {url!r}.")
         if self.finance_api_url and (not self.finance_api_url.startswith(("https://", "http://")) or self.finance_api_url.endswith("/")):
             raise ValueError(f"FINANCE_API_URL is an address like https://finance-api.example.com, with no / at the end, not {self.finance_api_url!r}.")
+        if self.pharmacy_api_url and (not self.pharmacy_api_url.startswith(("https://", "http://")) or self.pharmacy_api_url.endswith("/")):
+            raise ValueError(f"PHARMACY_API_URL is an address like https://pharmacy-api.example.com, with no / at the end, not {self.pharmacy_api_url!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
         if self.discord_mode.lower() not in ("mock", "live"):

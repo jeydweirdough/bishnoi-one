@@ -29,6 +29,12 @@ function Decision({ fmt, label, by, at, note }: { fmt: Format; label: string; by
   );
 }
 
+const PHARMACY_OUTCOMES = {
+  verified: "Verified by the pharmacist",
+  needs_clarification: "The pharmacist needs a clarification",
+  rejected: "Rejected by the pharmacist",
+} as const;
+
 /** A quote as everyone reads it: lines, totals and where approval and payment stand. Each of the approver's actions sits in the part it decides. */
 export async function QuoteView({
   quote,
@@ -42,10 +48,10 @@ export async function QuoteView({
   fields?: CustomField[];
   letterHref: string;
   customerHref?: string;
-  actions?: { approval?: ReactNode; letter?: ReactNode; payment?: ReactNode };
+  actions?: { approval?: ReactNode; letter?: ReactNode; payment?: ReactNode; pharmacy?: ReactNode };
 }) {
   const fmt = await orgFormat();
-  const { approval, letter, payment } = quote;
+  const { approval, letter, payment, pharmacy } = quote;
   return (
     <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start">
       <div className="space-y-5">
@@ -174,6 +180,41 @@ export async function QuoteView({
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="approvals">Approval and payment</SectionTitle>
         <div className="mt-1 divide-y divide-rule text-sm">
+          {pharmacy && (
+            // Rx medicines: a pharmacist in Nabhi Pharmacy checks the prescription before the quote is ordered.
+            <section className="py-3" aria-label="Pharmacist check">
+              <h3 className="text-meta text-ink-3">Pharmacist check{pharmacy.number && ` · ${pharmacy.number}`}</h3>
+              {pharmacy.outcome === "not_sent" ? (
+                <Flag letter="!">Not sent to Pharmacy yet</Flag>
+              ) : pharmacy.outcome === "waiting" ? (
+                <Flag letter="!">Waiting for a pharmacist</Flag>
+              ) : (
+                <>
+                  <p className="font-semibold">{PHARMACY_OUTCOMES[pharmacy.outcome]}</p>
+                  {pharmacy.checkedBy && (
+                    <p className="text-meta text-ink-3">
+                      {pharmacy.checkedBy} · {fmt.whenLabel(pharmacy.checkedAt)}
+                    </p>
+                  )}
+                  {pharmacy.note && <p className="mt-1 whitespace-pre-line text-ink-2">“{pharmacy.note}”</p>}
+                </>
+              )}
+              {pharmacy.sent && (
+                <p className="mt-1 text-meta text-ink-3">
+                  {pharmacy.sent.prescriberName} · prescribed {fmt.dateLabel(pharmacy.sent.prescribedOn)} · sent by {pharmacy.sent.sentBy}
+                </p>
+              )}
+              {pharmacy.outcome === "waiting" && pharmacy.blocking.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-meta text-ink-2">
+                  {pharmacy.blocking.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+              )}
+              {pharmacy.error && <p className="mt-1 text-meta text-danger">{pharmacy.error} Showing the last answer.</p>}
+              {actions?.pharmacy}
+            </section>
+          )}
           <section className="py-3" aria-label="Approval">
             <h3 className="text-meta text-ink-3">Approval</h3>
             {approval.status === "none" ? (

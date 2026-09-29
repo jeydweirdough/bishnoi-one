@@ -6,7 +6,7 @@ import { Input } from "@/src/platform/ui/field";
 import { Flag } from "@/src/platform/ui/marks";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { BATCH_STATUSES, MEDICINE_STATUSES, PRESCRIPTION_STATUSES, RX_CLASSES } from "../lib/words";
-import type { BatchStatus, DispenseState, MedicineStatus, PrescriptionStatus, RxClass } from "../lib/types";
+import type { BatchStatus, DispenseState, MedicineStatus, PrescriptionStatus, RxClass, RxSource } from "../lib/types";
 
 // The small pieces every Pharmacy screen shares. Status is printed in ink,
 // never coloured: solid for the settled state, dashed for waiting, outlined
@@ -31,6 +31,22 @@ export function DispenseMark({ state }: { state: DispenseState }) {
   if (state === "full") return <Stamp style={solid}>Dispensed</Stamp>;
   if (state === "partial") return <Stamp style={dashed}>Partly dispensed</Stamp>;
   return <Stamp style={dashed}>To dispense</Stamp>;
+}
+
+/** The Nabhi app that sent a prescription in for checking, by the name people know it by. */
+export function sourceName(app: string): string {
+  return ({ crm: "Nabhi CRM", orders: "Nabhi Order" } as Record<string, string>)[app] ?? app.toUpperCase();
+}
+
+/** Where a sent-in prescription came from: "From Nabhi CRM · Q-2026-00042 · sent by Rico Padilla". */
+export function SourceMark({ source }: { source: RxSource }) {
+  return (
+    <span className="block text-meta text-ink-3">
+      From {sourceName(source.app)}
+      {source.reference && ` · ${source.reference}`}
+      {source.sentBy && ` · sent by ${source.sentBy}`}
+    </span>
+  );
 }
 
 export function BatchStatusMark({ status, expired }: { status: BatchStatus; expired?: boolean }) {

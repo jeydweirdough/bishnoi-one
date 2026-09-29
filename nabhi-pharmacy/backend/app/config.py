@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     discord_logs_webhook_url: SecretStr | None = None
     discord_max_per_minute: int = 30
 
+    # Other Nabhi apps allowed to send orders here for the pharmacist's check
+    # (the /integration/checks endpoints), as name:key pairs in JSON, e.g.
+    # ["crm:<a long random key>"]. The app sends its key in X-Nabhi-Key. Empty:
+    # nothing outside can send any.
+    integration_keys: list[SecretStr] = []
+
     @property
     def discord_mock_dir(self) -> Path:
         """Where mock mode keeps its tables: beside a SQLite database (so each test has its own), else .data/."""
@@ -84,6 +90,10 @@ class Settings(BaseSettings):
             raise ValueError("EXPIRY_WARNING_DAYS and PRESCRIPTION_VALID_DAYS must be at least 1.")
         if self.discord_mode.lower() not in ("mock", "live"):
             raise ValueError("DISCORD_MODE is mock or live.")
+        for key in self.integration_keys:
+            name, _, secret = key.get_secret_value().partition(":")
+            if not name or len(secret) < 24:
+                raise ValueError("INTEGRATION_KEYS must list name:key pairs, each key at least 24 characters.")
         return self
 
 

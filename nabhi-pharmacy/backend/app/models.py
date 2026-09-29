@@ -374,6 +374,14 @@ class Prescription(Base):
     received_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbph_users.id", ondelete="SET NULL"), default=None)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # Sent by another Nabhi app for checking (routers/integration.py): which
+    # app ("crm"), its own id for it, the number people know it by there, and
+    # who sent it. None for a prescription taken in here. A sent one is
+    # checked here and filled by that app's order, so it isn't dispensed here.
+    source: Mapped[str | None] = mapped_column(String(20), default=None)
+    source_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    source_ref: Mapped[str | None] = mapped_column(String(40), default=None)
+    source_by: Mapped[str | None] = mapped_column(String(120), default=None)
 
     patient: Mapped[Patient] = relationship(lazy="joined")
     checked_by: Mapped[User | None] = relationship(foreign_keys="Prescription.checked_by_id", lazy="joined")

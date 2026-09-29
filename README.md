@@ -449,13 +449,14 @@ after you change a file.
 | CRM | `INVENTORY_API_URL`, `INVENTORY_API_KEY` | not set | Links the CRM to Inventory: the product list and stock levels come from there. Not set: products are added and priced in the CRM by hand. |
 | CRM | `INVENTORY_APP_URL` | not set | Inventory's screens, for the "Add it in Inventory" link on Products. |
 | CRM | `FINANCE_API_URL`, `FINANCE_API_KEY` | not set | Links the CRM to Finance, which works out tax as the last step of the price rules. Not set: quotes are priced without tax. |
-| Inventory, Finance | `INTEGRATION_KEYS` | `[]` | Which other apps may call this one, as `name:key` pairs. See [Linking apps](#linking-apps). |
+| CRM | `PHARMACY_API_URL`, `PHARMACY_API_KEY` | not set | Links the CRM to Pharmacy, where a pharmacist checks quotes marked Rx before they're ordered. Not set: an Rx quote can't be sent for checking, so it can't be ordered. |
+| Inventory, Finance, Pharmacy | `INTEGRATION_KEYS` | `[]` | Which other apps may call this one, as `name:key` pairs. See [Linking apps](#linking-apps). |
 | Platform | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | not set | A webhook in the announcements channel, where announcements are kept, a thread each (`ANN-20260926-0001`). |
 
 ### Linking apps
 
 Some apps ask others for data: the CRM asks **Inventory** for products and
-stock, and **Finance** for tax. The app being asked lists a key for each
+stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx. The app being asked lists a key for each
 caller, and the caller sends that key with every request.
 
 1. Make a key (at least 24 characters):
@@ -478,7 +479,7 @@ caller, and the caller sends that key with every request.
    ```
 
 Use a different key for each link: one for CRM → Inventory, another for
-CRM → Finance. Restart both APIs. If the key is missing or doesn't match,
+CRM → Finance, another for CRM → Pharmacy. Restart both APIs. If the key is missing or doesn't match,
 the CRM tells its users the other app can't be reached; nothing breaks.
 
 ### Screens settings (every app)
@@ -562,6 +563,10 @@ ENVIRONMENT=development
 # Tax from Finance (the key is "crm:<key>" in Finance's INTEGRATION_KEYS)
 # FINANCE_API_URL=http://127.0.0.1:8303
 # FINANCE_API_KEY=
+
+# The pharmacist's check on Rx quotes (the key is "crm:<key>" in Pharmacy's INTEGRATION_KEYS)
+# PHARMACY_API_URL=http://127.0.0.1:8307
+# PHARMACY_API_KEY=
 ```
 
 `nabhi-crm/frontend/.env.local`
@@ -704,6 +709,7 @@ ENVIRONMENT=development
 # ORG_TIMEZONE=Asia/Manila
 # ALLOWED_HOSTS=["localhost", "127.0.0.1"]
 # CORS_ORIGINS=[]
+# INTEGRATION_KEYS=["crm:<the CRM's PHARMACY_API_KEY>"]
 ```
 
 `nabhi-pharmacy/frontend/.env.local`

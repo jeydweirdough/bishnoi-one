@@ -5,7 +5,7 @@ import { Flag } from "@/src/platform/ui/marks";
 import { Particulars, PageHeader, SectionTitle, Sheet, Subheading } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { CheckForm } from "../components/check-form";
-import { DispenseMark, NoAccess, Qty, RxClassMark, RxStatusMark } from "../components/bits";
+import { DispenseMark, NoAccess, Qty, RxClassMark, RxStatusMark, SourceMark, sourceName } from "../components/bits";
 import { pageFor } from "../lib/page";
 import { age } from "../lib/words";
 import type { Medicine, Prescription } from "../lib/types";
@@ -43,7 +43,8 @@ export default async function PrescriptionPage({ params }: { params: Promise<{ i
           <span className="inline-flex flex-wrap items-center gap-3">
             <span>Prescription {rx.number}</span>
             <RxStatusMark status={rx.status} />
-            {rx.status === "verified" && <DispenseMark state={rx.dispensed} />}
+            {rx.status === "verified" && !rx.source && <DispenseMark state={rx.dispensed} />}
+            {rx.source && <SourceMark source={rx.source} />}
           </span>
         }
         tools={
@@ -56,6 +57,7 @@ export default async function PrescriptionPage({ params }: { params: Promise<{ i
         }
         actions={
           rx.status === "verified" &&
+          !rx.source &&
           owed &&
           may("dispensing.create") && (
             <LinkButton href={`/dispensing/new?rx=${rx.id}`} variant="primary" icon={<Pill className="size-4" aria-hidden />}>
@@ -195,7 +197,9 @@ export default async function PrescriptionPage({ params }: { params: Promise<{ i
             <div className="mt-5 border-t border-rule pt-4">
               <Subheading>Next</Subheading>
               <p className="mt-1 text-meta text-ink-2">
-                {owed ? "It waits in the dispensing queue, where the pharmacist picks the batch for each medicine." : "Everything on it has been dispensed."}
+                {rx.source
+                  ? `${sourceName(rx.source.app)} has the verdict and fills ${rx.source.reference ?? "it"} from its own order, so it isn't dispensed here.`
+                  : owed ? "It waits in the dispensing queue, where the pharmacist picks the batch for each medicine." : "Everything on it has been dispensed."}
               </p>
             </div>
           )}

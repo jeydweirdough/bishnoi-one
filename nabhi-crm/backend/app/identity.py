@@ -38,6 +38,7 @@ def me_out(user: User, settings: Settings) -> dict:
         "canRecover": False,
         # Nabhi Order is connected: ready quotes show "Raise order".
         "ordersLinked": settings.orders_linked,
+        "pharmacyLinked": settings.pharmacy_linked,
         "viewedBy": None,
         "isOwner": user.role.is_system,
         "isDeveloperAdmin": False,

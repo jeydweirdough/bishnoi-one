@@ -490,6 +490,15 @@ class Quote(Owned, Base):
     # The order Nabhi Order made from it: {"id", "number", "url", "status", "by": {"id", "name"}, "at"}.
     # None: not ordered yet. A quote is ordered once.
     sales_order: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # A quote marked Rx is checked by a pharmacist in Nabhi Pharmacy before
+    # it's ordered (app/pharmacy.py). What was sent: {"prescriberName",
+    # "prescriberLicense", "prescriberClinic", "prescribedOn", "notes",
+    # "sentBy", "sentAt"}; Pharmacy's last answer (its check_out); when it was
+    # asked; and why the last try failed, if it did. None: not sent.
+    pharmacy_sent: Mapped[dict | None] = mapped_column(JSON, default=None)
+    pharmacy_check: Mapped[dict | None] = mapped_column(JSON, default=None)
+    pharmacy_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    pharmacy_error: Mapped[str | None] = mapped_column(String(300), default=None)
 
     created_by: Mapped[User] = relationship(foreign_keys="Quote.created_by_id", lazy="joined")
 

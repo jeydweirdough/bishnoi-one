@@ -164,11 +164,14 @@ they call each other, so set them up in this order.
 | `nabhi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
 | `nabhi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
 | `nabhi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `nabhi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
 | `nabhi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
 | | `INVENTORY_API_KEY` | From step 2 |
 | | `INVENTORY_APP_URL` | `https://nabhi-inventory.vercel.app` |
 | | `FINANCE_API_URL` | `https://nabhi-finance-backend.vercel.app` |
 | | `FINANCE_API_KEY` | From step 2 |
+| | `PHARMACY_API_URL` | `https://nabhi-pharmacy-backend.vercel.app` |
+| | `PHARMACY_API_KEY` | From step 2 |
 | | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Nabhi Order, when it's ready |
 
 **Every screens project** (`nabhi-<app>`). The `NEXT_PUBLIC_` ones are built
@@ -284,6 +287,44 @@ The same link carries **fund requests** (cash advances):
 Finance's demo admin is Rhea Castillo (`rhea@pharmacrm.test`, demo1234). The
 admin changes the chart of accounts, expense categories, default accounts and
 tax setup; Finance Staff (Joy, Fely) do everything else.
+
+---
+
+## Linking the CRM to Pharmacy
+
+Pharmacy checks that orders are compliant. A CRM quote marked **Rx** can't be
+ordered until a pharmacist in Pharmacy verifies its prescription.
+
+1. Make a key, as above. Use a different one from the other links.
+2. **Pharmacy API** (`nabhi-pharmacy-backend`, or `nabhi-pharmacy/backend/.env`):
+   `INTEGRATION_KEYS` = `["crm:<the key>"]`.
+3. **CRM API** (`nabhi-crm-backend`, or `nabhi-crm/backend/.env`):
+   `PHARMACY_API_URL` = Pharmacy's API address (e.g.
+   `https://nabhi-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
+   one computer) and `PHARMACY_API_KEY` = the key.
+4. Restart both.
+
+How it works:
+
+- **In the CRM:** an Rx quote shows a **Pharmacist check** section. The rep
+  enters the prescription (prescriber, licence number, date, clinic) and
+  sends it. **Raise order** stays off until the pharmacist verifies it.
+- **In Pharmacy:** the quote arrives in **Prescriptions → Inbox**, marked
+  "From Nabhi CRM · Q-…". The pharmacist checks it as any other
+  prescription. It isn't dispensed in Pharmacy: the CRM's order fills it.
+- **The verdict goes back:** verified (the quote can be ordered), needs
+  clarification (the rep corrects the details and sends it again, to the same
+  check), or rejected (final; the quote can't be ordered).
+- The CRM asks Pharmacy for the verdict whenever someone opens the quote, at
+  most every 30 seconds. If Pharmacy can't be reached, the quote shows the
+  last answer and says why.
+
+Other apps can use the same check. `POST /integration/checks` sends an order
+(customer, prescription, lines by product code) and `GET
+/integration/checks/{sourceId}` reads the verdict, with the header
+`X-Nabhi-Key`. The fields are in
+`nabhi-pharmacy/backend/app/routers/integration.py`. Give each app its own
+entry in `INTEGRATION_KEYS`, e.g. `["crm:<key>", "orders:<key>"]`.
 
 ---
 

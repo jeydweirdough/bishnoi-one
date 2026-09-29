@@ -15,7 +15,7 @@ from app.discord import logs_for, mirror_audit
 from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
-from app.routers import admin, auth, batches, dispensing, medicines, patients, prescriptions, reports, sales, stock, suppliers
+from app.routers import admin, auth, batches, dispensing, integration, medicines, patients, prescriptions, reports, sales, stock, suppliers
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -61,6 +61,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "pharmacy"}
 
-    for module in (auth, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers):
+    for module in (auth, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers, integration):
         app.include_router(module.router)
     return app

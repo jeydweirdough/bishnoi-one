@@ -34,6 +34,7 @@ from app.extra import check_extra
 from app.inventory import sync_if_stale
 from app.models import Company, Contact, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
+from app import pharmacy
 from app.orders import OrdersUnavailable
 from app.orders import payload as order_payload
 from app.orders import send as send_order
@@ -234,6 +235,8 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         "extra": q.extra or {},
         # The order raised from it in Nabhi Order, or None.
         "order": q.sales_order,
+        # A quote marked Rx is checked by a pharmacist in Nabhi Pharmacy before it's ordered.
+        "pharmacy": pharmacy_out(q),
         "createdAt": iso(q.created_at),
         "createdBy": person_out(q.created_by) or {"id": "", "name": "Someone no longer here"},
         "owner": person_out(db.get(User, q.owner_id)),
@@ -242,7 +245,9 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
             "approve": approver and q.approval_status == "pending",
             "checkLetter": approver and q.letter_status == "pending",
             "recordPayment": approver and q.letter_status == "verified" and q.payment_status in ("unpaid", "partial") and ready,
-            "order": ready and access.can("orders.create") and q.sales_order is None,
+            "order": ready and access.can("orders.create") and q.sales_order is None and (not q.rx or pharmacy.outcome(q) == "verified"),
+            # Sent, or sent again with corrections, while the pharmacist hasn't settled it.
+            "sendToPharmacy": q.rx and access.can("quotes.create") and q.sales_order is None and pharmacy.outcome(q) not in pharmacy.SETTLED,
         },
     }
 
@@ -445,8 +450,74 @@ def list_quotes(
 
 
 @router.get("/quotes/{quote_id}")
-def read_quote(access: View, db: DB, quote_id: str) -> dict:
-    return quote_out(db, get_quote(db, access, quote_id), access)
+def read_quote(access: View, db: DB, settings: SettingsDep, quote_id: str) -> dict:
+    quote = get_quote(db, access, quote_id)
+    # Where the pharmacist is with it, asked again when out of date.
+    if pharmacy.refresh(settings, quote):
+        db.commit()
+    return quote_out(db, quote, access)
+
+
+def pharmacy_out(q: Quote) -> dict | None:
+    if not q.rx:
+        return None
+    check = q.pharmacy_check or {}
+    return {
+        # not_sent, waiting, verified, needs_clarification or rejected.
+        "outcome": pharmacy.outcome(q) or "not_sent",
+        "number": check.get("number"),
+        "note": check.get("note"),
+        "checkedBy": check.get("checkedBy"),
+        "checkedAt": check.get("checkedAt"),
+        "blocking": check.get("blocking") or [],
+        "sent": q.pharmacy_sent,
+        "syncedAt": iso(q.pharmacy_synced_at),
+        "error": q.pharmacy_error,
+    }
+
+
+class PharmacyCheckIn(Api):
+    prescriber_name: str = Field(min_length=1, max_length=120)
+    prescriber_license: str | None = Field(None, max_length=40)
+    prescriber_clinic: str | None = Field(None, max_length=160)
+    prescribed_on: date
+    notes: str | None = Field(None, max_length=4000)
+
+
+@router.post("/quotes/{quote_id}/pharmacy-check")
+def send_to_pharmacy(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str, body: PharmacyCheckIn) -> dict:
+    """Sends an Rx quote, with its prescription's details, for the pharmacist's
+    check. Sending it again replaces the details and, if the pharmacist asked
+    for clarification, puts it back in their inbox."""
+    quote = get_quote(db, access, quote_id)
+    if not quote.rx:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a quote marked Rx is checked by Pharmacy.")
+    if quote.sales_order is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "An order was already raised from this quote.")
+    if pharmacy.outcome(quote) in pharmacy.SETTLED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The pharmacist has already decided on this quote.")
+    if not settings.pharmacy_linked:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "The CRM isn't linked to Pharmacy yet: set PHARMACY_API_URL and PHARMACY_API_KEY.")
+    details = {
+        "prescriberName": body.prescriber_name,
+        "prescriberLicense": body.prescriber_license,
+        "prescriberClinic": body.prescriber_clinic,
+        "prescribedOn": body.prescribed_on.isoformat(),
+        "notes": body.notes,
+        "sentBy": me.full_name,
+        "sentAt": iso(datetime.now(UTC)),
+    }
+    again = quote.pharmacy_sent is not None
+    try:
+        pharmacy.send(db, settings, quote, details)
+    except pharmacy.PharmacyRefused as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
+    except pharmacy.PharmacyUnavailable as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    audit(db, me, "quote.pharmacy_resent" if again else "quote.pharmacy_sent", target=f"{quote.number} as {quote.pharmacy_check.get('number')}",
+          target_type="quote", target_id=quote.id)
+    db.commit()
+    return quote_out(db, quote, access)
 
 
 def letter_file_of(db: Session, quote: Quote) -> StoredFile | None:
@@ -476,6 +547,8 @@ def orderable(quote: Quote, access: Access) -> None:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Order {quote.sales_order.get('number')} was already raised from this quote.")
     if state_of(quote) != "ready":
         raise HTTPException(status.HTTP_409_CONFLICT, "An order is raised once the quote is approved and its letter is checked.")
+    if quote.rx and pharmacy.outcome(quote) != "verified":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This quote has prescription medicines: a pharmacist must verify it in Pharmacy before it's ordered.")
 
 
 @router.get("/quotes/{quote_id}/order-payload")

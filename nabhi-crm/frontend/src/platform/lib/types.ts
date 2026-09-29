@@ -115,6 +115,8 @@ export type Me = {
   canRecover: boolean;
   /** Nabhi Order is connected, so ready quotes can be raised as orders. */
   ordersLinked?: boolean;
+  /** Nabhi Pharmacy is connected, so Rx quotes can be sent for the pharmacist's check. */
+  pharmacyLinked?: boolean;
   // Set when a Developer Admin is looking through this person's eyes. The
   // screens resolve as the person; this says who is really at the keyboard,
   // and every change is refused while it is set.
@@ -584,9 +586,36 @@ export type Quote = {
   createdAt: string;
   createdBy: Person;
   owner: Person | null;
-  can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean };
+  can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean; sendToPharmacy?: boolean };
+  /** The pharmacist's check in Nabhi Pharmacy; null when the quote isn't Rx. */
+  pharmacy?: PharmacyCheck | null;
   /** The order raised from it in Nabhi Order; null until then. */
   order?: QuoteOrder | null;
+};
+
+export type PharmacyOutcome = "not_sent" | "waiting" | "verified" | "needs_clarification" | "rejected";
+
+export type PrescriptionDetails = {
+  prescriberName: string;
+  prescriberLicense: string | null;
+  prescriberClinic: string | null;
+  prescribedOn: string;
+  notes: string | null;
+};
+
+export type PharmacyCheck = {
+  outcome: PharmacyOutcome;
+  /** Pharmacy's own number for the check, e.g. RX-2026-00012. */
+  number: string | null;
+  note: string | null;
+  checkedBy: string | null;
+  checkedAt: string | null;
+  /** What stops the pharmacist verifying it, in Pharmacy's words. */
+  blocking: string[];
+  sent: (PrescriptionDetails & { sentBy: string; sentAt: string }) | null;
+  syncedAt: string | null;
+  /** Why the last answer couldn't be refreshed; the last one is kept. */
+  error: string | null;
 };
 
 export type QuotePreview = {
