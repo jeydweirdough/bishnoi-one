@@ -206,6 +206,24 @@ class Identity(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Their Nabhi account's password: one sign-in for every application they
+    # have (app/routers/identity.py). None until a Platform Admin sets a first one.
+    password_hash: Mapped[str | None] = mapped_column(String(255), default=None)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class IdentitySession(Base):
+    """One sign-in to a Nabhi account (not the console's staff sign-in). The
+    browser or Nabhi.exe holds the token; only its hash is kept here."""
+
+    __tablename__ = "nbpl_identity_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    identity_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class IdentityApp(Base):

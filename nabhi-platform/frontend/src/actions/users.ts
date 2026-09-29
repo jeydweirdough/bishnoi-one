@@ -35,6 +35,15 @@ export async function updateUser(id: string, patch: UserPatch): Promise<Result<{
   });
 }
 
+/** A first (or new) password for someone's Nabhi account, made here and shown once. Their sign-ins end. */
+export async function makePassword(id: string): Promise<Result<string>> {
+  return attempt(async () => {
+    const body = await api.post<{ password: string }>(`/platform/users/${enc(id)}/password`, {});
+    refresh();
+    return body.password;
+  });
+}
+
 /** Gives someone an application, or changes their role in it. */
 export async function grantApplication(userId: string, appId: string, grant: { role?: string | null; isAppAdmin?: boolean }): Promise<Result> {
   return attempt(async () => {

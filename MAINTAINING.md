@@ -121,6 +121,78 @@ projects on Vercel (Root Directory `nabhi-<app>/frontend` and
 
 ---
 
+## Putting an app online
+
+Six apps are ready for Vercel: Platform, CRM, Inventory, Finance, Executive
+Admin and Pharmacy. Each is two Vercel projects, its screens and its API, and
+they call each other, so set them up in this order.
+
+1. **Database logins.** On Supabase, run `scripts/supabase/app-users.sql`
+   (SQL Editor). It gives each app its own login; copy each app's address
+   from the result (the pooler, port 6543).
+2. **Keys.** `node scripts/deploy-keys.mjs` prints every key the apps use to
+   trust each other, beside the project and setting each goes in. Shown once.
+3. **Projects.** On Vercel, make any project that doesn't exist yet, named as
+   in `.github/deploy.json` (`nabhi-<app>` for the screens, Root Directory
+   `nabhi-<app>/frontend`; `nabhi-<app>-backend` for the API, Root Directory
+   `nabhi-<app>/backend`). The Deploy action stops with a message if one is
+   missing.
+4. **Settings**, below (each project → Settings → Environment Variables →
+   Production).
+5. **Deploy**: Actions → Deploy, tick the apps. APIs first, then screens.
+6. **Platform > Applications:** set each app's address to its screens'
+   address. A Nabhi account opens an app only at that address.
+7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
+   `FIRST_ADMIN_PASSWORD` from the project and redeploy.
+8. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
+   wrong, every request answers 503 naming the setting to look at.
+
+**Every API** (`nabhi-<app>-backend`):
+
+| Setting | Value |
+|---|---|
+| `ENVIRONMENT` | `production` |
+| `DATABASE_URL` | Its login from step 1 |
+| `ALLOWED_HOSTS` | `["nabhi-<app>-backend.vercel.app"]`, its own address |
+| `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
+| `PLATFORM_PUBLIC_KEY` | From step 2 (not the Platform itself) |
+
+**Only some APIs:**
+
+| Project | Setting | Value |
+|---|---|---|
+| `nabhi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
+| `nabhi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `nabhi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `nabhi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
+| | `INVENTORY_API_KEY` | From step 2 |
+| | `INVENTORY_APP_URL` | `https://nabhi-inventory.vercel.app` |
+| | `FINANCE_API_URL` | `https://nabhi-finance-backend.vercel.app` |
+| | `FINANCE_API_KEY` | From step 2 |
+| | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Nabhi Order, when it's ready |
+
+**Every screens project** (`nabhi-<app>`). The `NEXT_PUBLIC_` ones are built
+in, so redeploy the screens after changing them:
+
+| Setting | Value |
+|---|---|
+| `API_URL` | Its own API, e.g. `https://nabhi-crm-backend.vercel.app` |
+| `PLATFORM_API_URL` | `https://nabhi-platform-backend.vercel.app` (announcements) |
+| `NEXT_PUBLIC_NABHI_PLATFORM_URL` | `https://nabhi-platform.vercel.app` (the Nabhi account button; not on the Platform itself) |
+| `NEXT_PUBLIC_NABHI_CRM_URL`, `_INVENTORY_URL`, `_FINANCE_URL`, `_EXEC_URL`, `_PHARMACY_URL` | Each app's screens, for links between the apps |
+
+Leave `SHOW_DEMO_ACCOUNTS` unset online. The addresses above are the
+defaults Vercel gives; use the real ones if a project has its own domain.
+
+What was checked before these were called ready (September 28, 2026): each
+app's tests, its production build, its migrations on a Supabase-like Postgres
+under its own login, a browser through every page, and all six running
+together: the CRM's products and stock from Inventory, tax and fund requests
+through Finance, Raise order to a stand-in Nabhi Order, and one Nabhi account
+opening all five apps.
+
+---
+
 ## Linking the CRM to Inventory
 
 The CRM's products come from Inventory, with their SRP, and it shows
@@ -162,14 +234,16 @@ old one.
 
 Finance works out the tax on CRM quotes (the Philippines: VAT, exempt,
 zero-rated, senior citizen and PWD), as the last step of the CRM's price
-rules. Finance isn't on Vercel yet, so today this link works when both run on
-the same computer or network.
+rules.
 
-1. Make a key, as above. Use a different one from the Inventory link.
-2. **Finance API** (`nabhi-finance/backend/.env`): `INTEGRATION_KEYS` =
-   `["crm:<the key>"]`.
-3. **CRM API** (`nabhi-crm/backend/.env`): `FINANCE_API_URL` = Finance's API
-   address (e.g. `http://127.0.0.1:8303`) and `FINANCE_API_KEY` = the key.
+1. Make a key, as above (or use `scripts/deploy-keys.mjs`). Use a different
+   one from the Inventory link.
+2. **Finance API** (`nabhi-finance-backend`, or `nabhi-finance/backend/.env`):
+   `INTEGRATION_KEYS` = `["crm:<the key>"]`.
+3. **CRM API** (`nabhi-crm-backend`, or `nabhi-crm/backend/.env`):
+   `FINANCE_API_URL` = Finance's API address (e.g.
+   `https://nabhi-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
+   one computer) and `FINANCE_API_KEY` = the key.
 4. Restart both. In Finance, an admin fills in **Tax → Registration** (VAT
    status, registered name, TIN and address, as the invoice shows them).
 5. In the CRM, an admin ticks **Add tax from Finance** under **Settings →
@@ -235,6 +309,37 @@ see it for a real quote, call `GET /quotes/{id}/order-payload` on the CRM API.
 
 The printed quotation (**Print** on a quote) takes its letterhead from
 Settings, Company and quotes: business address, TIN, and phone or email.
+
+## One Nabhi account for every app (the platform)
+
+People at the client companies sign in once, with their Nabhi account on
+Nabhi Platform, and open each application their company has and they have
+been given (Platform > Users > their applications and role). The platform
+gives a signed, two-minute pass for one application; the application checks
+it with the platform's public key, takes it once, and opens its own session
+with the role from the platform. Apps: Executive Admin (`exec`), CRM,
+Finance, Inventory, Pharmacy. Each keeps its own password sign-in as well.
+
+To set it up:
+
+1. Make the platform's key pair once: in `nabhi-platform/backend`,
+   `uv run python -m app.passes`. It prints both halves.
+2. Platform API on Vercel: `PASS_SIGNING_KEY` = the private half (secret).
+3. Each app's API on Vercel: `PLATFORM_PUBLIC_KEY` = the public half (not
+   secret; also shown at the platform API's `/pass/key`).
+4. Each app's screens on Vercel: `NEXT_PUBLIC_NABHI_PLATFORM_URL` = the
+   platform's address. The sign-in page then shows "Sign in with your Nabhi
+   account".
+5. Platform > Applications: each application's address must be its real
+   address: the pass goes back only to `<that address>/auth/platform` (or to
+   Nabhi.exe on the same PC).
+6. Platform > Users > a person > the key icon: makes their first password,
+   shown once. They change it after signing in.
+
+A person gets a pass only while their account and their company are active,
+the company has the application, and they have been given it. A new person
+in an app is added with the platform's role; a role the app doesn't have is
+refused, except in Finance, which only has admin and member.
 
 ## Connecting Discord
 

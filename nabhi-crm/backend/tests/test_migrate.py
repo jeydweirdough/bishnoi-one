@@ -128,3 +128,20 @@ def test_table_names_are_put_right_whatever_the_recorded_revision_says(tmp_path)
 
         head = ScriptDirectory.from_config(_config(engine)).get_current_head()
         assert db.execute(text(f"SELECT version_num FROM {VERSION_TABLE}")).scalar() == head
+
+
+def test_an_older_copy_refuses_a_newer_database(tmp_path):
+    """Each Nabhi.exe runs its own API on the company's database. One not yet
+    updated must say so, not run on tables it doesn't know."""
+    import pytest
+
+    from app.migrate import DatabaseTooNew
+
+    url = f"sqlite:///{(tmp_path / 'sales.db').as_posix()}"
+    create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url))
+    engine = create_engine(url)
+    with engine.begin() as c:
+        c.execute(text("UPDATE nbcm_alembic_version SET version_num = '9999_from_a_newer_nabhi'"))
+    engine.dispose()
+    with pytest.raises(DatabaseTooNew, match="Update Nabhi.exe"):
+        create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url))

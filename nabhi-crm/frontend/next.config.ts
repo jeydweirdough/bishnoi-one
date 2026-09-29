@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: import.meta.dirname,
   poweredByHeader: false,
+  // Nabhi.exe runs the screens on each PC as a small server of their own
+  // (nabhi-desktop/scripts/build-web.mjs sets NABHI_DESKTOP). Vercel builds
+  // are unchanged.
+  ...(process.env.NABHI_DESKTOP ? { output: "standalone" as const } : {}),
   // A receipt or a guarantee letter goes up through a server action, and the
   // default (1 MB) is less than a phone photo. Vercel takes up to 4.5 MB.
   experimental: {

@@ -65,6 +65,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
 
@@ -80,6 +82,14 @@ class User(Base):
                 kwargs["role_id"] = ROLE_EXEC_ASST_ID
         super().__init__(**kwargs)
 
+
+class PlatformPass(Base):
+    """A pass from the platform already taken: each one works once. Kept until it would have expired."""
+
+    __tablename__ = "nbad_platform_passes"
+
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class SignInSession(Base):

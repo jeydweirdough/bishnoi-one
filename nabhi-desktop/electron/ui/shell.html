@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Nabhi</title>
+<style>
+  :root {
+    --bench: #eceef2; --sheet: #ffffff; --ink: #172233; --ink-2: #414d60; --ink-3: #6b7587;
+    --rule: #dde1e8; --control: #c5cbd6; --hema: #3a3f9c; --hema-tint: #ebecf8; --danger: #b42318; --filed: #1f6f47;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bench); color: var(--ink); font: 14px/1.55 "Segoe UI", system-ui, sans-serif; display: grid; place-items: center; padding: 24px; }
+  main { width: min(460px, 100%); background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 28px 28px 24px; }
+  .brand { font: 600 12px/1 "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  h1 { font-size: 22px; margin: 6px 0 4px; }
+  p { margin: 0 0 12px; color: var(--ink-2); }
+  label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 14px 0 4px; }
+  input[type=text] { width: 100%; height: 36px; border: 0; border-bottom: 1px solid var(--control); font: inherit; font-size: 15px; padding: 0; background: transparent; }
+  input[type=text]:focus { outline: none; border-color: var(--hema); box-shadow: inset 0 -1px 0 var(--hema); }
+  .mono { font-family: Consolas, ui-monospace, monospace; letter-spacing: .04em; }
+  .file { display: flex; gap: 10px; align-items: center; margin-top: 2px; }
+  .file span { color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button { font: 600 14px "Segoe UI", sans-serif; height: 36px; padding: 0 16px; border-radius: 3px; border: 1px solid var(--control); background: var(--sheet); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--hema); border-color: var(--hema); color: #fff; }
+  button:disabled { opacity: .55; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .error { color: var(--danger); background: #fbe9e7; border-radius: 3px; padding: 10px 12px; margin-top: 14px; white-space: pre-wrap; font-size: 13.5px; }
+  .hint { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+  ol.steps { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; }
+  ol.steps li { display: flex; gap: 8px; align-items: center; color: var(--ink-2); }
+  ol.steps li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--control); }
+  ol.steps li.done::before { background: var(--filed); }
+  ol.steps li.now::before { background: var(--hema); animation: pulse 1s infinite alternate; }
+  @keyframes pulse { to { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { ol.steps li.now::before { animation: none; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Nabhi</div>
+
+  <section id="activate" hidden>
+    <h1>Set up this PC</h1>
+    <p>Nabhi brings your company's apps together in one window: <strong>Nabhi CRM</strong> and <strong>Nabhi Inventory</strong>.</p>
+    <p>Enter what your administrator gave you. This is done once on each PC.</p>
+    <form id="activate-form" novalidate>
+      <label for="company-id">Company ID</label>
+      <input id="company-id" type="text" class="mono" placeholder="NBH-GETMEDS-01" autocomplete="off" spellcheck="false">
+      <label for="activation-key">Activation key</label>
+      <input id="activation-key" type="text" class="mono" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false">
+      <div class="hint">From your administrator. Letters and numbers; dashes are optional.</div>
+      <label for="file-input">Connection file</label>
+      <div class="file">
+        <button type="button" id="file-button">Choose file</button>
+        <span id="file-name">The .nabhi file sent to your company</span>
+        <input id="file-input" type="file" accept=".nabhi,.txt,.json" hidden>
+      </div>
+      <div id="activate-error" class="error" role="alert" hidden></div>
+      <div class="actions">
+        <button type="submit" class="primary" id="activate-button">Set up</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="starting" hidden>
+    <h1 id="starting-title">Opening Nabhi CRM and Nabhi Inventory</h1>
+    <p id="starting-company"></p>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <section id="problem" hidden>
+    <h1>Nabhi can't open</h1>
+    <p id="problem-company"></p>
+    <div id="problem-text" class="error" role="alert"></div>
+    <div class="actions">
+      <button type="button" class="primary" id="retry">Try again</button>
+      <button type="button" id="replace-button">Use a renewed connection file</button>
+      <input id="replace-input" type="file" accept=".nabhi,.txt,.json" hidden>
+    </div>
+    <div class="actions">
+      <button type="button" id="forget">Remove this company from this PC</button>
+    </div>
+  </section>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

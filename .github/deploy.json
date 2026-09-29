@@ -5,6 +5,14 @@
     "nabhi-crm/frontend": "nabhi-crm",
     "nabhi-crm/backend": "nabhi-crm-backend",
     "nabhi-inventory/frontend": "nabhi-inventory",
-    "nabhi-inventory/backend": "nabhi-inventory-backend"
+    "nabhi-inventory/backend": "nabhi-inventory-backend",
+    "nabhi-platform/frontend": "nabhi-platform",
+    "nabhi-platform/backend": "nabhi-platform-backend",
+    "nabhi-finance/frontend": "nabhi-finance",
+    "nabhi-finance/backend": "nabhi-finance-backend",
+    "nabhi-admin/frontend": "nabhi-admin",
+    "nabhi-admin/backend": "nabhi-admin-backend",
+    "nabhi-pharmacy/frontend": "nabhi-pharmacy",
+    "nabhi-pharmacy/backend": "nabhi-pharmacy-backend"
   }
 }

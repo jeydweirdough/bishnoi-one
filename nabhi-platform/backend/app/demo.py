@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.numbers import TICKET_PREFIXES
+from app.security import hash_password
 from app.models import (
     Announcement,
     Application,
@@ -88,7 +89,7 @@ def seed_sample(db: Session, by: str) -> bool:
     people: dict[str, Identity] = {}
     for name, email, slug, title, admin, roles in PEOPLE:
         person = Identity(company_id=companies[slug].id, full_name=name, email=email, title=title, is_company_admin=admin,
-                          last_active_at=now - timedelta(hours=len(people) * 5))
+                          last_active_at=now - timedelta(hours=len(people) * 5), password_hash=hash_password(DEMO_PASSWORD))
         db.add(person)
         db.flush()
         people[email] = person

@@ -116,21 +116,33 @@ def extra_by(db: Session, quote: Quote, *words: str) -> str | None:
     return None
 
 
-def control_number(db: Session, template: QuoteTemplate, quote: Quote) -> str:
-    """The quote's control number on this template, given the first time it's asked for."""
+def control_number(db: Session, template: QuoteTemplate, quote: Quote, tries: int = 5) -> str:
+    """The quote's control number on this template, given the first time it's asked for.
+
+    Several PCs (each Nabhi.exe runs its own API) can print at the same moment.
+    The template's row is locked while its next number is taken, so the second
+    one waits and gets the number after; a clash that still gets through (a
+    database without row locks) is caught by the unique number and retried."""
     found = db.scalar(select(QuoteControl).where(QuoteControl.template_id == template.id, QuoteControl.quote_id == quote.id))
     if found:
         return found.number
+    locked = db.scalar(select(QuoteTemplate).where(QuoteTemplate.id == template.id).with_for_update()) or template
     on = (quote.created_at or datetime.now()).strftime("%Y-%m")
-    prefix = (template.control_prefix or sales_settings(db).quote_prefix or "Q").strip("-")
-    number = f"{prefix}-{on}-{template.control_next:0{template.control_digits}d}"
-    template.control_next += 1
-    db.add(QuoteControl(template_id=template.id, quote_id=quote.id, number=number))
+    prefix = (locked.control_prefix or sales_settings(db).quote_prefix or "Q").strip("-")
+    number = f"{prefix}-{on}-{locked.control_next:0{locked.control_digits}d}"
+    # a number another PC already gave out (it hadn't moved the counter yet) is skipped
+    while db.scalar(select(QuoteControl.id).where(QuoteControl.template_id == locked.id, QuoteControl.number == number)):
+        locked.control_next += 1
+        number = f"{prefix}-{on}-{locked.control_next:0{locked.control_digits}d}"
+    locked.control_next += 1
+    db.add(QuoteControl(template_id=locked.id, quote_id=quote.id, number=number))
     try:
         db.commit()
-    except IntegrityError:  # asked twice at once: the other one's number stands
+    except IntegrityError:  # asked twice at once: the other one's number stands, or take the next
         db.rollback()
-        return control_number(db, template, quote)
+        if tries <= 1:
+            raise
+        return control_number(db, template, quote, tries - 1)
     return number
 
 

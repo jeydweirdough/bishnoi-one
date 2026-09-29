@@ -52,6 +52,19 @@ def _sqlite_file(engine: Engine) -> Path | None:
     return Path(database) if database and database != ":memory:" else None
 
 
+class DatabaseTooNew(RuntimeError):
+    """The database was brought up to a later version by a newer Nabhi. An
+    older one must not run on it: its screens and saves would not match the
+    tables. It says so plainly instead of failing somewhere later."""
+
+
+def _known(config: Config, revision: str) -> bool:
+    try:
+        return ScriptDirectory.from_config(config).get_revision(revision) is not None
+    except Exception:
+        return False
+
+
 # Any number will do, as long as it is always the same one (and not the CRM's).
 MIGRATION_LOCK = 4304
 
@@ -76,6 +89,10 @@ def _upgrade(engine: Engine) -> None:
     with engine.begin() as connection:
         tables = set(inspect(connection).get_table_names())
         current = MigrationContext.configure(connection, opts={"version_table": VERSION_TABLE}).get_current_revision()
+    if current is not None and not _known(config, current):
+        raise DatabaseTooNew(
+            f"The database is at version {current}, newer than this copy of Nabhi knows. Update Nabhi.exe (or this API) to open it."
+        )
     if current == head:
         return
     file = _sqlite_file(engine)

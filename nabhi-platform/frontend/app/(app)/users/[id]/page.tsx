@@ -12,7 +12,7 @@ import { EditLink, SuspendedTag } from "@/src/components/organizations/record-to
 import { Grants } from "@/src/components/users/grants";
 import { RequestAccess } from "@/src/components/users/request-form";
 import { AdminStamp, workState } from "@/src/components/users/user-rows";
-import { SuspendUser } from "@/src/components/users/user-tools";
+import { MakePassword, SuspendUser } from "@/src/components/users/user-tools";
 import type { Options, PlatformUserDetail, RequestStatus } from "@/src/lib/types";
 import { ago, when } from "@/src/lib/words";
 
@@ -48,6 +48,7 @@ export default async function UserPage({ params }: Props) {
             {staff.canAdminister && (
               <>
                 <EditLink href={`/users/${user.id}/edit`} what={user.fullName} />
+                <MakePassword id={user.id} name={user.fullName} hasPassword={user.hasPassword} />
                 <SuspendUser id={user.id} name={user.fullName} status={user.status} />
               </>
             )}

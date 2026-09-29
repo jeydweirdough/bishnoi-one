@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr | None = None
     # How long a sign-in lasts, until changed under Settings > Security.
     session_hours: int = 10
+    # Nabhi accounts (the companies' people): how long their sign-in lasts.
+    # Long, since Nabhi.exe works in the field for days at a time.
+    identity_session_hours: int = 720
+    # Signs the passes that take a Nabhi account into an application: an
+    # Ed25519 private key, base64 of its 32 raw bytes (app/passes.py makes one).
+    # Each application holds only the public half. Unset in development: a key
+    # is made and kept in .data/.
+    pass_signing_key: SecretStr | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15

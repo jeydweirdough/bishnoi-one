@@ -7,6 +7,8 @@ never goes past the company's: someone can only be given an application their
 company has (Organizations), and loses it when their company does.
 """
 
+import secrets
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Response, status
@@ -87,6 +89,8 @@ def user_out(p: Identity, company: Company | None = None, **extra) -> dict:
         "companyStatus": company.status if company else None,
         "createdAt": iso(p.created_at),
         "lastActiveAt": iso(p.last_active_at),
+        # Can sign in to their Nabhi account (a first password has been set).
+        "hasPassword": bool(p.password_hash),
         **extra,
     }
 
@@ -285,3 +289,29 @@ def withdraw_application(user_id: str, app_id: str, db: DB, me: AdminUser) -> Re
     db.delete(g)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class FirstPasswordIn(Api):
+    # None: one is made, and shown once.
+    password: str | None = Field(None, max_length=256)
+
+
+@router.post("/{user_id}/password")
+def set_password(user_id: str, body: FirstPasswordIn, me: AdminUser, db: DB) -> dict:
+    """A first (or replacement) password for someone's Nabhi account. Their
+    current sign-ins end. They change it themselves afterwards."""
+    from app.security import check_password_rules, hash_password
+
+    person = db.get(Identity, user_id)
+    if person is None:
+        raise not_found("user")
+    made = body.password is None
+    password = body.password or secrets.token_urlsafe(9)
+    problem = check_password_rules(password)
+    if problem:
+        raise field_error("password", problem)
+    person.password_hash = hash_password(password)
+    person.password_changed_at = datetime.now(UTC)
+    audit(db, me, "identity.password_set", category="security", target=person.email, target_type="identity", target_id=person.id, company_id=person.company_id)
+    db.commit()
+    return {"password": password if made else None}

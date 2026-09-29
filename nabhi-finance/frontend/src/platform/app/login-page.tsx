@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { thisAppLabel } from "../lib/apps";
+import { appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
+import { buttonClass } from "../ui/button";
 import { APP_NAME } from "../lib/labels";
 import { api } from "../lib/api";
 import { LoginForm, type Demo } from "./login-form";
@@ -23,11 +24,24 @@ async function demoAccounts(): Promise<{ items: Demo[]; password: string | null 
   }
 }
 
+/**
+ * Signing in with a Nabhi account, on the platform: the way in once the
+ * platform decides who may use which application. Shown when the platform's
+ * address is set for this build (NEXT_PUBLIC_NABHI_PLATFORM_URL).
+ */
+function platformSignIn(): string | null {
+  if (!THIS_APP || THIS_APP === "platform" || !process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) return null;
+  const back = `${appUrl(THIS_APP)}/auth/platform`;
+  return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
+}
+
 export async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : "/";
   const expired = params.expired === "1";
   const denied = params.denied === "1";
+  const refused = typeof params.platform === "string" ? params.platform.slice(0, 300) : null;
+  const nabhiAccount = platformSignIn();
   const demo = await demoAccounts();
   const app = thisAppLabel();
 
@@ -59,6 +73,23 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
           <p className="mt-1 text-ink-2">
             The account you're signed in with doesn't work in {app ?? "this app"}. Sign in with one that does.
           </p>
+        )}
+        {refused && (
+          <p role="alert" className="mt-3 rounded-[3px] bg-danger-tint px-3 py-2 text-sm text-danger">
+            {refused}
+          </p>
+        )}
+        {nabhiAccount && (
+          <div className="mt-6">
+            <a href={nabhiAccount} className={buttonClass("primary", "md", "w-full justify-center")}>
+              Sign in with your Nabhi account
+            </a>
+            <p className="mt-4 flex items-center gap-3 text-meta text-ink-3">
+              <span className="h-px flex-1 bg-rule" aria-hidden />
+              or with an account of {app ?? "this app"} only
+              <span className="h-px flex-1 bg-rule" aria-hidden />
+            </p>
+          </div>
         )}
       </LoginForm>
       <p className="mt-4 text-center text-meta text-ink-3">Forgot your password? Ask your admin to reset it.</p>

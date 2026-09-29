@@ -131,3 +131,18 @@ def acme_name(quote: dict) -> str:
 def test_only_admins_set_templates_up(client, crew):  # noqa: F811
     assert client.post("/admin/quote-templates", json={"name": "Mine"}, headers=crew["ria"]).status_code == 403
     assert client.get("/admin/quote-templates", headers=crew["ria"]).status_code == 403
+
+
+def test_a_control_number_taken_by_another_pc_moves_to_the_next(app, client, ana, crew, ids, pcso_quote):  # noqa: F811
+    """Two PCs printing at once: if the next number was just taken, this one takes the one after."""
+    from app.models import QuoteControl, QuoteTemplate
+
+    t = client.post("/admin/quote-templates", json={"name": "PCSO", "payer": "PCSO", "controlPrefix": "PCSOG", "controlNext": 780, "controlDigits": 5}, headers=ana).json()
+    taken = f"PCSOG-{pcso_quote['createdAt'][:7]}-00780"
+    with app.state.sessions() as db:
+        other = save(client, crew["ria"], {"id": pcso_quote["customerId"]}, [line(ids["AMX-500"])], payer="PCSO", letter=LETTER, letter_file=PDF).json()["id"]
+        db.add(QuoteControl(template_id=t["id"], quote_id=other, number=taken))  # another PC's, a moment ago
+        db.commit()
+        assert db.get(QuoteTemplate, t["id"]).control_next == 780  # that PC hadn't moved the counter yet
+    got = client.get(f"/quotes/{pcso_quote['id']}/document", headers=crew["ria"]).json()["controlNumber"]
+    assert got.endswith("-00781")

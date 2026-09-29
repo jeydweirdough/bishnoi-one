@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       nabhi-admin:
-        description: "Admin (not on Vercel yet)"
+        description: "Admin (on Vercel: screens + API)"
         type: boolean
         default: false
       nabhi-crm:
@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
       nabhi-finance:
-        description: "Finance (not on Vercel yet)"
+        description: "Finance (on Vercel: screens + API)"
         type: boolean
         default: false
       nabhi-in-licensing:
@@ -38,11 +38,11 @@ on:
         type: boolean
         default: false
       nabhi-pharmacy:
-        description: "Pharmacy (not on Vercel yet)"
+        description: "Pharmacy (on Vercel: screens + API)"
         type: boolean
         default: false
       nabhi-platform:
-        description: "Platform (not on Vercel yet)"
+        description: "Platform (on Vercel: screens + API)"
         type: boolean
         default: false
       nabhi-regulatory:
@@ -186,6 +186,13 @@ jobs:
           fi
           echo "Deploying as $user${flags[1]:+ to team ${flags[1]}}"
 
+          # The project must exist, with its Root Directory, before its first deploy:
+          # linking a name Vercel doesn't know would make a new project at the repo's root.
+          team=""; [ ${#flags[@]} -gt 0 ] && team="?slug=${flags[1]}"
+          if ! api "/v9/projects/${{ matrix.project }}${team}" > /dev/null; then
+            echo "::error::There's no Vercel project called ${{ matrix.project }} yet. Make it first (Root Directory: ${{ matrix.folder }}), then run this again. See MAINTAINING.md, Putting an app online."
+            exit 1
+          fi
           # From the repo's root: the project's own Root Directory (on Vercel)
           # says which folder it builds, as it did when Vercel built it itself.
           npx --yes vercel@latest link --yes --project "${{ matrix.project }}" "${flags[@]}" --token "$VERCEL_TOKEN"

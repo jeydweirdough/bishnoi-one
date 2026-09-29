@@ -80,9 +80,20 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
     team: Mapped[Team | None] = relationship(lazy="joined")
+
+
+class PlatformPass(Base):
+    """A pass from the platform already taken: each one works once. Kept until it would have expired."""
+
+    __tablename__ = "nbcm_platform_passes"
+
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class SignInSession(Base):
@@ -802,7 +813,10 @@ class QuoteControl(Base):
     printed or downloaded with it; the same number every time after."""
 
     __tablename__ = "nbcm_quote_controls"
-    __table_args__ = (UniqueConstraint("template_id", "quote_id", name="quote_control_once"),)
+    __table_args__ = (
+        UniqueConstraint("template_id", "quote_id", name="quote_control_once"),
+        UniqueConstraint("template_id", "number", name="quote_control_number_once"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     template_id: Mapped[str] = mapped_column(ForeignKey("nbcm_quote_templates.id", ondelete="CASCADE"), index=True)

@@ -34,7 +34,7 @@ def upgrade() -> None:
             sa.Column("id", sa.String(36), primary_key=True),
             sa.Column("name", sa.String(80), nullable=False, unique=True),
             sa.Column("description", sa.String(300), nullable=True),
-            sa.Column("is_system", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("is_system", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         )
 
@@ -93,7 +93,19 @@ def upgrade() -> None:
 
     # 5. Migrate nbad_users table to reference role_id
     user_columns = {col["name"] for col in inspector.get_columns("nbad_users")}
-    if "role_id" not in user_columns:
+    if "role_id" not in user_columns and bind.dialect.name != "sqlite":
+        # Postgres changes the table in place: sessions and the other tables
+        # keep pointing at it, so it can't be dropped and made again.
+        op.add_column("nbad_users", sa.Column("role_id", sa.String(36), nullable=True))
+        bind.execute(
+            sa.text("UPDATE nbad_users SET role_id = CASE WHEN role = 'admin' THEN :admin ELSE :assistant END"),
+            {"admin": ROLE_ADMIN_ID, "assistant": ROLE_EXEC_ASST_ID},
+        )
+        op.alter_column("nbad_users", "role_id", nullable=False)
+        op.create_foreign_key("fk_nbad_users_role_id", "nbad_users", "nbad_roles", ["role_id"], ["id"])
+        op.create_index("ix_nbad_users_role_id", "nbad_users", ["role_id"])
+        op.drop_column("nbad_users", "role")
+    elif "role_id" not in user_columns:
         # Recreate table cleanly so SQLite check constraints on dropped columns don't fail
         op.create_table(
             "nbad_users_new",

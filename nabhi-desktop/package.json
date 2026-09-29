@@ -1,0 +1,67 @@
+{
+  "name": "nabhi-desktop",
+  "private": true,
+  "type": "module",
+  "description": "Nabhi.exe: the desktop app, and the tool that issues each company's encrypted connection file.",
+  "scripts": {
+    "start": "electron .",
+    "company": "node tools/company.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "pack": "electron-builder --win nsis",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "version": "0.1.0",
+  "main": "electron/main.mjs",
+  "author": "Nabhi",
+  "build": {
+    "appId": "ph.nabhi.desktop",
+    "productName": "Nabhi",
+    "executableName": "Nabhi",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "lib/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/backends",
+        "to": "backends"
+      },
+      {
+        "from": "dist/web",
+        "to": "web"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "Nabhi",
+      "artifactName": "Nabhi-Setup-${version}.exe"
+    }
+  }
+}

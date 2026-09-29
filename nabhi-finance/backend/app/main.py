@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
 from app.discord import log_requests, logs_for
+from app.first_admin import make_first_admin
 from app.migrate import upgrade
 from app.routers import auth, finance, funds, integration, ledger, tax
 from app.tax import rates as tax_rates
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     log_requests(app, app.state.logs)
     # Each country pack's dated rates, and the company's tax registration row.
     tax_rates.seed(app.state.sessions)
+    make_first_admin(app.state.sessions, settings)
 
     app.add_middleware(
         CORSMiddleware,

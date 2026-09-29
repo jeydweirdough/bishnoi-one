@@ -36,6 +36,17 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+
+
+class PlatformPass(Base):
+    """A pass from the platform already taken: each one works once. Kept until it would have expired."""
+
+    __tablename__ = "nbfi_platform_passes"
+
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class SignInSession(Base):
