@@ -1,0 +1,17 @@
+{
+  "name": "nabhi-app-window",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Opens one Nabhi app in a window of its own, for trying it as a desktop app: npm run nabhi-crm:app (from the top of the repo).",
+  "main": "main.mjs",
+  "scripts": {
+    "icons": "electron make-icons.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5"
+  }
+}

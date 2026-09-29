@@ -37,7 +37,7 @@ WRONG = "That email and password don't match a Nabhi account."
 attempts = Attempts()
 _bearer = HTTPBearer(auto_error=False)
 
-# Nabhi.exe runs the applications on the PC itself, on these ports (nabhi-desktop/lib/apps.mjs).
+# Nabhi.exe runs the applications on the PC itself, on these ports.
 DESKTOP_PORTS = range(47300, 47400)
 RETURN_PATH = "/auth/platform"
 

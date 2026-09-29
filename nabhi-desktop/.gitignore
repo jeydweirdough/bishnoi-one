@@ -1,7 +1,0 @@
-# Issued connection files: encrypted, but they belong to the companies, not to git.
-issued/
-*.nabhi
-node_modules/
-dist/
-build/
-release/

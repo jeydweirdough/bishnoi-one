@@ -265,6 +265,33 @@ Every app has one: `npm run nabhi-admin`, `nabhi-crm`, `nabhi-finance`,
 It needs only Node.js and uv (step 2): the root `package.json` has no
 packages of its own to install.
 
+### As a desktop app
+
+To try an app the way it will be used on a PC, in a window of its own, add
+`:app` to its name:
+
+```
+npm run nabhi-crm:app
+```
+
+It starts the API and the screens as above, then opens them in the app's
+own window. The first time, it installs what the window needs (in
+`desktop/`). Closing the window stops the app; so does **Ctrl+C**.
+
+Every app with screens has one: `nabhi-admin:app`, `nabhi-crm:app`,
+`nabhi-finance:app`, `nabhi-inventory:app`, `nabhi-pharmacy:app` and
+`nabhi-platform:app`. To have several open, run each in its own terminal.
+
+| In the window | What happens |
+|---|---|
+| The app itself | Its own window, taskbar button and sign-in, separate from the other apps |
+| A link to another Nabhi app | Opens in that app's window. If that app isn't running, a message says how to start it |
+| Sign in with your Nabhi account | Stays in the window, and comes back signed in |
+| Any other link (a map, a website) | Opens in your browser |
+
+This is for trying the apps on your own computer. Installers for other PCs
+come later.
+
 ### By hand (or on a one-app clone)
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
@@ -317,6 +344,17 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
 - Every API has interactive docs at `/docs`
   (e.g. http://127.0.0.1:8302/docs).
 - Run an API's tests with `uv run pytest` in its `backend/` folder.
+- On Windows, if the screens stop with
+  `listen EACCES: permission denied 0.0.0.0:4302`, Windows has set that port
+  aside (Hyper-V, WSL and Docker do this, and it changes from one restart to
+  the next). `netsh interface ipv4 show excludedportrange protocol=tcp` shows
+  which ports. To keep it away from the Nabhi ports for good, run this once
+  in a terminal opened as administrator, then restart the PC:
+
+  ```
+  netsh int ipv4 set dynamicport tcp start=49152 num=16384
+  netsh int ipv6 set dynamicport tcp start=49152 num=16384
+  ```
 
 ### Put an app online (Vercel)
 

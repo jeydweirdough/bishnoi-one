@@ -14,6 +14,11 @@
  *   npm run nabhi-crm -- --api     the API only
  *   npm run nabhi-crm -- --web     the screens only
  *   npm run nabhi-crm -- --setup   get it ready, start nothing
+ *   npm run nabhi-crm:app          both, in a window of its own (--app)
+ *
+ * With --app the screens open as a desktop app (desktop/main.mjs), marked
+ * [app]. Its packages, desktop/node_modules, are installed the first time.
+ * Closing the window stops the app.
  *
  * Needs uv (https://docs.astral.sh/uv/) and Node.js. No packages of its own.
  */
@@ -41,12 +46,16 @@ if (!app) fail(`Which app? ${asked ? `"${asked}" isn't one. ` : ""}One of: ${app
 
 const only = { api: flags.includes("--api"), web: flags.includes("--web") };
 const setupOnly = flags.includes("--setup");
+const asApp = flags.includes("--app");
 const backend = join(ROOT, app, "backend");
 const frontend = join(ROOT, app, "frontend");
 const frontendPackage = join(frontend, "package.json");
 const devScript = existsSync(frontendPackage) ? JSON.parse(readFileSync(frontendPackage, "utf8")).scripts?.dev : undefined;
 const runApi = !only.web;
 const runWeb = !only.api && Boolean(devScript);
+const desktop = join(ROOT, "desktop");
+if (asApp && !devScript) fail(`${app} has no screens yet, so there is no window to open. Its API runs with: npm run ${app}`);
+if (asApp && only.api) fail("--app opens the screens in a window, so it can't go with --api.");
 
 // On Windows, npm is npm.cmd and needs a shell. The commands here are fixed
 // words, so they're handed over as one line (Node warns about args + shell).
@@ -73,6 +82,15 @@ function copyExample(dir, example, target) {
 
 const newer = (a, b) => existsSync(a) && (!existsSync(b) || statSync(a).mtimeMs > statSync(b).mtimeMs);
 
+// npm install, when a folder's packages are missing or older than what it asks for.
+function packages(dir, what) {
+  const installed = join(dir, "node_modules", ".package-lock.json");
+  if (existsSync(installed) && !newer(join(dir, "package-lock.json"), installed) && !newer(join(dir, "package.json"), installed)) return;
+  step(what, "npm", ["install"], dir);
+  // npm leaves this file alone when nothing changed: mark it, so the next start skips the install.
+  if (existsSync(installed)) utimesSync(installed, new Date(), new Date());
+}
+
 // ---- Get ready ----
 
 console.log(paint("1", `\n${app}`));
@@ -86,16 +104,13 @@ if (runApi || setupOnly) {
 
 if (runWeb || (setupOnly && devScript)) {
   copyExample(frontend, ".env.example", ".env.local");
-  const installed = join(frontend, "node_modules", ".package-lock.json");
-  if (!existsSync(installed) || newer(join(frontend, "package-lock.json"), installed) || newer(frontendPackage, installed)) {
-    step("Installing the screens' packages (npm install)", "npm", ["install"], frontend);
-    // npm leaves this file alone when nothing changed: mark it, so the next start skips the install.
-    if (existsSync(installed)) utimesSync(installed, new Date(), new Date());
-  }
+  packages(frontend, "Installing the screens' packages (npm install)");
 }
 
+if (asApp) packages(desktop, "Installing the desktop window's packages (npm install)");
+
 if (setupOnly) {
-  console.log(paint("32", `✓ ${app} is ready. Run it with: npm run ${app}`));
+  console.log(paint("32", `✓ ${app} is ready. Run it with: npm run ${app}${asApp ? ":app" : ""}`));
   process.exit(0);
 }
 
@@ -107,7 +122,8 @@ const mainPy = join(backend, "main.py");
 const apiPort = existsSync(mainPy) ? readFileSync(mainPy, "utf8").match(/"--port",[^)]*default=(\d+)/)?.[1] : undefined;
 if (runWeb && webPort) console.log(paint("32", `  Screens: http://localhost:${webPort}`));
 if (runApi && apiPort) console.log(paint("32", `  API:     http://127.0.0.1:${apiPort}  (docs at /docs)`));
-console.log(paint("2", "  Ctrl+C stops both.\n"));
+if (asApp) console.log(paint("32", "  Window:  opens by itself once the screens are ready"));
+console.log(paint("2", asApp ? "  Closing the window, or Ctrl+C here, stops everything.\n" : "  Ctrl+C stops both.\n"));
 
 const children = [];
 let stopping = false;
@@ -130,8 +146,12 @@ function stopAll(code = 0) {
   setTimeout(() => process.exit(code), 300);
 }
 
-function start(label, color, command, args, cwd) {
-  const child = spawn(...line(command, args), { cwd, shell: WINDOWS, detached: !WINDOWS, env: { ...process.env, FORCE_COLOR: COLOR ? "1" : "0" } });
+// direct: a program run as it is, with no shell between (its arguments may hold spaces).
+function start(label, color, command, args, cwd, direct = false) {
+  const env = { ...process.env, FORCE_COLOR: COLOR ? "1" : "0" };
+  // Set by some editors' terminals: with it, the desktop window would start as plain Node and open nothing.
+  delete env.ELECTRON_RUN_AS_NODE;
+  const child = spawn(...(direct ? [command, args] : line(command, args)), { cwd, shell: WINDOWS && !direct, detached: !WINDOWS, env });
   const tag = paint(color, `[${label}]`);
   for (const stream of [child.stdout, child.stderr]) {
     let rest = "";
@@ -144,7 +164,7 @@ function start(label, color, command, args, cwd) {
   }
   child.on("exit", (code) => {
     if (stopping) return;
-    console.log(paint(code ? "31" : "2", `${tag} stopped${code ? ` (exit ${code})` : ""}; stopping the rest.`));
+    console.log(paint(code ? "31" : "2", `${tag} ${label === "app" && !code ? "closed" : "stopped"}${code ? ` (exit ${code})` : ""}; stopping the rest.`));
     stopAll(code ?? 0);
   });
   children.push(child);
@@ -152,6 +172,7 @@ function start(label, color, command, args, cwd) {
 
 if (runApi) start("api", "35", "uv", ["run", "main.py"], backend);
 if (runWeb) start("web", "34", "npm", ["run", "dev"], frontend);
+if (asApp) start("app", "33", process.execPath, [join(desktop, "node_modules", "electron", "cli.js"), desktop, `--nabhi-app=${app}`], ROOT, true);
 if (!children.length) fail("Nothing to run.");
 
 process.on("SIGINT", () => stopAll(0));
