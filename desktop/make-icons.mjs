@@ -17,7 +17,7 @@ const page = ({ mark, color }) => `<!doctype html><meta charset="utf-8">
 <style>
   html, body { margin: 0; width: ${SIZE}px; height: ${SIZE}px; background: transparent; overflow: hidden; }
   div { width: ${SIZE}px; height: ${SIZE}px; border-radius: 48px; background: ${color}; color: #fff; display: grid; place-items: center;
-        font: 600 ${mark.length > 1 ? 124 : 156}px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: -.02em; }
+        font: 600 ${mark.length > 1 ? 124 : 156}px/1 Poppins, "Segoe UI", system-ui, sans-serif; letter-spacing: -.02em; }
 </style><div>${mark}</div>`;
 
 // Each icon's window is closed when it's drawn: that alone must not end the run.

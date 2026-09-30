@@ -1,4 +1,4 @@
-import { Nav } from "../shell/nav";
+import { Nav, type Unset } from "../shell/nav";
 import { Suspense } from "react";
 import { NavProgress } from "../shell/nav-progress";
 import { Notices } from "./notices";
@@ -32,7 +32,8 @@ function NoCompany() {
   );
 }
 
-export async function ShellLayout({ children }: { children: React.ReactNode }) {
+/** `unset`: how many things aren't set up yet, by kind, for the sidebar's red counts. */
+export async function ShellLayout({ children, unset }: { children: React.ReactNode; unset?: Unset }) {
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Nabhi app —
   // the cookie is shared — so somebody signed in to an app that is theirs
@@ -51,7 +52,7 @@ export async function ShellLayout({ children }: { children: React.ReactNode }) {
         <NavProgress />
       </Suspense>
       <div className="min-h-dvh lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">
-        <Nav me={me} />
+        <Nav me={me} unset={unset} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
           <div className="mx-auto max-w-[70rem]">
             {/* Announcements from Nabhi Platform (kept in Discord), for this app and for everyone. */}

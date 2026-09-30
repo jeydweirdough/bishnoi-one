@@ -32,6 +32,7 @@ from app.routers import (
     monitoring,
     public,
     support,
+    unset,
     users,
 )
 from app.routers import settings as settings_router
@@ -100,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(companies.router)
     app.include_router(applications.router)
     app.include_router(users.router)
+    app.include_router(unset.router)
     app.include_router(access.router)
     app.include_router(support.router)
     app.include_router(incidents.router)

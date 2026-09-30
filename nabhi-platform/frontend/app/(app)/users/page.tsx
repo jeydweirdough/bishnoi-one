@@ -50,13 +50,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
 }
 
 async function AllUsers({ params, canAdd }: { params: Record<string, string | string[] | undefined>; canAdd: boolean }) {
-  const [q, company, application, status, admins] = [one(params.q), one(params.company), one(params.application), one(params.status), one(params.admins)];
+  const [q, company, application, status, admins, password] = [one(params.q), one(params.company), one(params.application), one(params.status), one(params.admins), one(params.password)];
   const query = new URLSearchParams({
     ...(q && { q }),
     ...(company && { company_id: company }),
     ...(application && { application_id: application }),
     ...(["active", "suspended"].includes(status) && { status }),
     ...(admins === "true" && { admins: "true" }),
+    // The sidebar's red count on Users: people who can't sign in yet.
+    ...(password === "none" && { password: "none" }),
   });
   const [{ users, total }, options] = await Promise.all([
     load<{ users: PlatformUser[]; total: number }>(`/platform/users?${query}`),
@@ -86,6 +88,14 @@ async function AllUsers({ params, canAdd }: { params: Record<string, string | st
             options: [
               { value: "", label: "Everyone" },
               { value: "true", label: "Company admins only" },
+            ],
+          },
+          {
+            name: "password",
+            label: "Sign-in",
+            options: [
+              { value: "", label: "Anyone" },
+              { value: "none", label: "No password yet" },
             ],
           },
         ]}

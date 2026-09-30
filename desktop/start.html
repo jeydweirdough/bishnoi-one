@@ -12,14 +12,14 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--bench); color: var(--ink); font: 14px/1.55 "Segoe UI", system-ui, sans-serif; display: grid; place-items: center; padding: 24px; }
+  body { background: var(--bench); color: var(--ink); font: 14px/1.55 Poppins, "Segoe UI", system-ui, sans-serif; display: grid; place-items: center; padding: 24px; }
   main { width: min(460px, 100%); background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 28px 28px 24px; }
-  .brand { font: 600 12px/1 "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .brand { font: 600 12px/1 Poppins, "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
   h1 { font-size: 22px; margin: 6px 0 4px; }
   p { margin: 0 0 12px; color: var(--ink-2); }
   .now { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
   .now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--hema); animation: pulse 1s infinite alternate; }
-  code { display: block; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--bench); color: var(--ink); font: 13px Consolas, ui-monospace, monospace; user-select: all; }
+  code { display: block; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--bench); color: var(--ink); font: 13px Poppins, "Segoe UI", sans-serif; user-select: all; }
   @keyframes pulse { to { opacity: .3; } }
   @media (prefers-reduced-motion: reduce) { .now::before { animation: none; } }
   [hidden] { display: none !important; }

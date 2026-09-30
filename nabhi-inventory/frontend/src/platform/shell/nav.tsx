@@ -88,6 +88,15 @@ function crmPages(me: Me): Page[] {
  *  already limited to what their role may act on). */
 export type Waiting = Record<string, number>;
 
+/** How many things aren't set up yet, by kind (the API's /inventory/unset):
+ *  only the kinds this person can fix, so every red mark is one they can act on. */
+export type Unset = Record<string, number>;
+
+/** What each kind's red mark says when pointed at. */
+const UNSET_SAYS: Record<string, (n: number) => string> = {
+  productPrices: (n) => `${n} ${n === 1 ? "product has" : "products have"} no selling price or cost`,
+};
+
 type Place = Page & {
   /** Any of these, and the place is part of their work. */
   does: string[];
@@ -95,6 +104,8 @@ type Place = Page & {
   sees: string[];
   /** The alerts that count as waiting on them here. */
   waiting?: string[];
+  /** The things not set up yet that are fixed here. */
+  unset?: string[];
 };
 
 /**
@@ -177,6 +188,7 @@ function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place
       also: ["/catalog"],
       does: ["products.create", "products.edit", "products.delete"],
       sees: ["products.view"],
+      unset: ["productPrices"],
       subpages: [
         { href: "/products", label: "Products" },
         { href: "/catalog/categories", label: "Categories" },
@@ -211,6 +223,23 @@ function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place
     lookUp: places.filter((p) => !any(p.does) && any(p.sees)),
     admin,
   };
+}
+
+/**
+ * How many things in a place aren't set up yet: red, because until they are
+ * something doesn't work (a product with no price sells for nothing).
+ */
+function UnsetMark({ place, unset }: { place: Place; unset: Unset }) {
+  const found = (place.unset ?? []).filter((key) => unset[key]);
+  const count = found.reduce((n, key) => n + unset[key], 0);
+  if (!count) return null;
+  const says = found.map((key) => UNSET_SAYS[key]?.(unset[key]) ?? "").filter(Boolean).join(". ");
+  return (
+    <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> not set yet: {says}</span>
+    </span>
+  );
 }
 
 /** How many wait on them in a place, as the row's trailing mark. */
@@ -334,7 +363,7 @@ function Entry({ page, mark }: { page: Page; mark?: ReactNode }) {
   );
 }
 
-function InventoryLinks({ me, waiting }: { me: Me; waiting: Waiting }) {
+function InventoryLinks({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset }) {
   const pathname = usePathname();
   const { home, work, lookUp, admin } = inventoryNav(me);
   const count = (p: Place) => (p.waiting ?? []).reduce((n, key) => n + (waiting[key] ?? 0), 0);
@@ -348,7 +377,16 @@ function InventoryLinks({ me, waiting }: { me: Me; waiting: Waiting }) {
       {work.length > 0 && (
         <Group label="Your work">
           {work.map((p) => (
-            <Entry key={p.href} page={p} mark={<WaitingMark count={count(p)} />} />
+            <Entry
+              key={p.href}
+              page={p}
+              mark={
+                <>
+                  <UnsetMark place={p} unset={unset} />
+                  <WaitingMark count={count(p)} />
+                </>
+              }
+            />
           ))}
         </Group>
       )}
@@ -959,7 +997,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
+export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waiting; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -987,7 +1025,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} /> : <Links me={me} />}
+          {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} unset={unset} /> : <Links me={me} />}
         </div>
         <Account me={me} />
       </aside>
@@ -1010,7 +1048,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} /> : <Links me={me} />}
+            {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} unset={unset} /> : <Links me={me} />}
             <div className="mt-5">
               <Account me={me} />
             </div>

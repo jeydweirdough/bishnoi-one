@@ -16,6 +16,9 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 export function PropertiesScreen({ properties: initialProperties, canImport = false }: { properties: PropertyRecord[]; canImport?: boolean }) {
   const [properties, setProperties] = useState<PropertyRecord[]>(initialProperties);
   const [selectedType, setSelectedType] = useState<string>("all");
+  // The sidebar's red count on Properties: leases not ended with no rent written down.
+  const [onlyNoRent, setOnlyNoRent] = useState(false);
+  const noRent = properties.filter((p) => p.monthlyRent === null && p.status !== "terminated");
   const [modalProperty, setModalProperty] = useState<PropertyRecord | null | "new">(null);
 
   const types = [
@@ -26,7 +29,7 @@ export function PropertiesScreen({ properties: initialProperties, canImport = fa
     { key: "parking", label: "Parking" },
   ];
 
-  const filtered = properties.filter(
+  const filtered = (onlyNoRent ? noRent : properties).filter(
     (p) => selectedType === "all" || p.propertyType === selectedType
   );
 
@@ -46,6 +49,14 @@ export function PropertiesScreen({ properties: initialProperties, canImport = fa
         }
       >
         Offices, warehouses and depots the company leases or owns, with lease end dates, rent and utility accounts.
+        {(noRent.length > 0 || onlyNoRent) && (
+          <span className="mt-1 block text-danger">
+            {onlyNoRent ? "Showing the properties with no monthly rent." : `${noRent.length} ${noRent.length === 1 ? "property has" : "properties have"} no monthly rent.`}{" "}
+            <button type="button" onClick={() => setOnlyNoRent(!onlyNoRent)} className="font-semibold underline">
+              {onlyNoRent ? "Show every property" : `Show ${noRent.length === 1 ? "it" : "them"}`}
+            </button>
+          </span>
+        )}
       </PageHeader>
 
       <HealthStrip label="leases" {...healthOf(properties.map((pr) => pr.daysRemaining), 90)} />

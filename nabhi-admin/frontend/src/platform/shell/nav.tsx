@@ -32,8 +32,27 @@ type Page = {
    *  page offered to someone the API will then refuse is worse than no page,
    *  so these mirror the gates in app/deps.py rather than approximating them. */
   reach?: (me: Me) => boolean;
+  /** What isn't set up yet there. */
+  missing?: Missing;
 };
 type PageGroup = { label?: string; pages: Page[] };
+
+/** How many things aren't set up yet, by kind (the API's /admin/unset). */
+export type Unset = Record<string, number>;
+
+type Missing = { count: number; says: string };
+
+/** What each kind's red mark says when pointed at. */
+const UNSET_SAYS: Record<string, (n: number) => string> = {
+  propertyRent: (n) => `${n} ${n === 1 ? "property has" : "properties have"} no monthly rent`,
+  documentExpiry: (n) => `${n} ${n === 1 ? "document has" : "documents have"} no expiry date, so no renewal alert can be sent`,
+};
+
+/** What isn't set of these kinds: how many, and what to say about it. */
+function missingOf(unset: Unset, keys: string[]): Missing {
+  const found = keys.filter((key) => unset[key]);
+  return { count: found.reduce((n, key) => n + unset[key], 0), says: found.map((key) => UNSET_SAYS[key](unset[key])).join(". ") };
+}
 
 // The three keys to Settings, and what each unlocks.
 //
@@ -300,6 +319,7 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
               href={page.href}
               icon={page.icon}
               current={isCurrent(page, pathname, page.href === overviewHref)}
+              trailing={page.missing?.count ? <UnsetMark missing={page.missing} /> : undefined}
             >
               {page.label}
             </Row>
@@ -307,6 +327,19 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * How many things there aren't set up yet: red, because until they are
+ * something doesn't work (a document with no expiry date never raises an alert).
+ */
+function UnsetMark({ missing }: { missing: Missing }) {
+  return (
+    <span title={missing.says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {missing.count}
+      <span className="sr-only"> not set yet: {missing.says}</span>
+    </span>
   );
 }
 
@@ -438,6 +471,12 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
+/** The executive pages, with what isn't set up yet on each. */
+const executivePages = (unset: Unset): Page[] =>
+  EXECUTIVE_PAGES.map((p) =>
+    p.href === "/documents" ? { ...p, missing: missingOf(unset, ["documentExpiry"]) } : p.href === "/properties" ? { ...p, missing: missingOf(unset, ["propertyRent"]) } : p,
+  );
+
 const EXECUTIVE_PAGES: Page[] = [
   { href: "/", label: "Overview", icon: "overview" },
   { href: "/notifications", label: "Renewal alerts", icon: "notifications" },
@@ -463,7 +502,7 @@ function adminPagesFor(me: Me): Page[] {
   ];
 }
 
-function Links({ me }: { me: Me }) {
+function Links({ me, unset }: { me: Me; unset: Unset }) {
 
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
@@ -533,7 +572,7 @@ function Links({ me }: { me: Me }) {
       {isOurs("exec") && (
         <Group label={appLabel("exec")}>
           <Flat
-            groups={[{ pages: EXECUTIVE_PAGES }]}
+            groups={[{ pages: executivePages(unset) }]}
             overviewHref="/"
           />
         </Group>
@@ -659,7 +698,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -686,7 +725,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          <Links me={me} unset={unset} />
         </div>
         <Account me={me} />
       </aside>
@@ -709,7 +748,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            <Links me={me} unset={unset} />
             <div className="mt-5">
               <Account me={me} />
             </div>

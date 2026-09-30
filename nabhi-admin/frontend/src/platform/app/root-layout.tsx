@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Public_Sans } from "next/font/google";
+import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { APP_NAME } from "../lib/labels";
 
-const publicSans = Public_Sans({ variable: "--font-public-sans", subsets: ["latin"] });
+// Poppins has no variable version, so each weight in use is loaded by name.
+const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 /** What every Nabhi app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export const viewport: Viewport = { themeColor: "#eceef2" };
  */
 export function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${publicSans.variable} antialiased`}>
+    <html lang="en" className={`${poppins.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
         {children}
         <Toaster

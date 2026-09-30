@@ -16,6 +16,9 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 export function DocumentsScreen({ documents: initialDocuments, canImport = false }: { documents: CorporateDocument[]; canImport?: boolean }) {
   const [documents, setDocuments] = useState<CorporateDocument[]>(initialDocuments);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  // The sidebar's red count on Documents: in force, not renewing by itself, and no expiry date.
+  const [onlyNoExpiry, setOnlyNoExpiry] = useState(false);
+  const noExpiry = documents.filter((d) => d.expirationDate === null && !d.autoRenews && d.status !== "terminated");
   const [modalDocument, setModalDocument] = useState<CorporateDocument | null | "new">(null);
 
   const categories = [
@@ -27,7 +30,7 @@ export function DocumentsScreen({ documents: initialDocuments, canImport = false
     { key: "legal_retainer", label: "Legal retainers" },
   ];
 
-  const filtered = documents.filter(
+  const filtered = (onlyNoExpiry ? noExpiry : documents).filter(
     (d) => selectedCategory === "all" || d.category === selectedCategory
   );
 
@@ -47,6 +50,16 @@ export function DocumentsScreen({ documents: initialDocuments, canImport = false
         }
       >
         Insurance policies, contracts, NDAs, board resolutions and legal retainers, with their renewal and cancellation dates.
+        {(noExpiry.length > 0 || onlyNoExpiry) && (
+          <span className="mt-1 block text-danger">
+            {onlyNoExpiry
+              ? "Showing the documents with no expiry date."
+              : `${noExpiry.length} ${noExpiry.length === 1 ? "document has" : "documents have"} no expiry date, so no renewal alert can be sent.`}{" "}
+            <button type="button" onClick={() => setOnlyNoExpiry(!onlyNoExpiry)} className="font-semibold underline">
+              {onlyNoExpiry ? "Show every document" : `Show ${noExpiry.length === 1 ? "it" : "them"}`}
+            </button>
+          </span>
+        )}
       </PageHeader>
 
       <HealthStrip label="documents with an expiry date" {...healthOf(documents.map((d) => d.daysRemaining), 60)} />

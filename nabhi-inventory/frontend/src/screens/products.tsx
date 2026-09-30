@@ -13,7 +13,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const { fmt, may, me } = await context();
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
   const s = await searchParams;
-  const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock") };
+  const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock"), missing: param(s, "missing") };
   const [products, ref] = await Promise.all([load<ProductRow[]>(`/inventory/products${query(f)}`), load<Reference>("/inventory/reference")]);
   // Variants sit under their product, so the catalogue reads Product → 1 mL, 3 mL, 5 mL.
   const ids = new Set(products.map((p) => p.id));
@@ -57,6 +57,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "Every brand" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />
         <FilterSelect name="supplier" label="Supplier" value={f.supplier} options={[{ value: "", label: "Every supplier" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
         <FilterSelect name="stock" label="Stock" value={f.stock} options={[{ value: "", label: "Any" }, { value: "low", label: "Low" }, { value: "out", label: "Out of stock" }, { value: "over", label: "Over maximum" }]} />
+        {/* The same list as the sidebar's red count on Products. */}
+        <FilterSelect name="missing" label="Prices" value={f.missing} options={[{ value: "", label: "Any" }, { value: "true", label: "Missing a price" }]} />
         <FilterSelect name="status" label="Status" value={f.status} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "discontinued", label: "Discontinued" }, { value: "all", label: "All" }]} />
       </Filters>
       <Sheet>

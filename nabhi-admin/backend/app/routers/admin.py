@@ -649,14 +649,22 @@ class DocumentInput(BaseModel):
     notes: str | None = None
 
 
+def missing_an_expiry():
+    """In force with no expiry date and not renewing by itself, so no renewal alert can come."""
+    return CorporateDocument.expiration_date.is_(None) & ~CorporateDocument.auto_renews & (CorporateDocument.status != "terminated")
+
+
 @router.get("/documents")
 def list_documents(
     user: CurrentUser,
     db: DB,
     settings: SettingsDep,
     category: str | None = Query(None),
+    missing: bool = Query(False, description="only documents in force with no expiry date"),
 ) -> list[dict[str, Any]]:
     query = select(CorporateDocument)
+    if missing:
+        query = query.where(missing_an_expiry())
     if category:
         query = query.where(CorporateDocument.category == category)
     query = query.order_by(CorporateDocument.expiration_date.asc())
@@ -743,14 +751,22 @@ class PropertyInput(BaseModel):
     notes: str | None = None
 
 
+def missing_rent():
+    """Leased and not ended, with no monthly rent written down."""
+    return PropertyRecord.monthly_rent.is_(None) & (PropertyRecord.status != "terminated")
+
+
 @router.get("/properties")
 def list_properties(
     user: CurrentUser,
     db: DB,
     settings: SettingsDep,
     property_type: str | None = Query(None, alias="propertyType"),
+    missing: bool = Query(False, description="only properties not ended with no monthly rent"),
 ) -> list[dict[str, Any]]:
     query = select(PropertyRecord)
+    if missing:
+        query = query.where(missing_rent())
     if property_type:
         query = query.where(PropertyRecord.property_type == property_type)
     query = query.order_by(PropertyRecord.lease_end.asc())

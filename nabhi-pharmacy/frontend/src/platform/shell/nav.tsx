@@ -33,8 +33,27 @@ type Page = {
    *  page offered to someone the API will then refuse is worse than no page,
    *  so these mirror the gates in app/deps.py rather than approximating them. */
   reach?: (me: Me) => boolean;
+  /** What isn't set up yet there. */
+  missing?: Missing;
 };
 type PageGroup = { label?: string; pages: Page[] };
+
+/** How many things aren't set up yet, by kind (the API's /unset): only the
+ *  kinds this person can fix, so every red mark is one they can act on. */
+export type Unset = Record<string, number>;
+
+type Missing = { count: number; says: string };
+
+/** What each kind's red mark says when pointed at. */
+const UNSET_SAYS: Record<string, (n: number) => string> = {
+  medicinePrices: (n) => `${n} ${n === 1 ? "medicine has" : "medicines have"} no price`,
+};
+
+/** What isn't set of these kinds: how many, and what to say about it. */
+function missingOf(unset: Unset, keys: string[]): Missing {
+  const found = keys.filter((key) => unset[key]);
+  return { count: found.reduce((n, key) => n + unset[key], 0), says: found.map((key) => UNSET_SAYS[key](unset[key])).join(". ") };
+}
 
 // The three keys to Settings, and what each unlocks.
 //
@@ -109,7 +128,7 @@ function modulePages(m: ModuleAccess): Page[] {
  * page shows only for a role that may open it, and what belongs to a page
  * (Inbox, Pending, Verified...) is a tab inside it, not another link here.
  */
-function pharmacyGroups(me: Me): PageGroup[] {
+function pharmacyGroups(me: Me, unset: Unset = {}): PageGroup[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
   const groups: PageGroup[] = [
     { pages: [{ href: "/", label: "Dashboard", icon: "overview", reach: () => may("dashboard.view") }] },
@@ -125,7 +144,7 @@ function pharmacyGroups(me: Me): PageGroup[] {
     {
       label: "Stock",
       pages: [
-        { href: "/medicines", label: "Medicines", icon: "medicines", reach: () => may("medicines.view") },
+        { href: "/medicines", label: "Medicines", icon: "medicines", reach: () => may("medicines.view"), missing: missingOf(unset, ["medicinePrices"]) },
         { href: "/batches", label: "Batch & expiry", icon: "batches", reach: () => may("batches.view") },
         { href: "/stock", label: "Stock", icon: "stock", reach: () => may("stock.view") },
         { href: "/suppliers", label: "Suppliers", icon: "suppliers", reach: () => may("suppliers.view") },
@@ -139,8 +158,8 @@ function pharmacyGroups(me: Me): PageGroup[] {
 }
 
 /** A module's pages, in their groups. Most modules have one plain list. */
-function moduleGroups(m: ModuleAccess, me: Me): PageGroup[] {
-  return m.key === "pharmacy" ? pharmacyGroups(me) : [{ pages: modulePages(m) }];
+function moduleGroups(m: ModuleAccess, me: Me, unset: Unset = {}): PageGroup[] {
+  return m.key === "pharmacy" ? pharmacyGroups(me, unset) : [{ pages: modulePages(m) }];
 }
 
 // Settings' pages: the company itself, then who can do what, then the business
@@ -355,6 +374,7 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
               href={page.href}
               icon={page.icon}
               current={isCurrent(page, pathname, page.href === overviewHref)}
+              trailing={page.missing?.count ? <UnsetMark missing={page.missing} /> : undefined}
             >
               {page.label}
             </Row>
@@ -362,6 +382,19 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * How many things there aren't set up yet: red, because until they are
+ * something doesn't work (a medicine with no price would sell for nothing).
+ */
+function UnsetMark({ missing }: { missing: Missing }) {
+  return (
+    <span title={missing.says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {missing.count}
+      <span className="sr-only"> not set yet: {missing.says}</span>
+    </span>
   );
 }
 
@@ -493,7 +526,7 @@ function ModuleEntry({ m, me }: { m: ModuleAccess; me: Me }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={moduleGroups(m, me)} overviewHref={root} />;
 }
 
-function Links({ me }: { me: Me }) {
+function Links({ me, unset }: { me: Me; unset: Unset }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -608,7 +641,7 @@ function Links({ me }: { me: Me }) {
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (
-              <Flat key={m.key} groups={moduleGroups(m, me)} overviewHref={moduleBase(m.key) || "/"} />
+              <Flat key={m.key} groups={moduleGroups(m, me, unset)} overviewHref={moduleBase(m.key) || "/"} />
             ) : (
               <ModuleEntry key={m.key} m={m} me={me} />
             ),
@@ -722,7 +755,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -749,7 +782,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          <Links me={me} unset={unset} />
         </div>
         <Account me={me} />
       </aside>
@@ -772,7 +805,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            <Links me={me} unset={unset} />
             <div className="mt-5">
               <Account me={me} />
             </div>

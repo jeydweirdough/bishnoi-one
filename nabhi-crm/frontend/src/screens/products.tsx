@@ -1,4 +1,5 @@
 import { Upload } from "lucide-react";
+import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
@@ -25,7 +26,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const page = Math.max(1, Number(one(params.page)) || 1);
   const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
   if (q) query.set("q", q);
-  if (active) query.set("active", active);
+  // "missing" is its own question to the API: on sale, but missing a price.
+  if (active === "missing") query.set("missing", "true");
+  else if (active) query.set("active", active);
   const [list, rules, layout] = await Promise.all([
     load<Paged<CatalogueProduct> & { missingPrices: number; inventory: InventoryLink }>(`/products?${query}`),
     load<SalesRules>("/pricing"),
@@ -72,7 +75,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         {list.missingPrices > 0 && (
           <span className="mt-1 block text-danger">
             {list.missingPrices} {list.missingPrices === 1 ? "product is" : "products are"} missing a price, so {list.missingPrices === 1 ? "it" : "they"} can&apos;t be
-            quoted at every price type.
+            quoted at every price type.{" "}
+            {active !== "missing" && (
+              <Link href="/products?active=missing" className="font-semibold underline">
+                Show {list.missingPrices === 1 ? "it" : "them"}
+              </Link>
+            )}
           </span>
         )}
       </PageHeader>
@@ -86,6 +94,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
               { value: "", label: "Every product" },
               { value: "true", label: "On sale" },
               { value: "false", label: "Switched off" },
+              { value: "missing", label: "Missing a price" },
             ],
           },
         ]}

@@ -439,6 +439,15 @@ def product_row(p: Product, level: dict) -> dict:
     }
 
 
+def missing_a_price():
+    """On sale with no selling price, or (for anything but a service) no cost,
+    so it sells for nothing or its stock is valued at nothing. A product that
+    only groups its variants is priced on the variants, so it never counts."""
+    return (Product.status == "active") & (Product.variant_count == 0) & (
+        (Product.selling_price == 0) | ((Product.cost_price == 0) & (Product.product_type != "service"))
+    )
+
+
 @router.get("/products")
 def list_products(
     _: View,
@@ -450,8 +459,11 @@ def list_products(
     status_: str | None = Query(None, alias="status", max_length=16),
     stock: str | None = Query(None, max_length=8, description="low, out, over"),
     parent: str | None = Query(None, max_length=36, description="the variants of this product"),
+    missing: bool = Query(False, description="only products on sale with no selling price or cost"),
 ) -> list[dict]:
     query = select(Product).order_by(func.lower(Product.name))
+    if missing:
+        query = query.where(missing_a_price())
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Product.name).like(like), func.lower(Product.sku).like(like), func.lower(Product.barcode).like(like)))

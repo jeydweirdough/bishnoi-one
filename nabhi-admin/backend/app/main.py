@@ -14,7 +14,7 @@ from app.db import make_engine, make_sessions
 from app.discord import log_requests, logs_for
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
-from app.routers import admin, auth, sheets
+from app.routers import admin, auth, sheets, unset
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -63,4 +63,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(sheets.router)
+    app.include_router(unset.router)
     return app

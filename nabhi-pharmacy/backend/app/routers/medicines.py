@@ -219,6 +219,11 @@ def _code_taken(db: DB, code: str, but: str | None = None) -> bool:
     return db.scalar(q) is not None
 
 
+def missing_a_price():
+    """On sale at no price: a sale is priced straight from the medicine, so it would go for nothing."""
+    return (Medicine.status == "active") & (Medicine.price_centavos == 0)
+
+
 @router.get("")
 def list_medicines(
     _: Can("medicines.view"),
@@ -229,8 +234,11 @@ def list_medicines(
     category_id: str | None = Query(None, alias="categoryId", max_length=36),
     brand_id: str | None = Query(None, alias="brandId", max_length=36),
     rx_class: RxClass | None = Query(None, alias="rxClass"),
+    missing: bool = Query(False, description="only medicines on sale with no price"),
 ) -> list[dict]:
     query = select(Medicine).order_by(func.lower(Medicine.generic_name), Medicine.strength)
+    if missing:
+        query = query.where(missing_a_price())
     if state != "all":
         query = query.where(Medicine.status == state)
     if category_id:

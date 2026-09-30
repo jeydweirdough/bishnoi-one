@@ -36,13 +36,34 @@ type Page = {
   subpages?: SubPage[];
   /** How many things there wait on this person. */
   count?: number;
+  /** What isn't set up yet there. */
+  missing?: Missing;
 };
 type PageGroup = { label?: string; pages: Page[] };
 /** A page of a page, drawn indented under it without an icon of its own. */
-type SubPage = { href: string; label: string; count?: number };
+type SubPage = { href: string; label: string; count?: number; missing?: Missing };
 
 /** How many things wait on this person, by kind (Finance's /finance/funds/counts). */
 export type Waiting = Record<string, number>;
+
+/** How many things aren't set up yet, by kind (Finance's /finance/unset): an
+ *  admin's only, since only they can fix them. */
+export type Unset = Record<string, number>;
+
+type Missing = { count: number; says: string };
+
+/** What each kind's red mark says when pointed at. */
+const UNSET_SAYS: Record<string, (n: number) => string> = {
+  postingAccounts: (n) => `${n} default ${n === 1 ? "account isn't" : "accounts aren't"} set, so some fund steps can't be posted`,
+  categoryAccounts: (n) => `${n} expense ${n === 1 ? "category has" : "categories have"} no account`,
+  taxProfile: () => "The company's tax registration isn't complete",
+};
+
+/** What isn't set of these kinds: how many, and what to say about it. */
+function missingOf(unset: Unset, keys: string[]): Missing {
+  const found = keys.filter((key) => unset[key]);
+  return { count: found.reduce((n, key) => n + unset[key], 0), says: found.map((key) => UNSET_SAYS[key](unset[key])).join(". ") };
+}
 
 // The three keys to Settings, and what each unlocks.
 //
@@ -76,7 +97,7 @@ function crmPages(sales: ModuleAccess[]): Page[] {
   ];
 }
 
-function modulePages(m: ModuleAccess, waiting: Waiting = {}): Page[] {
+function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}): Page[] {
   const base = moduleBase(m.key);
   // In the module's own app the prefix is empty, so its root is plain "/".
   const root = base || "/";
@@ -105,16 +126,17 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}): Page[] {
         href: `${base}/ledger`,
         label: "Accounting",
         icon: "lists",
+        missing: missingOf(unset, ["categoryAccounts", "postingAccounts"]),
         subpages: [
           { href: `${base}/ledger`, label: "Journal entries" },
           { href: `${base}/ledger/accounts`, label: "Chart of accounts" },
           { href: `${base}/ledger/trial-balance`, label: "Trial balance" },
-          { href: `${base}/ledger/categories`, label: "Expense categories" },
-          { href: `${base}/ledger/posting`, label: "Default accounts" },
+          { href: `${base}/ledger/categories`, label: "Expense categories", missing: missingOf(unset, ["categoryAccounts"]) },
+          { href: `${base}/ledger/posting`, label: "Default accounts", missing: missingOf(unset, ["postingAccounts"]) },
         ],
       },
       // Tax is Finance's for every Nabhi app: registration, rates, and what a sale comes to.
-      { href: `${base}/tax`, label: "Tax", icon: "money" },
+      { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
     ];
   }
   if (m.key === "inventory") {
@@ -341,7 +363,14 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
                 href={page.href}
                 icon={page.icon}
                 current={isCurrent(page, pathname, page.href === overviewHref)}
-                trailing={page.count ? <WaitingMark count={page.count} /> : undefined}
+                trailing={
+                  page.count || page.missing?.count ? (
+                    <>
+                      <UnsetMark missing={page.missing} />
+                      <WaitingMark count={page.count} />
+                    </>
+                  ) : undefined
+                }
               >
                 {page.label}
               </Row>
@@ -350,6 +379,20 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * How many things there aren't set up yet: red, because until they are
+ * something doesn't work (a default account left empty stops a fund step posting).
+ */
+function UnsetMark({ missing }: { missing?: Missing }) {
+  if (!missing?.count) return null;
+  return (
+    <span title={missing.says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {missing.count}
+      <span className="sr-only"> not set yet: {missing.says}</span>
+    </span>
   );
 }
 
@@ -388,6 +431,7 @@ function WithSubpages({ page }: { page: Page }) {
         trailing={
           <>
             {/* Closed, the row carries the count; open, each sub-page its own. */}
+            {!open && <UnsetMark missing={page.missing} />}
             {!open && <WaitingMark count={page.count} />}
             <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
           </>
@@ -414,6 +458,7 @@ function SubRow({ sub, current }: { sub: SubPage; current: boolean }) {
       className={`flex h-8 items-center gap-2.5 rounded-[3px] px-3 text-sm ${current ? "bg-hema-tint font-semibold text-hema" : "text-ink-2 hover:bg-sheet hover:text-ink"}`}
     >
       <span className="min-w-0 flex-1 truncate">{sub.label}</span>
+      <UnsetMark missing={sub.missing} />
       <WaitingMark count={sub.count} />
     </Link>
   );
@@ -547,7 +592,7 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
+function Links({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -647,7 +692,7 @@ function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (
-              <Flat key={m.key} groups={[{ pages: modulePages(m, waiting) }]} overviewHref={moduleBase(m.key) || "/"} />
+              <Flat key={m.key} groups={[{ pages: modulePages(m, waiting, unset) }]} overviewHref={moduleBase(m.key) || "/"} />
             ) : (
               <ModuleEntry key={m.key} m={m} />
             ),
@@ -759,7 +804,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
+export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waiting; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -786,7 +831,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} waiting={waiting} />
+          <Links me={me} waiting={waiting} unset={unset} />
         </div>
         <Account me={me} />
       </aside>
@@ -809,7 +854,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} waiting={waiting} />
+            <Links me={me} waiting={waiting} unset={unset} />
             <div className="mt-5">
               <Account me={me} />
             </div>

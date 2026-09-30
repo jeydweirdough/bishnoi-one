@@ -23,6 +23,8 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
   const q = param(search, "q");
   const state = (STATES as readonly string[]).includes(param(search, "state")) ? param(search, "state") : "active";
   const category = param(search, "category");
+  // The medicines on sale with no price: the sidebar's red count on Medicines.
+  const missing = param(search, "missing") === "1";
 
   const tabs = (
     <Tabs
@@ -53,11 +55,12 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
   }
 
   const [medicines, categories] = await Promise.all([
-    load<Medicine[]>(`/medicines?state=${state}${q ? `&q=${enc(q)}` : ""}${category ? `&categoryId=${enc(category)}` : ""}`),
+    load<Medicine[]>(`/medicines?state=${state}${q ? `&q=${enc(q)}` : ""}${category ? `&categoryId=${enc(category)}` : ""}${missing ? "&missing=true" : ""}`),
     load<Category[]>("/medicines/categories"),
   ]);
   const href = (s: string) => `/medicines?state=${s}${q ? `&q=${enc(q)}` : ""}${category ? `&category=${enc(category)}` : ""}`;
   const inCategory = categories.find((c) => c.id === category);
+  const unpriced = medicines.filter((m) => m.priceCentavos === 0).length;
 
   return (
     <>
@@ -72,6 +75,24 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
         }
       >
         Prices are per unit. Available counts only what can be given out today: not expired, not held back.
+        {missing ? (
+          <span className="mt-1 block text-danger">
+            Showing the medicines on sale with no price. A sale is priced from here, so they would sell for nothing.{" "}
+            <Link href="/medicines" className="font-semibold underline">
+              Show every medicine
+            </Link>
+          </span>
+        ) : (
+          state === "active" &&
+          unpriced > 0 && (
+            <span className="mt-1 block text-danger">
+              {unpriced} {unpriced === 1 ? "medicine has" : "medicines have"} no price, so {unpriced === 1 ? "it" : "they"} would sell for nothing.{" "}
+              <Link href="/medicines?missing=1" className="font-semibold underline">
+                Show {unpriced === 1 ? "it" : "them"}
+              </Link>
+            </span>
+          )
+        )}
       </PageHeader>
       {tabs}
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

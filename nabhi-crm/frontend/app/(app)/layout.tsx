@@ -13,9 +13,13 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const me = await getMe();
   // What waits on them, for the sidebar's counts. A count that can't be had
   // is left out rather than stopping the page.
-  const waiting = me.permissions?.includes("funds.view") ? await api.get<Record<string, number>>("/funds/waiting").catch(() => undefined) : undefined;
+  const [waiting, unset] = await Promise.all([
+    me.permissions?.includes("funds.view") ? api.get<Record<string, number>>("/funds/waiting").catch(() => undefined) : undefined,
+    // What isn't set up yet (a product with no price), in red.
+    api.get<Record<string, number>>("/unset").catch(() => undefined),
+  ]);
   return (
-    <ShellLayout waiting={waiting}>
+    <ShellLayout waiting={waiting} unset={unset}>
       <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
       {isFieldAgent(me) && me.org && <FieldTracker userId={me.user.id} timeZone={me.org.timezone} />}
     </ShellLayout>

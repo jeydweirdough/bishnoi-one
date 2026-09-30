@@ -68,6 +68,11 @@ def split_tin(value: str) -> tuple[str, str | None]:
 # --- setup ---------------------------------------------------------------------------------
 
 
+def profile_complete(p: TaxProfile | None) -> bool:
+    """Registered enough to issue a tax invoice: the name, the TIN and the address."""
+    return bool(p and p.registered_name and p.tin and p.registered_address)
+
+
 def profile_out(p: TaxProfile) -> dict:
     pack = pack_for(p.country)
     return {
@@ -81,7 +86,7 @@ def profile_out(p: TaxProfile) -> dict:
         "branchCode": p.branch_code,
         "registeredAddress": p.registered_address,
         "pricesIncludeTax": p.prices_include_tax,
-        "complete": bool(p.registered_name and p.tin and p.registered_address),
+        "complete": profile_complete(p),
         "updatedAt": iso(p.updated_at),
     }
 

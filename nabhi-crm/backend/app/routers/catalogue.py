@@ -219,6 +219,19 @@ def product_out(p: Product, access: Access) -> dict:
     }
 
 
+def missing_a_price():
+    """On sale, but with no price at one of the listed price types, so it can't
+    be quoted at that type. Entered types are typed on the quote, so they never count."""
+    # Two levels down, so the product and the price type are both named as the ones outside.
+    priced = (
+        select(ProductPrice.product_id)
+        .where(ProductPrice.product_id == Product.id, ProductPrice.price_type_code == PriceType.code)
+        .correlate_except(ProductPrice)
+        .exists()
+    )
+    return Product.is_active & select(PriceType.code).where(PriceType.entry == "list", PriceType.is_active, ~priced).exists()
+
+
 def get_product(db: Session, product_id: str) -> Product:
     product = db.get(Product, product_id)
     if product is None:
@@ -233,11 +246,14 @@ def list_products(
     settings: SettingsDep,
     q: str | None = Query(None, max_length=100),
     active: bool | None = None,
+    missing: bool = Query(False, description="Only products on sale that are missing a price"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict:
     sync_if_stale(db, settings)
     query = select(Product)
+    if missing:
+        query = query.where(missing_a_price())
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Product.name).like(like), func.lower(Product.code).like(like), func.lower(Product.generic_name).like(like)))
@@ -245,9 +261,8 @@ def list_products(
         query = query.where(Product.is_active == active)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     products = db.scalars(query.order_by(func.lower(Product.name)).limit(limit).offset(offset)).all()
-    listed = [t.code for t in db.scalars(select(PriceType).where(PriceType.entry == "list", PriceType.is_active))]
-    missing = sum(1 for p in db.scalars(select(Product).where(Product.is_active)) if any(c not in {x.price_type_code for x in p.prices} for c in listed))
-    return {"items": [product_out(p, access) for p in products], "total": total, "missingPrices": missing, "inventory": link_out(db, settings)}
+    without = db.scalar(select(func.count()).select_from(Product).where(missing_a_price())) or 0
+    return {"items": [product_out(p, access) for p in products], "total": total, "missingPrices": without, "inventory": link_out(db, settings)}
 
 
 @router.post("/products/sync")

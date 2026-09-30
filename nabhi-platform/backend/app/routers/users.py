@@ -11,7 +11,7 @@ import secrets
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
@@ -125,6 +125,11 @@ def _email_taken(db: Session, email: str, other_than: str | None = None) -> bool
     return db.scalar(query) is not None
 
 
+def without_password():
+    """Active, and never given a password, so they can't sign in yet."""
+    return (Identity.status == "active") & Identity.password_hash.is_(None)
+
+
 @router.get("")
 def list_users(
     db: DB,
@@ -134,6 +139,7 @@ def list_users(
     application_id: str | None = None,
     status: str | None = None,
     admins: bool = False,
+    password: str | None = Query(None, description="none: only people who can't sign in yet"),
 ) -> dict:
     query = select(Identity, Company).join(Company, Company.id == Identity.company_id).order_by(func.lower(Identity.full_name))
     if q:
@@ -147,6 +153,8 @@ def list_users(
         query = query.where(Identity.status == status)
     if admins:
         query = query.where(Identity.is_company_admin)
+    if password == "none":
+        query = query.where(without_password())
     rows = db.execute(query.limit(500)).all()
     grants: dict[str, list[dict]] = {}
     for g, a in db.execute(

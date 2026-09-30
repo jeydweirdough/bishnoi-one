@@ -6,6 +6,12 @@ import type { IconName } from "@/src/platform/ui/icons";
 
 export type PlatformPage = { href: string; label: string; icon: IconName };
 
+/** Which page each thing not set up yet is fixed on (the API's /platform/unset), and what its red mark says. */
+export const UNSET: Record<string, { href: string; says: (n: number) => string }> = {
+  userPasswords: { href: "/users", says: (n) => `${n} ${n === 1 ? "person has" : "people have"} no password yet, so they can't sign in` },
+  applicationAddress: { href: "/applications", says: (n) => `${n} ${n === 1 ? "application has" : "applications have"} no address` },
+};
+
 export const PLATFORM_GROUPS: { label: string; pages: PlatformPage[] }[] = [
   { label: "Platform", pages: [{ href: "/", label: "Dashboard", icon: "overview" }] },
   {

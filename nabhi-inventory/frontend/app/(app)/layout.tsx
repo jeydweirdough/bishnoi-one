@@ -16,6 +16,16 @@ async function waiting(): Promise<Record<string, number>> {
   }
 }
 
+/** What isn't set up yet (a product with no price), for the sidebar's red counts. */
+async function unset(): Promise<Record<string, number>> {
+  return api.get<Record<string, number>>("/inventory/unset").catch(() => ({}));
+}
+
 export default async function Layout({ children }: { children: ReactNode }) {
-  return <ShellLayout waiting={await waiting()}>{children}</ShellLayout>;
+  const [counts, missing] = await Promise.all([waiting(), unset()]);
+  return (
+    <ShellLayout waiting={counts} unset={missing}>
+      {children}
+    </ShellLayout>
+  );
 }

@@ -4,14 +4,21 @@
 // for the screens to answer and opens them. Each app is a program of its own:
 // its own window, taskbar button, sign-in and saved settings. A link to
 // another Nabhi app opens in that app's window.
+//
+// Nothing opens without the company's license. It is set up once per PC, in
+// whichever Nabhi app comes first, and kept for all of them (license/store.mjs):
+// an app installed later opens with it already, as long as the license
+// includes that app.
 
-import { app, BrowserWindow, dialog, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { APPS, HOST, webUrl } from "./apps.mjs";
+import { LicenseError } from "./license/file.mjs";
+import { endedMessage, licenseKeyOf, licensePath, licenseStore } from "./license/store.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
@@ -23,6 +30,8 @@ const SUITE = "Nabhi";
 let win = null;
 let wanted = null; // the page to open once the screens answer
 let opening = false;
+let license = null; // the company's, opened, once it has been checked
+let licenses = null; // where it is kept: set once the app knows its folders (start, below)
 
 const home = () => webUrl(folder);
 const icon = () => {
@@ -110,9 +119,148 @@ const answers = (port) =>
     socket.once("error", () => end(false));
   });
 
+// --- the license ------------------------------------------------------------------------------
+
+const companyOf = (header) => (header ? `${header.companyName || header.companyId} (${header.companyId})` : "");
+
+/** The license screen: to set it up, or to say what's wrong with it. */
+function showLicense(view, { error = "", header = null } = {}) {
+  license = null;
+  menu();
+  return win?.loadFile(join(here, "license.html"), { query: { view, app: me.name, company: companyOf(header), error } });
+}
+
+/**
+ * Whether this app may open: the license is kept on this PC, opens, hasn't
+ * run out, and includes this app. If not, the license screen says why.
+ */
+async function checkLicense() {
+  let found;
+  try {
+    found = await licenses.load();
+  } catch (e) {
+    await showLicense("problem", { error: e instanceof LicenseError ? e.message : `The license couldn't be read: ${e.message}`, header: licenses.header() });
+    return false;
+  }
+  if (!found) {
+    await showLicense("activate");
+    return false;
+  }
+  if (found.state.ended) {
+    await showLicense("problem", { error: endedMessage(found.header), header: found.header });
+    return false;
+  }
+  if (!found.header.apps.includes(licenseKeyOf(folder))) {
+    const has = found.header.apps.map((a) => APPS[`nabhi-${a}`]?.name ?? a).join(", ");
+    await showLicense("problem", {
+      error: `Your company's license doesn't include ${me.name}. It includes: ${has}. Ask your administrator for a license file that adds it, then choose "Use a renewed license file".`,
+      header: found.header,
+    });
+    return false;
+  }
+  license = found;
+  menu();
+  if (found.state.expiring || found.state.expired) warnExpiry(found);
+  return true;
+}
+
+function warnExpiry({ header, state }) {
+  dialog.showMessageBox(win, {
+    type: "warning",
+    title: "Nabhi license",
+    message: state.expired ? "The license has run out" : `The license runs out in ${Math.max(1, Math.ceil(state.days))} days`,
+    detail: `Ask your administrator for the renewed license file, then choose Help > Use a renewed license file.${
+      state.expired ? ` Nabhi keeps working until ${state.graceUntil.slice(0, 10)}.` : ""
+    }`,
+  });
+}
+
+/** Checks the license, then opens the page asked for (or the app's home). */
+async function start(url = home()) {
+  if (win && (await checkLicense())) open(url);
+}
+
+const fromOwnScreen = (event) => event.senderFrame?.url?.startsWith("file:");
+const failed = (e) => ({ ok: false, error: e instanceof LicenseError ? e.message : `Something went wrong: ${e.message}` });
+
+ipcMain.handle("license:activate", async (event, form) => {
+  if (!fromOwnScreen(event)) return { ok: false, error: "Not allowed." };
+  try {
+    await licenses.activate(form);
+    start();
+    return { ok: true };
+  } catch (e) {
+    return failed(e);
+  }
+});
+
+ipcMain.handle("license:renew", async (event, fileText) => {
+  if (!fromOwnScreen(event)) return { ok: false, error: "Not allowed." };
+  try {
+    await licenses.renew(fileText);
+    start();
+    return { ok: true };
+  } catch (e) {
+    return failed(e);
+  }
+});
+
+ipcMain.handle("license:retry", (event) => {
+  if (fromOwnScreen(event)) start();
+});
+
+ipcMain.handle("license:remove", (event) => {
+  if (fromOwnScreen(event)) confirmRemove();
+});
+
+async function pickRenewedFile() {
+  const picked = await dialog.showOpenDialog(win, { title: "Renewed license file", filters: [{ name: "Nabhi license file", extensions: ["nabhi", "txt", "json"] }], properties: ["openFile"] });
+  if (picked.canceled || !picked.filePaths[0]) return;
+  try {
+    const header = await licenses.renew(readFileSync(picked.filePaths[0], "utf8"));
+    await dialog.showMessageBox(win, { message: "License renewed", detail: `Valid until ${header.expiresAt.slice(0, 10)}, for every Nabhi app on this PC.` });
+    start();
+  } catch (e) {
+    dialog.showErrorBox("Not renewed", failed(e).error);
+  }
+}
+
+async function confirmRemove() {
+  const header = licenses.header();
+  const answer = await dialog.showMessageBox(win, {
+    type: "warning",
+    buttons: ["Remove", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+    title: "Remove the license from this PC",
+    message: `Remove ${header?.companyName || "the company"}'s license from this PC?`,
+    detail: "Every Nabhi app on this PC stops opening until the license is set up again with the Company ID, the activation key and the license file. Nothing in the company's data changes.",
+  });
+  if (answer.response !== 0) return;
+  licenses.remove();
+  start();
+}
+
+function showLicenseDetails() {
+  const header = license?.header ?? licenses.header();
+  dialog.showMessageBox(win, {
+    title: "Nabhi license",
+    message: header ? companyOf(header) : "No license is set up on this PC yet.",
+    detail: header
+      ? [
+          `Apps: ${header.apps.map((a) => APPS[`nabhi-${a}`]?.name ?? a).join(", ")}`,
+          `Valid until ${header.expiresAt.slice(0, 10)}`,
+          "Kept for every Nabhi app on this PC, for this Windows account only.",
+        ].join("\n")
+      : "",
+  });
+}
+
 /** Shows the starting screen until the app's screens answer, then opens the page. */
 async function open(url) {
   wanted = url;
+  // Nothing opens before the license is checked: start() checks it first.
+  if (!license) return void start(url);
   if (opening || !win) return;
   opening = true;
   try {
@@ -136,7 +284,8 @@ function boot() {
     title: me.name,
     icon: icon(),
     backgroundColor: "#eceef2",
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    // The bridge is only for Nabhi's own screens (preload.cjs); the app's screens get nothing.
+    webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.once("ready-to-show", () => win.show());
   // Closing the app's window closes the app, and any pages it opened beside it.
@@ -155,7 +304,7 @@ function boot() {
   });
   menu();
   const asked = flag("nabhi-open");
-  open(asked && ownerOf(asked) === folder ? asked : home());
+  start(asked && ownerOf(asked) === folder ? asked : home());
 }
 
 // --- the menu ----------------------------------------------------------------------------------
@@ -189,13 +338,17 @@ function menu() {
       {
         label: "Help",
         submenu: [
+          { label: "License details", click: showLicenseDetails },
+          { label: "Use a renewed license file…", click: pickRenewedFile, enabled: Boolean(licenses?.header()) },
+          { label: "Remove the license from this PC…", click: confirmRemove, enabled: Boolean(licenses?.header()) },
+          { type: "separator" },
           {
             label: `About ${me.name}`,
             click: () =>
               dialog.showMessageBox(win, {
                 title: `About ${me.name}`,
                 message: me.name,
-                detail: `Development copy, run from the repo.\nScreens: ${home()}\nSigned-in sessions and settings are kept for this app only.`,
+                detail: `Development copy, run from the repo.\nScreens: ${home()}\nLicensed to: ${companyOf(license?.header) || "not set up yet"}\nSigned-in sessions and settings are kept for this app only; the license is shared by every Nabhi app.`,
               }),
           },
         ],
@@ -214,6 +367,8 @@ if (!me) {
   // and so two apps can be open at once (the one-window lock is per folder).
   app.setName(me.name);
   app.setPath("userData", join(app.getPath("appData"), "Nabhi development", folder));
+  // One license for every Nabhi app, outside any one app's folder.
+  licenses = licenseStore(licensePath(app.getPath("appData"), { development: !app.isPackaged }));
   if (process.platform === "win32") app.setAppUserModelId(`ph.nabhi.${folder.replace("nabhi-", "")}.development`);
 
   if (!app.requestSingleInstanceLock({ open: flag("nabhi-open") })) {

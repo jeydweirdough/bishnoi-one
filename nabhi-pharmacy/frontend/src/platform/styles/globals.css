@@ -10,10 +10,12 @@
  *   violet (coming up), always beside a legend and day labels that say it in words.
  */
 @theme {
-  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  /* Codes and figures too: one family everywhere. */
+  --font-mono: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 
   /*
-   * Type roles, named for their job. One family (Public Sans), and each role a
+   * Type roles, named for their job. One family (Poppins), and each role a
    * clear step from the next, so a page reads top-down without reading words:
    *   text-title    the page's name (h1)
    *   text-heading  a sheet's or panel's heading (h2): dark, sentence case

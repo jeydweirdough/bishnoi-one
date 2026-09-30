@@ -292,6 +292,42 @@ Every app with screens has one: `nabhi-admin:app`, `nabhi-crm:app`,
 This is for trying the apps on your own computer. Installers for other PCs
 come later.
 
+### The license
+
+A desktop app opens only with the company's license. It is set up once on
+each PC, in whichever Nabhi app is opened first, and kept for every Nabhi app
+on that PC: an app installed later opens with it straight away, as long as
+the license includes that app.
+
+Each company gets three things from us:
+
+| What | Example | Secret? |
+|---|---|---|
+| Company ID | `NBH-GETMEDS-01` | No |
+| Activation key | `7KQ4M-2XD9P-RTH6W-A3CFN-8B5JE` | Yes: give it to their administrator only, apart from the file |
+| License file | `NBH-GETMEDS-01.nabhi` | No: it is encrypted, and useless without the key |
+
+The license file says which apps the company has and until when (30 days
+by default), and carries each app's database connection. On the PC it is
+kept in `%APPDATA%\Nabhi\license.json`, with the activation key locked to
+that Windows account (it can't be copied to another PC or account). When it
+runs out, the apps warn a week before, keep working three days after, then
+stop until a renewed file is chosen (Help > Use a renewed license file).
+
+Issuing and renewing, from `desktop/`:
+
+```
+npm run license -- issue           # a new company: Company ID, activation key, file
+npm run license -- renew <file>    # a new file with the same IDs: new apps, passwords or expiry
+npm run license -- check <file>    # what's inside, passwords hidden
+```
+
+Files are written to `desktop/issued/`, which is never committed. To try the
+desktop apps on your own PC, add `--local` and type `local` for each app's
+database: the apps then keep using their own `backend/.env` databases. Trying
+the apps from the repo keeps its license apart from a real one, in
+`%APPDATA%\Nabhi development\license.json`.
+
 ### By hand (or on a one-app clone)
 
 Every app runs the same way, in **two terminals**. On a full clone, first go

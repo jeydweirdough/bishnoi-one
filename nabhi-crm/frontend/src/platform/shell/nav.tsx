@@ -60,6 +60,23 @@ type CrmPage = Page & { exact?: boolean; subpages?: SubPage[]; count?: number };
 /** How many things wait on this person, by kind (the API's /funds/waiting). */
 export type Waiting = Record<string, number>;
 
+/** How many things aren't set up yet, by kind (the API's /unset): only the
+ *  kinds this person can fix, so every red mark is one they can act on. */
+export type Unset = Record<string, number>;
+
+/** Which page each kind is fixed on, and what the mark says when pointed at. */
+const UNSET: Record<string, { href: string; says: (n: number) => string }> = {
+  productPrices: { href: "/products", says: (n) => `${n} ${n === 1 ? "product has" : "products have"} no price at every price type` },
+  quoteTemplates: { href: "/admin/settings/quote-templates", says: () => "No quotation template is set up, so quotes can't be printed" },
+  companyDetails: { href: "/admin/settings/company", says: (n) => `${n} of the company's letterhead details ${n === 1 ? "isn't" : "aren't"} set` },
+};
+
+/** What isn't set on these pages: how many, and what to say about it. */
+function unsetOn(unset: Unset, hrefs: string[]): { count: number; says: string } {
+  const found = Object.entries(UNSET).filter(([key, at]) => unset[key] && hrefs.includes(at.href));
+  return { count: found.reduce((n, [key]) => n + unset[key], 0), says: found.map(([key, at]) => at.says(unset[key])).join(". ") };
+}
+
 /** The CRM's own pages, in groups by what they're for, as Inventory's are.
  *  Each shows only for a role that may open it (the same gate as the page
  *  and the API); what belongs to a place (a customer's contacts, a product's
@@ -375,6 +392,20 @@ function Parent({ href, base, icon, label, groups, overviewHref }: {
   );
 }
 
+/**
+ * How many things there aren't set up yet: red, because until they are
+ * something doesn't work (a product with no price can't be quoted at it).
+ */
+function UnsetMark({ count, says }: { count: number; says: string }) {
+  if (!count) return null;
+  return (
+    <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> not set yet: {says}</span>
+    </span>
+  );
+}
+
 /** How many things wait on this person there: a count, or nothing. */
 function WaitingMark({ count }: { count: number }) {
   if (!count) return null;
@@ -390,16 +421,30 @@ function WaitingMark({ count }: { count: number }) {
  * One of the CRM's rows. A row with sub-pages opens to them, indented under
  * it, only while you're on one of them: everywhere else it is one line.
  */
-function CrmEntry({ page }: { page: CrmPage }) {
+function CrmEntry({ page, unset }: { page: CrmPage; unset: Unset }) {
   const pathname = usePathname();
   const subs = subpagesOf(page);
   if (subs.length === 0) {
+    const missing = unsetOn(unset, [page.href, ...(page.subpages ?? []).map((s) => s.href)]);
     return (
-      <Row href={page.href} icon={page.icon} current={crmCurrent(page, pathname)} trailing={page.count ? <WaitingMark count={page.count} /> : undefined}>
+      <Row
+        href={page.href}
+        icon={page.icon}
+        current={crmCurrent(page, pathname)}
+        trailing={
+          page.count || missing.count ? (
+            <>
+              <UnsetMark {...missing} />
+              <WaitingMark count={page.count ?? 0} />
+            </>
+          ) : undefined
+        }
+      >
         {page.label}
       </Row>
     );
   }
+  const missing = unsetOn(unset, subs.map((s) => s.href));
   const here = currentSub(page, pathname);
   const open = here !== undefined || crmCurrent(page, pathname);
   return (
@@ -411,7 +456,8 @@ function CrmEntry({ page }: { page: CrmPage }) {
         open={open}
         trailing={
           <>
-            {/* Closed, the row carries the count; open, each sub-page carries its own. */}
+            {/* Closed, the row carries the counts; open, each sub-page carries its own. */}
+            {!open && <UnsetMark {...missing} />}
             {!open && <WaitingMark count={page.count ?? 0} />}
             <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
           </>
@@ -423,7 +469,20 @@ function CrmEntry({ page }: { page: CrmPage }) {
         // The same guide line as a section's pages: these are the row's own.
         <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2" role="group" aria-label={page.label}>
           {subs.map((sub) => (
-            <Row key={sub.href} href={sub.href} nested current={sub === here} trailing={sub.count ? <WaitingMark count={sub.count} /> : undefined}>
+            <Row
+              key={sub.href}
+              href={sub.href}
+              nested
+              current={sub === here}
+              trailing={
+                sub.count || unsetOn(unset, [sub.href]).count ? (
+                  <>
+                    <UnsetMark {...unsetOn(unset, [sub.href])} />
+                    <WaitingMark count={sub.count ?? 0} />
+                  </>
+                ) : undefined
+              }
+            >
               {sub.label}
             </Row>
           ))}
@@ -609,7 +668,7 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
+function Links({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -702,7 +761,7 @@ function Links({ me, waiting }: { me: Me; waiting: Waiting }) {
         crmGroups(me, waiting).map((g) => (
           <Group key={g.label} label={g.label}>
             {g.pages.map((page) => (
-              <CrmEntry key={page.href} page={page} />
+              <CrmEntry key={page.href} page={page} unset={unset} />
             ))}
           </Group>
         ))}
@@ -833,7 +892,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
+export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waiting; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -860,7 +919,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} waiting={waiting} />
+          <Links me={me} waiting={waiting} unset={unset} />
         </div>
         <Account me={me} />
       </aside>
@@ -883,7 +942,7 @@ export function Nav({ me, waiting = {} }: { me: Me; waiting?: Waiting }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} waiting={waiting} />
+            <Links me={me} waiting={waiting} unset={unset} />
             <div className="mt-5">
               <Account me={me} />
             </div>

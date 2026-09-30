@@ -10,7 +10,7 @@ import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
-import { PLATFORM_GROUPS, platformPlace } from "@/src/lib/pages";
+import { PLATFORM_GROUPS, UNSET, platformPlace } from "@/src/lib/pages";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
 
@@ -451,7 +451,27 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-function Links({ me }: { me: Me }) {
+/** How many things aren't set up yet, by kind (the API's /platform/unset). */
+export type Unset = Record<string, number>;
+
+/**
+ * How many things on a page aren't set up yet: red, because until they are
+ * something doesn't work (a person with no password can't sign in).
+ */
+function UnsetMark({ unset, href }: { unset: Unset; href: string }) {
+  const found = Object.entries(UNSET).filter(([key, at]) => unset[key] && at.href === href);
+  const count = found.reduce((n, [key]) => n + unset[key], 0);
+  if (!count) return null;
+  const says = found.map(([key, at]) => at.says(unset[key])).join(". ");
+  return (
+    <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+      {count}
+      <span className="sr-only"> not set yet: {says}</span>
+    </span>
+  );
+}
+
+function Links({ me, unset }: { me: Me; unset: Unset }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
   // only the companies themselves, until one is opened.
@@ -463,7 +483,13 @@ function Links({ me }: { me: Me }) {
         {PLATFORM_GROUPS.map((group) => (
           <Group key={group.label} label={group.label}>
             {group.pages.map((page) => (
-              <Row key={page.href} href={page.href} icon={page.icon} current={page.href === "/" ? pathname === "/" : within(pathname, page.href)}>
+              <Row
+                key={page.href}
+                href={page.href}
+                icon={page.icon}
+                current={page.href === "/" ? pathname === "/" : within(pathname, page.href)}
+                trailing={<UnsetMark unset={unset} href={page.href} />}
+              >
                 {page.label}
               </Row>
             ))}
@@ -683,7 +709,7 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const pathname = usePathname();
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -710,7 +736,7 @@ export function Nav({ me }: { me: Me }) {
       <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} />
+          <Links me={me} unset={unset} />
         </div>
         <Account me={me} />
       </aside>
@@ -733,7 +759,7 @@ export function Nav({ me }: { me: Me }) {
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
-            <Links me={me} />
+            <Links me={me} unset={unset} />
             <div className="mt-5">
               <Account me={me} />
             </div>
