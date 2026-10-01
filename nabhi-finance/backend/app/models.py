@@ -98,7 +98,7 @@ class User(Base):
 
 class AuditEntry(Base):
     """The activity log: who changed what, and when. Names the fields that
-    changed, never their values. A fund request's own steps are also kept as
+    changed, never their values. A marketing request's own steps are also kept as
     its events (FundEvent)."""
 
     __tablename__ = "nbfi_audit_log"
@@ -288,7 +288,7 @@ class JournalEntry(Base):
     entry_date: Mapped[date] = mapped_column(Date, index=True)
     memo: Mapped[str] = mapped_column(String(300))
     reference: Mapped[str | None] = mapped_column(String(80), default=None)
-    # manual: written by Finance. fund: posted by a fund request's step.
+    # manual: written by Finance. fund: posted by a marketing request's step.
     source: Mapped[str] = mapped_column(String(10), default="manual")
     fund_request_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_fund_requests.id", ondelete="SET NULL"), index=True, default=None)
     # The entry this one reverses, or that reversed this one.

@@ -5,7 +5,7 @@ import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
 import type { ExpenseCategory, FundRequest, Method } from "./types";
 
-// Fund requests: releasing, checking a liquidation, and settling it. The API
+// Marketing requests: releasing, checking a liquidation, and settling it. The API
 // checks each step is still possible (app/routers/funds.py).
 
 const step = (id: string, path: string, body: unknown) =>

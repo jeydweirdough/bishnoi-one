@@ -316,7 +316,7 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
   );
 }
 
-/** Which accounts the fund request steps post to. */
+/** Which accounts the marketing request steps post to. */
 export function PostingEditor({ posting, accounts }: { posting: Posting; accounts: Account[] }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(posting.items.map((i) => [i.key, i.account?.id ?? ""])));
   const [fields, setFields] = useState<Record<string, string>>({});

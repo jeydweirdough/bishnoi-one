@@ -32,7 +32,7 @@ export default async function FinanceHome() {
       <div className="space-y-5">
         <Sheet>
           <div className="px-5 pt-4">
-            <SectionTitle icon="payments">Fund requests</SectionTitle>
+            <SectionTitle icon="payments">Marketing requests</SectionTitle>
           </div>
           <div className="grid grid-cols-2 divide-x divide-rule sm:grid-cols-4">
             <Figure label="For release" value={counts.to_release} href="/funds" />

@@ -1,6 +1,6 @@
 """The journal: posting balanced entries, and the entries each fund step makes.
 
-What a fund request posts, with the accounts from nbfi_ledger_settings:
+What a marketing request posts, with the accounts from nbfi_ledger_settings:
 
     released          Dr Advances to employees      Cr Cash / Bank / E-wallet
     reviewed          Dr each category's expense    Cr Advances (up to what was released)

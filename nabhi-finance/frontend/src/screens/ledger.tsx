@@ -6,7 +6,7 @@ import { ChartEditor, JournalForm, PostingEditor, ReverseButton } from "../ledge
 import { TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
 
 // The ledger: the journal, the chart of accounts, each account's ledger, the
-// trial balance, and the accounts fund requests post to. Each a sub-page of
+// trial balance, and the accounts marketing requests post to. Each a sub-page of
 // Ledger in the sidebar.
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -25,13 +25,13 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const filters = [
     { value: "", label: "All" },
     { value: "manual", label: "Manual journals" },
-    { value: "fund", label: "Fund requests" },
+    { value: "fund", label: "Marketing requests" },
     { value: "invoice", label: "Invoices" },
   ];
   return (
     <>
       <PageHeader title="Journal entries">
-        All posted entries, newest first. Fund requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided. Posted entries
+        All posted entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided. Posted entries
         are never edited: reverse an entry and post the correction.
       </PageHeader>
       {me.permissions?.includes("journal.post") && (
@@ -71,7 +71,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 </p>
                 {e.fundRequestId && (
                   <Link href={`/funds/${e.fundRequestId}`} className="text-meta text-hema hover:underline">
-                    Fund request
+                    Marketing request
                   </Link>
                 )}
                 {e.reversedById && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">Reversed</span>}
@@ -259,7 +259,7 @@ export async function PostingPage() {
   return (
     <>
       <PageHeader title="Default accounts">
-        The accounts used by the automatic entries for fund requests. On release: debit Advances to employees, credit the cash or bank account used. On
+        The accounts used by the automatic entries for marketing requests. On release: debit Advances to employees, credit the cash or bank account used. On
         liquidation: debit each category&apos;s expense account, credit Advances to employees, and credit Due to employees for any excess spent. Refunds and
         reimbursements settle these same accounts.
       </PageHeader>

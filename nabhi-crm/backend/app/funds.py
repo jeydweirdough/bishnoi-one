@@ -1,4 +1,4 @@
-"""Fund requests, and the part Nabhi Finance plays in them.
+"""Marketing requests, and the part Nabhi Finance plays in them.
 
 A request is the CRM's until its Team Lead approves it: then it's sent to
 Finance, which releases the money and checks how it was spent. From then on
@@ -126,7 +126,7 @@ def send(settings: Settings, r: FundRequest) -> bool:
         take(r, call(settings, "POST", "requests", body))
         return True
     except (FinanceUnavailable, FinanceRefused) as e:
-        log.warning("Fund request %s not sent to Finance: %s", r.number, e)
+        log.warning("Marketing request %s not sent to Finance: %s", r.number, e)
         r.finance_error = str(e)[:300]
         return False
 

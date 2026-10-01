@@ -5,7 +5,7 @@ import { NoAccess } from "../components/admin/words";
 import { PurposesEditor } from "../components/funds/purposes-editor";
 import type { FundPurpose } from "../components/funds/types";
 
-export const metadata = { title: "Fund purposes" };
+export const metadata = { title: "Marketing request purposes" };
 
 export default async function FundPurposesPage() {
   const me = await getCompanyMe();
@@ -13,8 +13,8 @@ export default async function FundPurposesPage() {
   const purposes = await load<{ items: FundPurpose[] }>("/funds/purposes?every=true");
   return (
     <>
-      <PageHeader title="Fund purposes">
-        The purposes salespeople and field agents can request funds for. A purpose subject to liquidation requires official receipts and a refund of any
+      <PageHeader title="Marketing request purposes">
+        The purposes salespeople and field agents can make a marketing request for. A purpose subject to liquidation requires official receipts and a refund of any
         excess; the Team Lead can still change that on a
         request. Expense categories are managed by Finance in Nabhi Finance.
       </PageHeader>

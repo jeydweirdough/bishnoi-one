@@ -6,9 +6,9 @@ import { CategoriesEditor } from "../funds/categories-editor";
 import type { Chart } from "../ledger/types";
 import type { ExpenseCategory, FundRequest } from "../funds/types";
 
-// Fund requests, by what Finance does next: release, review, settle. Refunds
+// Marketing requests, by what Finance does next: release, review, settle. Refunds
 // and reimbursements are one settlement queue; settled and cancelled requests
-// are one history. Each is a sub-page of Fund requests in the sidebar.
+// are one history. Each is a sub-page of Marketing requests in the sidebar.
 
 export type FundTask = "to_release" | "to_check" | "to_settle" | "to_liquidate" | "history";
 

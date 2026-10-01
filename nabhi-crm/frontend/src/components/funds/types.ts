@@ -1,4 +1,4 @@
-// Fund requests, as the API answers them (app/routers/funds.py). Once Finance
+// Marketing requests, as the API answers them (app/routers/funds.py). Once Finance
 // has a request, `finance` is Finance's own copy: the release, the receipts,
 // what they come to, and its record.
 

@@ -138,7 +138,7 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         // Team Lead's decision, and the requester's own money to account for.
         ...only(may("funds.view"), {
           href: "/funds",
-          label: "Fund requests",
+          label: "Marketing requests",
           icon: "payments",
           count: (waiting.toApprove ?? 0) + (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0),
           subpages: [

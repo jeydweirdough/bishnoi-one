@@ -1,4 +1,4 @@
-"""Fund requests: money a salesperson or field agent asks for ahead of
+"""Marketing requests: money a salesperson or field agent asks for ahead of
 spending it (a partnership dinner), their Team Lead's decision, and, once
 Finance has released it, the receipts that liquidate it (app/funds.py).
 

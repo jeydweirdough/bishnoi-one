@@ -1,4 +1,4 @@
-"""Fund requests: approved in the CRM, released here, liquidated receipt by
+"""Marketing requests: approved in the CRM, released here, liquidated receipt by
 receipt, and settled as unused funds returned or an amount reimbursed."""
 
 import base64

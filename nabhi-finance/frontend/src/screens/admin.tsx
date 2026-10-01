@@ -53,7 +53,7 @@ export async function RolesPage() {
       <PageHeader
         title="Roles and permissions"
       >
-        What each role can see and do in fund requests, accounting, tax and administration.
+        What each role can see and do in marketing requests, accounting, tax and administration.
       </PageHeader>
       <RolesEditor data={data} />
     </>
@@ -71,7 +71,7 @@ const ACTIONS: Record<string, string> = {
   "role.deleted": "Deleted a role",
   "auth.signed_in": "Signed in",
   "fund.released": "Released a cash advance",
-  "fund.cancelled": "Cancelled a fund request",
+  "fund.cancelled": "Cancelled a marketing request",
   "fund.expense_checked": "Checked a receipt",
   "fund.sent_back": "Sent a liquidation back",
   "fund.checked": "Finished a liquidation review",
@@ -101,7 +101,7 @@ const FILTERS = [
   { key: "", label: "Everything" },
   { key: "user.", label: "People" },
   { key: "role.", label: "Roles" },
-  { key: "fund.", label: "Fund requests" },
+  { key: "fund.", label: "Marketing requests" },
   { key: "invoice.", label: "Invoices" },
   { key: "entry.", label: "Journal entries" },
   { key: "account.", label: "Accounts" },

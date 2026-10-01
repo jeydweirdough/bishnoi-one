@@ -1,4 +1,4 @@
-"""Finance's side of fund requests: releasing the money, checking each
+"""Finance's side of marketing requests: releasing the money, checking each
 liquidation receipt by receipt, taking back the unused funds or paying back what was
 over, and the categories spending is sorted into (app/funds.py has the
 flow).

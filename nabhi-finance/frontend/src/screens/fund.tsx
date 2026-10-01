@@ -5,7 +5,7 @@ import { makeFormat } from "@/src/platform/lib/format";
 import { CheckLiquidation, RecordMoney, Release } from "../funds/steps";
 import type { ExpenseCategory, FundRequest } from "../funds/types";
 
-export const metadata = { title: "Fund request" };
+export const metadata = { title: "Marketing request" };
 
 /** The queue each status sits in, for the breadcrumb. */
 const QUEUE: Record<string, { href: string; label: string }> = {

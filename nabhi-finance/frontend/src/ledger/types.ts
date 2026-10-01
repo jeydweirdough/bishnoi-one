@@ -19,7 +19,7 @@ export type Entry = {
   date: string;
   memo: string;
   reference: string | null;
-  /** manual: a journal Finance wrote. fund: posted by a fund request's step. */
+  /** manual: a journal Finance wrote. fund: posted by a marketing request's step. */
   source: "manual" | "fund";
   fundRequestId: string | null;
   reversesId: string | null;

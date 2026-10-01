@@ -190,7 +190,7 @@ defaults Vercel gives; use the real ones if a project has its own domain.
 What was checked before these were called ready (September 28, 2026): each
 app's tests, its production build, its migrations on a Supabase-like Postgres
 under its own login, a browser through every page, and all six running
-together: the CRM's products and stock from Inventory, tax and fund requests
+together: the CRM's products and stock from Inventory, tax and marketing requests
 through Finance, Raise order to a stand-in Nabhi Order, and one Nabhi account
 opening all five apps.
 
@@ -262,13 +262,13 @@ Afterwards:
 - If Finance can't be reached, the quote isn't saved and the rep is told to
   try again. Untick the box to quote without tax.
 
-The same link carries **fund requests** (cash advances):
+The same link carries **marketing requests** (cash advances):
 
 - **In the CRM:** a salesperson or field agent submits a request, and their
-  Team Lead approves or declines it (**Field work → Fund requests**). An
+  Team Lead approves or declines it (**Field work → Marketing requests**). An
   admin sets the purposes, and whether each is subject to liquidation, under
-  **Settings → Fund purposes**.
-- **In Finance:** an approved request goes to Finance (**Fund requests**),
+  **Settings → Marketing request purposes**.
+- **In Finance:** an approved request goes to Finance (**Marketing requests**),
   which releases the cash advance (*For release*), reviews the liquidation
   expense by expense (*For review*), and records the refund due from the
   employee or the reimbursement due to them (*For settlement*). Released

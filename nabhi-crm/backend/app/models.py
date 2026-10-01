@@ -524,7 +524,7 @@ class StoredFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-# --- fund requests: money asked for ahead of spending it ---------------------------------
+# --- marketing requests: money asked for ahead of spending it ---------------------------------
 #
 # A salesperson or field agent asks here, their Team Lead approves here, and
 # Nabhi Finance releases it and checks how it was spent (app/funds.py).

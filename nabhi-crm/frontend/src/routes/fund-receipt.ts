@@ -1,6 +1,6 @@
 import { ApiError, enc, fetchFile } from "@/src/platform/lib/api";
 
-// Opens a fund request's receipt. Finance keeps the file; the API fetches it
+// Opens a marketing request's receipt. Finance keeps the file; the API fetches it
 // from there once it has checked this person can see the request, and it
 // comes through here with their token, as a quote's letter does.
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string; expense: string }> }) {

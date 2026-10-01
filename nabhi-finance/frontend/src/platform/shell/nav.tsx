@@ -110,7 +110,7 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
       // Cash advances to the CRM's people: what Finance does next, one queue per step.
       {
         href: `${base}/funds`,
-        label: "Fund requests",
+        label: "Marketing requests",
         icon: "payments",
         count: (waiting.to_release ?? 0) + (waiting.to_check ?? 0) + (waiting.to_settle ?? 0),
         subpages: [

@@ -59,7 +59,7 @@ AREAS: tuple[Area, ...] = (
     Area("goals", "Goals & balances", "Field work", ("view", "manage", "import")),
     # Money asked for ahead of spending it (a partnership dinner): funds.create
     # asks, funds.approve approves the requests in reach; Finance releases it.
-    Area("funds", "Fund requests", "Field work", ("view", "create", "approve")),
+    Area("funds", "Marketing requests", "Field work", ("view", "create", "approve")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )

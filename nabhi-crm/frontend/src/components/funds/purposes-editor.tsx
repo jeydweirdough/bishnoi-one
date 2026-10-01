@@ -23,7 +23,7 @@ export function PurposesEditor({ purposes }: { purposes: FundPurpose[] }) {
       )}
       {purposes.length === 0 ? (
         <Empty title="No purposes yet" icon="payments">
-          Add the purposes funds can be requested for: client meals, transportation.
+          Add the purposes a marketing request can be made for: client meals, transportation.
         </Empty>
       ) : (
         <ul className="divide-y divide-rule">

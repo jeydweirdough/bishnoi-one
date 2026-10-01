@@ -22,7 +22,7 @@ export const SETTINGS_PAGES = [
   { href: "/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
   { href: "/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
-  { href: "/admin/settings/funds", label: "Fund purposes", permission: "admin.settings" },
+  { href: "/admin/settings/funds", label: "Marketing request purposes", permission: "admin.settings" },
 ] as const;
 
 export const settingsPagesFor = (me: Me) => SETTINGS_PAGES.filter((t) => can(me, t.permission));

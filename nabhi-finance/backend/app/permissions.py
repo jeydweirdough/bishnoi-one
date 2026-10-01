@@ -40,8 +40,8 @@ class Area:
 
 AREAS: tuple[Area, ...] = (
     Area("dashboard", "Overview", "Finance", ("view",)),
-    Area("funds", "Fund requests", "Fund requests", ("view", "release", "check", "settle", "cancel")),
-    Area("categories", "Expense categories", "Fund requests", ("view", "manage")),
+    Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
+    Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
     Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),

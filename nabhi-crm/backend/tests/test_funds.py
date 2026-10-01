@@ -1,4 +1,4 @@
-"""Fund requests: asked for by a salesperson or field agent, decided by their
+"""Marketing requests: asked for by a salesperson or field agent, decided by their
 Team Lead, released and checked by Finance (here a stand-in answering as the
 real one does), and liquidated receipt by receipt from the CRM."""
 

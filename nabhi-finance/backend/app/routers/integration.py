@@ -1,4 +1,4 @@
-"""What the other Nabhi apps ask Finance: tax, and fund requests. Only for an
+"""What the other Nabhi apps ask Finance: tax, and marketing requests. Only for an
 app holding one of INTEGRATION_KEYS, sent in the X-Nabhi-Key header (the same
 way the CRM reads Inventory), so a quote, a pharmacy sale and an invoice are
 all taxed by Finance's one set of rules, and money is released by Finance

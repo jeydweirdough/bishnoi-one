@@ -10,7 +10,7 @@ small enough to need no library:
   differ. Pairs above the line are offered, strongest first.
 
 Merging keeps one record. Everything on the other one moves to it (contacts,
-activities, quotes, deals, visits, balances, fund requests); the kept record's
+activities, quotes, deals, visits, balances, marketing requests); the kept record's
 empty fields are filled from the other; the other is deleted, and its id is
 remembered (MergedRecord) so old links and the other Nabhi apps still find the
 one kept. Pairs someone says are different aren't offered again.

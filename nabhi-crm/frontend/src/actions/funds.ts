@@ -5,7 +5,7 @@ import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
 import type { FundPurpose, FundRequest } from "../components/funds/types";
 
-// Fund requests: asking, the Team Lead's decision, and liquidating. The API
+// Marketing requests: asking, the Team Lead's decision, and liquidating. The API
 // checks every step (who may, and whether it's still possible) and, once
 // Finance has the request, asks Finance.
 

@@ -9,7 +9,7 @@ import { Filters } from "../components/crm/list-controls";
 import { FundList } from "../components/funds/fund-list";
 import type { FundRequest } from "../components/funds/types";
 
-// Fund requests, three ways: your own, the ones waiting on your decision,
+// Marketing requests, three ways: your own, the ones waiting on your decision,
 // and everyone's within your reach (a Team Lead's team).
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -30,17 +30,17 @@ function FinanceNote({ error }: { error: string | null }) {
 function AskButton({ primary = false }: { primary?: boolean }) {
   return (
     <LinkButton href="/funds/new" variant={primary ? "primary" : "default"} icon={<Plus className="size-4" aria-hidden />}>
-      New fund request
+      New marketing request
     </LinkButton>
   );
 }
 
-export const metadata = { title: "Fund requests" };
+export const metadata = { title: "Marketing requests" };
 
 /** Your own requests. */
 export default async function MyFunds({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  if (!can(me, "funds.view")) return <NoAccess what="fund requests" />;
+  if (!can(me, "funds.view")) return <NoAccess what="marketing requests" />;
   const sp = await searchParams;
   const state = one(sp.state) || "open";
   const q = one(sp.q);
@@ -49,7 +49,7 @@ export default async function MyFunds({ searchParams }: { searchParams: Search }
   const mayAsk = can(me, "funds.create");
   return (
     <>
-      <PageHeader title="My fund requests" actions={mayAsk && <AskButton primary />}>
+      <PageHeader title="My marketing requests" actions={mayAsk && <AskButton primary />}>
         Cash advances for business expenses such as client meals and transportation. Approved by your Team Lead, released by Finance, and liquidated with
         official receipts.
       </PageHeader>
@@ -71,7 +71,7 @@ export default async function MyFunds({ searchParams }: { searchParams: Search }
 /** What's waiting on this person's decision: their team's requests, oldest first. */
 export async function FundsToApprove() {
   const me = await getCompanyMe();
-  if (!can(me, "funds.approve")) return <NoAccess what="approving fund requests" />;
+  if (!can(me, "funds.approve")) return <NoAccess what="approving marketing requests" />;
   const list = await load<Answer>("/funds?show=approve");
   const fmt = makeFormat(me.org);
   return (
@@ -93,7 +93,7 @@ export async function FundsToApprove() {
 /** Everyone's within reach: a Team Lead's team, an Administrator's company. */
 export async function TeamFunds({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  if (!can(me, "funds.approve")) return <NoAccess what="the team's fund requests" />;
+  if (!can(me, "funds.approve")) return <NoAccess what="the team's marketing requests" />;
   const sp = await searchParams;
   const state = one(sp.state) || "open";
   const q = one(sp.q);

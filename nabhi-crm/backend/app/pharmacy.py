@@ -5,7 +5,7 @@ ordered. The CRM sends it to Pharmacy with the prescription's details; it
 lands in the pharmacist's inbox there and is checked as any prescription is
 (ten checks, then a verdict). The CRM keeps Pharmacy's last answer and asks
 again when someone looks at the quote (nothing runs in the background on
-Vercel), the same way fund requests are followed in Finance.
+Vercel), the same way marketing requests are followed in Finance.
 
     POST {PHARMACY_API_URL}/integration/checks          the quote, sent or sent again
     GET  {PHARMACY_API_URL}/integration/checks/{quote}  where the pharmacist is with it

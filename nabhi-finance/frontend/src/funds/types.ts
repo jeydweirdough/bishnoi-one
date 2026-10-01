@@ -1,4 +1,4 @@
-// Fund requests, as Finance's API answers them (app/funds.py, request_out).
+// Marketing requests, as Finance's API answers them (app/funds.py, request_out).
 
 export type FundStatus = "to_release" | "to_liquidate" | "to_check" | "to_return" | "to_reimburse" | "closed" | "cancelled";
 

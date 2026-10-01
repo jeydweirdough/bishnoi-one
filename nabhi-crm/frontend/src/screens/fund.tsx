@@ -11,13 +11,13 @@ import { Liquidate, Receipts, Tally } from "../components/funds/liquidation";
 import type { ExpenseCategory, FundRequest } from "../components/funds/types";
 import { nextFor } from "../components/funds/words";
 
-export const metadata = { title: "Fund request" };
+export const metadata = { title: "Marketing request" };
 
 /** One request: where it is, what's next and whose move it is, the money, the
  *  receipts, and its record from asking to settled. */
 export default async function FundPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await getCompanyMe();
-  if (!can(me, "funds.view")) return <NoAccess what="fund requests" />;
+  if (!can(me, "funds.view")) return <NoAccess what="marketing requests" />;
   const { id } = await params;
   const r = await load<FundRequest & { financeProblem: string | null }>(`/funds/${enc(id)}`);
   // The categories only matter while receipts are going in.
@@ -38,7 +38,7 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <PageHeader
-        crumbs={[mine ? { href: "/funds", label: "My fund requests" } : { href: "/funds/team", label: "Team requests" }]}
+        crumbs={[mine ? { href: "/funds", label: "My marketing requests" } : { href: "/funds/team", label: "Team requests" }]}
         title={
           <>
             {r.purpose.name} <span className="text-ink-3">{r.number}</span>
