@@ -26,7 +26,7 @@ The decisions depend on each other, so the build follows this order:
 | 1. **The tax engine (D8), with the Philippines pack** | An invoice can't be made without the tax rules for its country | **Done** 2026-09-25: Finance → **Tax** (matrix F8, F9) |
 | 2. **Pricing conditions (D4)** | The tax step is the last condition in the price | **Done** 2026-09-25: CRM → Settings → **Price rules**, tax from Finance (matrix F4, F5) |
 | 3. **Invoices, payments and ageing (D4)**, in the Finance app | Needs steps 1 and 2 | **Done** 2026-09-30: Finance → **Invoices** (sales invoices, payments, receivables; matrix E5) |
-| 4. **Deals (D2)** and **offline visits and collections (D7)** | Stand on their own | Not started; can be built alongside the rest (matrix F1, G3, G4) |
+| 4. **Deals (D2)** and **offline visits and collections (D7)** | Stand on their own | Deals **done** 2026-10-01: CRM → **Deals** (pipeline board, forecast; matrix F1), with monthly **revenue targets** and **Results** (won against target by person, team, customer and product). Offline (D7) not started (matrix G3, G4) |
 
 ## Follow-ups, decided on 2026-09-25
 
@@ -34,3 +34,15 @@ The decisions depend on each other, so the build follows this order:
 |---|---|
 | Which country pack comes first (D8)? | **The Philippines** (VAT, BIR invoices). Others follow when a company in that country needs them. |
 | Where do sales orders live (D4)? | **In Nabhi Orders**, the user's separate sales-order system, outside this repo and not benchmarked here. This repo covers quotes before it (CRM) and invoices, payments and ageing after it (Finance). |
+
+## Open-source for lead generation, reviewed on 2026-10-01
+
+From the "100 GitHub Repos for Lead Generation" list. Libraries go in the apps; whole products stay outside.
+
+| Use | Where |
+|---|---|
+| `phonenumbers` (Google's libphonenumber) | **In use** in the CRM since 2026-10-01: numbers are matched however they're written, for duplicate warnings. Read as local to the company's country (from its locale); several countries (D8) will need the country per customer. |
+| `email-validator` | **In use** in the CRM since 2026-10-01 for every email address. The domain isn't checked for mail, so it works without the internet. |
+| fullcalendar (free views), mjml, splink, photon, OpenRefine | Later: call plans (P7), email layouts, merging duplicates, map points for routes, cleaning a list before import. |
+
+Not used: Google Maps, LinkedIn and review scrapers, OSINT tools, and anything for getting around site blocking (against the sites' terms, and building profiles of doctors without consent runs against the Data Privacy Act); WhatsApp Web automation (against WhatsApp's terms; use the official Business API); whole CRMs and ERPs under GPL or AGPL (looking at them for ideas is fine, copying their code into a licensed product isn't); self-hosted mail servers.

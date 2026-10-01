@@ -19,6 +19,7 @@ export const SETTINGS_PAGES = [
   { href: "/admin/settings/company", label: "Company and quotes", permission: "admin.settings" },
   { href: "/admin/settings/quote-templates", label: "Quotation templates", permission: "admin.settings" },
   { href: "/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
+  { href: "/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
   { href: "/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
   { href: "/admin/settings/funds", label: "Fund purposes", permission: "admin.settings" },

@@ -33,7 +33,7 @@ def test_account_says_role_reach_rights_and_sign_ins(client):
     assert ben["previousSignIn"] and ben["previousSignIn"] <= ben["signedInAt"]
     assert ben["signedInAt"].endswith("+00:00")  # UTC, whatever the database hands back
     keys = [a["key"] for a in ben["areas"]]
-    assert "admin" not in keys and "deals" not in keys  # not his, and not built yet
+    assert "admin" not in keys and "deals" in keys  # not his; deals are a salesperson's
     ana = client.get("/auth/account", headers=bearer(sign_in(client))).json()
     admin = next(a for a in ana["areas"] if a["key"] == "admin")
     assert "Users" in admin["actions"] and "Audit logs" in admin["actions"]

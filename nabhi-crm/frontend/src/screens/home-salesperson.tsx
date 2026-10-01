@@ -11,6 +11,7 @@ import { makeFormat } from "@/src/platform/lib/format";
 import type { ActivityItem, ActivitySummary, Assignable, CompanyRow, Paged, Quote } from "@/src/platform/lib/types";
 import { customerOf, dayOf, followUpRow } from "../components/crm/follow-up-rows";
 import { LogActivityButton } from "../components/crm/log-activity-button";
+import { MonthTarget } from "../components/deals/month-target";
 import { kindOf } from "../components/crm/words";
 
 
@@ -63,6 +64,8 @@ export async function SalespersonHome() {
         {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. {me.role?.name}
         {me.team ? ` · ${me.team.name}` : ""}
       </PageHeader>
+
+      {can(me, "deals.view") && <MonthTarget view="mine" fmt={fmt} today={today} mayTarget={can(me, "goals.manage")} />}
 
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <div className="space-y-5">

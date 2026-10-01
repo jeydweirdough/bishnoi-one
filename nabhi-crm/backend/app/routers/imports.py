@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.access import Access, CurrentAccess, keep_an_administrator
-from app.api import EMAIL, Api
+from app.api import Api, email_address
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import _value, fields_for
@@ -338,9 +338,10 @@ def import_people(db: Session, me: User, body: ImportIn, get) -> tuple[int, int,
             continue
         v = lambda key: get(row, key)  # noqa: E731
         try:
-            email = v("email").lower()
-            if not EMAIL.fullmatch(email):
-                raise ValueError(f"{email or 'No email'}: not an email address.")
+            try:
+                email = email_address(v("email"))
+            except ValueError:
+                raise ValueError(f"{v('email') or 'No email'}: not an email address.") from None
             if email in seen:
                 raise ValueError(f"{email} is on another row of this file too.")
             role = roles.get(normal(v("role"))) if v("role") else None

@@ -878,6 +878,7 @@ decision before building it).
 | Country and tax | **Several countries**: a tax engine with a pack per country. **The Philippines first** (VAT, BIR invoices). |
 | Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Nabhi Orders**, outside this repo. |
 | Leads and the pipeline | **Deals on customers**: a stage, an expected value, a forecast category. No separate lead record. |
+| Sales targets | A monthly **revenue target** per seller (Deals → Results → Set targets); a team's is its people's added up. Won deals count against it, on Deals → Results and on the home page. |
 | Working without signal | **Offline visits and collections** on the phone, synced when there's signal. |
 
 ### Where the build is
@@ -886,8 +887,8 @@ decision before building it).
 |---|---|
 | 1. Tax engine with the Philippines pack (Finance → **Tax**) | Done |
 | 2. Price rules in the CRM (**Settings → Price rules**), tax from Finance | Done |
-| 3. Invoices, payments and receivables ageing (Finance) | Next |
-| 4. Deals (CRM) and offline visits and collections | Can be built alongside |
+| 3. Invoices, payments and receivables ageing (Finance) | Done |
+| 4. Deals (CRM → **Deals**, **Settings → Deal stages**) and offline visits and collections | Deals done; offline next |
 
 ### How to use it
 

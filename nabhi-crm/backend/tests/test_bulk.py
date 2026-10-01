@@ -85,6 +85,25 @@ def test_a_company_that_looks_like_another_is_flagged(client, crew):
     assert client.post("/companies", json={"name": "ACME pharma", "allowDuplicate": True}, headers=crew["ria"]).status_code == 201
 
 
+def test_the_same_number_written_another_way_is_a_duplicate(client, crew):
+    company(client, crew["sam"], "Acme Pharma", phone="0917 555 0101")
+    for written in ("+63 917 555 0101", "(+63) 917-555-0101", "639175550101"):
+        r = client.post("/companies", json={"name": "Other name", "phone": written}, headers=crew["sam"])
+        assert r.status_code == 409, written
+    acme = company(client, crew["lia"], "Beta Clinic")["id"]
+    contact(client, crew["lia"], "Jo", companyId=acme, mobile="0918 222 3333")
+    r = client.post("/contacts", json={"firstName": "Joan", "phone": "+639182223333"}, headers=crew["lia"])
+    assert r.status_code == 409
+
+
+def test_email_addresses_are_checked_and_kept_in_lower_case(client, crew):
+    for bad in ("maria@", "maria@acme", "maria acme@acme.com", "maria@@acme.com"):
+        r = client.post("/contacts", json={"firstName": "M", "email": bad}, headers=crew["lia"])
+        assert r.status_code == 422, bad
+    made = contact(client, crew["lia"], "Maria", email="Maria.Santos@Acme.COM")
+    assert made["email"] == "maria.santos@acme.com"
+
+
 def test_a_contact_that_looks_like_another_is_flagged(client, crew):
     acme = company(client, crew["lia"])["id"]
     contact(client, crew["lia"], "Maria", lastName="Santos", companyId=acme, email="maria@acme.com")

@@ -12,9 +12,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api import email_address
 from app.models import FormField
 
-EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
 
 
 def fields_for(db: Session, entity: str, *, added_only: bool = False, shown_only: bool = False) -> list[FormField]:
@@ -36,10 +36,7 @@ def _value(field: FormField, raw: Any) -> Any:
             raise ValueError(f"At most {limit} characters.")
         return text
     if kind == "email":
-        text = str(raw).strip().lower()
-        if not EMAIL.fullmatch(text):
-            raise ValueError("Enter an email address like name@company.com.")
-        return text
+        return email_address(str(raw))
     if kind == "url":
         text = str(raw).strip()
         if " " in text or "." not in text:

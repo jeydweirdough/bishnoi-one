@@ -424,6 +424,9 @@ class SalesSettings(Base):
     pricing_procedure: Mapped[dict | None] = mapped_column(JSON, default=None)
     # Whether catalogue prices already include VAT.
     prices_include_tax: Mapped[bool] = mapped_column(default=True)
+    # Deals: the lists a deal's lead source and lost reason are picked from,
+    # {"sources": [...], "lostReasons": [...]}. None: the starting lists.
+    deal_lists: Mapped[dict | None] = mapped_column(JSON, default=None)
 
 
 # --- quotes --------------------------------------------------------------------------------
@@ -445,6 +448,8 @@ class Quote(Owned, Base):
     number: Mapped[str] = mapped_column(String(24), unique=True)
     company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True, default=None)
     contact_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_contacts.id", ondelete="SET NULL"), index=True, default=None)
+    # The deal it was made for, if any.
+    deal_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_deals.id", ondelete="SET NULL"), index=True, default=None)
     customer_name: Mapped[str] = mapped_column(String(200))
     price_type: Mapped[str] = mapped_column(String(40))
     price_type_name: Mapped[str] = mapped_column(String(80))
@@ -832,3 +837,94 @@ class QuoteControl(Base):
     quote_id: Mapped[str] = mapped_column(ForeignKey("nbcm_quotes.id", ondelete="CASCADE"), index=True)
     number: Mapped[str] = mapped_column(String(60))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- deals (benchmarks decision D2) ------------------------------------------------------
+#
+# A lead stays a customer status. Customers get deals: each with a stage, an
+# expected value and close date, and a forecast category kept apart from the
+# stage (Salesforce's pipeline idea). A won deal leads to a quote.
+
+FORECAST_CATEGORIES = ("pipeline", "best_case", "commit", "closed", "omitted")
+
+
+class DealStage(Base):
+    """A step a deal goes through: Qualify, Proposal, Negotiation... The list is
+    an administrator's to keep. Each open stage gives a new deal in it a
+    probability and a forecast category; the two closed stages, won and lost,
+    are always there and can only be renamed."""
+
+    __tablename__ = "nbcm_deal_stages"
+    __table_args__ = (
+        CheckConstraint("outcome IN ('open', 'won', 'lost')", name="deal_stage_outcome"),
+        CheckConstraint("forecast_category IN ('pipeline', 'best_case', 'commit', 'closed', 'omitted')", name="deal_stage_forecast"),
+        CheckConstraint("probability >= 0 AND probability <= 100", name="deal_stage_probability"),
+    )
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True)
+    outcome: Mapped[str] = mapped_column(String(8), default="open")
+    probability: Mapped[int] = mapped_column(Integer, default=10)
+    forecast_category: Mapped[str] = mapped_column(String(12), default="pipeline")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Switched off: deals keep it, but it isn't offered any more.
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class Deal(Owned, Base):
+    """Business expected from a customer: how much, by when, and how likely.
+
+    Its value is the products on it, priced by the price rules (as a quote
+    would be, without tax), or a figure typed in when it has none. The owner
+    is who's working it."""
+
+    __tablename__ = "nbcm_deals"
+    __table_args__ = (
+        CheckConstraint("forecast_category IN ('pipeline', 'best_case', 'commit', 'closed', 'omitted')", name="deal_forecast"),
+        CheckConstraint("probability >= 0 AND probability <= 100", name="deal_probability"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(160))
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_contacts.id", ondelete="SET NULL"), index=True, default=None)
+    stage_code: Mapped[str] = mapped_column(ForeignKey("nbcm_deal_stages.code"), index=True)
+    probability: Mapped[int] = mapped_column(Integer, default=10)
+    forecast_category: Mapped[str] = mapped_column(String(12), default="pipeline", index=True)
+    value_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    # YYYY-MM-DD, in the company's own calendar.
+    expected_close_on: Mapped[str] = mapped_column(String(10), index=True)
+    # Where the business came from, from the list in deal settings.
+    lead_source: Mapped[str | None] = mapped_column(String(60), default=None)
+    # The products on it, priced at this price type: [{productId, productName,
+    # unit, quantity, unitPriceCentavos, totalCentavos}].
+    price_type: Mapped[str | None] = mapped_column(String(40), default=None)
+    lines: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    # Closing: when, why it was lost and to whom, and the quote that won it.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, default=None)
+    lost_reason: Mapped[str | None] = mapped_column(String(80), default=None)
+    competitor: Mapped[str | None] = mapped_column(String(120), default=None)
+    # Not a foreign key: quotes already point at deals, and a deleted quote
+    # leaves the deal won all the same.
+    won_quote_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
+    company: Mapped[Company] = relationship(lazy="joined")
+    contact: Mapped[Contact | None] = relationship(lazy="joined")
+    stage: Mapped[DealStage] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="Deal.owner_id", lazy="joined")
+
+
+class RevenueTarget(Base):
+    """What one person is expected to sell in one month (YYYY-MM): the value of
+    the deals they win. A team's target is its people's added up. Set by whoever
+    sets goals (goals.manage)."""
+
+    __tablename__ = "nbcm_revenue_targets"
+    __table_args__ = (UniqueConstraint("user_id", "month", name="revenue_target_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

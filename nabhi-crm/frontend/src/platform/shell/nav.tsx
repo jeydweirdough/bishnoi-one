@@ -121,6 +121,7 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
             { href: "/contacts", label: "Contacts" },
           ],
         }),
+        ...only(selling && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
         ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
         ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),

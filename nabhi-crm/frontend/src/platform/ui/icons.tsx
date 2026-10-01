@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Handshake,
   Activity,
   ArrowUpRight,
   BadgePercent,
@@ -85,6 +86,7 @@ export const ICONS = {
   lists: ListChecks, // the company's own words for its records
   retention: Repeat,
   goals: Target,
+  deals: Handshake,
   company: Building,
   apps: LayoutGrid, // the other applications this company reaches from Nabhi
   companies: Globe, // every company on the platform, for a Developer Admin

@@ -539,6 +539,8 @@ export type Quote = {
   id: string;
   rev: string | null;
   number: string;
+  /** The deal it was made for (CRM). */
+  deal?: { id: string; name: string } | null;
   team: string;
   teamName: string;
   /** Who it's for: a company, or a contact (and the company they're in). */
@@ -1093,4 +1095,122 @@ export type PeopleInsights = {
     quotedThisMonthCentavos: number;
     quotesWaiting: number;
   };
+};
+
+// --- deals (CRM, decision D2) ---------------------------------------------------------------
+
+export type ForecastCategory = "pipeline" | "best_case" | "commit" | "closed" | "omitted";
+export type DealState = "open" | "won" | "lost";
+
+export type DealStage = {
+  code: string;
+  name: string;
+  outcome: DealState;
+  probability: number;
+  forecastCategory: ForecastCategory;
+  sortOrder: number;
+  isActive: boolean;
+  deals: number;
+};
+
+export type DealLists = { sources: string[]; lostReasons: string[] };
+
+export type DealLine = {
+  productId: string;
+  productCode: string;
+  productName: string;
+  unit: string;
+  quantity: number;
+  unitPriceCentavos: number;
+  totalCentavos: number;
+};
+
+export type DealRow = {
+  id: string;
+  name: string;
+  company: { id: string; name: string };
+  contact: { id: string; name: string } | null;
+  stage: { code: string; name: string };
+  state: DealState;
+  probability: number;
+  forecastCategory: ForecastCategory;
+  valueCentavos: number;
+  weightedCentavos: number;
+  expectedCloseOn: string;
+  leadSource: string | null;
+  owner: { id: string; name: string } | null;
+  closedAt: string | null;
+  lostReason: string | null;
+  competitor: string | null;
+  createdAt: string;
+  updatedAt: string;
+  can: { edit: boolean; delete: boolean; quote: boolean };
+};
+
+export type Deal = DealRow & {
+  notes: string | null;
+  priceType: string | null;
+  lines: DealLine[];
+  wonQuoteId: string | null;
+  quotes: { id: string; number: string; totalCentavos: number; approvalStatus: string; createdAt: string }[];
+};
+
+export type DealList = { items: DealRow[]; total: number; valueCentavos: number };
+
+export type DealBoard = {
+  columns: { stage: DealStage; count: number; valueCentavos: number; weightedCentavos: number; deals: DealRow[] }[];
+};
+
+export type ForecastFigures = {
+  pipelineCentavos: number;
+  bestCaseCentavos: number;
+  commitCentavos: number;
+  wonCentavos: number;
+  weightedCentavos: number;
+  deals: number;
+};
+
+export type DealForecast = {
+  period: string;
+  label: string;
+  start: string;
+  end: string;
+  people: ({ owner: { id: string; name: string } | null } & ForecastFigures)[];
+  totals: ForecastFigures;
+};
+
+// --- sales results and revenue targets (CRM) -----------------------------------------------
+
+export type SalesFigures = {
+  wonCentavos: number;
+  wonCount: number;
+  lostCentavos: number;
+  lostCount: number;
+  /** Won deals as a share of those decided (won or lost); null with none decided. */
+  winRate: number | null;
+  quotedCentavos: number;
+  quoteCount: number;
+  targetCentavos: number | null;
+  /** Won against the target, as a percentage; null with no target. */
+  attainment: number | null;
+};
+
+export type SalesResults = {
+  period: string;
+  label: string;
+  start: string;
+  end: string;
+  view: "mine" | "team";
+  totals: SalesFigures;
+  people: ({ person: { id: string; name: string }; team: { id: string; name: string } | null } & SalesFigures)[];
+  teams: ({ team: { id: string; name: string } | null } & SalesFigures)[];
+  customers: { customer: { id: string; name: string }; wonCentavos: number; wonCount: number }[];
+  products: { product: { id: string | null; name: string }; quantity: number; wonCentavos: number }[];
+  lostReasons: { reason: string; count: number; lostCentavos: number }[];
+  canExport: boolean;
+};
+
+export type RevenueTargets = {
+  month: string;
+  people: { person: { id: string; name: string }; team: { id: string; name: string } | null; targetCentavos: number | null }[];
 };

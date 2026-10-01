@@ -5,7 +5,7 @@ import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, CustomerType, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
+import type { Assignable, CustomerType, DealList, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
@@ -15,6 +15,7 @@ import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
 import { StatusTag, siteHref, siteLabel } from "../components/crm/words";
+import { StageTag } from "../components/deals/words";
 import { ClinicPin } from "../components/field/clinic-pin";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { DoctorBalance, Visit } from "../components/field/types";
@@ -38,7 +39,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
   const seesVisits = can(me, "visits.view");
-  const [company, people, quotes, types, fields, visits, owed] = await Promise.all([
+  const seesDeals = can(me, "deals.view");
+  const [company, people, quotes, types, fields, visits, owed, deals] = await Promise.all([
     load<CompanyDetail>(`/companies/${enc(id)}`),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
@@ -46,6 +48,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
     formLayout("company"),
     seesVisits ? load<Paged<Visit>>(`/visits?company=${enc(id)}&limit=30`) : null,
     seesVisits ? load<DoctorBalance>(`/field/doctors/${enc(id)}`) : null,
+    seesDeals ? load<DealList>(`/deals?company=${enc(id)}&limit=10`) : null,
   ]);
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && company.can.edit;
@@ -206,6 +209,48 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
               {company.notes && <p className="mt-4 border-t border-rule pt-3 text-sm whitespace-pre-line text-ink-2">{company.notes}</p>}
             </div>
           </Sheet>
+
+          {deals && (
+            <Sheet className="px-5 pt-4 pb-3">
+              <SectionTitle
+                icon="deals"
+                action={
+                  can(me, "deals.create") &&
+                  company.can.edit && (
+                    <LinkButton href={`/deals/new?company=${company.id}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
+                      Add
+                    </LinkButton>
+                  )
+                }
+              >
+                Deals
+              </SectionTitle>
+              {deals.items.length === 0 ? (
+                <p className="py-2 text-meta text-ink-3">No deals yet. Add one to forecast what this customer may buy.</p>
+              ) : (
+                <ul className="mt-1 divide-y divide-rule">
+                  {deals.items.map((d) => (
+                    <li key={d.id} className="py-2.5">
+                      <span className="flex items-start justify-between gap-2">
+                        <Link href={`/deals/${d.id}`} className="min-w-0 font-medium text-hema hover:underline">
+                          {d.name}
+                        </Link>
+                        <StageTag deal={d} />
+                      </span>
+                      <p className="text-meta text-ink-3">
+                        {fmt.peso(d.valueCentavos)} · {d.state === "open" ? `closes ${fmt.dateLabel(d.expectedCloseOn)}` : `closed ${fmt.dateLabel(d.expectedCloseOn)}`}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {deals.total > deals.items.length && (
+                <Link href={`/deals?view=list&q=${encodeURIComponent(company.name)}`} className="block pt-2 text-meta text-hema hover:underline">
+                  See all {deals.total}
+                </Link>
+              )}
+            </Sheet>
+          )}
 
           <Sheet className="px-5 pt-4 pb-3">
             <SectionTitle

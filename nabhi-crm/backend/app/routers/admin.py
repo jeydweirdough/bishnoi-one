@@ -6,7 +6,6 @@ written to the audit log in the same transaction, and nothing may leave the
 app with nobody able to manage users and roles (access.keep_an_administrator).
 """
 
-import re
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -17,6 +16,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.access import Access, keep_an_administrator, permissions_of, require
+from app.api import email_address
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import AuditEntry, Role, RolePermission, SignInSession, Team, User
@@ -30,7 +30,6 @@ Roles = Annotated[Access, Depends(require("admin.roles"))]
 Teams = Annotated[Access, Depends(require("admin.teams"))]
 Audit = Annotated[Access, Depends(require("admin.audit"))]
 
-EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
 
 
 class Api(BaseModel):
@@ -61,9 +60,7 @@ class UserIn(Api):
     @field_validator("email")
     @classmethod
     def _email(cls, value: str) -> str:
-        if not EMAIL.fullmatch(value):
-            raise ValueError("Enter an email address like name@company.com.")
-        return value.lower()
+        return email_address(value)
 
     @field_validator("password")
     @classmethod
@@ -84,9 +81,7 @@ class UserPatch(Api):
     @field_validator("email")
     @classmethod
     def _email(cls, value: str | None) -> str | None:
-        if value is not None and not EMAIL.fullmatch(value):
-            raise ValueError("Enter an email address like name@company.com.")
-        return value.lower() if value else value
+        return email_address(value) if value else value
 
 
 class PasswordIn(Api):

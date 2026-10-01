@@ -32,7 +32,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import check_extra
 from app.inventory import sync_if_stale
-from app.models import Company, Contact, Quote, StoredFile, Team, User
+from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
 from app import pharmacy
 from app.orders import OrdersUnavailable
@@ -93,6 +93,8 @@ class QuoteIn(Api):
     letter: LetterIn | None = None
     # Added fields' values, by key (Settings → Forms).
     extra: dict[str, Any] | None = None
+    # The deal it's made for: an open one, for this customer.
+    deal_id: str | None = Field(None, max_length=36)
 
 
 def lines_in(body: QuoteIn) -> list[dict]:
@@ -177,6 +179,11 @@ def by(person_id: str | None, name: str | None) -> dict | None:
     return {"id": person_id, "name": name} if name else None
 
 
+def deal_ref(db: Session, deal_id: str | None) -> dict | None:
+    deal = db.get(Deal, deal_id) if deal_id else None
+    return {"id": deal.id, "name": deal.name} if deal else None
+
+
 def quote_out(db: Session, q: Quote, access: Access) -> dict:
     team = db.get(Team, q.team_id) if q.team_id else None
     company = db.get(Company, q.company_id) if q.company_id else None
@@ -204,6 +211,7 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         "teamName": team.name if team else "No team",
         "company": {"id": company.id, "name": company.name} if company else None,
         "contact": {"id": contact.id, "name": contact.full_name} if contact else None,
+        "deal": deal_ref(db, q.deal_id),
         "customerId": (contact or company).id if (contact or company) else "",
         "customerHref": f"/contacts/{contact.id}" if contact else f"/companies/{company.id}" if company else None,
         "customerName": q.customer_name,
@@ -340,6 +348,12 @@ async def create_quote(
                 problems.add(["letter", "issuedOn"], "The letter can't be dated after today.")
         if issuer is not None and (letter_file is None or not letter_file.filename):
             problems.add(["letterFile"], "Attach the letter: a PDF, or a photo (JPG or PNG).")
+    deal = None
+    if body.deal_id:
+        deal = db.get(Deal, body.deal_id)
+        customer = company or (contact.company if contact else None)
+        if deal is None or not reaches(deal, access) or customer is None or deal.company_id != customer.id or deal.stage.outcome == "lost":
+            problems.add(["dealId"], "Pick an open deal with this customer.")
     problems.raise_if_any()
     extra = check_extra(db, "quote", body.extra)
     rules = book.settings
@@ -357,6 +371,7 @@ async def create_quote(
         number=next_number(db, on),
         company_id=company.id if company else None,
         contact_id=contact.id if contact else None,
+        deal_id=deal.id if deal else None,
         customer_name=who[:200],
         price_type=kind_.code,
         price_type_name=kind_.name,

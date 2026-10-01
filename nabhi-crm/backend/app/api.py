@@ -5,13 +5,26 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
+import phonenumbers
+from email_validator import EmailNotValidError, validate_email
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic.alias_generators import to_camel
 
+from app.config import get_settings
 from app.models import Team, User
 
-EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
+EMAIL_WORDS = "Enter an email address like name@company.com."
+
+
+def email_address(text: str) -> str:
+    """An email address as kept (lower case), or ValueError. The address is
+    checked as written; whether its domain takes mail isn't asked, so this
+    works on a PC without the internet."""
+    try:
+        return validate_email(text.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        raise ValueError(EMAIL_WORDS) from None
 
 
 class Api(BaseModel):
@@ -38,9 +51,7 @@ def not_found(what: str) -> HTTPException:
 
 
 def check_email(value: str | None) -> str | None:
-    if value is not None and not EMAIL.fullmatch(value):
-        raise ValueError("Enter an email address like name@company.com.")
-    return value.lower() if value else value
+    return email_address(value) if value else value
 
 
 def as_utc(moment: datetime) -> datetime:
@@ -71,9 +82,20 @@ def camel(names: list[str]) -> list[str]:
 
 
 def digits(phone: str | None) -> str | None:
-    """A phone number's digits alone, for telling two ways of writing it apart."""
-    only = re.sub(r"\D", "", phone or "")
-    return only or None
+    """A phone number in one form, for telling two ways of writing it apart:
+    "0917 123 4567", "+63 917-123-4567" and "(+63) 9171234567" are all
+    639171234567. Numbers are read as local to the company's country (from
+    its locale, en-PH); one that can't be read as a number keeps its digits."""
+    if not phone:
+        return None
+    region = get_settings().org_locale.rpartition("-")[2].upper() or None
+    try:
+        number = phonenumbers.parse(phone, region)
+        if phonenumbers.is_possible_number(number):
+            return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.E164).lstrip("+")
+    except phonenumbers.NumberParseException:
+        pass
+    return re.sub(r"\D", "", phone) or None
 
 
 def duplicates_error(noun: str, found: list[dict]) -> HTTPException:

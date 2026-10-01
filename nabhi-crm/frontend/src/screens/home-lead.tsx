@@ -10,6 +10,7 @@ import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { ActivityItem, Assignable, CompanyRow, Me, Org, Paged, PeopleInsights, PersonInsight, Quote } from "@/src/platform/lib/types";
 import { customerOf, dayOf, followUpRow } from "../components/crm/follow-up-rows";
 import { LogActivityButton } from "../components/crm/log-activity-button";
+import { MonthTarget } from "../components/deals/month-target";
 import { KINDS, kindOf } from "../components/crm/words";
 import { Stat, Stats } from "../components/stats";
 
@@ -135,6 +136,8 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
         <Stat label="Quoted this month" value={fmt.peso(t.quotedThisMonthCentavos)} note={`${t.quotesThisMonth} ${t.quotesThisMonth === 1 ? "quote" : "quotes"}`} href="/quotes" />
         {approver && <Stat label="Waiting for your approval" value={toApprove.total} flag href="/quotes?task=approvals" />}
       </Stats>
+
+      {can(me, "deals.view") && <MonthTarget view="team" fmt={fmt} today={today} mayTarget={can(me, "goals.manage")} />}
 
       <Sheet className="mb-5 px-5 pt-4 pb-2">
         <SectionTitle icon="teams">Your team</SectionTitle>

@@ -72,7 +72,7 @@ request that changes what it describes.
 
 | ID | Capability | Reference | Ours today | Decision |
 |---|---|---|---|---|
-| F1 | Pipeline stage separate from forecast category | Salesforce ★ | None: the CRM has no opportunities or deals. | **ADOPT** (decided 2026-09-25, D2): deals on customers, forecast category kept apart from the stage |
+| F1 | Pipeline stage separate from forecast category | Salesforce ★ | **Built 2026-10-01:** deals on customers; each stage gives a probability and a forecast category, which the deal then keeps as its own. Pipeline board and forecast by person (CRM → Deals). | **ADOPTED** (decided 2026-09-25, D2) |
 | F2 | Lead conversion in one transaction | Salesforce ★ | None: a lead is a company status, not its own record. | **SKIP** (decided 2026-09-25, D2): a lead stays a company status; there's no separate Lead record to convert |
 | F3 | Guided path: a checklist per stage on the record | Salesforce ★ | Ph partial: the 10 prescription checks before verifying (fixed in code). Others: none. | open (proposed ADAPT: make checklists data, like Ph's) |
 | F4 | Condition-based pricing: ordered, dated conditions | SAP ★ | CRM: an admin orders the price sources (customer-group price, team price, list price) and the adjustments (volume scale, promo, rep's discount, surcharge), switches each on or off, and adds dated rules; the most specific rule wins. Tax from Finance is the last step and is kept on the quote (Settings → Price rules). Inv, Ph: one price per item. | **ADOPT** (decided 2026-09-25, D4): ordered, dated conditions an admin sets; tax is the last step |

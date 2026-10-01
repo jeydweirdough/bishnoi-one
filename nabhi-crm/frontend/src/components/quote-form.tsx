@@ -97,8 +97,11 @@ export function QuoteForm({
   org,
   fields: custom = [],
   stock = null,
+  deal = null,
 }: {
   to: QuoteFor;
+  /** The deal it's made for, when started from one. */
+  deal?: { id: string; name: string } | null;
   priceList: PriceList;
   org: Org;
   fields?: CustomField[];
@@ -208,7 +211,7 @@ export function QuoteForm({
     }
 
     const form = new FormData();
-    form.set("quote", JSON.stringify({ ...toInput(fmt, draft, entered, letter), extra: extraChanges(custom, extra) }));
+    form.set("quote", JSON.stringify({ ...toInput(fmt, draft, entered, letter), extra: extraChanges(custom, extra), dealId: deal?.id ?? null }));
     if (withLetter && file) form.set("letterFile", file);
     startSave(async () => {
       const result = await createQuote(to, form);

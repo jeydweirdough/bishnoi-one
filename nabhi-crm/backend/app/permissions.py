@@ -66,13 +66,13 @@ AREAS: tuple[Area, ...] = (
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
 
-# Areas decided but not built yet (deals: benchmarks decision D2). Roles can
-# already hold them, but nothing uses them, so neither the roles screen nor a
-# person's account page offers them. Take one off as it lands.
+# Areas decided but not built yet. Roles can already hold them, but nothing
+# uses them, so neither the roles screen nor a person's account page offers
+# them. Take one off as it lands (deals landed on 2026-10-01).
 # (Leads, opportunities, contracts, documents, automations and integrations
 # were here with no plan behind them, and were taken out on 2026-09-30: a lead
 # is a customer status, by D2. Roles that held them simply no longer do.)
-NOT_BUILT: frozenset[str] = frozenset({"deals"})
+NOT_BUILT: frozenset[str] = frozenset()
 ADMIN_PERMISSIONS: frozenset[str] = frozenset(p for p in ALL_PERMISSIONS if p.startswith("admin."))
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
