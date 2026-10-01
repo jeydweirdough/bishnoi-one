@@ -1,13 +1,13 @@
 import { ChevronLeft, ChevronRight, Target, Upload } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
-import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import { NoAccess } from "../components/admin/words";
-import type { PersonMonth, Performance } from "../components/field/types";
-import { MEASURES, progress, shiftMonth } from "../components/field/words";
+import type { DetailingSummary, PersonMonth, Performance } from "../components/field/types";
+import { MEASURES, REACTIONS, progress, shiftMonth } from "../components/field/words";
 
 export const metadata = { title: "Field work" };
 
@@ -77,6 +77,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
   const data = await load<Performance>(`/field/performance${typeof asked === "string" ? `?month=${enc(asked)}` : ""}`);
   const fmt = makeFormat(me.org);
   const { month } = data;
+  const detailing = can(me, "visits.view") ? await load<DetailingSummary>(`/field/detailing?month=${enc(month)}`) : null;
   const behind = data.people.filter((p) => p.goal && MEASURES.some((m) => (progress(p.actual[m.key], p.goal![m.key]) ?? 100) < 100));
 
   return (
@@ -155,6 +156,64 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
           Still short of a goal this month: {behind.map((p) => p.person.name).join(", ")}.
         </p>
       )}
+      {detailing && <Detailing summary={detailing} />}
     </>
+  );
+}
+
+// One colour each, good to bad: green, pale green, brand, grey, amber, red.
+const SWATCH: Record<string, string> = {
+  will_prescribe: "bg-filed",
+  already_prescribes: "bg-filed/45",
+  interested: "bg-hema/60",
+  neutral: "bg-rule-strong",
+  concerns: "bg-due-today",
+  not_interested: "bg-danger",
+};
+
+/** The month's detailing: each product, on how many visits and doctors, and how doctors took it. */
+function Detailing({ summary }: { summary: DetailingSummary }) {
+  return (
+    <Sheet className="mt-5 px-5 pt-3 pb-4">
+      <SectionTitle icon="visit">Products detailed</SectionTitle>
+      <p className="mb-3 text-meta text-ink-3">
+        {summary.detailedVisits} of {summary.visits} {summary.visits === 1 ? "visit" : "visits"} this month recorded the products discussed.
+      </p>
+      {summary.products.length === 0 ? (
+        <p className="py-2 text-meta text-ink-3">No products recorded on visits yet. Agents add them when they log a visit.</p>
+      ) : (
+        <>
+          <ul className="space-y-3">
+            {summary.products.map((p) => (
+              <li key={p.product.id} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                <span className="text-sm">
+                  <span className="font-medium text-ink">{p.product.name}</span>
+                  <span className="block text-meta text-ink-3">
+                    {p.visits} {p.visits === 1 ? "visit" : "visits"} · {p.doctors} {p.doctors === 1 ? "doctor" : "doctors"}
+                  </span>
+                </span>
+                <div
+                  className="flex h-3 overflow-hidden rounded-full bg-bench"
+                  role="img"
+                  aria-label={REACTIONS.filter((r) => p.reactions[r.value]).map((r) => `${r.label}: ${p.reactions[r.value]}`).join(", ")}
+                >
+                  {REACTIONS.map((r) => (
+                    <span key={r.value} className={SWATCH[r.value]} style={{ width: `${(100 * (p.reactions[r.value] ?? 0)) / p.visits}%` }} />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-meta text-ink-3">
+            {REACTIONS.map((r) => (
+              <span key={r.value} className="inline-flex items-center gap-1.5">
+                <span className={`size-2.5 rounded-[2px] ${SWATCH[r.value]}`} aria-hidden />
+                {r.label}
+              </span>
+            ))}
+          </p>
+        </>
+      )}
+    </Sheet>
   );
 }

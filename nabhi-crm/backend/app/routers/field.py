@@ -35,7 +35,7 @@ from app.api import Api, as_utc, field_error, iso, not_found, person_out, team_o
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import AuditEntry, Balance, Company, FieldGoal, RouteDay, TrailBatch, User, Visit
+from app.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, FieldGoal, Product, RouteDay, TrailBatch, User, Visit
 from app.scope import reachable_people, reaches, within
 from app.trail import Point, decode, encode, metres, path_metres
 
@@ -92,11 +92,39 @@ class Where(Api):
     accuracy_m: int = Field(ge=0, le=100_000)
 
 
+Reaction = Literal["will_prescribe", "already_prescribes", "interested", "neutral", "concerns", "not_interested"]
+
+
+class DetailIn(Api):
+    """One product detailed on a visit: what was said, and how it landed."""
+
+    product_id: str = Field(max_length=36)
+    message: str | None = Field(None, max_length=300)
+    reaction: Reaction
+
+
 class VisitFields(Api):
     visited_at: datetime | None = None
     amount_centavos: int | None = Field(None, ge=0, le=10**12)
     receipt_no: str | None = Field(None, max_length=40)
     notes: str | None = Field(None, max_length=5000)
+    # The products detailed, in the order they were (P6). At most ten.
+    detailing: list[DetailIn] | None = Field(None, max_length=10)
+    next_objective: str | None = Field(None, max_length=300)
+
+
+def check_detailing(db: Session, items: list[DetailIn] | None) -> list[dict]:
+    """The detailing as kept: each product named as it was then, once each."""
+    out, seen = [], set()
+    for n, item in enumerate(items or []):
+        if item.product_id in seen:
+            raise field_error(f"detailing.{n}.productId", "This product is on the visit twice.")
+        seen.add(item.product_id)
+        product = db.get(Product, item.product_id)
+        if product is None:
+            raise field_error(f"detailing.{n}.productId", "Pick a product from the list.")
+        out.append({"productId": product.id, "productName": product.name, "message": (item.message or "").strip() or None, "reaction": item.reaction})
+    return out
 
 
 class VisitIn(VisitFields):
@@ -120,6 +148,8 @@ def visit_out(visit: Visit, access: Access) -> dict:
         "amountCentavos": visit.amount_centavos,
         "receiptNo": visit.receipt_no,
         "notes": visit.notes,
+        "detailing": visit.detailing or [],
+        "nextObjective": visit.next_objective,
         "owner": person_out(visit.owner),
         "createdAt": iso(visit.created_at),
         "location": (
@@ -210,6 +240,8 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
         amount_centavos=amount,
         receipt_no=receipt,
         notes=(body.notes or "").strip() or None,
+        detailing=check_detailing(db, body.detailing),
+        next_objective=(body.next_objective or "").strip() or None,
         owner_id=me.id,
         team_id=me.team_id,
         created_by_id=me.id,
@@ -244,6 +276,10 @@ def update_visit(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, v
         visit.receipt_no = (body.receipt_no or "").strip() or None
     if "notes" in sent:
         visit.notes = (body.notes or "").strip() or None
+    if "detailing" in sent:
+        visit.detailing = check_detailing(db, body.detailing)
+    if "next_objective" in sent:
+        visit.next_objective = (body.next_objective or "").strip() or None
     if visit.outcome != "collected":
         visit.amount_centavos, visit.receipt_no = 0, None
     check_collection(visit.outcome, visit.amount_centavos, visit.receipt_no)
@@ -251,6 +287,48 @@ def update_visit(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, v
     db.commit()
     db.refresh(visit)
     return visit_out(visit, access)
+
+
+@router.get("/field/visit-brief")
+def visit_brief(access: Create, db: DB, company: str = Query(max_length=36)) -> dict:
+    """What the visit form needs about a doctor before the visit: what the last
+    visit set out to do next, and the products that can be detailed (names
+    only: a field agent needn't see prices)."""
+    doctor = db.get(Company, company)
+    if doctor is None or not reaches(doctor, access):
+        raise not_found("customer")
+    last = db.scalars(
+        select(Visit).where(Visit.company_id == doctor.id, Visit.next_objective.is_not(None)).order_by(Visit.visited_at.desc()).limit(1)
+    ).first()
+    products = db.scalars(select(Product).where(Product.is_active).order_by(func.lower(Product.name)))
+    return {
+        "lastObjective": {"text": last.next_objective, "visitedAt": iso(last.visited_at), "by": person_out(last.owner)} if last else None,
+        "products": [{"id": p.id, "name": p.name, "strength": p.strength} for p in products],
+        "reactions": list(DETAIL_REACTIONS),
+    }
+
+
+@router.get("/field/detailing")
+def detailing_summary(access: View, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
+    """For a month, each product detailed: on how many visits, and how doctors
+    took it, over the visits this person can see."""
+    month = month_or_now(month, settings)
+    start, end = month_bounds(month, settings)
+    visits = db.scalars(within(select(Visit), Visit, access).where(Visit.visited_at >= start, Visit.visited_at < end)).unique().all()
+    products: dict[str, dict] = {}
+    for v in visits:
+        for d in v.detailing or []:
+            row = products.setdefault(d["productId"], {"product": {"id": d["productId"], "name": d["productName"]}, "visits": 0, "doctors": set(), "reactions": dict.fromkeys(DETAIL_REACTIONS, 0)})
+            row["visits"] += 1
+            row["doctors"].add(v.company_id)
+            row["reactions"][d["reaction"]] = row["reactions"].get(d["reaction"], 0) + 1
+    rows = sorted(products.values(), key=lambda r: (-r["visits"], r["product"]["name"].lower()))
+    return {
+        "month": month,
+        "visits": len(visits),
+        "detailedVisits": sum(1 for v in visits if v.detailing),
+        "products": [{**r, "doctors": len(r["doctors"])} for r in rows],
+    }
 
 
 @router.delete("/visits/{visit_id}", status_code=status.HTTP_204_NO_CONTENT)

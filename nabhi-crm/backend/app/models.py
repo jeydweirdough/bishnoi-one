@@ -173,6 +173,9 @@ class Company(Owned, Base):
     # Which price group's prices it gets (Hospital, Drugstore chain...). None: none.
     price_group_code: Mapped[str | None] = mapped_column(ForeignKey("nbcm_price_groups.code", ondelete="SET NULL"), index=True, default=None)
     industry: Mapped[str | None] = mapped_column(String(80), default=None)
+    # How they first came to us: one of the lead sources (Settings → Deal
+    # stages), the same list deals use. A new deal starts with it.
+    lead_source: Mapped[str | None] = mapped_column(String(60), default=None)
     website: Mapped[str | None] = mapped_column(String(200), default=None)
     email: Mapped[str | None] = mapped_column(String(254), default=None)
     phone: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -641,6 +644,8 @@ class FormField(Base):
 # bring it down. Each agent has monthly goals, set by an administrator.
 
 VISIT_OUTCOMES = ("collected", "promised", "not_in", "updated", "other")
+# How a doctor took a product that was detailed to them, best first.
+DETAIL_REACTIONS = ("will_prescribe", "already_prescribes", "interested", "neutral", "concerns", "not_interested")
 
 
 class Balance(Base):
@@ -681,6 +686,11 @@ class Visit(Owned, Base):
     longitude: Mapped[float | None] = mapped_column(Float, default=None)
     accuracy_m: Mapped[int | None] = mapped_column(Integer, default=None)
     distance_m: Mapped[int | None] = mapped_column(Integer, default=None)
+    # What was detailed, in the order it was (P6): [{"productId", "productName",
+    # "message", "reaction"}], the reaction one of DETAIL_REACTIONS. And what the
+    # next visit is for, shown when that visit is logged.
+    detailing: Mapped[list] = mapped_column(JSON, default=list)
+    next_objective: Mapped[str | None] = mapped_column(String(300), default=None)
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
@@ -928,3 +938,33 @@ class RevenueTarget(Base):
     month: Mapped[str] = mapped_column(String(7), index=True)
     amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class MergedRecord(Base):
+    """A customer or contact merged into another (Customers → Possible
+    duplicates). The merged one is gone; its id still leads to the one kept, for
+    old links and for the other Nabhi apps that saved it."""
+
+    __tablename__ = "nbcm_merged_records"
+
+    old_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))  # company | contact
+    new_id: Mapped[str] = mapped_column(String(36), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    merged_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    merged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class NotDuplicate(Base):
+    """Two records someone said are different, so they aren't offered again.
+    The pair is kept in id order, smaller first."""
+
+    __tablename__ = "nbcm_not_duplicates"
+    __table_args__ = (UniqueConstraint("kind", "first_id", "second_id", name="not_duplicate_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(16))
+    first_id: Mapped[str] = mapped_column(String(36), index=True)
+    second_id: Mapped[str] = mapped_column(String(36), index=True)
+    decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

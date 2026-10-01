@@ -26,6 +26,7 @@ from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import fields_for
 from app.models import FIELD_TYPES, Company, Contact, FormField, FormSection, Product, Quote
 from app.pricing import sales_settings
+from app.routers.deals import deal_lists
 
 router = APIRouter(tags=["settings"])
 
@@ -38,7 +39,15 @@ WITH_OPTIONS = ("choice", "multi_choice")
 # --- forms ---------------------------------------------------------------------------------
 
 
-def field_out(f: FormField, used: int | None = None) -> dict:
+# Built-in pick-lists whose choices are kept elsewhere, as (entity, key):
+# a customer's lead source uses the deals' list (Settings → Deal stages).
+SHARED_LISTS = {("company", "leadSource")}
+
+
+def field_out(f: FormField, used: int | None = None, db: Session | None = None) -> dict:
+    options = f.options or []
+    if db is not None and (f.entity, f.key) in SHARED_LISTS:
+        options = deal_lists(db)["sources"]
     out = {
         "id": f.id,
         "key": f.key,
@@ -49,7 +58,8 @@ def field_out(f: FormField, used: int | None = None) -> dict:
         "required": f.required,
         "hidden": f.hidden,
         "inList": f.in_list,
-        "options": f.options or [],
+        "options": options,
+        "sharedList": (f.entity, f.key) in SHARED_LISTS,
         "helpText": f.help_text,
         "placeholder": f.placeholder,
     }
@@ -77,7 +87,7 @@ def layout_out(db: Session, entity: str, *, everything: bool) -> dict:
         if not everything and not here:
             continue
         out.append(
-            {"id": s.id, "title": s.title, "columns": s.columns, "fields": [field_out(f, used.get(f.key, 0) if everything else None) for f in here]}
+            {"id": s.id, "title": s.title, "columns": s.columns, "fields": [field_out(f, used.get(f.key, 0) if everything else None, db) for f in here]}
         )
     return {"entity": entity, "sections": out}
 
@@ -134,6 +144,8 @@ def add_option(access: Manage, me: CurrentUser, db: DB, entity: Entity, key: str
     if field is None or field.type not in WITH_OPTIONS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That field has no list to add to.")
     label = body.label.strip()
+    if (entity, key) in SHARED_LISTS:
+        return add_shared_option(db, me, field, label)
     current = field.options or []
     same = next((o for o in current if o.lower() == label.lower()), None)
     if same is None:
@@ -143,6 +155,20 @@ def add_option(access: Manage, me: CurrentUser, db: DB, entity: Entity, key: str
         audit(db, me, "form.option_added", target=f"{field.label}: {label}", target_type="form", target_id=entity, fields=[key])
         db.commit()
     return {"option": same or label, "field": field_out(field)}
+
+
+def add_shared_option(db: Session, me, field: FormField, label: str) -> dict:
+    """A lead source added from the customer form goes on the deals' list."""
+    rules = sales_settings(db)
+    lists = deal_lists(db)
+    same = next((o for o in lists["sources"] if o.lower() == label.lower()), None)
+    if same is None:
+        if len(lists["sources"]) >= 50:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "label"], "msg": "This list is full (50 choices)."}])
+        rules.deal_lists = {**lists, "sources": [*lists["sources"], label[:60]]}
+        audit(db, me, "deal_lists.updated", target=f"Lead source added: {label}", target_type="settings", target_id="deal_lists")
+        db.commit()
+    return {"option": same or label[:60], "field": field_out(field, db=db)}
 
 
 @router.put("/admin/forms/{entity}")
@@ -171,7 +197,8 @@ def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: Lay
             elif f.type not in FIELD_TYPES:
                 problems.append(f"{f.label}: pick what kind of field it is.")
             kind = fields[f.id].type if f.id else f.type
-            if kind in WITH_OPTIONS and len(clean_options(f.options)) < (1 if f.id and fields[f.id].standard else 2):
+            shared = f.id is not None and (entity, fields[f.id].key) in SHARED_LISTS
+            if kind in WITH_OPTIONS and not shared and len(clean_options(f.options)) < (1 if f.id and fields[f.id].standard else 2):
                 problems.append(f"{f.label} needs at least two options to pick from.")
     for f in fields.values():
         if f.standard and f.id not in seen_fields:
@@ -208,7 +235,9 @@ def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: Lay
             field.required = True if field.locked else f.required
             field.hidden = False if field.locked else f.hidden
             field.in_list = f.in_list
-            field.options = clean_options(f.options) if field.type in WITH_OPTIONS else []
+            # A shared list's choices are kept where they belong, not here.
+            shared = (entity, field.key) in SHARED_LISTS
+            field.options = clean_options(f.options) if field.type in WITH_OPTIONS and not shared else []
             field.help_text = f.help_text
             field.placeholder = f.placeholder
             field.section_id = section.id

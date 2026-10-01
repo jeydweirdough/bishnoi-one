@@ -55,6 +55,20 @@ class Settings(BaseSettings):
     discord_logs_webhook_url: SecretStr | None = None
     discord_max_per_minute: int = 30
 
+    # Email notifications (app/email.py): sent through an email delivery
+    # service's SMTP server. Off until EMAIL_ENABLED=true; EMAIL_MODE=smtp
+    # really sends, mock keeps it on this machine. CRM_APP_URL is where the
+    # CRM's screens are, for the link in each email. See .env.example.
+    email_enabled: bool = False
+    email_mode: str = "mock"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_starttls: bool = True
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    email_from: str | None = None
+    crm_app_url: str | None = None
+
     # Nabhi Inventory, where the product list and stock come from: its API
     # (https://...), and the key it gave this app (one of its INTEGRATION_KEYS,
     # the part after "crm:"). Unset: products are kept here, by hand.

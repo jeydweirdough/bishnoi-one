@@ -32,7 +32,8 @@ export function DealForm({
   deal,
 }: {
   org: Org;
-  company: { id: string; name: string };
+  /** leadSource: the customer's own, which a new deal starts with. */
+  company: { id: string; name: string; leadSource?: string | null };
   contacts: { id: string; name: string }[];
   stages: DealStage[];
   lists: DealLists;
@@ -53,7 +54,7 @@ export function DealForm({
   const [probability, setProbability] = useState(deal ? String(deal.probability) : "");
   const [closeOn, setCloseOn] = useState(deal?.expectedCloseOn ?? "");
   const [value, setValue] = useState(deal && !deal.lines.length ? fmt.pesosText(deal.valueCentavos) : "");
-  const [source, setSource] = useState(deal?.leadSource ?? "");
+  const [source, setSource] = useState(deal ? (deal.leadSource ?? "") : (company.leadSource ?? ""));
   const [notes, setNotes] = useState(deal?.notes ?? "");
   const [ownerId, setOwnerId] = useState(deal?.owner?.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [priceType, setPriceType] = useState(deal?.priceType ?? priceTypes[0]?.code ?? "");

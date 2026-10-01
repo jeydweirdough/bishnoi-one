@@ -20,9 +20,10 @@ EMAIL_WORDS = "Enter an email address like name@company.com."
 def email_address(text: str) -> str:
     """An email address as kept (lower case), or ValueError. The address is
     checked as written; whether its domain takes mail isn't asked, so this
-    works on a PC without the internet."""
+    works on a PC without the internet. Addresses at a .test domain pass (the
+    demo accounts are @pharmacrm.test); other reserved names like .local don't."""
     try:
-        return validate_email(text.strip(), check_deliverability=False).normalized.lower()
+        return validate_email(text.strip(), check_deliverability=False, test_environment=True).normalized.lower()
     except EmailNotValidError:
         raise ValueError(EMAIL_WORDS) from None
 

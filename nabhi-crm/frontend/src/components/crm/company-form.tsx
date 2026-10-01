@@ -15,7 +15,7 @@ import { useCan } from "../quick-add/can";
 import { AddCustomerType } from "../quick-add/forms";
 import { QuickAdd } from "../quick-add/quick-add";
 
-const TEXT = ["name", "industry", "website", "email", "phone", "address", "city", "country", "notes"] as const;
+const TEXT = ["name", "industry", "leadSource", "website", "email", "phone", "address", "city", "country", "notes"] as const;
 type Text = (typeof TEXT)[number];
 
 /** Adding a company, or changing one. The form is laid out as an admin set it (Settings → Forms). */
@@ -120,6 +120,8 @@ export function CompanyForm({
         return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
       case "industry":
         return <ChoiceSelect field={f} value={values.industry} onChange={(v) => setValues({ ...values, industry: v })} error={fields.industry} />;
+      case "leadSource":
+        return <ChoiceSelect field={f} value={values.leadSource} onChange={(v) => setValues({ ...values, leadSource: v })} error={fields.leadSource} />;
       case "notes":
         return (
           <Field label={f.label} optional={!f.required} error={fields.notes} hint={hint}>

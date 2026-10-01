@@ -3,7 +3,7 @@ import type { Format } from "@/src/platform/lib/format";
 import { DeleteVisit } from "./delete-visit";
 import type { Visit } from "./types";
 import { distanceText, mapLink } from "./where";
-import { outcomeOf } from "./words";
+import { outcomeOf, reactionOf } from "./words";
 
 /** Where the visit was logged, against the clinic's pin: said plainly, with a map to check. */
 function Place({ v }: { v: Visit }) {
@@ -44,7 +44,27 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
                 {" · "}
                 <Place v={v} />
               </p>
+              {v.detailing.length > 0 && (
+                <ol className="mt-1.5 space-y-0.5 text-sm">
+                  {v.detailing.map((d) => {
+                    const r = reactionOf(d.reaction);
+                    return (
+                      <li key={d.productId}>
+                        <span className="font-medium">{d.productName}</span>
+                        {": "}
+                        <span className={r.tone === "good" ? "text-filed" : r.tone === "bad" ? "text-danger" : "text-ink-2"}>{r.label.toLowerCase()}</span>
+                        {d.message && <span className="text-ink-3"> · {d.message}</span>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
               {v.notes && <p className="mt-1 text-sm text-ink-2">{v.notes}</p>}
+              {v.nextObjective && (
+                <p className="mt-1 text-meta text-ink-3">
+                  <span className="font-semibold text-ink-2">Next time:</span> {v.nextObjective}
+                </p>
+              )}
             </div>
             {v.outcome === "collected" && <span className="shrink-0 pt-0.5 text-sm font-semibold tabular-nums">{fmt.peso(v.amountCentavos)}</span>}
             {v.can.delete && <DeleteVisit id={v.id} doctor={v.company.name} />}

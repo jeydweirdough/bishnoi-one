@@ -879,6 +879,10 @@ decision before building it).
 | Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Nabhi Orders**, outside this repo. |
 | Leads and the pipeline | **Deals on customers**: a stage, an expected value, a forecast category. No separate lead record. |
 | Sales targets | A monthly **revenue target** per seller (Deals → Results → Set targets); a team's is its people's added up. Won deals count against it, on Deals → Results and on the home page. |
+| Visit record | A visit records the **products discussed**, in order, each with its key message and the doctor's reaction, and the **next visit's objective**, shown when the next visit is logged. **Field work** shows a month's products detailed and how doctors took them. |
+| Lead source | Customers and deals share one list (Settings → Deal stages); a new deal starts with its customer's. |
+| Duplicates | **Customers → Possible duplicates** finds lookalike customers and contacts (same phone however it's written, same email, same or similar name) and merges two into one with all their history. A merged id still leads to the one kept. Merging needs Delete. |
+| Email notifications | A quote waiting for approval is emailed to its approvers, and the decision to the rep, through an email delivery service's SMTP. Off until `EMAIL_ENABLED=true`; see `nabhi-crm/backend/.env.example`. |
 | Working without signal | **Offline visits and collections** on the phone, synced when there's signal. |
 
 ### Where the build is

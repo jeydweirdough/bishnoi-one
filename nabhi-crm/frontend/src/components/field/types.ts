@@ -10,6 +10,10 @@ export type Visit = {
   amountCentavos: number;
   receiptNo: string | null;
   notes: string | null;
+  /** What was detailed, in order (P6). */
+  detailing: Detail[];
+  /** What the next visit is for. */
+  nextObjective: string | null;
   owner: { id: string; name: string };
   createdAt: string;
   /** Where the phone was when it was logged; null when it didn't say. */
@@ -18,6 +22,23 @@ export type Visit = {
   distanceM: number | null;
   atClinic: boolean | null;
   can: { edit: boolean; delete: boolean };
+};
+
+export type Reaction = "will_prescribe" | "already_prescribes" | "interested" | "neutral" | "concerns" | "not_interested";
+
+export type Detail = { productId: string; productName: string; message: string | null; reaction: Reaction };
+
+/** What the visit form needs about a doctor: the last visit's objective, and what can be detailed. */
+export type VisitBrief = {
+  lastObjective: { text: string; visitedAt: string; by: { id: string; name: string } | null } | null;
+  products: { id: string; name: string; strength: string | null }[];
+};
+
+export type DetailingSummary = {
+  month: string;
+  visits: number;
+  detailedVisits: number;
+  products: { product: { id: string; name: string }; visits: number; doctors: number; reactions: Record<Reaction, number> }[];
 };
 
 export type Pin = { latitude: number; longitude: number; pinnedAt: string | null };

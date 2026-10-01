@@ -73,7 +73,7 @@ export default async function NewDealPage({ searchParams }: { searchParams: Sear
       <Sheet className="max-w-[56rem] px-5 py-6 sm:px-8">
         <DealForm
           org={me.org}
-          company={{ id: company.id, name: company.name }}
+          company={{ id: company.id, name: company.name, leadSource: company.leadSource }}
           contacts={company.contacts.map((c) => ({ id: c.id, name: c.name }))}
           stages={stages}
           lists={lists}

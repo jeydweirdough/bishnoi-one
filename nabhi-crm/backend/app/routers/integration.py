@@ -15,7 +15,7 @@ from sqlalchemy import func, or_, select
 
 from app.api import not_found
 from app.deps import DB, SettingsDep
-from app.models import Company
+from app.models import Company, MergedRecord
 
 
 def calling_app(settings: SettingsDep, x_nabhi_key: Annotated[str | None, Header()] = None) -> str:
@@ -58,6 +58,10 @@ def find_customers(_: Caller, db: DB, q: str | None = Query(None, max_length=100
 @router.get("/{customer_id}")
 def read_customer(_: Caller, db: DB, customer_id: str) -> dict:
     c = db.get(Company, customer_id)
+    if c is None and (merged := db.get(MergedRecord, customer_id)) is not None and merged.kind == "company":
+        # Merged into another: that one answers, under its own id, so the
+        # calling app can save the new id.
+        c = db.get(Company, merged.new_id)
     if c is None:
         raise not_found("customer")
     return customer_out(c)

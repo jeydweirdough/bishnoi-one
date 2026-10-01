@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { FieldCounts, GoalsPayload, Pin, Visit, VisitOutcome } from "../components/field/types";
+import type { FieldCounts, GoalsPayload, Pin, Reaction, Visit, VisitBrief, VisitOutcome } from "../components/field/types";
 import type { Where } from "../components/field/where";
 
 // Field work: logging visits, and the month's goals. The API checks who may.
@@ -16,9 +16,17 @@ export type VisitInput = {
   amountCentavos: number | null;
   receiptNo: string | null;
   notes: string | null;
+  /** The products detailed, in order (P6). */
+  detailing: { productId: string; message: string | null; reaction: Reaction }[];
+  nextObjective: string | null;
   /** Where the phone was, if it said. */
   location: Where | null;
 };
+
+/** The doctor's last objective and the products that can be detailed, for the visit form. */
+export async function visitBrief(companyId: string): Promise<Result<VisitBrief>> {
+  return attempt(() => api.get<VisitBrief>(`/field/visit-brief?company=${enc(companyId)}`));
+}
 
 export async function logVisit(input: VisitInput): Promise<Result<Visit>> {
   return attempt(async () => {

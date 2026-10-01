@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Copy, Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -41,11 +41,18 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
       <PageHeader
         title="Customers"
         actions={
-          can(me, "customers.create") && (
-            <LinkButton href="/contacts/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add customer
-            </LinkButton>
-          )
+          <>
+            {can(me, "customers.edit") && (
+              <LinkButton href="/companies/duplicates?kind=contact" icon={<Copy className="size-4" aria-hidden />}>
+                Possible duplicates
+              </LinkButton>
+            )}
+            {can(me, "customers.create") && (
+              <LinkButton href="/contacts/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                Add customer
+              </LinkButton>
+            )}
+          </>
         }
       >
         {list.total} {list.total === 1 ? "person" : "people"}

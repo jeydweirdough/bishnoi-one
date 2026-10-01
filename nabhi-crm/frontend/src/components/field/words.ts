@@ -1,6 +1,6 @@
 import { can } from "@/src/platform/lib/access";
 import type { Me } from "@/src/platform/lib/types";
-import type { FieldCounts, VisitOutcome } from "./types";
+import type { FieldCounts, Reaction, VisitOutcome } from "./types";
 
 /** A field agent: logs visits, doesn't quote, doesn't watch others. Their location is required. */
 export const isFieldAgent = (me: Me) => can(me, "visits.create") && !can(me, "quotes.view") && !can(me, "goals.view");
@@ -14,6 +14,18 @@ export const OUTCOMES: { value: VisitOutcome; label: string; past: string }[] = 
   { value: "updated", label: "Updated details", past: "Updated their details" },
   { value: "other", label: "Other", past: "Visited" },
 ];
+
+/** How a doctor took a product that was detailed, best first; `tone` colours it. */
+export const REACTIONS: { value: Reaction; label: string; tone: "good" | "plain" | "bad" }[] = [
+  { value: "will_prescribe", label: "Will prescribe", tone: "good" },
+  { value: "already_prescribes", label: "Already prescribes", tone: "good" },
+  { value: "interested", label: "Interested", tone: "plain" },
+  { value: "neutral", label: "Neutral", tone: "plain" },
+  { value: "concerns", label: "Has concerns", tone: "bad" },
+  { value: "not_interested", label: "Not interested", tone: "bad" },
+];
+
+export const reactionOf = (value: Reaction) => REACTIONS.find((r) => r.value === value) ?? REACTIONS[3];
 
 export const outcomeOf = (value: VisitOutcome) => OUTCOMES.find((o) => o.value === value) ?? OUTCOMES[OUTCOMES.length - 1];
 

@@ -55,7 +55,7 @@ request that changes what it describes.
 | C1 | One timeline any record can have (messages, activities, tracked fields) | Odoo ★ (`mail.thread`) | None. CRM activities link to a company or contact only. | open (proposed ADOPT: P1) |
 | C2 | Typed scheduled activities (type, due, assignee, link, done) | Odoo ★ (`mail.activity`) | CRM partial: kind, due time, done, owner; linked to companies and contacts only. Others: none. | open (proposed ADAPT: CRM's activity on C1's polymorphic link) |
 | C3 | Feed with posts, @mentions and followers | Salesforce ★ (Chatter) | None. Plat has ticket and incident notes. | open |
-| C4 | Structured interaction record (what was detailed, said, and how it landed) | Veeva (pattern) | CRM partial: field visits record an outcome, an amount and a receipt; not products detailed or reaction. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P6 |
+| C4 | Structured interaction record (what was detailed, said, and how it landed) | Veeva (pattern) | **Built 2026-10-01:** a visit records the products discussed in order, each with its key message and the doctor's reaction, and the next visit's objective; Field work sums a month's detailing. Samples given wait for sample management. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P6 |
 | C5 | Call plans with attainment | Veeva (pattern) | CRM partial: monthly field goals and a performance screen; no per-account visit frequency. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P7 |
 
 ## E. Views and reporting

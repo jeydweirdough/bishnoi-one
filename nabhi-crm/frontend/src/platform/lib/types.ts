@@ -919,6 +919,8 @@ export type CompanyRow = {
   status: CompanyStatus;
   priceGroupCode?: string | null;
   industry: string | null;
+  /** How they first came to us: one of the deals' lead sources. */
+  leadSource: string | null;
   website: string | null;
   email: string | null;
   phone: string | null;
@@ -1027,6 +1029,8 @@ export type FormFieldDef = {
   hidden: boolean;
   inList: boolean;
   options: string[];
+  /** Its choices are kept elsewhere (a customer's lead source: Settings → Deal stages). */
+  sharedList?: boolean;
   helpText: string | null;
   placeholder: string | null;
   /** Only in Settings: how many records have a value in it. */
@@ -1213,4 +1217,24 @@ export type SalesResults = {
 export type RevenueTargets = {
   month: string;
   people: { person: { id: string; name: string }; team: { id: string; name: string } | null; targetCentavos: number | null }[];
+};
+
+// --- possible duplicates (CRM) ---------------------------------------------------------------
+
+export type DuplicateRecord = {
+  id: string;
+  name: string;
+  /** A customer's city and country; a contact's customer. */
+  place: string | null;
+  email: string | null;
+  phone: string | null;
+  owner: { id: string; name: string } | null;
+  updatedAt: string;
+  counts: Record<string, number>;
+};
+
+export type DuplicatePairs = {
+  kind: "company" | "contact";
+  total: number;
+  pairs: { score: number; reasons: string[]; a: DuplicateRecord; b: DuplicateRecord }[];
 };

@@ -34,7 +34,7 @@ from app.extra import check_extra
 from app.inventory import sync_if_stale
 from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
-from app import pharmacy
+from app import mail, pharmacy
 from app.orders import OrdersUnavailable
 from app.orders import payload as order_payload
 from app.orders import send as send_order
@@ -416,6 +416,8 @@ async def create_quote(
     audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
     db.commit()
     db.refresh(record)
+    if record.approval_status == "pending":
+        mail.quote_waiting(db, settings, record, me)
     return quote_out(db, record, access)
 
 
@@ -631,7 +633,7 @@ def decided(body: Decision) -> None:
 
 
 @router.post("/quotes/{quote_id}/approval")
-def decide_approval(access: Approve, me: CurrentUser, db: DB, quote_id: str, body: Decision) -> dict:
+def decide_approval(access: Approve, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str, body: Decision) -> dict:
     quote = get_quote(db, access, quote_id)
     if quote.approval_status != "pending":
         raise HTTPException(status.HTTP_409_CONFLICT, "This quote isn't waiting for approval.")
@@ -640,6 +642,7 @@ def decide_approval(access: Approve, me: CurrentUser, db: DB, quote_id: str, bod
     quote.approval_note, quote.approval_by_id, quote.approval_by_name, quote.approval_at = body.note, me.id, me.full_name, datetime.now(UTC)
     audit(db, me, f"quote.{quote.approval_status}", target=quote.number, target_type="quote", target_id=quote.id)
     db.commit()
+    mail.quote_decided(db, settings, quote, me)
     return quote_out(db, quote, access)
 
 

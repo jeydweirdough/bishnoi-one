@@ -20,6 +20,7 @@ from app.extra import check_extra, check_required
 from app.models import Activity, Company, Contact, PriceGroup
 from app.routers.activities import activity_out
 from app.routers.customer_types import check_type, first_type
+from app.routers.deals import check_source
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -36,6 +37,7 @@ class CompanyFields(Api):
     # The price group whose prices it gets (Settings → Price rules). A null: none.
     price_group_code: str | None = Field(None, max_length=40)
     industry: str | None = Field(None, max_length=80)
+    lead_source: str | None = Field(None, max_length=60)
     website: str | None = Field(None, max_length=200)
     email: str | None = Field(None, max_length=254)
     phone: str | None = Field(None, max_length=40)
@@ -91,6 +93,7 @@ def company_row(company: Company, access: Access, contacts: int = 0, last_activi
         "status": company.status,
         "priceGroupCode": company.price_group_code,
         "industry": company.industry,
+        "leadSource": company.lead_source,
         "website": company.website,
         "email": company.email,
         "phone": company.phone,
@@ -176,6 +179,7 @@ def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> 
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     values["status"] = check_type(db, body.status) if body.status else first_type(db)
     check_price_group(db, body.price_group_code)
+    check_source(db, body.lead_source)
     values["extra"] = check_extra(db, "company", body.extra)
     company = Company(**values, owner_id=owner.id, team_id=owner.team_id, created_by_id=me.id)
     check_required(db, "company", company)
@@ -223,6 +227,8 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
         check_type(db, wanted["status"])
     if wanted.get("price_group_code") and wanted["price_group_code"] != company.price_group_code:
         check_price_group(db, wanted["price_group_code"])
+    if wanted.get("lead_source") and wanted["lead_source"] != company.lead_source:
+        check_source(db, wanted["lead_source"])
     if "extra" in wanted:
         wanted["extra"] = check_extra(db, "company", wanted["extra"], company.extra)
     if "owner_id" in wanted:

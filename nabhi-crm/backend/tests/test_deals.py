@@ -186,3 +186,33 @@ def test_deleting_a_deal_keeps_its_quotes(client, crew, ids):
     assert client.delete(f"/deals/{d['id']}", headers=crew["lia"]).status_code == 204
     again = client.get(f"/quotes/{quote['id']}", headers=crew["lia"])
     assert again.status_code == 200 and again.json()["deal"] is None
+
+
+# --- lead source on customers ---
+
+
+def test_a_customer_has_a_lead_source_from_the_deals_list_and_deals_start_with_it(client, crew):
+    from tests.conftest import bearer, sign_in
+
+    ria = crew["ria"]
+    acme = company(client, ria, "Acme", leadSource="Referral")
+    assert acme["leadSource"] == "Referral"
+    r = client.post("/companies", json={"name": "Beta", "leadSource": "Billboard"}, headers=ria)
+    assert r.status_code == 422 and errors(r) == {"leadSource": "Pick a lead source from the list."}
+    # A new deal starts with its customer's lead source, unless it's given one (or none).
+    assert deal(client, ria, acme)["leadSource"] == "Referral"
+    assert deal(client, ria, acme, leadSource="Event")["leadSource"] == "Event"
+    assert deal(client, ria, acme, leadSource=None)["leadSource"] is None
+
+    # On the customer form, its choices are the deals' list; one added there goes on that list.
+    ana = bearer(sign_in(client))
+    form = client.get("/forms/company", headers=ria).json()
+    field = next(f for s in form["sections"] for f in s["fields"] if f["key"] == "leadSource")
+    assert field["options"] == client.get("/deal-lists", headers=ria).json()["sources"] and field["sharedList"] is True
+    assert client.post("/admin/forms/company/fields/leadSource/options", json={"label": "Trade show"}, headers=ana).status_code == 200
+    assert "Trade show" in client.get("/deal-lists", headers=ria).json()["sources"]
+    # The forms editor saves the form as it is, with no choices of its own for this field.
+    editor = client.get("/forms/company?all=true", headers=ana).json()
+    body = {"sections": [{"id": s["id"], "title": s["title"], "columns": s["columns"], "fields": [{"id": f["id"], "label": f["label"], "type": f["type"], "required": f["required"], "hidden": f["hidden"], "inList": f["inList"], "options": f["options"], "helpText": f["helpText"], "placeholder": f["placeholder"]} for f in s["fields"]]} for s in editor["sections"]]}
+    assert client.put("/admin/forms/company", json=body, headers=ana).status_code == 200, "the form saves"
+    assert client.patch(f"/companies/{acme['id']}", json={"leadSource": "Trade show"}, headers=ria).json()["leadSource"] == "Trade show"

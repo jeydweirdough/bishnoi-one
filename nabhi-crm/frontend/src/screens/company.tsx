@@ -7,6 +7,7 @@ import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Assignable, CustomerType, DealList, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { loadRecord } from "../components/crm/merged";
 import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
 import { layoutItems } from "../components/extra/extra-values";
@@ -41,7 +42,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
   const seesVisits = can(me, "visits.view");
   const seesDeals = can(me, "deals.view");
   const [company, people, quotes, types, fields, visits, owed, deals] = await Promise.all([
-    load<CompanyDetail>(`/companies/${enc(id)}`),
+    loadRecord<CompanyDetail>("companies", id),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
     load<CustomerType[]>("/customer-types"),
@@ -115,7 +116,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
           </>
         }
       >
-        {[company.industry, [company.city, company.country].filter(Boolean).join(", ")].filter(Boolean).join(" · ") || "No details yet"}
+        {[company.industry, [company.city, company.country].filter(Boolean).join(", "), company.leadSource && `Lead source: ${company.leadSource}`]
+          .filter(Boolean)
+          .join(" · ") || "No details yet"}
       </PageHeader>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">

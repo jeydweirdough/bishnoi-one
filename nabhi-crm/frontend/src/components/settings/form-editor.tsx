@@ -357,7 +357,15 @@ function Properties({ field, onChange, onRemove }: { field: F; onChange: (patch:
         </p>
       </div>
       <Field label="Name">{(p) => <Input {...p} value={f.label} onChange={(e) => onChange({ label: e.target.value })} maxLength={80} />}</Field>
-      {withOptions && (
+      {withOptions && f.sharedList ? (
+        <p className="text-meta text-ink-2">
+          Its choices are the lead sources deals use. Change them in{" "}
+          <a href="/admin/settings/deal-stages" className="text-hema hover:underline">
+            Settings → Deal stages
+          </a>
+          .
+        </p>
+      ) : withOptions && (
         <ChipsInput
           label={f.type === "choice" ? "Pick list options" : "Options"}
           value={f.options}

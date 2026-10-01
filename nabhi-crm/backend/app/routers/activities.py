@@ -7,7 +7,7 @@ activities.view / create / edit / delete, within the person's reach; a
 company or contact linked to one must be within reach too.
 """
 
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
@@ -147,10 +147,17 @@ def list_activities(
     contact: str | None = Query(None, max_length=36),
     owner: str | None = Query(None, max_length=36, description="'me', or a person's id"),
     state: State | None = None,
-    limit: int = Query(50, ge=1, le=200),
+    from_: date | None = Query(None, alias="from", description="from this day (the company's own), for a calendar"),
+    to: date | None = Query(None, description="up to, not including, this day"),
+    limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict:
     query = within(select(Activity), Activity, access)
+    zone = ZoneInfo(settings.org_timezone)
+    if from_:
+        query = query.where(Activity.at >= datetime.combine(from_, time(), zone).astimezone(UTC))
+    if to:
+        query = query.where(Activity.at < datetime.combine(to, time(), zone).astimezone(UTC))
     if kind:
         query = query.where(Activity.kind == kind)
     if company:
@@ -163,7 +170,7 @@ def list_activities(
         query = in_state(query, state, settings)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     # What's still to do reads soonest first; what's done, newest first.
-    order = Activity.at.asc() if state in ("open", "overdue", "today", "upcoming") else Activity.at.desc()
+    order = Activity.at.asc() if state in ("open", "overdue", "today", "upcoming") or from_ else Activity.at.desc()
     items = db.scalars(query.order_by(order).limit(limit).offset(offset)).unique().all()
     return {"items": [activity_out(a, access) for a in items], "total": total}
 

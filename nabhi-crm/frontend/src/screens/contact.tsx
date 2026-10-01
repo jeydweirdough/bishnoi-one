@@ -7,6 +7,7 @@ import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Assignable, Paged, Quote, ContactDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { loadRecord } from "../components/crm/merged";
 import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
 import { layoutItems } from "../components/extra/extra-values";
@@ -32,7 +33,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
   const { id } = await params;
   const seesQuotes = can(me, "quotes.view");
   const [contact, people, quotes, fields] = await Promise.all([
-    load<ContactDetail>(`/contacts/${enc(id)}`),
+    loadRecord<ContactDetail>("contacts", id),
     load<Assignable[]>("/people/assignable"),
     seesQuotes ? load<Paged<Quote>>(`/quotes?contact=${enc(id)}&limit=20`) : null,
     formLayout("contact"),

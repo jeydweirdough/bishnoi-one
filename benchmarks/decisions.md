@@ -37,12 +37,16 @@ The decisions depend on each other, so the build follows this order:
 
 ## Open-source for lead generation, reviewed on 2026-10-01
 
-From the "100 GitHub Repos for Lead Generation" list. Libraries go in the apps; whole products stay outside.
+From the "100 GitHub Repos for Lead Generation" list. Small libraries go in the apps; for anything heavy or needing a server, the idea is taken and built in our own code; whole products stay outside.
 
 | Use | Where |
 |---|---|
 | `phonenumbers` (Google's libphonenumber) | **In use** in the CRM since 2026-10-01: numbers are matched however they're written, for duplicate warnings. Read as local to the company's country (from its locale); several countries (D8) will need the country per customer. |
 | `email-validator` | **In use** in the CRM since 2026-10-01 for every email address. The domain isn't checked for mail, so it works without the internet. |
-| fullcalendar (free views), mjml, splink, photon, OpenRefine | Later: call plans (P7), email layouts, merging duplicates, map points for routes, cleaning a list before import. |
+| splink's idea (block, then score) | **Built** 2026-10-01 in our own code, no library: Customers → Possible duplicates, and merge. A merged id still leads to the record kept (`nbcm_merged_records`), for Finance and old links. |
+| fullcalendar's idea | **Built** 2026-10-01 in our own code: Activities → Calendar, a month grid. Planned visits join it with call plans (P7). |
+| mjml's idea | **Built** 2026-10-01 in our own code (app/mail.py): one table layout with inline styles, plus a text version. Quote approvals are emailed through an email delivery service's SMTP (EMAIL_ENABLED, EMAIL_MODE). |
+| photon | **Not needed:** a customer's map point comes from the rep's GPS at the clinic (Field work), more exact than an address lookup, and no geocoder to host. |
+| OpenRefine | For staff, outside the app: cleaning a spreadsheet before importing it. |
 
 Not used: Google Maps, LinkedIn and review scrapers, OSINT tools, and anything for getting around site blocking (against the sites' terms, and building profiles of doctors without consent runs against the Data Privacy Act); WhatsApp Web automation (against WhatsApp's terms; use the official Business API); whole CRMs and ERPs under GPL or AGPL (looking at them for ideas is fine, copying their code into a licensed product isn't); self-hosted mail servers.

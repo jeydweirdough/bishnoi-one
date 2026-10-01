@@ -16,6 +16,7 @@ export type CompanyInput = {
   /** The price group whose prices it gets (Settings → Price rules). */
   priceGroupCode?: string | null;
   industry: string | null;
+  leadSource: string | null;
   website: string | null;
   email: string | null;
   phone: string | null;

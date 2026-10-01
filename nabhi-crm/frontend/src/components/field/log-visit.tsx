@@ -11,6 +11,7 @@ import type { Org } from "@/src/platform/lib/types";
 import { logVisit } from "../../actions/field";
 import { localDateTime } from "../crm/words";
 import type { VisitOutcome } from "./types";
+import { DetailingFields, type DetailDraft } from "./detailing-fields";
 import { locate, NO_LOCATION } from "./where";
 import { OUTCOMES } from "./words";
 
@@ -44,6 +45,8 @@ function LogVisitForm({
   const [amount, setAmount] = useState("");
   const [receipt, setReceipt] = useState("");
   const [notes, setNotes] = useState("");
+  const [details, setDetails] = useState<DetailDraft[]>([]);
+  const [objective, setObjective] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -53,6 +56,17 @@ function LogVisitForm({
     const cents = collecting ? fmt.toCentavos(amount) : null;
     if (collecting && !cents) {
       setFields({ amountCentavos: "Enter how much was collected." });
+      return;
+    }
+    const used = details.filter((d) => d.productId || d.reaction || d.message.trim());
+    const missing: Record<string, string> = {};
+    used.forEach((d, i) => {
+      if (!d.productId) missing[`detailing.${i}.productId`] = "Pick the product.";
+      if (!d.reaction) missing[`detailing.${i}.reaction`] = "Pick how the doctor took it.";
+    });
+    if (Object.keys(missing).length) {
+      setDetails(used);
+      setFields(missing);
       return;
     }
     start(async () => {
@@ -71,6 +85,8 @@ function LogVisitForm({
         amountCentavos: cents,
         receiptNo: collecting ? receipt.trim() || null : null,
         notes: notes.trim() || null,
+        detailing: used.map((d) => ({ productId: d.productId, message: d.message.trim() || null, reaction: d.reaction as Exclude<typeof d.reaction, "">})),
+        nextObjective: objective.trim() || null,
         location,
       });
       if (!result.ok) {
@@ -83,6 +99,8 @@ function LogVisitForm({
       setAmount("");
       setReceipt("");
       setNotes("");
+      setDetails([]);
+      setObjective("");
       setError(null);
       setFields({});
       onDone();
@@ -126,6 +144,9 @@ function LogVisitForm({
       <Field label="When" error={fields.visitedAt}>
         {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}
       </Field>
+      {outcome !== "not_in" && (
+        <DetailingFields companyId={companyId} rows={details} onRows={setDetails} objective={objective} onObjective={setObjective} errors={fields} />
+      )}
       <Field label="Notes" optional error={fields.notes}>
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={collecting ? "Anything about the payment" : "What happened, and what's next"} />}
       </Field>

@@ -248,3 +248,14 @@ def test_an_administrator_keeps_the_customer_types(client, crew, ana):
     assert client.patch(f"/companies/{acme['id']}", json={"name": "Acme 2"}, headers=crew["ria"]).status_code == 200  # keeps its type
     assert client.post("/companies", json={"name": "Delta", "status": "key_account"}, headers=crew["ria"]).status_code == 422  # not offered
     assert client.delete("/admin/customer-types/partner", headers=ana).status_code == 204
+
+
+def test_activities_for_a_calendar_range_in_the_companys_own_days(client, crew):
+    lia = crew["lia"]
+    # 23:30 Manila on 31 October is 15:30 UTC that day; 00:30 Manila on 1 November is 16:30 UTC on 31 October.
+    for subject, at in (("Last of October", "2026-10-31T15:30:00Z"), ("First of November", "2026-10-31T16:30:00Z"), ("Mid November", "2026-11-15T02:00:00Z")):
+        activity(client, lia, kind="meeting", subject=subject, at=at)
+    november = client.get("/activities?from=2026-11-01&to=2026-12-01&limit=500", headers=lia).json()
+    assert [a["subject"] for a in november["items"]] == ["First of November", "Mid November"]
+    october = client.get("/activities?from=2026-10-01&to=2026-11-01", headers=lia).json()
+    assert [a["subject"] for a in october["items"]] == ["Last of October"]
