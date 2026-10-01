@@ -20,22 +20,25 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams;
   const source = one(sp.source);
   const query = new URLSearchParams({ limit: "200" });
-  if (source === "manual" || source === "fund") query.set("source", source);
+  if (source === "manual" || source === "fund" || source === "invoice") query.set("source", source);
   const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
   const filters = [
     { value: "", label: "All" },
     { value: "manual", label: "Manual journals" },
     { value: "fund", label: "Fund requests" },
+    { value: "invoice", label: "Invoices" },
   ];
   return (
     <>
       <PageHeader title="Journal entries">
-        All posted entries, newest first. Fund requests post their entries automatically at release, liquidation, refund and reimbursement. Posted entries
+        All posted entries, newest first. Fund requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided. Posted entries
         are never edited: reverse an entry and post the correction.
       </PageHeader>
-      <div className="mb-4">
-        <JournalForm accounts={chart.items} org={me.org} today={fmt.todayKey()} />
-      </div>
+      {me.permissions?.includes("journal.post") && (
+        <div className="mb-4">
+          <JournalForm accounts={chart.items} org={me.org} today={fmt.todayKey()} />
+        </div>
+      )}
       <nav aria-label="Show" className="mb-3 flex flex-wrap gap-1.5">
         {filters.map((f) => (
           <Link
@@ -72,7 +75,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                   </Link>
                 )}
                 {e.reversedById && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">Reversed</span>}
-                {!e.reversedById && !e.reversesId && <ReverseButton id={e.id} number={e.number} />}
+                {!e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
               </div>
               <table className="mt-2 w-full text-sm">
                 <tbody>

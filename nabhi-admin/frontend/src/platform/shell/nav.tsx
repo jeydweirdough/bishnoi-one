@@ -471,20 +471,23 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
-/** The executive pages, with what isn't set up yet on each. */
-const executivePages = (unset: Unset): Page[] =>
-  EXECUTIVE_PAGES.map((p) =>
+/** The executive pages this person's role sees, with what isn't set up yet on each. */
+const executivePages = (me: Me, unset: Unset): Page[] =>
+  EXECUTIVE_PAGES.filter((p) => !p.reach || p.reach(me)).map((p) =>
     p.href === "/documents" ? { ...p, missing: missingOf(unset, ["documentExpiry"]) } : p.href === "/properties" ? { ...p, missing: missingOf(unset, ["propertyRent"]) } : p,
   );
 
+/** A role that holds this permission reaches the page (the API checks the same). */
+const sees = (permission: string) => (me: Me) => me.permissions?.includes(permission) ?? me.canManageSettings;
+
 const EXECUTIVE_PAGES: Page[] = [
-  { href: "/", label: "Overview", icon: "overview" },
-  { href: "/notifications", label: "Renewal alerts", icon: "notifications" },
-  { href: "/permits", label: "Permits", icon: "permits" },
-  { href: "/immigration", label: "Expatriates", icon: "immigration" },
-  { href: "/documents", label: "Documents", icon: "documents" },
-  { href: "/properties", label: "Properties", icon: "properties" },
-  { href: "/tickets", label: "Office requests", icon: "tickets" },
+  { href: "/", label: "Overview", icon: "overview", reach: sees("dashboard.view") },
+  { href: "/notifications", label: "Renewal alerts", icon: "notifications", reach: sees("notifications.view") },
+  { href: "/permits", label: "Permits", icon: "permits", reach: sees("permits.view") },
+  { href: "/immigration", label: "Expatriates", icon: "immigration", reach: sees("immigration.view") },
+  { href: "/documents", label: "Documents", icon: "documents", reach: sees("documents.view") },
+  { href: "/properties", label: "Properties", icon: "properties", reach: sees("properties.view") },
+  { href: "/tickets", label: "Office requests", icon: "tickets", reach: sees("tickets.view") },
 ];
 
 function adminPagesFor(me: Me): Page[] {
@@ -572,7 +575,7 @@ function Links({ me, unset }: { me: Me; unset: Unset }) {
       {isOurs("exec") && (
         <Group label={appLabel("exec")}>
           <Flat
-            groups={[{ pages: executivePages(unset) }]}
+            groups={[{ pages: executivePages(me, unset) }]}
             overviewHref="/"
           />
         </Group>

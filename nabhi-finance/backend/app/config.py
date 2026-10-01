@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     # many days after it's released.
     liquidate_within_days: int = 7
 
+    # Nabhi CRM, whose customers an invoice is made out to: its API
+    # (https://...), and the key it gave Finance (one of its INTEGRATION_KEYS,
+    # the part after "finance:"). Unset: the customer is typed on the invoice.
+    crm_api_url: str | None = None
+    crm_api_key: SecretStr | None = None
+
+    @property
+    def crm_linked(self) -> bool:
+        return bool(self.crm_api_url and self.crm_api_key)
+
     @property
     def discord_mock_dir(self) -> Path:
         """Where mock mode keeps its tables: beside a SQLite database (so each test has its own), else .data/."""
@@ -83,6 +93,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ORIGINS must list exact origins like https://app.example.com, not {origin!r}.")
         if self.session_hours < 1:
             raise ValueError("SESSION_HOURS must be at least 1.")
+        if self.crm_api_url and (not self.crm_api_url.startswith(("https://", "http://")) or self.crm_api_url.endswith("/")):
+            raise ValueError(f"CRM_API_URL is an address like https://crm-api.example.com, with no / at the end, not {self.crm_api_url!r}.")
         for key in self.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
             if not name or len(secret) < 24:

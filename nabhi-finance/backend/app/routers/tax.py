@@ -8,7 +8,7 @@ quote, a pharmacy sale and an invoice are taxed by one set of rules.
 
 import re
 from datetime import UTC, date, datetime
-from typing import Annotated, Any
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, status
@@ -16,8 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.alias_generators import to_camel
 from sqlalchemy import select
 
+from app.access import access_of, permitted
+from app.audit import audit
 from app.config import Settings
-from app.deps import DB, AdminUser, CurrentUser, SettingsDep
+from app.deps import DB, SettingsDep
 from app.models import TaxProfile, TaxRate
 from app.tax import rates as rate_book
 from app.tax.engine import LineIn, SaleIn, TaxError, compute
@@ -136,8 +138,8 @@ def setup_out(db: DB, settings: Settings, can_edit: bool) -> dict:
 
 
 @router.get("/setup")
-def read_setup(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
-    return setup_out(db, settings, user.role == "admin")
+def read_setup(user: permitted("tax.view"), db: DB, settings: SettingsDep) -> dict:
+    return setup_out(db, settings, access_of(user).can("tax.manage"))
 
 
 class ProfileIn(Api):
@@ -159,7 +161,7 @@ class ProfileIn(Api):
 
 
 @router.put("/profile")
-def update_profile(admin: AdminUser, db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
+def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
     if body.country not in PACKS:
         raise field_error("country", "There's no tax pack for that country yet.")
     if body.regime not in pack_for(body.country).regimes:
@@ -177,6 +179,7 @@ def update_profile(admin: AdminUser, db: DB, settings: SettingsDep, body: Profil
     profile.tin, profile.branch_code = tin, branch or "00000"
     profile.registered_address, profile.prices_include_tax = body.registered_address, body.prices_include_tax
     profile.updated_by_id = admin.id
+    audit(db, admin, "tax.profile_updated", target="Tax registration", target_type="settings", fields=body.model_fields_set)
     db.commit()
     return setup_out(db, settings, True)
 
@@ -189,7 +192,7 @@ class RateIn(Api):
 
 
 @router.post("/rates", status_code=status.HTTP_201_CREATED)
-def add_rate(admin: AdminUser, db: DB, settings: SettingsDep, body: RateIn) -> dict:
+def add_rate(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
     """A change in a rate, from a day on: the law's, entered ahead of an update."""
     profile = db.get(TaxProfile, 1)
     pack = pack_for(profile.country)
@@ -199,6 +202,7 @@ def add_rate(admin: AdminUser, db: DB, settings: SettingsDep, body: RateIn) -> d
     if db.scalar(select(TaxRate.id).where(TaxRate.country == pack.country, TaxRate.code == body.code, TaxRate.valid_from == body.valid_from)):
         raise field_error("validFrom", "A rate already starts on that day. Pick another day.")
     rate_book.change(db, pack.country, body.code, body.rate_bp, body.valid_from, body.basis, admin.id)
+    audit(db, admin, "tax.rate_added", target=f"{body.code} from {body.valid_from.isoformat()}", target_type="tax_rate")
     db.commit()
     return setup_out(db, settings, True)
 
@@ -303,5 +307,5 @@ def work_out(db, settings: Settings, body: SaleBody) -> dict:
 
 
 @router.post("/compute")
-def compute_sale(_: CurrentUser, db: DB, settings: SettingsDep, body: SaleBody) -> dict:
+def compute_sale(_: permitted("tax.view"), db: DB, settings: SettingsDep, body: SaleBody) -> dict:
     return work_out(db, settings, body)

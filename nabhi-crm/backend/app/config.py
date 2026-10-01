@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     pharmacy_api_url: str | None = None
     pharmacy_api_key: SecretStr | None = None
 
+    # The other Nabhi apps allowed to read the CRM's customers (the
+    # /integration/customers endpoints: Finance invoices them), as name:key
+    # pairs in JSON, e.g. ["finance:<a long random key>"]. The app sends its key
+    # in X-Nabhi-Key. Empty: nothing outside can read them.
+    integration_keys: list[SecretStr] = []
+
     @property
     def inventory_linked(self) -> bool:
         return bool(self.inventory_api_url and self.inventory_api_key)
@@ -129,6 +135,10 @@ class Settings(BaseSettings):
             raise ValueError("SESSION_HOURS must be at least 1.")
         if self.discord_mode.lower() not in ("mock", "live"):
             raise ValueError("DISCORD_MODE is mock or live.")
+        for key in self.integration_keys:
+            name, _, secret = key.get_secret_value().partition(":")
+            if not name or len(secret) < 24:
+                raise ValueError("INTEGRATION_KEYS must list name:key pairs, each key at least 24 characters.")
         return self
 
 

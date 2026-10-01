@@ -73,7 +73,7 @@ def me(client, r):
 
 def role_of(app, email):
     with app.state.sessions() as db:
-        return db.query(User).filter_by(email=email).one().role
+        return db.query(User).filter_by(email=email).one().role.name
 
 
 def test_someone_new_is_added_as_staff(app, client, linked):
@@ -81,7 +81,7 @@ def test_someone_new_is_added_as_staff(app, client, linked):
     assert r.status_code == 200, r.text
     who = me(client, r)
     assert (who["user"]["email"], who["user"]["fullName"], who["canManageSettings"]) == ("jade@getmeds.test", "Jade Madigal", False)
-    assert role_of(app, "jade@getmeds.test") == "member"
+    assert role_of(app, "jade@getmeds.test") == "Finance Staff"
     # next time: the same person, found by their Nabhi account
     again = take(client, make_pass(name="Jade M. Madigal"))
     assert me(client, again)["user"]["id"] == who["user"]["id"]
@@ -118,13 +118,13 @@ def test_not_set_up_without_the_platform_key(client, app):
 def test_an_application_admin_is_an_admin_here(app, client, linked):
     r = take(client, make_pass(appAdmin=True, role="Accountant"))
     assert me(client, r)["canManageSettings"] is True
-    assert role_of(app, "jade@getmeds.test") == "admin"
+    assert role_of(app, "jade@getmeds.test") == "Administrator"
 
 
 def test_the_administrator_role_is_an_admin_here(app, client, linked):
     r = take(client, make_pass(role="Administrator"))
     assert me(client, r)["canManageSettings"] is True
-    assert role_of(app, "jade@getmeds.test") == "admin"
+    assert role_of(app, "jade@getmeds.test") == "Administrator"
 
 
 def test_an_existing_member_is_linked_by_email_and_its_role_follows_the_platform(app, client, linked):
@@ -135,7 +135,7 @@ def test_an_existing_member_is_linked_by_email_and_its_role_follows_the_platform
     assert (who["user"]["email"], who["canManageSettings"]) == ("ben@example.com", True)
     with app.state.sessions() as db:
         ben = db.query(User).filter_by(email="ben@example.com").one()
-        assert (ben.platform_identity_id, ben.role) == ("identity-9", "admin")
+        assert (ben.platform_identity_id, ben.role.name) == ("identity-9", "Administrator")
 
 
 def test_someone_switched_off_here_stays_out(app, client, linked):

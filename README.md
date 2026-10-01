@@ -530,7 +530,9 @@ after you change a file.
 ### Linking apps
 
 Some apps ask others for data: the CRM asks **Inventory** for products and
-stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx. The app being asked lists a key for each
+stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx; **Finance** asks the
+**CRM** for customers to invoice (`CRM_API_URL`, `CRM_API_KEY` in Finance, and
+`INTEGRATION_KEYS=["finance:<the key>"]` in the CRM). The app being asked lists a key for each
 caller, and the caller sends that key with every request.
 
 1. Make a key (at least 24 characters):

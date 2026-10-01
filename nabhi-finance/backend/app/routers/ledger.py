@@ -21,8 +21,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
-from app.deps import DB, AdminUser, CurrentUser, SettingsDep
-from app.ledger import Leg, account_out, entry_out, post, settings as posting_settings
+from app.access import access_of, permitted
+from app.audit import audit
+from app.deps import DB, SettingsDep
+from app.ledger import Leg, account_out, entry_out, post
+from app.ledger import settings as posting_settings
 from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine
 from app.routers.funds import today
 from app.routers.tax import Api, field_error
@@ -41,9 +44,9 @@ def balance(type_: str, debit: int, credit: int) -> int:
 
 
 @router.get("/accounts")
-def list_accounts(user: CurrentUser, db: DB) -> dict:
+def list_accounts(user: permitted("accounts.view"), db: DB) -> dict:
     items = db.scalars(select(Account).order_by(Account.code)).all()
-    return {"items": [account_out(a) for a in items], "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()], "canEdit": user.role == "admin"}
+    return {"items": [account_out(a) for a in items], "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()], "canEdit": access_of(user).can("accounts.manage")}
 
 
 class AccountIn(Api):
@@ -55,17 +58,19 @@ class AccountIn(Api):
 
 
 @router.post("/accounts", status_code=status.HTTP_201_CREATED)
-def add_account(user: AdminUser, db: DB, body: AccountIn) -> dict:
+def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> dict:
     if db.scalar(select(Account.id).where(func.upper(Account.code) == body.code.upper())):
         raise field_error("code", "This account code is already in use.")
     a = Account(**body.model_dump())
     db.add(a)
+    db.flush()
+    audit(db, user, "account.created", target=f"{a.code} {a.name}", target_type="account", target_id=a.id)
     db.commit()
     return account_out(a)
 
 
 @router.put("/accounts/{account_id}")
-def change_account(user: AdminUser, db: DB, account_id: str, body: AccountIn) -> dict:
+def change_account(user: permitted("accounts.manage"), db: DB, account_id: str, body: AccountIn) -> dict:
     a = db.get(Account, account_id)
     if a is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such account.")
@@ -73,8 +78,10 @@ def change_account(user: AdminUser, db: DB, account_id: str, body: AccountIn) ->
         raise field_error("code", "This account code is already in use.")
     if body.type != a.type and db.scalar(select(JournalLine.id).where(JournalLine.account_id == a.id).limit(1)):
         raise field_error("type", "This account has journal entries, so its type cannot change. Create a new account instead.")
+    changes = [k for k, v in body.model_dump().items() if getattr(a, k) != v]
     for k, v in body.model_dump().items():
         setattr(a, k, v)
+    audit(db, user, "account.updated", target=f"{a.code} {a.name}", target_type="account", target_id=a.id, fields=changes)
     db.commit()
     return account_out(a)
 
@@ -88,6 +95,9 @@ POSTING = {
     "bank_account_id": ("asset", "Paid by bank transfer"),
     "ewallet_account_id": ("asset", "Paid by e-wallet"),
     "check_account_id": ("asset", "Paid by check"),
+    "receivables_account_id": ("asset", "What customers owe on invoices"),
+    "sales_account_id": ("income", "Sales on invoices"),
+    "output_tax_account_id": ("liability", "Tax on invoices (output VAT)"),
 }
 
 
@@ -103,8 +113,8 @@ def posting_out(db: DB, can_edit: bool) -> dict:
 
 
 @router.get("/posting")
-def read_posting(user: CurrentUser, db: DB) -> dict:
-    return posting_out(db, user.role == "admin")
+def read_posting(user: permitted("accounts.view"), db: DB) -> dict:
+    return posting_out(db, access_of(user).can("accounts.manage"))
 
 
 class PostingIn(Api):
@@ -112,7 +122,7 @@ class PostingIn(Api):
 
 
 @router.put("/posting")
-def change_posting(user: AdminUser, db: DB, body: PostingIn) -> dict:
+def change_posting(user: permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
     s = posting_settings(db)
     for key, account_id in body.accounts.items():
         if key not in POSTING:
@@ -121,6 +131,7 @@ def change_posting(user: AdminUser, db: DB, body: PostingIn) -> dict:
         if account_id and (a is None or a.type != POSTING[key][0] or not a.is_active):
             raise field_error(key, f"Select an active {POSTING[key][0]} account.")
         setattr(s, key, account_id)
+    audit(db, user, "posting.updated", target="Default accounts", target_type="settings", fields=body.accounts.keys())
     db.commit()
     return posting_out(db, True)
 
@@ -130,11 +141,11 @@ def change_posting(user: AdminUser, db: DB, body: PostingIn) -> dict:
 
 @router.get("/entries")
 def list_entries(
-    user: CurrentUser,
+    user: permitted("journal.view"),
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund"] | None = None,
+    source: Literal["manual", "fund", "invoice"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:
@@ -153,7 +164,7 @@ def list_entries(
 
 
 @router.get("/entries/{entry_id}")
-def read_entry(user: CurrentUser, db: DB, entry_id: str) -> dict:
+def read_entry(user: permitted("journal.view"), db: DB, entry_id: str) -> dict:
     e = db.get(JournalEntry, entry_id)
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such entry.")
@@ -175,7 +186,7 @@ class EntryIn(Api):
 
 
 @router.post("/entries", status_code=status.HTTP_201_CREATED)
-def add_entry(user: CurrentUser, db: DB, settings: SettingsDep, body: EntryIn) -> dict:
+def add_entry(user: permitted("journal.post"), db: DB, settings: SettingsDep, body: EntryIn) -> dict:
     """A manual journal."""
     if body.entry_date > today(settings):
         raise field_error("date", "The entry date cannot be in the future.")
@@ -188,6 +199,7 @@ def add_entry(user: CurrentUser, db: DB, settings: SettingsDep, body: EntryIn) -
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "lines", i, "accountId"], "msg": "Select an active account."}])
         legs.append(Leg(a, debit=line.debit_centavos, credit=line.credit_centavos, description=line.description))
     e = post(db, body.entry_date, body.memo, legs, user.full_name, reference=body.reference)
+    audit(db, user, "entry.posted", target=e.number, target_type="journal_entry", target_id=e.id)
     db.commit()
     return entry_out(e)
 
@@ -197,7 +209,7 @@ class ReverseIn(Api):
 
 
 @router.post("/entries/{entry_id}/reverse", status_code=status.HTTP_201_CREATED)
-def reverse(user: CurrentUser, db: DB, settings: SettingsDep, entry_id: str, body: ReverseIn) -> dict:
+def reverse(user: permitted("journal.reverse"), db: DB, settings: SettingsDep, entry_id: str, body: ReverseIn) -> dict:
     """Undoes an entry with its mirror: the same lines, the sides swapped."""
     e = db.get(JournalEntry, entry_id)
     if e is None:
@@ -208,6 +220,7 @@ def reverse(user: CurrentUser, db: DB, settings: SettingsDep, entry_id: str, bod
     legs = [Leg(ln.account, debit=ln.credit_centavos, credit=ln.debit_centavos, description=ln.description) for ln in e.lines]
     back = post(db, on, f"Reversal of {e.number}: {e.memo}", legs, user.full_name, reference=e.reference, source=e.source, reverses=e)
     back.fund_request_id = e.fund_request_id
+    audit(db, user, "entry.reversed", target=e.number, target_type="journal_entry", target_id=e.id, fields=[back.number])
     db.commit()
     return entry_out(back)
 
@@ -217,7 +230,7 @@ def reverse(user: CurrentUser, db: DB, settings: SettingsDep, entry_id: str, bod
 
 @router.get("/accounts/{account_id}")
 def account_ledger(
-    user: CurrentUser,
+    user: permitted("journal.view"),
     db: DB,
     account_id: str,
     since: date | None = Query(None, alias="from"),
@@ -250,7 +263,7 @@ def account_ledger(
 
 
 @router.get("/trial-balance")
-def trial_balance(user: CurrentUser, db: DB, settings: SettingsDep, until: date | None = Query(None, alias="to")) -> dict:
+def trial_balance(user: permitted("journal.view"), db: DB, settings: SettingsDep, until: date | None = Query(None, alias="to")) -> dict:
     on = until or today(settings)
     sums = {
         account_id: (debit, credit)

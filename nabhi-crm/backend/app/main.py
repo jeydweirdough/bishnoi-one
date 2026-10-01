@@ -16,7 +16,7 @@ from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.inventory import srp_type
 from app.migrate import upgrade
-from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, field, funds, imports, insights, people, price_rules, prices, quote_templates, quotes, retention, crm, unset
+from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, field, funds, imports, insights, people, price_rules, prices, quote_templates, quotes, retention, crm, unset, integration
 from app.routers import settings as settings_router
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -90,4 +90,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(crm.router)
     app.include_router(unset.router)
+    app.include_router(integration.router)
     return app

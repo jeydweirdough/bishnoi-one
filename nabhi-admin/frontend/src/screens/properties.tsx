@@ -13,7 +13,11 @@ import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
-export function PropertiesScreen({ properties: initialProperties, canImport = false }: { properties: PropertyRecord[]; canImport?: boolean }) {
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { create: boolean; edit: boolean; delete: boolean };
+const ALL: Can = { create: true, edit: true, delete: true };
+
+export function PropertiesScreen({ properties: initialProperties, canImport = false, can = ALL }: { properties: PropertyRecord[]; canImport?: boolean; can?: Can }) {
   const [properties, setProperties] = useState<PropertyRecord[]>(initialProperties);
   const [selectedType, setSelectedType] = useState<string>("all");
   // The sidebar's red count on Properties: leases not ended with no rent written down.
@@ -41,10 +45,12 @@ export function PropertiesScreen({ properties: initialProperties, canImport = fa
           <>
             <ExportButton kind="properties" />
             {canImport && <ImportButton href="/properties/import" />}
-            <Button variant="primary" onClick={() => setModalProperty("new")}>
-              <Icon name="properties" className="mr-1.5 size-4" />
-              New property
-            </Button>
+            {can.create && (
+              <Button variant="primary" onClick={() => setModalProperty("new")}>
+                <Icon name="properties" className="mr-1.5 size-4" />
+                New property
+              </Button>
+            )}
           </>
         }
       >
@@ -103,32 +109,36 @@ export function PropertiesScreen({ properties: initialProperties, canImport = fa
                       <span className="font-semibold text-sm text-ink">{pr.name}</span>
                       {/* Edit and delete sit with the record they act on. */}
                       <span className="inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setModalProperty(pr)}
-                          aria-label="Edit property"
-                          title="Edit property"
-                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <ConfirmButton
-                          label={<span className="sr-only">Delete property</span>}
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          triggerTitle="Delete property"
-                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                title={`Delete ${pr.name}?`}
-                          body="This property and its lease alerts are deleted. This cannot be undone."
-                          confirmLabel="Delete property"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                          await deleteProperty(pr.id);
-                          setProperties((prev) => prev.filter((item) => item.id !== pr.id));
-                          }}
-                          
-                        />
+                        {can.edit && (
+                          <button
+                            type="button"
+                            onClick={() => setModalProperty(pr)}
+                            aria-label="Edit property"
+                            title="Edit property"
+                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {can.delete && (
+                          <ConfirmButton
+                            label={<span className="sr-only">Delete property</span>}
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            triggerTitle="Delete property"
+                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                  title={`Delete ${pr.name}?`}
+                            body="This property and its lease alerts are deleted. This cannot be undone."
+                            confirmLabel="Delete property"
+                            danger
+                            triggerVariant="quiet"
+                            triggerSize="sm"
+                            onConfirm={async () => {
+                            await deleteProperty(pr.id);
+                            setProperties((prev) => prev.filter((item) => item.id !== pr.id));
+                            }}
+                            
+                          />
+                        )}
                       </span>
                       <span className="inline-block rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3 first-letter:uppercase">
                         {pr.propertyType}

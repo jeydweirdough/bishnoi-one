@@ -1,5 +1,6 @@
 """What the screens are told about this app and the person signed in to it."""
 
+from app.access import access_of
 from app.config import Settings
 from app.models import User
 
@@ -27,10 +28,15 @@ def org_out(settings: Settings) -> dict:
 
 
 def me_out(user: User, settings: Settings) -> dict:
-    admin = user.role == "admin"
+    access = access_of(user)
+    # Runs Finance: manages its users and roles.
+    admin = access.can("admin.users") or access.can("admin.roles")
     return {
         "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
         "org": None if DEVELOPER_ADMIN_APP else org_out(settings),
+        "role": {"id": user.role.id, "name": user.role.name, "scope": "all"},
+        "team": None,
+        "permissions": sorted(access.permissions),
         "canManageSettings": admin and not DEVELOPER_ADMIN_APP,
         "canRecover": DEVELOPER_ADMIN_APP,
         "viewedBy": None,

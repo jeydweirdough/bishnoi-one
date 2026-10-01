@@ -14,10 +14,15 @@ import { Figure } from "@/src/platform/ui/figure";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { acknowledge: boolean; resolve: boolean };
+
 export function NotificationsScreen({
   notifications: initialNotifications,
+  can = { acknowledge: true, resolve: true },
 }: {
   notifications: ExecutiveNotification[];
+  can?: Can;
 }) {
   const [notifications, setNotifications] = useState<ExecutiveNotification[]>(initialNotifications);
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
@@ -173,7 +178,7 @@ export function NotificationsScreen({
                     Open Record &rarr;
                   </Link>
 
-                  {!n.isAcknowledged && (
+                  {can.acknowledge && !n.isAcknowledged && (
                     <AsyncButton
                       variant="default"
                       size="sm"
@@ -188,18 +193,20 @@ export function NotificationsScreen({
                     </AsyncButton>
                   )}
 
-                  <AsyncButton
-                    variant="quiet"
-                    size="sm"
-                    onRun={async () => {
-                      await resolveNotification(n.id);
-                      setNotifications((prev) =>
-                        prev.map((item) => (item.id === n.id ? { ...item, isResolved: true } : item))
-                      );
-                    }}
-                  >
-                    Mark Resolved
-                  </AsyncButton>
+                  {can.resolve && (
+                    <AsyncButton
+                      variant="quiet"
+                      size="sm"
+                      onRun={async () => {
+                        await resolveNotification(n.id);
+                        setNotifications((prev) =>
+                          prev.map((item) => (item.id === n.id ? { ...item, isResolved: true } : item))
+                        );
+                      }}
+                    >
+                      Mark Resolved
+                    </AsyncButton>
+                  )}
                 </div>
               </li>
             ))}

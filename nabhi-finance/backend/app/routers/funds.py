@@ -17,8 +17,10 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
+from app.access import access_of, permitted
+from app.audit import audit
 from app.config import Settings
-from app.deps import DB, AdminUser, CurrentUser, SettingsDep
+from app.deps import DB, SettingsDep
 from app.funds import (
     RELEASE_METHODS,
     category_out,
@@ -32,7 +34,14 @@ from app.funds import (
     utcnow,
 )
 from app.ledger import post_check, post_reimbursed, post_release, post_returned
-from app.models import FUND_STATUSES, Account, ExpenseCategory, FundRequest, StoredFile
+from app.models import (
+    FUND_STATUSES,
+    Account,
+    ExpenseCategory,
+    FundRequest,
+    StoredFile,
+    User,
+)
 from app.routers.tax import Api, field_error
 
 router = APIRouter(prefix="/finance/funds", tags=["funds"])
@@ -54,11 +63,16 @@ def found(db: DB, request_id: str) -> FundRequest:
     return r
 
 
+def step(db: DB, user: User, r: FundRequest, action: str) -> None:
+    """The activity log's line for a fund step. The request keeps the full story as its events."""
+    audit(db, user, f"fund.{action}", target=r.number, target_type="fund_request", target_id=r.id)
+
+
 # --- the lists --------------------------------------------------------------------------------
 
 
 @router.get("/counts")
-def waiting(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
+def waiting(user: permitted("funds.view"), db: DB, settings: SettingsDep) -> dict:
     """What's waiting on Finance, by step, for the sidebar."""
     by = dict(db.execute(select(FundRequest.status, func.count()).group_by(FundRequest.status)).all())
     late = db.scalar(select(func.count()).where(FundRequest.status == "to_liquidate", FundRequest.liquidate_by < today(settings))) or 0
@@ -68,7 +82,7 @@ def waiting(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
 
 @router.get("")
 def list_requests(
-    user: CurrentUser,
+    user: permitted("funds.view"),
     db: DB,
     settings: SettingsDep,
     task: Task = "to_release",
@@ -106,8 +120,8 @@ def ordered_categories(db: DB, active_only: bool = False) -> list[ExpenseCategor
 
 
 @router.get("/categories")
-def list_categories(user: CurrentUser, db: DB) -> dict:
-    return {"items": [category_out(c) for c in ordered_categories(db)], "canEdit": user.role == "admin"}
+def list_categories(user: permitted("categories.view"), db: DB) -> dict:
+    return {"items": [category_out(c) for c in ordered_categories(db)], "canEdit": access_of(user).can("categories.manage")}
 
 
 class CategoryIn(Api):
@@ -155,18 +169,20 @@ def category_values(db: DB, body: CategoryIn, this: ExpenseCategory | None) -> d
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
-def add_category(user: AdminUser, db: DB, body: CategoryIn) -> dict:
+def add_category(user: permitted("categories.manage"), db: DB, body: CategoryIn) -> dict:
     values = category_values(db, body, None)
     last = db.scalar(select(func.max(ExpenseCategory.sort_order))) or 0
     c = ExpenseCategory(**values, sort_order=last + 1)
     db.add(c)
+    db.flush()
+    audit(db, user, "category.created", target=c.name, target_type="category", target_id=c.id)
     db.commit()
     db.refresh(c)
     return category_out(c)
 
 
 @router.put("/categories/{category_id}")
-def change_category(user: AdminUser, db: DB, category_id: str, body: CategoryIn) -> dict:
+def change_category(user: permitted("categories.manage"), db: DB, category_id: str, body: CategoryIn) -> dict:
     c = db.get(ExpenseCategory, category_id)
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such category.")
@@ -176,18 +192,19 @@ def change_category(user: AdminUser, db: DB, category_id: str, body: CategoryIn)
     if c.parent_id is None:
         for sub in db.scalars(select(ExpenseCategory).where(ExpenseCategory.parent_id == c.id)):
             sub.reimbursable = c.reimbursable
+    audit(db, user, "category.updated", target=c.name, target_type="category", target_id=c.id, fields=body.model_fields_set)
     db.commit()
     db.refresh(c)
     return category_out(c)
 
 
 @router.get("/{request_id}")
-def read_request(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str) -> dict:
+def read_request(user: permitted("funds.view"), db: DB, settings: SettingsDep, request_id: str) -> dict:
     return request_out(found(db, request_id), today(settings))
 
 
 @router.get("/{request_id}/expenses/{expense_id}/receipt")
-def receipt(user: CurrentUser, db: DB, request_id: str, expense_id: str) -> Response:
+def receipt(user: permitted("funds.view"), db: DB, request_id: str, expense_id: str) -> Response:
     return receipt_of(db, found(db, request_id), expense_id)
 
 
@@ -212,7 +229,7 @@ class ReleaseIn(Api):
 
 
 @router.post("/{request_id}/release")
-def release(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, body: ReleaseIn) -> dict:
+def release(user: permitted("funds.release"), db: DB, settings: SettingsDep, request_id: str, body: ReleaseIn) -> dict:
     r = found(db, request_id)
     must_be(r, "to_release")
     if body.amount_centavos > r.approved_centavos:
@@ -231,6 +248,7 @@ def release(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, b
         r.status = "to_liquidate"
     else:
         close(r, user.full_name, "Not subject to liquidation: settled upon release.")
+    step(db, user, r, "released")
     db.commit()
     return request_out(r, on)
 
@@ -240,11 +258,12 @@ class ReasonIn(Api):
 
 
 @router.post("/{request_id}/cancel")
-def cancel(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, body: ReasonIn) -> dict:
+def cancel(user: permitted("funds.cancel"), db: DB, settings: SettingsDep, request_id: str, body: ReasonIn) -> dict:
     r = found(db, request_id)
     must_be(r, "to_release")
     r.status, r.cancel_reason, r.closed_at = "cancelled", body.reason, utcnow()
     event(r, "cancelled", user.full_name, f"Release declined by Finance: {body.reason}")
+    step(db, user, r, "cancelled")
     db.commit()
     return request_out(r, today(settings))
 
@@ -257,7 +276,7 @@ class ExpenseCheck(Api):
 
 
 @router.patch("/{request_id}/expenses/{expense_id}")
-def check_expense(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, expense_id: str, body: ExpenseCheck) -> dict:
+def check_expense(user: permitted("funds.check"), db: DB, settings: SettingsDep, request_id: str, expense_id: str, body: ExpenseCheck) -> dict:
     r = found(db, request_id)
     must_be(r, "to_check")
     e = next((x for x in r.expenses if x.id == expense_id), None)
@@ -275,6 +294,7 @@ def check_expense(user: CurrentUser, db: DB, settings: SettingsDep, request_id: 
             raise field_error("refusedReason", "Enter the reason for rejection. The requester will see it.")
         e.accepted = body.accepted
         e.refused_reason = body.refused_reason if body.accepted is False else None
+    step(db, user, r, "expense_checked")
     db.commit()
     return request_out(r, today(settings))
 
@@ -284,18 +304,19 @@ class NoteIn(Api):
 
 
 @router.post("/{request_id}/send-back")
-def send_back(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, body: NoteIn) -> dict:
+def send_back(user: permitted("funds.check"), db: DB, settings: SettingsDep, request_id: str, body: NoteIn) -> dict:
     """Back to the requester to fix: a missing receipt, a wrong amount."""
     r = found(db, request_id)
     must_be(r, "to_check")
     r.status, r.sent_back_note = "to_liquidate", body.note
     event(r, "sent_back", user.full_name, f"Liquidation returned for correction: {body.note}")
+    step(db, user, r, "sent_back")
     db.commit()
     return request_out(r, today(settings))
 
 
 @router.post("/{request_id}/finish-check")
-def finish_check(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str) -> dict:
+def finish_check(user: permitted("funds.check"), db: DB, settings: SettingsDep, request_id: str) -> dict:
     r = found(db, request_id)
     must_be(r, "to_check")
     if any(e.accepted is None for e in r.expenses):
@@ -305,6 +326,7 @@ def finish_check(user: CurrentUser, db: DB, settings: SettingsDep, request_id: s
     r.checked_by_id = user.id
     settle(r, user.full_name)
     post_check(db, r, today(settings), user.full_name)
+    step(db, user, r, "checked")
     db.commit()
     return request_out(r, today(settings))
 
@@ -316,7 +338,7 @@ class MoneyIn(Api):
 
 
 @router.post("/{request_id}/returned")
-def returned(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, body: MoneyIn) -> dict:
+def returned(user: permitted("funds.settle"), db: DB, settings: SettingsDep, request_id: str, body: MoneyIn) -> dict:
     """The unused funds, handed back: all of it, or some of it so far."""
     r = found(db, request_id)
     must_be(r, "to_return")
@@ -329,12 +351,13 @@ def returned(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, 
     post_returned(db, r, body.amount_centavos, body.method, body.reference, today(settings), user.full_name)
     if r.returned_centavos >= r.return_due_centavos:
         close(r, user.full_name, "Refund received in full. Settled.")
+    step(db, user, r, "returned")
     db.commit()
     return request_out(r, today(settings))
 
 
 @router.post("/{request_id}/reimbursed")
-def reimbursed(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str, body: MoneyIn) -> dict:
+def reimbursed(user: permitted("funds.settle"), db: DB, settings: SettingsDep, request_id: str, body: MoneyIn) -> dict:
     r = found(db, request_id)
     must_be(r, "to_reimburse")
     left = r.reimburse_due_centavos - r.reimbursed_centavos
@@ -346,6 +369,7 @@ def reimbursed(user: CurrentUser, db: DB, settings: SettingsDep, request_id: str
     post_reimbursed(db, r, body.amount_centavos, body.method, body.reference, today(settings), user.full_name)
     if r.reimbursed_centavos >= r.reimburse_due_centavos:
         close(r, user.full_name, "Reimbursement paid in full. Settled.")
+    step(db, user, r, "reimbursed")
     db.commit()
     return request_out(r, today(settings))
 

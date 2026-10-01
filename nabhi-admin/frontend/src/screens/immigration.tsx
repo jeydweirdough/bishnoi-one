@@ -13,7 +13,11 @@ import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
-export function ImmigrationScreen({ records: initialRecords, canImport = false }: { records: ImmigrationRecord[]; canImport?: boolean }) {
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { create: boolean; edit: boolean; delete: boolean };
+const ALL: Can = { create: true, edit: true, delete: true };
+
+export function ImmigrationScreen({ records: initialRecords, canImport = false, can = ALL }: { records: ImmigrationRecord[]; canImport?: boolean; can?: Can }) {
   const [records, setRecords] = useState<ImmigrationRecord[]>(initialRecords);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [modalRecord, setModalRecord] = useState<ImmigrationRecord | null | "new">(null);
@@ -57,10 +61,12 @@ export function ImmigrationScreen({ records: initialRecords, canImport = false }
           <>
             <ExportButton kind="expatriates" />
             {canImport && <ImportButton href="/immigration/import" />}
-            <Button variant="primary" onClick={() => setModalRecord("new")}>
-              <Icon name="immigration" className="mr-1.5 size-4" />
-              New expatriate document
-            </Button>
+            {can.create && (
+              <Button variant="primary" onClick={() => setModalRecord("new")}>
+                <Icon name="immigration" className="mr-1.5 size-4" />
+                New expatriate document
+              </Button>
+            )}
           </>
         }
       >
@@ -111,32 +117,36 @@ export function ImmigrationScreen({ records: initialRecords, canImport = false }
                       <span className="font-semibold text-sm text-ink">{r.individualName}</span>
                       {/* Edit and delete sit with the record they act on. */}
                       <span className="inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setModalRecord(r)}
-                          aria-label="Edit document"
-                          title="Edit document"
-                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <ConfirmButton
-                          label={<span className="sr-only">Delete document</span>}
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          triggerTitle="Delete document"
-                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                title={`Delete ${r.individualName}'s ${docTypeLabel(r.documentType)}?`}
-                          body="This document and its renewal alerts are deleted. This cannot be undone."
-                          confirmLabel="Delete document"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                          await deleteImmigration(r.id);
-                          setRecords((prev) => prev.filter((item) => item.id !== r.id));
-                          }}
-                          
-                        />
+                        {can.edit && (
+                          <button
+                            type="button"
+                            onClick={() => setModalRecord(r)}
+                            aria-label="Edit document"
+                            title="Edit document"
+                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {can.delete && (
+                          <ConfirmButton
+                            label={<span className="sr-only">Delete document</span>}
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            triggerTitle="Delete document"
+                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                  title={`Delete ${r.individualName}'s ${docTypeLabel(r.documentType)}?`}
+                            body="This document and its renewal alerts are deleted. This cannot be undone."
+                            confirmLabel="Delete document"
+                            danger
+                            triggerVariant="quiet"
+                            triggerSize="sm"
+                            onConfirm={async () => {
+                            await deleteImmigration(r.id);
+                            setRecords((prev) => prev.filter((item) => item.id !== r.id));
+                            }}
+                            
+                          />
+                        )}
                       </span>
                       <span className="text-meta text-ink-2">· {r.designation}</span>
                       <span className="inline-block rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3 first-letter:uppercase">

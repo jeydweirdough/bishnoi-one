@@ -13,7 +13,11 @@ import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
-export function DocumentsScreen({ documents: initialDocuments, canImport = false }: { documents: CorporateDocument[]; canImport?: boolean }) {
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { create: boolean; edit: boolean; delete: boolean };
+const ALL: Can = { create: true, edit: true, delete: true };
+
+export function DocumentsScreen({ documents: initialDocuments, canImport = false, can = ALL }: { documents: CorporateDocument[]; canImport?: boolean; can?: Can }) {
   const [documents, setDocuments] = useState<CorporateDocument[]>(initialDocuments);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   // The sidebar's red count on Documents: in force, not renewing by itself, and no expiry date.
@@ -42,10 +46,12 @@ export function DocumentsScreen({ documents: initialDocuments, canImport = false
           <>
             <ExportButton kind="documents" />
             {canImport && <ImportButton href="/documents/import" />}
-            <Button variant="primary" onClick={() => setModalDocument("new")}>
-              <Icon name="documents" className="mr-1.5 size-4" />
-              New document
-            </Button>
+            {can.create && (
+              <Button variant="primary" onClick={() => setModalDocument("new")}>
+                <Icon name="documents" className="mr-1.5 size-4" />
+                New document
+              </Button>
+            )}
           </>
         }
       >
@@ -112,32 +118,36 @@ export function DocumentsScreen({ documents: initialDocuments, canImport = false
                       <span className="font-semibold text-sm text-ink">{d.title}</span>
                       {/* Edit and delete sit with the record they act on. */}
                       <span className="inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setModalDocument(d)}
-                          aria-label="Edit document"
-                          title="Edit document"
-                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <ConfirmButton
-                          label={<span className="sr-only">Delete document</span>}
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          triggerTitle="Delete document"
-                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                title={`Delete ${d.title}?`}
-                          body="This document and its renewal alerts are deleted. This cannot be undone."
-                          confirmLabel="Delete document"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                          await deleteDocument(d.id);
-                          setDocuments((prev) => prev.filter((item) => item.id !== d.id));
-                          }}
-                          
-                        />
+                        {can.edit && (
+                          <button
+                            type="button"
+                            onClick={() => setModalDocument(d)}
+                            aria-label="Edit document"
+                            title="Edit document"
+                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {can.delete && (
+                          <ConfirmButton
+                            label={<span className="sr-only">Delete document</span>}
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            triggerTitle="Delete document"
+                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                  title={`Delete ${d.title}?`}
+                            body="This document and its renewal alerts are deleted. This cannot be undone."
+                            confirmLabel="Delete document"
+                            danger
+                            triggerVariant="quiet"
+                            triggerSize="sm"
+                            onConfirm={async () => {
+                            await deleteDocument(d.id);
+                            setDocuments((prev) => prev.filter((item) => item.id !== d.id));
+                            }}
+                            
+                          />
+                        )}
                       </span>
                       <span className="text-meta text-ink-2">· {d.counterparty}</span>
                       {d.autoRenews && (

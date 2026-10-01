@@ -56,14 +56,7 @@ def current_user(
     return user
 
 
-def require_admin(user: Annotated[User, Depends(current_user)]) -> User:
-    if user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only this app's admins can do that.")
-    return user
-
-
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 DB = Annotated[Session, Depends(get_db)]
 CurrentSession = Annotated[SignInSession, Depends(current_session)]
 CurrentUser = Annotated[User, Depends(current_user)]
-AdminUser = Annotated[User, Depends(require_admin)]

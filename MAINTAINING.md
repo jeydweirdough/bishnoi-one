@@ -380,7 +380,8 @@ To set it up:
 A person gets a pass only while their account and their company are active,
 the company has the application, and they have been given it. A new person
 in an app is added with the platform's role; a role the app doesn't have is
-refused, except in Finance, which only has admin and member.
+refused, except in Finance, where it becomes Finance Staff (an application
+admin is the Administrator there).
 
 ## Connecting Discord
 

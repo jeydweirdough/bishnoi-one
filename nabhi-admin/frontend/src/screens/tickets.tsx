@@ -24,7 +24,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: "Other",
 };
 
-export function TicketsScreen({ tickets: initialTickets }: { tickets: OfficeTicket[] }) {
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { create: boolean; edit: boolean; delete: boolean };
+const ALL: Can = { create: true, edit: true, delete: true };
+
+export function TicketsScreen({ tickets: initialTickets, can = ALL }: { tickets: OfficeTicket[]; can?: Can }) {
   const [tickets, setTickets] = useState<OfficeTicket[]>(initialTickets);
   const [selectedStatus, setSelectedStatus] = useState<string>("active");
   const [modalTicket, setModalTicket] = useState<OfficeTicket | null | "new">(null);
@@ -74,10 +78,12 @@ export function TicketsScreen({ tickets: initialTickets }: { tickets: OfficeTick
         actions={
           <>
             <ExportButton kind="requests" />
-            <Button variant="primary" onClick={() => setModalTicket("new")}>
-              <Icon name="tickets" className="mr-1.5 size-4" />
-              New office request
-            </Button>
+            {can.create && (
+              <Button variant="primary" onClick={() => setModalTicket("new")}>
+                <Icon name="tickets" className="mr-1.5 size-4" />
+                New office request
+              </Button>
+            )}
           </>
         }
       >
@@ -130,32 +136,36 @@ export function TicketsScreen({ tickets: initialTickets }: { tickets: OfficeTick
                       <span className="font-semibold text-sm text-ink">{t.title}</span>
                       {/* Edit and delete sit with the record they act on. */}
                       <span className="inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setModalTicket(t)}
-                          aria-label="Edit request"
-                          title="Edit request"
-                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <ConfirmButton
-                          label={<span className="sr-only">Delete request</span>}
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          triggerTitle="Delete request"
-                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                              title={`Delete ${t.ticketNumber}?`}
-                          body="This request and its updates are deleted. This cannot be undone."
-                          confirmLabel="Delete request"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                          await deleteTicket(t.id);
-                          setTickets((prev) => prev.filter((item) => item.id !== t.id));
-                          }}
-                          
-                        />
+                        {can.edit && (
+                          <button
+                            type="button"
+                            onClick={() => setModalTicket(t)}
+                            aria-label="Edit request"
+                            title="Edit request"
+                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {can.delete && (
+                          <ConfirmButton
+                            label={<span className="sr-only">Delete request</span>}
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            triggerTitle="Delete request"
+                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                title={`Delete ${t.ticketNumber}?`}
+                            body="This request and its updates are deleted. This cannot be undone."
+                            confirmLabel="Delete request"
+                            danger
+                            triggerVariant="quiet"
+                            triggerSize="sm"
+                            onConfirm={async () => {
+                            await deleteTicket(t.id);
+                            setTickets((prev) => prev.filter((item) => item.id !== t.id));
+                            }}
+                            
+                          />
+                        )}
                       </span>
                       <span className={`inline-block rounded-[2px] px-1.5 py-0.2 text-meta first-letter:uppercase ${priorityBadge(t.priority)}`}>
                         {t.priority}
@@ -194,13 +204,15 @@ export function TicketsScreen({ tickets: initialTickets }: { tickets: OfficeTick
                     {t.status.replace("_", " ")}
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={() => setUpdateModalTicket(t)}
-                    className="rounded-[3px] bg-hema-tint px-2.5 py-1 text-meta font-semibold text-hema hover:bg-hema/15"
-                  >
-                    Add update
-                  </button>
+                  {can.edit && (
+                    <button
+                      type="button"
+                      onClick={() => setUpdateModalTicket(t)}
+                      className="rounded-[3px] bg-hema-tint px-2.5 py-1 text-meta font-semibold text-hema hover:bg-hema/15"
+                    >
+                      Add update
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

@@ -136,7 +136,9 @@ def test_starting_roles_and_the_permission_catalogue(client, ana):
     assert (by_name["Salesperson"]["scope"], by_name["Team Lead"]["scope"]) == ("own", "team")
     assert "customers.delete" not in by_name["Salesperson"]["permissions"]
     areas = {a["key"] for a in data["catalogue"]}
-    assert {"customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "contracts", "documents", "reports", "automations", "integrations", "admin"} <= areas
+    assert {"customers", "activities", "quotes", "orders", "reports", "admin"} <= areas
+    # Areas with no screens are neither offered nor kept: deals until they land, the rest for good.
+    assert not {"deals", "leads", "opportunities", "contracts", "documents", "automations", "integrations"} & areas
     assert [s["key"] for s in data["scopes"]] == ["own", "team", "all"]
 
 

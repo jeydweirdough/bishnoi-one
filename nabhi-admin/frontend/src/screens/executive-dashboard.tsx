@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CountdownBadge } from "@/src/components/countdown-badge";
 import { HealthChart, RenewalsChart } from "@/src/components/overview-charts";
+import { Restricted } from "@/src/components/restricted";
 import { ExportButton } from "@/src/components/sheet-actions";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { getMe, load } from "@/src/platform/lib/api";
 import type { ExecutiveDashboardSummary } from "@/src/platform/lib/types";
 
 export const metadata = { title: "Overview" };
@@ -14,6 +15,8 @@ export const metadata = { title: "Overview" };
  *  renewals fall due, and the next ones to act on. Each area's own page has
  *  the rest, so nothing is repeated here. */
 export default async function ExecutiveDashboardPage() {
+  const me = await getMe();
+  if (!(me.permissions?.includes("dashboard.view") ?? me.canManageSettings)) return <Restricted what="the overview" />;
   const { stats, countdownHighlights, health, requests, renewalsByMonth } = await load<ExecutiveDashboardSummary>("/admin/dashboard");
 
   const urgentCount =

@@ -17,11 +17,21 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app import platform_pass
+from app.access import access_of
+from app.audit import audit
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
 from app.identity import me_out
-from app.models import PlatformPass, SignInSession, User
-from app.security import DUMMY_HASH, MAX_PASSWORD, hash_password, new_token, token_hash, verify_password
+from app.models import PlatformPass, Role, SignInSession, User
+from app.permissions import ACTION_LABELS, ADMINISTRATOR, AREAS, FINANCE_STAFF
+from app.security import (
+    DUMMY_HASH,
+    MAX_PASSWORD,
+    hash_password,
+    new_token,
+    token_hash,
+    verify_password,
+)
 
 router = APIRouter(prefix="/auth", tags=["sign-in"])
 
@@ -98,7 +108,6 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> d
 # --- signing in with a Nabhi account (the platform) -----------------------------------
 
 APP_KEY = "finance"  # this application's key on the platform
-ADMIN_ROLES = {"administrator", "admin"}  # platform roles that are Finance Admin here
 
 
 class PlatformIn(BaseModel):
@@ -106,12 +115,16 @@ class PlatformIn(BaseModel):
     token: str = Field(alias="pass", min_length=20, max_length=8000)
 
 
-def role_from(claims: dict) -> str:
-    """Finance has two roles: an application admin, or the platform role
-    Administrator, is admin here; any other role, or none, is member."""
-    if claims.get("appAdmin") or str(claims.get("role") or "").strip().lower() in ADMIN_ROLES:
-        return "admin"
-    return "member"
+def role_from(db: DB, claims: dict) -> Role:
+    """The role the platform gives them here: an application admin is the
+    Administrator; a role Finance has by that name is that role; any other
+    role, or none, is Finance Staff. So nobody is turned away for a role this
+    app doesn't have, as before roles, when there were only admin and member."""
+    wanted = ADMINISTRATOR if claims.get("appAdmin") else str(claims.get("role") or "").strip()
+    if wanted.lower() == "admin":
+        wanted = ADMINISTRATOR
+    found = db.scalar(select(Role).where(func.lower(Role.name) == wanted.lower())) if wanted else None
+    return found or db.scalar(select(Role).where(Role.name == FINANCE_STAFF))
 
 
 @router.post("/platform")
@@ -119,10 +132,9 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     """Takes a pass from the platform (app/platform_pass.py) and opens a session
     here, as /auth/login does. The person is found by their Nabhi account, or
     by email the first time; someone new is added. Their role comes from the
-    platform every time (see role_from): Finance has only admin and member, so
-    nobody is turned away for a role this app doesn't have. The platform
-    decides who may open this application; this only refuses someone
-    switched off here."""
+    platform every time (see role_from), and nobody is turned away for a role
+    this app doesn't have. The platform decides who may open this application;
+    this only refuses someone switched off here."""
     try:
         claims = platform_pass.check(body.token, settings.platform_public_key, APP_KEY)
     except platform_pass.PassRefused as e:
@@ -137,7 +149,7 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
 
     email = str(claims["email"]).strip().lower()
-    role = role_from(claims)
+    role = role_from(db, claims)
     user = db.scalar(select(User).where(User.platform_identity_id == claims["sub"]))
     if user is None:
         user = db.scalar(select(User).where(func.lower(User.email) == email))
@@ -156,20 +168,32 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         )
         db.add(user)
         db.flush()
+        audit(db, email, "user.created", target=email, target_type="user", target_id=user.id, fields=["from the platform"])
     else:
         if not user.is_active:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account in this application is switched off. Ask your administrator.")
-        user.platform_identity_id = claims["sub"]
+        changed = []
+        if user.platform_identity_id != claims["sub"]:
+            user.platform_identity_id = claims["sub"]
+            changed.append("platformIdentity")
         if claims.get("name") and user.full_name != claims["name"]:
             user.full_name = str(claims["name"])[:120]
+            changed.append("fullName")
         if user.email != email and db.scalar(select(User.id).where(func.lower(User.email) == email)) is None:
             user.email = email
+            changed.append("email")
         # the platform decides the role
-        user.role = role
+        if user.role_id != role.id:
+            user.role = role
+            user.legacy_role = "admin" if role.is_system else "member"
+            changed.append("role")
+        if changed:
+            audit(db, email, "user.updated", target=email, target_type="user", target_id=user.id, fields=changed)
 
     token = new_token()
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
+    audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Nabhi account"])
     db.commit()
     response.headers["Cache-Control"] = "no-store"
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
@@ -187,23 +211,6 @@ def me(user: CurrentUser, settings: SettingsDep) -> dict:
     return me_out(user, settings)
 
 
-# What each of Finance's two roles may do, for the account page. The API's own
-# gates (deps.require_admin) are the ones that count; this says the same.
-ROLES = {
-    "admin": ("Finance Admin", "Administers Finance: chart of accounts, expense categories, default accounts and tax setup, plus all Finance Staff duties."),
-    "member": ("Finance Staff", "Releases cash advances, reviews liquidations, records refunds and reimbursements, and posts journal entries."),
-}
-AREAS = (
-    ("Fund requests", "Fund requests", ("Release", "Review liquidations", "Record refunds and reimbursements"), ()),
-    ("Accounting", "Journal entries", ("View", "Post manual journals", "Reverse entries"), ()),
-    ("Accounting", "Chart of accounts", ("View",), ("Add and edit",)),
-    ("Accounting", "Expense categories", ("View",), ("Add and edit",)),
-    ("Accounting", "Default accounts", ("View",), ("Edit",)),
-    ("Accounting", "Reports", ("Account ledgers", "Trial balance"), ()),
-    ("Tax", "Tax setup", ("View", "Compute tax on a sale"), ("Registration", "Rate changes")),
-)
-
-
 @router.get("/account")
 def account(user: CurrentUser, record: CurrentSession, db: DB) -> dict:
     """Everything about the person signed in, for their account page: the role,
@@ -218,18 +225,19 @@ def account(user: CurrentUser, record: CurrentSession, db: DB) -> dict:
     def at(when: datetime) -> str:  # SQLite hands times back without their zone: they're UTC
         return (when if when.tzinfo else when.replace(tzinfo=UTC)).isoformat()
 
-    admin = user.role == "admin"
-    name, description = ROLES[user.role]
+    access = access_of(user)
     return {
-        "role": {"name": name, "description": description, "scope": "all"},
+        "role": {"name": user.role.name, "description": user.role.description, "scope": "all"},
         "team": None,
         "memberSince": at(user.created_at),
         "passwordChangedAt": at(user.password_changed_at),
         "signedInAt": at(record.created_at),
         "previousSignIn": at(previous) if previous else None,
+        # What their role allows, area by area, as the roles screen lists it.
         "areas": [
-            {"key": area.lower().replace(" ", "_"), "name": area, "group": group, "actions": [*everyone, *(admins if admin else ())]}
-            for group, area, everyone, admins in AREAS
+            {"key": a.key, "name": a.name, "group": a.group, "actions": [ACTION_LABELS[x] for x in a.actions if access.can(f"{a.key}.{x}")]}
+            for a in AREAS
+            if any(access.can(p) for p in a.permissions())
         ],
     }
 

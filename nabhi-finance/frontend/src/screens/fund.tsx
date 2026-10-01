@@ -27,6 +27,8 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
   const categories = r.status === "to_check" ? (await load<{ items: ExpenseCategory[] }>("/finance/funds/categories")).items.filter((c) => c.isActive) : [];
   const fmt = makeFormat(me.org);
   const t = r.tally;
+  // Each step only for a role that may take it; the API checks the same.
+  const may = (p: string) => me.permissions?.includes(p) ?? false;
 
   return (
     <>
@@ -44,19 +46,19 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
       </PageHeader>
 
       <div className="space-y-5">
-        {r.status === "to_release" && (
+        {r.status === "to_release" && may("funds.release") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="payments">Release cash advance</SectionTitle>
             <Release request={r} org={me.org} today={fmt.todayKey()} />
           </Sheet>
         )}
-        {r.status === "to_check" && (
+        {r.status === "to_check" && may("funds.check") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="approvals">Liquidation review</SectionTitle>
             <CheckLiquidation request={r} categories={categories} org={me.org} />
           </Sheet>
         )}
-        {(r.status === "to_return" || r.status === "to_reimburse") && (
+        {(r.status === "to_return" || r.status === "to_reimburse") && may("funds.settle") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="payments">{r.status === "to_return" ? "Record refund" : "Record reimbursement"}</SectionTitle>
             <RecordMoney request={r} org={me.org} kind={r.status === "to_return" ? "returned" : "reimbursed"} />

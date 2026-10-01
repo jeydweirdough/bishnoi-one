@@ -2,17 +2,19 @@
 
 Each count is a thing an admin has to fill in before Finance works in full: a
 default account left empty stops a fund step from posting, an expense category
-with no account stops a liquidation being checked. Only admins can fix these,
-so only admins are sent them, and every red mark is one they can act on.
+with no account stops a liquidation being checked. Only the counts this person
+may fix are sent, so a mark in their sidebar is always one they can act on.
 """
 
 from fastapi import APIRouter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.deps import DB, CurrentUser
+from app.access import CurrentAccess
+from app.deps import DB
 from app.ledger import settings as posting_settings
 from app.models import Account, ExpenseCategory, TaxProfile
+from app.routers.invoices import issued_to_nobody
 from app.routers.ledger import POSTING
 from app.routers.tax import profile_complete
 
@@ -34,14 +36,16 @@ def categories_without_account(db: Session) -> int:
 
 
 @router.get("/unset")
-def unset(user: CurrentUser, db: DB) -> dict[str, int]:
-    """How many of each thing isn't set yet, by kind. Empty for anyone who
-    isn't an admin, and kinds with nothing missing are left out."""
-    if user.role != "admin":
-        return {}
-    counts = {
-        "postingAccounts": posting_gaps(db),
-        "categoryAccounts": categories_without_account(db),
-        "taxProfile": 0 if profile_complete(db.get(TaxProfile, 1)) else 1,
-    }
+def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
+    """How many of each thing isn't set yet, by kind. Kinds are left out when
+    this person can't fix them, and when nothing is missing."""
+    counts: dict[str, int] = {}
+    if access.can("accounts.manage"):
+        counts["postingAccounts"] = posting_gaps(db)
+    if access.can("categories.manage"):
+        counts["categoryAccounts"] = categories_without_account(db)
+    if access.can("invoices.setup"):
+        counts["invoiceSeries"] = issued_to_nobody(db)
+    if access.can("tax.manage"):
+        counts["taxProfile"] = 0 if profile_complete(db.get(TaxProfile, 1)) else 1
     return {k: v for k, v in counts.items() if v}

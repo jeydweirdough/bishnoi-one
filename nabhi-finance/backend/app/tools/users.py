@@ -57,7 +57,7 @@ def main() -> int:
     with make_sessions(engine)() as db:
         if args.command == "list":
             for u in db.scalars(select(User).order_by(User.email)):
-                print(f"{u.email:40} {u.full_name:30} {u.role:7} {'on' if u.is_active else 'off'}")
+                print(f"{u.email:40} {u.full_name:30} {u.role.name:14} {'on' if u.is_active else 'off'}")
             return 0
 
         if args.command == "demo":

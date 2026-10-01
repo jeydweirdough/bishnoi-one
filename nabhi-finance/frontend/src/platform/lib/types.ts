@@ -109,6 +109,9 @@ export type Me = {
   // not opened one: they sign in to the platform, which is in no company.
   // Everything else here is within whichever company that is.
   org: Org | null;
+  // Their role, and what it allows ("funds.release", "admin.users"): the API checks the same.
+  role?: { id: string; name: string; scope: string };
+  permissions?: string[];
   canManageSettings: boolean;
   // Holds the recovery key itself (a Developer Admin). Not "can reach the
   // recovery screens" -- each screen's rule combines this with the two below.

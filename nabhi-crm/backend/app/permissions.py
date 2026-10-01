@@ -48,15 +48,11 @@ class Area:
 AREAS: tuple[Area, ...] = (
     Area("dashboard", "Dashboard", "CRM", ("view",)),
     Area("customers", "Customers & contacts", "CRM", CRUD),
-    Area("leads", "Leads", "CRM", CRUD),
-    Area("opportunities", "Opportunities", "CRM", CRUD),
     Area("deals", "Deals", "CRM", CRUD),
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "CRM", CRUD),
     Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices")),
     Area("quotes", "Quotes", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
-    Area("contracts", "Contracts", "Catalogue & paperwork", CRUD),
-    Area("documents", "Documents", "Catalogue & paperwork", CRUD),
     Area("visits", "Visits & collections", "Field work", CRUD),
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.
@@ -65,16 +61,18 @@ AREAS: tuple[Area, ...] = (
     # asks, funds.approve approves the requests in reach; Finance releases it.
     Area("funds", "Fund requests", "Field work", ("view", "create", "approve")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
-    Area("automations", "Automations", "Insight & tools", ("view", "manage")),
-    Area("integrations", "Integrations", "Insight & tools", ("view", "manage")),
     Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
 
-# Areas with no screens yet: roles can already allow them, but nothing uses
-# them, so a person's account page leaves them out. Take one off as it lands.
-NOT_BUILT: frozenset[str] = frozenset({"leads", "opportunities", "deals", "contracts", "documents", "automations", "integrations"})
+# Areas decided but not built yet (deals: benchmarks decision D2). Roles can
+# already hold them, but nothing uses them, so neither the roles screen nor a
+# person's account page offers them. Take one off as it lands.
+# (Leads, opportunities, contracts, documents, automations and integrations
+# were here with no plan behind them, and were taken out on 2026-09-30: a lead
+# is a customer status, by D2. Roles that held them simply no longer do.)
+NOT_BUILT: frozenset[str] = frozenset({"deals"})
 ADMIN_PERMISSIONS: frozenset[str] = frozenset(p for p in ALL_PERMISSIONS if p.startswith("admin."))
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
@@ -84,6 +82,7 @@ SCOPE_LABELS = {"own": "Their own records", "team": "Their team's records", "all
 
 
 def catalogue_out() -> list[dict]:
+    """What the roles screen offers: every area that has screens."""
     return [
         {
             "key": a.key,
@@ -92,6 +91,7 @@ def catalogue_out() -> list[dict]:
             "actions": [{"key": x, "label": ACTION_LABELS[x], "permission": f"{a.key}.{x}"} for x in a.actions],
         }
         for a in AREAS
+        if a.key not in NOT_BUILT
     ]
 
 
@@ -113,12 +113,11 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         "Manages their own team: its customers, quotes and prices. Approves the team's quotes.",
         "team",
         frozenset(
-            _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", "contracts", "documents")
+            _grant("customers", "deals", "activities", "quotes", "orders")
             | _grant("quotes", "orders", actions=("approve",))
             | _grant("dashboard", "products", actions=("view",))
             | _grant("products", actions=("prices",))
             | _grant("reports", actions=("view", "export"))
-            | _grant("automations", "integrations", actions=("view",))
             | _grant("visits")
             | _grant("goals", actions=("view",))
             | _grant("funds", actions=("view", "create", "approve"))
@@ -129,8 +128,8 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         "Works their own customers, activities and quotes.",
         "own",
         frozenset(
-            _grant("customers", "leads", "opportunities", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
-            | _grant("dashboard", "products", "contracts", "documents", actions=("view",))
+            _grant("customers", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
+            | _grant("dashboard", "products", actions=("view",))
             | _grant("funds", actions=("view", "create"))
         ),
     ),

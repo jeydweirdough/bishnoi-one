@@ -66,7 +66,7 @@ request that changes what it describes.
 | E2 | Filters stored as data | Odoo ★ (domains) | None: filters live in the URL, not saved. | open (proposed ADOPT with E1) |
 | E3 | Report types: pre-approved joins users filter without SQL | Salesforce ★ | Inv: about 15 dated reports with per-warehouse filters and CSV. Ph: six date-ranged reports. CRM: people and retention reports (CSV). Plat: dashboards. | open (proposed ADAPT: Inventory's report registry as the pattern) |
 | E4 | Documents (PDF) from the same data the screens use | Odoo ★ (QWeb) | None. CRM only accepts uploaded PDFs (guarantee letters). | open |
-| E5 | Receivables outstanding and ageing as a main screen | Marg ★ | CRM partial: what a doctor owes now (field collections); no ageing buckets. Others: none. | **ADOPT** (decided 2026-09-25, D4): a main screen in the Finance app, with invoices and payments |
+| E5 | Receivables outstanding and ageing as a main screen | Marg ★ | **Finance: Invoices → Receivables** (`routers/receivables.py`): what each customer owes on issued invoices, not yet due and 1-30, 31-60, 61-90, over 90 days late; sales invoices numbered from the BIR's ATP series, VAT from the engine, posted to receivables, sales and output VAT; payments posted against them. CRM partial: what a doctor owes now (field collections). | **ADOPT** (decided 2026-09-25, D4): a main screen in the Finance app, with invoices and payments |
 
 ## F. Selling and pricing
 

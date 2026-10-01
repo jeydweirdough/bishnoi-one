@@ -15,7 +15,7 @@ def settings(tmp_path, **extra) -> Settings:
 def test_first_admin_is_made_once(tmp_path):
     first = settings(tmp_path, first_admin_email="Boss@Example.com", first_admin_name="Boss", first_admin_password=SecretStr("a long enough password 1"))
     with create_app(first).state.sessions() as db:
-        assert [(u.email, u.role) for u in db.scalars(select(User))] == [("boss@example.com", "admin")]
+        assert [(u.email, u.role.name) for u in db.scalars(select(User))] == [("boss@example.com", "Administrator")]
     # Started again with other settings: someone exists, so nothing more is made.
     again = settings(tmp_path, first_admin_email="other@example.com", first_admin_password=SecretStr("a long enough password 2"))
     with create_app(again).state.sessions() as db:

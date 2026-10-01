@@ -5,9 +5,11 @@ from .test_tax_api import REGISTRATION, ana, app, ben, client  # noqa: F401 (fix
 
 
 def test_setup_an_admin_owes(client, ana, ben):  # noqa: F811 (fixtures)
-    # Fresh from the migration the default accounts are set; the tax registration isn't.
-    assert client.get("/finance/unset", headers=ana).json() == {"taxProfile": 1}
+    # Fresh from the migration the default accounts are set; the tax registration
+    # and the invoice numbers (from the BIR's Authority to Print) aren't.
+    assert client.get("/finance/unset", headers=ana).json() == {"taxProfile": 1, "invoiceSeries": 1}
     client.put("/tax/profile", json=REGISTRATION, headers=ana)
+    client.post("/finance/invoices/series", json={"name": "Sales invoices", "firstNumber": 1, "lastNumber": 5000, "atpNumber": "OCN-1", "atpDate": "2026-01-05"}, headers=ana)
     assert client.get("/finance/unset", headers=ana).json() == {}
     # A default account cleared, and one switched off: two to fix.
     acc = accounts(client, ana)

@@ -64,6 +64,20 @@ def allowed(permission: str) -> type[Access]:
     return Annotated[Access, Depends(require(permission))]  # type: ignore[return-value]
 
 
+def permitted(permission: str) -> type[User]:
+    """`user: permitted("permits.edit")`: the signed-in person, once their role
+    allows it. For endpoints that need the person themselves (their name on a
+    ticket update), not only the yes or no."""
+    if permission not in ALL_PERMISSIONS:
+        raise ValueError(f"unknown permission {permission!r}")
+
+    def check(access: CurrentAccess) -> User:
+        access.require(permission)
+        return access.user
+
+    return Annotated[User, Depends(check)]  # type: ignore[return-value]
+
+
 def administrators(db: Session) -> int:
     """Active people whose role holds every key to administration."""
     system = select(func.count()).select_from(User).join(Role).where(User.is_active, Role.is_system)

@@ -57,6 +57,7 @@ const UNSET_SAYS: Record<string, (n: number) => string> = {
   postingAccounts: (n) => `${n} default ${n === 1 ? "account isn't" : "accounts aren't"} set, so some fund steps can't be posted`,
   categoryAccounts: (n) => `${n} expense ${n === 1 ? "category has" : "categories have"} no account`,
   taxProfile: () => "The company's tax registration isn't complete",
+  invoiceSeries: () => "There are no invoice numbers left: add the series from the BIR's Authority to Print",
 };
 
 /** What isn't set of these kinds: how many, and what to say about it. */
@@ -102,9 +103,8 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
   // In the module's own app the prefix is empty, so its root is plain "/".
   const root = base || "/";
   if (m.key === "finance") {
-    // Approvals, guarantee letters and letter payments have screens here
-    // (src/screens) but no API behind them yet, so they stay out of the
-    // sidebar until they do: a link that opens to "not found" is worse than none.
+    // Quote approvals, guarantee letters and letter payments are decided in
+    // the CRM, on the quote: Finance keeps no quotes, so it has no screens for them.
     return [
       { href: root, label: "Overview", icon: "overview" },
       // Cash advances to the CRM's people: what Finance does next, one queue per step.
@@ -119,6 +119,18 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/funds/settlement`, label: "For settlement", count: waiting.to_settle },
           { href: `${base}/funds/outstanding`, label: "Outstanding", count: waiting.overdue },
           { href: `${base}/funds/history`, label: "History" },
+        ],
+      },
+      // Sales invoices: made, issued with the BIR's numbers, posted to the books.
+      {
+        href: `${base}/invoices`,
+        label: "Invoices",
+        icon: "letters",
+        missing: missingOf(unset, ["invoiceSeries"]),
+        subpages: [
+          { href: `${base}/invoices`, label: "Sales invoices" },
+          { href: `${base}/invoices/receivables`, label: "Receivables" },
+          { href: `${base}/invoices/series`, label: "Invoice numbers", missing: missingOf(unset, ["invoiceSeries"]) },
         ],
       },
       // The books: every entry, the accounts, and what they add up to.
@@ -592,6 +604,42 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
   return <Parent href={root} base={root} icon={moduleIcon(m.key)} label={m.name} groups={[{ pages: modulePages(m) }]} overviewHref={root} />;
 }
 
+/** What each of Finance's pages needs, so the sidebar offers only what the role opens (the API checks the same). */
+const FINANCE_NEEDS: [string, string][] = [
+  ["/funds", "funds.view"],
+  ["/invoices", "invoices.view"],
+  ["/ledger/accounts", "accounts.view"],
+  ["/ledger/posting", "accounts.view"],
+  ["/ledger/categories", "categories.view"],
+  ["/ledger", "journal.view"],
+  ["/tax", "tax.view"],
+  ["/", "dashboard.view"],
+];
+
+/** Finance's pages, and their sub-pages, that this person's role opens. */
+function financePages(me: Me, pages: Page[]): Page[] {
+  const may = (p: string) => me.permissions?.includes(p) ?? false;
+  const needs = (href: string) => {
+    const path = href.replace(/^\/m\/finance/, "") || "/";
+    const rule = FINANCE_NEEDS.find(([at]) => (at === "/" ? path === "/" : path === at || path.startsWith(`${at}/`)));
+    return rule ? may(rule[1]) : true;
+  };
+  return pages
+    .map((p) => (p.subpages ? { ...p, subpages: p.subpages.filter((sub) => needs(sub.href)) } : p))
+    .filter((p) => (p.subpages ? p.subpages.length > 0 : needs(p.href)))
+    .map((p) => (p.subpages && !needs(p.href) ? { ...p, href: p.subpages[0].href } : p));
+}
+
+/** Finance's Administration: users, roles and the activity log, each for a role that may open it. */
+function financeAdmin(me: Me): Page[] {
+  const may = (p: string) => me.permissions?.includes(p) ?? false;
+  return [
+    ...(may("admin.users") ? [{ href: "/admin/users", label: "Users", icon: "people" as const }] : []),
+    ...(may("admin.roles") ? [{ href: "/admin/roles", label: "Roles and permissions", icon: "roles" as const }] : []),
+    ...(may("admin.audit") ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
+  ];
+}
+
 function Links({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset }) {
   const pathname = usePathname();
   // On the platform there is no company, so there is nothing of one to list:
@@ -692,11 +740,20 @@ function Links({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset 
         <Group label={THIS_APP ? (departments.find(serves)?.name ?? "Departments") : "Departments"}>
           {departments.filter(serves).map((m) =>
             THIS_APP ? (
-              <Flat key={m.key} groups={[{ pages: modulePages(m, waiting, unset) }]} overviewHref={moduleBase(m.key) || "/"} />
+              <Flat
+                key={m.key}
+                groups={[{ pages: m.key === "finance" ? financePages(me, modulePages(m, waiting, unset)) : modulePages(m, waiting, unset) }]}
+                overviewHref={moduleBase(m.key) || "/"}
+              />
             ) : (
               <ModuleEntry key={m.key} m={m} />
             ),
           )}
+        </Group>
+      )}
+      {THIS_APP === "finance" && financeAdmin(me).length > 0 && (
+        <Group label="Administration">
+          <Flat groups={[{ pages: financeAdmin(me) }]} />
         </Group>
       )}
       {/* The apps this person has but is not in. The shell keeps them as the
@@ -828,7 +885,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
   return (
     <>
       {/* Desktop: a fixed column on the bench. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex print:!hidden">
         <div>
           <div className="mb-6 px-3">{brand}</div>
           <Links me={me} waiting={waiting} unset={unset} />
@@ -837,7 +894,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
       </aside>
 
       {/* Phone and tablet: a top bar with a menu, saying where you are. */}
-      <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden print:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-36 shrink-0">{brand}</div>
           <button

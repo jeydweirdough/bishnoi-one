@@ -13,7 +13,11 @@ import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 
-export function PermitsScreen({ permits: initialPermits, canImport = false }: { permits: ComplianceRecord[]; canImport?: boolean }) {
+/** What this person's role lets them do here; the API checks the same. */
+type Can = { create: boolean; edit: boolean; delete: boolean };
+const ALL: Can = { create: true, edit: true, delete: true };
+
+export function PermitsScreen({ permits: initialPermits, canImport = false, can = ALL }: { permits: ComplianceRecord[]; canImport?: boolean; can?: Can }) {
   const [permits, setPermits] = useState<ComplianceRecord[]>(initialPermits);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [modalPermit, setModalPermit] = useState<ComplianceRecord | null | "new">(null);
@@ -40,10 +44,12 @@ export function PermitsScreen({ permits: initialPermits, canImport = false }: { 
           <>
             <ExportButton kind="permits" />
             {canImport && <ImportButton href="/permits/import" />}
-            <Button variant="primary" onClick={() => setModalPermit("new")}>
-              <Icon name="permits" className="mr-1.5 size-4" />
-              New permit
-            </Button>
+            {can.create && (
+              <Button variant="primary" onClick={() => setModalPermit("new")}>
+                <Icon name="permits" className="mr-1.5 size-4" />
+                New permit
+              </Button>
+            )}
           </>
         }
       >
@@ -94,32 +100,36 @@ export function PermitsScreen({ permits: initialPermits, canImport = false }: { 
                       <span className="font-semibold text-sm text-ink">{p.title}</span>
                       {/* Edit and delete sit with the record they act on. */}
                       <span className="inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => setModalPermit(p)}
-                          aria-label="Edit permit"
-                          title="Edit permit"
-                          className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <ConfirmButton
-                          label={<span className="sr-only">Delete permit</span>}
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          triggerTitle="Delete permit"
-                          triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                title={`Delete ${p.title}?`}
-                          body="This permit and its renewal alerts are deleted. This cannot be undone."
-                          confirmLabel="Delete permit"
-                          danger
-                          triggerVariant="quiet"
-                          triggerSize="sm"
-                          onConfirm={async () => {
-                          await deletePermit(p.id);
-                          setPermits((prev) => prev.filter((item) => item.id !== p.id));
-                          }}
-                          
-                        />
+                        {can.edit && (
+                          <button
+                            type="button"
+                            onClick={() => setModalPermit(p)}
+                            aria-label="Edit permit"
+                            title="Edit permit"
+                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {can.delete && (
+                          <ConfirmButton
+                            label={<span className="sr-only">Delete permit</span>}
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            triggerTitle="Delete permit"
+                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
+                                                  title={`Delete ${p.title}?`}
+                            body="This permit and its renewal alerts are deleted. This cannot be undone."
+                            confirmLabel="Delete permit"
+                            danger
+                            triggerVariant="quiet"
+                            triggerSize="sm"
+                            onConfirm={async () => {
+                            await deletePermit(p.id);
+                            setPermits((prev) => prev.filter((item) => item.id !== p.id));
+                            }}
+                            
+                          />
+                        )}
                       </span>
                       <span className="text-meta text-ink-2">· {p.agency}</span>
                     </div>

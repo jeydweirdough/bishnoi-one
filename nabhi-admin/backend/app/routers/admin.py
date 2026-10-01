@@ -13,7 +13,13 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import desc, func, or_, select
 
-from app.access import allowed, keep_an_administrator, permissions_of
+from app.access import (
+    access_of,
+    allowed,
+    keep_an_administrator,
+    permissions_of,
+    permitted,
+)
 from app.api import Api, changed, check_email, field_error, iso
 from app.audit import audit
 from app.config import Settings
@@ -204,7 +210,7 @@ def serialize_notification(n: Notification) -> dict[str, Any]:
 
 
 @router.get("/dashboard")
-def executive_dashboard(user: CurrentUser, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: SettingsDep) -> dict[str, Any]:
     """Executive Cockpit summary figures, compliance score, countdown highlights,
 
     and urgent actions for executive admins & assistants.
@@ -454,7 +460,7 @@ def parse_iso_datetime(dt_str: str | None) -> datetime | None:
 
 @router.get("/permits")
 def list_permits(
-    user: CurrentUser,
+    user: permitted("permits.view"),
     db: DB,
     settings: SettingsDep,
     category: str | None = Query(None),
@@ -471,7 +477,7 @@ def list_permits(
 
 
 @router.post("/permits", status_code=status.HTTP_201_CREATED)
-def create_permit(user: CurrentUser, payload: PermitInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def create_permit(user: permitted("permits.create"), payload: PermitInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     exp_dt = parse_iso_datetime(payload.expirationDate)
     if not exp_dt:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Valid expiration date is required.")
@@ -497,7 +503,7 @@ def create_permit(user: CurrentUser, payload: PermitInput, db: DB, settings: Set
 
 
 @router.patch("/permits/{permit_id}")
-def update_permit(permit_id: str, user: CurrentUser, payload: PermitInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def update_permit(permit_id: str, user: permitted("permits.edit"), payload: PermitInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     rec = db.get(ComplianceRecord, permit_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Permit record not found.")
@@ -523,7 +529,7 @@ def update_permit(permit_id: str, user: CurrentUser, payload: PermitInput, db: D
 
 
 @router.delete("/permits/{permit_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_permit(permit_id: str, user: CurrentUser, db: DB, settings: SettingsDep):
+def delete_permit(permit_id: str, user: permitted("permits.delete"), db: DB, settings: SettingsDep):
     rec = db.get(ComplianceRecord, permit_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Permit record not found.")
@@ -552,7 +558,7 @@ class ImmigrationInput(BaseModel):
 
 @router.get("/immigration")
 def list_immigration(
-    user: CurrentUser,
+    user: permitted("immigration.view"),
     db: DB,
     settings: SettingsDep,
     doc_type: str | None = Query(None, alias="documentType"),
@@ -566,7 +572,7 @@ def list_immigration(
 
 
 @router.post("/immigration", status_code=status.HTTP_201_CREATED)
-def create_immigration(user: CurrentUser, payload: ImmigrationInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def create_immigration(user: permitted("immigration.create"), payload: ImmigrationInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     exp_dt = parse_iso_datetime(payload.expirationDate)
     if not exp_dt:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Valid expiration date is required.")
@@ -594,7 +600,7 @@ def create_immigration(user: CurrentUser, payload: ImmigrationInput, db: DB, set
 
 @router.patch("/immigration/{record_id}")
 def update_immigration(
-    record_id: str, user: CurrentUser, payload: ImmigrationInput, db: DB, settings: SettingsDep
+    record_id: str, user: permitted("immigration.edit"), payload: ImmigrationInput, db: DB, settings: SettingsDep
 ) -> dict[str, Any]:
     rec = db.get(ImmigrationRecord, record_id)
     if not rec:
@@ -622,7 +628,7 @@ def update_immigration(
 
 
 @router.delete("/immigration/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_immigration(record_id: str, user: CurrentUser, db: DB, settings: SettingsDep):
+def delete_immigration(record_id: str, user: permitted("immigration.delete"), db: DB, settings: SettingsDep):
     rec = db.get(ImmigrationRecord, record_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Immigration record not found.")
@@ -656,7 +662,7 @@ def missing_an_expiry():
 
 @router.get("/documents")
 def list_documents(
-    user: CurrentUser,
+    user: permitted("documents.view"),
     db: DB,
     settings: SettingsDep,
     category: str | None = Query(None),
@@ -673,7 +679,7 @@ def list_documents(
 
 
 @router.post("/documents", status_code=status.HTTP_201_CREATED)
-def create_document(user: CurrentUser, payload: DocumentInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def create_document(user: permitted("documents.create"), payload: DocumentInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     rec = CorporateDocument(
         id=new_id(),
         title=payload.title.strip(),
@@ -697,7 +703,7 @@ def create_document(user: CurrentUser, payload: DocumentInput, db: DB, settings:
 
 
 @router.patch("/documents/{doc_id}")
-def update_document(doc_id: str, user: CurrentUser, payload: DocumentInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def update_document(doc_id: str, user: permitted("documents.edit"), payload: DocumentInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     rec = db.get(CorporateDocument, doc_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document record not found.")
@@ -721,7 +727,7 @@ def update_document(doc_id: str, user: CurrentUser, payload: DocumentInput, db: 
 
 
 @router.delete("/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(doc_id: str, user: CurrentUser, db: DB, settings: SettingsDep):
+def delete_document(doc_id: str, user: permitted("documents.delete"), db: DB, settings: SettingsDep):
     rec = db.get(CorporateDocument, doc_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document record not found.")
@@ -758,7 +764,7 @@ def missing_rent():
 
 @router.get("/properties")
 def list_properties(
-    user: CurrentUser,
+    user: permitted("properties.view"),
     db: DB,
     settings: SettingsDep,
     property_type: str | None = Query(None, alias="propertyType"),
@@ -775,7 +781,7 @@ def list_properties(
 
 
 @router.post("/properties", status_code=status.HTTP_201_CREATED)
-def create_property(user: CurrentUser, payload: PropertyInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def create_property(user: permitted("properties.create"), payload: PropertyInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     lease_end = parse_iso_datetime(payload.leaseEnd)
     if not lease_end:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Valid lease end date is required.")
@@ -806,7 +812,7 @@ def create_property(user: CurrentUser, payload: PropertyInput, db: DB, settings:
 
 @router.patch("/properties/{property_id}")
 def update_property(
-    property_id: str, user: CurrentUser, payload: PropertyInput, db: DB, settings: SettingsDep
+    property_id: str, user: permitted("properties.edit"), payload: PropertyInput, db: DB, settings: SettingsDep
 ) -> dict[str, Any]:
     rec = db.get(PropertyRecord, property_id)
     if not rec:
@@ -837,7 +843,7 @@ def update_property(
 
 
 @router.delete("/properties/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_property(property_id: str, user: CurrentUser, db: DB, settings: SettingsDep):
+def delete_property(property_id: str, user: permitted("properties.delete"), db: DB, settings: SettingsDep):
     rec = db.get(PropertyRecord, property_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Property record not found.")
@@ -871,9 +877,22 @@ class TicketUpdateInput(BaseModel):
     newStatus: str | None = None
 
 
+CLOSED = ("resolved", "closed")
+
+
+def check_ticket_change(user: User, rec: Ticket, assigned_to: str | None, new_status: str) -> None:
+    """Editing a request isn't all of it: handing it to someone else needs
+    "assign", and closing it (or opening it again) needs "resolve"."""
+    access = access_of(user)
+    if (assigned_to or "").strip() != (rec.assigned_to or ""):
+        access.require("tickets.assign")
+    if (new_status in CLOSED) != (rec.status in CLOSED):
+        access.require("tickets.resolve")
+
+
 @router.get("/tickets")
 def list_tickets(
-    user: CurrentUser,
+    user: permitted("tickets.view"),
     db: DB,
     settings: SettingsDep,
     status_filter: str | None = Query(None, alias="status"),
@@ -890,7 +909,7 @@ def list_tickets(
 
 
 @router.post("/tickets", status_code=status.HTTP_201_CREATED)
-def create_ticket(user: CurrentUser, payload: TicketInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def create_ticket(user: permitted("tickets.create"), payload: TicketInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     # Generate sequential ticket number
     count = db.scalar(select(func.count(Ticket.id))) or 0
     now_year = datetime.now(safe_tz(settings.org_timezone)).year
@@ -932,7 +951,7 @@ def create_ticket(user: CurrentUser, payload: TicketInput, db: DB, settings: Set
 
 
 @router.get("/tickets/{ticket_id}")
-def get_ticket(ticket_id: str, user: CurrentUser, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def get_ticket(ticket_id: str, user: permitted("tickets.view"), db: DB, settings: SettingsDep) -> dict[str, Any]:
     rec = db.get(Ticket, ticket_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found.")
@@ -943,10 +962,11 @@ def get_ticket(ticket_id: str, user: CurrentUser, db: DB, settings: SettingsDep)
 
 
 @router.patch("/tickets/{ticket_id}")
-def update_ticket(ticket_id: str, user: CurrentUser, payload: TicketInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def update_ticket(ticket_id: str, user: permitted("tickets.edit"), payload: TicketInput, db: DB, settings: SettingsDep) -> dict[str, Any]:
     rec = db.get(Ticket, ticket_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found.")
+    check_ticket_change(user, rec, payload.assignedTo, payload.status)
     rec.title = payload.title.strip()
     rec.category = payload.category.strip()
     rec.priority = payload.priority
@@ -969,11 +989,12 @@ def update_ticket(ticket_id: str, user: CurrentUser, payload: TicketInput, db: D
 
 @router.post("/tickets/{ticket_id}/updates")
 def add_ticket_update(
-    ticket_id: str, user: CurrentUser, payload: TicketUpdateInput, db: DB, settings: SettingsDep
+    ticket_id: str, user: permitted("tickets.edit"), payload: TicketUpdateInput, db: DB, settings: SettingsDep
 ) -> dict[str, Any]:
     rec = db.get(Ticket, ticket_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found.")
+    check_ticket_change(user, rec, rec.assigned_to, payload.newStatus or rec.status)
     update = TicketUpdate(
         id=new_id(),
         ticket_id=ticket_id,
@@ -996,7 +1017,7 @@ def add_ticket_update(
 
 
 @router.delete("/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_ticket(ticket_id: str, user: CurrentUser, db: DB, settings: SettingsDep):
+def delete_ticket(ticket_id: str, user: permitted("tickets.delete"), db: DB, settings: SettingsDep):
     rec = db.get(Ticket, ticket_id)
     if not rec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found.")
@@ -1010,7 +1031,7 @@ def delete_ticket(ticket_id: str, user: CurrentUser, db: DB, settings: SettingsD
 
 @router.get("/notifications")
 def list_notifications(
-    user: CurrentUser,
+    user: permitted("notifications.view"),
     db: DB,
     settings: SettingsDep,
     unread_only: bool = Query(False, alias="unreadOnly"),
@@ -1025,13 +1046,13 @@ def list_notifications(
 
 
 @router.post("/notifications/sync")
-def trigger_notification_sync(user: CurrentUser, db: DB, settings: SettingsDep) -> dict[str, Any]:
+def trigger_notification_sync(user: permitted("notifications.view"), db: DB, settings: SettingsDep) -> dict[str, Any]:
     count = sync_notifications(db, settings)
     return {"ok": True, "newOrUpdated": count}
 
 
 @router.patch("/notifications/{notif_id}/acknowledge")
-def acknowledge_notification(notif_id: str, user: CurrentUser, db: DB) -> dict[str, Any]:
+def acknowledge_notification(notif_id: str, user: permitted("notifications.acknowledge"), db: DB) -> dict[str, Any]:
     n = db.get(Notification, notif_id)
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found.")
@@ -1043,7 +1064,7 @@ def acknowledge_notification(notif_id: str, user: CurrentUser, db: DB) -> dict[s
 
 
 @router.patch("/notifications/{notif_id}/resolve")
-def resolve_notification(notif_id: str, user: CurrentUser, db: DB) -> dict[str, Any]:
+def resolve_notification(notif_id: str, user: permitted("notifications.resolve"), db: DB) -> dict[str, Any]:
     n = db.get(Notification, notif_id)
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found.")

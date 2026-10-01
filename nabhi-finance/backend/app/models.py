@@ -8,7 +8,18 @@ a migration (migrations/versions)."""
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -22,6 +33,32 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+class Role(Base):
+    __tablename__ = "nbfi_roles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Administrator: always every permission, can't be changed or deleted.
+    is_system: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    grants: Mapped[list["RolePermission"]] = relationship(back_populates="role", cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def permissions(self) -> set[str]:
+        return {g.permission for g in self.grants}
+
+
+class RolePermission(Base):
+    __tablename__ = "nbfi_role_permissions"
+
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbfi_roles.id", ondelete="CASCADE"), primary_key=True)
+    permission: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+    role: Mapped[Role] = relationship(back_populates="grants")
+
+
 class User(Base):
     __tablename__ = "nbfi_users"
     __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"),)
@@ -30,14 +67,52 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
-    # admin: runs this app's settings. member: uses it.
-    role: Mapped[str] = mapped_column(String(16), default="member")
+    # What they may do: their role's permissions (app/permissions.py).
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbfi_roles.id"), index=True)
+    # Admin or member, from before roles (migration 0006). No longer read; kept
+    # filled so the table didn't have to be rebuilt to drop it.
+    legacy_role: Mapped[str] = mapped_column("role", String(16), default="member")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+
+    role: Mapped[Role] = relationship(lazy="joined")
+
+    def __init__(self, **kwargs):
+        # role="admin" or "member", as accounts were made before roles: the
+        # Administrator or Finance Staff role. A Role, or role_id, as they are now.
+        from app.permissions import ROLE_ADMIN_ID, ROLE_STAFF_ID
+
+        given = kwargs.pop("role", None)
+        if isinstance(given, Role):
+            kwargs["role"] = given
+        elif "role_id" not in kwargs:
+            kwargs["role_id"] = ROLE_ADMIN_ID if given == "admin" else ROLE_STAFF_ID
+        admin = kwargs.get("role_id") == ROLE_ADMIN_ID or (isinstance(given, Role) and given.is_system)
+        kwargs.setdefault("legacy_role", "admin" if admin else "member")
+        super().__init__(**kwargs)
+
+
+class AuditEntry(Base):
+    """The activity log: who changed what, and when. Names the fields that
+    changed, never their values. A fund request's own steps are also kept as
+    its events (FundEvent)."""
+
+    __tablename__ = "nbfi_audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    actor_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    # Kept as written at the time, so the log still reads after a rename.
+    actor: Mapped[str] = mapped_column(String(254))
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target_type: Mapped[str | None] = mapped_column(String(32), default=None)
+    target_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    target: Mapped[str] = mapped_column(String(200), default="")
+    fields: Mapped[list[str]] = mapped_column(JSON, default=list)
 
 
 class PlatformPass(Base):
@@ -197,6 +272,10 @@ class LedgerSettings(Base):
     bank_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     ewallet_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     check_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Where an issued invoice posts: what customers owe, the sale, and the tax on it.
+    receivables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    sales_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    output_tax_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class JournalEntry(Base):
@@ -355,3 +434,106 @@ class StoredFile(Base):
     content_type: Mapped[str] = mapped_column(String(100))
     data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- invoices: sales invoices to customers, numbered from the BIR's authority -------------
+#
+# An invoice is a draft until it's issued: then it takes the next number of
+# its series, its amounts are worked out by the tax engine and kept as they
+# were, and it posts to the ledger (what the customer owes, the sale, the tax).
+# An issued invoice is never edited or deleted: it's voided, which keeps the
+# number and posts the reversal, as the BIR expects every number accounted for.
+
+INVOICE_STATUSES = ("draft", "issued", "void")
+
+
+class InvoiceSeries(Base):
+    """A run of invoice numbers the BIR authorized (the Authority to Print, or
+    the system's permit): numbers are used in order and never past the last."""
+
+    __tablename__ = "nbfi_invoice_series"
+    __table_args__ = (CheckConstraint("first_number <= last_number", name="series_range"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(80))
+    # Printed before the number: "SI-" gives SI-000123.
+    prefix: Mapped[str] = mapped_column(String(10), default="")
+    digits: Mapped[int] = mapped_column(Integer, default=6)
+    first_number: Mapped[int] = mapped_column(Integer)
+    last_number: Mapped[int] = mapped_column(Integer)
+    next_number: Mapped[int] = mapped_column(Integer)
+    atp_number: Mapped[str] = mapped_column(String(40))
+    atp_date: Mapped[date] = mapped_column(Date)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    @property
+    def left(self) -> int:
+        return max(0, self.last_number - self.next_number + 1)
+
+
+class Invoice(Base):
+    __tablename__ = "nbfi_invoices"
+    __table_args__ = (CheckConstraint("status IN ('draft', 'issued', 'void')", name="invoice_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    series_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_invoice_series.id"), default=None)
+    # Given when it's issued; a voided invoice keeps it.
+    number: Mapped[str | None] = mapped_column(String(30), unique=True, default=None)
+    # The customer: the CRM's, when picked from it, and as the invoice states them.
+    customer_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    customer_tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    customer_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Who is buying, as the tax engine reads it: regular, senior citizen, PWD...
+    treatment: Mapped[str] = mapped_column(String(20), default="regular")
+    buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)
+    invoice_date: Mapped[date] = mapped_column(Date)
+    terms_days: Mapped[int] = mapped_column(Integer, default=30)
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    prices_include_tax: Mapped[bool | None] = mapped_column(default=None)
+    # The lines as entered: [{description, ref, quantity, unitPriceCentavos, discountCentavos, category, reliefEligible}].
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # Kept as issued: the tax engine's answer, for printing it the same forever.
+    computed: Mapped[dict | None] = mapped_column(JSON, default=None)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    issued_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    series: Mapped[InvoiceSeries | None] = relationship(lazy="joined")
+    payments: Mapped[list["InvoicePayment"]] = relationship(
+        back_populates="invoice", order_by="InvoicePayment.paid_on", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class InvoicePayment(Base):
+    """Money received against an invoice. Posted as it's recorded (cash in,
+    receivables down); one recorded by mistake is taken off, which posts the
+    reversal and keeps the line, marked, so the story stays whole."""
+
+    __tablename__ = "nbfi_invoice_payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    invoice_id: Mapped[str] = mapped_column(ForeignKey("nbfi_invoices.id", ondelete="CASCADE"), index=True)
+    paid_on: Mapped[date] = mapped_column(Date)
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+    # cash, bank, ewallet, check: the money account it lands in (Default accounts).
+    method: Mapped[str] = mapped_column(String(10))
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    recorded_by: Mapped[str] = mapped_column(String(120))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    invoice: Mapped[Invoice] = relationship(back_populates="payments")

@@ -25,7 +25,7 @@ The decisions depend on each other, so the build follows this order:
 |---|---|---|
 | 1. **The tax engine (D8), with the Philippines pack** | An invoice can't be made without the tax rules for its country | **Done** 2026-09-25: Finance → **Tax** (matrix F8, F9) |
 | 2. **Pricing conditions (D4)** | The tax step is the last condition in the price | **Done** 2026-09-25: CRM → Settings → **Price rules**, tax from Finance (matrix F4, F5) |
-| 3. **Invoices, payments and ageing (D4)**, in the Finance app | Needs steps 1 and 2 | **Next** (matrix E5) |
+| 3. **Invoices, payments and ageing (D4)**, in the Finance app | Needs steps 1 and 2 | **Done** 2026-09-30: Finance → **Invoices** (sales invoices, payments, receivables; matrix E5) |
 | 4. **Deals (D2)** and **offline visits and collections (D7)** | Stand on their own | Not started; can be built alongside the rest (matrix F1, G3, G4) |
 
 ## Follow-ups, decided on 2026-09-25
