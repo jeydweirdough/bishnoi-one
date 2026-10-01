@@ -1,9 +1,9 @@
 """The Pharmacy's tables. Changes to them go through a migration (migrations/versions).
 
-Every table's name starts with nbph_ (NaBhi PHarmacy), so it is plain which
+Every table's name starts with nbph_ (Bishnoi One PHarmacy), so it is plain which
 app a table belongs to, whatever database it ends up in.
 
-Accounts here are the Pharmacy's own: nobody signed in here exists in any other Nabhi app.
+Accounts here are the Pharmacy's own: nobody signed in here exists in any other Bishnoi One app.
 
 Money is kept in centavos (whole numbers), never as a float.
 
@@ -76,7 +76,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
@@ -374,7 +374,7 @@ class Prescription(Base):
     received_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbph_users.id", ondelete="SET NULL"), default=None)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-    # Sent by another Nabhi app for checking (routers/integration.py): which
+    # Sent by another Bishnoi One app for checking (routers/integration.py): which
     # app ("crm"), its own id for it, the number people know it by there, and
     # who sent it. None for a prescription taken in here. A sent one is
     # checked here and filled by that app's order, so it isn't dispensed here.

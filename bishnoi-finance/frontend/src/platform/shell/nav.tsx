@@ -147,7 +147,7 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/ledger/posting`, label: "Default accounts", missing: missingOf(unset, ["postingAccounts"]) },
         ],
       },
-      // Tax is Finance's for every Nabhi app: registration, rates, and what a sale comes to.
+      // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
     ];
   }
@@ -225,7 +225,7 @@ function settingsFor(me: Me): PageGroup[] {
 }
 
 /**
- * Whether the sidebar offers the other Nabhi apps.
+ * Whether the sidebar offers the other Bishnoi One apps.
  *
  * Off while each app is being built on its own: a panel of links into apps that
  * are half-built, or not built at all, is noise in the one place a person goes
@@ -874,7 +874,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
           saying a company name there would be saying something untrue. */}
       <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
       {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Nabhi" alone leaves you working out from the port
+          its own address, so "Bishnoi One" alone leaves you working out from the port
           whether the screen in front of you is missing or simply elsewhere. */}
       <span className="block truncate text-base leading-tight font-semibold text-ink">
         {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}

@@ -9,7 +9,7 @@ export type Action = "view" | "create" | "edit" | "delete" | "report" | "prices"
 // need when something is broken.
 export type SettingsAction = "manage" | "recover";
 
-// The steps of an order, taken in the Orders app; Nabhi holds who may take which.
+// The steps of an order, taken in the Orders app; Bishnoi One holds who may take which.
 export type OrderAction =
   | "view"
   | "raise"
@@ -98,7 +98,7 @@ export type NewCompanyInput = {
 /** One choice on a company's own pick-list. `icon` is a name from the icon registry, where the list has icons. */
 export type ListItem = { code: string; name: string; icon: string | null; isActive: boolean };
 
-/** The pick-lists a company writes for itself. Everything else here is Nabhi's own vocabulary. */
+/** The pick-lists a company writes for itself. Everything else here is Bishnoi One's own vocabulary. */
 export type ListKind = "customer_kind" | "activity_kind" | "outcome";
 export type CompanyLists = Record<ListKind, ListItem[]>;
 
@@ -113,9 +113,9 @@ export type Me = {
   // Holds the recovery key itself (a Developer Admin). Not "can reach the
   // recovery screens" -- each screen's rule combines this with the two below.
   canRecover: boolean;
-  /** Nabhi Order is connected, so ready quotes can be raised as orders. */
+  /** Bishnoi One Order is connected, so ready quotes can be raised as orders. */
   ordersLinked?: boolean;
-  /** Nabhi Pharmacy is connected, so Rx quotes can be sent for the pharmacist's check. */
+  /** Bishnoi One Pharmacy is connected, so Rx quotes can be sent for the pharmacist's check. */
   pharmacyLinked?: boolean;
   // Set when a Developer Admin is looking through this person's eyes. The
   // screens resolve as the person; this says who is really at the keyboard,
@@ -251,7 +251,7 @@ export type OrgDivision = {
   code: string;
   name: string;
   kind: "sales" | "department" | null;
-  /** Built-in divisions come with Nabhi's modules: they have screens and can't be switched off. */
+  /** Built-in divisions come with Bishnoi One's modules: they have screens and can't be switched off. */
   isBuiltIn: boolean;
   /** An icon name an Admin picked; null leaves the built-in one. */
   icon: string | null;
@@ -323,7 +323,7 @@ export type DivisionPricing = {
   priceTypes: Record<string, PriceRule>;
 };
 
-/** Another application this company reaches from Nabhi. Which applications it
+/** Another application this company reaches from Bishnoi One. Which applications it
  *  has and where they live is a company's own setting (Settings → Apps), so
  *  adding one later needs no deployment. */
 export type AppLink = {
@@ -332,7 +332,7 @@ export type AppLink = {
   url: string;
   description: string;
   icon: string | null;
-  /** Nabhi ships with this one, so it can be renamed and moved but not removed:
+  /** Bishnoi One ships with this one, so it can be renamed and moved but not removed:
    *  its permissions live in code and are granted to people. */
   isBuiltIn: boolean;
   isActive: boolean;
@@ -417,14 +417,14 @@ export type Product = {
   /** For VAT, as Finance's tax pack names it (the price rules' tax step). */
   vatCategory?: "standard" | "zero_rated" | "exempt";
   isActive: boolean;
-  /** Its code, name, unit, state and SRP are Nabhi Inventory's, changed there. */
+  /** Its code, name, unit, state and SRP are Bishnoi One Inventory's, changed there. */
   fromInventory?: boolean;
   prices: Record<string, number>;
   extra: ExtraValues;
   updatedAt: string | null;
 };
 
-/** The link to Nabhi Inventory, where the product list comes from when it's set up. */
+/** The link to Bishnoi One Inventory, where the product list comes from when it's set up. */
 export type InventoryLink = { linked: boolean; syncedAt: string | null; error: string | null; appUrl: string | null };
 
 /** How much Inventory has of a product: out, low, ok, over (null for a service). */
@@ -589,9 +589,9 @@ export type Quote = {
   createdBy: Person;
   owner: Person | null;
   can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean; sendToPharmacy?: boolean };
-  /** The pharmacist's check in Nabhi Pharmacy; null when the quote isn't Rx. */
+  /** The pharmacist's check in Bishnoi One Pharmacy; null when the quote isn't Rx. */
   pharmacy?: PharmacyCheck | null;
-  /** The order raised from it in Nabhi Order; null until then. */
+  /** The order raised from it in Bishnoi One Order; null until then. */
   order?: QuoteOrder | null;
 };
 

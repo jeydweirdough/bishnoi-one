@@ -35,7 +35,7 @@ export async function updateUser(id: string, patch: UserPatch): Promise<Result<{
   });
 }
 
-/** A first (or new) password for someone's Nabhi account, made here and shown once. Their sign-ins end. */
+/** A first (or new) password for someone's Bishnoi One account, made here and shown once. Their sign-ins end. */
 export async function makePassword(id: string): Promise<Result<string>> {
   return attempt(async () => {
     const body = await api.post<{ password: string }>(`/platform/users/${enc(id)}/password`, {});

@@ -6,7 +6,7 @@ import { ACCOUNT_COOKIE, AccountError, accountCall, accountToken, withPass } fro
 
 export type GoState = { error?: string; email?: string } | null;
 
-/** Signs in to the Nabhi account, then goes on to the application with a pass. */
+/** Signs in to the Bishnoi One account, then goes on to the application with a pass. */
 export async function signInAccount(_previous: GoState, form: FormData): Promise<GoState> {
   const email = String(form.get("email") ?? "").trim();
   const password = String(form.get("password") ?? "");
@@ -36,7 +36,7 @@ export async function signInAccount(_previous: GoState, form: FormData): Promise
   redirect(target);
 }
 
-/** Signs out of the Nabhi account on this browser, to sign in as someone else. */
+/** Signs out of the Bishnoi One account on this browser, to sign in as someone else. */
 export async function signOutAccount(form: FormData): Promise<void> {
   const token = await accountToken();
   if (token) await accountCall("/identity/logout", {}, token).catch(() => undefined);

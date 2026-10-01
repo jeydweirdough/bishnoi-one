@@ -33,12 +33,12 @@ export function DispenseMark({ state }: { state: DispenseState }) {
   return <Stamp style={dashed}>To dispense</Stamp>;
 }
 
-/** The Nabhi app that sent a prescription in for checking, by the name people know it by. */
+/** The Bishnoi One app that sent a prescription in for checking, by the name people know it by. */
 export function sourceName(app: string): string {
-  return ({ crm: "Nabhi CRM", orders: "Nabhi Order" } as Record<string, string>)[app] ?? app.toUpperCase();
+  return ({ crm: "Bishnoi One CRM", orders: "Bishnoi One Order" } as Record<string, string>)[app] ?? app.toUpperCase();
 }
 
-/** Where a sent-in prescription came from: "From Nabhi CRM · Q-2026-00042 · sent by Rico Padilla". */
+/** Where a sent-in prescription came from: "From Bishnoi One CRM · Q-2026-00042 · sent by Rico Padilla". */
 export function SourceMark({ source }: { source: RxSource }) {
   return (
     <span className="block text-meta text-ink-3">

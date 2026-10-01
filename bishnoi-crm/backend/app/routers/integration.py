@@ -1,6 +1,6 @@
-"""What other Nabhi apps may read from the CRM: its customers, for Finance to
+"""What other Bishnoi One apps may read from the CRM: its customers, for Finance to
 invoice. Only for an app holding one of INTEGRATION_KEYS, sent in the
-X-Nabhi-Key header (the same way the CRM reads Inventory and asks Finance).
+X-Bishnoi-Key header (the same way the CRM reads Inventory and asks Finance).
 
 Read-only, and only what an invoice needs: who the customer is, where they
 are, how to reach them, and their TIN when the company keeps one (an added
@@ -18,14 +18,20 @@ from app.deps import DB, SettingsDep
 from app.models import Company, MergedRecord
 
 
-def calling_app(settings: SettingsDep, x_nabhi_key: Annotated[str | None, Header()] = None) -> str:
+def calling_app(
+    settings: SettingsDep,
+    x_bishnoi_key: Annotated[str | None, Header()] = None,
+    # The header's name before the rename to Bishnoi One: still taken until every app is redeployed.
+    x_nabhi_key: Annotated[str | None, Header()] = None,
+) -> str:
     """The name of the app whose key came with the request."""
-    if x_nabhi_key:
+    x_bishnoi_key = x_bishnoi_key or x_nabhi_key
+    if x_bishnoi_key:
         for key in settings.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
-            if hmac.compare_digest(secret.encode(), x_nabhi_key.encode()):
+            if hmac.compare_digest(secret.encode(), x_bishnoi_key.encode()):
                 return name
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Nabhi app's key (X-Nabhi-Key).")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Bishnoi One app's key (X-Bishnoi-Key).")
 
 
 Caller = Annotated[str, Depends(calling_app)]

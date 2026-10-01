@@ -16,7 +16,7 @@ export default async function FundPurposesPage() {
       <PageHeader title="Marketing request purposes">
         The purposes salespeople and field agents can make a marketing request for. A purpose subject to liquidation requires official receipts and a refund of any
         excess; the Team Lead can still change that on a
-        request. Expense categories are managed by Finance in Nabhi Finance.
+        request. Expense categories are managed by Finance in Bishnoi One Finance.
       </PageHeader>
       <Sheet className="px-5 py-4">
         <PurposesEditor purposes={purposes.items} />

@@ -46,7 +46,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader title={mine ? "Your route" : `${route.person.name}'s route`} crumbs={watches ? [{ href: "/field", label: "Field work" }] : undefined}>
-        Where {mine ? "you" : "they"} went while Nabhi was open, 6:00 to 20:00, and where each visit was logged.
+        Where {mine ? "you" : "they"} went while Bishnoi One was open, 6:00 to 20:00, and where each visit was logged.
       </PageHeader>
 
       {watches && people.length > 1 && (
@@ -103,7 +103,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
         <div className="space-y-5">
           <Sheet className="p-2">
             <RouteMap points={route.points} visits={route.visits} />
-            {!route.points.length && <p className="px-3 pt-2 pb-1 text-meta text-ink-3">No trail this day: Nabhi wasn&apos;t open on their phone during work hours.</p>}
+            {!route.points.length && <p className="px-3 pt-2 pb-1 text-meta text-ink-3">No trail this day: Bishnoi One wasn&apos;t open on their phone during work hours.</p>}
           </Sheet>
           <Sheet className="px-5 pt-4 pb-2">
             <SectionTitle icon="visit">Visits</SectionTitle>

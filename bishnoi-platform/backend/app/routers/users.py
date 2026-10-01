@@ -89,7 +89,7 @@ def user_out(p: Identity, company: Company | None = None, **extra) -> dict:
         "companyStatus": company.status if company else None,
         "createdAt": iso(p.created_at),
         "lastActiveAt": iso(p.last_active_at),
-        # Can sign in to their Nabhi account (a first password has been set).
+        # Can sign in to their Bishnoi One account (a first password has been set).
         "hasPassword": bool(p.password_hash),
         **extra,
     }
@@ -306,7 +306,7 @@ class FirstPasswordIn(Api):
 
 @router.post("/{user_id}/password")
 def set_password(user_id: str, body: FirstPasswordIn, me: AdminUser, db: DB) -> dict:
-    """A first (or replacement) password for someone's Nabhi account. Their
+    """A first (or replacement) password for someone's Bishnoi One account. Their
     current sign-ins end. They change it themselves afterwards."""
     from app.security import check_password_rules, hash_password
 

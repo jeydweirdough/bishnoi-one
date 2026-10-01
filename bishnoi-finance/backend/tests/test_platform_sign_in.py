@@ -1,4 +1,4 @@
-"""Signing in with a Nabhi account: a pass signed by the platform opens a
+"""Signing in with a Bishnoi One account: a pass signed by the platform opens a
 session here, once, for the right person with the right role."""
 
 import base64
@@ -45,10 +45,10 @@ def b64(data: bytes) -> str:
 
 
 def make_pass(key=KEY, **over) -> str:
-    """A pass as the platform makes it (nabhi-platform app/passes.py)."""
+    """A pass as the platform makes it (bishnoi-platform app/passes.py)."""
     now = int(time.time())
     claims = {
-        "iss": "nabhi-platform", "aud": "finance", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
+        "iss": "bishnoi-platform", "aud": "finance", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
         "company": "c1", "companyName": "GetMeds", "role": "Accountant", "appAdmin": False, "companyAdmin": False,
         "iat": now, "exp": now + 120, "jti": secrets.token_urlsafe(18), **over,
     }
@@ -82,7 +82,7 @@ def test_someone_new_is_added_as_staff(app, client, linked):
     who = me(client, r)
     assert (who["user"]["email"], who["user"]["fullName"], who["canManageSettings"]) == ("jade@getmeds.test", "Jade Madigal", False)
     assert role_of(app, "jade@getmeds.test") == "Finance Staff"
-    # next time: the same person, found by their Nabhi account
+    # next time: the same person, found by their Bishnoi One account
     again = take(client, make_pass(name="Jade M. Madigal"))
     assert me(client, again)["user"]["id"] == who["user"]["id"]
     assert me(client, again)["user"]["fullName"] == "Jade M. Madigal"

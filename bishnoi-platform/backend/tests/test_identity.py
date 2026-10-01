@@ -1,4 +1,4 @@
-"""Nabhi accounts: one sign-in, and a signed pass into each application the
+"""Bishnoi One accounts: one sign-in, and a signed pass into each application the
 person has been given, and no other."""
 
 import base64
@@ -62,7 +62,7 @@ def test_a_pass_into_crm_signed_by_the_platform(client, jade):
     assert r.status_code == 200, r.text
     key = client.get("/pass/key").json()
     claims = claims_of(r.json()["pass"], key["publicKey"])
-    assert claims["aud"] == "crm" and claims["iss"] == "nabhi-platform"
+    assert claims["aud"] == "crm" and claims["iss"] == "bishnoi-platform"
     assert (claims["email"], claims["role"], claims["companyName"]) == ("jade@getmeds.test", "Salesperson", "GetMeds")
     assert claims["exp"] - claims["iat"] == 120 and len(claims["jti"]) >= 20
     assert r.json()["returnTo"] == CRM_RETURN
@@ -80,7 +80,7 @@ def test_no_pass_for_what_she_wasnt_given(client, ana, jade):
     assert inventory.status_code == 403 and "GetMeds doesn't have Inventory" in inventory.json()["detail"]
 
 
-def test_passes_go_back_only_to_the_app_or_nabhi_exe(client, jade):
+def test_passes_go_back_only_to_the_app_or_bishnoi_exe(client, jade):
     token = sign_in(client, "jade@getmeds.test", jade["password"]).json()["accessToken"]
     h = {"Authorization": f"Bearer {token}"}
     for bad in ("https://evil.example/auth/platform", "http://localhost:4302/somewhere-else", "http://localhost:4302/auth/platform?x=1", "javascript:alert(1)"):

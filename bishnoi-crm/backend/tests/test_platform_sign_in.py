@@ -1,4 +1,4 @@
-"""Signing in with a Nabhi account: a pass signed by the platform opens a
+"""Signing in with a Bishnoi One account: a pass signed by the platform opens a
 session here, once, for the right person with the right role."""
 
 import base64
@@ -21,10 +21,10 @@ def b64(data: bytes) -> str:
 
 
 def make_pass(key=KEY, **over) -> str:
-    """A pass as the platform makes it (nabhi-platform app/passes.py)."""
+    """A pass as the platform makes it (bishnoi-platform app/passes.py)."""
     now = int(time.time())
     claims = {
-        "iss": "nabhi-platform", "aud": "crm", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
+        "iss": "bishnoi-platform", "aud": "crm", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
         "company": "c1", "companyName": "GetMeds", "role": "Salesperson", "appAdmin": False, "companyAdmin": False,
         "iat": now, "exp": now + 120, "jti": secrets.token_urlsafe(18), **over,
     }
@@ -52,7 +52,7 @@ def test_someone_new_is_added_with_their_role(client, linked):
     assert r.status_code == 200, r.text
     who = me(client, r)
     assert (who["user"]["email"], who["user"]["fullName"], who["role"]["name"]) == ("jade@getmeds.test", "Jade Madigal", "Salesperson")
-    # next time: the same person, found by their Nabhi account
+    # next time: the same person, found by their Bishnoi One account
     again = take(client, make_pass(name="Jade M. Madigal"))
     assert me(client, again)["user"]["id"] == who["user"]["id"]
     assert me(client, again)["user"]["fullName"] == "Jade M. Madigal"
@@ -111,3 +111,8 @@ def test_someone_switched_off_here_stays_out(app, client, linked):
         db.commit()
     r = take(client, make_pass())
     assert r.status_code == 403 and "switched off" in r.json()["detail"]
+
+
+def test_a_pass_signed_before_the_rename_is_still_taken(client, linked):
+    # The platform may still sign passes as "nabhi-platform" until it's redeployed.
+    assert take(client, make_pass(iss="nabhi-platform")).status_code == 200

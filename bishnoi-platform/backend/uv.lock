@@ -409,7 +409,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nabhi-platform-api"
+name = "bishnoi-platform-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

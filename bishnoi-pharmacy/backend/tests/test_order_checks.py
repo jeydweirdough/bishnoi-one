@@ -1,4 +1,4 @@
-"""Orders another Nabhi app sends for the pharmacist's check (routers/integration.py):
+"""Orders another Bishnoi One app sends for the pharmacist's check (routers/integration.py):
 they land in Prescriptions, are checked as any other, and the app reads the
 verdict back. Sending again updates; a verdict stands; they're never
 dispensed from the counter."""
@@ -17,7 +17,7 @@ from tests.conftest import PASSWORD, bearer, fresh_database, role_id, sign_in
 from tests.test_workflow import ALL_TICKED, medicine
 
 KEY = "k" * 32
-CRM = {"X-Nabhi-Key": KEY}
+CRM = {"X-Bishnoi-Key": KEY}
 TODAY = date.today()
 
 
@@ -59,7 +59,7 @@ def order(**changes) -> dict:
 
 def test_only_an_app_with_a_key_can_send_or_read(client):
     assert client.post("/integration/checks", json=order()).status_code == 401
-    assert client.post("/integration/checks", headers={"X-Nabhi-Key": "wrong" * 8}, json=order()).status_code == 401
+    assert client.post("/integration/checks", headers={"X-Bishnoi-Key": "wrong" * 8}, json=order()).status_code == 401
     assert client.get("/integration/checks/quote-1", headers=CRM).status_code == 404
 
 

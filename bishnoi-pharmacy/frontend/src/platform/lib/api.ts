@@ -47,7 +47,7 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
       cache: "no-store",
     });
   } catch {
-    throw new ApiError(503, `Can't reach the ${thisAppLabel() ?? "Nabhi"} server. Check that the API is running.`);
+    throw new ApiError(503, `Can't reach the ${thisAppLabel() ?? "Bishnoi One"} server. Check that the API is running.`);
   }
 }
 

@@ -1,7 +1,7 @@
 [project]
-name = "nabhi-pharmacy-api"
+name = "bishnoi-pharmacy-api"
 version = "0.2.0"
-description = "Nabhi Pharmacy API"
+description = "Bishnoi One Pharmacy API"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",

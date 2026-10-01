@@ -1,7 +1,7 @@
 [project]
-name = "nabhi-regulatory-api"
+name = "bishnoi-regulatory-api"
 version = "0.1.0"
-description = "Nabhi Regulatory API"
+description = "Bishnoi One Regulatory API"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",

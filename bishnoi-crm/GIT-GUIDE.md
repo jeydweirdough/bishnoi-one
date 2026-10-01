@@ -1,4 +1,4 @@
-# Git guide — CRM app (`nabhi-crm`)
+# Git guide — CRM app (`bishnoi-crm`)
 
 How to clone, pull and push **just the CRM app**. For the whole repo and how
 the branches fit together, see `README.md` at the top of the `main` branch:
@@ -8,7 +8,7 @@ Every feature you build here is measured against the benchmark in
 `benchmarks/` on `main`; check its row before you build:
 https://github.com/jeydweirdough/nabhi/blob/main/benchmarks/README.md
 
-Branch: **`nabhi-crm`**. It holds only this app, at the top level:
+Branch: **`bishnoi-crm`**. It holds only this app, at the top level:
 
 ```
 frontend/     the screens (Next.js)
@@ -17,7 +17,7 @@ GIT-GUIDE.md  this guide
 ```
 
 The app stands on its own: its own screens, its own API, its own database.
-The same files live in the `nabhi-crm/` folder on `main`, and the two are kept
+The same files live in the `bishnoi-crm/` folder on `main`, and the two are kept
 in sync.
 
 ---
@@ -39,14 +39,14 @@ instead, and `git who` to check which account is active.
 ## 2. Clone
 
 ```
-git clone -b nabhi-crm --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-crm
-cd nabhi-crm
+git clone -b bishnoi-crm --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-crm
+cd bishnoi-crm
 ```
 
 This downloads only the CRM app, not the other apps.
 
 Want everything instead? Run `git clone https://github.com/jeydweirdough/nabhi.git`
-and work in the `nabhi-crm/` folder on `main`. Sections 3–4 still apply, but your
+and work in the `bishnoi-crm/` folder on `main`. Sections 3–4 still apply, but your
 pushes go to `main`.
 
 ---
@@ -102,7 +102,7 @@ git commit -m "Say what changed"
 git push
 ```
 
-`git push` sends your commits to the `nabhi-crm` branch on GitHub.
+`git push` sends your commits to the `bishnoi-crm` branch on GitHub.
 
 **Push rejected?** Someone pushed first. Pull their work, then push again:
 
@@ -121,7 +121,7 @@ markers in the listed files, then `git add .`, `git rebase --continue`,
 
 A GitHub action (**Sync branches**) runs by itself a minute after your push. It:
 
-- merges your pushes into the `nabhi-crm/` folder on `main`, and
+- merges your pushes into the `bishnoi-crm/` folder on `main`, and
 - brings any changes made on `main` back to this branch.
 
 After a sync, `git pull` gives you those changes. You don't need to do

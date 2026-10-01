@@ -1,9 +1,9 @@
 // Locking a secret to this Windows account on this PC (Windows DPAPI).
 //
 // Electron's own safeStorage can't be used for the license: its key lives in
-// each app's own data folder, so what Nabhi CRM locked, Nabhi Inventory could
+// each app's own data folder, so what Bishnoi One CRM locked, Bishnoi One Inventory could
 // never open. DPAPI's "current user" protection is the account's own, the same
-// for every program the account runs, so every Nabhi app can open what any of
+// for every program the account runs, so every Bishnoi One app can open what any of
 // them locked, and nobody else can: not another Windows account, not another PC.
 //
 // Windows PowerShell is on every Windows PC and reaches DPAPI directly, so no
@@ -13,11 +13,11 @@
 import { spawnSync } from "node:child_process";
 import { LicenseError } from "./file.mjs";
 
-// Mixed into the protection, so a secret only unlocks as the Nabhi license.
+// Mixed into the protection, so a secret only unlocks as the Bishnoi One license.
 const ENTROPY = "Nabhi license";
 
 function run(script, input) {
-  if (process.platform !== "win32") throw new LicenseError("For now the Nabhi license can only be kept on Windows.");
+  if (process.platform !== "win32") throw new LicenseError("For now the Bishnoi One license can only be kept on Windows.");
   const result = spawnSync(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `Add-Type -AssemblyName System.Security; $in = [Console]::In.ReadToEnd().Trim(); ${script}`],

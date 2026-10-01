@@ -1,6 +1,6 @@
 """Discord as a store, the way getmeds_discord_system keeps its data there.
 
-The same file is in every Nabhi app's backend (app/discord.py); change it in
+The same file is in every Bishnoi One app's backend (app/discord.py); change it in
 one, copy it to the rest.
 
 - A **table** is a channel, written through its own webhook.
@@ -44,13 +44,13 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-log = logging.getLogger("nabhi.discord")
+log = logging.getLogger("bishnoi.discord")
 
 CONTENT_LIMIT = 2000  # Discord's limit for a message's text
 COLOR = 0x1F3864
 DATA_FILE = re.compile(r"^data-.*\.json$")
 JSON_BLOCK = re.compile(r"```json\n([\s\S]+?)\n```")
-USER_AGENT = "Nabhi (https://github.com/jeydweirdough/nabhi, 1)"
+USER_AGENT = "Bishnoi One (https://github.com/jeydweirdough/nabhi, 1)"
 
 
 class DiscordError(Exception):
@@ -538,7 +538,7 @@ class Logs:
                 return self.threads[day]
         starter = self.live.post({"allowed_mentions": {"parse": []}, "embeds": [{
             "title": day, "color": COLOR,
-            "description": f"Log of **Nabhi {self.code.title()}** for {at.astimezone(ZoneInfo(self.timezone)).strftime('%A, %d %B %Y')}.",
+            "description": f"Log of **Bishnoi One {self.code.title()}** for {at.astimezone(ZoneInfo(self.timezone)).strftime('%A, %d %B %Y')}.",
         }]})
         self.threads[day] = self.live.start_thread(starter["id"], day)
         return self.threads[day]

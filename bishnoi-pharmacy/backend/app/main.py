@@ -1,4 +1,4 @@
-"""Nabhi Pharmacy API.
+"""Bishnoi One Pharmacy API.
 
 Run with:  uv run main.py   (port 8307)
 """
@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Nabhi Pharmacy API", version="0.2.0", **docs)
+    app = FastAPI(title="Bishnoi One Pharmacy API", version="0.2.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # The audit log goes to Discord too, a thread a day (app/discord.py).

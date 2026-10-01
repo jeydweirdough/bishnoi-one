@@ -1,6 +1,6 @@
-"""Orders other Nabhi apps send here for the pharmacist's check, and the
+"""Orders other Bishnoi One apps send here for the pharmacist's check, and the
 verdict they read back. Only for an app holding one of INTEGRATION_KEYS, sent
-in the X-Nabhi-Key header (the same way the CRM reads Inventory and asks
+in the X-Bishnoi-Key header (the same way the CRM reads Inventory and asks
 Finance).
 
     the app sends an order ──> it lands in Prescriptions (received)
@@ -34,14 +34,20 @@ from app.routers.prescriptions import flags
 from app.stock import sellable
 
 
-def calling_app(settings: SettingsDep, x_nabhi_key: Annotated[str | None, Header()] = None) -> str:
+def calling_app(
+    settings: SettingsDep,
+    x_bishnoi_key: Annotated[str | None, Header()] = None,
+    # The header's name before the rename to Bishnoi One: still taken until every app is redeployed.
+    x_nabhi_key: Annotated[str | None, Header()] = None,
+) -> str:
     """The name of the app whose key came with the request."""
-    if x_nabhi_key:
+    x_bishnoi_key = x_bishnoi_key or x_nabhi_key
+    if x_bishnoi_key:
         for key in settings.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
-            if hmac.compare_digest(secret.encode(), x_nabhi_key.encode()):
+            if hmac.compare_digest(secret.encode(), x_bishnoi_key.encode()):
                 return name
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Nabhi app's key (X-Nabhi-Key).")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Bishnoi One app's key (X-Bishnoi-Key).")
 
 
 Caller = Annotated[str, Depends(calling_app)]

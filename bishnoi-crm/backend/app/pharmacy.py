@@ -1,4 +1,4 @@
-"""The pharmacist's check on a quote marked Rx, from Nabhi Pharmacy.
+"""The pharmacist's check on a quote marked Rx, from Bishnoi One Pharmacy.
 
 A quote with prescription medicines is checked by a pharmacist before it's
 ordered. The CRM sends it to Pharmacy with the prescription's details; it
@@ -9,7 +9,7 @@ Vercel), the same way marketing requests are followed in Finance.
 
     POST {PHARMACY_API_URL}/integration/checks          the quote, sent or sent again
     GET  {PHARMACY_API_URL}/integration/checks/{quote}  where the pharmacist is with it
-    X-Nabhi-Key: {PHARMACY_API_KEY}
+    X-Bishnoi-Key: {PHARMACY_API_KEY}
 
 Pharmacy's verdict ("outcome"): waiting, verified, needs_clarification or
 rejected. Only a verified quote can be ordered. One that needs clarification
@@ -50,7 +50,7 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None) -
     if not settings.pharmacy_linked:
         raise PharmacyUnavailable("The CRM isn't linked to Pharmacy yet (PHARMACY_API_URL, PHARMACY_API_KEY), so an Rx quote can't be checked.")
     url = f"{settings.pharmacy_api_url}/integration/checks" + (f"/{urllib.parse.quote(path)}" if path else "")
-    headers = {"X-Nabhi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {"X-Bishnoi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json"}
     data = None
     if body is not None:
         data = json.dumps(body).encode()

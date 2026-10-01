@@ -1,4 +1,4 @@
-# Nabhi Inventory — screens
+# Bishnoi One Inventory — screens
 
 What you have, where it is, how much you have, what is moving, and what needs
 attention. The API is in `../backend`.
@@ -37,4 +37,4 @@ checks every permission again.
 | `src/components/` | Forms and pieces the screens share |
 | `src/actions/inventory.ts` | Every change, as a server action. The browser never talks to the API |
 | `src/lib/types.ts`, `src/lib/labels.ts` | What the API sends, and its words |
-| `src/platform/` | The frame every Nabhi app shares (sidebar, sign-in, UI kit) |
+| `src/platform/` | The frame every Bishnoi One app shares (sidebar, sign-in, UI kit) |

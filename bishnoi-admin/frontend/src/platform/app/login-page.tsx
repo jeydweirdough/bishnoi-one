@@ -30,7 +30,7 @@ async function demoAccounts(): Promise<{ items: Demo[]; password: string | null 
  * address is set for this build (NEXT_PUBLIC_BISHNOI_PLATFORM_URL).
  */
 function platformSignIn(): string | null {
-  if (!THIS_APP || THIS_APP === "platform" || !process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL) return null;
+  if (!THIS_APP || THIS_APP === "platform" || !(process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)) return null;
   const back = `${appUrl(THIS_APP)}/auth/platform`;
   return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
 }

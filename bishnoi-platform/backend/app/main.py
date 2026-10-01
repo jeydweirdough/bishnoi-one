@@ -1,4 +1,4 @@
-"""Nabhi Platform API: the control tower above every application.
+"""Bishnoi One Platform API: the control tower above every application.
 
 Run with:  uv run main.py   (port 8305)
 """
@@ -54,7 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Nabhi Platform API", version="0.1.0", **docs)
+    app = FastAPI(title="Bishnoi One Platform API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     make_first_admin(app.state.sessions, settings)
@@ -66,9 +66,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.notices.load()
         moved = import_from_database(app.state.notices, app.state.sessions)
         if moved:
-            logging.getLogger("nabhi.discord").info("[discord:announcements] moved %d announcement(s) out of the database", moved)
+            logging.getLogger("bishnoi.discord").info("[discord:announcements] moved %d announcement(s) out of the database", moved)
     except DiscordError as e:
-        logging.getLogger("nabhi.discord").warning("[discord:announcements] couldn't read them yet, trying again in a minute: %s", e)
+        logging.getLogger("bishnoi.discord").warning("[discord:announcements] couldn't read them yet, trying again in a minute: %s", e)
 
     app.add_middleware(
         CORSMiddleware,

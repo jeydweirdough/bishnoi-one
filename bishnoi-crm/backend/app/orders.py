@@ -1,22 +1,22 @@
-"""Raising an order in Nabhi Order from a ready quote.
+"""Raising an order in Bishnoi One Order from a ready quote.
 
-Nabhi Order is its own application; the CRM only sends it the quote. "Raise
+Bishnoi One Order is its own application; the CRM only sends it the quote. "Raise
 order" on a quote POSTs the payload below to
 
     {ORDERS_API_URL}/orders
-    X-Nabhi-Key: {ORDERS_API_KEY}
+    X-Bishnoi-Key: {ORDERS_API_KEY}
     Idempotency-Key: {the quote's id}
     Content-Type: application/json
 
 and expects 200 or 201 with at least {"id": "...", "number": "..."}, plus
 optionally "url" (the order's page, for the "Open order" link) and "status".
-The same quote sent twice carries the same Idempotency-Key, so Nabhi Order can
+The same quote sent twice carries the same Idempotency-Key, so Bishnoi One Order can
 answer with the order it already made instead of a second one.
 
 The payload (amounts in centavos, dates as YYYY-MM-DD):
 
     {
-      "source": "nabhi-crm",
+      "source": "bishnoi-crm",
       "quote": {"id", "number", "createdAt", "validUntil", "terms", "notes", "priceType", "rx"},
       "customer": {"kind": "company" | "contact", "id", "name", "address", "email", "phone"},
       "team": {"id", "name"} | null,
@@ -45,7 +45,7 @@ TIMEOUT = 15  # seconds
 
 
 class OrdersUnavailable(Exception):
-    """Nabhi Order didn't answer, or refused: the message says which, for people."""
+    """Bishnoi One Order didn't answer, or refused: the message says which, for people."""
 
 
 def text(record: Any, *names: str) -> str | None:
@@ -67,7 +67,7 @@ def person(user: User | None) -> dict | None:
 
 
 def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
-    """What Nabhi Order receives for a quote. See the module's docstring."""
+    """What Bishnoi One Order receives for a quote. See the module's docstring."""
     contact = db.get(Contact, quote.contact_id) if quote.contact_id else None
     company = db.get(Company, quote.company_id) if quote.company_id else (contact.company if contact else None)
     customer = contact or company
@@ -91,7 +91,7 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
             "bundle": line.get("bundleName"),
         })
     return {
-        "source": "nabhi-crm",
+        "source": "bishnoi-crm",
         "quote": {
             "id": quote.id,
             "number": quote.number,
@@ -131,13 +131,13 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
 
 
 def send(settings: Settings, quote_id: str, body: dict) -> dict:
-    """POSTs the order to Nabhi Order and returns what it made."""
+    """POSTs the order to Bishnoi One Order and returns what it made."""
     request = urllib.request.Request(
         f"{settings.orders_api_url.rstrip('/')}/orders",
         data=json.dumps(body).encode(),
         method="POST",
         headers={
-            "X-Nabhi-Key": settings.orders_api_key.get_secret_value(),
+            "X-Bishnoi-Key": settings.orders_api_key.get_secret_value(),
             "Idempotency-Key": quote_id,
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -148,16 +148,16 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
             made = json.loads(response.read() or b"{}")
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise OrdersUnavailable("Nabhi Order refused the CRM's key: check ORDERS_API_KEY.") from e
+            raise OrdersUnavailable("Bishnoi One Order refused the CRM's key: check ORDERS_API_KEY.") from e
         detail = ""
         try:
             detail = json.loads(e.read() or b"{}").get("detail") or ""
         except (ValueError, AttributeError):
             pass
-        message = f"Nabhi Order didn't take the order ({e.code})."
+        message = f"Bishnoi One Order didn't take the order ({e.code})."
         raise OrdersUnavailable(f"{message} {detail}".strip() if isinstance(detail, str) else message) from e
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
-        raise OrdersUnavailable("Nabhi Order can't be reached right now. Try again in a moment.") from e
+        raise OrdersUnavailable("Bishnoi One Order can't be reached right now. Try again in a moment.") from e
     if not isinstance(made, dict) or not made.get("id") or not made.get("number"):
-        raise OrdersUnavailable("Nabhi Order answered without an order number.")
+        raise OrdersUnavailable("Bishnoi One Order answered without an order number.")
     return made

@@ -7,7 +7,7 @@ import { APP_NAME } from "../lib/labels";
 // Poppins has no variable version, so each weight in use is loaded by name.
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-/** What every Nabhi app calls itself, unless it says otherwise. */
+/** What every Bishnoi One app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: "Customers, quotes, activities and products for every team.",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#eceef2" };
 
 /**
- * The frame round every Nabhi app — the shell and each module alike.
+ * The frame round every Bishnoi One app — the shell and each module alike.
  *
  * Deliberately takes plain children rather than Next's `LayoutProps<"/">`: that
  * type is built from one app's routes, and this is worn by all of them.

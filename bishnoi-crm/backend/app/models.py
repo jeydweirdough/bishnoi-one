@@ -1,9 +1,9 @@
 """The CRM's tables. Changes to them go through a migration (migrations/versions).
 
-Every table's name starts with nbcm_ (NaBhi CRM), so it is plain which app a
+Every table's name starts with nbcm_ (Bishnoi One CRM), so it is plain which app a
 table belongs to, whatever database it ends up in.
 
-Accounts here are the CRM's own: nobody signed in here exists in any other Nabhi app.
+Accounts here are the CRM's own: nobody signed in here exists in any other Bishnoi One app.
 """
 
 import uuid
@@ -80,7 +80,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
@@ -294,7 +294,7 @@ class Product(Base):
     # For VAT, as Finance's tax pack names it: standard, zero_rated or exempt.
     vat_category: Mapped[str] = mapped_column(String(20), default="standard")
     is_active: Mapped[bool] = mapped_column(default=True)
-    # The product in Nabhi Inventory this one is, when the list comes from there:
+    # The product in Bishnoi One Inventory this one is, when the list comes from there:
     # then its code, name, unit, state and SRP are Inventory's.
     inventory_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -495,10 +495,10 @@ class Quote(Owned, Base):
     terms: Mapped[str | None] = mapped_column(Text, default=None)
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
-    # The order Nabhi Order made from it: {"id", "number", "url", "status", "by": {"id", "name"}, "at"}.
+    # The order Bishnoi One Order made from it: {"id", "number", "url", "status", "by": {"id", "name"}, "at"}.
     # None: not ordered yet. A quote is ordered once.
     sales_order: Mapped[dict | None] = mapped_column(JSON, default=None)
-    # A quote marked Rx is checked by a pharmacist in Nabhi Pharmacy before
+    # A quote marked Rx is checked by a pharmacist in Bishnoi One Pharmacy before
     # it's ordered (app/pharmacy.py). What was sent: {"prescriberName",
     # "prescriberLicense", "prescriberClinic", "prescribedOn", "notes",
     # "sentBy", "sentAt"}; Pharmacy's last answer (its check_out); when it was
@@ -527,7 +527,7 @@ class StoredFile(Base):
 # --- marketing requests: money asked for ahead of spending it ---------------------------------
 #
 # A salesperson or field agent asks here, their Team Lead approves here, and
-# Nabhi Finance releases it and checks how it was spent (app/funds.py).
+# Bishnoi One Finance releases it and checks how it was spent (app/funds.py).
 
 
 class FundPurpose(Base):
@@ -943,7 +943,7 @@ class RevenueTarget(Base):
 class MergedRecord(Base):
     """A customer or contact merged into another (Customers → Possible
     duplicates). The merged one is gone; its id still leads to the one kept, for
-    old links and for the other Nabhi apps that saved it."""
+    old links and for the other Bishnoi One apps that saved it."""
 
     __tablename__ = "nbcm_merged_records"
 

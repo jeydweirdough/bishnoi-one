@@ -1,6 +1,6 @@
-# Nabhi Platform — screens
+# Bishnoi One Platform — screens
 
-The control tower above every Nabhi application. It doesn't run the pharmacy,
+The control tower above every Bishnoi One application. It doesn't run the pharmacy,
 the CRM or the inventory; it answers "what is happening across the whole
 platform right now?" and lets the people who run the platform act on it.
 
@@ -48,4 +48,4 @@ screens hide what the API would refuse.
 | `src/components/` | The console's own components; `marks.tsx` for statuses and tabs |
 | `src/lib/types.ts`, `src/lib/words.ts` | The API's shapes; the words for its codes |
 | `src/lib/pages.ts` | The sidebar's places |
-| `src/platform/` | The frame every Nabhi app shares (sign-in, sidebar, UI parts) |
+| `src/platform/` | The frame every Bishnoi One app shares (sign-in, sidebar, UI parts) |

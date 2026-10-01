@@ -1,4 +1,4 @@
-// The .nabhi license file: sealed with an activation key, opened only with it,
+// The .bishnoi license file: sealed with an activation key, opened only with it,
 // and any change to it (dates, company, data) stops it opening.
 
 import { test } from "node:test";
@@ -93,9 +93,9 @@ test("an expired file still opens, and says it's expired", async () => {
   assert.equal((await open(text, key, { now: new Date("2026-01-03") })).expired, true);
 });
 
-test("a file from a newer Nabhi asks for an update", () => {
-  assert.throws(() => readHeader(JSON.stringify({ format: "nabhi-license", version: 2 })), /Update the Nabhi app/);
-  assert.throws(() => readHeader("not json"), /isn't a Nabhi license file/);
+test("a file from a newer Bishnoi One asks for an update", () => {
+  assert.throws(() => readHeader(JSON.stringify({ format: "bishnoi-license", version: 2 })), /Update the Bishnoi One app/);
+  assert.throws(() => readHeader("not json"), /isn't a Bishnoi One license file/);
 });
 
 test("passwords are hidden when shown", () => {
@@ -106,9 +106,9 @@ test("passwords are hidden when shown", () => {
 });
 
 test("the tool issues a file, and checks it with the key", () => {
-  const dir = mkdtempSync(join(tmpdir(), "nabhi-issued-"));
+  const dir = mkdtempSync(join(tmpdir(), "bishnoi-issued-"));
   const tool = join(import.meta.dirname, "..", "tools", "license.mjs");
-  const env = { ...process.env, NABHI_ISSUED_DIR: dir };
+  const env = { ...process.env, BISHNOI_ISSUED_DIR: dir };
   const issued = spawnSync(process.execPath, [tool, "issue"], {
     env,
     encoding: "utf8",
@@ -119,8 +119,8 @@ test("the tool issues a file, and checks it with the key", () => {
   assert.match(issued.stdout, /First admin\s+mila@getmeds\.ph, first password [A-Za-z0-9]{16}/);
   assert.ok(!issued.stdout.includes("Vx9pQ2"), "the password isn't printed");
   const key = issued.stdout.match(/Activation key\s+([0-9A-Z-]{29})/)[1];
-  assert.deepEqual(readdirSync(dir), ["NBH-GETMEDS-01.nabhi"]);
-  const file = join(dir, "NBH-GETMEDS-01.nabhi");
+  assert.deepEqual(readdirSync(dir), ["NBH-GETMEDS-01.bishnoi"]);
+  const file = join(dir, "NBH-GETMEDS-01.bishnoi");
   assert.ok(!readFileSync(file, "utf8").includes("nabhi_crm"));
 
   const checked = spawnSync(process.execPath, [tool, "check", file], { env, encoding: "utf8", input: `${key}\n` });
@@ -135,7 +135,7 @@ test("the tool issues a file, and checks it with the key", () => {
   assert.match(again.stderr, /issued already/);
 
   const refused = spawnSync(process.execPath, [tool, "issue"], {
-    env: { ...env, NABHI_ISSUED_DIR: mkdtempSync(join(tmpdir(), "nabhi-issued-")) },
+    env: { ...env, BISHNOI_ISSUED_DIR: mkdtempSync(join(tmpdir(), "bishnoi-issued-")) },
     encoding: "utf8",
     input: ["Other Co", "", "crm", "postgresql://postgres.abcd:secret@h:6543/postgres", CRM, "", "", "30", ""].join("\n"),
   });

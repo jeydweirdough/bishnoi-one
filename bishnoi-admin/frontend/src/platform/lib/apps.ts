@@ -45,18 +45,18 @@ const DEFAULTS: Record<AppName, string> = {
 };
 
 const FROM_ENV: Record<AppName, string | undefined> = {
-  exec: process.env.NEXT_PUBLIC_BISHNOI_EXEC_URL,
-  crm: process.env.NEXT_PUBLIC_BISHNOI_CRM_URL,
-  finance: process.env.NEXT_PUBLIC_BISHNOI_FINANCE_URL,
-  inventory: process.env.NEXT_PUBLIC_BISHNOI_INVENTORY_URL,
-  platform: process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL,
-  inlicensing: process.env.NEXT_PUBLIC_BISHNOI_INLICENSING_URL,
-  pharmacy: process.env.NEXT_PUBLIC_BISHNOI_PHARMACY_URL,
-  regulatory: process.env.NEXT_PUBLIC_BISHNOI_REGULATORY_URL,
+  exec: (process.env.NEXT_PUBLIC_BISHNOI_EXEC_URL ?? process.env.NEXT_PUBLIC_NABHI_EXEC_URL),
+  crm: (process.env.NEXT_PUBLIC_BISHNOI_CRM_URL ?? process.env.NEXT_PUBLIC_NABHI_CRM_URL),
+  finance: (process.env.NEXT_PUBLIC_BISHNOI_FINANCE_URL ?? process.env.NEXT_PUBLIC_NABHI_FINANCE_URL),
+  inventory: (process.env.NEXT_PUBLIC_BISHNOI_INVENTORY_URL ?? process.env.NEXT_PUBLIC_NABHI_INVENTORY_URL),
+  platform: (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL),
+  inlicensing: (process.env.NEXT_PUBLIC_BISHNOI_INLICENSING_URL ?? process.env.NEXT_PUBLIC_NABHI_INLICENSING_URL),
+  pharmacy: (process.env.NEXT_PUBLIC_BISHNOI_PHARMACY_URL ?? process.env.NEXT_PUBLIC_NABHI_PHARMACY_URL),
+  regulatory: (process.env.NEXT_PUBLIC_BISHNOI_REGULATORY_URL ?? process.env.NEXT_PUBLIC_NABHI_REGULATORY_URL),
 };
 
 /** Which app this one is. Each app sets it; unset means the shell, which has them all. */
-export const THIS_APP = (process.env.NEXT_PUBLIC_BISHNOI_APP ?? "") as AppName | "";
+export const THIS_APP = ((process.env.NEXT_PUBLIC_BISHNOI_APP ?? process.env.NEXT_PUBLIC_NABHI_APP) ?? "") as AppName | "";
 
 export const appUrl = (app: AppName): string => (FROM_ENV[app] || DEFAULTS[app]).replace(/\/$/, "");
 

@@ -5,14 +5,14 @@ const asked = new URLSearchParams(location.search);
 const view = asked.get("view") === "problem" ? "problem" : "activate";
 let fileText = null;
 
-document.title = `${asked.get("app") ?? "Nabhi"}: license`;
+document.title = `${asked.get("app") ?? "Bishnoi One"}: license`;
 $(view).hidden = false;
 
 function readFile(input) {
   return new Promise((resolve, reject) => {
     const f = input.files?.[0];
     if (!f) return resolve(null);
-    if (f.size > 64 * 1024) return reject(new Error("That file is too large to be a Nabhi license file."));
+    if (f.size > 64 * 1024) return reject(new Error("That file is too large to be a Bishnoi One license file."));
     const reader = new FileReader();
     reader.onload = () => resolve({ name: f.name, text: String(reader.result) });
     reader.onerror = () => reject(new Error("The file couldn't be read."));
@@ -50,7 +50,7 @@ $("activate-form").addEventListener("submit", async (e) => {
   showError("");
   $("activate-button").disabled = true;
   $("activate-button").textContent = "Checking…";
-  const result = await window.nabhi.activate({ companyId, activationKey, fileText });
+  const result = await window.bishnoi.activate({ companyId, activationKey, fileText });
   $("activate-button").disabled = false;
   $("activate-button").textContent = "Set up";
   if (!result.ok) showError(result.error);
@@ -62,14 +62,14 @@ if (view === "activate") $("company-id").focus();
 
 $("problem-company").textContent = asked.get("company") ?? "";
 $("problem-text").textContent = asked.get("error") ?? "";
-$("retry").addEventListener("click", () => window.nabhi.retry());
-$("remove").addEventListener("click", () => window.nabhi.remove());
+$("retry").addEventListener("click", () => window.bishnoi.retry());
+$("remove").addEventListener("click", () => window.bishnoi.remove());
 $("renew-button").addEventListener("click", () => $("renew-input").click());
 $("renew-input").addEventListener("change", async () => {
   try {
     const f = await readFile($("renew-input"));
     if (!f) return;
-    const result = await window.nabhi.renew(f.text);
+    const result = await window.bishnoi.renew(f.text);
     if (!result.ok) $("problem-text").textContent = result.error;
   } catch (e) {
     $("problem-text").textContent = e.message;

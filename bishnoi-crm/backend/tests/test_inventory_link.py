@@ -1,4 +1,4 @@
-"""The product list and stock come from Nabhi Inventory, when it's linked:
+"""The product list and stock come from Bishnoi One Inventory, when it's linked:
 here Inventory is a stand-in answering as the real one does."""
 
 import pytest

@@ -409,7 +409,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nabhi-inventory-api"
+name = "bishnoi-inventory-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

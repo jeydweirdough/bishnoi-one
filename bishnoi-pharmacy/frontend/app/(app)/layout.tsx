@@ -1,4 +1,4 @@
-// The signed-in frame: the same sidebar every Nabhi app wears, with what
+// The signed-in frame: the same sidebar every Bishnoi One app wears, with what
 // isn't set up yet (a medicine with no price) counted in red.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";

@@ -1,4 +1,4 @@
-// The signed-in frame: the same sidebar every Nabhi app wears, with how many
+// The signed-in frame: the same sidebar every Bishnoi One app wears, with how many
 // things wait on this person beside each place they work in.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";

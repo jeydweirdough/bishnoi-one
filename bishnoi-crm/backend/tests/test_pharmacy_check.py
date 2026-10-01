@@ -1,4 +1,4 @@
-"""A quote marked Rx is checked by a pharmacist in Nabhi Pharmacy before it's
+"""A quote marked Rx is checked by a pharmacist in Bishnoi One Pharmacy before it's
 ordered (app/pharmacy.py). Pharmacy is stood in for here, answering as the
 real one does; the last test makes the real HTTP call to a stand-in on
 localhost."""
@@ -140,7 +140,7 @@ def test_the_call_goes_out_with_the_key():
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):  # noqa: N802
-            seen["path"], seen["key"] = self.path, self.headers["X-Nabhi-Key"]
+            seen["path"], seen["key"] = self.path, self.headers["X-Bishnoi-Key"]
             seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             self._answer({"number": "RX-1", "outcome": "waiting"})
 

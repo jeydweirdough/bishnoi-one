@@ -1,4 +1,4 @@
-"""Nabhi CRM API.
+"""Bishnoi One CRM API.
 
 Run with:  uv run main.py   (port 8302)
 """
@@ -35,7 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Nabhi CRM API", version="0.1.0", **docs)
+    app = FastAPI(title="Bishnoi One CRM API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # The audit log goes to Discord too, a thread a day (app/discord.py).

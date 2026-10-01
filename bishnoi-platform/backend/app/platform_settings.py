@@ -22,7 +22,7 @@ from app.models import PlatformSetting
 
 
 class PlatformSection(Api):
-    name: str = Field("Nabhi", min_length=2, max_length=60)
+    name: str = Field("Bishnoi One", min_length=2, max_length=60)
     support_email: str | None = Field(None, max_length=254)
     timezone: str = Field("Asia/Manila", min_length=3, max_length=64)
 

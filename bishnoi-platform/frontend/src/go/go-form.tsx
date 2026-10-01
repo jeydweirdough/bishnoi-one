@@ -5,7 +5,7 @@ import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input } from "@/src/platform/ui/field";
 import { signInAccount, type GoState } from "./actions";
 
-/** The Nabhi account sign-in: email and password, then on to the application. */
+/** The Bishnoi One account sign-in: email and password, then on to the application. */
 export function GoForm({ app, returnTo }: { app: string; returnTo: string }) {
   const [state, action, pending] = useActionState<GoState, FormData>(signInAccount, null);
   return (

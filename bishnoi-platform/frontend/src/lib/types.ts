@@ -106,7 +106,7 @@ export type PlatformUser = {
   companyStatus: Company["status"] | null;
   createdAt: string;
   lastActiveAt: string | null;
-  /** Can sign in to their Nabhi account (a first password has been set). */
+  /** Can sign in to their Bishnoi One account (a first password has been set). */
   hasPassword: boolean;
   applications?: { applicationId: string; key: string; name: string; role: string | null }[];
 };

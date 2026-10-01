@@ -72,11 +72,11 @@ def test_people_are_imported_with_their_roles_and_teams(client, crew, ana):
     assert "first password" in client.post("/imports/people", json={**body, "password": "short"}, headers=ana).json()["detail"]
     no_password = client.post("/imports/people", json=body, headers=ana).json()
     assert no_password["added"] == 0 and any("first password" in p["message"] for p in no_password["problems"])
-    done = client.post("/imports/people", json={**body, "password": "welcome to nabhi"}, headers=ana).json()
+    done = client.post("/imports/people", json={**body, "password": "welcome to bishnoi"}, headers=ana).json()
     assert (done["added"], done["updated"]) == (2, 1)
     assert sorted(p["row"] for p in done["problems"]) == [5, 6]
     users = {u["email"]: u for u in client.get("/admin/users", headers=ana).json()}
     assert (users["joy@example.com"]["role"]["name"], users["joy@example.com"]["team"]["name"]) == ("Salesperson", "North")
     assert users["kim@example.com"]["team"]["name"] == "Pharma East"
     assert users["ria@example.com"]["role"]["name"] == "Team Lead"
-    assert client.post("/auth/login", json={"email": "joy@example.com", "password": "welcome to nabhi"}).status_code == 200
+    assert client.post("/auth/login", json={"email": "joy@example.com", "password": "welcome to bishnoi"}).status_code == 200

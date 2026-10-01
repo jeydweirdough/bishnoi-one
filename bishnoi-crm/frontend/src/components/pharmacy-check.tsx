@@ -8,7 +8,7 @@ import { Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org, Quote } from "@/src/platform/lib/types";
 
-/** Sends an Rx quote to Nabhi Pharmacy with the prescription's details, or
+/** Sends an Rx quote to Bishnoi One Pharmacy with the prescription's details, or
  *  sends it again once they're corrected. Sits in the quote's Pharmacist check
  *  section; the verdict comes back there. */
 export function PharmacyCheckForm({ quote, org, linked }: { quote: Quote; org: Org; linked: boolean }) {

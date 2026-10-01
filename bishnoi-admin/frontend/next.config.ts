@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // Which app this is, for the sidebar and the sign-in cookie. Built in, so
   // no .env.local or host setting needs it; one there still wins.
   env: {
-    NEXT_PUBLIC_BISHNOI_APP: process.env.NEXT_PUBLIC_BISHNOI_APP ?? "exec",
+    NEXT_PUBLIC_BISHNOI_APP: (process.env.NEXT_PUBLIC_BISHNOI_APP ?? process.env.NEXT_PUBLIC_NABHI_APP) ?? "exec",
   },
 };
 

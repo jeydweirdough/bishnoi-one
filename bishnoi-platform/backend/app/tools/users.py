@@ -11,7 +11,7 @@
 Platform Admin can change either under Access > Roles.
 
 Passwords are asked for, never passed on the command line (it would sit in
-the shell's history). For scripts, set NABHI_NEW_PASSWORD instead.
+the shell's history). For scripts, set BISHNOI_NEW_PASSWORD instead.
 """
 
 import argparse
@@ -34,7 +34,7 @@ TOOL = "users tool"
 
 
 def ask_password() -> str:
-    password = os.environ.get("NABHI_NEW_PASSWORD")
+    password = os.environ.get("BISHNOI_NEW_PASSWORD")
     if password is None:
         password = getpass.getpass("Password: ")
         if getpass.getpass("Again: ") != password:

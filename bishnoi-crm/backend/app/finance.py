@@ -1,6 +1,6 @@
-"""Tax, from Nabhi Finance: the last step of the price rules.
+"""Tax, from Bishnoi One Finance: the last step of the price rules.
 
-Finance owns tax for every Nabhi app (benchmarks/decisions.md, D8), so the
+Finance owns tax for every Bishnoi One app (benchmarks/decisions.md, D8), so the
 CRM doesn't work it out itself: it sends the priced lines, each with its
 product's VAT category, and keeps what Finance answers, as the invoice will
 show it. Finance is asked with the key it gave the CRM, the same way the CRM
@@ -28,7 +28,7 @@ def _post(settings: Settings, path: str, body: dict) -> dict:
     request = urllib.request.Request(
         f"{settings.finance_api_url}/integration/{path}",
         data=json.dumps(body).encode(),
-        headers={"X-Nabhi-Key": settings.finance_api_key.get_secret_value(), "Content-Type": "application/json", "Accept": "application/json"},
+        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Content-Type": "application/json", "Accept": "application/json"},
         method="POST",
     )
     try:

@@ -2,7 +2,7 @@
   "name": "platform",
   "label": "Platform",
   "icon": "companies",
-  "what": "The control tower above every Nabhi application.",
+  "what": "The control tower above every Bishnoi One application.",
   "state": "moved",
   "screens": [
     "Dashboard",

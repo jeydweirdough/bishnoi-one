@@ -409,7 +409,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nabhi-finance-api"
+name = "bishnoi-finance-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-# Looking after the Nabhi repo
+# Looking after the Bishnoi One repo
 
 This page is for the repo owner. Everyone else only needs
 [README.md](README.md).
@@ -18,8 +18,8 @@ The repo has three actions, in `.github/workflows/`:
 
 | Action | Runs when | What it does |
 |---|---|---|
-| **Sync branches** (`sync-branches.yml`) | any push to `main` or a `nabhi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `nabhi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Sync branches** (`sync-branches.yml`) | any push to `main` or a `bishnoi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
 | **Deploy** (`deploy.yml`) | only by hand: **Run workflow** | Deploys to Vercel the apps you tick ([below](#deployments-on-vercel-only-when-you-ask)). |
 
 Set these once:
@@ -31,7 +31,7 @@ Set these once:
    branch.
    1. Create the token: your profile → **Settings → Developer settings →
       Personal access tokens → Fine-grained tokens → Generate new token**.
-   2. Repository access: only `jeydweirdough/nabhi`.
+   2. Repository access: only `jeydweirdough/bishnoi`.
    3. Permissions: **Contents: Read and write**, **Workflows: Read and write**.
    4. Save it on the repo: **Settings → Secrets and variables → Actions →
       New repository secret**, named `SYNC_TOKEN`.
@@ -52,7 +52,7 @@ into `main` (README section 8). Before merging:
 
 1. **Check apps is green.**
 2. **The folder name is the branch name you want.** Once merged,
-   `nabhi-<name>` becomes the app's branch, and renaming it later means
+   `bishnoi-<name>` becomes the app's branch, and renaming it later means
    renaming the folder and deleting the old branch by hand. If you want a
    different name, ask them to rename the folder in the pull request.
 3. **The ports are free:** no other app uses them (the screens port + 4000 =
@@ -65,7 +65,7 @@ into `main` (README section 8). Before merging:
    and its "Ours today" cells are filled in.
 
 Then **merge** it. About a minute later, Sync branches creates the
-`nabhi-<name>` branch. Afterwards:
+`bishnoi-<name>` branch. Afterwards:
 
 - Add the app to the layout, branch and port tables in `README.md`, and
   update the "next free ports" in README section 8.
@@ -101,7 +101,7 @@ its button:
 Set up once:
 
 1. Vercel → your avatar → **Account Settings → Tokens → Create**, on the
-   account the Nabhi projects are in, with no expiry or a long one.
+   account the Bishnoi One projects are in, with no expiry or a long one.
 2. GitHub → the repo → **Settings → Secrets and variables → Actions → New
    repository secret**: `VERCEL_TOKEN`, the token.
 
@@ -116,8 +116,8 @@ If a deploy fails, the run's error says why: the token is wrong or expired
 see).
 
 If a whole app is being set up on Vercel for the first time: make its two
-projects on Vercel (Root Directory `nabhi-<app>/frontend` and
-`nabhi-<app>/backend`), add them to `deploy.json`, then tick it here.
+projects on Vercel (Root Directory `bishnoi-<app>/frontend` and
+`bishnoi-<app>/backend`), add them to `deploy.json`, then tick it here.
 
 ---
 
@@ -133,27 +133,27 @@ they call each other, so set them up in this order.
 2. **Keys.** `node scripts/deploy-keys.mjs` prints every key the apps use to
    trust each other, beside the project and setting each goes in. Shown once.
 3. **Projects.** On Vercel, make any project that doesn't exist yet, named as
-   in `.github/deploy.json` (`nabhi-<app>` for the screens, Root Directory
-   `nabhi-<app>/frontend`; `nabhi-<app>-backend` for the API, Root Directory
-   `nabhi-<app>/backend`). The Deploy action stops with a message if one is
+   in `.github/deploy.json` (`bishnoi-<app>` for the screens, Root Directory
+   `bishnoi-<app>/frontend`; `bishnoi-<app>-backend` for the API, Root Directory
+   `bishnoi-<app>/backend`). The Deploy action stops with a message if one is
    missing.
 4. **Settings**, below (each project → Settings → Environment Variables →
    Production).
 5. **Deploy**: Actions → Deploy, tick the apps. APIs first, then screens.
 6. **Platform > Applications:** set each app's address to its screens'
-   address. A Nabhi account opens an app only at that address.
+   address. A Bishnoi One account opens an app only at that address.
 7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
    `FIRST_ADMIN_PASSWORD` from the project and redeploy.
 8. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
    wrong, every request answers 503 naming the setting to look at.
 
-**Every API** (`nabhi-<app>-backend`):
+**Every API** (`bishnoi-<app>-backend`):
 
 | Setting | Value |
 |---|---|
 | `ENVIRONMENT` | `production` |
 | `DATABASE_URL` | Its login from step 1 |
-| `ALLOWED_HOSTS` | `["nabhi-<app>-backend.vercel.app"]`, its own address |
+| `ALLOWED_HOSTS` | `["bishnoi-<app>-backend.vercel.app"]`, its own address |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
 | `PLATFORM_PUBLIC_KEY` | From step 2 (not the Platform itself) |
 
@@ -161,28 +161,28 @@ they call each other, so set them up in this order.
 
 | Project | Setting | Value |
 |---|---|---|
-| `nabhi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
-| `nabhi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `nabhi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `nabhi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `nabhi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
+| `bishnoi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
+| `bishnoi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `bishnoi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `bishnoi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
+| `bishnoi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
 | | `INVENTORY_API_KEY` | From step 2 |
 | | `INVENTORY_APP_URL` | `https://nabhi-inventory.vercel.app` |
 | | `FINANCE_API_URL` | `https://nabhi-finance-backend.vercel.app` |
 | | `FINANCE_API_KEY` | From step 2 |
 | | `PHARMACY_API_URL` | `https://nabhi-pharmacy-backend.vercel.app` |
 | | `PHARMACY_API_KEY` | From step 2 |
-| | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Nabhi Order, when it's ready |
+| | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
 
-**Every screens project** (`nabhi-<app>`). The `NEXT_PUBLIC_` ones are built
+**Every screens project** (`bishnoi-<app>`). The `NEXT_PUBLIC_` ones are built
 in, so redeploy the screens after changing them:
 
 | Setting | Value |
 |---|---|
 | `API_URL` | Its own API, e.g. `https://nabhi-crm-backend.vercel.app` |
 | `PLATFORM_API_URL` | `https://nabhi-platform-backend.vercel.app` (announcements) |
-| `NEXT_PUBLIC_NABHI_PLATFORM_URL` | `https://nabhi-platform.vercel.app` (the Nabhi account button; not on the Platform itself) |
-| `NEXT_PUBLIC_NABHI_CRM_URL`, `_INVENTORY_URL`, `_FINANCE_URL`, `_EXEC_URL`, `_PHARMACY_URL` | Each app's screens, for links between the apps |
+| `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` | `https://nabhi-platform.vercel.app` (the Bishnoi One account button; not on the Platform itself) |
+| `NEXT_PUBLIC_BISHNOI_CRM_URL`, `_INVENTORY_URL`, `_FINANCE_URL`, `_EXEC_URL`, `_PHARMACY_URL` | Each app's screens, for links between the apps |
 
 Leave `SHOW_DEMO_ACCOUNTS` unset online. The addresses above are the
 defaults Vercel gives; use the real ones if a project has its own domain.
@@ -191,7 +191,7 @@ What was checked before these were called ready (September 28, 2026): each
 app's tests, its production build, its migrations on a Supabase-like Postgres
 under its own login, a browser through every page, and all six running
 together: the CRM's products and stock from Inventory, tax and marketing requests
-through Finance, Raise order to a stand-in Nabhi Order, and one Nabhi account
+through Finance, Raise order to a stand-in Bishnoi One Order, and one Bishnoi One account
 opening all five apps.
 
 ---
@@ -204,8 +204,8 @@ shared key. Set up once, on Vercel (each project → **Settings → Environment
 Variables**, then redeploy it):
 
 1. Make a key: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-2. **nabhi-inventory-backend:** `INTEGRATION_KEYS` = `["crm:<the key>"]`.
-3. **nabhi-crm-backend:**
+2. **bishnoi-inventory-backend:** `INTEGRATION_KEYS` = `["crm:<the key>"]`.
+3. **bishnoi-crm-backend:**
    - `INVENTORY_API_URL` = the Inventory API's address, e.g.
      `https://nabhi-inventory-backend.vercel.app` (no `/` at the end).
    - `INVENTORY_API_KEY` = the key.
@@ -241,9 +241,9 @@ rules.
 
 1. Make a key, as above (or use `scripts/deploy-keys.mjs`). Use a different
    one from the Inventory link.
-2. **Finance API** (`nabhi-finance-backend`, or `nabhi-finance/backend/.env`):
+2. **Finance API** (`bishnoi-finance-backend`, or `bishnoi-finance/backend/.env`):
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
-3. **CRM API** (`nabhi-crm-backend`, or `nabhi-crm/backend/.env`):
+3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `FINANCE_API_URL` = Finance's API address (e.g.
    `https://nabhi-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
    one computer) and `FINANCE_API_KEY` = the key.
@@ -296,9 +296,9 @@ Pharmacy checks that orders are compliant. A CRM quote marked **Rx** can't be
 ordered until a pharmacist in Pharmacy verifies its prescription.
 
 1. Make a key, as above. Use a different one from the other links.
-2. **Pharmacy API** (`nabhi-pharmacy-backend`, or `nabhi-pharmacy/backend/.env`):
+2. **Pharmacy API** (`bishnoi-pharmacy-backend`, or `bishnoi-pharmacy/backend/.env`):
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
-3. **CRM API** (`nabhi-crm-backend`, or `nabhi-crm/backend/.env`):
+3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `PHARMACY_API_URL` = Pharmacy's API address (e.g.
    `https://nabhi-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
    one computer) and `PHARMACY_API_KEY` = the key.
@@ -310,7 +310,7 @@ How it works:
   enters the prescription (prescriber, licence number, date, clinic) and
   sends it. **Raise order** stays off until the pharmacist verifies it.
 - **In Pharmacy:** the quote arrives in **Prescriptions → Inbox**, marked
-  "From Nabhi CRM · Q-…". The pharmacist checks it as any other
+  "From Bishnoi One CRM · Q-…". The pharmacist checks it as any other
   prescription. It isn't dispensed in Pharmacy: the CRM's order fills it.
 - **The verdict goes back:** verified (the quote can be ordered), needs
   clarification (the rep corrects the details and sends it again, to the same
@@ -322,39 +322,39 @@ How it works:
 Other apps can use the same check. `POST /integration/checks` sends an order
 (customer, prescription, lines by product code) and `GET
 /integration/checks/{sourceId}` reads the verdict, with the header
-`X-Nabhi-Key`. The fields are in
-`nabhi-pharmacy/backend/app/routers/integration.py`. Give each app its own
+`X-Bishnoi-Key`. The fields are in
+`bishnoi-pharmacy/backend/app/routers/integration.py`. Give each app its own
 entry in `INTEGRATION_KEYS`, e.g. `["crm:<key>", "orders:<key>"]`.
 
 ---
 
-## Linking the CRM to Nabhi Order
+## Linking the CRM to Bishnoi One Order
 
-Nabhi Order is its own application. On a quote, **Raise order** sends the quote
+Bishnoi One Order is its own application. On a quote, **Raise order** sends the quote
 to it; the CRM keeps the order number it answers with, so a quote is ordered
 once. The button is off until the quote is approved and its guarantee letter is
 checked.
 
-On the CRM API (`nabhi-crm/backend`, and Vercel):
+On the CRM API (`bishnoi-crm/backend`, and Vercel):
 
 | Variable | Value |
 |---|---|
-| `ORDERS_API_URL` | Nabhi Order's API, e.g. `https://orders-api.example.com` |
-| `ORDERS_API_KEY` | The key Nabhi Order gave the CRM |
+| `ORDERS_API_URL` | Bishnoi One Order's API, e.g. `https://orders-api.example.com` |
+| `ORDERS_API_KEY` | The key Bishnoi One Order gave the CRM |
 
-The CRM calls `POST {ORDERS_API_URL}/orders` with the headers `X-Nabhi-Key`
+The CRM calls `POST {ORDERS_API_URL}/orders` with the headers `X-Bishnoi-Key`
 and `Idempotency-Key` (the quote's id, the same on a retry), and expects
 `{"id", "number"}` back, with an optional `"url"` for the "Order SO-..." link.
-The payload is described at the top of `nabhi-crm/backend/app/orders.py`; to
+The payload is described at the top of `bishnoi-crm/backend/app/orders.py`; to
 see it for a real quote, call `GET /quotes/{id}/order-payload` on the CRM API.
 
 The printed quotation (**Print** on a quote) takes its letterhead from
 Settings, Company and quotes: business address, TIN, and phone or email.
 
-## One Nabhi account for every app (the platform)
+## One Bishnoi One account for every app (the platform)
 
-People at the client companies sign in once, with their Nabhi account on
-Nabhi Platform, and open each application their company has and they have
+People at the client companies sign in once, with their Bishnoi One account on
+Bishnoi One Platform, and open each application their company has and they have
 been given (Platform > Users > their applications and role). The platform
 gives a signed, two-minute pass for one application; the application checks
 it with the platform's public key, takes it once, and opens its own session
@@ -363,17 +363,17 @@ Finance, Inventory, Pharmacy. Each keeps its own password sign-in as well.
 
 To set it up:
 
-1. Make the platform's key pair once: in `nabhi-platform/backend`,
+1. Make the platform's key pair once: in `bishnoi-platform/backend`,
    `uv run python -m app.passes`. It prints both halves.
 2. Platform API on Vercel: `PASS_SIGNING_KEY` = the private half (secret).
 3. Each app's API on Vercel: `PLATFORM_PUBLIC_KEY` = the public half (not
    secret; also shown at the platform API's `/pass/key`).
-4. Each app's screens on Vercel: `NEXT_PUBLIC_NABHI_PLATFORM_URL` = the
-   platform's address. The sign-in page then shows "Sign in with your Nabhi
+4. Each app's screens on Vercel: `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` = the
+   platform's address. The sign-in page then shows "Sign in with your Bishnoi One
    account".
 5. Platform > Applications: each application's address must be its real
    address: the pass goes back only to `<that address>/auth/platform` (or to
-   Nabhi.exe on the same PC).
+   Bishnoi One.exe on the same PC).
 6. Platform > Users > a person > the key icon: makes their first password,
    shown once. They change it after signing in.
 
@@ -403,7 +403,7 @@ goes, the way the Getmeds orders app kept its orders there
 
 Set up once:
 
-1. Make two channels, e.g. `#nabhi-announcements` and `#nabhi-logs`. Keep
+1. Make two channels, e.g. `#bishnoi-announcements` and `#bishnoi-logs`. Keep
    them private: only people who may read the logs.
 2. In each, **Edit Channel → Integrations → Webhooks → New Webhook**, and
    copy its URL. The announcements one goes in Platform's
@@ -476,7 +476,7 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
   Bash):
   ```
   bash scripts/sync-branches.sh                 # every app
-  bash scripts/sync-branches.sh nabhi-crm       # just one app
+  bash scripts/sync-branches.sh bishnoi-crm       # just one app
   ```
 
 ---
@@ -484,15 +484,15 @@ bash scripts/sync-branches.sh     # run it again: it finishes and pushes
 ## Changing the sync workflow
 
 `.github/workflows/sync-branches.yml` has a copy in each app folder
-(`nabhi-*/.github/workflows/`). Each app branch needs its copy, because
+(`bishnoi-*/.github/workflows/`). Each app branch needs its copy, because
 GitHub only runs the workflows in the branch that was pushed. Keep all the
 copies identical: Check apps fails a pull request if they differ.
 
 After editing, copy it to every app, then stage them all:
 
 ```
-for d in nabhi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
-git add .github "nabhi-*/.github/*"
+for d in bishnoi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
+git add .github "bishnoi-*/.github/*"
 ```
 
 With `SYNC_TOKEN` set, pushing `main` is enough: the sync carries the copies

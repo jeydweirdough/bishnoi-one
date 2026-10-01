@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // Which app this is, for the sidebar. Built into the screens, so it is set
   // here and not left to each machine's .env.local or the host's settings.
   env: {
-    NEXT_PUBLIC_NABHI_APP: process.env.NEXT_PUBLIC_NABHI_APP ?? "pharmacy",
+    NEXT_PUBLIC_BISHNOI_APP: (process.env.NEXT_PUBLIC_BISHNOI_APP ?? process.env.NEXT_PUBLIC_NABHI_APP) ?? "pharmacy",
   },
 };
 

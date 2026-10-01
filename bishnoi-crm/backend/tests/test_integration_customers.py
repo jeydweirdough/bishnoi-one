@@ -34,9 +34,15 @@ def test_finance_finds_customers_with_its_key(client):
     made = company(client, ana, name="Mercury Drug Makati", address="Ayala Ave", city="Makati", email="buy@mercury.test")
     company(client, ana, name="Watsons BGC")
     assert client.get("/integration/customers").status_code == 401
-    assert client.get("/integration/customers", headers={"X-Nabhi-Key": "wrong-key-that-is-long-enough-000"}).status_code == 401
-    found = client.get("/integration/customers?q=mercury", headers={"X-Nabhi-Key": KEY}).json()["items"]
+    assert client.get("/integration/customers", headers={"X-Bishnoi-Key": "wrong-key-that-is-long-enough-000"}).status_code == 401
+    found = client.get("/integration/customers?q=mercury", headers={"X-Bishnoi-Key": KEY}).json()["items"]
     assert [(c["name"], c["address"], c["email"]) for c in found] == [("Mercury Drug Makati", "Ayala Ave, Makati", "buy@mercury.test")]
-    one = client.get(f"/integration/customers/{made['id']}", headers={"X-Nabhi-Key": KEY}).json()
+    one = client.get(f"/integration/customers/{made['id']}", headers={"X-Bishnoi-Key": KEY}).json()
     assert one["id"] == made["id"] and one["tin"] is None
-    assert client.get("/integration/customers/nope", headers={"X-Nabhi-Key": KEY}).status_code == 404
+    assert client.get("/integration/customers/nope", headers={"X-Bishnoi-Key": KEY}).status_code == 404
+
+
+def test_the_header_name_from_before_the_rename_still_works(client):
+    # Apps redeployed one at a time may still send X-Nabhi-Key for a while.
+    assert client.get("/integration/customers", headers={"X-Nabhi-Key": KEY}).status_code == 200
+    assert client.get("/integration/customers", headers={"X-Bishnoi-Key": KEY}).status_code == 200

@@ -6,12 +6,12 @@ import { AccountError, accountCall, accountToken, withPass } from "./account";
 import { signOutAccount } from "./actions";
 import { GoForm } from "./go-form";
 
-export const metadata: Metadata = { title: "Sign in with your Nabhi account" };
+export const metadata: Metadata = { title: "Sign in with your Bishnoi One account" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
 /**
- * One sign-in for every Nabhi application. An application's sign-in page
+ * One sign-in for every Bishnoi One application. An application's sign-in page
  * sends people here (?app=crm&return=<its address>/auth/platform); signed in,
  * they go back with a pass for that application, if their account has it.
  */
@@ -42,10 +42,10 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
       <div className="w-full max-w-md rounded-[3px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
         <div className="border-b-[3px] border-double border-ink pb-3">
           <p className="text-stamp text-ink-3 uppercase">{APP_NAME}</p>
-          <p className="text-heading leading-tight">{name ? `Opening ${name}` : "Your Nabhi account"}</p>
+          <p className="text-heading leading-tight">{name ? `Opening ${name}` : "Your Bishnoi One account"}</p>
         </div>
         {!app || !returnTo ? (
-          <p className="mt-6 text-ink-2">This sign-in link is incomplete. Go back to the application and choose Sign in with your Nabhi account again.</p>
+          <p className="mt-6 text-ink-2">This sign-in link is incomplete. Go back to the application and choose Sign in with your Bishnoi One account again.</p>
         ) : refused ? (
           <>
             <h1 className="mt-6 text-title">Can't open {name}</h1>
@@ -65,7 +65,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
         ) : (
           <>
             <h1 className="mt-6 text-title">Sign in</h1>
-            <p className="mt-1 text-ink-2">One Nabhi account for every application your company gives you.</p>
+            <p className="mt-1 text-ink-2">One Bishnoi One account for every application your company gives you.</p>
             <GoForm app={key} returnTo={returnTo} />
           </>
         )}

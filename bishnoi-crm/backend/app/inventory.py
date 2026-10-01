@@ -1,4 +1,4 @@
-"""The product list and stock levels, from Nabhi Inventory.
+"""The product list and stock levels, from Bishnoi One Inventory.
 
 Inventory owns the products: it's where they're added and changed. The CRM
 brings them over (matched by Inventory's id, or at first by SKU = code), with
@@ -44,7 +44,7 @@ def call(settings: Settings, path: str, params: dict | None = None) -> dict:
     url = f"{settings.inventory_api_url}/integration/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"X-Nabhi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json"})
+    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json"})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())

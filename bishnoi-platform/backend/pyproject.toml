@@ -1,7 +1,7 @@
 [project]
-name = "nabhi-platform-api"
+name = "bishnoi-platform-api"
 version = "0.1.0"
-description = "Nabhi Platform API"
+description = "Bishnoi One Platform API"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",

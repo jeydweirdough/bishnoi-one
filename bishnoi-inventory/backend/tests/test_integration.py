@@ -4,12 +4,12 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import INTEGRATION_KEY, receive
 
-KEY = {"X-Nabhi-Key": INTEGRATION_KEY}
+KEY = {"X-Bishnoi-Key": INTEGRATION_KEY}
 
 
 def test_only_an_app_with_its_key_reads(client: TestClient, people):
     assert client.get("/integration/products").status_code == 401
-    assert client.get("/integration/products", headers={"X-Nabhi-Key": "wrong" * 8}).status_code == 401
+    assert client.get("/integration/products", headers={"X-Bishnoi-Key": "wrong" * 8}).status_code == 401
     # A person's sign-in isn't a key.
     assert client.get("/integration/products", headers=people["ana"]).status_code == 401
 

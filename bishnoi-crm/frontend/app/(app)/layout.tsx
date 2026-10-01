@@ -1,4 +1,4 @@
-// The signed-in frame: the same sidebar every Nabhi app wears. A field agent
+// The signed-in frame: the same sidebar every Bishnoi One app wears. A field agent
 // also needs their location on while the CRM is open in work hours (a guide
 // stands in front of it until it is), and their trail is taken, with a
 // marker in the corner saying so.

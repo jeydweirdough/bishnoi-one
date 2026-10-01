@@ -77,7 +77,7 @@ class FakeDiscord:
                 if m := re.fullmatch(r"/api/v10/webhooks/(\d+)/([^/]+)(?:/messages/(\d+))?", path):
                     return fake.webhook(self, method, m.group(3), query)
                 if path == "/api/v10/users/@me":
-                    return self._answer(200, {"id": BOT_ID, "username": "nabhi"})
+                    return self._answer(200, {"id": BOT_ID, "username": "bishnoi"})
                 if m := re.fullmatch(r"/api/v10/channels/(\d+)/messages/(\d+)/threads", path):
                     return fake.start_thread(self, m.group(2), self._body()[0])
                 if m := re.fullmatch(r"/api/v10/channels/(\d+)/messages", path):

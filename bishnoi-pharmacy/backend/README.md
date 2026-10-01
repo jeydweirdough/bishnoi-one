@@ -1,4 +1,4 @@
-# Nabhi Pharmacy — API
+# Bishnoi One Pharmacy — API
 
 The Pharmacy app's own backend. Its screens are in `../frontend`.
 
@@ -48,7 +48,7 @@ says otherwise; Postgres works the same (Neon, Supabase's pooler on port 6543).
 A SQLite file is copied beside itself before a migration touches it, and put
 back if the migration fails.
 
-Every table is **`nbph_…`** (NaBhi PHarmacy), and so is the migration table,
+Every table is **`nbph_…`** (Bishnoi One PHarmacy), and so is the migration table,
 `nbph_alembic_version`. A database from Orbit Pharmacy (plain `users` and
 `sessions`) has its accounts carried over by the first migration.
 
@@ -110,7 +110,7 @@ one email make it wait 15 minutes.
 | `SESSION_HOURS` | How long a sign-in lasts | `10` |
 | `EXPIRY_WARNING_DAYS` | A batch expiring within this many days is "expiring" | `90` |
 | `PRESCRIPTION_VALID_DAYS` | Older prescriptions can't be verified | `180` |
-| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Nabhi, PHP, en-PH, Asia/Manila |
+| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Bishnoi One, PHP, en-PH, Asia/Manila |
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 

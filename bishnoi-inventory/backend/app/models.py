@@ -1,10 +1,10 @@
 """Inventory's tables. Changes to them go through a migration (migrations/versions).
 
-Every table's name starts with nbin_ (NaBhi INventory), so it is plain which
+Every table's name starts with nbin_ (Bishnoi One INventory), so it is plain which
 app a table belongs to, whatever database it ends up in.
 
 Accounts here are Inventory's own: nobody signed in here exists in any other
-Nabhi app.
+Bishnoi One app.
 
 Quantities are whole units of a product's unit of measure. Money is in minor
 units (centavos), as whole numbers, so sums never drift.
@@ -79,7 +79,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")

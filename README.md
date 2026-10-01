@@ -1,6 +1,6 @@
-# Nabhi
+# Bishnoi One
 
-Nabhi is a set of separate web apps (Admin, CRM, Finance, Inventory, and
+Bishnoi One is a set of separate web apps (Admin, CRM, Finance, Inventory, and
 more) kept in one GitHub repo. This page shows you how to:
 
 - get the code onto your computer
@@ -43,15 +43,15 @@ The apps don't depend on each other. Each one has its own settings, database
 and sign-in.
 
 ```
-nabhi/
-├── nabhi-admin/          screens :4300   API :8300
-├── nabhi-crm/            screens :4302   API :8302
-├── nabhi-finance/        screens :4303   API :8303
-├── nabhi-inventory/      screens :4304   API :8304
-├── nabhi-platform/       screens :4305   API :8305
-├── nabhi-in-licensing/   screens :4306   API :8306   (screens not built yet)
-├── nabhi-pharmacy/       screens :4307   API :8307
-└── nabhi-regulatory/     screens :4308   API :8308   (screens not built yet)
+bishnoi/
+├── bishnoi-admin/          screens :4300   API :8300
+├── bishnoi-crm/            screens :4302   API :8302
+├── bishnoi-finance/        screens :4303   API :8303
+├── bishnoi-inventory/      screens :4304   API :8304
+├── bishnoi-platform/       screens :4305   API :8305
+├── bishnoi-in-licensing/   screens :4306   API :8306   (screens not built yet)
+├── bishnoi-pharmacy/       screens :4307   API :8307
+└── bishnoi-regulatory/     screens :4308   API :8308   (screens not built yet)
 ```
 
 ### Branches
@@ -59,7 +59,7 @@ nabhi/
 | Branch | What's in it |
 |---|---|
 | `main` | **Everything**: every app, each in its own folder |
-| `nabhi-admin`, `nabhi-crm`, `nabhi-finance`, … | **One app only**, named after it |
+| `bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`, … | **One app only**, named after it |
 
 An app branch holds the same files as that app's folder on `main`. You can
 work on either one; GitHub keeps them matched for you
@@ -115,12 +115,12 @@ projects, then pick **one** option.
 Use this if you work on a single app. Example for CRM:
 
 ```
-git clone -b nabhi-crm --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-crm
-cd nabhi-crm
+git clone -b bishnoi-crm --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-crm
+cd bishnoi-crm
 ```
 
-For another app, replace **both** `nabhi-crm`s with its branch name
-(`nabhi-admin`, `nabhi-finance`, …). You get only that app, with `frontend/`
+For another app, replace **both** `bishnoi-crm`s with its branch name
+(`bishnoi-admin`, `bishnoi-finance`, …). You get only that app, with `frontend/`
 and `backend/` right at the top.
 
 ### Option B: Everything
@@ -129,7 +129,7 @@ Use this if you work across several apps, or to [add a new app](#8-add-a-new-app
 
 ```
 git clone https://github.com/jeydweirdough/nabhi.git
-cd nabhi
+cd bishnoi
 ```
 
 You get `main`, with every app in its own folder.
@@ -242,7 +242,7 @@ From the top of the repo, one command runs an app's API and screens
 together:
 
 ```
-npm run nabhi-crm
+npm run bishnoi-crm
 ```
 
 The first time, it gets the app ready by itself: it copies the `.env`
@@ -251,15 +251,15 @@ example files, makes the API's Python environment (`backend/.venv`, with
 only redoes what changed. Each line of output is marked `[api]` or `[web]`,
 and **Ctrl+C** stops both.
 
-Every app has one: `npm run nabhi-admin`, `nabhi-crm`, `nabhi-finance`,
-`nabhi-inventory`, `nabhi-pharmacy`, `nabhi-platform`, `nabhi-in-licensing`,
-`nabhi-regulatory` (the last two run their API only: no screens yet).
+Every app has one: `npm run bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`,
+`bishnoi-inventory`, `bishnoi-pharmacy`, `bishnoi-platform`, `bishnoi-in-licensing`,
+`bishnoi-regulatory` (the last two run their API only: no screens yet).
 
 | Also | Does |
 |---|---|
-| `npm run nabhi-crm -- --api` | The API only |
-| `npm run nabhi-crm -- --web` | The screens only |
-| `npm run nabhi-crm -- --setup` | Gets it ready, starts nothing |
+| `npm run bishnoi-crm -- --api` | The API only |
+| `npm run bishnoi-crm -- --web` | The screens only |
+| `npm run bishnoi-crm -- --setup` | Gets it ready, starts nothing |
 | `npm run setup` | Gets **every** app ready |
 
 It needs only Node.js and uv (step 2): the root `package.json` has no
@@ -271,22 +271,22 @@ To try an app the way it will be used on a PC, in a window of its own, add
 `:app` to its name:
 
 ```
-npm run nabhi-crm:app
+npm run bishnoi-crm:app
 ```
 
 It starts the API and the screens as above, then opens them in the app's
 own window. The first time, it installs what the window needs (in
 `desktop/`). Closing the window stops the app; so does **Ctrl+C**.
 
-Every app with screens has one: `nabhi-admin:app`, `nabhi-crm:app`,
-`nabhi-finance:app`, `nabhi-inventory:app`, `nabhi-pharmacy:app` and
-`nabhi-platform:app`. To have several open, run each in its own terminal.
+Every app with screens has one: `bishnoi-admin:app`, `bishnoi-crm:app`,
+`bishnoi-finance:app`, `bishnoi-inventory:app`, `bishnoi-pharmacy:app` and
+`bishnoi-platform:app`. To have several open, run each in its own terminal.
 
 | In the window | What happens |
 |---|---|
 | The app itself | Its own window, taskbar button and sign-in, separate from the other apps |
-| A link to another Nabhi app | Opens in that app's window. If that app isn't running, a message says how to start it |
-| Sign in with your Nabhi account | Stays in the window, and comes back signed in |
+| A link to another Bishnoi One app | Opens in that app's window. If that app isn't running, a message says how to start it |
+| Sign in with your Bishnoi One account | Stays in the window, and comes back signed in |
 | Any other link (a map, a website) | Opens in your browser |
 
 This is for trying the apps on your own computer. Installers for other PCs
@@ -295,7 +295,7 @@ come later.
 ### The license
 
 A desktop app opens only with the company's license. It is set up once on
-each PC, in whichever Nabhi app is opened first, and kept for every Nabhi app
+each PC, in whichever Bishnoi One app is opened first, and kept for every Bishnoi One app
 on that PC: an app installed later opens with it straight away, as long as
 the license includes that app.
 
@@ -305,11 +305,11 @@ Each company gets three things from us:
 |---|---|---|
 | Company ID | `NBH-GETMEDS-01` | No |
 | Activation key | `7KQ4M-2XD9P-RTH6W-A3CFN-8B5JE` | Yes: give it to their administrator only, apart from the file |
-| License file | `NBH-GETMEDS-01.nabhi` | No: it is encrypted, and useless without the key |
+| License file | `NBH-GETMEDS-01.bishnoi` | No: it is encrypted, and useless without the key |
 
 The license file says which apps the company has and until when (30 days
 by default), and carries each app's database connection. On the PC it is
-kept in `%APPDATA%\Nabhi\license.json`, with the activation key locked to
+kept in `%APPDATA%\Bishnoi One\license.json`, with the activation key locked to
 that Windows account (it can't be copied to another PC or account). When it
 runs out, the apps warn a week before, keep working three days after, then
 stop until a renewed file is chosen (Help > Use a renewed license file).
@@ -326,12 +326,12 @@ Files are written to `desktop/issued/`, which is never committed. To try the
 desktop apps on your own PC, add `--local` and type `local` for each app's
 database: the apps then keep using their own `backend/.env` databases. Trying
 the apps from the repo keeps its license apart from a real one, in
-`%APPDATA%\Nabhi development\license.json`.
+`%APPDATA%\Bishnoi One development\license.json`.
 
 ### By hand (or on a one-app clone)
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
-into the app's folder (`cd nabhi-crm`).
+into the app's folder (`cd bishnoi-crm`).
 
 **Terminal 1: the API**
 
@@ -384,7 +384,7 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
   `listen EACCES: permission denied 0.0.0.0:4302`, Windows has set that port
   aside (Hyper-V, WSL and Docker do this, and it changes from one restart to
   the next). `netsh interface ipv4 show excludedportrange protocol=tcp` shows
-  which ports. To keep it away from the Nabhi ports for good, run this once
+  which ports. To keep it away from the Bishnoi One ports for good, run this once
   in a terminal opened as administrator, then restart the PC:
 
   ```
@@ -435,15 +435,15 @@ FIRST_ADMIN_PASSWORD=<at least 8 characters>
 
 ```
 API_URL=https://<this app's API address>.vercel.app
-NEXT_PUBLIC_NABHI_CRM_URL=https://<the CRM's screens address>.vercel.app
-NEXT_PUBLIC_NABHI_INVENTORY_URL=https://<Inventory's screens address>.vercel.app
+NEXT_PUBLIC_BISHNOI_CRM_URL=https://<the CRM's screens address>.vercel.app
+NEXT_PUBLIC_BISHNOI_INVENTORY_URL=https://<Inventory's screens address>.vercel.app
 ```
 
-- Add one `NEXT_PUBLIC_NABHI_<APP>_URL` for each other app you've put
+- Add one `NEXT_PUBLIC_BISHNOI_<APP>_URL` for each other app you've put
   online, so the sidebar's links between apps go to the right place
   ([section 6](#screens-settings-every-app)). These are read when the
   screens are built: redeploy after you set or change one.
-- Each app already knows which app it is: `NEXT_PUBLIC_NABHI_APP` isn't
+- Each app already knows which app it is: `NEXT_PUBLIC_BISHNOI_APP` isn't
   needed.
 - Don't set `SHOW_DEMO_ACCOUNTS` online.
 
@@ -453,10 +453,10 @@ the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
 
 | App | API root directory | Screens root directory |
 |---|---|---|
-| CRM | `nabhi-crm/backend` | `nabhi-crm/frontend` |
-| Inventory | `nabhi-inventory/backend` | `nabhi-inventory/frontend` |
-| Pharmacy | `nabhi-pharmacy/backend` | `nabhi-pharmacy/frontend` |
-| Platform | `nabhi-platform/backend` | `nabhi-platform/frontend` |
+| CRM | `bishnoi-crm/backend` | `bishnoi-crm/frontend` |
+| Inventory | `bishnoi-inventory/backend` | `bishnoi-inventory/frontend` |
+| Pharmacy | `bishnoi-pharmacy/backend` | `bishnoi-pharmacy/frontend` |
+| Platform | `bishnoi-platform/backend` | `bishnoi-platform/frontend` |
 
 Use the addresses Vercel actually gives your projects (e.g.
 `nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
@@ -499,7 +499,7 @@ after you change a file.
 | `SESSION_HOURS` | `10` | How long a sign-in lasts. |
 | `LOGIN_ATTEMPTS` | `5` | Wrong passwords in a row before an account is locked for a while. |
 | `LOGIN_LOCKOUT_MINUTES` | `15` | How long that lock lasts. |
-| `ORG_NAME` | `Nabhi` | The company name the screens show. |
+| `ORG_NAME` | `Bishnoi One` | The company name the screens show. |
 | `ORG_CURRENCY` | `PHP` | The currency amounts are shown in. |
 | `ORG_MINOR_UNITS` | `2` | Decimal places of that currency (centavos). |
 | `ORG_LOCALE` | `en-PH` | How numbers and dates are written. |
@@ -563,14 +563,14 @@ the CRM tells its users the other app can't be reached; nothing breaks.
 | Setting | Default | What it does |
 |---|---|---|
 | `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
-| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Nabhi Platform's API, for the announcements above every page. Unreachable: none show. |
+| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API, for the announcements above every page. Unreachable: none show. |
 | `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
-| `NEXT_PUBLIC_NABHI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
-| `NEXT_PUBLIC_NABHI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |
+| `NEXT_PUBLIC_BISHNOI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
+| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |
 
 The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
 `PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
-`NEXT_PUBLIC_NABHI_FINANCE_URL=https://nabhi-finance.vercel.app`.
+`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://nabhi-finance.vercel.app`.
 `NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
 change one.
 
@@ -582,7 +582,7 @@ remove the `#` to use one.
 <details>
 <summary><b>Admin</b> (screens :4300, API :8300)</summary>
 
-`nabhi-admin/backend/.env`
+`bishnoi-admin/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -590,7 +590,7 @@ ENVIRONMENT=development
 # SESSION_HOURS=10
 # LOGIN_ATTEMPTS=5
 # LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -599,12 +599,12 @@ ENVIRONMENT=development
 # CORS_ORIGINS=[]
 ```
 
-`nabhi-admin/frontend/.env.local`
+`bishnoi-admin/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8300
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=exec
+# NEXT_PUBLIC_BISHNOI_APP=exec
 ```
 
 </details>
@@ -612,7 +612,7 @@ SHOW_DEMO_ACCOUNTS=1
 <details>
 <summary><b>CRM</b> (screens :4302, API :8302)</summary>
 
-`nabhi-crm/backend/.env`
+`bishnoi-crm/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -623,7 +623,7 @@ ENVIRONMENT=development
 # SESSION_HOURS=10
 # LOGIN_ATTEMPTS=5
 # LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -645,12 +645,12 @@ ENVIRONMENT=development
 # PHARMACY_API_KEY=
 ```
 
-`nabhi-crm/frontend/.env.local`
+`bishnoi-crm/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8302
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=crm
+# NEXT_PUBLIC_BISHNOI_APP=crm
 ```
 
 </details>
@@ -658,7 +658,7 @@ SHOW_DEMO_ACCOUNTS=1
 <details>
 <summary><b>Finance</b> (screens :4303, API :8303)</summary>
 
-`nabhi-finance/backend/.env`
+`bishnoi-finance/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -666,7 +666,7 @@ ENVIRONMENT=development
 # SESSION_HOURS=10
 # LOGIN_ATTEMPTS=5
 # LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -678,12 +678,12 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's FINANCE_API_KEY>"]
 ```
 
-`nabhi-finance/frontend/.env.local`
+`bishnoi-finance/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8303
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=finance
+# NEXT_PUBLIC_BISHNOI_APP=finance
 ```
 
 </details>
@@ -691,7 +691,7 @@ SHOW_DEMO_ACCOUNTS=1
 <details>
 <summary><b>Inventory</b> (screens :4304, API :8304)</summary>
 
-`nabhi-inventory/backend/.env`
+`bishnoi-inventory/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -704,7 +704,7 @@ ENVIRONMENT=development
 # LOGIN_LOCKOUT_MINUTES=15
 # EXPIRY_WARNING_DAYS=90
 # DEAD_STOCK_DAYS=180
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -716,12 +716,12 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's INVENTORY_API_KEY>"]
 ```
 
-`nabhi-inventory/frontend/.env.local`
+`bishnoi-inventory/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8304
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=inventory
+# NEXT_PUBLIC_BISHNOI_APP=inventory
 ```
 
 </details>
@@ -729,7 +729,7 @@ SHOW_DEMO_ACCOUNTS=1
 <details>
 <summary><b>Platform</b> (screens :4305, API :8305)</summary>
 
-`nabhi-platform/backend/.env`
+`bishnoi-platform/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -740,7 +740,7 @@ ENVIRONMENT=development
 # SESSION_HOURS=10
 # LOGIN_ATTEMPTS=5
 # LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -752,12 +752,12 @@ ENVIRONMENT=development
 The sign-in settings are only where Platform starts: after that, **Settings →
 Security** in the app changes them.
 
-`nabhi-platform/frontend/.env.local`
+`bishnoi-platform/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8305
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=platform
+# NEXT_PUBLIC_BISHNOI_APP=platform
 ```
 
 </details>
@@ -765,7 +765,7 @@ SHOW_DEMO_ACCOUNTS=1
 <details>
 <summary><b>Pharmacy</b> (screens :4307, API :8307)</summary>
 
-`nabhi-pharmacy/backend/.env`
+`bishnoi-pharmacy/backend/.env`
 
 ```
 ENVIRONMENT=development
@@ -778,7 +778,7 @@ ENVIRONMENT=development
 # LOGIN_LOCKOUT_MINUTES=15
 # EXPIRY_WARNING_DAYS=90
 # PRESCRIPTION_VALID_DAYS=180
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -788,12 +788,12 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's PHARMACY_API_KEY>"]
 ```
 
-`nabhi-pharmacy/frontend/.env.local`
+`bishnoi-pharmacy/frontend/.env.local`
 
 ```
 API_URL=http://127.0.0.1:8307
 SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_NABHI_APP=pharmacy
+# NEXT_PUBLIC_BISHNOI_APP=pharmacy
 ```
 
 </details>
@@ -803,7 +803,7 @@ SHOW_DEMO_ACCOUNTS=1
 
 Only the API exists so far. Their screens have no settings yet.
 
-`nabhi-in-licensing/backend/.env` (for Regulatory, use
+`bishnoi-in-licensing/backend/.env` (for Regulatory, use
 `sqlite:///.data/regulatory.db`)
 
 ```
@@ -812,7 +812,7 @@ ENVIRONMENT=development
 # SESSION_HOURS=10
 # LOGIN_ATTEMPTS=5
 # LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Nabhi
+# ORG_NAME=Bishnoi One
 # ORG_CURRENCY=PHP
 # ORG_MINOR_UNITS=2
 # ORG_LOCALE=en-PH
@@ -845,7 +845,7 @@ each of our apps stands today, and what we decided to do about it.
 
 ### The five benchmarks
 
-Nabhi is built for **pharma distribution** first. Each benchmark is the
+Bishnoi One is built for **pharma distribution** first. Each benchmark is the
 reference for what it does best:
 
 | Benchmark | The reference for |
@@ -876,13 +876,13 @@ decision before building it).
 |---|---|
 | Who we mainly build for | **Pharma distribution** |
 | Country and tax | **Several countries**: a tax engine with a pack per country. **The Philippines first** (VAT, BIR invoices). |
-| Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Nabhi Orders**, outside this repo. |
+| Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Bishnoi One Orders**, outside this repo. |
 | Leads and the pipeline | **Deals on customers**: a stage, an expected value, a forecast category. No separate lead record. |
 | Sales targets | A monthly **revenue target** per seller (Deals → Results → Set targets); a team's is its people's added up. Won deals count against it, on Deals → Results and on the home page. |
 | Visit record | A visit records the **products discussed**, in order, each with its key message and the doctor's reaction, and the **next visit's objective**, shown when the next visit is logged. **Field work** shows a month's products detailed and how doctors took them. |
 | Lead source | Customers and deals share one list (Settings → Deal stages); a new deal starts with its customer's. |
 | Duplicates | **Customers → Possible duplicates** finds lookalike customers and contacts (same phone however it's written, same email, same or similar name) and merges two into one with all their history. A merged id still leads to the one kept. Merging needs Delete. |
-| Email notifications | A quote waiting for approval is emailed to its approvers, and the decision to the rep, through an email delivery service's SMTP. Off until `EMAIL_ENABLED=true`; see `nabhi-crm/backend/.env.example`. |
+| Email notifications | A quote waiting for approval is emailed to its approvers, and the decision to the rep, through an email delivery service's SMTP. Off until `EMAIL_ENABLED=true`; see `bishnoi-crm/backend/.env.example`. |
 | Working without signal | **Offline visits and collections** on the phone, synced when there's signal. |
 
 ### Where the build is
@@ -925,13 +925,13 @@ git switch -c add-app/hr
 
 Replace `hr` with your app's name.
 
-> Name your branch `add-app/<name>`. **Don't** start it with `nabhi-`: those
+> Name your branch `add-app/<name>`. **Don't** start it with `bishnoi-`: those
 > names are kept for the app branches.
 
 ### Step 2: Create the app's folder
 
-Name the folder **`nabhi-<name>`**, using small letters, digits and dashes
-only (e.g. `nabhi-hr`, `nabhi-field-sales`). This becomes your app's branch
+Name the folder **`bishnoi-<name>`**, using small letters, digits and dashes
+only (e.g. `bishnoi-hr`, `bishnoi-field-sales`). This becomes your app's branch
 name. Inside it, add:
 
 | What | How |
@@ -970,10 +970,10 @@ runs again by itself.
 
 The repo owner reviews your app and merges it into `main`. About a minute
 later, your app has **its own branch, named after its folder**
-(`nabhi-hr`). From then on, anyone can clone just your app:
+(`bishnoi-hr`). From then on, anyone can clone just your app:
 
 ```
-git clone -b nabhi-hr --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-hr
+git clone -b bishnoi-hr --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-hr
 ```
 
 ---
@@ -983,7 +983,7 @@ git clone -b nabhi-hr --single-branch https://github.com/jeydweirdough/nabhi.git
 **Nothing for you to do.** About a minute after any push to `main` or to an
 app branch, GitHub's **Sync branches** action runs:
 
-- Push to an **app branch** (e.g. `nabhi-crm`): your work is copied into
+- Push to an **app branch** (e.g. `bishnoi-crm`): your work is copied into
   that app's folder on `main`.
 - Push to **`main`**: each app's folder is copied to its app branch.
 
@@ -1007,7 +1007,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
    already does that. If GitHub shows a yellow "Compare & pull request"
    banner after you push to an app branch, ignore it. (Pull requests from an
    `add-app/…` or `feature/…` branch are fine.)
-5. **Don't create branches that start with `nabhi-`.** Those are the app
+5. **Don't create branches that start with `bishnoi-`.** Those are the app
    branches, and the sync manages them.
 6. **Build features to the benchmark.** Every app is measured against
    [`benchmarks/`](benchmarks/README.md) ([section 7](#7-benchmarks-what-we-build-to)): find the feature's row in
@@ -1031,7 +1031,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` |
-| Run an app (API + screens) | `npm run nabhi-crm` (from the top of a full clone) |
+| Run an app (API + screens) | `npm run bishnoi-crm` (from the top of a full clone) |
 | Start a new app | `git switch -c add-app/<name>`, then [section 8](#8-add-a-new-app) |
 
 ---

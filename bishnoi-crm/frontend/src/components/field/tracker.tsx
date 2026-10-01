@@ -34,13 +34,13 @@ type State = "starting" | "on" | "after-hours" | NoLocation;
 
 const PILL: Record<State, { text: string; hint: string }> = {
   starting: { text: "Finding your location", hint: "Asking your phone where you are." },
-  on: { text: "Location on", hint: "Your route is saved while Nabhi is open, 6:00 to 20:00. Your lead and the admin can see it." },
+  on: { text: "Location on", hint: "Your route is saved while Bishnoi One is open, 6:00 to 20:00. Your lead and the admin can see it." },
   "after-hours": { text: "Location off after hours", hint: "Nothing is saved outside 6:00 to 20:00." },
   slow: { text: "Finding your location", hint: "Your phone hasn't found you yet. Near a window or outside helps." },
   denied: { text: "Location blocked", hint: "Allow location for this site." },
   off: { text: "Location off", hint: "Turn on your phone's location." },
   unsupported: { text: "No location", hint: "This browser can't share your location." },
-  insecure: { text: "No location", hint: "Open Nabhi from its https address." },
+  insecure: { text: "No location", hint: "Open Bishnoi One from its https address." },
 };
 
 export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: string }) {
@@ -51,7 +51,7 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
   const restart = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const key = `nabhi-trail:${userId}`;
+    const key = `bishnoi-trail:${userId}`;
     const read = (): TrailPoint[] => {
       try {
         return JSON.parse(localStorage.getItem(key) ?? "[]");

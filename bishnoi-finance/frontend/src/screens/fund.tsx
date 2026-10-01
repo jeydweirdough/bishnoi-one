@@ -78,7 +78,7 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
                 ["Customer", r.customerName],
                 ["Subject to liquidation", r.liquidate ? "Yes" : "No: settled upon release"],
                 ["Details", r.details ? <span key="d" className="whitespace-pre-line">{r.details}</span> : null],
-                ["Source", r.sourceApp === "crm" ? "Nabhi CRM" : r.sourceApp],
+                ["Source", r.sourceApp === "crm" ? "Bishnoi One CRM" : r.sourceApp],
               ]}
             />
           </Sheet>

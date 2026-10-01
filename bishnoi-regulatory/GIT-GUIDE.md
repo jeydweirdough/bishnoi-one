@@ -1,4 +1,4 @@
-# Git guide — Regulatory app (`nabhi-regulatory`)
+# Git guide — Regulatory app (`bishnoi-regulatory`)
 
 How to clone, pull and push **just the Regulatory app**. For the whole repo and how
 the branches fit together, see `README.md` at the top of the `main` branch:
@@ -8,7 +8,7 @@ Every feature you build here is measured against the benchmark in
 `benchmarks/` on `main`; check its row before you build:
 https://github.com/jeydweirdough/nabhi/blob/main/benchmarks/README.md
 
-Branch: **`nabhi-regulatory`**. It holds only this app, at the top level:
+Branch: **`bishnoi-regulatory`**. It holds only this app, at the top level:
 
 ```
 frontend/     the screens (Next.js)
@@ -17,7 +17,7 @@ GIT-GUIDE.md  this guide
 ```
 
 The app stands on its own: its own screens, its own API, its own database.
-The same files live in the `nabhi-regulatory/` folder on `main`, and the two are kept
+The same files live in the `bishnoi-regulatory/` folder on `main`, and the two are kept
 in sync.
 
 ---
@@ -39,14 +39,14 @@ instead, and `git who` to check which account is active.
 ## 2. Clone
 
 ```
-git clone -b nabhi-regulatory --single-branch https://github.com/jeydweirdough/nabhi.git nabhi-regulatory
-cd nabhi-regulatory
+git clone -b bishnoi-regulatory --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-regulatory
+cd bishnoi-regulatory
 ```
 
 This downloads only the Regulatory app, not the other apps.
 
 Want everything instead? Run `git clone https://github.com/jeydweirdough/nabhi.git`
-and work in the `nabhi-regulatory/` folder on `main`. Sections 3–4 still apply, but your
+and work in the `bishnoi-regulatory/` folder on `main`. Sections 3–4 still apply, but your
 pushes go to `main`.
 
 ---
@@ -94,7 +94,7 @@ git commit -m "Say what changed"
 git push
 ```
 
-`git push` sends your commits to the `nabhi-regulatory` branch on GitHub.
+`git push` sends your commits to the `bishnoi-regulatory` branch on GitHub.
 
 **Push rejected?** Someone pushed first. Pull their work, then push again:
 
@@ -113,7 +113,7 @@ markers in the listed files, then `git add .`, `git rebase --continue`,
 
 A GitHub action (**Sync branches**) runs by itself a minute after your push. It:
 
-- merges your pushes into the `nabhi-regulatory/` folder on `main`, and
+- merges your pushes into the `bishnoi-regulatory/` folder on `main`, and
 - brings any changes made on `main` back to this branch.
 
 After a sync, `git pull` gives you those changes. You don't need to do

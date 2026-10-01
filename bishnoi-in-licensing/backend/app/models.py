@@ -1,4 +1,4 @@
-"""This app's own accounts. Nobody signed in here exists in any other Nabhi app.
+"""This app's own accounts. Nobody signed in here exists in any other Bishnoi One app.
 
 Every table's name starts with nbil_ (In-Licensing), so it is plain which app a
 table belongs to, whatever database it ends up in. Changes to them go through

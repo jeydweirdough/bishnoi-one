@@ -39,7 +39,7 @@ export async function AdminDashboard({ me }: { me: Me & { org: Org } }) {
 
   return (
     <>
-      <PageHeader title="Dashboard">How your people are using Nabhi CRM: who signs in, who logs their work, and where work is piling up.</PageHeader>
+      <PageHeader title="Dashboard">How your people are using Bishnoi One CRM: who signs in, who logs their work, and where work is piling up.</PageHeader>
 
       <Stats>
         <Stat label="Signed in this week" value={`${t.signedInThisWeek - (data.people.find((p) => p.isMe)?.signInsThisWeek ? 1 : 0)} of ${people.length}`} href="/admin/users" />

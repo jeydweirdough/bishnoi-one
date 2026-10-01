@@ -18,6 +18,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 ISSUER = "bishnoi-platform"
+# Passes the platform signed before the rename to Bishnoi One, until it's redeployed.
+ISSUERS = {ISSUER, "nabhi-platform"}
 LEEWAY = 30  # seconds of clock difference allowed between the platform and this PC
 
 
@@ -43,7 +45,7 @@ def check(token: str, public_key: str | None, app_key: str, now: float | None = 
         Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key)).verify(_b64(sig_b64), f"{head_b64}.{body_b64}".encode())
     except (ValueError, InvalidSignature, json.JSONDecodeError, TypeError):
         raise PassRefused("This sign-in link isn't valid. Sign in again from the start.") from None
-    if body.get("iss") != ISSUER or body.get("aud") != app_key:
+    if body.get("iss") not in ISSUERS or body.get("aud") != app_key:
         raise PassRefused("This sign-in link is for another application. Sign in again from the start.")
     if not isinstance(body.get("exp"), int) or body["exp"] + LEEWAY < now:
         raise PassRefused("This sign-in link has expired. Sign in again from the start.")

@@ -1,8 +1,8 @@
 {
-  "name": "@nabhi/platform",
+  "name": "@bishnoi/platform",
   "version": "0.1.0",
   "private": true,
-  "description": "The control tower above every Nabhi application: companies, users, access, health, support and incidents.",
+  "description": "The control tower above every Bishnoi One application: companies, users, access, health, support and incidents.",
   "exports": {
     "./module.json": "./module.json"
   },

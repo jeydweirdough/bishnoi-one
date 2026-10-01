@@ -28,8 +28,8 @@ def _diagnose(error: Exception) -> dict:
     from app.migrate import DatabaseTooNew
 
     if isinstance(error, DatabaseTooNew):
-        return {"problem": "version", "check": ["Nabhi.exe"],
-                "hint": "The company's database was updated by a newer Nabhi. Update Nabhi.exe to open it."}
+        return {"problem": "version", "check": ["Bishnoi One.exe"],
+                "hint": "The company's database was updated by a newer Bishnoi One. Update Bishnoi One.exe to open it."}
     if isinstance(error, ValidationError):
         fields = sorted({str(e["loc"][0]).upper() for e in error.errors() if e.get("loc")})
         return {"problem": "settings", "check": fields or ["the environment variables"],

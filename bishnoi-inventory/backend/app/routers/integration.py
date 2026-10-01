@@ -1,6 +1,6 @@
-"""What the other Nabhi apps read from here: the product list (the CRM sells
+"""What the other Bishnoi One apps read from here: the product list (the CRM sells
 from it) and how much of each there is. Read-only, and only for an app
-holding one of INTEGRATION_KEYS, sent in the X-Nabhi-Key header.
+holding one of INTEGRATION_KEYS, sent in the X-Bishnoi-Key header.
 
 A product that only groups its variants isn't sold itself, so it isn't
 listed: its variants are.
@@ -20,14 +20,20 @@ from app.models import Product, Warehouse
 MAX_SKUS = 500
 
 
-def calling_app(settings: SettingsDep, x_nabhi_key: Annotated[str | None, Header()] = None) -> str:
+def calling_app(
+    settings: SettingsDep,
+    x_bishnoi_key: Annotated[str | None, Header()] = None,
+    # The header's name before the rename to Bishnoi One: still taken until every app is redeployed.
+    x_nabhi_key: Annotated[str | None, Header()] = None,
+) -> str:
     """The name of the app whose key came with the request."""
-    if x_nabhi_key:
+    x_bishnoi_key = x_bishnoi_key or x_nabhi_key
+    if x_bishnoi_key:
         for key in settings.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
-            if hmac.compare_digest(secret.encode(), x_nabhi_key.encode()):
+            if hmac.compare_digest(secret.encode(), x_bishnoi_key.encode()):
                 return name
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Nabhi app's key (X-Nabhi-Key).")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Bishnoi One app's key (X-Bishnoi-Key).")
 
 
 router = APIRouter(prefix="/integration", tags=["integration"], dependencies=[Depends(calling_app)])

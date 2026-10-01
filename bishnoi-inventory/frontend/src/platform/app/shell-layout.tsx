@@ -36,7 +36,7 @@ function NoCompany() {
  *  `unset`: how many things aren't set up yet, for its red counts. */
 export async function ShellLayout({ children, waiting, unset }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset }) {
   const me = await getMe();
-  // Every page, not only the sign-in. One session opens every Nabhi app —
+  // Every page, not only the sign-in. One session opens every Bishnoi One app —
   // the cookie is shared — so somebody signed in to an app that is theirs
   // arrives here already authenticated, and nothing else would ask whether
   // this one is. Asked once, above every screen, before any of them load.
@@ -56,7 +56,7 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
         <Nav me={me} waiting={waiting} unset={unset} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
           <div className="mx-auto max-w-[70rem]">
-            {/* Announcements from Nabhi Platform (kept in Discord), for this app and for everyone. */}
+            {/* Announcements from Bishnoi One Platform (kept in Discord), for this app and for everyone. */}
             <Notices timeZone={me.org?.timezone} />
             {stranded ? <NoCompany /> : children}
           </div>

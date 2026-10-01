@@ -105,7 +105,7 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> d
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
 
 
-# --- signing in with a Nabhi account (the platform) -----------------------------------
+# --- signing in with a Bishnoi One account (the platform) -----------------------------------
 
 APP_KEY = "finance"  # this application's key on the platform
 
@@ -130,7 +130,7 @@ def role_from(db: DB, claims: dict) -> Role:
 @router.post("/platform")
 def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, response: Response) -> dict:
     """Takes a pass from the platform (app/platform_pass.py) and opens a session
-    here, as /auth/login does. The person is found by their Nabhi account, or
+    here, as /auth/login does. The person is found by their Bishnoi One account, or
     by email the first time; someone new is added. Their role comes from the
     platform every time (see role_from), and nobody is turned away for a role
     this app doesn't have. The platform decides who may open this application;
@@ -154,12 +154,12 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     if user is None:
         user = db.scalar(select(User).where(func.lower(User.email) == email))
         if user is not None and user.platform_identity_id not in (None, claims["sub"]):
-            raise HTTPException(status.HTTP_409_CONFLICT, "This email is already linked to another Nabhi account here. Ask your administrator.")
+            raise HTTPException(status.HTTP_409_CONFLICT, "This email is already linked to another Bishnoi One account here. Ask your administrator.")
     if user is None:
         user = User(
             email=email,
             full_name=str(claims.get("name") or email)[:120],
-            # never used: they sign in with their Nabhi account
+            # never used: they sign in with their Bishnoi One account
             password_hash=hash_password(secrets.token_urlsafe(32)),
             role=role,
             platform_identity_id=claims["sub"],
@@ -193,7 +193,7 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     token = new_token()
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
-    audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Nabhi account"])
+    audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
     db.commit()
     response.headers["Cache-Control"] = "no-store"
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}

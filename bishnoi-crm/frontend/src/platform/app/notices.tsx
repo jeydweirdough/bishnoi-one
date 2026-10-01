@@ -2,7 +2,7 @@ import { Info, Megaphone, TriangleAlert, Wrench } from "lucide-react";
 import { THIS_APP } from "../lib/apps";
 
 /**
- * Announcements from Nabhi Platform, above every page: the ones showing now
+ * Announcements from Bishnoi One Platform, above every page: the ones showing now
  * for this app (or for everyone), and maintenance coming up. Platform keeps
  * them in Discord and serves them at /public/notices; PLATFORM_API_URL says
  * where Platform's API is. If Platform can't be reached, nothing shows and the

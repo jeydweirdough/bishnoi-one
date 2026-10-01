@@ -43,11 +43,11 @@ export async function whereNow(timeoutMs = 10_000): Promise<Where | null> {
 
 /** What to say, in a sentence, when there's no location. */
 export const NO_LOCATION: Record<NoLocation, string> = {
-  denied: "Location is blocked for Nabhi in your browser.",
+  denied: "Location is blocked for Bishnoi One in your browser.",
   off: "Your phone's location is switched off.",
   slow: "Your phone couldn't find where you are yet. Step near a window or outside, then try again.",
   unsupported: "This browser can't share your location. Use Chrome or Safari on your phone.",
-  insecure: "Location only works on the secure (https) address of Nabhi.",
+  insecure: "Location only works on the secure (https) address of Bishnoi One.",
 };
 
 /** How far apart two places are, in metres, along the ground. */

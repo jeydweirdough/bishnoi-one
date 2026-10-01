@@ -1,6 +1,6 @@
 // The starting screen: which app, and what to do if it doesn't come up.
 const asked = new URLSearchParams(location.search);
-const name = asked.get("name") ?? "Nabhi";
+const name = asked.get("name") ?? "Bishnoi One";
 
 document.title = name;
 document.getElementById("name").textContent = name;

@@ -65,8 +65,8 @@ const SWITCHED_OFF: Record<Device, string[]> = {
 
 const OTHER: Record<Exclude<NoLocation, "denied" | "off">, string[]> = {
   slow: ["Step near a window or outside.", "Turn on Wi-Fi: it helps the phone find you, even without joining a network.", "Tap Try again."],
-  unsupported: ["Open Nabhi in Chrome (Android) or Safari (iPhone).", "Sign in there, and allow location when it asks."],
-  insecure: ["Open Nabhi from its https:// address (the one your admin gave you).", "Sign in there, and allow location when it asks."],
+  unsupported: ["Open Bishnoi One in Chrome (Android) or Safari (iPhone).", "Sign in there, and allow location when it asks."],
+  insecure: ["Open Bishnoi One from its https:// address (the one your admin gave you).", "Sign in there, and allow location when it asks."],
 };
 
 /**
@@ -85,7 +85,7 @@ export function LocationGuide({ why, onRetry, retrying }: { why: NoLocation; onR
           <MapPinOff className="size-5" aria-hidden />
         </span>
         <h2 id="location-title" className="text-heading">
-          Turn on your location to use Nabhi
+          Turn on your location to use Bishnoi One
         </h2>
         <p className="mt-1 text-sm text-ink-2">{NO_LOCATION[why]}</p>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm">
@@ -97,7 +97,7 @@ export function LocationGuide({ why, onRetry, retrying }: { why: NoLocation; onR
           Try again
         </Button>
         <p className="mt-4 border-t border-rule pt-3 text-meta text-ink-3">
-          Field work saves where each visit is logged, and your route while Nabhi is open, from 6:00 to 20:00. Your lead and the admin can see it. Nothing
+          Field work saves where each visit is logged, and your route while Bishnoi One is open, from 6:00 to 20:00. Your lead and the admin can see it. Nothing
           is taken after hours.
         </p>
       </div>

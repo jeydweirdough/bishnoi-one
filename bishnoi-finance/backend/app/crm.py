@@ -1,4 +1,4 @@
-"""Customers, from Nabhi CRM: who an invoice is made out to.
+"""Customers, from Bishnoi One CRM: who an invoice is made out to.
 
 The CRM keeps the customers; Finance reads them with the key the CRM gave it
 (its INTEGRATION_KEYS), the same way the CRM reads Inventory's products. What
@@ -25,7 +25,7 @@ def _get(settings: Settings, path: str) -> dict:
         raise CrmUnavailable("Finance isn't linked to the CRM (CRM_API_URL, CRM_API_KEY): type the customer's details instead.")
     request = urllib.request.Request(
         f"{settings.crm_api_url}/integration/customers{path}",
-        headers={"X-Nabhi-Key": settings.crm_api_key.get_secret_value(), "Accept": "application/json"},
+        headers={"X-Bishnoi-Key": settings.crm_api_key.get_secret_value(), "Accept": "application/json"},
     )
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:

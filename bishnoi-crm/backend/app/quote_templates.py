@@ -119,7 +119,7 @@ def extra_by(db: Session, quote: Quote, *words: str) -> str | None:
 def control_number(db: Session, template: QuoteTemplate, quote: Quote, tries: int = 5) -> str:
     """The quote's control number on this template, given the first time it's asked for.
 
-    Several PCs (each Nabhi.exe runs its own API) can print at the same moment.
+    Several PCs (each Bishnoi One.exe runs its own API) can print at the same moment.
     The template's row is locked while its next number is taken, so the second
     one waits and gets the number after; a clash that still gets through (a
     database without row locks) is caught by the unique number and retried."""

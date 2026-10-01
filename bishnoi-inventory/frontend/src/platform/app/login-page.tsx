@@ -5,7 +5,7 @@ import { APP_NAME } from "../lib/labels";
 import { api } from "../lib/api";
 import { LoginForm, type Demo } from "./login-form";
 
-// Each Nabhi app signs in on its own page, so the tab says which one it is:
+// Each Bishnoi One app signs in on its own page, so the tab says which one it is:
 // six sign-in tabs that all read the same thing are six tabs you have to guess at.
 export const metadata: Metadata = {
   title: thisAppLabel() ? `Sign in to ${thisAppLabel()}` : "Sign in",
@@ -25,12 +25,12 @@ async function demoAccounts(): Promise<{ items: Demo[]; password: string | null 
 }
 
 /**
- * Signing in with a Nabhi account, on the platform: the way in once the
+ * Signing in with a Bishnoi One account, on the platform: the way in once the
  * platform decides who may use which application. Shown when the platform's
- * address is set for this build (NEXT_PUBLIC_NABHI_PLATFORM_URL).
+ * address is set for this build (NEXT_PUBLIC_BISHNOI_PLATFORM_URL).
  */
 function platformSignIn(): string | null {
-  if (!THIS_APP || THIS_APP === "platform" || !process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) return null;
+  if (!THIS_APP || THIS_APP === "platform" || !(process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)) return null;
   const back = `${appUrl(THIS_APP)}/auth/platform`;
   return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
 }
@@ -41,7 +41,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
   const expired = params.expired === "1";
   const denied = params.denied === "1";
   const refused = typeof params.platform === "string" ? params.platform.slice(0, 300) : null;
-  const nabhiAccount = platformSignIn();
+  const bishnoiAccount = platformSignIn();
   const demo = await demoAccounts();
   const app = thisAppLabel();
 
@@ -79,10 +79,10 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
             {refused}
           </p>
         )}
-        {nabhiAccount && (
+        {bishnoiAccount && (
           <div className="mt-6">
-            <a href={nabhiAccount} className={buttonClass("primary", "md", "w-full justify-center")}>
-              Sign in with your Nabhi account
+            <a href={bishnoiAccount} className={buttonClass("primary", "md", "w-full justify-center")}>
+              Sign in with your Bishnoi One account
             </a>
             <p className="mt-4 flex items-center gap-3 text-meta text-ink-3">
               <span className="h-px flex-1 bg-rule" aria-hidden />

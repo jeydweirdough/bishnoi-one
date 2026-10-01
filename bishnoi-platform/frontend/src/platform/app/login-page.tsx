@@ -4,7 +4,7 @@ import { APP_NAME } from "../lib/labels";
 import { api } from "../lib/api";
 import { LoginForm, type Demo } from "./login-form";
 
-// Each Nabhi app signs in on its own page, so the tab says which one it is:
+// Each Bishnoi One app signs in on its own page, so the tab says which one it is:
 // six sign-in tabs that all read the same thing are six tabs you have to guess at.
 export const metadata: Metadata = {
   title: thisAppLabel() ? `Sign in to ${thisAppLabel()}` : "Sign in",

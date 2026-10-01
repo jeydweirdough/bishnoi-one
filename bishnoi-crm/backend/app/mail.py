@@ -33,7 +33,7 @@ from app.access import permissions_of
 from app.config import Settings
 from app.models import Quote, User
 
-log = logging.getLogger("nabhi.mail")
+log = logging.getLogger("bishnoi.mail")
 
 BRAND = "#1F3864"
 

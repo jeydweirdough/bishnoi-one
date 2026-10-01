@@ -1,6 +1,6 @@
-"""Passes: how a Nabhi account gets into an application.
+"""Passes: how a Bishnoi One account gets into an application.
 
-Someone signs in once, here, with their Nabhi account. To open an application
+Someone signs in once, here, with their Bishnoi One account. To open an application
 the platform gives them a pass: a short note, signed with the platform's
 private key, saying who they are, which company, which application and their
 role there. The application checks the signature with the platform's public
@@ -12,7 +12,7 @@ works once: it is for the trip from here to the application, nothing more.
 
 The format is a compact JWS (a JWT) signed with Ed25519 ("EdDSA"):
     header  {"alg": "EdDSA", "typ": "JWT", "kid": <key id>}
-    claims  {"iss": "nabhi-platform", "aud": <app key>, "sub": <identity id>,
+    claims  {"iss": "bishnoi-platform", "aud": <app key>, "sub": <identity id>,
              "email", "name", "company", "companyName", "role", "appAdmin",
              "companyAdmin", "iat", "exp", "jti"}
 """
@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from app.config import DATA_DIR, Settings
 from app.models import Application, Company, Identity, IdentityApp
 
-ISSUER = "nabhi-platform"
+ISSUER = "bishnoi-platform"
 LIFETIME = 120  # seconds
 KEY_FILE = DATA_DIR / "pass-signing.key"
 

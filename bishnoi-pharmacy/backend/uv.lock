@@ -409,7 +409,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nabhi-pharmacy-api"
+name = "bishnoi-pharmacy-api"
 version = "0.2.0"
 source = { virtual = "." }
 dependencies = [

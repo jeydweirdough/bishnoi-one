@@ -1,5 +1,5 @@
-"""Raising an order in Nabhi Order from a ready quote, and the printed quotation's letterhead.
-(Nabhi Order is stood in for here.)"""
+"""Raising an order in Bishnoi One Order from a ready quote, and the printed quotation's letterhead.
+(Bishnoi One Order is stood in for here.)"""
 
 import pytest
 
@@ -55,9 +55,9 @@ def test_a_quote_waiting_for_approval_is_not_ordered(client, crew, ids, linked):
     assert linked == []
 
 
-def test_nabhi_order_down_says_so_and_keeps_nothing(client, crew, ids, linked, monkeypatch):
+def test_bishnoi_order_down_says_so_and_keeps_nothing(client, crew, ids, linked, monkeypatch):
     def down(settings, quote_id, body):
-        raise orders.OrdersUnavailable("Nabhi Order can't be reached right now. Try again in a moment.")
+        raise orders.OrdersUnavailable("Bishnoi One Order can't be reached right now. Try again in a moment.")
 
     monkeypatch.setattr(quotes_router, "send_order", down)
     acme = company(client, crew["ria"])
@@ -89,7 +89,7 @@ def test_letterhead_comes_from_company_settings(client, crew, ana):
 
 
 def test_send_posts_the_payload_with_the_key(monkeypatch):
-    """The real HTTP call, against a stand-in Nabhi Order on localhost."""
+    """The real HTTP call, against a stand-in Bishnoi One Order on localhost."""
     import json
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -103,7 +103,7 @@ def test_send_posts_the_payload_with_the_key(monkeypatch):
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):  # noqa: N802
             seen["path"] = self.path
-            seen["key"] = self.headers["X-Nabhi-Key"]
+            seen["key"] = self.headers["X-Bishnoi-Key"]
             seen["idem"] = self.headers["Idempotency-Key"]
             seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             out = json.dumps({"id": "o1", "number": "SO-1"}).encode()
@@ -120,8 +120,8 @@ def test_send_posts_the_payload_with_the_key(monkeypatch):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         settings = Settings(_env_file=None, orders_api_url=f"http://127.0.0.1:{server.server_port}/", orders_api_key=SecretStr("k1"))
-        made = orders.send(settings, "quote-1", {"source": "nabhi-crm"})
+        made = orders.send(settings, "quote-1", {"source": "bishnoi-crm"})
     finally:
         server.shutdown()
     assert made == {"id": "o1", "number": "SO-1"}
-    assert seen == {"path": "/orders", "key": "k1", "idem": "quote-1", "body": {"source": "nabhi-crm"}}
+    assert seen == {"path": "/orders", "key": "k1", "idem": "quote-1", "body": {"source": "bishnoi-crm"}}

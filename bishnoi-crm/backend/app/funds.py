@@ -1,4 +1,4 @@
-"""Marketing requests, and the part Nabhi Finance plays in them.
+"""Marketing requests, and the part Bishnoi One Finance plays in them.
 
 A request is the CRM's until its Team Lead approves it: then it's sent to
 Finance, which releases the money and checks how it was spent. From then on
@@ -58,7 +58,7 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None, p
     url = f"{settings.finance_api_url}/integration/funds/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    headers = {"X-Nabhi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json"}
     data = None
     if body is not None:
         data = json.dumps(body).encode()

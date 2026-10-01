@@ -241,9 +241,9 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
         "validUntil": q.valid_until,
         "terms": q.terms,
         "extra": q.extra or {},
-        # The order raised from it in Nabhi Order, or None.
+        # The order raised from it in Bishnoi One Order, or None.
         "order": q.sales_order,
-        # A quote marked Rx is checked by a pharmacist in Nabhi Pharmacy before it's ordered.
+        # A quote marked Rx is checked by a pharmacist in Bishnoi One Pharmacy before it's ordered.
         "pharmacy": pharmacy_out(q),
         "createdAt": iso(q.created_at),
         "createdBy": person_out(q.created_by) or {"id": "", "name": "Someone no longer here"},
@@ -570,17 +570,17 @@ def orderable(quote: Quote, access: Access) -> None:
 
 @router.get("/quotes/{quote_id}/order-payload")
 def preview_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> dict:
-    """What "Raise order" sends to Nabhi Order for this quote (app/orders.py)."""
+    """What "Raise order" sends to Bishnoi One Order for this quote (app/orders.py)."""
     return order_payload(db, get_quote(db, access, quote_id), me, settings)
 
 
 @router.post("/quotes/{quote_id}/order")
 def raise_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> dict:
-    """Sends the quote to Nabhi Order and keeps the order it made on the quote."""
+    """Sends the quote to Bishnoi One Order and keeps the order it made on the quote."""
     quote = get_quote(db, access, quote_id)
     orderable(quote, access)
     if not settings.orders_linked:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Nabhi Order isn't connected yet: set ORDERS_API_URL and ORDERS_API_KEY.")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Bishnoi One Order isn't connected yet: set ORDERS_API_URL and ORDERS_API_KEY.")
     try:
         made = send_order(settings, quote.id, order_payload(db, quote, me, settings))
     except OrdersUnavailable as e:

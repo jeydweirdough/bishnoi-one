@@ -10,7 +10,7 @@ import { FormError } from "../ui/field";
 import type { Result } from "../lib/result";
 
 // Choosing a picture: pick a file, see it straight away, and it uploads itself.
-// Nabhi crops it to a square and keeps a small copy, so any photo will do.
+// Bishnoi One crops it to a square and keeps a small copy, so any photo will do.
 
 export function PhotoPicker({
   name,
@@ -93,7 +93,7 @@ export function PhotoPicker({
             />
           )}
         </div>
-        <p className="mt-1.5 text-meta text-ink-3">JPEG, PNG or WebP, up to 6MB. Nabhi crops it to a square.</p>
+        <p className="mt-1.5 text-meta text-ink-3">JPEG, PNG or WebP, up to 6MB. Bishnoi One crops it to a square.</p>
         <FormError message={error} />
       </div>
       <input

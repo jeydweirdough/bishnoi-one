@@ -2,7 +2,7 @@
 
 Customers, and everything that happens with them.
 
-**Its screens are still in `nabhi-frontend`, waiting to move in.**
+**Its screens are still in `bishnoi-frontend`, waiting to move in.**
 
 ## Screens
 
@@ -35,17 +35,17 @@ not listed above is a change to `module.json`, not a quiet import.
 
 `"api": "shared"` in `module.json`.
 
-`shared` means the one Nabhi backend still holds this module's routes and tables,
+`shared` means the one Bishnoi One backend still holds this module's routes and tables,
 exactly where they were. It becomes `own` when they move into `api/` here.
 
 ## Using it
 
-The shell (`nabhi-frontend`) lists this package in `package.json` as
-`file:../nabhi-crm` and in `transpilePackages`, then re-exports each page from a
+The shell (`bishnoi-frontend`) lists this package in `package.json` as
+`file:../bishnoi-crm` and in `transpilePackages`, then re-exports each page from a
 route file:
 
 ```tsx
-export { default, metadata } from "@nabhi/crm/screens/<page>";
+export { default, metadata } from "@bishnoi/crm/screens/<page>";
 ```
 
 Core — the sheet, the buttons, the fields, `lib/api`, `lib/types`,

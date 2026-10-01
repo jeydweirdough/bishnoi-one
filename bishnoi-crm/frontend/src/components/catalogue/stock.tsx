@@ -7,7 +7,7 @@ import { Button } from "@/src/platform/ui/button";
 import type { StockLevel } from "@/src/platform/lib/types";
 import { syncProducts } from "../../actions/catalogue";
 
-// How much Nabhi Inventory has of a product, as the Products list and the
+// How much Bishnoi One Inventory has of a product, as the Products list and the
 // quote form show it.
 
 const STATE: Record<NonNullable<StockLevel["state"]>, { label: string; className: string }> = {

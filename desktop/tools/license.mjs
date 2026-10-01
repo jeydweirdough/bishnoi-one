@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Issues a company's license file (.nabhi) and its two IDs.
+// Issues a company's license file (.bishnoi) and its two IDs.
 //
 //   npm run license -- issue          a new company: Company ID, activation key, file
 //   npm run license -- renew <file>   a new file with the same IDs: new passwords, or a new expiry
@@ -29,7 +29,7 @@ import {
   seal,
 } from "../license/file.mjs";
 
-const OUT = process.env.NABHI_ISSUED_DIR || join(dirname(fileURLToPath(import.meta.url)), "..", "issued");
+const OUT = process.env.BISHNOI_ISSUED_DIR || join(dirname(fileURLToPath(import.meta.url)), "..", "issued");
 const ALLOW_POSTGRES = process.argv.includes("--allow-postgres");
 // For trying the apps on a developer's PC: "local" is the app's own backend/.env database.
 const ALLOW_LOCAL = process.argv.includes("--local");
@@ -119,7 +119,7 @@ async function askSupabase(current) {
 
 function write(companyId, text) {
   mkdirSync(OUT, { recursive: true });
-  const file = join(OUT, `${companyId}.nabhi`);
+  const file = join(OUT, `${companyId}.bishnoi`);
   writeFileSync(file, text, "utf8");
   return file;
 }
@@ -129,7 +129,7 @@ function write(companyId, text) {
 async function issue() {
   const name = await ask("Company name");
   const companyId = checkCompanyId(await ask("Company ID", companyIdFrom(name)));
-  if (existsSync(join(OUT, `${companyId}.nabhi`))) {
+  if (existsSync(join(OUT, `${companyId}.bishnoi`))) {
     throw new LicenseError(`${companyId} was issued already. Use "renew" to give it a new file with the same IDs.`);
   }
   const apps = (await ask("Apps, separated by commas (admin, crm, finance, inventory, pharmacy)", "crm,inventory"))
@@ -216,7 +216,7 @@ try {
   else if (command === "renew" && arg) await renew(arg);
   else if (command === "check" && arg) await check(arg);
   else {
-    console.log("Use: npm run license -- issue | renew <file.nabhi> | check <file.nabhi>");
+    console.log("Use: npm run license -- issue | renew <file.bishnoi> | check <file.bishnoi>");
     process.exitCode = 2;
   }
 } catch (e) {

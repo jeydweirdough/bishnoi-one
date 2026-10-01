@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
-    # Signing in with a Nabhi account: the platform's public key, base64 (its
+    # Signing in with a Bishnoi One account: the platform's public key, base64 (its
     # /pass/key). Unset: only this app's own accounts sign in.
     platform_public_key: str | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
 
     # The company this app belongs to, as its screens show it.
-    org_name: str = "Nabhi"
+    org_name: str = "Bishnoi One"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     email_from: str | None = None
     crm_app_url: str | None = None
 
-    # Nabhi Inventory, where the product list and stock come from: its API
+    # Bishnoi One Inventory, where the product list and stock come from: its API
     # (https://...), and the key it gave this app (one of its INTEGRATION_KEYS,
     # the part after "crm:"). Unset: products are kept here, by hand.
     inventory_api_url: str | None = None
@@ -77,29 +77,29 @@ class Settings(BaseSettings):
     # Inventory's screens, for the "Add it in Inventory" link. Optional.
     inventory_app_url: str | None = None
 
-    # Nabhi Finance, which works out tax (the price rules' last step): its API,
+    # Bishnoi One Finance, which works out tax (the price rules' last step): its API,
     # and the key it gave this app (one of its INTEGRATION_KEYS, the part after
     # "crm:"). Unset: quotes are priced without tax.
     finance_api_url: str | None = None
     finance_api_key: SecretStr | None = None
 
-    # Nabhi Order, where orders are made: its API (https://...), and the key it
-    # gave this app (sent as X-Nabhi-Key). "Raise order" on a ready quote sends
+    # Bishnoi One Order, where orders are made: its API (https://...), and the key it
+    # gave this app (sent as X-Bishnoi-Key). "Raise order" on a ready quote sends
     # it there (app/orders.py has the payload). Unset: the button is not shown.
     orders_api_url: str | None = None
     orders_api_key: SecretStr | None = None
 
-    # Nabhi Pharmacy, where a pharmacist checks a quote marked Rx before it's
+    # Bishnoi One Pharmacy, where a pharmacist checks a quote marked Rx before it's
     # ordered (app/pharmacy.py): its API, and the key it gave this app (one of
     # its INTEGRATION_KEYS, the part after "crm:"). Unset: an Rx quote can't be
     # sent for checking, so it can't be ordered.
     pharmacy_api_url: str | None = None
     pharmacy_api_key: SecretStr | None = None
 
-    # The other Nabhi apps allowed to read the CRM's customers (the
+    # The other Bishnoi One apps allowed to read the CRM's customers (the
     # /integration/customers endpoints: Finance invoices them), as name:key
     # pairs in JSON, e.g. ["finance:<a long random key>"]. The app sends its key
-    # in X-Nabhi-Key. Empty: nothing outside can read them.
+    # in X-Bishnoi-Key. Empty: nothing outside can read them.
     integration_keys: list[SecretStr] = []
 
     @property

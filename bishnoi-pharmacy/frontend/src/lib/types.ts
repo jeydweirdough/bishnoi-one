@@ -106,7 +106,7 @@ export type PrescriptionSummary = {
   itemCount: number;
   items: { writtenAs: string; quantity: number; remaining: number }[];
   ready?: boolean;
-  /** Sent in by another Nabhi app (e.g. a CRM quote) for the pharmacist's
+  /** Sent in by another Bishnoi One app (e.g. a CRM quote) for the pharmacist's
    *  check. That app fills it from its own order, so it's never dispensed here. */
   source: RxSource | null;
 };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Runs one Nabhi app, API and screens together: `npm run nabhi-crm`.
+ * Runs one Bishnoi One app, API and screens together: `npm run bishnoi-crm`.
  *
  * Before starting, it gets the app ready, doing only what's missing:
  *   - backend/.env and frontend/.env.local, copied from their examples;
@@ -10,11 +10,11 @@
  * Then it starts `uv run main.py` and `npm run dev`, with each line marked
  * [api] or [web]. Ctrl+C stops both; if one stops, the other is stopped too.
  *
- *   npm run nabhi-crm              both
- *   npm run nabhi-crm -- --api     the API only
- *   npm run nabhi-crm -- --web     the screens only
- *   npm run nabhi-crm -- --setup   get it ready, start nothing
- *   npm run nabhi-crm:app          both, in a window of its own (--app)
+ *   npm run bishnoi-crm              both
+ *   npm run bishnoi-crm -- --api     the API only
+ *   npm run bishnoi-crm -- --web     the screens only
+ *   npm run bishnoi-crm -- --setup   get it ready, start nothing
+ *   npm run bishnoi-crm:app          both, in a window of its own (--app)
  *
  * With --app the screens open as a desktop app (desktop/main.mjs), marked
  * [app]. Its packages, desktop/node_modules, are installed the first time.
@@ -33,7 +33,7 @@ const WINDOWS = process.platform === "win32";
 const COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code, text) => (COLOR ? `\x1b[${code}m${text}\x1b[0m` : text);
 
-const apps = readdirSync(ROOT).filter((name) => name.startsWith("nabhi-") && existsSync(join(ROOT, name, "backend")));
+const apps = readdirSync(ROOT).filter((name) => name.startsWith("bishnoi-") && existsSync(join(ROOT, name, "backend")));
 
 function fail(message) {
   console.error(paint("31", `✗ ${message}`));
@@ -41,7 +41,7 @@ function fail(message) {
 }
 
 const [asked, ...flags] = process.argv.slice(2);
-const app = asked && (apps.includes(asked) ? asked : apps.includes(`nabhi-${asked}`) ? `nabhi-${asked}` : null);
+const app = asked && (apps.includes(asked) ? asked : apps.includes(`bishnoi-${asked}`) ? `bishnoi-${asked}` : null);
 if (!app) fail(`Which app? ${asked ? `"${asked}" isn't one. ` : ""}One of: ${apps.join(", ")}`);
 
 const only = { api: flags.includes("--api"), web: flags.includes("--web") };
@@ -172,7 +172,7 @@ function start(label, color, command, args, cwd, direct = false) {
 
 if (runApi) start("api", "35", "uv", ["run", "main.py"], backend);
 if (runWeb) start("web", "34", "npm", ["run", "dev"], frontend);
-if (asApp) start("app", "33", process.execPath, [join(desktop, "node_modules", "electron", "cli.js"), desktop, `--nabhi-app=${app}`], ROOT, true);
+if (asApp) start("app", "33", process.execPath, [join(desktop, "node_modules", "electron", "cli.js"), desktop, `--bishnoi-app=${app}`], ROOT, true);
 if (!children.length) fail("Nothing to run.");
 
 process.on("SIGINT", () => stopAll(0));

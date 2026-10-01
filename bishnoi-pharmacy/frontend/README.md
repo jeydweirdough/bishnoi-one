@@ -1,4 +1,4 @@
-# Nabhi Pharmacy — screens
+# Bishnoi One Pharmacy — screens
 
 The Pharmacy's own Next.js app. Its API is in `../backend`; only this app's
 server talks to it, never the browser.
@@ -37,4 +37,4 @@ inside it, and each page shows only to a role that may open it.
 | `src/components/` | Forms and the pieces screens share (`bits.tsx`: marks, tabs, tables) |
 | `src/actions/pharmacy.ts` | Every change the screens make, as server actions |
 | `src/lib/` | Types the API sends, the words for each state, the page helper |
-| `src/platform/` | The shell every Nabhi app shares: sign-in, sidebar, UI kit |
+| `src/platform/` | The shell every Bishnoi One app shares: sign-in, sidebar, UI kit |

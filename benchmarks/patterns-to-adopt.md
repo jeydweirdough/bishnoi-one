@@ -1,6 +1,6 @@
 # Patterns to adopt
 
-How every Nabhi app is built, whichever app it is. Each pattern names the
+How every Bishnoi One app is built, whichever app it is. Each pattern names the
 benchmark it comes from, where we stand, and which matrix rows it serves.
 
 A pattern marked **rule** is how we already build. A pattern marked
@@ -153,7 +153,7 @@ How the apps already agree, kept that way:
 - **Migrations** run on start and each step checks it isn't already done.
 - **Apps talk to each other** through their `/integration/…` endpoints,
   with a key per calling app (`INTEGRATION_KEYS` on the app being asked,
-  sent in the `X-Nabhi-Key` header). If the other app can't be reached, the
+  sent in the `X-Bishnoi-Key` header). If the other app can't be reached, the
   caller says so plainly and never saves a half-done record.
 - **The shared kit** (`frontend/src/platform/`) is one design across apps: a
   pattern adopted in one app goes into the kit for the rest.

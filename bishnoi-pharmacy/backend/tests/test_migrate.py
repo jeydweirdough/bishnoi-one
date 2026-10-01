@@ -1,5 +1,5 @@
 """A database from Orbit Pharmacy (plain users and sessions, no migrations)
-becomes Nabhi Pharmacy's: every table nbph_, its people kept, a copy of the
+becomes Bishnoi One Pharmacy's: every table nbph_, its people kept, a copy of the
 file left beside it."""
 
 from datetime import UTC, datetime

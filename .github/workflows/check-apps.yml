@@ -2,8 +2,8 @@
 # check a new app's folder: once merged, the Sync branches action makes the
 # app its own branch, named after the folder.
 #
-# For each app folder (nabhi-*) it checks that:
-# - the name is nabhi-<name>: small letters, digits and dashes
+# For each app folder (bishnoi-*) it checks that:
+# - the name is bishnoi-<name>: small letters, digits and dashes
 # - it has frontend/, backend/, .gitignore and GIT-GUIDE.md
 # - its .github/workflows/sync-branches.yml is the same as main's, without
 #   which pushes to its branch wouldn't sync
@@ -31,11 +31,11 @@ jobs:
           fail() { echo "::error::$1"; echo "- $1" >> "$GITHUB_STEP_SUMMARY"; problems=$((problems + 1)); }
 
           echo "### Checking the app folders" >> "$GITHUB_STEP_SUMMARY"
-          for dir in nabhi-*/; do
+          for dir in bishnoi-*/; do
             [ -d "$dir" ] || continue
             app="${dir%/}"
-            if ! [[ "$app" =~ ^nabhi-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-              fail "$app: name it nabhi-<name>, in small letters, digits and dashes (e.g. nabhi-hr)"
+            if ! [[ "$app" =~ ^bishnoi-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+              fail "$app: name it bishnoi-<name>, in small letters, digits and dashes (e.g. bishnoi-hr)"
             fi
             for part in frontend backend; do
               [ -d "$app/$part" ] || fail "$app: the $part/ folder is missing"

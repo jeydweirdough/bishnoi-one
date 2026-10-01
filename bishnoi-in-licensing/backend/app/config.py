@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
 
     # The company this app belongs to, as its screens show it.
-    org_name: str = "Nabhi"
+    org_name: str = "Bishnoi One"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"

@@ -1,10 +1,10 @@
-"""Nabhi accounts: the companies' people signing in once, here, for every
+"""Bishnoi One accounts: the companies' people signing in once, here, for every
 application they have been given.
 
 - /identity/login, /identity/logout: their sign-in (not the console's staff).
 - /identity/me: who they are, and the applications they may open.
 - /identity/pass: a pass into one application (app/passes.py), sent back to
-  that application's own address (or to Nabhi.exe on the same PC) only.
+  that application's own address (or to Bishnoi One.exe on the same PC) only.
 - /identity/password: changing their password.
 - /pass/key: the platform's public key, for the applications to check passes.
 
@@ -31,13 +31,13 @@ from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
 from app.routers.auth import Attempts
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
 
-router = APIRouter(tags=["nabhi accounts"])
+router = APIRouter(tags=["bishnoi accounts"])
 
-WRONG = "That email and password don't match a Nabhi account."
+WRONG = "That email and password don't match a Bishnoi One account."
 attempts = Attempts()
 _bearer = HTTPBearer(auto_error=False)
 
-# Nabhi.exe runs the applications on the PC itself, on these ports.
+# Bishnoi One.exe runs the applications on the PC itself, on these ports.
 DESKTOP_PORTS = range(47300, 47400)
 RETURN_PATH = "/auth/platform"
 
@@ -47,14 +47,14 @@ def current_identity(
     db: Annotated[Session, Depends(get_db)],
 ) -> tuple[IdentitySession, Identity]:
     if credentials is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Please sign in with your Nabhi account.")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Please sign in with your Bishnoi One account.")
     record = db.scalar(select(IdentitySession).where(IdentitySession.token_hash == token_hash(credentials.credentials)))
     if record is None or record.revoked_at is not None or as_utc(record.expires_at) <= datetime.now(UTC):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Nabhi sign-in has ended. Please sign in again.")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
     person = db.get(Identity, record.identity_id)
     changed = person and person.password_changed_at and as_utc(record.created_at) < as_utc(person.password_changed_at)
     if person is None or person.status != "active" or changed:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Nabhi sign-in has ended. Please sign in again.")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
     return record, person
 
 
@@ -86,9 +86,9 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
     company = db.get(Company, person.company_id)
     if person.status != "active":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This Nabhi account is suspended. Ask your company's administrator.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
     if company is None or company.status != "active":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Nabhi access is suspended. Ask your company's administrator.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     attempts.clear(email)
     token = new_token()
     now = datetime.now(UTC)
@@ -146,7 +146,7 @@ class PassIn(Api):
 
 
 def check_return(app: Application, return_to: str, settings) -> str:
-    """The pass goes back only to the application's own address, or to Nabhi.exe on this PC."""
+    """The pass goes back only to the application's own address, or to Bishnoi One.exe on this PC."""
     try:
         target = urlsplit(return_to)
     except ValueError:
@@ -172,12 +172,12 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
     return_to = check_return(app, body.return_to, settings)
     company = db.get(Company, person.company_id)
     if company is None or company.status != "active":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Nabhi access is suspended. Ask your company's administrator.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     if db.get(CompanyApp, (company.id, app.id)) is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} doesn't have {app.name}. Ask your company's administrator.")
     grant = db.get(IdentityApp, (person.id, app.id))
     if grant is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Nabhi account doesn't include {app.name}. Ask your company's administrator for access.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")
     try:
         token = issue(settings, person, company, app, grant)
     except PassUnavailable as e:

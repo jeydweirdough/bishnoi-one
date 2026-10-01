@@ -1,7 +1,7 @@
 # Keeps main and the per-app branches in step, on GitHub, after every push.
 #
 # - A push to main rebuilds every app's branch from its folder.
-# - A push to an app branch (nabhi-crm, nabhi-admin, ...) merges that work into
+# - A push to an app branch (bishnoi-crm, bishnoi-admin, ...) merges that work into
 #   main's folder first, then rebuilds the branches.
 #
 # It runs scripts/sync-branches.sh, the same script you can still run by hand.
@@ -12,7 +12,7 @@
 #
 # GitHub reads a push's workflow from the branch pushed to, and an app branch
 # holds only its folder. So this same file is also in each app folder
-# (nabhi-*/.github/workflows/sync-branches.yml), which is that branch's root.
+# (bishnoi-*/.github/workflows/sync-branches.yml), which is that branch's root.
 # Change one, change them all: they must stay the same.
 name: Sync branches
 
@@ -20,7 +20,7 @@ on:
   push:
     branches:
       - main
-      - "nabhi-*"
+      - "bishnoi-*"
   workflow_dispatch: # "Run workflow" on the Actions tab, for a manual sync
   schedule:
     - cron: "*/30 * * * *" # a safety net, in case a push was missed

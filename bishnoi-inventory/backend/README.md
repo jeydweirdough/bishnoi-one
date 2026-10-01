@@ -1,4 +1,4 @@
-# Nabhi Inventory — API
+# Bishnoi One Inventory — API
 
 Inventory's own backend: what you have, where it is, how much, what is
 moving, and what needs attention. Its screens are in `../frontend`.
@@ -18,7 +18,7 @@ uv run python -m pytest
 
 The database is brought up to date on every start (`app/migrate.py`): SQLite
 in `.data/` unless `DATABASE_URL` says otherwise. Every table is `nbin_…`
-(NaBhi INventory), and so is the migration table, `nbin_alembic_version`. A
+(Bishnoi One INventory), and so is the migration table, `nbin_alembic_version`. A
 database from before migrations (plain `users` and `sessions`) is carried
 over: its admins become Administrators, the rest Warehouse.
 
@@ -81,7 +81,7 @@ after that, from Administration → Users.
 | `uv run python -m app.tools.users password --email …` | Sets a new password; ends that person's sessions |
 | `uv run python -m app.tools.users disable --email …` / `enable` | Switches the account off or on |
 
-For scripts, set `NABHI_NEW_PASSWORD` instead of typing the password.
+For scripts, set `BISHNOI_NEW_PASSWORD` instead of typing the password.
 
 ## Settings (`.env`)
 
@@ -91,15 +91,15 @@ For scripts, set `NABHI_NEW_PASSWORD` instead of typing the password.
 | `SESSION_HOURS` | How long a sign-in lasts | `10` |
 | `EXPIRY_WARNING_DAYS` | A batch expiring within this many days is flagged | `90` |
 | `DEAD_STOCK_DAYS` | Nothing issued or transferred out for this long counts as dead stock | `180` |
-| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Nabhi, PHP, en-PH, Asia/Manila |
+| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Bishnoi One, PHP, en-PH, Asia/Manila |
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 
 ## Deploying on Vercel
 
 Two Vercel projects from the same repo, like the CRM's: the API
-(root directory `nabhi-inventory/backend`, run from `app/server.py`) and the
-screens (root directory `nabhi-inventory/frontend`). Vercel has no lasting
+(root directory `bishnoi-inventory/backend`, run from `app/server.py`) and the
+screens (root directory `bishnoi-inventory/frontend`). Vercel has no lasting
 disk, so the data lives in Postgres, pictures included.
 
 **API project** (Settings → Environment Variables):
@@ -116,7 +116,7 @@ disk, so the data lives in Postgres, pictures included.
 | Name | Value |
 |---|---|
 | `API_URL` | the API's address: `https://nabhi-inventory-backend.vercel.app` |
-| `NEXT_PUBLIC_NABHI_APP` | `inventory` (read at build time: redeploy after changing it) |
+| `NEXT_PUBLIC_BISHNOI_APP` | `inventory` (read at build time: redeploy after changing it) |
 
 The first request builds the tables and, with the `FIRST_ADMIN_*` settings,
 makes the first administrator. Or make them from this folder instead, pointed

@@ -1,10 +1,10 @@
 import "server-only";
 import { cookies } from "next/headers";
 
-// Nabhi accounts (the companies' people), apart from the console's staff
+// Bishnoi One accounts (the companies' people), apart from the console's staff
 // sign-in: their own cookie, sent to the API's /identity endpoints only.
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
-export const ACCOUNT_COOKIE = "nabhi_account";
+export const ACCOUNT_COOKIE = "bishnoi_account";
 
 export class AccountError extends Error {
   constructor(
@@ -28,7 +28,7 @@ export async function accountCall<T>(path: string, body?: unknown, token?: strin
       cache: "no-store",
     });
   } catch {
-    throw new AccountError(503, "Nabhi can't be reached right now. Check the internet connection and try again.");
+    throw new AccountError(503, "Bishnoi One can't be reached right now. Check the internet connection and try again.");
   }
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);

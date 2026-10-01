@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 
 from .test_tax_api import CRM_KEY, app, ana, ben, client  # noqa: F401 (fixtures)
 
-KEY = {"X-Nabhi-Key": CRM_KEY}
+KEY = {"X-Bishnoi-Key": CRM_KEY}
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 100).decode()
 
 
@@ -53,7 +53,7 @@ def check_all(client, who, req):
 
 def test_only_an_app_with_a_key_sends_requests(client):
     assert client.post("/integration/funds/requests", json={}).status_code == 401
-    assert client.get("/integration/funds/categories", headers={"X-Nabhi-Key": "x" * 32}).status_code == 401
+    assert client.get("/integration/funds/categories", headers={"X-Bishnoi-Key": "x" * 32}).status_code == 401
 
 
 def test_sent_twice_is_one_request(client, ben):

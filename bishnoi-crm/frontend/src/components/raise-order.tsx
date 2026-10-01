@@ -7,13 +7,13 @@ import { buttonClass } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import type { Quote } from "@/src/platform/lib/types";
 
-/** Raise an order in Nabhi Order from this quote.
+/** Raise an order in Bishnoi One Order from this quote.
  *
- *  The CRM sends the quote to Nabhi Order's API (backend app/orders.py has the
+ *  The CRM sends the quote to Bishnoi One Order's API (backend app/orders.py has the
  *  payload) and keeps the order number it answers with, so a quote is ordered
  *  once. After that this shows the order instead of the button.
  *
- *  Shown to people who raise orders. Until Nabhi Order is connected, and until
+ *  Shown to people who raise orders. Until Bishnoi One Order is connected, and until
  *  the quote is approved and its letter checked, the button is there but off,
  *  and says why on hover. */
 export function RaiseOrder({
@@ -39,7 +39,7 @@ export function RaiseOrder({
         target="_blank"
         rel="noopener"
         className={buttonClass("default")}
-        title="Open the order in Nabhi Order"
+        title="Open the order in Bishnoi One Order"
       >
         {label}
         <ArrowUpRight className="size-4" aria-hidden />
@@ -53,7 +53,7 @@ export function RaiseOrder({
   }
   if (!mayOrder) return null;
   const why = !linked
-    ? "Nabhi Order isn't connected yet. Your administrator sets ORDERS_API_URL and ORDERS_API_KEY."
+    ? "Bishnoi One Order isn't connected yet. Your administrator sets ORDERS_API_URL and ORDERS_API_KEY."
     : quote.state === "waiting"
       ? "Available once the quote is approved and its guarantee letter is checked."
       : quote.state === "rejected"
@@ -76,7 +76,7 @@ export function RaiseOrder({
         title={`Raise an order from ${quote.number}?`}
         body={
           <p>
-            The quote&apos;s products, prices and customer are sent to Nabhi
+            The quote&apos;s products, prices and customer are sent to Bishnoi One
             Order, which makes the sales order. This is done once per quote.
           </p>
         }
@@ -88,7 +88,7 @@ export function RaiseOrder({
             return false;
           }
           toast.success(`Order ${r.data.order?.number} raised`, {
-            description: "Nabhi Order has it now.",
+            description: "Bishnoi One Order has it now.",
           });
         }}
       />

@@ -1,7 +1,7 @@
 """Tax: the company's registration, the dated rates, and working out a sale.
 
 Anyone signed in to Finance can see the setup and work out a sale; only its
-admins change the registration or a rate. The other Nabhi apps ask for the
+admins change the registration or a rate. The other Bishnoi One apps ask for the
 same answer through /integration/tax (app/routers/integration.py), so a
 quote, a pharmacy sale and an invoice are taxed by one set of rules.
 """

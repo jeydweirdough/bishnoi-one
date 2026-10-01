@@ -88,7 +88,7 @@ export const ICONS = {
   goals: Target,
   deals: Handshake,
   company: Building,
-  apps: LayoutGrid, // the other applications this company reaches from Nabhi
+  apps: LayoutGrid, // the other applications this company reaches from Bishnoi One
   companies: Globe, // every company on the platform, for a Developer Admin
   headquarters: MapPinHouse, // a team's office: a place with a building
   auditLog: ScrollText,

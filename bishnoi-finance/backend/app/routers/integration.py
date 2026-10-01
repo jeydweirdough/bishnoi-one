@@ -1,5 +1,5 @@
-"""What the other Nabhi apps ask Finance: tax, and marketing requests. Only for an
-app holding one of INTEGRATION_KEYS, sent in the X-Nabhi-Key header (the same
+"""What the other Bishnoi One apps ask Finance: tax, and marketing requests. Only for an
+app holding one of INTEGRATION_KEYS, sent in the X-Bishnoi-Key header (the same
 way the CRM reads Inventory), so a quote, a pharmacy sale and an invoice are
 all taxed by Finance's one set of rules, and money is released by Finance
 whichever app asked for it.
@@ -20,14 +20,20 @@ from app.routers.funds import ordered_categories, receipt_of, today
 from app.routers.tax import Api, SaleBody, field_error, setup_out, work_out
 
 
-def calling_app(settings: SettingsDep, x_nabhi_key: Annotated[str | None, Header()] = None) -> str:
+def calling_app(
+    settings: SettingsDep,
+    x_bishnoi_key: Annotated[str | None, Header()] = None,
+    # The header's name before the rename to Bishnoi One: still taken until every app is redeployed.
+    x_nabhi_key: Annotated[str | None, Header()] = None,
+) -> str:
     """The name of the app whose key came with the request."""
-    if x_nabhi_key:
+    x_bishnoi_key = x_bishnoi_key or x_nabhi_key
+    if x_bishnoi_key:
         for key in settings.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
-            if hmac.compare_digest(secret.encode(), x_nabhi_key.encode()):
+            if hmac.compare_digest(secret.encode(), x_bishnoi_key.encode()):
                 return name
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Nabhi app's key (X-Nabhi-Key).")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This needs a Bishnoi One app's key (X-Bishnoi-Key).")
 
 
 router = APIRouter(prefix="/integration/tax", tags=["integration"], dependencies=[Depends(calling_app)])

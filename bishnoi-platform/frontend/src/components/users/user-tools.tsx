@@ -37,7 +37,7 @@ export function SuspendUser({ id, name, status }: { id: string; name: string; st
   );
 }
 
-/** A first password for their Nabhi account (or a new one), shown once to hand over. */
+/** A first password for their Bishnoi One account (or a new one), shown once to hand over. */
 export function MakePassword({ id, name, hasPassword }: { id: string; name: string; hasPassword: boolean }) {
   const label = hasPassword ? `Reset the password of ${name}` : `Make a first password for ${name}`;
   return (
@@ -53,7 +53,7 @@ export function MakePassword({ id, name, hasPassword }: { id: string; name: stri
       body={
         hasPassword
           ? `A new password is made and shown once. ${name} is signed out everywhere and signs in with it, then changes it.`
-          : `A password is made and shown once. Give it to ${name}: they sign in with their Nabhi account, then change it.`
+          : `A password is made and shown once. Give it to ${name}: they sign in with their Bishnoi One account, then change it.`
       }
       confirmLabel={hasPassword ? "Reset password" : "Make password"}
       onConfirm={async () => {

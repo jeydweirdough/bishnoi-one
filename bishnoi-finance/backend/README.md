@@ -1,4 +1,4 @@
-# Nabhi Finance — API
+# Bishnoi One Finance — API
 
 The Finance app's own backend. Its screens are in `../frontend`.
 
@@ -52,7 +52,7 @@ one email make it wait 15 minutes (`LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`).
 |---|---|---|
 | `DATABASE_URL` | This app's own database | `sqlite:///.data/finance.db` |
 | `SESSION_HOURS` | How long a sign-in lasts | `10` |
-| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Nabhi, PHP, en-PH, Asia/Manila |
+| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The company, as the screens show it | Bishnoi One, PHP, en-PH, Asia/Manila |
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 
@@ -72,7 +72,7 @@ Port: screens on 4303, this API on 8303 (screens + 4000).
 
 ## Tax
 
-Finance owns tax for every Nabhi app (benchmarks/decisions.md, D8): quotes,
+Finance owns tax for every Bishnoi One app (benchmarks/decisions.md, D8): quotes,
 pharmacy sales and invoices are all taxed by the rules here.
 
 | Path | What it's for |
@@ -81,7 +81,7 @@ pharmacy sales and invoices are all taxed by the rules here.
 | `app/tax/packs/ph.py` | The Philippines: VAT, zero-rated, exempt, senior citizen and PWD, percentage tax, the Sales Invoice summary. **Confirm with your accountant before filing** |
 | `app/tax/rates.py` | Dated rates in `nbfi_tax_rates`: seeded from the packs on start; a change in the law is a new row from its first day |
 | `app/routers/tax.py` | `/tax/setup`, `/tax/profile` (admins), `/tax/rates` (admins), `/tax/compute` |
-| `app/routers/integration.py` | `/integration/tax/setup` and `/integration/tax/compute` for the other apps, with `X-Nabhi-Key` |
+| `app/routers/integration.py` | `/integration/tax/setup` and `/integration/tax/compute` for the other apps, with `X-Bishnoi-Key` |
 
 Other apps get a key in `INTEGRATION_KEYS` (see `.env.example`). Screens: **Tax** in the sidebar,
 with Registration, Rates and Try a sale.

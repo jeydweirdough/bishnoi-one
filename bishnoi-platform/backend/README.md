@@ -1,6 +1,6 @@
-# Nabhi Platform — API
+# Bishnoi One Platform — API
 
-The Platform app's own backend: the control tower above every Nabhi
+The Platform app's own backend: the control tower above every Bishnoi One
 application. Its screens are in `../frontend`.
 
 It doesn't run the pharmacy, the CRM or the inventory. It keeps the record of
@@ -98,7 +98,7 @@ fast each answers its health check.
 | `DATABASE_URL` | This app's own database | `sqlite:///.data/platform.db` |
 | `FIRST_ADMIN_EMAIL`, `_NAME`, `_PASSWORD` | The first Platform Admin, into an empty database | none |
 | `SESSION_HOURS`, `LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES` | Sign-in rules to start with; Settings › Security wins once saved | 10, 5, 15 |
-| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The platform, as the screens show it | Nabhi, PHP, en-PH, Asia/Manila |
+| `ORG_NAME`, `ORG_CURRENCY`, `ORG_LOCALE`, `ORG_TIMEZONE` | The platform, as the screens show it | Bishnoi One, PHP, en-PH, Asia/Manila |
 | `ALLOWED_HOSTS` | Host names this API answers to | `["localhost", "127.0.0.1"]` |
 | `CORS_ORIGINS` | Browser origins allowed to call it directly | none |
 

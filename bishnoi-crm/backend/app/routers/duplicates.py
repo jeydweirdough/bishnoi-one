@@ -12,7 +12,7 @@ small enough to need no library:
 Merging keeps one record. Everything on the other one moves to it (contacts,
 activities, quotes, deals, visits, balances, marketing requests); the kept record's
 empty fields are filled from the other; the other is deleted, and its id is
-remembered (MergedRecord) so old links and the other Nabhi apps still find the
+remembered (MergedRecord) so old links and the other Bishnoi One apps still find the
 one kept. Pairs someone says are different aren't offered again.
 """
 

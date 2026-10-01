@@ -54,7 +54,7 @@ def _sqlite_file(engine: Engine) -> Path | None:
 
 
 class DatabaseTooNew(RuntimeError):
-    """The database was brought up to a later version by a newer Nabhi. An
+    """The database was brought up to a later version by a newer Bishnoi One. An
     older one must not run on it: its screens and saves would not match the
     tables. It says so plainly instead of failing somewhere later."""
 
@@ -97,7 +97,7 @@ def _upgrade(engine: Engine) -> None:
         current = MigrationContext.configure(connection, opts={"version_table": VERSION_TABLE}).get_current_revision()
     if current is not None and not _known(config, current):
         raise DatabaseTooNew(
-            f"The database is at version {current}, newer than this copy of Nabhi knows. Update Nabhi.exe (or this API) to open it."
+            f"The database is at version {current}, newer than this copy of Bishnoi One knows. Update Bishnoi One.exe (or this API) to open it."
         )
     if current is None and "users" in tables:
         command.stamp(config, "0001")

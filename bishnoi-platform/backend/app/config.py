@@ -30,10 +30,10 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr | None = None
     # How long a sign-in lasts, until changed under Settings > Security.
     session_hours: int = 10
-    # Nabhi accounts (the companies' people): how long their sign-in lasts.
-    # Long, since Nabhi.exe works in the field for days at a time.
+    # Bishnoi One accounts (the companies' people): how long their sign-in lasts.
+    # Long, since Bishnoi One.exe works in the field for days at a time.
     identity_session_hours: int = 720
-    # Signs the passes that take a Nabhi account into an application: an
+    # Signs the passes that take a Bishnoi One account into an application: an
     # Ed25519 private key, base64 of its 32 raw bytes (app/passes.py makes one).
     # Each application holds only the public half. Unset in development: a key
     # is made and kept in .data/.
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
 
     # The platform, as its screens show it.
-    org_name: str = "Nabhi"
+    org_name: str = "Bishnoi One"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"

@@ -286,7 +286,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nabhi-regulatory-api"
+name = "bishnoi-regulatory-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-"""The platform's records. Every table is nbpl_ (NaBhi PLatform).
+"""The platform's records. Every table is nbpl_ (Bishnoi One PLatform).
 
 Two kinds of people live here, and they are kept apart on purpose:
 
@@ -206,15 +206,15 @@ class Identity(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    # Their Nabhi account's password: one sign-in for every application they
+    # Their Bishnoi One account's password: one sign-in for every application they
     # have (app/routers/identity.py). None until a Platform Admin sets a first one.
     password_hash: Mapped[str | None] = mapped_column(String(255), default=None)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class IdentitySession(Base):
-    """One sign-in to a Nabhi account (not the console's staff sign-in). The
-    browser or Nabhi.exe holds the token; only its hash is kept here."""
+    """One sign-in to a Bishnoi One account (not the console's staff sign-in). The
+    browser or Bishnoi One.exe holds the token; only its hash is kept here."""
 
     __tablename__ = "nbpl_identity_sessions"
 

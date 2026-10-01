@@ -1,7 +1,7 @@
 [project]
-name = "nabhi-in-licensing-api"
+name = "bishnoi-in-licensing-api"
 version = "0.1.0"
-description = "Nabhi Licensing API"
+description = "Bishnoi One Licensing API"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",

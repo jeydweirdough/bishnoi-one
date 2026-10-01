@@ -1,7 +1,7 @@
 [project]
-name = "nabhi-finance-api"
+name = "bishnoi-finance-api"
 version = "0.1.0"
-description = "Nabhi Finance API"
+description = "Bishnoi One Finance API"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",

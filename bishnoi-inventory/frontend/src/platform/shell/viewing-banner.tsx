@@ -19,7 +19,7 @@ export function ViewingBanner({ who, company }: { who: string; company: string }
       <p className="flex min-w-0 items-center gap-2 text-meta">
         <Eye className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0">
-          You&apos;re seeing Nabhi as <b className="font-semibold">{who}</b> in {company}.
+          You&apos;re seeing Bishnoi One as <b className="font-semibold">{who}</b> in {company}.
           <span className="text-sheet/70"> Looking only — nothing here can be changed.</span>
         </span>
       </p>

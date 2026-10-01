@@ -267,8 +267,8 @@ def test_settings_are_checked_and_logged(client, ana, ben):
     assert s["security"]["sessionHours"] == 10 and s["notifications"]["responseHours"]["critical"] == 4
     assert client.put("/platform/settings/monitoring", json={**s["monitoring"], "staleSeconds": 5}, headers=ana).status_code == 422
     assert client.put("/platform/settings/monitoring", json=s["monitoring"], headers=ben).status_code == 403
-    r = client.put("/platform/settings/platform", json={**s["platform"], "supportEmail": "help@nabhi.test"}, headers=ana)
-    assert r.json()["settings"]["platform"]["supportEmail"] == "help@nabhi.test"
+    r = client.put("/platform/settings/platform", json={**s["platform"], "supportEmail": "help@bishnoi.test"}, headers=ana)
+    assert r.json()["settings"]["platform"]["supportEmail"] == "help@bishnoi.test"
     log = client.get("/platform/activity", headers=ana).json()["entries"]
     assert log[0]["action"] == "settings.platform" and log[0]["fields"] == ["supportEmail"]
 

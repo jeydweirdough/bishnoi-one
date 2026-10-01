@@ -17,7 +17,7 @@ const BUCKETS = { taxable: "On the invoice as VAT", zero_rated: "Zero-rated", ex
 
 /**
  * Tax: the company's registration, the dated rates, and a place to see what a
- * sale comes to. Finance owns tax for every Nabhi app; the CRM and Pharmacy
+ * sale comes to. Finance owns tax for every Bishnoi One app; the CRM and Pharmacy
  * ask it for the same answer (benchmarks/decisions.md, D8).
  */
 export default async function TaxPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -32,7 +32,7 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
   return (
     <>
       <PageHeader title="Tax">
-        {pack.name} · {profile.regimeName}. Every quote, sale and invoice in Nabhi is taxed by these rules.
+        {pack.name} · {profile.regimeName}. Every quote, sale and invoice in Bishnoi One is taxed by these rules.
         {!profile.complete && (
           <span className="mt-1 block">
             <Flag letter="!">Fill in the registration: every {pack.document} needs the registered name, TIN and address.</Flag>

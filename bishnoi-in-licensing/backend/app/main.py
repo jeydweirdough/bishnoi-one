@@ -1,4 +1,4 @@
-"""Nabhi Licensing API.
+"""Bishnoi One Licensing API.
 
 Run with:  uv run main.py   (port 8306)
 """
@@ -31,7 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="Nabhi Licensing API", version="0.1.0", **docs)
+    app = FastAPI(title="Bishnoi One Licensing API", version="0.1.0", **docs)
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # Every change and sign-in goes to Discord as a line, a thread a day (app/discord.py).

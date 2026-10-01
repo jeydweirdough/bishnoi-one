@@ -181,7 +181,7 @@ export async function QuoteView({
         <SectionTitle icon="approvals">Approval and payment</SectionTitle>
         <div className="mt-1 divide-y divide-rule text-sm">
           {pharmacy && (
-            // Rx medicines: a pharmacist in Nabhi Pharmacy checks the prescription before the quote is ordered.
+            // Rx medicines: a pharmacist in Bishnoi One Pharmacy checks the prescription before the quote is ordered.
             <section className="py-3" aria-label="Pharmacist check">
               <h3 className="text-meta text-ink-3">Pharmacist check{pharmacy.number && ` · ${pharmacy.number}`}</h3>
               {pharmacy.outcome === "not_sent" ? (

@@ -1,5 +1,5 @@
 """Finance's tables: its own accounts (nobody signed in here exists in any
-other Nabhi app), tax, and the funds released to other apps' people.
+other Bishnoi One app), tax, and the funds released to other apps' people.
 
 Every table's name starts with nbfi_ (Finance), so it is plain which app a
 table belongs to, whatever database it ends up in. Changes to them go through
@@ -76,7 +76,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Every session started before this ends (see deps.current_user).
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    # Their Nabhi account on the platform, once they have signed in with it (app/platform_pass.py).
+    # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")

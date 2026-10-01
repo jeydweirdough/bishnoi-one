@@ -12,7 +12,7 @@ import { listName, pickable } from "@/src/platform/lib/labels";
 import type { Activity, ListItem, Org, Person } from "@/src/platform/lib/types";
 
 // A follow-up worth suggesting after a call that didn't land. Only the outcomes
-// Nabhi starts a company off with are known by code here; a company that writes
+// Bishnoi One starts a company off with are known by code here; a company that writes
 // its own simply gets no suggestion, which is no worse than typing one.
 const SUGGESTED_FOLLOW_UP: Record<string, string> = {
   no_answer: "Try calling again",

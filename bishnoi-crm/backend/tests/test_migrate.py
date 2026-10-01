@@ -131,7 +131,7 @@ def test_table_names_are_put_right_whatever_the_recorded_revision_says(tmp_path)
 
 
 def test_an_older_copy_refuses_a_newer_database(tmp_path):
-    """Each Nabhi.exe runs its own API on the company's database. One not yet
+    """Each Bishnoi One.exe runs its own API on the company's database. One not yet
     updated must say so, not run on tables it doesn't know."""
     import pytest
 
@@ -141,7 +141,7 @@ def test_an_older_copy_refuses_a_newer_database(tmp_path):
     create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url))
     engine = create_engine(url)
     with engine.begin() as c:
-        c.execute(text("UPDATE nbcm_alembic_version SET version_num = '9999_from_a_newer_nabhi'"))
+        c.execute(text("UPDATE nbcm_alembic_version SET version_num = '9999_from_a_newer_bishnoi'"))
     engine.dispose()
-    with pytest.raises(DatabaseTooNew, match="Update Nabhi.exe"):
+    with pytest.raises(DatabaseTooNew, match="Update Bishnoi One.exe"):
         create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url))

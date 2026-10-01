@@ -48,7 +48,7 @@ def probe(url: str, timeout: float, slow_ms: int) -> Answer:
     """One look at one address. Replaced in tests, which have nothing to call."""
     started = time.perf_counter()
     try:
-        response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "nabhi-platform-monitor"})
+        response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
     except httpx.TimeoutException:
         return Answer("down", None, None, f"No answer within {timeout:g} seconds.")
     except httpx.HTTPError:

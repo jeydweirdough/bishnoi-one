@@ -17,35 +17,35 @@ name: Deploy
 on:
   workflow_dispatch:
     inputs:
-      nabhi-admin:
+      bishnoi-admin:
         description: "Admin (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-crm:
+      bishnoi-crm:
         description: "CRM (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-finance:
+      bishnoi-finance:
         description: "Finance (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-in-licensing:
+      bishnoi-in-licensing:
         description: "In-Licensing (not on Vercel yet)"
         type: boolean
         default: false
-      nabhi-inventory:
+      bishnoi-inventory:
         description: "Inventory (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-pharmacy:
+      bishnoi-pharmacy:
         description: "Pharmacy (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-platform:
+      bishnoi-platform:
         description: "Platform (on Vercel: screens + API)"
         type: boolean
         default: false
-      nabhi-regulatory:
+      bishnoi-regulatory:
         description: "Regulatory (not on Vercel yet)"
         type: boolean
         default: false
@@ -97,7 +97,7 @@ jobs:
           part = asked.get("part", "screens and API")
           only_changed = str(asked.get("only_changed")).lower() == "true"
           head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-          apps = sorted(d for d in os.listdir(".") if d.startswith("nabhi-") and os.path.isdir(d))
+          apps = sorted(d for d in os.listdir(".") if d.startswith("bishnoi-") and os.path.isdir(d))
           wanted_side = {"screens and API": ("frontend", "backend"), "screens only": ("frontend",), "API only": ("backend",)}[part]
 
           todo, rows = [], []

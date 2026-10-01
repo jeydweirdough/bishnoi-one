@@ -1,5 +1,5 @@
 """Tax through the API: the registration, dated rate changes, working out a
-sale, and other Nabhi apps asking with their key."""
+sale, and other Bishnoi One apps asking with their key."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,7 +47,7 @@ def ben(client):
 
 
 REGISTRATION = {
-    "regime": "vat", "registeredName": "Nabhi Pharma Distribution Inc.", "tin": "123 456 789 00000",
+    "regime": "vat", "registeredName": "Bishnoi One Pharma Distribution Inc.", "tin": "123 456 789 00000",
     "registeredAddress": "123 Ayala Ave, Makati City", "pricesIncludeTax": True,
 }
 
@@ -128,8 +128,8 @@ def test_a_non_vat_company(client, ana, ben):
 def test_other_apps_ask_with_their_key(client):
     body = {"lines": [line(112)]}
     assert client.post("/integration/tax/compute", json=body).status_code == 401
-    assert client.post("/integration/tax/compute", json=body, headers={"X-Nabhi-Key": "wrong"}).status_code == 401
-    r = client.post("/integration/tax/compute", json=body, headers={"X-Nabhi-Key": CRM_KEY})
+    assert client.post("/integration/tax/compute", json=body, headers={"X-Bishnoi-Key": "wrong"}).status_code == 401
+    r = client.post("/integration/tax/compute", json=body, headers={"X-Bishnoi-Key": CRM_KEY})
     assert r.status_code == 200 and r.json()["totalDueCentavos"] == 11200
-    setup = client.get("/integration/tax/setup", headers={"X-Nabhi-Key": CRM_KEY}).json()
+    setup = client.get("/integration/tax/setup", headers={"X-Bishnoi-Key": CRM_KEY}).json()
     assert {c["key"] for c in setup["pack"]["categories"]} == {"standard", "zero_rated", "exempt"} and setup["canEdit"] is False

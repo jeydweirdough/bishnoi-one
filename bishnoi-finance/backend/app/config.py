@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
-    # Signing in with a Nabhi account: the platform's public key, base64 (its
+    # Signing in with a Bishnoi One account: the platform's public key, base64 (its
     # /pass/key). Unset: only this app's own accounts sign in.
     platform_public_key: str | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
 
     # The company this app belongs to, as its screens show it.
-    org_name: str = "Nabhi"
+    org_name: str = "Bishnoi One"
     org_currency: str = "PHP"
     org_minor_units: int = 2
     org_locale: str = "en-PH"
@@ -52,16 +52,16 @@ class Settings(BaseSettings):
     discord_logs_webhook_url: SecretStr | None = None
     discord_max_per_minute: int = 30
 
-    # Other Nabhi apps allowed to ask for tax (the /integration endpoints), as
+    # Other Bishnoi One apps allowed to ask for tax (the /integration endpoints), as
     # name:key pairs in JSON, e.g. ["crm:<a long random key>"]. The app sends
-    # its key in X-Nabhi-Key. Empty: nothing outside can ask.
+    # its key in X-Bishnoi-Key. Empty: nothing outside can ask.
     integration_keys: list[SecretStr] = []
 
     # A released fund that's liquidated is due back, with its receipts, this
     # many days after it's released.
     liquidate_within_days: int = 7
 
-    # Nabhi CRM, whose customers an invoice is made out to: its API
+    # Bishnoi One CRM, whose customers an invoice is made out to: its API
     # (https://...), and the key it gave Finance (one of its INTEGRATION_KEYS,
     # the part after "finance:"). Unset: the customer is typed on the invoice.
     crm_api_url: str | None = None

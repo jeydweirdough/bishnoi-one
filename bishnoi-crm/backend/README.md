@@ -1,4 +1,4 @@
-# Nabhi CRM — API
+# Bishnoi One CRM — API
 
 The CRM app's own backend. Its screens are in `../frontend`.
 
@@ -96,7 +96,7 @@ rules** (`/pricing/...`, `app/conditions.py`, `app/pricing.py`):
    price that has one. The admin sets the order.
 2. **Then the adjustments**, in the admin's order: volume scale, promo,
    rep's discount, surcharge. Each can be switched off.
-3. **Tax, last**, from Nabhi Finance (`app/finance.py`), kept on the quote.
+3. **Tax, last**, from Bishnoi One Finance (`app/finance.py`), kept on the quote.
 
 A customer is put in a **price group** on its own page. Rules are dated;
 when several match a line, the most specific wins (product and group, then
@@ -111,8 +111,8 @@ the CRM has:
 
 | Setting | What it is |
 |---|---|
-| `INVENTORY_API_URL`, `INVENTORY_API_KEY`, `INVENTORY_APP_URL` | Products and stock from Nabhi Inventory. Unset: products are kept here |
-| `FINANCE_API_URL`, `FINANCE_API_KEY` | Tax from Nabhi Finance. Unset: quotes are priced without tax |
+| `INVENTORY_API_URL`, `INVENTORY_API_KEY`, `INVENTORY_APP_URL` | Products and stock from Bishnoi One Inventory. Unset: products are kept here |
+| `FINANCE_API_URL`, `FINANCE_API_KEY` | Tax from Bishnoi One Finance. Unset: quotes are priced without tax |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator, made on start while there are no accounts (Vercel) |
 
 Setting up the links: [MAINTAINING.md](../../MAINTAINING.md), "Linking the
@@ -124,11 +124,11 @@ Vercel runs the API from `app/server.py` (`[tool.vercel]` in `pyproject.toml`).
 It has no lasting disk, so the data lives in Postgres: the database, and the
 guarantee letters, which are kept in it (`nbcm_stored_files`).
 
-Every table the CRM makes is named `nbcm_…` (Nabhi CRM: `nbcm_users`,
+Every table the CRM makes is named `nbcm_…` (Bishnoi One CRM: `nbcm_users`,
 `nbcm_quotes`, and `nbcm_alembic_version` for the migrations), so its tables are easy to tell
 apart from any other app's.
 
-1. **Project:** import the repo, with the root directory `nabhi-crm/backend`.
+1. **Project:** import the repo, with the root directory `bishnoi-crm/backend`.
 2. **Database:** any Postgres, as `DATABASE_URL`.
    - **Supabase:** use the **pooler** address (Connect → Transaction pooler,
      port 6543), not `db.<project>.supabase.co`: that direct one is IPv6

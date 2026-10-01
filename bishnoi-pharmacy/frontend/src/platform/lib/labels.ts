@@ -13,11 +13,11 @@ import type {
 
 // The product. One name, whoever is using it — a company's own name is its
 // brandName (Settings → Company) and sits above this, never instead of it.
-export const APP_NAME = "Nabhi";
+export const APP_NAME = "Bishnoi One";
 
 // Customer kinds, activity kinds and call outcomes are the company's own words,
 // written in Settings → Lists and carried on the session. Lead, active and
-// inactive stay Nabhi's: the retention maths is built on those three.
+// inactive stay Bishnoi One's: the retention maths is built on those three.
 export const CUSTOMER_STATUSES: Record<CustomerStatus, string> = {
   lead: "Lead",
   active: "Active",

@@ -15,7 +15,7 @@ MODULE_ACTIONS = ("view", "create", "edit", "delete")
 def org_out(settings: Settings) -> dict:
     return {
         "id": ORG_ID,
-        "slug": "nabhi",
+        "slug": "bishnoi",
         "name": settings.org_name,
         "brandName": settings.org_name,
         "currency": settings.org_currency,
@@ -36,7 +36,7 @@ def me_out(user: User, settings: Settings) -> dict:
         "permissions": sorted(access.permissions),
         "canManageSettings": administers,
         "canRecover": False,
-        # Nabhi Order is connected: ready quotes show "Raise order".
+        # Bishnoi One Order is connected: ready quotes show "Raise order".
         "ordersLinked": settings.orders_linked,
         "pharmacyLinked": settings.pharmacy_linked,
         "viewedBy": None,
