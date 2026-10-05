@@ -80,7 +80,7 @@ def app(tmp_path, finance):
             db.add(User(email=f"{name}@example.com", full_name=name.title(), password_hash=hash_password(PASSWORD), role_id=role_id(db, role), team_id=team))
         db.commit()
     yield app
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()
 
 
 @pytest.fixture

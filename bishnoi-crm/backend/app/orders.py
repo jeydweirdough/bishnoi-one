@@ -39,6 +39,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import Company, Contact, Product, Quote, Team, User
 
 TIMEOUT = 15  # seconds
@@ -141,6 +142,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
             "Idempotency-Key": quote_id,
             "Content-Type": "application/json",
             "Accept": "application/json",
+            **company_header(settings),
         },
     )
     try:

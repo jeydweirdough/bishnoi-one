@@ -1,0 +1,42 @@
+# Puts Pharmacy on Vercel, only when you ask: Actions > Deploy Pharmacy > Run workflow.
+# When: any time.
+#
+# It checks first that everything is set up (the Vercel token, Pharmacy's Vercel
+# projects, their settings, the apps it needs online) and stops with what to do
+# next when something isn't; then tests, deploys the API and then the screens,
+# and checks each answers. The steps are in deploy-app.yml; what Pharmacy needs is
+# under "apps" in .github/deploy.json.
+name: Deploy Pharmacy
+
+on:
+  workflow_dispatch:
+    inputs:
+      part:
+        description: "What to deploy"
+        type: choice
+        options:
+          - screens and API
+          - API only
+          - screens only
+        default: screens and API
+      run_tests:
+        description: "Run the API's tests first (a failure stops the deploy)"
+        type: boolean
+        default: true
+
+# One deploy of Pharmacy at a time; a second run waits for the first.
+concurrency:
+  group: deploy-pharmacy
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the deployed/<project> tags
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-pharmacy
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit

@@ -7,7 +7,7 @@ export type Crumb = { href: string; label: string };
 
 /** A white sheet on the bench. The only thing that lifts. */
 export function Sheet({ children, className = "", as: Tag = "section" }: { children: ReactNode; className?: string; as?: "section" | "div" | "article" }) {
-  return <Tag className={`rounded-[3px] bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
+  return <Tag className={`rounded-[8px] border border-rule bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
 }
 
 /** A sheet's heading. Every sheet gets one, in the same style, so sections are found at a glance. */
@@ -56,7 +56,7 @@ export function PageHeader({
               {crumbs.map((c, i) => (
                 <li key={c.href} className="inline-flex items-center gap-1">
                   {i > 0 && <ChevronRight className="size-3.5 text-ink-3" aria-hidden />}
-                  <Link href={c.href} className="text-ink-2 underline-offset-2 hover:text-hema hover:underline">
+                  <Link href={c.href} className="text-ink-2 underline-offset-2 hover:text-ink hover:underline">
                     {c.label}
                   </Link>
                 </li>

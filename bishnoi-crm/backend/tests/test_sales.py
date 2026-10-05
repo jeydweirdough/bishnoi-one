@@ -117,3 +117,33 @@ def test_deal_views_filter_by_owner_and_team(client, crew):
     assert by_team(f"/deals-forecast?team={north_team}")["totals"]["pipelineCentavos"] == 100
     # "Mine" in the forecast is mine, not my team's.
     assert client.get("/deals-forecast?owner=me", headers=crew["lia"]).json()["totals"]["deals"] == 0
+
+
+def test_the_growth_trend_month_by_month(client, crew):
+    from datetime import date
+
+    from tests.test_deals import deal
+
+    lia = crew["lia"]
+    acme = company(client, crew["ria"], "Acme")
+    d = deal(client, crew["ria"], acme, valueCentavos=50000)
+    client.post(f"/deals/{d['id']}/win", json={}, headers=crew["ria"])
+    r = client.get("/sales/trend?months=6", headers=lia)
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert len(got["points"]) == 6 and got["points"][-1]["month"] == got["thisMonth"] == date.today().isoformat()[:7]
+    assert got["points"][-1]["wonCentavos"] == 50000 and got["points"][-1]["newCustomers"] == 1
+    assert got["growth"] is None  # nothing won in either of the last two full months
+    # A salesperson's role sees only their own work: no team trend.
+    assert client.get("/sales/trend", headers=crew["ria"]).status_code == 403
+
+
+def test_results_for_a_range_of_days(client, ben):
+    r = client.get("/sales/results?view=mine&period=2026-07-01..2026-10-15", headers=ben)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert (body["start"], body["end"], body["label"]) == ("2026-07-01", "2026-10-16", "1 Jul – 15 Oct 2026")
+    across = client.get("/sales/results?view=mine&period=2025-12-01..2026-01-31", headers=ben).json()
+    assert across["label"] == "1 Dec 2025 – 31 Jan 2026"
+    for bad in ("2026-10-15..2026-07-01", "2026-02-30..2026-03-01", "2020-01-01..2026-01-01"):
+        assert client.get(f"/sales/results?view=mine&period={bad}", headers=ben).status_code == 422, bad

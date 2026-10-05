@@ -27,7 +27,7 @@ export function ViewingBanner({ who, company }: { who: string; company: string }
         type="button"
         disabled={leaving}
         onClick={() => start(async () => void (await leaveCompany()))}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-[3px] bg-sheet/15 px-2.5 py-1 text-meta font-semibold hover:bg-sheet/25 disabled:opacity-60"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-[6px] bg-sheet/15 px-2.5 py-1 text-meta font-semibold hover:bg-sheet/25 disabled:opacity-60"
       >
         <LogOut className="size-3.5" aria-hidden />
         {leaving ? "Leaving…" : "Leave"}

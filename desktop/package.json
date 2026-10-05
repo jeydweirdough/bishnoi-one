@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Opens one Bishnoi One app in a window of its own, for trying it as a desktop app: npm run bishnoi-crm:app (from the top of the repo). Also the Bishnoi One license: kept once per PC for every app, and the tool that issues it.",
+  "description": "Opens one Bishnoi One app in a window of its own, for trying it as a desktop app: npm run bishnoi-crm:app (from the top of the repo).",
   "main": "main.mjs",
   "scripts": {
-    "icons": "electron make-icons.mjs",
-    "license": "node tools/license.mjs",
-    "test": "node --test \"test/*.test.mjs\""
+    "icons": "electron make-icons.mjs"
   },
   "engines": {
     "node": ">=22"

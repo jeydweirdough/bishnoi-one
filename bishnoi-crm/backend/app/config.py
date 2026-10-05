@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'crm.db').as_posix()}"
+    # The online database (Neon) that `python -m app.tools.copy_database backup`
+    # copies into .data/backups/ each night. Unset: DATABASE_URL itself.
+    backup_from: str | None = None
     # Where uploaded files (guarantee letters) are kept.
     files_dir: Path = DATA_DIR / "files"
     # The first administrator, made when the database has no accounts at all:
@@ -25,11 +28,27 @@ class Settings(BaseSettings):
     first_admin_email: str | None = None
     first_admin_name: str = "Administrator"
     first_admin_password: SecretStr | None = None
+    # Which company's database the first administrator is made in (each company
+    # has its own: app/tenants.py). Unset: DEFAULT_COMPANY on this computer, and
+    # none in production, where a company's administrators come from Bishnoi One.
+    first_admin_company: str | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
     # Signing in with a Bishnoi One account: the platform's public key, base64 (its
     # /pass/key). Unset: only this app's own accounts sign in.
     platform_public_key: str | None = None
+    # Bishnoi One Platform's API: where the CRM asks whether a company is
+    # registered, active and given the CRM (app/company.py). Each company has a
+    # database of its own (app/tenants.py), made the first time it's used.
+    platform_api_url: str | None = None
+    # On this computer only (never in production): the company a request is for
+    # when it doesn't say, and the companies allowed while the platform isn't
+    # set up here (PLATFORM_API_URL unset).
+    default_company: str | None = "getmeds"
+    # Not a setting: the company of the request these settings are for, set
+    # by app/deps.py, and sent on to the other apps (X-Bishnoi-Company).
+    company: str | None = None
+    dev_companies: list[str] = ["getmeds", "northwind"]
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15
@@ -101,6 +120,12 @@ class Settings(BaseSettings):
     # pairs in JSON, e.g. ["finance:<a long random key>"]. The app sends its key
     # in X-Bishnoi-Key. Empty: nothing outside can read them.
     integration_keys: list[SecretStr] = []
+
+    # The key the secrets of Settings → Connections are encrypted with (a Fernet
+    # key: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())").
+    # Unset in development: one is made in .data/connections.key. Unset in
+    # production: connections can't be saved. Changing it loses the saved secrets.
+    connections_key: SecretStr | None = None
 
     @property
     def inventory_linked(self) -> bool:

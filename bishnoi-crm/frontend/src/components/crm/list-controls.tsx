@@ -98,11 +98,11 @@ export function Pager({ total, page, size, base }: { total: number; page: number
 
 /** Deleting a company or a contact, from its own page. */
 /** What a record page's name can do to the record itself, as icons beside the name. */
-const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] text-ink-3 transition-colors";
+const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[6px] text-ink-3 transition-colors";
 
 export function EditRecord({ href, what }: { href: string; what: string }) {
   return (
-    <Link href={href} aria-label={`Edit ${what}`} title={`Edit ${what}`} className={`${ICON} hover:bg-hema-tint hover:text-hema`}>
+    <Link href={href} aria-label={`Edit ${what}`} title={`Edit ${what}`} className={`${ICON} hover:bg-hema-tint hover:text-ink`}>
       <Pencil className="size-4" aria-hidden />
     </Link>
   );

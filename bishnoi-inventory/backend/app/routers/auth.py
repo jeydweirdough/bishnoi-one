@@ -10,7 +10,7 @@ import time
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import delete, func, select
@@ -19,7 +19,10 @@ from sqlalchemy.exc import IntegrityError
 from app import platform_pass
 from app.audit import audit
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
-from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
+from app.deps import DB, CurrentSession, CurrentTenant, CurrentUser, SettingsDep, open_company
+from app.company import standing as company_standing
+from app.config import Settings
+from app.tenants import clean, company_of
 from app.identity import me_out
 from app.models import PlatformPass, Role, SignInSession, User
 from app.permissions import ADMINISTRATOR
@@ -70,7 +73,9 @@ attempts = Attempts()
 
 
 @router.post("/login")
-def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> dict:
+def login(body: LoginIn, db: DB, settings: SettingsDep, tenant: CurrentTenant, response: Response) -> dict:
+    """At the company the sign-in page names (X-Bishnoi-Company), which must be
+    registered on the platform (CurrentTenant refuses it otherwise)."""
     email = body.email.lower()
     window = settings.login_lockout_minutes * 60
     wait = attempts.wait_seconds(email, settings.login_attempts, window)
@@ -88,7 +93,7 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> d
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
     attempts.clear(email)
 
-    token = new_token()
+    token = f"{tenant.slug}.{new_token()}"
     now = datetime.now(UTC)
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
@@ -108,16 +113,29 @@ class PlatformIn(BaseModel):
 
 
 @router.post("/platform")
-def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, response: Response) -> dict:
+def sign_in_with_platform(body: PlatformIn, request: Request, response: Response) -> dict:
     """Takes a pass from the platform (app/platform_pass.py) and opens a session
-    here, as /auth/login does. The person is found by their Bishnoi One account, or
-    by email the first time; someone new is added with their role from the
-    platform. The platform decides who may open this application; this only
-    refuses someone switched off here."""
+    here, as /auth/login does, at the company the pass is for. The person is
+    found by their Bishnoi One account, or by email the first time; someone new
+    is added with their role from the platform. The platform decides who may
+    open this application; this only refuses someone switched off here."""
+    base: Settings = request.app.state.settings
     try:
-        claims = platform_pass.check(body.token, settings.platform_public_key, APP_KEY)
+        claims = platform_pass.check(body.token, base.platform_public_key, APP_KEY)
     except platform_pass.PassRefused as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
+    slug = clean(claims.get("companySlug"))
+    if slug is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link doesn't say which company it's for. Sign in again from Bishnoi One.")
+    tenant = open_company(request, slug)
+    found = company_standing(base, slug)
+    if found.company_id and claims.get("company") != found.company_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This sign-in link isn't for this company. Sign in again from Bishnoi One.")
+    with tenant.sessions() as db:
+        return _open_platform_session(db, base, tenant.slug, claims, response)
+
+
+def _open_platform_session(db, settings: Settings, slug: str, claims: dict, response: Response) -> dict:
     now = datetime.now(UTC)
     db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
     db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
@@ -172,7 +190,7 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         if changed:
             audit(db, email, "user.updated", target=email, target_type="user", target_id=user.id, fields=changed)
 
-    token = new_token()
+    token = f"{slug}.{new_token()}"
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
     audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
@@ -194,12 +212,13 @@ def me(user: CurrentUser, settings: SettingsDep) -> dict:
 
 
 @router.get("/demo-accounts")
-def demo_accounts(db: DB, settings: SettingsDep) -> dict:
-    """The demo accounts that exist here, for the sign-in page. Development only."""
-    if settings.is_production:
+def demo_accounts(request: Request) -> dict:
+    """The demo accounts that exist at the company, for the sign-in page. Development only."""
+    if request.app.state.settings.is_production:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
     emails = [d.email for d in DEMO_ACCOUNTS]
-    active = set(db.scalars(select(User.email).where(User.email.in_(emails), User.is_active)))
+    with open_company(request, company_of(request)).sessions() as db:
+        active = set(db.scalars(select(User.email).where(User.email.in_(emails), User.is_active)))
     return {
         "password": DEMO_PASSWORD,
         "items": [{"group": d.group, "email": d.email, "who": d.name, "role": d.role} for d in DEMO_ACCOUNTS if d.email in active],
@@ -211,3 +230,12 @@ def demo_accounts(db: DB, settings: SettingsDep) -> dict:
 @router.post("/leave")
 def not_here() -> None:
     raise HTTPException(status.HTTP_404_NOT_FOUND, "This app has one company and its own accounts, so there's nothing to switch to.")
+
+
+@router.get("/company")
+def company_status(request: Request) -> dict:
+    """For the sign-in page: whether the company it names (X-Bishnoi-Company) may
+    use Inventory, and why not; or, signed in, the company of the session."""
+    slug = company_of(request)
+    found = company_standing(request.app.state.settings, slug)
+    return {"ok": found.ok, "message": found.message, "name": found.name, "slug": slug}

@@ -58,7 +58,7 @@ export function ActivityCalendar({ items, month, today, timeZone, showOwner }: {
     return (
       <li key={a.id} title={label}>
         {customer.href ? (
-          <Link href={customer.href} aria-label={label} className={`flex items-center gap-1 rounded-[2px] px-1 py-0.5 text-[0.75rem] leading-tight hover:bg-bench ${tone}`}>
+          <Link href={customer.href} aria-label={label} className={`flex items-center gap-1 rounded-[4px] px-1 py-0.5 text-[0.75rem] leading-tight hover:bg-bench ${tone}`}>
             {body}
           </Link>
         ) : (

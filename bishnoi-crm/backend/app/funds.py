@@ -25,6 +25,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import FundRequest
 
 log = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None, p
     url = f"{settings.finance_api_url}/integration/funds/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    headers = {"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)}
     data = None
     if body is not None:
         data = json.dumps(body).encode()

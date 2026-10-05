@@ -41,7 +41,7 @@ export function ClinicPin({ companyId, pin, canPin, canUnpin, pinnedOn }: { comp
       {pin ? (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm">
-            <a href={mapLink(pin)} target="_blank" rel="noopener noreferrer" className="text-hema hover:underline">
+            <a href={mapLink(pin)} target="_blank" rel="noopener noreferrer" className="text-ink hover:underline">
               See it on the map
             </a>
             {pinnedOn && <span className="block text-meta text-ink-3">Pinned {pinnedOn}</span>}

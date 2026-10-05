@@ -35,7 +35,8 @@ from app.api import Api, as_utc, field_error, iso, not_found, person_out, team_o
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, FieldGoal, Product, RouteDay, TrailBatch, User, Visit
+from app.kpis import by_code, person_targets, set_person_target
+from app.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, Product, RouteDay, TrailBatch, User, Visit
 from app.scope import reachable_people, reaches, within
 from app.trail import Point, decode, encode, metres, path_metres
 
@@ -475,15 +476,15 @@ def is_field_person(user: User) -> bool:
     return not user.role.is_system and "visits.create" in granted and "goals.view" not in granted
 
 
-def goal_out(goal: FieldGoal | None) -> dict | None:
-    if goal is None:
-        return None
-    return {
-        "doctorsVisited": goal.doctors_visited,
-        "doctorsUpdated": goal.doctors_updated,
-        "amountCentavos": goal.amount_centavos,
-        "collectionVisits": goal.collection_visits,
-    }
+# The four field goals are built-in KPIs (Settings → KPIs), by their codes.
+FIELD_KPIS = {"doctorsVisited": "doctors_visited", "doctorsUpdated": "doctors_updated", "amountCentavos": "amount_collected", "collectionVisits": "collection_visits"}
+
+
+def field_goals(db: Session, month: str) -> dict[str, dict]:
+    """Each person with a field goal this month: all four, a missing one as 0."""
+    per_key = {key: person_targets(db, by_code(db, code), [month]) for key, code in FIELD_KPIS.items()}
+    people = {u for targets in per_key.values() for u in targets}
+    return {u: {key: per_key[key].get(u, 0) for key in FIELD_KPIS} for u in people}
 
 
 def actuals(db: Session, user_ids: list[str], start: datetime, end: datetime) -> dict[str, dict]:
@@ -517,14 +518,14 @@ def actuals(db: Session, user_ids: list[str], start: datetime, end: datetime) ->
 def performance(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
     start, end = month_bounds(month, settings)
-    goals = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
+    goals = field_goals(db, month)
     if access.can("goals.view"):
         people = [u for u in reachable_people(db, access) if is_field_person(u) or u.id in goals]
     else:
         people = [me]
     done = actuals(db, [p.id for p in people], start, end)
     rows = [
-        {"person": person_out(p), "team": team_out(p.team), "goal": goal_out(goals.get(p.id)), "actual": done[p.id]}
+        {"person": person_out(p), "team": team_out(p.team), "goal": goals.get(p.id), "actual": done[p.id]}
         for p in sorted(people, key=lambda u: u.full_name.lower())
     ]
     totals = {k: sum(r["actual"][k] for r in rows) for k in ("doctorsVisited", "doctorsUpdated", "amountCentavos", "collectionVisits")}
@@ -548,11 +549,11 @@ def read_goals(access: Manage, db: DB, settings: SettingsDep, month: str | None 
     """Everyone who can be given goals (field people, and anyone already given
     some that month), with the month's goals."""
     month = month_or_now(month, settings)
-    goals = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
+    goals = field_goals(db, month)
     people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if is_field_person(u) or u.id in goals]
     return {
         "month": month,
-        "people": [{"person": person_out(p), "team": team_out(p.team), "goal": goal_out(goals.get(p.id))} for p in people],
+        "people": [{"person": person_out(p), "team": team_out(p.team), "goal": goals.get(p.id)} for p in people],
     }
 
 
@@ -562,12 +563,13 @@ def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, bo
     users = set(db.scalars(select(User.id).where(User.id.in_([g.user_id for g in body.goals]))))
     if missing := [g.user_id for g in body.goals if g.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
-    existing = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
+    kpis = {key: by_code(db, code) for key, code in FIELD_KPIS.items()}
     for g in body.goals:
-        goal = existing.get(g.user_id) or FieldGoal(user_id=g.user_id, month=month)
-        goal.doctors_visited, goal.doctors_updated = g.doctors_visited, g.doctors_updated
-        goal.amount_centavos, goal.collection_visits = g.amount_centavos, g.collection_visits
-        db.add(goal)
+        given = {"doctorsVisited": g.doctors_visited, "doctorsUpdated": g.doctors_updated, "amountCentavos": g.amount_centavos, "collectionVisits": g.collection_visits}
+        for key, kpi in kpis.items():
+            if kpi is not None:
+                # 0 here has always meant "no goal".
+                set_person_target(db, kpi, month, g.user_id, given[key] or None)
     audit(db, me, "goals.updated", target=f"Goals for {month} ({len(body.goals)} people)", target_type="goals")
     db.commit()
     return read_goals(access, db, settings, month)

@@ -25,7 +25,7 @@ def make_pass(key=KEY, **over) -> str:
     now = int(time.time())
     claims = {
         "iss": "bishnoi-platform", "aud": "crm", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
-        "company": "c1", "companyName": "GetMeds", "role": "Salesperson", "appAdmin": False, "companyAdmin": False,
+        "company": "c1", "companySlug": "getmeds", "companyName": "GetMeds", "role": "Salesperson", "appAdmin": False, "companyAdmin": False,
         "iat": now, "exp": now + 120, "jti": secrets.token_urlsafe(18), **over,
     }
     head = b64(json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": "test"}).encode())
@@ -116,3 +116,33 @@ def test_someone_switched_off_here_stays_out(app, client, linked):
 def test_a_pass_signed_before_the_rename_is_still_taken(client, linked):
     # The platform may still sign passes as "nabhi-platform" until it's redeployed.
     assert take(client, make_pass(iss="nabhi-platform")).status_code == 200
+
+
+def test_the_pass_names_the_company(client, linked):
+    """Each company's people come in to that company's own database: the same
+    person, in two companies, is two accounts, one in each."""
+    here = take(client, make_pass())
+    there = take(client, make_pass(companySlug="northwind", company="c2", companyName="Northwind"))
+    assert here.status_code == 200 and there.status_code == 200, there.text
+    assert here.json()["accessToken"].startswith("getmeds.") and there.json()["accessToken"].startswith("northwind.")
+    assert me(client, here)["user"]["id"] != me(client, there)["user"]["id"]
+    # A pass that doesn't say, or names a company that isn't one, opens nothing.
+    assert take(client, make_pass(companySlug=None)).status_code == 401
+    assert take(client, make_pass(companySlug="nowhere")).status_code == 403
+
+
+def test_the_pass_and_the_platform_must_agree_on_the_company(app, client, linked, monkeypatch):
+    """With the platform checking companies, a pass whose company isn't the one
+    the platform has under that name is refused."""
+    from app import company
+    from tests.test_company import Answer, company_pass
+
+    company.forget()
+    app.state.settings = app.state.settings.model_copy(update={"platform_api_url": "https://platform.test"})
+    monkeypatch.setattr(company.httpx, "get", lambda url, params=None, timeout=None: Answer(200, {"pass": company_pass(key=KEY)}))
+    try:
+        r = take(client, make_pass(company="someone-else"))
+        assert r.status_code == 403 and "isn't for this company" in r.json()["detail"]
+        assert take(client, make_pass(company="co-1")).status_code == 200
+    finally:
+        company.forget()

@@ -11,7 +11,7 @@ from app.models import User
 
 
 def test_a_database_from_before_administration_is_upgraded(tmp_path):
-    file = tmp_path / "sales.db"
+    file = tmp_path / "sales-getmeds.db"  # the default company's, beside DATABASE_URL (app/tenants.py)
     old = create_engine(f"sqlite:///{file.as_posix()}")
     now = datetime.now(UTC).isoformat()
     with old.begin() as c:
@@ -28,7 +28,7 @@ def test_a_database_from_before_administration_is_upgraded(tmp_path):
                       {"id": f"00000000-0000-0000-0000-00000000000{i}", "email": email, "name": email, "role": role, "now": now})
     old.dispose()
 
-    app = create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{file.as_posix()}"))
+    app = create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'sales.db').as_posix()}"))
     with app.state.sessions() as db:
         people = {u.email: u.role.name for u in db.query(User)}
     # "Sales Rep" then; "Salesperson" since the three roles (0008).
@@ -37,12 +37,12 @@ def test_a_database_from_before_administration_is_upgraded(tmp_path):
     assert len(backups) == 1  # named after the newest migration
 
     # Starting again changes nothing and copies nothing more.
-    create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{file.as_posix()}"))
+    create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'sales.db').as_posix()}"))
     assert sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name) == backups
 
 
 def test_a_failed_migration_leaves_the_database_as_it_was(tmp_path, monkeypatch):
-    file = tmp_path / "sales.db"
+    file = tmp_path / "sales-getmeds.db"
     old = create_engine(f"sqlite:///{file.as_posix()}")
     with old.begin() as c:
         c.execute(text("""CREATE TABLE users (id VARCHAR(36) PRIMARY KEY, email VARCHAR(254) NOT NULL UNIQUE,
@@ -60,7 +60,7 @@ def test_a_failed_migration_leaves_the_database_as_it_was(tmp_path, monkeypatch)
         raise RuntimeError("boom")
 
     monkeypatch.setattr(Operations, "batch_alter_table", explode)
-    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{file.as_posix()}")
+    settings = Settings(_env_file=None, allowed_hosts=["testserver"], database_url=f"sqlite:///{(tmp_path / 'sales.db').as_posix()}")
     try:
         create_app(settings)
         raise AssertionError("the migration should have failed")
@@ -139,7 +139,7 @@ def test_an_older_copy_refuses_a_newer_database(tmp_path):
 
     url = f"sqlite:///{(tmp_path / 'sales.db').as_posix()}"
     create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url))
-    engine = create_engine(url)
+    engine = create_engine(url.replace("sales.db", "sales-getmeds.db"))
     with engine.begin() as c:
         c.execute(text("UPDATE nbcm_alembic_version SET version_num = '9999_from_a_newer_bishnoi'"))
     engine.dispose()

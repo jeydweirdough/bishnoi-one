@@ -13,7 +13,7 @@ works once: it is for the trip from here to the application, nothing more.
 The format is a compact JWS (a JWT) signed with Ed25519 ("EdDSA"):
     header  {"alg": "EdDSA", "typ": "JWT", "kid": <key id>}
     claims  {"iss": "bishnoi-platform", "aud": <app key>, "sub": <identity id>,
-             "email", "name", "company", "companyName", "role", "appAdmin",
+             "email", "name", "company", "companySlug", "companyName", "role", "appAdmin",
              "companyAdmin", "iat", "exp", "jti"}
 """
 
@@ -86,6 +86,7 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
         "email": identity.email,
         "name": identity.full_name,
         "company": company.id,
+        "companySlug": company.slug,
         "companyName": company.name,
         "role": grant.role,
         "appAdmin": grant.is_app_admin,
@@ -97,6 +98,31 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
     signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
     signature = signing_key(settings).sign(signing_input.encode())
     return f"{signing_input}.{b64url(signature)}"
+
+
+# A company pass: how an application knows its company is registered here.
+COMPANY_LIFETIME = 3600  # seconds; the application asks again after it
+
+
+def company_pass(settings: Settings, company: Company, app: Application, granted: bool) -> str:
+    """Signed: this company, its status, and whether it may use this application.
+    The application checks it with the platform's public key, as a sign-in pass."""
+    now = int(time.time())
+    header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
+    claims = {
+        "iss": ISSUER,
+        "aud": app.key,
+        "kind": "company",
+        "company": company.id,
+        "slug": company.slug,
+        "companyName": company.name,
+        "status": company.status,
+        "granted": granted,
+        "iat": now,
+        "exp": now + COMPANY_LIFETIME,
+    }
+    signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
+    return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
 
 
 if __name__ == "__main__":

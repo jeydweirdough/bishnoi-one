@@ -192,8 +192,6 @@ def add_company(body: CompanyIn, db: DB, me: AdminUser) -> dict:
         raise field_error("slug" if body.slug else "name", f"The address {slug} is taken. Give it another.")
     if (body.admin_name is None) != (body.admin_email is None):
         raise field_error("adminEmail" if body.admin_email is None else "adminName", "Give both their name and their email, or neither.")
-    if body.admin_email and db.scalar(select(Identity).where(func.lower(Identity.email) == body.admin_email)):
-        raise field_error("adminEmail", "Somebody on the platform already has that email.")
     apps = _apps(db, body.application_ids)
     c = Company(name=body.name, slug=slug, currency=body.currency, timezone=body.timezone, contact_email=body.contact_email, notes=body.notes)
     db.add(c)
@@ -203,6 +201,10 @@ def add_company(body: CompanyIn, db: DB, me: AdminUser) -> dict:
     audit(db, me, "company.created", target=c.name, target_type="company", target_id=c.id, company_id=c.id)
     if body.admin_email:
         person = Identity(company_id=c.id, full_name=body.admin_name, email=body.admin_email, is_company_admin=True)
+        # Already at another company: the same person, with the password they have.
+        elsewhere = db.scalar(select(Identity).where(func.lower(Identity.email) == body.admin_email.lower(), Identity.password_hash.is_not(None)))
+        if elsewhere is not None:
+            person.password_hash, person.password_changed_at = elsewhere.password_hash, elsewhere.password_changed_at
         db.add(person)
         db.flush()
         audit(db, me, "user.created", target=person.email, target_type="user", target_id=person.id, company_id=c.id, fields=["isCompanyAdmin"])

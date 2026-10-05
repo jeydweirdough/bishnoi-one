@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { platformHome } from "./apps";
-import { SESSION_COOKIE } from "./session-cookie";
+import { COMPANY_COOKIE, COMPANY_HEADER, SESSION_COOKIE } from "./session-cookie";
 import type { Me, Org } from "./types";
 
 // The browser never talks to the API. Pages and server actions call it from
@@ -31,8 +31,14 @@ async function clientAddress(): Promise<string | null> {
   return incoming.get("x-forwarded-for")?.split(",")[0].trim() || incoming.get("x-real-ip") || null;
 }
 
-async function send(method: string, path: string, body?: unknown): Promise<Response> {
-  const [token, address] = await Promise.all([cookies().then((c) => c.get(SESSION_COOKIE)?.value), clientAddress()]);
+type Extra = Record<string, string>;
+
+async function send(method: string, path: string, body?: unknown, extra: Extra = {}): Promise<Response> {
+  const [jar, address] = await Promise.all([cookies(), clientAddress()]);
+  const token = jar.get(SESSION_COOKIE)?.value;
+  // Before signing in, which company: the one last signed in to here. Signed
+  // in, the token says (it starts with the company), so nothing is added.
+  const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
   // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
   const form = body instanceof FormData;
   try {
@@ -41,7 +47,9 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(address ? { "X-Forwarded-For": address } : {}),
+        ...(company ? { [COMPANY_HEADER]: company } : {}),
         ...(body === undefined || form ? {} : { "Content-Type": "application/json" }),
+        ...extra,
       },
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
       cache: "no-store",
@@ -57,16 +65,16 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // to ask for twice; saves never are, so they're never retried.
 const BLIPS = new Set([502, 503, 504]);
 
-async function sendThroughBlips(method: string, path: string, body?: unknown): Promise<Response> {
-  if (method !== "GET") return send(method, path, body);
+async function sendThroughBlips(method: string, path: string, body?: unknown, extra?: Extra): Promise<Response> {
+  if (method !== "GET") return send(method, path, body, extra);
   try {
-    const response = await send(method, path, body);
+    const response = await send(method, path, body, extra);
     if (!BLIPS.has(response.status)) return response;
   } catch {
     // unreachable for a moment: fall through and try once more
   }
   await pause(300);
-  return send(method, path, body);
+  return send(method, path, body, extra);
 }
 
 // Over the API's rate limit, the request waits its turn instead of failing: a
@@ -74,18 +82,18 @@ async function sendThroughBlips(method: string, path: string, body?: unknown): P
 // safe for saves too. A wait longer than this goes back to the person, worded.
 const LONGEST_WAIT_MS = 5000;
 
-async function sendWithRetry(method: string, path: string, body?: unknown): Promise<Response> {
-  const response = await sendThroughBlips(method, path, body);
+async function sendWithRetry(method: string, path: string, body?: unknown, extra?: Extra): Promise<Response> {
+  const response = await sendThroughBlips(method, path, body, extra);
   if (response.status !== 429) return response;
   const wait = Number(response.headers.get("retry-after") ?? "1") * 1000;
   if (!(wait > 0 && wait <= LONGEST_WAIT_MS)) return response;
   await response.body?.cancel(); // let the connection go back to the pool
   await pause(wait);
-  return sendThroughBlips(method, path, body);
+  return sendThroughBlips(method, path, body, extra);
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await sendWithRetry(method, path, body);
+async function call<T>(method: string, path: string, body?: unknown, extra?: Extra): Promise<T> {
+  const response = await sendWithRetry(method, path, body, extra);
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new ApiError(response.status, data?.detail ?? response.statusText);
@@ -93,8 +101,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
-  get: <T>(path: string) => call<T>("GET", path),
-  post: <T>(path: string, body?: unknown) => call<T>("POST", path, body ?? {}),
+  get: <T>(path: string, extra?: Extra) => call<T>("GET", path, undefined, extra),
+  post: <T>(path: string, body?: unknown, extra?: Extra) => call<T>("POST", path, body ?? {}, extra),
   patch: <T>(path: string, body: unknown) => call<T>("PATCH", path, body),
   put: <T>(path: string, body: unknown) => call<T>("PUT", path, body),
   del: <T = void>(path: string) => call<T>("DELETE", path),

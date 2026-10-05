@@ -126,4 +126,4 @@ def test_the_first_administrator_comes_from_the_settings(tmp_path):
     create_app(settings.model_copy(update={"first_admin_email": "x@example.com", "first_admin_password": SecretStr("another long password")}))
     with app.state.sessions() as db:
         assert [u.email for u in db.query(User)] == ["boss@example.com"]
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()

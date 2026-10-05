@@ -97,7 +97,7 @@ export function ContactForm({
 
   /** A built-in field, drawn with the label and hints the admin gave it. */
   function standard(f: FormFieldDef) {
-    if (f.key === "ownerId") return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
+    if (f.key === "ownerId") return people.length > 1 ? <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} /> : null;
     if (f.key === "companyId") {
       return (
         <div>

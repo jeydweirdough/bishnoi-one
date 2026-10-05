@@ -55,7 +55,13 @@ class UserIn(Api):
     full_name: str = Field(min_length=1, max_length=120)
     role_id: str = Field(max_length=36)
     team_id: str | None = Field(None, max_length=36)
+    employee_id: str | None = Field(None, max_length=20)
     password: str = Field(max_length=256)
+
+    @field_validator("employee_id")
+    @classmethod
+    def _employee_id(cls, value: str | None) -> str | None:
+        return employee_code(value)
 
     @field_validator("email")
     @classmethod
@@ -76,12 +82,30 @@ class UserPatch(Api):
     full_name: str | None = Field(None, min_length=1, max_length=120)
     role_id: str | None = Field(None, max_length=36)
     team_id: str | None = Field(None, max_length=36)
+    employee_id: str | None = Field(None, max_length=20)
     is_active: bool | None = None
+
+    @field_validator("employee_id")
+    @classmethod
+    def _employee_id(cls, value: str | None) -> str | None:
+        return employee_code(value)
 
     @field_validator("email")
     @classmethod
     def _email(cls, value: str | None) -> str | None:
         return email_address(value) if value else value
+
+
+def employee_code(value: str | None) -> str | None:
+    """An employee ID as kept: trimmed and in capitals, so "emp-12 " finds EMP-12. Blank is none."""
+    return (value.strip().upper() or None) if value is not None else None
+
+
+def employee_id_taken(db: DB, code: str, but: str | None = None) -> bool:
+    q = select(User.id).where(User.employee_id == code)
+    if but:
+        q = q.where(User.id != but)
+    return db.scalar(q) is not None
 
 
 class PasswordIn(Api):
@@ -109,6 +133,7 @@ def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
         "id": user.id,
         "email": user.email,
         "fullName": user.full_name,
+        "employeeId": user.employee_id,
         "isActive": user.is_active,
         "role": {"id": user.role.id, "name": user.role.name, "scope": user.role.scope},
         "team": {"id": user.team.id, "name": user.team.name} if user.team else None,
@@ -159,7 +184,7 @@ def list_users(_: Users, db: DB) -> list[dict]:
 def user_options(_: Users, db: DB) -> dict:
     """The roles and teams a person can be given, for whoever manages users
     (who may not manage roles or teams themselves)."""
-    reach = case({"all": 0, "team": 1, "own": 2}, value=Role.scope, else_=3)
+    reach = case({"all": 0, "managed": 1, "team": 2, "own": 3}, value=Role.scope, else_=4)
     roles = db.scalars(select(Role).order_by(Role.is_system.desc(), reach, func.lower(Role.name)))
     teams = db.scalars(select(Team).order_by(Team.is_active.desc(), func.lower(Team.name)))
     return {
@@ -174,7 +199,16 @@ def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
         raise field_error("email", "Someone here already has that email.")
     check_role(db, body.role_id)
     check_team(db, body.team_id)
-    user = User(email=body.email, full_name=body.full_name, role_id=body.role_id, team_id=body.team_id, password_hash=hash_password(body.password))
+    if body.employee_id and employee_id_taken(db, body.employee_id):
+        raise field_error("employeeId", "Someone here already has that employee ID.")
+    user = User(
+        email=body.email,
+        full_name=body.full_name,
+        role_id=body.role_id,
+        team_id=body.team_id,
+        employee_id=body.employee_id,
+        password_hash=hash_password(body.password),
+    )
     db.add(user)
     db.flush()
     audit(db, me, "user.created", target=user.email, target_type="user", target_id=user.id)
@@ -200,6 +234,8 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
         raise HTTPException(status.HTTP_409_CONFLICT, "You can't switch yourself off. Ask another admin.")
     if "email" in wanted and email_taken(db, wanted["email"], but=user.id):
         raise field_error("email", "Someone here already has that email.")
+    if wanted.get("employee_id") and employee_id_taken(db, wanted["employee_id"], but=user.id):
+        raise field_error("employeeId", "Someone here already has that employee ID.")
     if "role_id" in wanted:
         check_role(db, wanted["role_id"])
     if "team_id" in wanted:
@@ -307,7 +343,7 @@ def set_grants(role: Role, permissions: list[str]) -> None:
 def list_roles(_: Roles, db: DB) -> dict:
     counts = role_users(db)
     # Administrator first, then by reach: every record, the team's, their own.
-    reach = case({"all": 0, "team": 1, "own": 2}, value=Role.scope, else_=3)
+    reach = case({"all": 0, "managed": 1, "team": 2, "own": 3}, value=Role.scope, else_=4)
     roles = db.scalars(select(Role).order_by(Role.is_system.desc(), reach, func.lower(Role.name)))
     return {
         "roles": [role_out(r, counts.get(r.id, 0)) for r in roles],
@@ -397,6 +433,8 @@ class TeamIn(Api):
     name: str = Field(min_length=1, max_length=80)
     description: str | None = Field(None, max_length=300)
     headquarters: Headquarters = []
+    # The manager over it (above its team lead).
+    manager_id: str | None = Field(None, max_length=36)
 
 
 class TeamPatch(Api):
@@ -404,9 +442,11 @@ class TeamPatch(Api):
     description: str | None = Field(None, max_length=300)
     headquarters: Headquarters | None = None
     is_active: bool | None = None
+    manager_id: str | None = Field(None, max_length=36)
 
 
-def team_out(team: Team, members: int = 0) -> dict:
+def team_out(team: Team, members: int = 0, db: DB | None = None) -> dict:
+    manager = db.get(User, team.manager_id) if db is not None and team.manager_id else None
     return {
         "id": team.id,
         "name": team.name,
@@ -414,7 +454,18 @@ def team_out(team: Team, members: int = 0) -> dict:
         "headquarters": team.headquarters or [],
         "isActive": team.is_active,
         "memberCount": members,
+        "manager": {"id": manager.id, "name": manager.full_name} if manager else None,
     }
+
+
+def check_manager(db: DB, manager_id: str | None) -> str | None:
+    """A team's manager: someone switched on whose role manages teams."""
+    if manager_id is None:
+        return None
+    person = db.get(User, manager_id)
+    if person is None or not person.is_active or person.role.scope != "managed":
+        raise field_error("managerId", "Pick someone whose role manages teams (scope: the teams they manage).")
+    return person.id
 
 
 def team_members(db: DB) -> dict[str, int]:
@@ -433,14 +484,21 @@ def get_team(db: DB, team_id: str) -> Team:
 def list_teams(_: Teams, db: DB) -> list[dict]:
     counts = team_members(db)
     teams = db.scalars(select(Team).order_by(Team.is_active.desc(), func.lower(Team.name)))
-    return [team_out(t, counts.get(t.id, 0)) for t in teams]
+    return [team_out(t, counts.get(t.id, 0), db) for t in teams]
+
+
+@router.get("/teams/managers")
+def team_managers(_: Teams, db: DB) -> list[dict]:
+    """Who can be a team's manager: people switched on whose role manages teams."""
+    people = db.scalars(select(User).join(User.role).where(User.is_active, Role.scope == "managed").order_by(func.lower(User.full_name)))
+    return [{"id": u.id, "name": u.full_name} for u in people]
 
 
 @router.post("/teams", status_code=status.HTTP_201_CREATED)
 def create_team(_: Teams, me: CurrentUser, db: DB, body: TeamIn) -> dict:
     if name_taken(db, Team, body.name):
         raise field_error("name", "There's already a team with that name.")
-    team = Team(name=body.name, description=body.description, headquarters=body.headquarters)
+    team = Team(name=body.name, description=body.description, headquarters=body.headquarters, manager_id=check_manager(db, body.manager_id))
     db.add(team)
     db.flush()
     audit(db, me, "team.created", target=team.name, target_type="team", target_id=team.id)
@@ -458,7 +516,9 @@ def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch
         raise field_error("name", "There's already a team with that name.")
     if "headquarters" in wanted and wanted["headquarters"] is None:
         wanted["headquarters"] = []
-    fields = [k for k in ("name", "description", "headquarters", "is_active") if k in wanted and getattr(team, k) != wanted[k]]
+    if "manager_id" in wanted:
+        wanted["manager_id"] = check_manager(db, wanted["manager_id"])
+    fields = [k for k in ("name", "description", "headquarters", "is_active", "manager_id") if k in wanted and getattr(team, k) != wanted[k]]
     for key in fields:
         setattr(team, key, wanted[key])
     if fields:
@@ -467,7 +527,7 @@ def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch
             action = "team.switched_on" if team.is_active else "team.switched_off"
         audit(db, me, action, target=team.name, target_type="team", target_id=team.id, fields=[to_camel(f) for f in fields])
         db.commit()
-    return team_out(team, team_members(db).get(team.id, 0))
+    return team_out(team, team_members(db).get(team.id, 0), db)
 
 
 @router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)

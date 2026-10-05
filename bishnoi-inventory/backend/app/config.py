@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'inventory.db').as_posix()}"
+    # The online database (Neon) that `python -m app.tools.copy_database backup`
+    # copies into .data/backups/ each night. Unset: DATABASE_URL itself.
+    backup_from: str | None = None
     # The first administrator, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + a database it
     # can reach and you can't). Once they exist these are ignored; remove the
@@ -23,11 +26,26 @@ class Settings(BaseSettings):
     first_admin_email: str | None = None
     first_admin_name: str = "Administrator"
     first_admin_password: SecretStr | None = None
+    # Which company's database the first administrator is made in (each company
+    # has its own: app/tenants.py). Unset: DEFAULT_COMPANY on this computer, and
+    # none in production, where a company's administrators come from Bishnoi One.
+    first_admin_company: str | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
     # Signing in with a Bishnoi One account: the platform's public key, base64 (its
     # /pass/key). Unset: only this app's own accounts sign in.
     platform_public_key: str | None = None
+    # Bishnoi One Platform's API: where Inventory asks whether a company is
+    # registered, active and given Inventory (app/company.py). Each company has
+    # a database of its own (app/tenants.py), made the first time it's used.
+    platform_api_url: str | None = None
+    # On this computer only (never in production): the company a request is for
+    # when it doesn't say, and the companies allowed while the platform isn't
+    # set up here (PLATFORM_API_URL unset).
+    default_company: str | None = "getmeds"
+    dev_companies: list[str] = ["getmeds", "northwind"]
+    # Not a setting: the company of the request these settings are for (app/deps.py).
+    company: str | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15

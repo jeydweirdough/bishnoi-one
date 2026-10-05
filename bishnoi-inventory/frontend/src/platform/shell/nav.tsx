@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -979,6 +979,17 @@ function Account({ me }: { me: Me }) {
           <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
         </span>
       </Link>
+      {/* Each company has its own data here. Someone who works for more than
+          one picks the other on Bishnoi One, which sends them back signed in there. */}
+      {THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) && (
+        <a
+          href={`${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`}
+          className="mt-1 flex items-center gap-2 rounded-[3px] px-3 py-1.5 text-sm text-ink-2 hover:bg-sheet"
+        >
+          <ArrowLeftRight className="size-4" aria-hidden />
+          Switch company
+        </a>
+      )}
       <ConfirmButton
         label="Sign out"
         icon={<LogOut className="size-4" aria-hidden />}

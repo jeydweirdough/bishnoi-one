@@ -15,11 +15,14 @@ export type Demo = { email: string; who: string; role: string; group: string };
  */
 export function LoginForm({
   next,
+  company,
   demo,
   demoPassword,
   children,
 }: {
   next: string;
+  /** The company last signed in to on this browser, filled in. */
+  company: string;
   demo: Demo[];
   demoPassword: string | null;
   children: ReactNode;
@@ -41,6 +44,22 @@ export function LoginForm({
       {children}
       <form action={action} className="mt-6 space-y-5" noValidate>
         <input type="hidden" name="next" value={next} />
+        {/* Each company on Bishnoi One has its own Inventory data: which one is
+            asked first, by the short name the platform gave it. */}
+        <Field label="Company" hint="Your company's short name on Bishnoi One, for example getmeds.">
+          {(p) => (
+            <Input
+              {...p}
+              name="company"
+              autoComplete="organization"
+              autoCapitalize="none"
+              spellCheck={false}
+              defaultValue={state?.company ?? company}
+              required
+              autoFocus={!company}
+            />
+          )}
+        </Field>
         <Field label="Work email">
           {(p) => (
             <Input
@@ -52,7 +71,7 @@ export function LoginForm({
               inputMode="email"
               defaultValue={state?.email}
               required
-              autoFocus
+              autoFocus={!!company}
             />
           )}
         </Field>

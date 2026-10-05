@@ -56,7 +56,7 @@ AREAS: tuple[Area, ...] = (
     Area("visits", "Visits & collections", "Field work", CRUD),
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.
-    Area("goals", "Goals & balances", "Field work", ("view", "manage", "import")),
+    Area("goals", "Targets and balances", "Field work", ("view", "manage", "import")),
     # Money asked for ahead of spending it (a partnership dinner): funds.create
     # asks, funds.approve approves the requests in reach; Finance releases it.
     Area("funds", "Marketing requests", "Field work", ("view", "create", "approve")),
@@ -77,8 +77,8 @@ ADMIN_PERMISSIONS: frozenset[str] = frozenset(p for p in ALL_PERMISSIONS if p.st
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
 
-SCOPES = ("own", "team", "all")
-SCOPE_LABELS = {"own": "Their own records", "team": "Their team's records", "all": "Every record"}
+SCOPES = ("own", "team", "managed", "all")
+SCOPE_LABELS = {"own": "Their own records", "team": "Their team's records", "managed": "The records of every team they manage", "all": "Every record"}
 
 
 def catalogue_out() -> list[dict]:
@@ -103,6 +103,7 @@ def _grant(*areas: str, actions: tuple[str, ...] = CRUD) -> set[str]:
 # holds every permission and can't be changed or deleted. The other two are
 # ordinary roles, there to start from.
 ADMINISTRATOR = "Administrator"
+MANAGER = "Manager"
 TEAM_LEAD = "Team Lead"
 SALESPERSON = "Salesperson"
 FIELD_AGENT = "Field agent"
@@ -135,6 +136,12 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     ),
 )
 STARTING_ROLES += (
+    (
+        MANAGER,
+        "Above the team leads: manages every team they're the manager of, and its people. Approves their quotes and sets their targets.",
+        "managed",
+        frozenset(dict(((r[0], r[3]) for r in STARTING_ROLES))[TEAM_LEAD] | _grant("goals", actions=("view", "manage"))),
+    ),
     (
         FIELD_AGENT,
         "Visits their own doctors and collects what they owe; sees their own goals.",

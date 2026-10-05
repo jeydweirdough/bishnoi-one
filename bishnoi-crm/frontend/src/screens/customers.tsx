@@ -107,7 +107,7 @@ export default async function CustomersPage({ searchParams }: { params: Promise<
                       {bulk && <td className="py-3 pl-5 align-top">{tickable(c) && <SelectBox id={c.id} label={c.name} />}</td>}
                       <td className={`${bulk ? "pl-2" : "pl-5"} py-3 pr-5`}>
                         {/* The name link stretches over the row, so the whole row is the target. */}
-                        <Link href={`/customers/${c.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
+                        <Link href={`/customers/${c.id}`} className="font-semibold text-ink after:absolute after:inset-0 hover:underline">
                           {c.name}
                         </Link>
                         <span className="block text-meta text-ink-3">{describe(kinds, c)}</span>
@@ -140,7 +140,7 @@ export default async function CustomersPage({ searchParams }: { params: Promise<
                     )}
                     <Link href={`/customers/${c.id}`} className="block min-w-0 flex-1 px-4 py-3">
                       <span className="flex items-start justify-between gap-3">
-                        <span className="font-semibold text-hema">{c.name}</span>
+                        <span className="font-semibold text-ink">{c.name}</span>
                         <StatusMark status={c.status} />
                       </span>
                       <span className="block text-meta text-ink-3">{describe(kinds, c)}</span>

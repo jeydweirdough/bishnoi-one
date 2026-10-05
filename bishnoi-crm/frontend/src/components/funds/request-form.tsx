@@ -58,7 +58,7 @@ export function RequestForm({ purposes, org, today }: { purposes: FundPurpose[];
           {purposes.map((p) => (
             <label
               key={p.id}
-              className="flex cursor-pointer gap-3 rounded-[3px] border border-rule-strong px-3 py-2.5 has-checked:border-hema has-checked:bg-hema-tint has-focus-visible:outline-2 has-focus-visible:outline-hema"
+              className="flex cursor-pointer gap-3 rounded-[6px] border border-rule-strong px-3 py-2.5 has-checked:border-hema has-checked:bg-hema-tint has-focus-visible:outline-2 has-focus-visible:outline-hema"
             >
               <input type="radio" name="purpose" value={p.id} checked={purposeId === p.id} onChange={() => setPurposeId(p.id)} className="mt-1 accent-hema" />
               <span className="min-w-0">
@@ -124,7 +124,7 @@ function CustomerPick({ value, onChange, error }: { value: { id: string; name: s
     return (
       <div>
         <p className="mb-1 text-meta font-medium text-ink-2">Customer</p>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-hema-tint py-1 pr-1.5 pl-3 text-sm text-hema">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-hema-tint py-1 pr-1.5 pl-3 text-sm text-ink">
           {value.name}
           <button type="button" onClick={() => onChange(null)} className="rounded-full p-0.5 hover:bg-sheet" aria-label={`Not for ${value.name}`}>
             <X className="size-3.5" aria-hidden />
@@ -139,7 +139,7 @@ function CustomerPick({ value, onChange, error }: { value: { id: string; name: s
         {(p) => <Input {...p} value={words} onChange={(e) => search(e.target.value)} placeholder="Search by name" autoComplete="off" />}
       </Field>
       {found.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[3px] border border-rule bg-sheet shadow-lg">
+        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[6px] border border-rule bg-sheet shadow-lg">
           {found.map((c) => (
             <li key={c.id}>
               <button

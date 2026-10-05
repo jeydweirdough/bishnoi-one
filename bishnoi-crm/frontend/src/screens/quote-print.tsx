@@ -48,7 +48,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
           Back to the quote
         </LinkButton>
         {choices.length > 1 && (
-          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
+          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-[6px] border border-rule-strong bg-sheet p-0.5">
             {choices.map((c) => {
               const on = (template?.id ?? "standard") === c.id;
               return (
@@ -56,7 +56,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
                   key={c.id}
                   href={`/print/quotes/${id}?template=${c.id}`}
                   aria-current={on ? "page" : undefined}
-                  className={`rounded-[2px] px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-hema" : "text-ink-2 hover:text-ink"}`}
+                  className={`rounded-[4px] px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:text-ink"}`}
                 >
                   {c.name}
                   {c.kind === "excel" ? " (Excel)" : ""}

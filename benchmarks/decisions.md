@@ -50,3 +50,38 @@ From the "100 GitHub Repos for Lead Generation" list. Small libraries go in the 
 | OpenRefine | For staff, outside the app: cleaning a spreadsheet before importing it. |
 
 Not used: Google Maps, LinkedIn and review scrapers, OSINT tools, and anything for getting around site blocking (against the sites' terms, and building profiles of doctors without consent runs against the Data Privacy Act); WhatsApp Web automation (against WhatsApp's terms; use the official Business API); whole CRMs and ERPs under GPL or AGPL (looking at them for ideas is fine, copying their code into a licensed product isn't); self-hosted mail servers.
+
+## KPI management, decided on 2026-10-02
+
+The fixed field goals (four measures) and revenue targets became **KPIs an administrator defines** (Settings → KPIs), with monthly targets per person and per team and a scorecard. A KPI counts one of the measures the CRM knows (app/kpis.py), perhaps narrowed, or is entered by hand; a formula language was not built (safer, and enough for now). The five old goals are built-in KPIs that keep what they measure; their saved targets moved over (migration 0031).
+
+New goal, same day: **lead sources and integrations** (checklist g-lead-sources, g-integrations): leads from LinkedIn, Facebook and Google lead forms and AI research through official APIs only, and webhooks, a public API, an MCP server and connectors, with every app and AI call logged. Not started; the first sources are the user's to pick.
+
+## Ant Design for the CRM's screens, decided on 2026-10-02
+
+The CRM's screens use **Ant Design 6** (antd), set in **Poppins** (the font it already had). The theme is set once (`src/platform/app/ant-theme.tsx`: Ant's blue `#1677ff`, radius 6, the registry for server rendering). The shared pieces became Ant's: buttons and link buttons (`ui/ant-button.tsx`), text inputs, text areas and table-cell inputs, choices (radio buttons), form errors (Alert), view switches (Segmented, still links), confirmations (Modal). The design tokens in `globals.css` carry Ant's palette, so what's drawn with Tailwind matches; every table gets Ant's header row. Kept native, drawn like Ant: dropdowns (their change events differ from antd's Select, used in dozens of forms) and toasts (sonner). Other apps keep their look until moved the same way.
+
+## HubSpot as a benchmark, decided on 2026-10-03
+
+**HubSpot** joins the benchmarks (best-of-breed.md), for how a CRM links its
+records and lays out a record's page. Adopted from it: **associations with
+labels** between any records, and one activity on several records (A10, C6,
+P13); the **record page in three columns** (I1, P14); and **emails from each
+rep's own connected mailbox** (C7): Gmail, Outlook, Zoho Mail, or any provider
+by SMTP, set up in Settings → Connections. Order: associations, the record
+page, email connections, then Veeva's approved emails. On the Desktop feature
+benchmark page HubSpot has its own column, from our own review (it isn't in
+the brief's lists).
+
+## Several companies on one deployment, decided on 2026-10-05
+
+No software license: a **company is registered on Bishnoi One Platform**
+first, active and given the app, and only then can its people use it. One CRM
+and one Inventory serve **five to ten companies**, and **each company has a
+database of its own** (`neondb_getmeds`, `crm-getmeds.db`), rather than a
+company column on every row or a schema each: nothing one company keeps can
+reach another's screens, a company's data can be backed up or moved on its
+own, and it works the same behind Neon's connection pooler. The sign-in page
+asks for the company; a session belongs to one company. **A person can work
+for two companies**: one Platform password, a standing (title, apps, role) at
+each, and **Switch company** in the apps' menu. Today's data became GetMeds's.

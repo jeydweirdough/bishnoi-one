@@ -2,7 +2,7 @@ import { PageHeader } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { TeamRow } from "@/src/platform/lib/types";
-import { TeamsEditor } from "../components/admin/teams-editor";
+import { TeamsEditor, type ManagerOption } from "../components/admin/teams-editor";
 import { NoAccess } from "../components/admin/words";
 
 export const metadata = { title: "Teams" };
@@ -10,13 +10,13 @@ export const metadata = { title: "Teams" };
 export default async function TeamsPage() {
   const me = await getCompanyMe();
   if (!can(me, "admin.teams")) return <NoAccess what="managing teams" />;
-  const teams = await load<TeamRow[]>("/admin/teams");
+  const [teams, managers] = await Promise.all([load<TeamRow[]>("/admin/teams"), load<ManagerOption[]>("/admin/teams/managers")]);
   return (
     <>
       <PageHeader title="People and access">
-        People work in teams. A role that reaches &ldquo;their team&apos;s records&rdquo; means the records of everyone in the same team.
+        People work in teams. A team lead reaches their own team&apos;s records; a manager, above the team leads, reaches every team they&apos;re the manager of.
       </PageHeader>
-      <TeamsEditor teams={teams} />
+      <TeamsEditor teams={teams} managers={managers} />
     </>
   );
 }

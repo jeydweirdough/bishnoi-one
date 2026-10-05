@@ -10,13 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
-from app.db import make_engine, make_sessions
 from app.discord import logs_for, mirror_audit
 from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.inventory import srp_type
-from app.migrate import upgrade
-from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, field, funds, imports, insights, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration
+from app.tenants import HEADER, Tenants, clean
+from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, field, funds, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, connections, attention, media, associations, mailbox
 from app.routers import settings as settings_router
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -30,29 +29,40 @@ SECURITY_HEADERS = {
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    engine = make_engine(settings.database_url)
-    upgrade(engine)
 
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One CRM API", version="0.1.0", **docs)
     app.state.settings = settings
-    app.state.sessions = make_sessions(engine)
     # The audit log goes to Discord too, a thread a day (app/discord.py).
     app.state.logs = logs_for("CRM", settings)
-    mirror_audit(app.state.sessions, AuditEntry, app.state.logs)
-    make_first_admin(app.state.sessions, settings)
-    if settings.inventory_linked:
-        # The SRP price type, there before any page asks for the price types.
-        with app.state.sessions() as db:
-            srp_type(db)
-            db.commit()
+
+    def set_up(tenant) -> None:
+        """Each company's database, the first time this process opens it."""
+        mirror_audit(tenant.sessions, AuditEntry, app.state.logs, tenant.slug)
+        # Into one company only: the same account in every company's database
+        # would let one person into all of them.
+        if tenant.slug == (clean(settings.first_admin_company) or (clean(settings.default_company) if not settings.is_production else None)):
+            make_first_admin(tenant.sessions, settings)
+        if settings.inventory_linked:
+            # The SRP price type, there before any page asks for the price types.
+            with tenant.sessions() as db:
+                srp_type(db)
+                db.commit()
+
+    # Each company's data in a database of its own (app/tenants.py).
+    app.state.tenants = Tenants(settings, on_new=[set_up])
+    # On this computer, the default company is opened now, so the tools and
+    # tests have its sessions to hand; in production, each when first asked for.
+    default = clean(settings.default_company) if not settings.is_production else None
+    if default:
+        app.state.sessions = app.state.tenants.get(default).sessions
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", HEADER],
     )
 
     @app.middleware("http")
@@ -81,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sales.router)
     app.include_router(people.router)
     app.include_router(insights.router)
+    app.include_router(kpis.router)
     app.include_router(imports.router)
     app.include_router(catalogue.router)
     app.include_router(price_rules.router)
@@ -91,6 +102,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(field.router)
     app.include_router(funds.router)
     app.include_router(settings_router.router)
+    app.include_router(connections.router)
+    app.include_router(attention.router)
+    app.include_router(media.router)
+    app.include_router(associations.router)
+    app.include_router(mailbox.router)
     app.include_router(crm.router)
     app.include_router(unset.router)
     app.include_router(integration.router)

@@ -147,7 +147,7 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
           )}
         </Field>
         {moving && (
-          <p className="animate-reshape rounded-[3px] bg-hema-tint px-3 py-2 text-meta text-ink-2 sm:col-span-2">
+          <p className="animate-reshape rounded-[6px] bg-hema-tint px-3 py-2 text-meta text-ink-2 sm:col-span-2">
             Moving this customer to <strong>{current?.name}</strong> moves its calls, visits and follow-ups too. People who only
             work in {customer.teamName} won&apos;t see it anymore.
           </p>
@@ -202,13 +202,13 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
       </fieldset>
 
       {duplicates.length > 0 ? (
-        <div role="alert" className="animate-reshape rounded-[3px] border border-rule-strong px-4 py-3">
+        <div role="alert" className="animate-reshape rounded-[6px] border border-rule-strong px-4 py-3">
           <p className="font-semibold">{error}</p>
           <p className="mt-0.5 text-meta text-ink-2">Check these first. Two records for one customer splits their history.</p>
           <ul className="mt-2 space-y-1 text-sm">
             {duplicates.map((d) => (
               <li key={d.id}>
-                <Link href={`/customers/${d.id}`} className="font-medium text-hema hover:underline" target="_blank">
+                <Link href={`/customers/${d.id}`} className="font-medium text-ink hover:underline" target="_blank">
                   {d.name}
                 </Link>
                 <span className="text-ink-3"> · {[d.teamName, d.phone].filter(Boolean).join(" · ")}</span>

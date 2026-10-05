@@ -73,7 +73,7 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
           No goals set for {monthName} yet.{" "}
           <button
             type="button"
-            className="font-semibold text-hema hover:underline"
+            className="font-semibold text-ink hover:underline"
             onClick={() => setDrafts(Object.fromEntries(data.people.map((p) => [p.person.id, toDraft(lastMonth.get(p.person.id) ?? null)])))}
           >
             Start from {previousName}&apos;s

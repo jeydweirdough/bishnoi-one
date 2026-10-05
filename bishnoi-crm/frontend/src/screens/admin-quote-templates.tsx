@@ -35,7 +35,7 @@ export default async function QuoteTemplatesPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <Link href={`/admin/settings/quote-templates/${t.id}`} className="font-semibold text-ink hover:text-hema hover:underline">
+                    <Link href={`/admin/settings/quote-templates/${t.id}`} className="font-semibold text-ink hover:text-ink hover:underline">
                       {t.name}
                     </Link>
                     <DeleteTemplate id={t.id} name={t.name} />

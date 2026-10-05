@@ -56,7 +56,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
               key={p.id}
               href={link(route.day, p.id)}
               aria-current={p.id === route.person.id ? "page" : undefined}
-              className={`rounded-[3px] border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+              className={`rounded-[6px] border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:border-control"}`}
             >
               {p.name}
             </Link>
@@ -65,12 +65,12 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
       )}
 
       <nav aria-label="Day" className="mb-4 flex items-center gap-2">
-        <Link href={link(shiftDay(route.day, -1))} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
+        <Link href={link(shiftDay(route.day, -1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-44 text-center text-heading">{route.day === route.today ? "Today" : fmt.dateLabel(route.day)}</span>
         {route.day < route.today ? (
-          <Link href={link(shiftDay(route.day, 1))} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
+          <Link href={link(shiftDay(route.day, 1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (
@@ -120,7 +120,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
             <ul className="mt-1 divide-y divide-rule">
               {days.days.map((d) => (
                 <li key={d.day}>
-                  <Link href={link(d.day)} className={`flex justify-between py-2 text-sm hover:text-hema ${d.day === route.day ? "font-semibold text-hema" : ""}`}>
+                  <Link href={link(d.day)} className={`flex justify-between py-2 text-sm hover:text-ink ${d.day === route.day ? "font-semibold text-ink" : ""}`}>
                     <span>{fmt.dateLabel(d.day)}</span>
                     <span className="tabular-nums text-ink-2">{distanceText(d.distanceM)}</span>
                   </Link>

@@ -193,12 +193,12 @@ def read_retention(access: View, db: DB, settings: SettingsDep, view: Which = "m
             key=lambda r: (-r["atRisk"], r["name"] or ""),
         )
     team_query = select(Team).where(Team.is_active).order_by(Team.name)
-    if access.scope == "team":
-        team_query = team_query.where(Team.id == (access.team_id or ""))
+    if access.scope in ("team", "managed"):
+        team_query = team_query.where(Team.id.in_(access.team_ids or {""}))
     return {
         "view": view,
         "canSeeTeam": access.scope != "own",
-        "teams": [{"id": t.id, "name": t.name} for t in db.scalars(team_query)] if access.scope == "all" else [],
+        "teams": [{"id": t.id, "name": t.name} for t in db.scalars(team_query)] if access.scope in ("all", "managed") else [],
         "team": team if view == "team" else None,
         "asOf": on.isoformat(),
         "rules": [{"atRiskDays": at_risk, "lostDays": lost, "division": "", "divisionName": "Sales"}],

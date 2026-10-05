@@ -13,7 +13,7 @@ export const kindOf = (kind: CrmKind) => KINDS.find((k) => k.kind === kind) ?? K
 
 export const TYPE_COLORS: Record<CustomerTypeColor, { label: string; style: string }> = {
   gray: { label: "Gray", style: "border-rule-strong text-ink-2" },
-  brand: { label: "Indigo", style: "border-hema bg-hema-tint text-hema" },
+  brand: { label: "Indigo", style: "border-hema bg-hema-tint text-ink" },
   green: { label: "Green", style: "border-filed text-filed" },
   blue: { label: "Blue", style: "border-sky-700 text-sky-700" },
   amber: { label: "Amber", style: "border-amber-600 text-amber-700" },
@@ -29,7 +29,7 @@ export const typeOptions = (types: CustomerType[], current?: string) =>
 export function StatusTag({ status, types }: { status: CompanyStatus; types: CustomerType[] }) {
   const type = types.find((t) => t.code === status);
   return (
-    <span className={`inline-flex h-5 items-center rounded-[2px] border px-1.5 text-stamp uppercase ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
+    <span className={`inline-flex h-5 items-center rounded-[4px] border px-1.5 text-stamp uppercase ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
       {type?.name ?? status}
     </span>
   );

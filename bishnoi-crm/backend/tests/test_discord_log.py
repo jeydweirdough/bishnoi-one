@@ -29,6 +29,6 @@ def test_audit_lines_go_to_a_thread_a_day(tmp_path):
         assert re.fullmatch(r"LOG-CRM-\d{8}", day)
         lines = [m["embeds"][0] for m in discord.thread_named(day)]
         added = next(line for line in lines if line["title"].startswith("company."))
-        assert added["footer"]["text"] == "ana@example.com"
+        assert added["footer"]["text"] == "ana@example.com (getmeds)"  # whose company: one CRM, several companies
         assert any("Bayview Pediatrics" in f["value"] for f in added["fields"])
-        app.state.sessions.kw["bind"].dispose()
+        app.state.tenants.close()

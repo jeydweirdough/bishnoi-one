@@ -26,7 +26,7 @@ def make_pass(key=KEY, **over) -> str:
     now = int(time.time())
     claims = {
         "iss": "bishnoi-platform", "aud": "inventory", "sub": "identity-1", "email": "jade@getmeds.test", "name": "Jade Madigal",
-        "company": "c1", "companyName": "GetMeds", "role": "Warehouse", "appAdmin": False, "companyAdmin": False,
+        "company": "c1", "companySlug": "getmeds", "companyName": "GetMeds", "role": "Warehouse", "appAdmin": False, "companyAdmin": False,
         "iat": now, "exp": now + 120, "jti": secrets.token_urlsafe(18), **over,
     }
     head = b64(json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": "test"}).encode())

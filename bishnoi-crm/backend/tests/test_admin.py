@@ -40,7 +40,7 @@ def test_managing_users_needs_only_admin_users(client, ana):
     new_user(client, ana, email="pd@example.com", roleId=only_users["id"])
     pd = bearer(sign_in(client, "pd@example.com", "a fine password"))
     options = client.get("/admin/users/options", headers=pd).json()
-    assert [r["name"] for r in options["roles"]][:2] == ["Administrator", "Team Lead"]
+    assert [r["name"] for r in options["roles"]][:3] == ["Administrator", "Manager", "Team Lead"]
     assert [t["name"] for t in options["teams"]] == ["HOS"]
     assert client.get("/admin/roles", headers=pd).status_code == 403
 
@@ -131,7 +131,8 @@ def test_resetting_a_password_ends_their_sessions(client, ana, ben):
 def test_starting_roles_and_the_permission_catalogue(client, ana):
     data = client.get("/admin/roles", headers=ana).json()
     by_name = {r["name"]: r for r in data["roles"]}
-    assert list(by_name) == ["Administrator", "Team Lead", "Field agent", "Salesperson"]
+    assert list(by_name) == ["Administrator", "Manager", "Team Lead", "Field agent", "Salesperson"]
+    assert by_name["Manager"]["scope"] == "managed" and "goals.manage" in by_name["Manager"]["permissions"]
     assert by_name["Administrator"]["isSystem"] and "admin.audit" in by_name["Administrator"]["permissions"]
     assert (by_name["Salesperson"]["scope"], by_name["Team Lead"]["scope"]) == ("own", "team")
     assert "customers.delete" not in by_name["Salesperson"]["permissions"]
@@ -139,7 +140,7 @@ def test_starting_roles_and_the_permission_catalogue(client, ana):
     assert {"customers", "deals", "activities", "quotes", "orders", "reports", "admin"} <= areas
     # Areas with no screens are neither offered nor kept.
     assert not {"leads", "opportunities", "contracts", "documents", "automations", "integrations"} & areas
-    assert [s["key"] for s in data["scopes"]] == ["own", "team", "all"]
+    assert [s["key"] for s in data["scopes"]] == ["own", "team", "managed", "all"]
 
 
 def test_make_edit_and_delete_a_role(client, ana):

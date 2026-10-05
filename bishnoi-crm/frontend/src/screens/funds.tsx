@@ -24,7 +24,7 @@ const STATES = [
 
 function FinanceNote({ error }: { error: string | null }) {
   if (!error) return null;
-  return <p className="mb-3 rounded-[3px] bg-danger-tint px-3 py-2 text-meta text-danger">Finance couldn&apos;t be asked just now ({error}). What&apos;s shown is its last answer.</p>;
+  return <p className="mb-3 rounded-[6px] bg-danger-tint px-3 py-2 text-meta text-danger">Finance couldn&apos;t be asked just now ({error}). What&apos;s shown is its last answer.</p>;
 }
 
 function AskButton({ primary = false }: { primary?: boolean }) {

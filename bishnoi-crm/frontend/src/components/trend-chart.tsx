@@ -130,7 +130,7 @@ export function TrendChart({ points, title, org }: { points: TrendPoint[]; title
           aria-roledescription="chart"
           aria-label={`${title}. Use the left and right arrow keys to read each month.`}
           aria-describedby={tableId}
-          className="absolute inset-0 cursor-crosshair rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-4"
+          className="absolute inset-0 cursor-crosshair rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-4"
           onPointerMove={(e) => pick(e.clientX, e.currentTarget.getBoundingClientRect())}
           onPointerLeave={() => setActive(null)}
           onFocus={() => setActive(active ?? n - 1)}
@@ -146,7 +146,7 @@ export function TrendChart({ points, title, org }: { points: TrendPoint[]; title
         {shown && (
           <div
             role="status"
-            className="pointer-events-none absolute top-0 z-10 w-max max-w-48 rounded-[3px] bg-sheet px-2.5 py-1.5 text-meta shadow-overlay"
+            className="pointer-events-none absolute top-0 z-10 w-max max-w-48 rounded-[6px] bg-sheet px-2.5 py-1.5 text-meta shadow-overlay"
             style={{
               left: `${x(active!, n)}%`,
               transform: `translateX(${x(active!, n) > 60 ? "calc(-100% - 10px)" : "10px"})`,

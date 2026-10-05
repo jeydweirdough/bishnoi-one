@@ -18,10 +18,10 @@ export async function MonthTarget({ view, fmt, today, mayTarget }: { view: "mine
         today={today}
         fmt={fmt}
         label={`${view === "team" ? "Your team's sales" : "Your sales"} in ${r.label}`}
-        href={mayTarget ? `/deals/targets?month=${r.period}` : undefined}
+        href={mayTarget ? `/kpis/targets?month=${r.period}` : undefined}
       />
       <p className="mt-2 text-meta">
-        <Link href={results} className="text-hema hover:underline">
+        <Link href={results} className="text-ink hover:underline">
           See sales results
         </Link>
       </p>

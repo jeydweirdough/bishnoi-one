@@ -7,10 +7,10 @@ import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, Deal, DealLists, DealStage, ForecastCategory, Org, PriceList } from "@/src/platform/lib/types";
+import type { DealPriority, Assignable, Deal, DealLists, DealStage, ForecastCategory, Org, PriceList } from "@/src/platform/lib/types";
 import { createDeal, updateDeal, type DealInput } from "../../actions/deals";
 import { OwnerField } from "../crm/owner-field";
-import { OPEN_CATEGORIES } from "./words";
+import { PRIORITIES, OPEN_CATEGORIES } from "./words";
 
 type LineDraft = { key: number; productId: string; quantity: string };
 type OpenCategory = Exclude<ForecastCategory, "closed">;
@@ -55,6 +55,7 @@ export function DealForm({
   const [closeOn, setCloseOn] = useState(deal?.expectedCloseOn ?? "");
   const [value, setValue] = useState(deal && !deal.lines.length ? fmt.pesosText(deal.valueCentavos) : "");
   const [source, setSource] = useState(deal ? (deal.leadSource ?? "") : (company.leadSource ?? ""));
+  const [priority, setPriority] = useState<DealPriority | "">(deal?.priority ?? "");
   const [notes, setNotes] = useState(deal?.notes ?? "");
   const [ownerId, setOwnerId] = useState(deal?.owner?.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [priceType, setPriceType] = useState(deal?.priceType ?? priceTypes[0]?.code ?? "");
@@ -95,6 +96,7 @@ export function DealForm({
       valueCentavos: withProducts ? null : typedValue,
       expectedCloseOn: closeOn,
       leadSource: source || null,
+      priority: priority || null,
       priceType: withProducts ? priceType : null,
       lines: lines.filter((l) => l.productId).map((l) => ({ productId: l.productId, quantity: Number(l.quantity) || 0 })),
       notes: notes.trim() || null,
@@ -111,6 +113,7 @@ export function DealForm({
         if (isOpen && probabilityNumber !== null && probabilityNumber !== deal.probability) change.probability = probabilityNumber;
         if (input.expectedCloseOn !== deal.expectedCloseOn) change.expectedCloseOn = input.expectedCloseOn;
         if (input.leadSource !== deal.leadSource) change.leadSource = input.leadSource;
+        if ((input.priority ?? null) !== (deal.priority ?? null)) change.priority = input.priority;
         if (input.notes !== deal.notes) change.notes = input.notes;
         if (input.ownerId && input.ownerId !== deal.owner?.id) change.ownerId = input.ownerId;
         const before = JSON.stringify(deal.lines.map((l) => [l.productId, l.quantity]));
@@ -211,6 +214,18 @@ export function DealForm({
               {[...new Set([...lists.sources, ...(deal?.leadSource ? [deal.leadSource] : [])])].map((s) => (
                 <option key={s} value={s}>
                   {s}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Field label="Priority" optional error={fields.priority} hint="How much it matters now.">
+          {(p) => (
+            <Select {...p} value={priority} onChange={(e) => setPriority(e.target.value as DealPriority | "")}>
+              <option value="">Not set</option>
+              {PRIORITIES.filter((x) => x.value).map((x) => (
+                <option key={x.label} value={x.value!}>
+                  {x.label}
                 </option>
               ))}
             </Select>

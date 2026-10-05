@@ -183,12 +183,12 @@ export function LogVisitButton({
       <Button variant={variant} icon={<MapPin className="size-4" aria-hidden />} onClick={() => dialog.current?.showModal()}>
         {label}
       </Button>
-      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
+      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-[6px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
         <div className="flex items-center justify-between border-b border-rule px-5 py-3">
           <h2 id={titleId} className="text-heading">
             {form.doctor ? `Visit to ${form.doctor.name}` : "Log visit"}
           </h2>
-          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
+          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
             <X className="size-4" aria-hidden />
           </button>
         </div>

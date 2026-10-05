@@ -51,7 +51,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
         href={tab(key)}
         aria-current={current ? "page" : undefined}
         className={`rounded-full border px-3 py-1 text-meta ${
-          current ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-hema"
+          current ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-ink"
         }`}
       >
         {label}
@@ -128,7 +128,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
             {list.items.map((x) => (
               <li key={x.id} className="flex items-start justify-between gap-4 px-5 py-3">
                 <div className="min-w-0">
-                  <Link href={`/quotes/${x.id}${task ? `?from=${task.key}` : ""}`} className="font-semibold text-hema hover:underline">
+                  <Link href={`/quotes/${x.id}${task ? `?from=${task.key}` : ""}`} className="font-semibold text-ink hover:underline">
                     {x.number}
                   </Link>
                   <span className="text-ink-2"> · {x.customerName}</span>

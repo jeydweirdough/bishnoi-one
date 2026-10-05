@@ -1,0 +1,104 @@
+# How every app goes on Vercel. Not run by itself: each app has its own
+# workflow (deploy-<app>.yml: Actions > Deploy CRM, Deploy Inventory, ...) that
+# runs this one for that app, only when you press Run workflow.
+#
+# 1. Check: is everything set up (.github/deploy.json, scripts/deploy/vercel_check.py)?
+#    The token, the app's Vercel projects and their Root Directory, their
+#    Production settings, and the apps it needs online first. Anything missing
+#    stops the run here, before anything is deployed, and the run's summary
+#    says what to do next.
+# 2. Test: the API's tests, on GitHub's machines (the screens are type-checked
+#    by Vercel's own build, which stops the deploy if they don't pass).
+# 3. Deploy the API, then the screens (they call it), each checked afterwards:
+#    the API's /health, the screens' sign-in page.
+#
+# Each project's last deployed commit is kept as a tag (deployed/<project>),
+# so the repo's Tags say what's live.
+name: Deploy an app
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: "The app's folder, e.g. bishnoi-crm"
+        type: string
+        required: true
+      part:
+        description: "screens and API, API only, or screens only"
+        type: string
+        default: screens and API
+      run_tests:
+        type: boolean
+        default: true
+    secrets:
+      VERCEL_TOKEN:
+        required: false # its absence is reported by the check, with what to do
+
+permissions:
+  contents: write # the deployed/<project> tags
+
+env:
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
+
+jobs:
+  check:
+    name: Is it set up?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      api: ${{ steps.check.outputs.api }}
+      screens: ${{ steps.check.outputs.screens }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: check
+        run: python3 scripts/deploy/vercel_check.py check --app "${{ inputs.app }}" --part "${{ inputs.part }}"
+
+  test:
+    name: Tests
+    needs: check
+    if: inputs.run_tests && needs.check.outputs.api != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: astral-sh/setup-uv@v5
+      - name: API tests
+        working-directory: ${{ inputs.app }}/backend
+        run: uv run pytest -q -p no:warnings
+
+  api:
+    name: Deploy the API
+    needs: [check, test]
+    # Tests skipped (run_tests off) still lets it go ahead; failed tests don't.
+    if: always() && needs.check.result == 'success' && needs.check.outputs.api != '' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: ./.github/actions/vercel-deploy
+        with:
+          project: ${{ needs.check.outputs.api }}
+          side: backend
+
+  screens:
+    name: Deploy the screens
+    needs: [check, test, api]
+    # After the API (when it was deployed in this run, it must have worked).
+    if: always() && needs.check.result == 'success' && needs.check.outputs.screens != '' && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.api.result == 'success' || needs.api.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: ./.github/actions/vercel-deploy
+        with:
+          project: ${{ needs.check.outputs.screens }}
+          side: frontend

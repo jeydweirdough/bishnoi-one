@@ -216,3 +216,46 @@ def test_a_customer_has_a_lead_source_from_the_deals_list_and_deals_start_with_i
     body = {"sections": [{"id": s["id"], "title": s["title"], "columns": s["columns"], "fields": [{"id": f["id"], "label": f["label"], "type": f["type"], "required": f["required"], "hidden": f["hidden"], "inList": f["inList"], "options": f["options"], "helpText": f["helpText"], "placeholder": f["placeholder"]} for f in s["fields"]]} for s in editor["sections"]]}
     assert client.put("/admin/forms/company", json=body, headers=ana).status_code == 200, "the form saves"
     assert client.patch(f"/companies/{acme['id']}", json={"leadSource": "Trade show"}, headers=ria).json()["leadSource"] == "Trade show"
+
+
+# --- the deals page: priority, the table's columns, and the summary charts ---
+
+
+def test_priority_sorting_and_the_next_step_with_the_customer(client, crew):
+    from tests.test_customers import activity
+
+    ria = crew["ria"]
+    acme, beta = company(client, ria, "Acme"), company(client, ria, "Beta")
+    low = deal(client, ria, acme, name="Small", priority="low", valueCentavos=100)
+    urgent = deal(client, ria, beta, name="Big", priority="urgent", valueCentavos=900)
+    plain = deal(client, ria, acme, name="Plain", valueCentavos=500)
+    assert (urgent["priority"], plain["priority"], urgent["createdBy"]["name"]) == ("urgent", None, "Ria")
+    assert client.post("/deals", json={"name": "x", "companyId": acme["id"], "expectedCloseOn": "2026-12-01", "priority": "asap"}, headers=ria).status_code == 422
+    names = lambda q: [d["name"] for d in client.get(f"/deals?{q}", headers=ria).json()["items"]]  # noqa: E731
+    assert names("sort=priority") == ["Big", "Small", "Plain"]
+    assert names("sort=value&desc=true") == ["Big", "Plain", "Small"]
+    assert names("priority=none") == ["Plain"] and names("priority=urgent") == ["Big"]
+    # The next step: the soonest meeting or task still to do with that customer.
+    activity(client, ria, kind="task", subject="Send the price list", companyId=acme["id"], at="2030-01-05T02:00:00Z")
+    activity(client, ria, kind="meeting", subject="Visit", companyId=acme["id"], at="2030-01-02T02:00:00Z")
+    rows = {d["name"]: d for d in client.get("/deals", headers=ria).json()["items"]}
+    assert rows["Small"]["nextStep"]["subject"] == "Visit" and rows["Big"]["nextStep"] is None
+    assert client.patch(f"/deals/{low['id']}", json={"priority": "high"}, headers=ria).json()["priority"] == "high"
+
+
+def test_the_summary_for_the_charts(client, crew):
+    ria = crew["ria"]
+    acme = company(client, ria, "Acme")
+    deal(client, ria, acme, name="A", priority="urgent", valueCentavos=1000, probability=90)
+    deal(client, ria, acme, name="B", priority="urgent", valueCentavos=2000, probability=60)
+    c = deal(client, ria, acme, name="C", valueCentavos=4000, probability=10)
+    s = client.get("/deals-summary?owner=me", headers=ria).json()
+    assert (s["count"], s["valueCentavos"], s["weightedCentavos"]) == (3, 7000, 900 + 1200 + 400)
+    assert [b["count"] for b in s["byProbability"]] == [1, 1, 1]
+    assert {p["priority"]: p["count"] for p in s["byPriority"]} == {"urgent": 2, "high": 0, "normal": 0, "low": 0, None: 1}
+    assert sum(st["count"] for st in s["byStage"]) == 3
+    # Closed deals: won and lost.
+    client.post(f"/deals/{c['id']}/lose", json={"reason": "Price"}, headers=ria)
+    closed = client.get("/deals-summary?state=closed&owner=me", headers=ria).json()
+    assert (closed["count"], closed["wonCount"], closed["lostCount"]) == (1, 0, 1)
+    assert [d["name"] for d in client.get("/deals?state=closed", headers=ria).json()["items"]] == ["C"]

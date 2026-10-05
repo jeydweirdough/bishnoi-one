@@ -25,7 +25,7 @@ export function Duplicates({
   quote?: boolean;
 }) {
   return (
-    <div role="alert" className="animate-reshape space-y-3 rounded-[3px] border border-rule-strong bg-bench/60 px-4 py-3">
+    <div role="alert" className="animate-reshape space-y-3 rounded-[6px] border border-rule-strong bg-bench/60 px-4 py-3">
       <p className="text-sm font-semibold text-ink">{message}</p>
       <ul className="space-y-1 text-meta">
         {found.map((d) => (
@@ -33,7 +33,7 @@ export function Duplicates({
             {d.canOpen === false ? (
               <span className="font-medium text-ink">{d.name}</span>
             ) : (
-              <Link href={`${base}/${d.id}`} target="_blank" className="font-medium text-hema hover:underline">
+              <Link href={`${base}/${d.id}`} target="_blank" className="font-medium text-ink hover:underline">
                 {d.name}
               </Link>
             )}
@@ -42,7 +42,7 @@ export function Duplicates({
               {d.canOpen === false ? " · someone else's" : ""}
             </span>
             {quote && d.canOpen !== false && (
-              <Link href={`/companies/${d.id}/quotes/new`} className="ml-2 font-medium text-hema hover:underline">
+              <Link href={`/companies/${d.id}/quotes/new`} className="ml-2 font-medium text-ink hover:underline">
                 Quote them instead
               </Link>
             )}

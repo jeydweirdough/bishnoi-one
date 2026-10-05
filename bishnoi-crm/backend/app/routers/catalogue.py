@@ -426,7 +426,7 @@ def reach_of(access: Access) -> set[str] | None:
     """The divisions this person's promos and bundles come from. None: every one."""
     if access.scope == "all":
         return None
-    return {access.team_id} if access.team_id else set()
+    return set(access.team_ids) or ({access.team_id} if access.team_id else set())
 
 
 def sees(record: Promo | Bundle, access: Access) -> bool:

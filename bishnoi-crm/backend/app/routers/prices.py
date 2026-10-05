@@ -30,7 +30,7 @@ def teams_for(db: Session, access: Access) -> list[Team]:
     """The teams this person may price."""
     query = select(Team).where(Team.is_active).order_by(Team.name)
     if access.scope != "all":
-        query = query.where(Team.id == (access.team_id or ""))
+        query = query.where(Team.id.in_(access.team_ids or {access.team_id or ""}))
     return list(db.scalars(query))
 
 

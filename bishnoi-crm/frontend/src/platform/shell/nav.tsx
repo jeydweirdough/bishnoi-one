@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ArrowLeftRight, Mail, ChevronRight, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -121,10 +121,29 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
             { href: "/contacts", label: "Contacts" },
           ],
         }),
-        ...only(selling && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
+        ...only((selling || admin) && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
         ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
+        ...only(!admin && may("activities.view"), { href: "/calendar", label: "Calendar", icon: "calendar" }),
         ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
+        // Writing to customers through one's own mailbox (Zoho Mail, Gmail, Outlook, SMTP).
+        ...only(!admin && may("activities.create"), { href: "/email", label: "Email", icon: "email" }),
+        // Approved materials: everyone shows them; an administrator keeps them.
+        ...only(may("customers.view") || may("admin.settings"), { href: "/media", label: "Media", icon: "letters" }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
+        // Everyone's own scorecard; whoever sets goals sets the targets too.
+        {
+          href: "/kpis",
+          label: "KPIs",
+          icon: "goals" as const,
+          ...(may("goals.manage")
+            ? {
+                subpages: [
+                  { href: "/kpis", label: "Scorecard", exact: true },
+                  { href: "/kpis/targets", label: "Targets" },
+                ],
+              }
+            : {}),
+        },
       ],
     },
     {
@@ -321,16 +340,16 @@ function Row({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-[3px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const className = `flex items-center gap-2.5 rounded-[6px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
     current
-      ? "bg-hema-tint font-semibold text-hema"
+      ? "bg-hema-tint font-semibold text-ink"
       : open
         ? "font-semibold text-ink hover:bg-sheet"
         : "text-ink-2 hover:bg-sheet hover:text-ink"
   }`;
   const inside = (
     <>
-      {icon && <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />}
+      {icon && <Icon name={icon} className={`size-4 ${current ? "text-ink" : open ? "text-ink-2" : "text-ink-3"}`} />}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -500,7 +519,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-[6px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
     >
       <Icon name={icon} className="size-4 text-ink-3" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -604,7 +623,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[3px] px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-[6px] px-3 text-sm ${
           open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
         }`}
       >
@@ -620,7 +639,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[3px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-[6px] border border-rule bg-bench p-1 shadow-lg"
           >
             {items.map((e) => (
               <a
@@ -628,7 +647,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-[3px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -867,14 +886,36 @@ function Account({ me }: { me: Me }) {
       <Link
         href="/account"
         aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
+        className={`flex items-center gap-2.5 rounded-[6px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
       >
         <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
         <span className="min-w-0">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-hema" : ""}`}>{me.user.fullName}</span>
+          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-ink" : ""}`}>{me.user.fullName}</span>
           <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
         </span>
       </Link>
+      {/* The CRM sends email from each person's own mailbox. */}
+      {process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" && (
+        <Link
+          href="/account/mailbox"
+          aria-current={pathname.startsWith("/account/mailbox") ? "page" : undefined}
+          className={`mt-1 flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-sm ${pathname.startsWith("/account/mailbox") ? "bg-hema-tint text-ink" : "text-ink-2 hover:bg-sheet"}`}
+        >
+          <Mail className="size-4" aria-hidden />
+          Mailbox
+        </Link>
+      )}
+      {/* Each company has its own data here. Someone who works for more than
+          one picks the other on Bishnoi One, which sends them back signed in there. */}
+      {THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) && (
+        <a
+          href={`${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`}
+          className="mt-1 flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-sm text-ink-2 hover:bg-sheet"
+        >
+          <ArrowLeftRight className="size-4" aria-hidden />
+          Switch company
+        </a>
+      )}
       <ConfirmButton
         label="Sign out"
         icon={<LogOut className="size-4" aria-hidden />}
@@ -934,7 +975,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[6px] pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

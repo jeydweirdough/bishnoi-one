@@ -1,10 +1,10 @@
-import { Plus } from "lucide-react";
 import Link from "next/link";
 import { FollowUpItem } from "../components/follow-up-item";
-import { LinkButton } from "@/src/platform/ui/button";
+import { NewCustomerButton } from "../components/crm/new-customer";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
+import { AttentionPanel } from "../components/attention-panel";
 import { load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { ActivityItem, Assignable, CompanyRow, Me, Org, Paged, PeopleInsights, PersonInsight, Quote } from "@/src/platform/lib/types";
@@ -41,7 +41,7 @@ function TeamTable({ people, fmt, today }: { people: PersonInsight[]; fmt: Forma
           {people.map((p) => (
             <tr key={p.id} className={p.overdue ? "bg-danger-tint/40" : ""}>
               <th scope="row" className="py-2.5 pr-3 text-left font-medium">
-                <Link href={`/activities?who=team&person=${p.id}`} className="text-hema hover:underline">
+                <Link href={`/activities?who=team&person=${p.id}`} className="text-ink hover:underline">
                   {p.isMe ? "You" : p.name}
                 </Link>
                 <span className="block text-meta font-normal text-ink-3">{p.role}</span>
@@ -109,9 +109,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
         actions={
           <>
             {can(me, "customers.create") && (
-              <LinkButton href="/companies/new" icon={<Plus className="size-4" aria-hidden />}>
-                Add customer
-              </LinkButton>
+<NewCustomerButton variant="default" />
             )}
             {can(me, "activities.create") && (
               <LogActivityButton
@@ -128,6 +126,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
         {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. You lead {me.team?.name ?? "your team"}: {others.length}{" "}
         {others.length === 1 ? "person" : "people"}.
       </PageHeader>
+      <AttentionPanel />
 
       <Stats>
         <Stat label="Overdue in the team" value={t.overdue} flag href="/activities?who=team" />
@@ -150,7 +149,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
           <SectionTitle
             icon="followUps"
             action={
-              <Link href="/activities?who=team" className="text-meta font-medium text-hema hover:underline">
+              <Link href="/activities?who=team" className="text-meta font-medium text-ink hover:underline">
                 All team to do
               </Link>
             }
@@ -172,7 +171,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
           <SectionTitle
             icon="activity"
             action={
-              <Link href="/activities?view=history&who=team" className="text-meta font-medium text-hema hover:underline">
+              <Link href="/activities?view=history&who=team" className="text-meta font-medium text-ink hover:underline">
                 All team history
               </Link>
             }
@@ -206,7 +205,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
                     </p>
                     <p className="mt-0.5">
                       {customer.href && (
-                        <Link href={customer.href} className="font-medium text-hema hover:underline">
+                        <Link href={customer.href} className="font-medium text-ink hover:underline">
                           {customer.name}
                         </Link>
                       )}

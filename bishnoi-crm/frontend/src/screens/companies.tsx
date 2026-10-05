@@ -1,5 +1,6 @@
-import { Copy, Plus } from "lucide-react";
+import { Copy } from "lucide-react";
 import Link from "next/link";
+import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
@@ -56,21 +57,19 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
               </LinkButton>
             )}
             {can(me, "customers.create") && (
-              <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                Add customer
-              </LinkButton>
+<NewCustomerButton />
             )}
           </>
         }
       >
         {list.total} {list.total === 1 ? "customer" : "customers"}
         {filtered ? " match" : ""}
-        {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : ""}.
+        {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : me.role?.scope === "managed" ? " in the teams you manage" : ""}.
       </PageHeader>
 
 
       <Filters
-        search="Search by name, city or industry"
+        search="Search by name, code, city or industry"
         selects={[
           { name: "status", label: "Type", options: [{ value: "", label: "Any type" }, ...typeOptions(types)] },
           ...(me.role?.scope !== "own"
@@ -90,9 +89,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                   <LinkButton href="/companies">Clear filters</LinkButton>
                 ) : (
                   can(me, "customers.create") && (
-                    <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                      Add customer
-                    </LinkButton>
+<NewCustomerButton />
                   )
                 )
               }
@@ -117,7 +114,10 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                       className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_6.5rem_minmax(0,9rem)_minmax(0,9rem)_7rem] md:items-center md:gap-4"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate font-semibold text-hema">{c.name}</span>
+                        <span className="flex min-w-0 items-baseline gap-2">
+                          <span className="truncate font-semibold text-ink">{c.name}</span>
+                          {c.code && <span className="shrink-0 font-mono text-meta text-ink-3">{c.code}</span>}
+                        </span>
                         <span className="block truncate text-meta text-ink-3">
                           {[
                             c.industry,

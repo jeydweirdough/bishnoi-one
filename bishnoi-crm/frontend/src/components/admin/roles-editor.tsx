@@ -237,7 +237,7 @@ function Permissions({
                     <div className="flex items-center justify-between gap-2 text-sm">
                       <span className="min-w-0 text-ink">{area.name}</span>
                       {!locked && area.actions.length > 1 && (
-                        <button type="button" onClick={() => all(area, !every)} className="shrink-0 text-meta text-hema hover:underline md:hidden">
+                        <button type="button" onClick={() => all(area, !every)} className="shrink-0 text-meta text-ink hover:underline md:hidden">
                           {every ? "None" : "All"}
                         </button>
                       )}
@@ -249,7 +249,7 @@ function Permissions({
                           <label
                             key={a.permission}
                             className={`relative inline-flex items-center rounded-full border px-3 py-1 text-meta transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${
-                              on ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong bg-sheet text-ink-2"
+                              on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"
                             } ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}
                           >
                             <input
@@ -264,7 +264,7 @@ function Permissions({
                         );
                       })}
                       {!locked && area.actions.length > 1 && (
-                        <button type="button" onClick={() => all(area, !every)} className="ml-1 hidden text-meta text-hema hover:underline md:inline">
+                        <button type="button" onClick={() => all(area, !every)} className="ml-1 hidden text-meta text-ink hover:underline md:inline">
                           {every ? "None" : "All"}
                         </button>
                       )}

@@ -262,7 +262,7 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
         icon="lists"
         action={
           excel && (
-            <a href={`/admin/settings/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-hema hover:underline">
+            <a href={`/admin/settings/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-ink hover:underline">
               <Download className="size-3.5" aria-hidden />
               Download the form
             </a>
@@ -333,7 +333,7 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
       )}
 
       <details className="mt-4 border-t border-rule pt-3">
-        <summary className="cursor-pointer text-meta font-medium text-hema">Placeholders, for cells the labels don&apos;t cover</summary>
+        <summary className="cursor-pointer text-meta font-medium text-ink">Placeholders, for cells the labels don&apos;t cover</summary>
         <p className="mt-2 text-meta text-ink-3">
           Type one in a cell of the form to say exactly what goes there, for example {"{{customer}}"}. For the products table, put the line placeholders in
           one row; it repeats for each product.

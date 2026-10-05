@@ -15,49 +15,84 @@ export type Demo = { email: string; who: string; role: string; group: string };
  */
 export function LoginForm({
   next,
+  company,
   demo,
   demoPassword,
   children,
 }: {
   next: string;
+  /** The company last signed in to on this browser, filled in. */
+  company: string;
   demo: Demo[];
   demoPassword: string | null;
   children: ReactNode;
 }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
-  const email = useRef<HTMLInputElement>(null);
   const password = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  // The fields hold their values here (Ant's inputs keep their own copy, so
+  // writing to the element directly doesn't stick): a demo account fills both.
+  const [emailValue, setEmailValue] = useState(state?.email ?? "");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [companyValue, setCompanyValue] = useState(state?.company ?? company);
 
   function fillDemo(address: string) {
     setPicked(address);
-    if (email.current) email.current.value = address;
-    if (password.current && demoPassword) password.current.value = demoPassword;
+    setEmailValue(address);
+    if (demoPassword) setPasswordValue(demoPassword);
     password.current?.focus();
   }
 
   const card = (
-    <div className="rounded-[3px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
+    <div className="rounded-[6px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
       {children}
       <form action={action} className="mt-6 space-y-5" noValidate>
         <input type="hidden" name="next" value={next} />
+        {/* Each company on Bishnoi One has its own CRM data: which one is
+            asked first, by the short name the platform gave it. */}
+        <Field label="Company" hint="Your company's short name on Bishnoi One, for example getmeds.">
+          {(p) => (
+            <Input
+              {...p}
+              name="company"
+              autoComplete="organization"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={companyValue}
+              onChange={(e) => setCompanyValue(e.target.value)}
+              required
+              autoFocus={!companyValue}
+            />
+          )}
+        </Field>
         <Field label="Work email">
           {(p) => (
             <Input
               {...p}
-              ref={email}
               name="email"
               type="email"
               autoComplete="username"
               inputMode="email"
-              defaultValue={state?.email}
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
               required
-              autoFocus
+              autoFocus={!!companyValue}
             />
           )}
         </Field>
         <Field label="Password">
-          {(p) => <Input {...p} ref={password} name="password" type="password" autoComplete="current-password" required />}
+          {(p) => (
+            <Input
+              {...p}
+              ref={password}
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={passwordValue}
+              onChange={(e) => setPasswordValue(e.target.value)}
+              required
+            />
+          )}
         </Field>
         <FormError message={state?.error} />
         <Button type="submit" variant="primary" loading={pending} className="w-full">
@@ -72,7 +107,7 @@ export function LoginForm({
   return (
     <div className="grid w-full max-w-[56rem] gap-6 md:grid-cols-[minmax(0,1fr)_25rem] md:items-start">
       <div className="md:order-2">{card}</div>
-      <aside aria-labelledby="demo-accounts" className="rounded-[3px] border border-rule px-5 py-5 text-meta md:order-1 md:max-h-[calc(100dvh-5rem)] md:overflow-y-auto">
+      <aside aria-labelledby="demo-accounts" className="rounded-[6px] border border-rule px-5 py-5 text-meta md:order-1 md:max-h-[calc(100dvh-5rem)] md:overflow-y-auto">
         <h2 id="demo-accounts" className="font-semibold text-ink-2">
           Demo accounts
         </h2>
@@ -93,8 +128,8 @@ export function LoginForm({
                       aria-pressed={picked === d.email}
                       className={`rounded-full border px-3 py-1 transition-colors ${
                         picked === d.email
-                          ? "border-hema bg-hema-tint text-hema"
-                          : "border-rule-strong bg-sheet text-ink hover:border-hema hover:text-hema"
+                          ? "border-hema bg-hema-tint text-ink"
+                          : "border-rule-strong bg-sheet text-ink hover:border-hema hover:text-ink"
                       }`}
                     >
                       <span className="font-medium">{d.who}</span>

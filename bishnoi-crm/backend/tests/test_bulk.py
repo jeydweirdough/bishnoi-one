@@ -72,24 +72,20 @@ def test_bulk_follow_ups(client, crew):
 # --- duplicates ---
 
 
-def test_a_company_that_looks_like_another_is_flagged(client, crew):
+def test_a_company_like_another_is_shown_not_refused(client, crew):
     company(client, crew["sam"], "Acme Pharma", phone="0917 555 0101")
-    r = client.post("/companies", json={"name": "ACME pharma"}, headers=crew["ria"])
-    assert r.status_code == 409
-    dup = r.json()["detail"]["duplicates"][0]
-    # Ria can't see Sam's company: she learns it exists, not its details.
-    assert (dup["name"], dup["teamName"], dup["phone"], dup["canOpen"]) == ("Acme Pharma", "South", None, False)
-    by_phone = client.post("/companies", json={"name": "Other name", "phone": "09175550101"}, headers=crew["max"])
-    assert by_phone.status_code == 409 and by_phone.json()["detail"]["duplicates"][0]["canOpen"] is True
-    # It really is a different one: add it anyway.
-    assert client.post("/companies", json={"name": "ACME pharma", "allowDuplicate": True}, headers=crew["ria"]).status_code == 201
+    # One customer can be several divisions': the second is added all the same.
+    assert client.post("/companies", json={"name": "ACME pharma"}, headers=crew["ria"]).status_code == 201
+    # While typing, it's shown. Ria can't see Sam's company: she learns it exists, not its details.
+    seen = {c["teamName"]: c for c in client.get("/companies/lookalikes?name=Acme Pharma", headers=crew["ria"]).json()}
+    assert (seen["South"]["canOpen"], seen["South"]["owner"], seen["South"]["city"]) == (False, None, None)
 
 
-def test_the_same_number_written_another_way_is_a_duplicate(client, crew):
+def test_the_same_number_written_another_way_is_a_lookalike(client, crew):
     company(client, crew["sam"], "Acme Pharma", phone="0917 555 0101")
     for written in ("+63 917 555 0101", "(+63) 917-555-0101", "639175550101"):
-        r = client.post("/companies", json={"name": "Other name", "phone": written}, headers=crew["sam"])
-        assert r.status_code == 409, written
+        found = client.get("/companies/lookalikes", params={"phone": written}, headers=crew["sam"]).json()
+        assert [c["name"] for c in found] == ["Acme Pharma"], written
     acme = company(client, crew["lia"], "Beta Clinic")["id"]
     contact(client, crew["lia"], "Jo", companyId=acme, mobile="0918 222 3333")
     r = client.post("/contacts", json={"firstName": "Joan", "phone": "+639182223333"}, headers=crew["lia"])

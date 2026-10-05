@@ -1,0 +1,42 @@
+# Puts Regulatory on Vercel, only when you ask: Actions > Deploy Regulatory > Run workflow.
+# When: not ready for Vercel yet: the run says what's missing.
+#
+# It checks first that everything is set up (the Vercel token, Regulatory's Vercel
+# projects, their settings, the apps it needs online) and stops with what to do
+# next when something isn't; then tests, deploys the API and then the screens,
+# and checks each answers. The steps are in deploy-app.yml; what Regulatory needs is
+# under "apps" in .github/deploy.json.
+name: Deploy Regulatory
+
+on:
+  workflow_dispatch:
+    inputs:
+      part:
+        description: "What to deploy"
+        type: choice
+        options:
+          - screens and API
+          - API only
+          - screens only
+        default: screens and API
+      run_tests:
+        description: "Run the API's tests first (a failure stops the deploy)"
+        type: boolean
+        default: true
+
+# One deploy of Regulatory at a time; a second run waits for the first.
+concurrency:
+  group: deploy-regulatory
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the deployed/<project> tags
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-regulatory
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit

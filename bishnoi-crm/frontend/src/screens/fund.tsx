@@ -56,7 +56,7 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
         <Sheet className="px-5 py-4">
           <FundSteps request={r} />
           {next && <p className={`mt-3 text-sm ${r.status === "to_liquidate" || r.status === "to_return" ? "font-semibold text-due-today" : "text-ink-2"}`}>{next}</p>}
-          {f?.sentBackNote && r.status === "to_liquidate" && <p className="mt-2 rounded-[3px] bg-danger-tint px-3 py-2 text-meta text-danger">Returned by Finance for correction: {f.sentBackNote}</p>}
+          {f?.sentBackNote && r.status === "to_liquidate" && <p className="mt-2 rounded-[6px] bg-danger-tint px-3 py-2 text-meta text-danger">Returned by Finance for correction: {f.sentBackNote}</p>}
           {r.financeProblem && <p className="mt-2 text-meta text-danger">Finance couldn&apos;t be asked just now ({r.financeProblem}); this is its last answer.</p>}
         </Sheet>
 
@@ -75,7 +75,7 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
                 ["Amount requested", fmt.peso(r.amountCentavos)],
                 ["Amount approved", r.approvedCentavos ? fmt.peso(r.approvedCentavos) : null],
                 ["Date needed", r.neededOn ? fmt.dateLabel(r.neededOn) : null],
-                ["Customer", r.company ? <Link href={`/companies/${r.company.id}`} className="text-hema hover:underline">{r.company.name}</Link> : null],
+                ["Customer", r.company ? <Link href={`/companies/${r.company.id}`} className="text-ink hover:underline">{r.company.name}</Link> : null],
                 ["Subject to liquidation", r.liquidate ? "Yes" : "No"],
                 ["Details", <span key="d" className="whitespace-pre-line">{r.details}</span>],
                 ...(r.decision?.note ? ([[r.status === "declined" ? "Reason for declining" : "Approver's remarks", r.decision.note]] as [string, string][]) : []),

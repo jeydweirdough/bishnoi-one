@@ -160,7 +160,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
                         </span>
                       )}
                       <div className="min-w-0">
-                        <Link href={`/companies/${row.customerId}`} className="font-semibold text-hema hover:underline">
+                        <Link href={`/companies/${row.customerId}`} className="font-semibold text-ink hover:underline">
                           {row.name}
                         </Link>
                         <p className="text-meta text-ink-3">

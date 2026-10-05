@@ -51,7 +51,7 @@ export function FundSteps({ request }: { request: FundRequest }) {
           {i > 0 && <span aria-hidden className={`h-px w-5 ${s.done || s.current ? "bg-hema" : "bg-rule-strong"}`} />}
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${
-              s.done ? "bg-hema text-white" : s.current ? "border border-hema font-semibold text-hema" : "border border-rule-strong text-ink-3"
+              s.done ? "bg-hema text-white" : s.current ? "border border-hema font-semibold text-ink" : "border border-rule-strong text-ink-3"
             }`}
             aria-current={s.current ? "step" : undefined}
           >

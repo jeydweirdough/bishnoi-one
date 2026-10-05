@@ -4,6 +4,7 @@ import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { NoAccess } from "../components/admin/words";
+import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { Doctors } from "../components/field/types";
@@ -42,13 +43,13 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
           defaultValue={search}
           placeholder="Search by name"
           aria-label="Search doctors by name"
-          className="h-9 w-64 rounded-[3px] border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
+          className="h-9 w-64 rounded-[6px] border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
         />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />
           Only those who owe
         </label>
-        <button type="submit" className="h-9 rounded-[3px] border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
+        <button type="submit" className="h-9 rounded-[6px] border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
           Show
         </button>
       </form>
@@ -64,9 +65,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
               ) : (
                 <>
                   {can(me, "customers.create") && (
-                    <LinkButton href="/companies/new" variant="primary">
-                      Add a doctor
-                    </LinkButton>
+<NewCustomerButton label="Add a doctor" kind="doctor" icon={false} />
                   )}
                   {can(me, "goals.import") && <LinkButton href="/field/balances/import">Upload balances</LinkButton>}
                 </>
@@ -90,7 +89,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
                 {data.items.map((d) => (
                   <tr key={d.id}>
                     <th scope="row" className="py-2.5 pr-3 text-left font-medium">
-                      <Link href={`/companies/${d.id}`} className="text-hema hover:underline">
+                      <Link href={`/companies/${d.id}`} className="text-ink hover:underline">
                         {d.name}
                       </Link>
                       {d.city && <span className="block text-meta font-normal text-ink-3">{d.city}</span>}

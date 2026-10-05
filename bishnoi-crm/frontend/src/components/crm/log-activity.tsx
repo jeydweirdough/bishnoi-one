@@ -12,6 +12,7 @@ import { useCan } from "../quick-add/can";
 import { AddCustomer } from "../quick-add/forms";
 import { QuickAdd } from "../quick-add/quick-add";
 import { KINDS, kindOf, localDateTime, tomorrowMorning } from "./words";
+import { AlsoAbout } from "./also-about";
 
 const PLACEHOLDERS: Record<CrmKind, string> = {
   call: "What was the call about?",
@@ -35,6 +36,7 @@ export function LogActivity({
   contacts = [],
   companies,
   onDone,
+  initialKind = "call",
 }: {
   org: Org;
   /** The moment the page was made, so the server and the browser start the
@@ -49,12 +51,14 @@ export function LogActivity({
   companies?: Ref[];
   /** Called once it's saved (the panel it sits in closes). */
   onDone?: () => void;
+  /** Opened for one kind (the customer page's Note, Email, Call, Task, Meeting). */
+  initialKind?: CrmKind;
 }) {
-  const [kind, setKind] = useState<CrmKind>("call");
+  const [kind, setKind] = useState<CrmKind>(initialKind);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [at, setAt] = useState(() => localDateTime(new Date(now), org.timezone));
-  const [planned, setPlanned] = useState(false);
+  const [at, setAt] = useState(() => (kindOf(initialKind).planned ? tomorrowMorning(org.timezone) : localDateTime(new Date(now), org.timezone)));
+  const [planned, setPlanned] = useState(kindOf(initialKind).planned);
   const [duration, setDuration] = useState("");
   const [direction, setDirection] = useState<"out" | "in">("out");
   const [contact, setContact] = useState(contactId ?? "");
@@ -62,6 +66,7 @@ export function LogActivity({
   const can = useCan();
   const [made, setMade] = useState<Ref[]>([]);
   const [ownerId, setOwnerId] = useState(people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
+  const [alsoAbout, setAlsoAbout] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -88,6 +93,7 @@ export function LogActivity({
       durationMinutes: (kind === "call" || kind === "meeting") && duration ? Number(duration) : null,
       direction: kind === "call" || kind === "email" ? direction : null,
       ownerId: ownerId || null,
+      alsoCompanyIds: alsoAbout,
     };
     start(async () => {
       const result = await createActivity(input);
@@ -98,6 +104,7 @@ export function LogActivity({
       }
       toast.success(info.planned ? `${info.label} planned` : `${info.label} logged`, { description: result.data.subject });
       setSubject("");
+      setAlsoAbout([]);
       setBody("");
       setDuration("");
       setError(null);
@@ -185,6 +192,7 @@ export function LogActivity({
             )}
           </Field>
         )}
+        <AlsoAbout value={alsoAbout} onChange={setAlsoAbout} except={company || undefined} />
         {info.planned && people.length > 1 && (
           <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label="Who's doing it" />
         )}

@@ -128,7 +128,9 @@ def approvers_of(db: Session, quote: Quote) -> list[User]:
     team. Never the person who made it."""
     people = [u for u in db.scalars(select(User).where(User.is_active)) if "quotes.approve" in permissions_of(u.role) and u.id != quote.owner_id]
     team = [u for u in people if u.role.scope == "team" and quote.team_id and u.team_id == quote.team_id]
-    return team or [u for u in people if u.role.scope == "all"]
+    # No team lead to decide: the team's manager, then those who reach every team.
+    managers = [u for u in people if u.role.scope == "managed" and quote.team_id in {t.id for t in u.managed_teams} | ({u.team_id} if u.team_id else set())]
+    return team or managers or [u for u in people if u.role.scope == "all"]
 
 
 def quote_waiting(db: Session, settings: Settings, quote: Quote, maker: User) -> None:

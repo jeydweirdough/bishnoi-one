@@ -1,12 +1,19 @@
 "use client";
 
+import { Alert, Input as AntInput, Radio, type InputRef } from "antd";
 import { ChevronDown } from "lucide-react";
-import { useId, type ComponentProps, type ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
 
-// Underlined fields: transparent, a control-grey rule underneath, the rule
-// thickens to ink on focus. The label always sits above, never inside.
+// Fields are Ant Design's: boxed, Ant's border, blue on focus, red when
+// invalid. The label always sits above, never inside.
 const control =
-  "block w-full min-w-0 bg-transparent border-0 border-b border-control rounded-none px-0 text-sm text-ink placeholder:text-ink-3/80 focus:outline-none focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:border-hema aria-[invalid=true]:border-danger disabled:text-ink-3";
+  "block w-full min-w-0 rounded-[6px] border border-rule-strong bg-sheet px-[11px] text-sm text-ink placeholder:text-ink-3/70 transition-colors hover:border-hema-hover focus:border-hema focus:outline-none focus:shadow-[0_0_0_2px_rgb(5_145_255_/_0.1)] aria-[invalid=true]:border-[#ff4d4f] disabled:bg-bench disabled:text-ink-3";
+
+/** Hands the caller the real <input> (or <textarea>), as before, not Ant's wrapper. */
+function toElement<E extends HTMLElement>(ref: Ref<E> | undefined, el: E | null) {
+  if (typeof ref === "function") ref(el);
+  else if (ref) (ref as { current: E | null }).current = el;
+}
 
 type FieldProps = {
   label: string;
@@ -23,13 +30,13 @@ export function Field({ label, hint, error, optional, className = "", children }
   const note = error || hint;
   return (
     <div className={`min-w-0 ${className}`}>
-      <label htmlFor={id} className="mb-1 block text-meta font-medium text-ink-2">
+      <label htmlFor={id} className="mb-1.5 block text-sm text-ink">
         {label}
         {optional && <span className="font-normal text-ink-3"> (optional)</span>}
       </label>
       {children({ id, "aria-invalid": error ? true : undefined, "aria-describedby": note ? noteId : undefined })}
       {note && (
-        <p id={noteId} className={`mt-1 text-meta ${error ? "text-danger" : "text-ink-3"}`}>
+        <p id={noteId} className={`mt-1 text-meta ${error ? "text-[#ff4d4f]" : "text-ink-3"}`}>
           {note}
         </p>
       )}
@@ -37,8 +44,14 @@ export function Field({ label, hint, error, optional, className = "", children }
   );
 }
 
-export function Input({ className = "", ...rest }: ComponentProps<"input">) {
-  return <input className={`h-9 ${control} ${className}`} {...rest} />;
+export function Input({ ref, size: _size, ...rest }: ComponentProps<"input">) {
+  return (
+    <AntInput
+      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
+      status={rest["aria-invalid"] ? "error" : undefined}
+      {...(rest as ComponentProps<typeof AntInput>)}
+    />
+  );
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
@@ -46,7 +59,7 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
   return (
     <input
       type="file"
-      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[3px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
+      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[6px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
       {...rest}
     />
   );
@@ -57,26 +70,34 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
  * cell has a column header instead, so this one is boxed to show where it can
  * be typed. Always give it an aria-label naming its row and column.
  */
-export function CellInput({ className = "", ...rest }: ComponentProps<"input">) {
+export function CellInput({ ref, size: _size, className = "", ...rest }: ComponentProps<"input">) {
   return (
-    <input
-      className={`h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-right text-sm tabular-nums hover:border-control focus:border-hema focus:outline-none aria-[invalid=true]:border-danger ${className}`}
-      {...rest}
+    <AntInput
+      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
+      status={rest["aria-invalid"] ? "error" : undefined}
+      className={`text-right tabular-nums ${className}`}
+      {...(rest as ComponentProps<typeof AntInput>)}
     />
   );
 }
 
-export function Textarea({ className = "", ...rest }: ComponentProps<"textarea">) {
-  return <textarea className={`min-h-20 resize-y py-2 ${control} ${className}`} {...rest} />;
+export function Textarea({ ref, ...rest }: ComponentProps<"textarea">) {
+  return (
+    <AntInput.TextArea
+      ref={(r: { resizableTextArea?: { textArea: HTMLTextAreaElement } } | null) => toElement(ref, r?.resizableTextArea?.textArea ?? null)}
+      status={rest["aria-invalid"] ? "error" : undefined}
+      {...(rest as ComponentProps<typeof AntInput.TextArea>)}
+    />
+  );
 }
 
 export function Select({ className = "", children, ...rest }: ComponentProps<"select">) {
   return (
     <div className="relative">
-      <select className={`h-9 appearance-none pr-7 ${control} ${className}`} {...rest}>
+      <select className={`h-8 appearance-none pr-8 ${control} ${className}`} {...rest}>
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-1 size-4 -translate-y-1/2 text-ink-3" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-ink-3" />
     </div>
   );
 }
@@ -97,35 +118,22 @@ export function Choice<T extends string>({
 }) {
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1.5 text-meta font-medium text-ink-2">{legend}</legend>
-      <div className="flex flex-wrap gap-1.5">
+      <legend className="mb-1.5 text-sm text-ink">{legend}</legend>
+      <Radio.Group name={name} value={value} onChange={(e) => onChange(e.target.value as T)} optionType="button" buttonStyle="solid">
         {options.map((o) => (
-          <label
-            key={o.value}
-            className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-[3px] border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-hema has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
-          >
-            <input
-              type="radio"
-              name={name}
-              value={o.value}
-              checked={value === o.value}
-              onChange={() => onChange(o.value)}
-              className="sr-only"
-            />
-            {o.icon}
-            {o.label}
-          </label>
+          <Radio.Button key={o.value} value={o.value}>
+            <span className="inline-flex items-center gap-1.5">
+              {o.icon}
+              {o.label}
+            </span>
+          </Radio.Button>
         ))}
-      </div>
+      </Radio.Group>
     </fieldset>
   );
 }
 
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return (
-    <p role="alert" className="animate-reshape rounded-[3px] bg-danger-tint px-3 py-2 text-meta text-danger">
-      {message}
-    </p>
-  );
+  return <Alert role="alert" type="error" showIcon title={message} />;
 }

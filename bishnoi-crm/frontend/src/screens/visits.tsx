@@ -39,19 +39,19 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
         {visits.total} {visits.total === 1 ? "visit" : "visits"} · {fmt.peso(collected)} collected
       </PageHeader>
       <nav aria-label="Month" className="mb-4 flex items-center gap-2">
-        <Link href={link(shiftMonth(month, -1))} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
+        <Link href={link(shiftMonth(month, -1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-36 text-center text-heading">
           {fmt.monthLabel(month)} {month.slice(0, 4)}
         </span>
         {month < perf.thisMonth && (
-          <Link href={link(shiftMonth(month, 1))} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
+          <Link href={link(shiftMonth(month, 1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         )}
         {person && (
-          <Link href={`/visits?month=${month}`} className="ml-2 text-meta text-hema hover:underline">
+          <Link href={`/visits?month=${month}`} className="ml-2 text-meta text-ink hover:underline">
             Everyone&apos;s
           </Link>
         )}

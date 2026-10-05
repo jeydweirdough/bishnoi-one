@@ -20,6 +20,7 @@ type Account = {
 const REACH = {
   own: "Only the records you own",
   team: "Every record your team owns",
+  managed: "Every record of the teams you manage",
   all: "Every record in the CRM",
 } as const;
 const REACH_IN = { own: "the records you own", team: "every record your team owns", all: "every record in the CRM" } as const;

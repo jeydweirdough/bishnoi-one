@@ -33,7 +33,8 @@ from app.api import Api, person_out, team_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Deal, DealStage, Quote, RevenueTarget, Team, User
+from app.kpis import by_code, person_targets, set_person_target
+from app.models import Company, Deal, DealStage, Quote, Team, User
 from app.pricing import today
 from app.routers.deals import period_bounds
 from app.routers.field import month_or_now
@@ -59,7 +60,7 @@ def is_seller(user: User) -> bool:
 def read_targets(access: Manage, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
     """Everyone who sells (and anyone already given a target that month), with the month's targets."""
     month = month_or_now(month, settings)
-    targets = {t.user_id: t.amount_centavos for t in db.scalars(select(RevenueTarget).where(RevenueTarget.month == month))}
+    targets = person_targets(db, by_code(db, "revenue_won"), [month])
     people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if is_seller(u) or u.id in targets]
     return {
         "month": month,
@@ -83,16 +84,11 @@ def set_targets(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, 
     users = set(db.scalars(select(User.id).where(User.id.in_([t.user_id for t in body.targets]))))
     if missing := [t.user_id for t in body.targets if t.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
-    existing = {t.user_id: t for t in db.scalars(select(RevenueTarget).where(RevenueTarget.month == month))}
+    kpi = by_code(db, "revenue_won")
+    if kpi is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The Revenue won KPI has been removed. Add it back under Settings → KPIs.")
     for t in body.targets:
-        target = existing.get(t.user_id)
-        if t.amount_centavos is None:
-            if target is not None:
-                db.delete(target)
-            continue
-        target = target or RevenueTarget(user_id=t.user_id, month=month)
-        target.amount_centavos = t.amount_centavos
-        db.add(target)
+        set_person_target(db, kpi, month, t.user_id, t.amount_centavos)
     audit(db, me, "revenue_targets.updated", target=f"Revenue targets for {month} ({len(body.targets)} people)", target_type="goals")
     db.commit()
     return read_targets(access, db, settings, month)
@@ -158,9 +154,8 @@ def results(db: Session, access: Access, settings: Settings, view: Which, period
     else:
         people = [u for u in reachable_people(db, access) if not team or u.team_id == team]
     ids = {p.id for p in people}
-    targets: dict[str, int] = defaultdict(int)
-    for t in db.scalars(select(RevenueTarget).where(RevenueTarget.month.in_(months), RevenueTarget.user_id.in_(ids))):
-        targets[t.user_id] += t.amount_centavos
+    everyone = person_targets(db, by_code(db, "revenue_won"), months)
+    targets: dict[str, int] = defaultdict(int, {u: v for u, v in everyone.items() if u in ids})
     active = {d.owner_id for d in closed} | {q.owner_id for q in quotes} | set(targets)
     people = [p for p in people if p.id in active or is_seller(p)]
 
@@ -248,7 +243,7 @@ def read_results(
     db: DB,
     settings: SettingsDep,
     view: Which = "mine",
-    period: str | None = Query(None, max_length=7, description="a month (2026-10) or a quarter (2026-Q4); this month when not given"),
+    period: str | None = Query(None, max_length=22, description="a month (2026-10), a quarter (2026-Q4) or days (2026-07-01..2026-10-15); this month when not given"),
     team: str | None = Query(None, max_length=36),
 ) -> dict:
     check_view(access, view)
@@ -266,7 +261,7 @@ def export_results(
     settings: SettingsDep,
     report: Literal["people", "teams", "customers", "products"],
     view: Which = "mine",
-    period: str | None = Query(None, max_length=7),
+    period: str | None = Query(None, max_length=22),
     team: str | None = Query(None, max_length=36),
 ) -> Response:
     check_view(access, view)
@@ -295,5 +290,60 @@ def export_results(
     return Response(
         "﻿" + out.getvalue(),  # so Excel reads it as UTF-8
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="sales-{report}-{r["period"]}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="sales-{report}-{r["period"].replace("..", "-to-")}.csv"'},
     )
+
+
+# --- growth: month by month ----------------------------------------------------------------
+
+
+@router.get("/trend")
+def read_trend(
+    access: CurrentAccess,
+    db: DB,
+    settings: SettingsDep,
+    view: Which = "team",
+    months: int = Query(12, ge=2, le=36),
+    team: str | None = Query(None, max_length=36),
+) -> dict:
+    """The last `months` months, this one included: revenue won (deals won, by
+    the day they were won), value quoted, and new customers, for the dashboard's
+    growth chart. Growth: the last full month against the one before it."""
+    check_view(access, view)
+    this = today(settings.org_timezone)[:7]
+    y, m = int(this[:4]), int(this[5:])
+    keys = []
+    for back in range(months - 1, -1, -1):
+        yy, mm = divmod((y * 12 + m - 1) - back, 12)
+        keys.append(f"{yy:04d}-{mm + 1:02d}")
+    first_day, after = f"{keys[0]}-01", period_bounds(keys[-1])[1]
+    first, last = utc_bounds(first_day, after, settings)
+    zone = ZoneInfo(settings.org_timezone)
+
+    won: dict[str, list[int]] = {k: [0, 0] for k in keys}
+    for d in db.scalars(
+        narrowed(select(Deal).join(Deal.stage), Deal, access, view, team).where(
+            DealStage.outcome == "won", Deal.expected_close_on >= first_day, Deal.expected_close_on < after
+        )
+    ).unique():
+        won[d.expected_close_on[:7]][0] += d.value_centavos
+        won[d.expected_close_on[:7]][1] += 1
+    quoted: dict[str, int] = defaultdict(int)
+    for q in db.scalars(narrowed(select(Quote), Quote, access, view, team).where(Quote.created_at >= first, Quote.created_at < last, Quote.approval_status != "rejected")):
+        quoted[as_month(q.created_at, zone)] += q.total_centavos
+    new: dict[str, int] = defaultdict(int)
+    for c in db.scalars(narrowed(select(Company), Company, access, view, team).where(Company.created_at >= first, Company.created_at < last)).unique():
+        new[as_month(c.created_at, zone)] += 1
+
+    points = [{"month": k, "wonCentavos": won[k][0], "wonCount": won[k][1], "quotedCentavos": quoted[k], "newCustomers": new[k]} for k in keys]
+    before, latest = points[-3]["wonCentavos"] if len(points) > 2 else 0, points[-2]["wonCentavos"]
+    return {
+        "thisMonth": this,
+        "points": points,
+        # The last full month against the one before it; None with nothing to compare.
+        "growth": round(100 * (latest - before) / before) if before else None,
+    }
+
+
+def as_month(moment: datetime, zone: ZoneInfo) -> str:
+    return (moment if moment.tzinfo else moment.replace(tzinfo=UTC)).astimezone(zone).strftime("%Y-%m")

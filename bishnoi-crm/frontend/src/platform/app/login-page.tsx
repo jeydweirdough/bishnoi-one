@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { COMPANY_COOKIE } from "../lib/session-cookie";
 import { appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
 import { buttonClass } from "../ui/button";
 import { APP_NAME } from "../lib/labels";
@@ -44,10 +46,12 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
   const bishnoiAccount = platformSignIn();
   const demo = await demoAccounts();
   const app = thisAppLabel();
+  // The company last signed in to here; on this computer, the API's own default.
+  const company = (await cookies()).get(COMPANY_COOKIE)?.value ?? (process.env.SHOW_DEMO_ACCOUNTS === "1" ? "getmeds" : "");
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-start px-4 py-10 sm:justify-center">
-      <LoginForm next={next} demo={demo.items} demoPassword={demo.password}>
+      <LoginForm next={next} company={company} demo={demo.items} demoPassword={demo.password}>
         {/* No company name here, and not by omission: nobody has signed in
             yet, so which company this is isn't known. One sign-in page serves
             every company on the platform. The company's own name appears the
@@ -75,7 +79,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
           </p>
         )}
         {refused && (
-          <p role="alert" className="mt-3 rounded-[3px] bg-danger-tint px-3 py-2 text-sm text-danger">
+          <p role="alert" className="mt-3 rounded-[6px] bg-danger-tint px-3 py-2 text-sm text-danger">
             {refused}
           </p>
         )}

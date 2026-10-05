@@ -1,0 +1,34 @@
+# One Vercel project to production, then checked that it answers. Used by
+# .github/workflows/deploy-app.yml once the check has passed. Needs
+# VERCEL_TOKEN (and VERCEL_SCOPE, for a team) in the job's environment.
+name: Deploy to Vercel
+description: Deploys one project to production, checks it answers, and tags the commit as deployed.
+inputs:
+  project:
+    description: The Vercel project's name
+    required: true
+  side:
+    description: backend (its /health is checked) or frontend (its sign-in page)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Deploy ${{ inputs.project }}
+      # bash -eo pipefail: a failed deploy fails the step, so it isn't tagged as deployed.
+      shell: bash
+      run: |
+        scope="${VERCEL_SCOPE:-$(python3 -c 'import json; print(json.load(open(".github/deploy.json")).get("scope", ""))')}"
+        flags=()
+        [ -n "$scope" ] && flags=(--scope "$scope")
+        # From the repo's root: the project's Root Directory (on Vercel) says which folder it builds.
+        npx --yes vercel@latest link --yes --project "${{ inputs.project }}" "${flags[@]}" --token "$VERCEL_TOKEN"
+        npx --yes vercel@latest deploy --prod --yes "${flags[@]}" --token "$VERCEL_TOKEN" | tee deploy.log
+        echo "Deployed ${{ inputs.project }}: $(tail -n 1 deploy.log)" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Is it answering?
+      shell: bash
+      run: python3 scripts/deploy/vercel_check.py health --project "${{ inputs.project }}" --side "${{ inputs.side }}"
+
+    - name: Remember this commit as deployed
+      shell: bash
+      run: git push -f origin "HEAD:refs/tags/deployed/${{ inputs.project }}"

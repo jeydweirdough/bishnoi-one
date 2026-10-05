@@ -105,7 +105,7 @@ function ReceiptRow({ request, expense: e, fmt, editable }: { request: FundReque
           {e.category && !e.category.reimbursable && " (non-reimbursable)"}
         </p>
         {e.receipt ? (
-          <a href={`/funds/${request.id}/receipts/${e.id}`} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 text-meta text-hema hover:underline">
+          <a href={`/funds/${request.id}/receipts/${e.id}`} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 text-meta text-ink hover:underline">
             <FileText className="size-3.5" aria-hidden />
             {e.receipt.name}
           </a>
@@ -200,7 +200,7 @@ export function Liquidate({ request, categories, org, today }: { request: FundRe
   return (
     <div className="space-y-4">
       {open ? (
-        <form ref={form} onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule p-4">
+        <form ref={form} onSubmit={submit} noValidate className="space-y-4 rounded-[6px] border border-rule p-4">
           <p className="text-sm font-semibold">Add expense</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Description" error={fields.description}>

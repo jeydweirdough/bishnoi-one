@@ -68,5 +68,5 @@ export function RouteMap({ points, visits }: { points: RoutePoint[]; visits: Map
     };
   }, [points, visits]);
 
-  return <div ref={box} role="img" aria-label="The day's route on a map" className="h-[28rem] w-full rounded-[3px] bg-bench" />;
+  return <div ref={box} role="img" aria-label="The day's route on a map" className="h-[28rem] w-full rounded-[6px] bg-bench" />;
 }

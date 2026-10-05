@@ -20,7 +20,7 @@ The repo has three actions, in `.github/workflows/`:
 |---|---|---|
 | **Sync branches** (`sync-branches.yml`) | any push to `main` or a `bishnoi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
 | **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
-| **Deploy** (`deploy.yml`) | only by hand: **Run workflow** | Deploys to Vercel the apps you tick ([below](#deployments-on-vercel-only-when-you-ask)). |
+| **Deploy <app>** (`deploy-<app>.yml`, one per app) | only by hand: **Run workflow** | Checks the app is set up, then deploys it to Vercel; stops and says what to do when it isn't ([below](#deployments-on-vercel-only-when-you-ask)). |
 
 Set these once:
 
@@ -77,26 +77,43 @@ Then **merge** it. About a minute later, Sync branches creates the
 ## Deployments on Vercel: only when you ask
 
 Nothing deploys by itself. Vercel doesn't build from Git (every app's
-`vercel.json`, screens and API: `git.deploymentEnabled: false`), and the
-**Deploy** action (`.github/workflows/deploy.yml`) runs only when you press
-its button:
+`vercel.json`, screens and API: `git.deploymentEnabled: false`), and each app
+has its own **Deploy** workflow that runs only when you press its button:
+**Deploy Platform**, **Deploy CRM**, **Deploy Inventory**, **Deploy Pharmacy**,
+**Deploy Finance**, **Deploy Executive Admin**, **Deploy In-Licensing**,
+**Deploy Regulatory** (`.github/workflows/deploy-<app>.yml`; the steps they
+share are in `deploy-app.yml`).
 
-1. **Actions → Deploy → Run workflow** (branch `main`).
-2. Tick the apps to put online. Each says whether it's on Vercel, e.g. "CRM
-   (on Vercel: screens + API)" or "Pharmacy (not on Vercel yet)".
-3. Pick **screens and API**, **screens only** or **API only**. Tick **Skip a
-   part that hasn't changed** to leave out any that are already up to date.
-4. **Run workflow.** The run's summary is a table of every app: whether you
-   ticked it, its Vercel projects, and what this run did with it. An app
-   that isn't on Vercel is listed as skipped, never an error.
+1. **Actions → Deploy <app> → Run workflow** (branch `main`).
+2. Pick **screens and API**, **API only** or **screens only**, and whether to
+   run the API's tests first (on by default).
+3. **Run workflow.** It goes in this order, and stops at the first step that
+   isn't right, before anything is deployed:
+   1. **Is it set up?** The app's code can run on Vercel; `VERCEL_TOKEN`
+      works; the app's Vercel projects exist with the right Root Directory;
+      their **Production** environment variables are there (names only, never
+      values: `.github/deploy.json` lists what each app needs); and the apps
+      it depends on are online (the CRM and Inventory need the Platform's API
+      first). The run's summary is a checklist: ✅ ready, ⚠️ optional and
+      missing, ❌ blocking, with **What to do before deploying**, step by step.
+   2. **Tests:** the API's tests, on GitHub's machines.
+   3. **Deploy the API**, then **the screens**, each checked afterwards (the
+      API's `/health`, the screens' sign-in page). An API that doesn't start
+      says which setting to look at.
+4. Blocked? Do the steps in the summary, then run it again.
+
+Order the first time: **Platform** first, then the CRM and Inventory, then
+the others. In-Licensing and Regulatory stop at the first check until their
+code is ready for Vercel (the summary says what's missing).
 
 - It deploys `main` as it is, to production. Commits get no Vercel checks,
   and the app branches get no preview builds.
 - Each project's last deployed commit is the tag `deployed/<project>` (the
-  repo's Tags show what's live).
-- Which folder goes to which project: `.github/deploy.json`. When an app gets
-  its Vercel projects, add them there, and change its "(not on Vercel yet)"
-  in `deploy.yml` to "(on Vercel: screens + API)".
+  repo's Tags show what's live). A bad deploy is put back from Vercel →
+  the project → Deployments → **Instant Rollback**.
+- Which folder goes to which project, and what each app needs:
+  `.github/deploy.json`. When an app gets its Vercel projects, add them under
+  `projects`; when its code is ready, set its `ready` to `true`.
 
 Set up once:
 
@@ -135,11 +152,11 @@ they call each other, so set them up in this order.
 3. **Projects.** On Vercel, make any project that doesn't exist yet, named as
    in `.github/deploy.json` (`bishnoi-<app>` for the screens, Root Directory
    `bishnoi-<app>/frontend`; `bishnoi-<app>-backend` for the API, Root Directory
-   `bishnoi-<app>/backend`). The Deploy action stops with a message if one is
+   `bishnoi-<app>/backend`). The app's Deploy workflow stops with a message if one is
    missing.
 4. **Settings**, below (each project → Settings → Environment Variables →
    Production).
-5. **Deploy**: Actions → Deploy, tick the apps. APIs first, then screens.
+5. **Deploy**: Actions → Deploy <app>, Platform first. Each deploys its API, then its screens.
 6. **Platform > Applications:** set each app's address to its screens'
    address. A Bishnoi One account opens an app only at that address.
 7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete

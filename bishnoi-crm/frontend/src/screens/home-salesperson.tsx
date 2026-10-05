@@ -1,11 +1,11 @@
-import { Plus } from "lucide-react";
 import Link from "next/link";
 import { FollowUpItem } from "../components/follow-up-item";
-import { LinkButton } from "@/src/platform/ui/button";
+import { NewCustomerButton } from "../components/crm/new-customer";
 import { Icon } from "@/src/platform/ui/icons";
 import { QuoteStateMark } from "@/src/platform/ui/marks";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
+import { AttentionPanel } from "../components/attention-panel";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { ActivityItem, ActivitySummary, Assignable, CompanyRow, Paged, Quote } from "@/src/platform/lib/types";
@@ -45,9 +45,7 @@ export async function SalespersonHome() {
         actions={
           <>
             {can(me, "customers.create") && (
-              <LinkButton href="/companies/new" icon={<Plus className="size-4" aria-hidden />}>
-                Add customer
-              </LinkButton>
+<NewCustomerButton variant="default" />
             )}
             {can(me, "activities.create") && (
               <LogActivityButton
@@ -64,6 +62,7 @@ export async function SalespersonHome() {
         {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. {me.role?.name}
         {me.team ? ` · ${me.team.name}` : ""}
       </PageHeader>
+      <AttentionPanel />
 
       {can(me, "deals.view") && <MonthTarget view="mine" fmt={fmt} today={today} mayTarget={can(me, "goals.manage")} />}
 
@@ -74,7 +73,7 @@ export async function SalespersonHome() {
               <SectionTitle
                 icon="followUps"
                 action={
-                  <Link href="/activities" className="text-meta font-medium text-hema hover:underline">
+                  <Link href="/activities" className="text-meta font-medium text-ink hover:underline">
                     All to do
                   </Link>
                 }
@@ -110,7 +109,7 @@ export async function SalespersonHome() {
               <SectionTitle
                 icon="quotes"
                 action={
-                  <Link href="/quotes?owner=me" className="text-meta font-medium text-hema hover:underline">
+                  <Link href="/quotes?owner=me" className="text-meta font-medium text-ink hover:underline">
                     All your quotes
                   </Link>
                 }
@@ -118,7 +117,7 @@ export async function SalespersonHome() {
                 Your quotes
               </SectionTitle>
               {approver && toApprove.total > 0 && (
-                <Link href="/quotes?task=approvals" className="mt-1 flex items-center justify-between rounded-[3px] bg-hema-tint px-3 py-2 text-sm font-medium text-hema hover:underline">
+                <Link href="/quotes?task=approvals" className="mt-1 flex items-center justify-between rounded-[6px] bg-hema-tint px-3 py-2 text-sm font-medium text-ink hover:underline">
                   {toApprove.total} {toApprove.total === 1 ? "quote is" : "quotes are"} waiting for your approval
                   <span aria-hidden>→</span>
                 </Link>
@@ -130,7 +129,7 @@ export async function SalespersonHome() {
                   {needsHand.map((q) => (
                     <li key={q.id} className="flex items-center justify-between gap-3 py-2.5">
                       <span className="min-w-0">
-                        <Link href={`/quotes/${q.id}`} className="font-medium text-hema hover:underline">
+                        <Link href={`/quotes/${q.id}`} className="font-medium text-ink hover:underline">
                           {q.number}
                         </Link>
                         <span className="block truncate text-meta text-ink-3">{q.customerName}</span>
@@ -152,7 +151,7 @@ export async function SalespersonHome() {
             icon="activity"
             action={
               seesActivities && (
-                <Link href="/activities?view=history" className="text-meta font-medium text-hema hover:underline">
+                <Link href="/activities?view=history" className="text-meta font-medium text-ink hover:underline">
                   All history
                 </Link>
               )
@@ -186,7 +185,7 @@ export async function SalespersonHome() {
                     </p>
                     <p className="mt-0.5">
                       {customer.href ? (
-                        <Link href={customer.href} className="font-medium text-hema hover:underline">
+                        <Link href={customer.href} className="font-medium text-ink hover:underline">
                           {customer.name}
                         </Link>
                       ) : null}

@@ -2,7 +2,7 @@ import { Sheet } from "./sheet";
 
 /** A grey bar where text is about to be. */
 export function Bone({ className = "" }: { className?: string }) {
-  return <span aria-hidden className={`block animate-pulse rounded-[2px] bg-rule/70 ${className}`} />;
+  return <span aria-hidden className={`block animate-pulse rounded-[4px] bg-rule/70 ${className}`} />;
 }
 
 function Lines({ rows }: { rows: number }) {

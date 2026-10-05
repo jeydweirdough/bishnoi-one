@@ -191,15 +191,21 @@ REQUEST_STATUSES = ("pending", "approved", "declined")
 
 
 class Identity(Base):
-    """A person on the platform: one account, whichever applications it reaches."""
+    """A person at a company: their standing there (title, whether they run it,
+    the applications they have). Someone who works for two companies has a row
+    at each, under the same email, and one password for both: they sign in
+    once and switch between them (app/routers/identity.py)."""
 
     __tablename__ = "nbpl_identities"
-    __table_args__ = (_one_of("status", IDENTITY_STATUSES, "nbpl_identity_status"),)
+    __table_args__ = (
+        _one_of("status", IDENTITY_STATUSES, "nbpl_identity_status"),
+        UniqueConstraint("company_id", "email", name="nbpl_identity_email"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="RESTRICT"), index=True)
     full_name: Mapped[str] = mapped_column(String(120))
-    email: Mapped[str] = mapped_column(String(254), unique=True)
+    email: Mapped[str] = mapped_column(String(254), index=True)
     title: Mapped[str | None] = mapped_column(String(120), default=None)
     # Runs their own company: its people, its application access, its settings.
     is_company_admin: Mapped[bool] = mapped_column(default=False)

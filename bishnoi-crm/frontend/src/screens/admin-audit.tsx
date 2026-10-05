@@ -40,7 +40,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Sea
             href={f.key ? `/admin/audit?action=${enc(f.key)}` : "/admin/audit"}
             aria-current={f.key === filter ? "page" : undefined}
             className={`rounded-full border px-3 py-1 text-meta ${
-              f.key === filter ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-hema"
+              f.key === filter ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-ink"
             }`}
           >
             {f.label}
@@ -66,7 +66,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Sea
                     {e.target && e.target !== e.actor && <span className="text-ink-2"> · {e.target}</span>}
                   </p>
                   <p className="text-meta text-ink-3">
-                    by {e.actorId ? <Link href={`/admin/users/${e.actorId}`} className="hover:text-hema hover:underline">{e.actor}</Link> : e.actor}
+                    by {e.actorId ? <Link href={`/admin/users/${e.actorId}`} className="hover:text-ink hover:underline">{e.actor}</Link> : e.actor}
                     {e.fields.length > 0 && <> · changed {describeFields(e.fields)}</>}
                   </p>
                 </div>

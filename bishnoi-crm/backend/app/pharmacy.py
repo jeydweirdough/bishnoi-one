@@ -26,6 +26,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import Company, Contact, Quote
 
 log = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None) -
     if not settings.pharmacy_linked:
         raise PharmacyUnavailable("The CRM isn't linked to Pharmacy yet (PHARMACY_API_URL, PHARMACY_API_KEY), so an Rx quote can't be checked.")
     url = f"{settings.pharmacy_api_url}/integration/checks" + (f"/{urllib.parse.quote(path)}" if path else "")
-    headers = {"X-Bishnoi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {"X-Bishnoi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)}
     data = None
     if body is not None:
         data = json.dumps(body).encode()

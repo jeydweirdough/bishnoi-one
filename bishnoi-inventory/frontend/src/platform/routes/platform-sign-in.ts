@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { api, ApiError, SESSION_COOKIE } from "../lib/api";
+import { COMPANY_COOKIE, companyOfToken } from "../lib/session-cookie";
 
 // Back from the platform with a pass (/auth/platform?pass=...): this app's API
 // checks it (app/platform_pass.py) and opens a session, kept in the same cookie
@@ -32,6 +33,11 @@ export async function GET(request: NextRequest) {
     path: "/",
     maxAge: session.expiresIn,
   });
+  // The company the pass was for, for the sign-in page next time.
+  const company = companyOfToken(session.accessToken);
+  if (company) {
+    response.cookies.set(COMPANY_COOKIE, company, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 400 * 24 * 3600 });
+  }
   response.headers.set("Cache-Control", "no-store");
   return response;
 }

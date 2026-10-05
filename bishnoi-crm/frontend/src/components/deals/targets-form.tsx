@@ -71,7 +71,7 @@ export function TargetsForm({
           No targets set for {monthName} yet.{" "}
           <button
             type="button"
-            className="font-semibold text-hema hover:underline"
+            className="font-semibold text-ink hover:underline"
             onClick={() => setDrafts(Object.fromEntries(data.people.map((p) => [p.person.id, toText(lastMonth.get(p.person.id))])))}
           >
             Start from {previousName}&apos;s

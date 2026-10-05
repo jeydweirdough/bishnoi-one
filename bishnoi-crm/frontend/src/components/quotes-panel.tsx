@@ -19,7 +19,7 @@ export async function QuotesPanel({ customerHref, quotes, canAdd, showWho = fals
           {quotes.map((q) => (
             <li key={q.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <Link href={`/quotes/${q.id}`} className="font-semibold text-hema hover:underline">
+                <Link href={`/quotes/${q.id}`} className="font-semibold text-ink hover:underline">
                   {q.number}
                 </Link>
                 <p className="text-meta text-ink-3">

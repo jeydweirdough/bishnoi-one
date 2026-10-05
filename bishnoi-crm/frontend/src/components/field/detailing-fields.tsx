@@ -56,7 +56,7 @@ export function DetailingFields({
   return (
     <div className="space-y-3">
       {shownBrief?.lastObjective && (
-        <p className="rounded-[3px] border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
+        <p className="rounded-[6px] border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
           <span className="font-semibold">Last visit&apos;s objective:</span> {shownBrief.lastObjective.text}
         </p>
       )}
@@ -65,7 +65,7 @@ export function DetailingFields({
           Products discussed <span className="font-normal text-ink-3">(optional, in the order you discussed them)</span>
         </legend>
         {rows.map((r, i) => (
-          <div key={r.key} className="rounded-[3px] border border-rule p-2.5">
+          <div key={r.key} className="rounded-[6px] border border-rule p-2.5">
             <div className="flex items-start gap-2">
               <span className="pt-2 text-meta font-semibold text-ink-3 tabular-nums">{i + 1}.</span>
               <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
@@ -101,13 +101,13 @@ export function DetailingFields({
                 </div>
               </div>
               <div className="flex flex-col gap-0.5">
-                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed earlier">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed earlier">
                   <ArrowUp className="size-3.5" aria-hidden />
                 </button>
-                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed later">
+                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed later">
                   <ArrowDown className="size-3.5" aria-hidden />
                 </button>
-                <button type="button" onClick={() => onRows(rows.filter((x) => x.key !== r.key))} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label="Take this product off">
+                <button type="button" onClick={() => onRows(rows.filter((x) => x.key !== r.key))} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label="Take this product off">
                   <X className="size-3.5" aria-hidden />
                 </button>
               </div>

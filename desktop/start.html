@@ -2,26 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
 <title>Bishnoi One</title>
 <style>
   :root {
-    --bench: #eceef2; --sheet: #ffffff; --ink: #172233; --ink-2: #414d60; --ink-3: #6b7587;
-    --rule: #dde1e8; --hema: #3a3f9c;
+    --bench: #f5f5f5; --sheet: #ffffff; --ink: #1f1f1f; --ink-2: #434343; --ink-3: #8c8c8c;
+    --rule: #f0f0f0; --track: #e6efff; --hema: #1677ff; --done: #52c41a;
     color-scheme: light;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bench); color: var(--ink); font: 14px/1.55 Poppins, "Segoe UI", system-ui, sans-serif; display: grid; place-items: center; padding: 24px; }
-  main { width: min(460px, 100%); background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 28px 28px 24px; }
+  main { width: min(420px, 100%); background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 32px 28px 24px; text-align: center;
+    box-shadow: 0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12); }
   .brand { font: 600 12px/1 Poppins, "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-  h1 { font-size: 22px; margin: 6px 0 4px; }
+  h1 { font-size: 22px; margin: 6px 0 20px; }
   p { margin: 0 0 12px; color: var(--ink-2); }
-  .now { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
-  .now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--hema); animation: pulse 1s infinite alternate; }
-  code { display: block; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--bench); color: var(--ink); font: 13px Poppins, "Segoe UI", sans-serif; user-select: all; }
-  @keyframes pulse { to { opacity: .3; } }
-  @media (prefers-reduced-motion: reduce) { .now::before { animation: none; } }
+
+  /* The ring: a quarter of it filled for each step done, and the step under
+     way sweeping inside its own quarter, so it moves without promising a time. */
+  .ring { position: relative; width: 132px; height: 132px; margin: 0 auto 18px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 10; }
+  .track { stroke: var(--track); }
+  .bar { stroke: var(--hema); stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
+  .sweep { stroke: var(--hema); stroke-linecap: round; opacity: .35; animation: sweep 1.6s ease-in-out infinite; transform-box: view-box; transform-origin: 50% 50%; }
+  .centre { position: absolute; inset: 0; display: grid; place-content: center; }
+  .centre b { font-size: 26px; font-weight: 600; line-height: 1; }
+  .centre span { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+  @keyframes sweep { 0% { stroke-dasharray: 2 400; } 60% { stroke-dasharray: 70 400; } 100% { stroke-dasharray: 2 400; } }
+
+  .now { font-weight: 500; color: var(--ink); margin-bottom: 14px; }
+  ol { list-style: none; margin: 0 auto; padding: 0; display: inline-grid; gap: 6px; text-align: left; }
+  li { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 13px; }
+  li::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--rule); flex: none; }
+  li.doing { color: var(--ink); }
+  li.doing::before { border-color: var(--hema); border-top-color: transparent; animation: spin .8s linear infinite; }
+  li.done { color: var(--ink-2); }
+  li.done::before { border-color: var(--done); background: var(--done) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .slow { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); text-align: left; }
+  code { display: block; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bench); color: var(--ink); font: 13px Poppins, "Segoe UI", sans-serif; user-select: all; }
+  @media (prefers-reduced-motion: reduce) { .sweep, li.doing::before { animation: none; } .bar { transition: none; } }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -29,9 +52,22 @@
 <main>
   <div class="brand">Bishnoi One</div>
   <h1 id="name">Bishnoi One</h1>
-  <p class="now" role="status">Starting. The first time takes a little longer.</p>
-  <div id="slow" hidden>
-    <p>This is taking longer than usual. The window opens by itself once the app answers.</p>
+  <div class="ring" aria-hidden="true">
+    <svg viewBox="0 0 120 120">
+      <circle class="track" cx="60" cy="60" r="52"/>
+      <circle class="sweep" id="sweep" cx="60" cy="60" r="52"/>
+      <circle class="bar" id="bar" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+    </svg>
+    <div class="centre"><b id="count">1/3</b><span>steps</span></div>
+  </div>
+  <p class="now" id="now" role="status" aria-live="polite">Starting the server</p>
+  <ol id="steps">
+    <li>Starting the server</li>
+    <li>Preparing the screens</li>
+    <li>Opening</li>
+  </ol>
+  <div class="slow" id="slow" hidden>
+    <p>This is taking longer than usual. The first time takes a little longer; the window opens by itself once the app answers.</p>
     <p>If the app was stopped in the terminal, start it again: <code id="run"></code></p>
   </div>
 </main>

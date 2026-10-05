@@ -16,9 +16,9 @@ export const metadata = { title: "Home" };
  *   against their goals, who owes the most, their recent visits;
  * - a Salesperson: their own to do, quotes and recent work.
  */
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
-  if (me.isOwner) return <AdminDashboard me={me} />;
+  if (me.isOwner) return <AdminDashboard me={me} params={(await searchParams) ?? {}} />;
   if (me.role?.scope !== "own" && can(me, "reports.view")) return <LeadHome me={me} />;
   if (can(me, "visits.create") && !can(me, "quotes.view") && !can(me, "goals.view")) return <FieldHome me={me} />;
   return <SalespersonHome />;

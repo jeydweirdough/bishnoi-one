@@ -146,7 +146,7 @@ export async function QuoteView({
                 [
                   "Customer",
                   customerHref ? (
-                    <Link href={customerHref} className="text-hema hover:underline">
+                    <Link href={customerHref} className="text-ink hover:underline">
                       {quote.customerName}
                     </Link>
                   ) : (
@@ -244,7 +244,7 @@ export async function QuoteView({
                 {fmt.dateLabel(letter.issuedOn)} · covers {fmt.peso(letter.amountCentavos)}
               </p>
               {letter.file && (
-                <a href={letterHref} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 text-hema hover:underline">
+                <a href={letterHref} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 text-ink hover:underline">
                   <FileText className="size-4" aria-hidden />
                   Open the letter <span className="text-meta text-ink-3">({Math.ceil(letter.file.size / 1024)} KB)</span>
                 </a>

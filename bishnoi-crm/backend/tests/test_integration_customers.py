@@ -26,7 +26,7 @@ def client(tmp_path):
         db.commit()
     with TestClient(app) as c:
         yield c
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()
 
 
 def test_finance_finds_customers_with_its_key(client):

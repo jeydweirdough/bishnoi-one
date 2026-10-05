@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AttentionPanel } from "../components/attention-panel";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -30,10 +31,11 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
         }
       >
         {fmt.monthLabel(month.month)}: your visits and collections against your goals.{" "}
-        <Link href="/field/routes" className="text-hema hover:underline">
+        <Link href="/field/routes" className="text-ink hover:underline">
           Your route today
         </Link>
       </PageHeader>
+      <AttentionPanel />
 
       {mine && <Meters actual={mine.actual} goal={mine.goal} fmt={fmt} />}
 
@@ -42,7 +44,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
           <SectionTitle
             icon="money"
             action={
-              <Link href="/field/doctors" className="text-meta text-hema hover:underline">
+              <Link href="/field/doctors" className="text-meta text-ink hover:underline">
                 All your doctors
               </Link>
             }
@@ -56,7 +58,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
               {owing.map((d) => (
                 <li key={d.id} className="flex items-baseline gap-3 py-2.5">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/companies/${d.id}`} className="font-medium text-hema hover:underline">
+                    <Link href={`/companies/${d.id}`} className="font-medium text-ink hover:underline">
                       {d.name}
                     </Link>
                     <p className="text-meta text-ink-3">
@@ -76,7 +78,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
             icon="visit"
             action={
               visits.total > visits.items.length && (
-                <Link href="/visits" className="text-meta text-hema hover:underline">
+                <Link href="/visits" className="text-meta text-ink hover:underline">
                   See all {visits.total}
                 </Link>
               )

@@ -51,31 +51,31 @@
   --text-tick: 0.6875rem;
   --text-tick--line-height: 1.2;
 
-  --color-bench: #eceef2;
+  --color-bench: #f5f5f5;
   --color-sheet: #ffffff;
-  --color-ink: #1b1d22;
-  --color-ink-2: #454a54;
-  --color-ink-3: #636973;
-  --color-rule: #dfe2e7;
-  --color-rule-strong: #c5cad3;
-  --color-control: #7f8793;
-  --color-hema: #33307a;
-  --color-hema-hover: #27245f;
-  --color-hema-tint: #edecf7;
-  --color-eosin: #a62f58;
-  --color-eosin-tint: #f9ebf0;
-  --color-danger: #b42318;
-  --color-danger-tint: #fdeceb;
-  --color-filed: #1f6f47;
+  --color-ink: #1f1f1f;
+  --color-ink-2: #595959;
+  --color-ink-3: #737373;
+  --color-rule: #f0f0f0;
+  --color-rule-strong: #d9d9d9;
+  --color-control: #d9d9d9;
+  --color-hema: #1677ff;
+  --color-hema-hover: #4096ff;
+  --color-hema-tint: #e6f4ff;
+  --color-eosin: #c41d7f;
+  --color-eosin-tint: #fff0f6;
+  --color-danger: #cf1322;
+  --color-danger-tint: #fff2f0;
+  --color-filed: #389e0d;
   /* The home calendar's key, with eosin for overdue. Checked as a set for colour
      blindness (every pair, deutan/protan/tritan); green was dropped because it
      reads the same as eosin to red-green colour-blind people. */
-  --color-due-today: #b7791f;
-  --color-due-later: #4c47a8;
+  --color-due-today: #d48806;
+  --color-due-later: #2f54eb;
 
-  --radius-sheet: 3px;
-  --shadow-sheet: 0 1px 2px rgb(20 22 30 / 0.06), 0 14px 34px -14px rgb(20 22 30 / 0.2);
-  --shadow-overlay: 0 0 0 1px rgb(20 22 30 / 0.08), 0 18px 48px -12px rgb(20 22 30 / 0.3);
+  --radius-sheet: 8px;
+  --shadow-sheet: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 1px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px 0 rgb(0 0 0 / 0.02);
+  --shadow-overlay: 0 6px 16px 0 rgb(0 0 0 / 0.08), 0 3px 6px -4px rgb(0 0 0 / 0.12), 0 9px 28px 8px rgb(0 0 0 / 0.05);
 
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-reshape: reshape 180ms var(--ease-out-soft);
@@ -180,4 +180,17 @@ a[data-nav-pending] {
     opacity: 0.5;
     animation: none !important;
   }
+}
+
+/* Ant Design's table head on every table: a light grey row, dark headings in
+   normal case. (Set over the utilities each table gives its <th>.) */
+table > thead > tr > th {
+  background: #fafafa;
+  color: var(--color-ink) !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+table > thead > tr {
+  border-color: var(--color-rule) !important;
 }

@@ -135,10 +135,10 @@ function StageRow({
     <li className={`flex flex-wrap items-center gap-3 px-5 py-3 ${stage.isActive ? "" : "bg-bench/50"}`}>
       {isOpen && (
         <span className="flex flex-col">
-          <button type="button" disabled={first || pending} onClick={() => onMove(-1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${stage.name} up`}>
+          <button type="button" disabled={first || pending} onClick={() => onMove(-1)} className="text-ink-3 hover:text-ink disabled:opacity-30" aria-label={`Move ${stage.name} up`}>
             <ArrowUp className="size-3.5" aria-hidden />
           </button>
-          <button type="button" disabled={last || pending} onClick={() => onMove(1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${stage.name} down`}>
+          <button type="button" disabled={last || pending} onClick={() => onMove(1)} className="text-ink-3 hover:text-ink disabled:opacity-30" aria-label={`Move ${stage.name} down`}>
             <ArrowDown className="size-3.5" aria-hidden />
           </button>
         </span>

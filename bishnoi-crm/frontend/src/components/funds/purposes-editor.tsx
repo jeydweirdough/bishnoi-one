@@ -78,7 +78,7 @@ function PurposeForm({ purpose, onDone }: { purpose: FundPurpose | null; onDone:
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule p-4">
+    <form onSubmit={submit} noValidate className="space-y-4 rounded-[6px] border border-rule p-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Purpose" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder="Client meal" autoFocus />}

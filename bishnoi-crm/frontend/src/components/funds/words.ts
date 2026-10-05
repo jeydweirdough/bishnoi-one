@@ -6,7 +6,7 @@ import type { FundRequest, FundStatus } from "./types";
 export type Tone = "waiting" | "you" | "done" | "stopped";
 
 export const TONE_CLASS: Record<Tone, string> = {
-  waiting: "bg-hema-tint text-hema",
+  waiting: "bg-hema-tint text-ink",
   you: "bg-[#fdf3e1] text-due-today",
   done: "bg-[#e6f2eb] text-filed",
   stopped: "bg-bench text-ink-3",

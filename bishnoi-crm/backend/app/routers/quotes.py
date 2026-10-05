@@ -26,6 +26,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import clidp
 from app.access import Access, require
 from app.api import Api, iso, not_found, person_out
 from app.audit import audit
@@ -275,8 +276,12 @@ def read_price_list(access: View, db: DB, settings: SettingsDep, kind: Kind, rec
 @router.post("/{kind}/{record_id}/quotes/preview")
 def preview_quote(access: Create, db: DB, settings: SettingsDep, kind: Kind, record_id: str, body: QuoteIn) -> dict:
     company, contact = customer_of(db, access, kind, record_id)
-    book = book_for(db, company, contact, today(settings.org_timezone))
+    on = today(settings.org_timezone)
+    book = book_for(db, company, contact, on)
     priced = price_lines(book, body.price_type, body.rx, lines_in(body))
+    # A contact's quote goes to its company's division.
+    customer = company or (db.get(Company, contact.company_id) if contact and contact.company_id else None)
+    priced["clidpWarnings"] = clidp.warnings(db, [l.get("productCode") for l in priced["lines"]], customer, on)
     try:
         return with_tax(settings, book, priced)
     except TaxUnavailable as problem:

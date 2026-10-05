@@ -19,6 +19,12 @@ export type FieldDraft = {
   options: string[];
   helpText: string | null;
   placeholder: string | null;
+  optionNames: Record<string, string>;
+  unique: boolean;
+  onlyTeams: string[];
+  onlyTypes: string[];
+  exceptTypes: string[];
+  exceptTeams: string[];
 };
 export type SectionDraft = { id: string | null; title: string; columns: 1 | 2; fields: FieldDraft[] };
 
@@ -46,4 +52,77 @@ export async function addChoice(entity: CustomEntity, key: string, label: string
     refresh();
     return { option: added.option };
   });
+}
+
+// --- connections to outside services (Settings → Connections) ---
+
+export type ConnectionDetail = {
+  key: string;
+  label: string;
+  hint: string;
+  secret: boolean;
+  required: boolean;
+  options: { value: string; label: string }[];
+  /** Not secret: what's saved. */
+  value?: string | null;
+  /** Secret: whether one is saved, and its last four characters (empty when it's short). */
+  saved?: boolean;
+  ending?: string;
+};
+
+export type ConnectionInfo = {
+  key: string;
+  name: string;
+  purpose: string;
+  helpUrl: string;
+  enabled: boolean;
+  details: ConnectionDetail[];
+  missing: string[];
+  check: { at: string; ok: boolean; message: string } | null;
+  updatedAt: string | null;
+  updatedBy: { id: string; name: string } | null;
+};
+
+/** Saves what changed. A secret left out stays as saved; one sent as "" is removed. */
+export async function saveConnection(key: string, values: Record<string, string>, enabled?: boolean): Promise<Result<ConnectionInfo>> {
+  return attempt(async () => {
+    const saved = await api.put<ConnectionInfo>(`/admin/connections/${enc(key)}`, { values, enabled });
+    refresh();
+    return saved;
+  });
+}
+
+/** Tries the saved details on the service; the answer is kept and shown. */
+export async function checkConnection(key: string): Promise<Result<ConnectionInfo>> {
+  return attempt(async () => {
+    const checked = await api.post<ConnectionInfo>(`/admin/connections/${enc(key)}/check`, {});
+    refresh();
+    return checked;
+  });
+}
+
+// --- Settings → Attention: when something is worth a prompt on the home page ---
+
+export type Rule = { team: { id: string; name: string } | null; quietDays: number; noticeDays: number; clidpDays: number; stuckDays: number };
+export type AttentionRules = { everyone: Rule; divisions: Rule[]; teams: { id: string; name: string }[] };
+
+export async function saveAttentionRule(rule: { teamId: string | null; quietDays: number; noticeDays: number; clidpDays: number; stuckDays: number }): Promise<Result<AttentionRules>> {
+  return attempt(() => api.put<AttentionRules>("/admin/attention-rules", rule));
+}
+
+/** A division goes back to everyone's rule. */
+export async function dropAttentionRule(teamId: string): Promise<Result<AttentionRules>> {
+  return attempt(() => api.del<AttentionRules>(`/admin/attention-rules/${enc(teamId)}`));
+}
+
+// --- Settings → Associations: what a link between two records can mean ---
+
+export type AssociationLabel = { code: string; fromType: string; toType: string; name: string; inverseName: string; isActive: boolean; used: number };
+
+export async function addAssociationLabel(label: { fromType: string; toType: string; name: string; inverseName: string }): Promise<Result<AssociationLabel[]>> {
+  return attempt(() => api.post<AssociationLabel[]>("/admin/association-labels", label));
+}
+
+export async function changeAssociationLabel(code: string, change: Partial<{ name: string; inverseName: string; isActive: boolean }>): Promise<Result<AssociationLabel[]>> {
+  return attempt(() => api.patch<AssociationLabel[]>(`/admin/association-labels/${enc(code)}`, change));
 }

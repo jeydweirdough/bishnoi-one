@@ -7,6 +7,7 @@ import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Assignable, Paged, Quote, ContactDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { AssociationsPanel } from "../components/crm/associations-panel";
 import { loadRecord } from "../components/crm/merged";
 import { QuotesPanel } from "../components/quotes-panel";
 import { formLayout, layoutFields } from "../components/extra/load";
@@ -42,7 +43,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
   const mayLog = can(me, "activities.create") && contact.can.edit;
   const tab = (await searchParams).tab === "quotes" && quotes ? "quotes" : "activity";
   const link = (href: string, text: string) => (
-    <a href={href} className="text-hema hover:underline">
+    <a href={href} className="text-ink hover:underline">
       {text}
     </a>
   );
@@ -85,7 +86,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
         {contact.jobTitle}
         {contact.jobTitle && contact.company ? " at " : ""}
         {contact.company ? (
-          <Link href={`/companies/${contact.company.id}`} className="text-hema hover:underline">
+          <Link href={`/companies/${contact.company.id}`} className="text-ink hover:underline">
             {contact.company.name}
           </Link>
         ) : (
@@ -115,6 +116,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
           )}
         </Sheet>
 
+        <div className="space-y-5">
         <Sheet className="px-5 pt-4 pb-5">
           <SectionTitle icon="particulars">Details</SectionTitle>
           <div className="mt-3">
@@ -140,6 +142,8 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
             {contact.notes && <p className="mt-4 border-t border-rule pt-3 text-sm whitespace-pre-line text-ink-2">{contact.notes}</p>}
           </div>
         </Sheet>
+        <AssociationsPanel kind="contact" id={contact.id} />
+        </div>
       </div>
     </>
   );

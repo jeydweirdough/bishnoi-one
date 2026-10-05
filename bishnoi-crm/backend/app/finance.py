@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import Bundle, Product
 
 TIMEOUT = 10  # seconds
@@ -28,7 +29,7 @@ def _post(settings: Settings, path: str, body: dict) -> dict:
     request = urllib.request.Request(
         f"{settings.finance_api_url}/integration/{path}",
         data=json.dumps(body).encode(),
-        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Content-Type": "application/json", "Accept": "application/json"},
+        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Content-Type": "application/json", "Accept": "application/json", **company_header(settings)},
         method="POST",
     )
     try:

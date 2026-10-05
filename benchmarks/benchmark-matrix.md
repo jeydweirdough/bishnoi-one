@@ -38,6 +38,7 @@ request that changes what it describes.
 | A7 | Layouts and required fields per record type | Salesforce ★ | CRM partial: one layout per entity, required/hidden per field, not per customer type. Others: none. | open |
 | A8 | Declarative validation rules, errors on the named field | Salesforce ★ | Every app: rules in code (pydantic); errors already come back on the named field. CRM partial: admin-set required fields and options. | open (proposed ADAPT: keep code rules, add admin rules on custom fields) |
 | A9 | Extend a record without forking its code | Odoo ★ | None: each app is its own codebase. | open (proposed SKIP: each app owns its code) |
+| A10 | Associations with labels between any records, both ways | HubSpot ★ | CRM partial: contacts on a customer; since 2026-10-03 a customer field can point at another customer (a doctor's hospital), and the hospital lists who points at it. **Built 2026-10-03:** labelled associations between customers, contacts and deals, read both ways, with + Add on each record page (Settings → Associations keeps the labels). | **ADOPT** (decided 2026-10-03): P13 |
 
 ## B. Access and history
 
@@ -57,6 +58,8 @@ request that changes what it describes.
 | C3 | Feed with posts, @mentions and followers | Salesforce ★ (Chatter) | None. Plat has ticket and incident notes. | open |
 | C4 | Structured interaction record (what was detailed, said, and how it landed) | Veeva (pattern) | **Built 2026-10-01:** a visit records the products discussed in order, each with its key message and the doctor's reaction, and the next visit's objective; Field work sums a month's detailing. Samples given wait for sample management. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P6 |
 | C5 | Call plans with attainment | Veeva (pattern) | CRM partial: monthly field goals and a performance screen; no per-account visit frequency. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P7 |
+| C6 | One activity on several records (the doctor and the hospital) | HubSpot ★ | **Built 2026-10-03:** "Also about" puts an activity on more customers; it shows on each. | **ADOPT** (decided 2026-10-03): P13 |
+| C7 | Emails sent from each rep's own connected mailbox, kept on the record | HubSpot ★ | **Built 2026-10-03:** Gmail, Outlook, Zoho Mail by each person's sign-in, or SMTP (app/mailbox.py); approved emails from Settings → Approved emails. | **ADOPT** (decided 2026-10-03) |
 
 ## E. Views and reporting
 
@@ -99,3 +102,9 @@ request that changes what it describes.
 |---|---|---|---|---|
 | H1 | Automated actions (on create, change, delete, or time) | Odoo ★ | None. | open |
 | H2 | Portal users: outsiders see their own records | Odoo ★ | None. Plat serves public notices without sign-in. | open |
+
+## I. Record pages
+
+| ID | Capability | Reference | Ours today | Decision |
+|---|---|---|---|---|
+| I1 | A record's page in three columns: who and quick actions; overview and activities; associations | HubSpot ★ | **Built 2026-10-03** for customers. Contacts and deals have associations, not yet the three columns. | **ADOPT** (decided 2026-10-03): P14 |

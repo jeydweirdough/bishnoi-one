@@ -23,10 +23,13 @@ class Access:
     user_id: str
     role_id: str
     role_name: str
-    # own | team | all: whose records the permissions reach.
+    # own | team | managed | all: whose records the permissions reach.
     scope: str
     team_id: str | None
     permissions: frozenset[str]
+    # The teams whose records they reach (team: their own; managed: the ones
+    # they manage, and their own). Empty for own and all.
+    team_ids: frozenset[str] = frozenset()
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -50,7 +53,19 @@ def access_of(user: User) -> Access:
         scope=user.role.scope,
         team_id=user.team_id,
         permissions=permissions_of(user.role),
+        team_ids=teams_reached(user),
     )
+
+
+def teams_reached(user: User) -> frozenset[str]:
+    """The teams whose records this person's scope reaches."""
+    scope = user.role.scope
+    own = {user.team_id} if user.team_id else set()
+    if scope == "team":
+        return frozenset(own)
+    if scope == "managed":
+        return frozenset(own | {t.id for t in user.managed_teams})
+    return frozenset()
 
 
 def current_access(user: CurrentUser) -> Access:

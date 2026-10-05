@@ -17,7 +17,7 @@ function Cell({ actual, goal, money, fmt }: { actual: number; goal: number | und
   const pct = progress(actual, goal);
   return (
     <td className="px-3 py-2.5 text-right tabular-nums">
-      <span className={pct !== null && pct >= 100 ? "font-semibold text-hema" : ""}>{show(actual)}</span>
+      <span className={pct !== null && pct >= 100 ? "font-semibold text-ink" : ""}>{show(actual)}</span>
       {goal ? <span className="text-ink-3"> / {show(goal)}</span> : null}
       {pct !== null && (
         <div aria-hidden className="mt-1 ml-auto h-1 w-24 overflow-hidden rounded-full bg-rule">
@@ -46,13 +46,13 @@ function Table({ people, month, fmt }: { people: PersonMonth[]; month: string; f
           {people.map((p) => (
             <tr key={p.person.id}>
               <th scope="row" className="py-2.5 pr-3 text-left font-medium">
-                <Link href={`/visits?person=${p.person.id}&month=${month}`} className="text-hema hover:underline">
+                <Link href={`/visits?person=${p.person.id}&month=${month}`} className="text-ink hover:underline">
                   {p.person.name}
                 </Link>
                 <span className="block text-meta font-normal text-ink-3">
                   {p.team?.name ?? "No team"}
                   {!p.goal && " · no goals set"} ·{" "}
-                  <Link href={`/field/routes?person=${p.person.id}`} className="text-hema hover:underline">
+                  <Link href={`/field/routes?person=${p.person.id}`} className="text-ink hover:underline">
                     Route
                   </Link>
                 </span>
@@ -92,8 +92,8 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
               </LinkButton>
             )}
             {data.canSetGoals && (
-              <LinkButton href={`/field/goals?month=${month}`} variant="primary" icon={<Target className="size-4" aria-hidden />}>
-                Set goals
+              <LinkButton href={`/kpis/targets?month=${month}`} variant="primary" icon={<Target className="size-4" aria-hidden />}>
+                Set targets
               </LinkButton>
             )}
           </>
@@ -103,21 +103,21 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
       </PageHeader>
 
       <nav aria-label="Month" className="mb-4 flex items-center gap-2">
-        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
+        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-36 text-center text-heading">
           {fmt.monthLabel(month)} {month.slice(0, 4)}
         </span>
         {month < data.thisMonth ? (
-          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-[3px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
+          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (
           <span className="w-7" />
         )}
         {month !== data.thisMonth && (
-          <Link href="/field" className="ml-2 text-meta text-hema hover:underline">
+          <Link href="/field" className="ml-2 text-meta text-ink hover:underline">
             This month
           </Link>
         )}
@@ -207,7 +207,7 @@ function Detailing({ summary }: { summary: DetailingSummary }) {
           <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-meta text-ink-3">
             {REACTIONS.map((r) => (
               <span key={r.value} className="inline-flex items-center gap-1.5">
-                <span className={`size-2.5 rounded-[2px] ${SWATCH[r.value]}`} aria-hidden />
+                <span className={`size-2.5 rounded-[4px] ${SWATCH[r.value]}`} aria-hidden />
                 {r.label}
               </span>
             ))}

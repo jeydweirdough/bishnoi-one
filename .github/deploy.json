@@ -1,5 +1,5 @@
 {
-  "_what": "Which folder deploys to which Vercel project (.github/workflows/deploy.yml). Add a line when an app gets a Vercel project; a folder not listed here is never deployed. scope: empty when the projects are on the token owner's own Vercel account; a team's slug when they are in a team.",
+  "_what": "What each app's Deploy workflow (.github/workflows/deploy-<app>.yml) checks before it puts the app on Vercel. projects: which folder deploys to which Vercel project (a folder not listed is never deployed). scope: empty when the projects are on the token owner's own Vercel account; a team's slug when they are in a team (the repo variable VERCEL_SCOPE overrides it). apps: per app, whether its code can run on Vercel yet, which apps must be online before it, and the Production environment variables its projects need (required: deploying stops without them; recommended: it goes ahead and says what's missing; never: deploying stops while it's set). Only the names are checked, never the values.",
   "scope": "",
   "projects": {
     "bishnoi-crm/frontend": "nabhi-crm",
@@ -14,5 +14,146 @@
     "bishnoi-admin/backend": "nabhi-admin-backend",
     "bishnoi-pharmacy/frontend": "nabhi-pharmacy",
     "bishnoi-pharmacy/backend": "nabhi-pharmacy-backend"
+  },
+  "every": {
+    "backend": {
+      "required": {
+        "ENVIRONMENT": "production",
+        "DATABASE_URL": "The database's pooled address (Neon: the -pooler address; Supabase: the Transaction pooler, port 6543). For the CRM and Inventory, the base database (…/neondb): each company's is made beside it.",
+        "ALLOWED_HOSTS": "The API's own address as JSON, e.g. [\"nabhi-crm-backend.vercel.app\"]"
+      }
+    },
+    "frontend": {
+      "required": {
+        "API_URL": "This app's API, e.g. https://nabhi-crm-backend.vercel.app"
+      },
+      "never": {
+        "SHOW_DEMO_ACCOUNTS": "Lists the demo accounts and their password on the sign-in page. Delete it from the screens project."
+      }
+    }
+  },
+  "apps": {
+    "bishnoi-platform": {
+      "name": "Platform",
+      "ready": true,
+      "backend": {
+        "required": {
+          "PASS_SIGNING_KEY": "The key the Platform signs passes with: node scripts/deploy-keys.mjs prints it (secret)."
+        },
+        "recommended": {
+          "FIRST_ADMIN_EMAIL": "The first Platform administrator, made while there are no accounts (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD).",
+          "FIRST_ADMIN_PASSWORD": "Delete it after the first sign-in, then deploy again."
+        }
+      },
+      "frontend": {}
+    },
+    "bishnoi-crm": {
+      "name": "CRM",
+      "ready": true,
+      "after": {
+        "bishnoi-platform": "Each company must be registered on the Platform before its people can use the CRM, so the Platform's API must be online first."
+      },
+      "backend": {
+        "required": {
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://nabhi-platform-backend.vercel.app (the CRM checks each company there).",
+          "PLATFORM_PUBLIC_KEY": "From node scripts/deploy-keys.mjs (the Platform's /pass/key shows it too)."
+        },
+        "recommended": {
+          "CONNECTIONS_KEY": "Encrypts what Settings > Connections saves (Zoho, mailboxes). Without it nothing can be connected online.",
+          "INVENTORY_API_URL": "Products and stock from Inventory, e.g. https://nabhi-inventory-backend.vercel.app (with INVENTORY_API_KEY).",
+          "INVENTORY_API_KEY": "From node scripts/deploy-keys.mjs; Inventory's INTEGRATION_KEYS holds the same key.",
+          "INVENTORY_APP_URL": "Inventory's screens, for the Add it in Inventory link.",
+          "FINANCE_API_URL": "Tax on quotes from Finance (with FINANCE_API_KEY).",
+          "FINANCE_API_KEY": "From node scripts/deploy-keys.mjs.",
+          "PHARMACY_API_URL": "The pharmacist's check of Rx quotes (with PHARMACY_API_KEY).",
+          "PHARMACY_API_KEY": "From node scripts/deploy-keys.mjs."
+        }
+      },
+      "frontend": {
+        "recommended": {
+          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens: the Sign in with your Bishnoi One account button and Switch company.",
+          "PLATFORM_API_URL": "The Platform's API, for announcements."
+        }
+      }
+    },
+    "bishnoi-inventory": {
+      "name": "Inventory",
+      "ready": true,
+      "after": {
+        "bishnoi-platform": "Each company must be registered on the Platform before its people can use Inventory, so the Platform's API must be online first."
+      },
+      "backend": {
+        "required": {
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://nabhi-platform-backend.vercel.app (Inventory checks each company there).",
+          "PLATFORM_PUBLIC_KEY": "From node scripts/deploy-keys.mjs."
+        },
+        "recommended": {
+          "INTEGRATION_KEYS": "Lets the CRM read products and stock, e.g. [\"crm:<key>\"], from node scripts/deploy-keys.mjs."
+        }
+      },
+      "frontend": {
+        "recommended": {
+          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens: the Sign in with your Bishnoi One account button and Switch company.",
+          "PLATFORM_API_URL": "The Platform's API, for announcements."
+        }
+      }
+    },
+    "bishnoi-pharmacy": {
+      "name": "Pharmacy",
+      "ready": true,
+      "backend": {
+        "recommended": {
+          "PLATFORM_PUBLIC_KEY": "Sign-in with a Bishnoi One account. Without it, only Pharmacy's own accounts sign in.",
+          "INTEGRATION_KEYS": "Lets the CRM send Rx quotes for checking, e.g. [\"crm:<key>\"].",
+          "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
+        }
+      },
+      "frontend": {
+        "recommended": {
+          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+        }
+      }
+    },
+    "bishnoi-finance": {
+      "name": "Finance",
+      "ready": true,
+      "backend": {
+        "recommended": {
+          "PLATFORM_PUBLIC_KEY": "Sign-in with a Bishnoi One account. Without it, only Finance's own accounts sign in.",
+          "INTEGRATION_KEYS": "Lets the CRM ask for tax and marketing request payments, e.g. [\"crm:<key>\"].",
+          "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
+        }
+      },
+      "frontend": {
+        "recommended": {
+          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+        }
+      }
+    },
+    "bishnoi-admin": {
+      "name": "Executive Admin",
+      "ready": true,
+      "backend": {
+        "recommended": {
+          "PLATFORM_PUBLIC_KEY": "Sign-in with a Bishnoi One account. Without it, only Admin's own accounts sign in.",
+          "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
+        }
+      },
+      "frontend": {
+        "recommended": {
+          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+        }
+      }
+    },
+    "bishnoi-in-licensing": {
+      "name": "In-Licensing",
+      "ready": false,
+      "not_ready": "Its API can't run on Vercel yet: it has no Vercel entry point (backend/app/server.py and [tool.vercel] in pyproject.toml), no Postgres driver (psycopg) and no first-administrator settings. Copy them from bishnoi-crm/backend, add its two Vercel projects to \"projects\" in .github/deploy.json, and set \"ready\" to true."
+    },
+    "bishnoi-regulatory": {
+      "name": "Regulatory",
+      "ready": false,
+      "not_ready": "Its API can't run on Vercel yet: it has no Vercel entry point (backend/app/server.py and [tool.vercel] in pyproject.toml), no Postgres driver (psycopg) and no first-administrator settings. Copy them from bishnoi-crm/backend, add its two Vercel projects to \"projects\" in .github/deploy.json, and set \"ready\" to true."
+    }
   }
 }

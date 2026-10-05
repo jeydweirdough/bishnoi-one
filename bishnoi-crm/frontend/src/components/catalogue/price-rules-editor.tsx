@@ -83,7 +83,7 @@ export function PriceGroupsEditor({ rules }: { rules: PriceRules }) {
                 {edit && (
                   <button
                     type="button"
-                    className="font-semibold text-hema hover:underline"
+                    className="font-semibold text-ink hover:underline"
                     onClick={() =>
                       start(async () => {
                         const r = await updatePriceGroup(g.code, { isActive: !g.isActive });
@@ -180,7 +180,7 @@ export function PriceRulesEditor({ rules, products, types, org }: { rules: Price
                   <p className="flex flex-wrap items-center gap-1.5 font-medium">
                     {r.name}
                     {edit && (
-                      <button type="button" onClick={() => setEditing(r)} title={`Change ${r.name}`} aria-label={`Change ${r.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                      <button type="button" onClick={() => setEditing(r)} title={`Change ${r.name}`} aria-label={`Change ${r.name}`} className="rounded-[6px] p-1 text-ink-3 hover:bg-hema-tint hover:text-ink">
                         <Pencil className="size-3.5" aria-hidden />
                       </button>
                     )}

@@ -1,0 +1,26 @@
+import { PageHeader } from "@/src/platform/ui/sheet";
+import { can } from "@/src/platform/lib/access";
+import { getCompanyMe, load } from "@/src/platform/lib/api";
+import type { KpiCatalogue, Paged } from "@/src/platform/lib/types";
+import { NoAccess } from "../components/admin/words";
+import { KpiEditor } from "../components/kpis/kpi-editor";
+
+export const metadata = { title: "KPIs" };
+
+export default async function KpiSettingsPage() {
+  const me = await getCompanyMe();
+  if (!can(me, "admin.settings")) return <NoAccess what="managing KPIs" />;
+  const [catalogue, products] = await Promise.all([
+    load<KpiCatalogue>("/kpis?all=true"),
+    can(me, "products.view") ? load<Paged<{ id: string; name: string }>>("/products?limit=500") : Promise.resolve({ items: [], total: 0 }),
+  ]);
+  return (
+    <>
+      <PageHeader title="Settings">
+        KPIs: what each person&apos;s month is measured by. Pick what the CRM counts, or have it entered by hand; say who it&apos;s for, and from what share of the target
+        it counts as on target or slightly behind. Targets are set each month under KPIs → Set targets. The built-in ones keep what they measure but can be renamed, retuned or switched off.
+      </PageHeader>
+      <KpiEditor catalogue={catalogue} products={products.items.map((p) => ({ id: p.id, name: p.name }))} />
+    </>
+  );
+}

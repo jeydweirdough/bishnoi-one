@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { Deal, DealLists, DealStage, ForecastCategory, RevenueTargets } from "@/src/platform/lib/types";
+import type { DealPriority, Deal, DealLists, DealStage, ForecastCategory, RevenueTargets } from "@/src/platform/lib/types";
 
 // Deals: on a customer, through stages, won with a quote or lost with a reason.
 // The API decides whose deals someone reaches and what their role lets them
@@ -19,6 +19,7 @@ export type DealInput = {
   valueCentavos: number | null;
   expectedCloseOn: string;
   leadSource: string | null;
+  priority?: DealPriority | null;
   priceType: string | null;
   lines: { productId: string; quantity: number }[];
   notes: string | null;
@@ -103,4 +104,14 @@ export async function saveTargets(month: string, targets: { userId: string; amou
     refresh();
     return saved;
   });
+}
+
+// --- picking the customer for a new deal ---
+
+/** Customers in reach whose name (or city, or industry) matches, for the new-deal picker. */
+export async function findCustomers(q: string): Promise<{ id: string; name: string; city: string | null }[]> {
+  const found = await api.get<{ items: { id: string; name: string; city: string | null }[] }>(
+    `/companies?limit=20&sort=name${q.trim() ? `&q=${enc(q.trim())}` : ""}`,
+  );
+  return found.items.map((c) => ({ id: c.id, name: c.name, city: c.city }));
 }

@@ -20,6 +20,9 @@ import {
   Type,
   AlignLeft,
   GripVertical,
+  Package,
+  FlaskConical,
+  Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
@@ -30,6 +33,8 @@ import { Sheet } from "@/src/platform/ui/sheet";
 import type { CustomEntity, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 import { saveForm, type SectionDraft } from "../../actions/settings";
 import { ChipsInput } from "../admin/chips-input";
+import { Select as AntSelect } from "antd";
+import { TeamsFor, type TeamName } from "../admin/teams-for";
 
 // The form editor (Settings → Forms), laid out like Zoho's: the kinds of field
 // on the left, the form itself in the middle, the picked field's properties on
@@ -48,6 +53,9 @@ const KINDS: Kind[] = [
   { type: "email", label: "Email", icon: <AtSign className="size-4" /> },
   { type: "phone", label: "Phone", icon: <Phone className="size-4" /> },
   { type: "url", label: "URL", icon: <Link2 className="size-4" /> },
+  { type: "products", label: "Our products", icon: <Package className="size-4" /> },
+  { type: "molecule", label: "Molecule", icon: <FlaskConical className="size-4" /> },
+  { type: "customer", label: "Another customer", icon: <Building2 className="size-4" /> },
 ];
 const BUILT_IN_KINDS: Record<string, string> = { status: "Customer type", owner: "Owner", company: "Customer" };
 const kindLabel = (t: string) => KINDS.find((k) => k.type === t)?.label ?? BUILT_IN_KINDS[t] ?? t;
@@ -67,7 +75,18 @@ const uid = () => `u${++counter}`;
 const fromLayout = (layout: FormLayout): S[] =>
   layout.sections.map((s) => ({ uid: uid(), id: s.id, title: s.title, columns: s.columns, fields: s.fields.map((f) => ({ ...f, uid: uid() })) }));
 
-export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: FormLayout }) {
+export function FormEditor({
+  entity,
+  layout,
+  teams = [],
+  kinds = [],
+}: {
+  entity: CustomEntity;
+  layout: FormLayout;
+  teams?: TeamName[];
+  /** The customer types, for "Which customer types" (customers' form only). */
+  kinds?: TeamName[];
+}) {
   const router = useRouter();
   const [saved, setSaved] = useState(() => fromLayout(layout));
   const [sections, setSections] = useState<S[]>(saved);
@@ -154,6 +173,12 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
         options: f.options,
         helpText: f.helpText?.trim() || null,
         placeholder: f.placeholder?.trim() || null,
+        optionNames: Object.fromEntries(Object.entries(f.optionNames ?? {}).filter(([o, n]) => f.options.includes(o) && n.trim())),
+        unique: f.unique ?? false,
+        onlyTeams: f.onlyTeams ?? [],
+        exceptTeams: f.exceptTeams ?? [],
+        onlyTypes: f.onlyTypes ?? [],
+        exceptTypes: f.exceptTypes ?? [],
       })),
     }));
     start(async () => {
@@ -182,7 +207,7 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
                 onDragStart={() => setDragging({ kind: k.type })}
                 onDragEnd={() => setDragging(null)}
                 onClick={() => add(k.type)}
-                className="flex w-full cursor-grab items-center gap-2 rounded-[3px] border border-transparent px-2 py-1.5 text-left text-sm text-ink-2 hover:border-rule-strong hover:bg-bench hover:text-ink"
+                className="flex w-full cursor-grab items-center gap-2 rounded-[6px] border border-transparent px-2 py-1.5 text-left text-sm text-ink-2 hover:border-rule-strong hover:bg-bench hover:text-ink"
               >
                 <span className="text-ink-3">{k.icon}</span>
                 {k.label}
@@ -219,13 +244,13 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
                 onChange={(e) => update((all) => ((all[i].title = e.target.value), all))}
                 className="min-w-0 flex-1 border-0 border-b border-transparent bg-transparent px-0 text-sm font-semibold text-ink hover:border-rule focus:border-hema focus:outline-none"
               />
-              <span className="inline-flex rounded-[3px] border border-rule-strong p-0.5 text-meta">
+              <span className="inline-flex rounded-[6px] border border-rule-strong p-0.5 text-meta">
                 {([1, 2] as const).map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => update((all) => ((all[i].columns = c), all))}
-                    className={`rounded-[2px] px-2 py-0.5 ${s.columns === c ? "bg-hema-tint font-semibold text-hema" : "text-ink-2"}`}
+                    className={`rounded-[4px] px-2 py-0.5 ${s.columns === c ? "bg-hema-tint font-semibold text-ink" : "text-ink-2"}`}
                   >
                     {c} column{c === 2 ? "s" : ""}
                   </button>
@@ -250,7 +275,7 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
               </IconButton>
             </div>
             <ul
-              className={`mt-3 grid min-h-14 gap-2 ${s.columns === 2 ? "sm:grid-cols-2" : ""} rounded-[3px] ${dragging ? "outline-1 outline-offset-4 outline-rule-strong outline-dashed" : ""}`}
+              className={`mt-3 grid min-h-14 gap-2 ${s.columns === 2 ? "sm:grid-cols-2" : ""} rounded-[6px] ${dragging ? "outline-1 outline-offset-4 outline-rule-strong outline-dashed" : ""}`}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -274,7 +299,7 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
                     place(s.uid, f.uid);
                   }}
                   onClick={() => setPicked(f.uid)}
-                  className={`group flex cursor-pointer items-center gap-2 rounded-[3px] border px-2.5 py-2 text-sm ${
+                  className={`group flex cursor-pointer items-center gap-2 rounded-[6px] border px-2.5 py-2 text-sm ${
                     picked === f.uid ? "border-hema bg-hema-tint" : "border-rule-strong bg-sheet hover:border-hema"
                   } ${f.hidden ? "opacity-50" : ""} ${(f.type === "long_text" || f.type === "multi_choice") && s.columns === 2 ? "sm:col-span-2" : ""}`}
                 >
@@ -307,7 +332,7 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
       {/* The picked field's properties. */}
       <Sheet className="px-4 py-4 lg:sticky lg:top-4">
         {field ? (
-          <Properties key={field.uid} field={field} onChange={change} onRemove={remove} />
+          <Properties key={field.uid} field={field} onChange={change} onRemove={remove} teams={teams} kinds={kinds} entity={entity} />
         ) : (
           <div className="py-6 text-center text-meta text-ink-3">
             <ChevronDown className="mx-auto mb-2 size-5 rotate-90 lg:rotate-0" aria-hidden />
@@ -321,7 +346,7 @@ export function FormEditor({ entity, layout }: { entity: CustomEntity; layout: F
 
 function FixedBlock({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-[3px] border border-dashed border-rule-strong bg-bench/60 px-4 py-3 text-meta text-ink-3">
+    <div className="flex items-center gap-2 rounded-[6px] border border-dashed border-rule-strong bg-bench/60 px-4 py-3 text-meta text-ink-3">
       <Lock className="size-3.5 shrink-0" aria-hidden />
       {text}
     </div>
@@ -330,13 +355,59 @@ function FixedBlock({ text }: { text: string }) {
 
 function IconButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-hema disabled:opacity-30">
+    <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-ink disabled:opacity-30">
       {children}
     </button>
   );
 }
 
-function Properties({ field, onChange, onRemove }: { field: F; onChange: (patch: Partial<F>) => void; onRemove: () => void }) {
+/** Who a field is on the form for: everyone, only some teams (the Rx team's own fields), or everyone but some. */
+function WhoFor({ field: f, teams, onChange }: { field: F; teams: TeamName[]; onChange: (patch: Partial<F>) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-ink">Who it&apos;s for</p>
+      <TeamsFor teams={teams} only={f.onlyTeams} except={f.exceptTeams} onChange={(onlyTeams, exceptTeams) => onChange({ onlyTeams, exceptTeams })} what="this field" />
+    </div>
+  );
+}
+
+/** Full names for short options ("MED ONCO": "Medical oncology"): the short one is shown, either can be searched. */
+function OptionNames({ field: f, onChange }: { field: F; onChange: (patch: Partial<F>) => void }) {
+  const names = f.optionNames ?? {};
+  const filled = Object.values(names).filter((n) => n.trim()).length;
+  return (
+    <details className="rounded-sheet border border-rule px-3 py-2" open={filled > 0}>
+      <summary className="cursor-pointer text-sm text-ink">
+        Full names {filled > 0 && <span className="text-ink-3">({filled})</span>}
+      </summary>
+      <p className="mt-1 text-meta text-ink-3">For options that are short codes. People see the code and can search by either.</p>
+      <div className="mt-2 space-y-1.5">
+        {f.options.map((o) => (
+          <label key={o} className="grid grid-cols-[minmax(0,7rem)_1fr] items-center gap-2 text-sm">
+            <span className="truncate text-ink-2">{o}</span>
+            <Input value={names[o] ?? ""} onChange={(e) => onChange({ optionNames: { ...names, [o]: e.target.value } })} maxLength={120} placeholder="Full name" />
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function Properties({
+  field,
+  onChange,
+  onRemove,
+  teams,
+  kinds,
+  entity,
+}: {
+  field: F;
+  onChange: (patch: Partial<F>) => void;
+  onRemove: () => void;
+  teams: TeamName[];
+  kinds: TeamName[];
+  entity: CustomEntity;
+}) {
   const f = field;
   const withOptions = f.type === "choice" || f.type === "multi_choice";
   const box = (label: string, value: boolean, set: (v: boolean) => void, disabled = false, note?: string) => (
@@ -360,7 +431,7 @@ function Properties({ field, onChange, onRemove }: { field: F; onChange: (patch:
       {withOptions && f.sharedList ? (
         <p className="text-meta text-ink-2">
           Its choices are the lead sources deals use. Change them in{" "}
-          <a href="/admin/settings/deal-stages" className="text-hema hover:underline">
+          <a href="/admin/settings/deal-stages" className="text-ink hover:underline">
             Settings → Deal stages
           </a>
           .
@@ -375,11 +446,63 @@ function Properties({ field, onChange, onRemove }: { field: F; onChange: (patch:
           optional={false}
         />
       )}
+      {f.type === "choice" && !f.sharedList && f.options.length > 0 && <OptionNames field={f} onChange={onChange} />}
+      {f.type === "customer" && entity === "company" && (
+        <div className="space-y-1">
+          <p className="text-sm text-ink">Which customer types it can be</p>
+          <AntSelect
+            mode="multiple"
+            className="w-full"
+            value={f.options}
+            onChange={(options) => onChange({ options })}
+            placeholder="Any customer"
+            options={kinds.map((k) => ({ value: k.id, label: k.name }))}
+            showSearch={{ optionFilterProp: "label" }}
+          />
+          <p className="text-meta text-ink-3">E.g. a doctor&apos;s hospital: Hospital, Cancer center. Its page lists who points at it.</p>
+        </div>
+      )}
+      {f.type === "products" && (
+        <div className="space-y-1">
+          <p className="text-sm text-ink">Products not offered</p>
+          <AntSelect
+            mode="multiple"
+            className="w-full"
+            value={f.options}
+            onChange={(options) => onChange({ options })}
+            placeholder="Every active product is offered"
+            options={(f.picks ?? []).map((p) => ({ value: p.value, label: p.hint ? `${p.label} (${p.hint})` : p.label }))}
+            showSearch={{ optionFilterProp: "label" }}
+          />
+          <p className="text-meta text-ink-3">Left off this field&apos;s list, e.g. products not promoted. New products are offered until left out here.</p>
+        </div>
+      )}
       <div className="space-y-2">
         {box("Required", f.required, (required) => onChange({ required }), f.locked, f.locked ? "Always required: the record can't do without it." : undefined)}
         {box("Hidden", f.hidden, (hidden) => onChange({ hidden }), f.locked, f.locked ? "Always shown." : "Off the form; values already kept stay.")}
         {!["status", "owner", "company"].includes(f.type) && box("Show in the list", f.inList, (inList) => onChange({ inList }))}
+        {!f.standard &&
+          ["text", "number", "email", "phone"].includes(f.type) &&
+          box("No two can be the same", f.unique ?? false, (unique) => onChange({ unique }), false, "Like a customer code: each record has its own.")}
       </div>
+      {entity === "company" && !f.locked && teams.length > 0 && <WhoFor field={f} teams={teams} onChange={onChange} />}
+      {entity === "company" && !f.locked && kinds.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm text-ink">Which customer types</p>
+          <TeamsFor
+            teams={kinds}
+            only={f.onlyTypes}
+            except={f.exceptTypes}
+            onChange={(onlyTypes, exceptTypes) => onChange({ onlyTypes, exceptTypes })}
+            notes={{
+              everyone: "Asked of every kind of customer.",
+              only: "Asked only of these kinds of customer (a doctor's profile, say).",
+              except: "Not asked of these kinds of customer.",
+              placeholder: "Pick customer types",
+            }}
+          />
+        </div>
+      )}
       {!["status", "owner", "company", "yes_no"].includes(f.type) && (
         <>
           <Field label="Help text" optional>

@@ -585,13 +585,18 @@ export function QuoteForm({
                 <Flag letter="!">{preview.taxError}</Flag>
               </p>
             )}
+            {(preview.clidpWarnings ?? []).map((w) => (
+              <p key={w} className="mt-2 text-left">
+                <Flag letter="!">{w}</Flag>
+              </p>
+            ))}
           </>
         ) : (
           <p className="text-right text-meta text-ink-3">Pick products to see the total.</p>
         )}
       </div>
       {preview && preview.approvalReasons.length > 0 && (
-        <p className="animate-reshape rounded-[3px] bg-hema-tint px-3 py-2 text-meta text-ink-2">
+        <p className="animate-reshape rounded-[6px] bg-hema-tint px-3 py-2 text-meta text-ink-2">
           Your team lead approves this quote before it goes out:{" "}
           {preview.approvalReasons
             .map((r) => (r === "price" ? `${priceType?.name} needs approval` : `extra discounts are over ${percent(priceList.discountApprovalBp)}`))
@@ -661,7 +666,7 @@ export function QuoteForm({
 
       <FormError message={error} />
       {/* The total and the button that commits to it, together, pinned where the hand already is. */}
-      <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
+      <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-[6px] bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
         <div className="min-w-0">
           <p className="text-meta text-ink-3">Total</p>
           <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.tax?.totalDueCentavos ?? preview.totalCentavos) : "—"}</p>

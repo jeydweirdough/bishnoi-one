@@ -43,6 +43,14 @@ export async function accountToken(): Promise<string | null> {
   return (await cookies()).get(ACCOUNT_COOKIE)?.value ?? null;
 }
 
+/** Who is signed in, as far as choosing a company goes. */
+export type AccountMe = { company: { slug: string; name: string } | null; companies: { slug: string; name: string; current: boolean }[] };
+
+/** This page again, for one application and (when known) one company. */
+export function goLink(app: string, returnTo: string, company?: string): string {
+  return `/go?app=${encodeURIComponent(app)}&return=${encodeURIComponent(returnTo)}${company ? `&company=${encodeURIComponent(company)}` : ""}`;
+}
+
 /** Where a pass goes: the application's return address, with the pass added. */
 export function withPass(returnTo: string, pass: string): string {
   return `${returnTo}?pass=${encodeURIComponent(pass)}`;

@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import PriceType, Product, ProductPrice
 from app.pricing import sales_settings
 
@@ -44,7 +45,7 @@ def call(settings: Settings, path: str, params: dict | None = None) -> dict:
     url = f"{settings.inventory_api_url}/integration/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json"})
+    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())

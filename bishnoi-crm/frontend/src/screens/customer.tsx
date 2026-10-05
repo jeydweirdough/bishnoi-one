@@ -81,8 +81,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <div className="mt-2">
                 <Particulars
                   items={[
-                    ["Phone", customer.phone && <a href={`tel:${customer.phone.replace(/[^\d+]/g, "")}`} className="text-hema hover:underline">{customer.phone}</a>],
-                    ["Email", customer.email && <a href={`mailto:${customer.email}`} className="text-hema hover:underline">{customer.email}</a>],
+                    ["Phone", customer.phone && <a href={`tel:${customer.phone.replace(/[^\d+]/g, "")}`} className="text-ink hover:underline">{customer.phone}</a>],
+                    ["Email", customer.email && <a href={`mailto:${customer.email}`} className="text-ink hover:underline">{customer.email}</a>],
                     ["Address", customer.address],
                     ["City", customer.city],
                     ["Owner", customer.owner.name],

@@ -31,7 +31,7 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
                 {showDoctor && (
                   <>
                     {" · "}
-                    <Link href={`/companies/${v.company.id}`} className="text-hema hover:underline">
+                    <Link href={`/companies/${v.company.id}`} className="text-ink hover:underline">
                       {v.company.name}
                     </Link>
                   </>

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
+from app.tenants import for_tool
 from app.demo import (
     DEMO_ACCOUNTS,
     DEMO_ACTIVITIES,
@@ -110,6 +111,13 @@ def make_demo(db: Session) -> None:
                 for model in (Company, Contact, Activity, Quote):
                     db.execute(update(model).where(model.owner_id == user.id).values(team_id=user.team_id))
             updated += 1
+    # Demo employee IDs (EMP-0001 on), for the customer transfer. Ones already set stay.
+    for number, d in enumerate(DEMO_ACCOUNTS, 1):
+        user = db.scalar(select(User).where(func.lower(User.email) == d.email))
+        code = f"EMP-{number:04d}"
+        if user is not None and user.employee_id is None and db.scalar(select(User.id).where(User.employee_id == code)) is None:
+            user.employee_id = code
+            db.flush()
     db.commit()
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
     make_demo_records(db)
@@ -224,6 +232,7 @@ def make_demo_records(db: Session) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage the CRM's accounts.")
+    parser.add_argument("--company", help="the company's short name on Bishnoi One Platform (on this computer: DEFAULT_COMPANY)")
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("add", help="make an account")
     add.add_argument("--email", required=True)
@@ -237,7 +246,9 @@ def main() -> int:
         sub.add_parser(name).add_argument("--email", required=True)
     args = parser.parse_args()
 
-    engine = make_engine(get_settings().database_url)
+    company, url = for_tool(sys.argv)
+    engine = make_engine(url)
+    print(f"Company: {company}")
     upgrade(engine)
     with make_sessions(engine)() as db:
         if args.command == "list":

@@ -7,6 +7,7 @@ import { buttonClass } from "@/src/platform/ui/button";
 import type { ActivityItem, ActivitySummary, Assignable, Bucket, CompanyRow, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { ActivityCalendar, monthRange } from "../components/crm/activity-calendar";
+import { NewCallButton } from "../components/crm/new-call";
 import { ActivityList } from "../components/crm/activity-list";
 import { dayOf, followUpRow } from "../components/crm/follow-up-rows";
 import { Filters, Pager } from "../components/crm/list-controls";
@@ -33,11 +34,12 @@ const GROUPS: { bucket: Bucket; label: string }[] = [
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
-export default async function ActivitiesPage({ searchParams }: { searchParams: Search }) {
+export default async function ActivitiesPage({ searchParams, calendar = false }: { searchParams: Search; calendar?: boolean }) {
   const me = await getCompanyMe();
   if (!can(me, "activities.view")) return <NoAccess what="activities" />;
   const params = await searchParams;
-  const view = (["history", "calendar"] as const).find((v) => v === one(params.view)) ?? "todo";
+  // The calendar has its own place in the menu (/calendar); the old address still opens it.
+  const view = calendar ? "calendar" : ((["history", "calendar"] as const).find((v) => v === one(params.view)) ?? "todo");
   const teamWide = me.role?.scope !== "own";
   // A lead manages people: their team first. A salesperson has only their own.
   const who = teamWide && one(params.who) !== "me" ? "team" : "me";
@@ -46,7 +48,8 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   const page = Math.max(1, Number(one(params.page)) || 1);
   const href = (v: string, w = who) => {
     const q = new URLSearchParams({ ...(v !== "todo" && { view: v }), ...(w === "me" && teamWide && { who: w }), ...(w === "team" && person && { person }) });
-    return `/activities${q.size ? `?${q}` : ""}`;
+    if (v === "calendar") q.delete("view");
+    return `${v === "calendar" ? "/calendar" : "/activities"}${q.size ? `?${q}` : ""}`;
   };
 
   const today = dayOf(new Date().toISOString(), me.org.timezone);
@@ -74,20 +77,23 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   return (
     <SelectionProvider key={`${view}-${who}`} items={editable} toggled>
       <PageHeader
-        title="Activities"
+        title={view === "calendar" ? "Calendar" : "Activities"}
         actions={
           can(me, "activities.create") && (
-            <LogActivityButton
-              variant="primary"
-              org={me.org}
-              now={new Date().toISOString()}
-              people={people}
-              companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
-            />
+            <>
+              {view === "calendar" && <NewCallButton />}
+              <LogActivityButton
+                variant={view === "calendar" ? "default" : "primary"}
+                org={me.org}
+                now={new Date().toISOString()}
+                people={people}
+                companies={companies.items.map((c) => ({ id: c.id, name: c.name }))}
+              />
+            </>
           )
         }
       >
-        Calls, meetings, emails, notes and tasks. What&apos;s still to do comes first.
+        {view === "calendar" ? "Your calls and visits by day. Plan one with New call; tick it off afterwards to say how it went." : "Calls, meetings, emails, notes and tasks. What's still to do comes first."}
       </PageHeader>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -104,12 +110,12 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
             current={who}
             options={[
               { value: "me", label: "Mine", href: href(view, "me") },
-              { value: "team", label: me.role?.scope === "all" ? "Everyone" : "My team", href: href(view, "team") },
+              { value: "team", label: me.role?.scope === "all" ? "Everyone" : me.role?.scope === "managed" ? "My teams" : "My team", href: href(view, "team") },
             ]}
           />
         )}
         {personName && (
-          <span className="inline-flex items-center gap-2 rounded-[3px] border border-hema bg-hema-tint px-2.5 py-1 text-meta text-hema">
+          <span className="inline-flex items-center gap-2 rounded-[6px] border border-hema bg-hema-tint px-2.5 py-1 text-meta text-ink">
             {personName}&apos;s only
             <a href={href(view, "team").replace(/[?&]person=[^&]*/, "")} className="font-semibold hover:underline" aria-label="Show the whole team">
               ✕

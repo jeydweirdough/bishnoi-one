@@ -9,8 +9,8 @@ Accounts here are the CRM's own: nobody signed in here exists in any other Bishn
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from app.db import Base
 
@@ -34,11 +34,14 @@ class Team(Base):
     # Switched off: kept for its history, but nobody new is put in it.
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The manager over the team (above its team lead): with a role whose scope
+    # is "managed", they reach every team they manage, and its people.
+    manager_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), index=True, default=None)
 
 
 class Role(Base):
     __tablename__ = "nbcm_roles"
-    __table_args__ = (CheckConstraint("scope IN ('own', 'team', 'all')", name="role_scope"),)
+    __table_args__ = (CheckConstraint("scope IN ('own', 'team', 'managed', 'all')", name="role_scope"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(80), unique=True)
@@ -73,6 +76,9 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # The company's own ID for them (e.g. EMP-0012), kept in capitals. A
+    # customer transfer asks for it, so a record can't go to the wrong person.
+    employee_id: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, default=None)
     password_hash: Mapped[str] = mapped_column(String(255))
     role_id: Mapped[str] = mapped_column(ForeignKey("nbcm_roles.id"), index=True)
     team_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="SET NULL"), index=True, default=None)
@@ -84,7 +90,9 @@ class User(Base):
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
-    team: Mapped[Team | None] = relationship(lazy="joined")
+    team: Mapped[Team | None] = relationship(lazy="joined", foreign_keys=[team_id])
+    # The teams this person is the manager of (Team.manager_id).
+    managed_teams: Mapped[list[Team]] = relationship(lazy="selectin", primaryjoin="User.id == Team.manager_id", foreign_keys="Team.manager_id", viewonly=True)
 
 
 class PlatformPass(Base):
@@ -159,6 +167,10 @@ class CustomerType(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     # Switched off: companies keep it, but it isn't offered any more.
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Which teams are offered it (app/extra.py, applies): only these team ids,
+    # or everyone but these. Both empty: everyone.
+    only_teams: Mapped[list] = mapped_column(JSON, default=list)
+    except_teams: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class Company(Owned, Base):
@@ -168,6 +180,9 @@ class Company(Owned, Base):
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # The customer's code (CRM-000001), given by the system when it's added
+    # (number_new_customers, below) and never changed: what people quote.
+    code: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, default=None)
     name: Mapped[str] = mapped_column(String(160), index=True)
     status: Mapped[str] = mapped_column(String(16), default="prospect")
     # Which price group's prices it gets (Hospital, Drugstore chain...). None: none.
@@ -245,6 +260,13 @@ class Activity(Owned, Base):
     # Calls and meetings: how long, in minutes. Calls and emails: which way.
     duration_minutes: Mapped[int | None] = mapped_column(Integer, default=None)
     direction: Mapped[str | None] = mapped_column(String(8), default=None)
+    # A planned call (Calendar → New call): what it's for, and the products to
+    # bring up, as their codes. Once done: what came of it, and the products
+    # actually discussed.
+    objective: Mapped[str | None] = mapped_column(String(300), default=None)
+    products: Mapped[list] = mapped_column(JSON, default=list)
+    outcome: Mapped[str | None] = mapped_column(Text, default=None)
+    discussed: Mapped[list] = mapped_column(JSON, default=list)
 
     company: Mapped[Company | None] = relationship(lazy="joined")
     contact: Mapped[Contact | None] = relationship(lazy="joined")
@@ -595,7 +617,40 @@ class FundRequest(Owned, Base):
 
 FORM_ENTITIES = ("company", "contact", "product", "quote")
 # Kinds an admin can add. Built-in fields have their own kinds too (status, owner...).
-FIELD_TYPES = ("text", "long_text", "number", "money", "date", "choice", "multi_choice", "yes_no", "email", "phone", "url")
+# "products": several of the catalogue's products (kept as their codes); its
+# options are the products it leaves out. "molecule": a generic name, offered
+# from the catalogue's and free to type.
+# "customer": another customer (kept as its id), e.g. the hospital a doctor
+# works at; its options are the customer types it may be.
+FIELD_TYPES = ("text", "long_text", "number", "money", "date", "choice", "multi_choice", "yes_no", "email", "phone", "url", "products", "molecule", "customer")
+
+
+# --- customer codes ---------------------------------------------------------------------
+
+CUSTOMER_PREFIX = "CRM"
+
+
+def customer_code(number: int) -> str:
+    return f"{CUSTOMER_PREFIX}-{number:06d}"
+
+
+def _last_number(session) -> int:
+    last = session.scalar(select(func.max(Company.code)).where(Company.code.like(f"{CUSTOMER_PREFIX}-%")))
+    return int(last.rsplit("-", 1)[1]) if last else 0
+
+
+@event.listens_for(Session, "before_flush")
+def number_new_customers(session, _context, _instances) -> None:
+    """Every customer added gets the next code, however it's added (the
+    screens, an import, the demo). Codes already given are never changed."""
+    new = [c for c in session.new if isinstance(c, Company) and not c.code]
+    if not new:
+        return
+    with session.no_autoflush:
+        number = _last_number(session)
+    for company in sorted(new, key=lambda c: c.created_at or datetime.min.replace(tzinfo=UTC)):
+        number += 1
+        company.code = customer_code(number)
 
 
 class FormSection(Base):
@@ -630,6 +685,19 @@ class FormField(Base):
     in_list: Mapped[bool] = mapped_column(default=False)
     # For a pick list: what can be picked.
     options: Mapped[list] = mapped_column(JSON, default=list)
+    # An option's full name, when the option is a short code ("MED ONCO" is
+    # "Medical oncology"): the code is shown and kept, either can be searched.
+    option_names: Mapped[dict] = mapped_column(JSON, default=dict)
+    # No two records may have the same value in it (a customer's own code).
+    unique: Mapped[bool] = mapped_column(default=False)
+    # Whose records it's on (app/extra.py, applies): only these teams', or
+    # everyone's but these. Both empty: everyone's. A record's team is its owner's.
+    only_teams: Mapped[list] = mapped_column(JSON, default=list)
+    except_teams: Mapped[list] = mapped_column(JSON, default=list)
+    # Which kinds of customer it's asked of (customer type codes): only these,
+    # or all but these. A doctor is profiled; a hospital isn't asked its birthday.
+    only_types: Mapped[list] = mapped_column(JSON, default=list)
+    except_types: Mapped[list] = mapped_column(JSON, default=list)
     help_text: Mapped[str | None] = mapped_column(String(200), default=None)
     placeholder: Mapped[str | None] = mapped_column(String(80), default=None)
     section_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_form_sections.id", ondelete="SET NULL"), default=None)
@@ -694,22 +762,6 @@ class Visit(Owned, Base):
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
-
-
-class FieldGoal(Base):
-    """One person's goals for one month (YYYY-MM), set by an administrator."""
-
-    __tablename__ = "nbcm_field_goals"
-    __table_args__ = (UniqueConstraint("user_id", "month", name="field_goal_once"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
-    month: Mapped[str] = mapped_column(String(7), index=True)
-    doctors_visited: Mapped[int] = mapped_column(Integer, default=0)
-    doctors_updated: Mapped[int] = mapped_column(Integer, default=0)
-    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    collection_visits: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class TrailBatch(Base):
@@ -906,6 +958,8 @@ class Deal(Owned, Base):
     expected_close_on: Mapped[str] = mapped_column(String(10), index=True)
     # Where the business came from, from the list in deal settings.
     lead_source: Mapped[str | None] = mapped_column(String(60), default=None)
+    # How much it matters now: one of DEAL_PRIORITIES, or None (not said).
+    priority: Mapped[str | None] = mapped_column(String(8), index=True, default=None)
     # The products on it, priced at this price type: [{productId, productName,
     # unit, quantity, unitPriceCentavos, totalCentavos}].
     price_type: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -923,21 +977,7 @@ class Deal(Owned, Base):
     contact: Mapped[Contact | None] = relationship(lazy="joined")
     stage: Mapped[DealStage] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Deal.owner_id", lazy="joined")
-
-
-class RevenueTarget(Base):
-    """What one person is expected to sell in one month (YYYY-MM): the value of
-    the deals they win. A team's target is its people's added up. Set by whoever
-    sets goals (goals.manage)."""
-
-    __tablename__ = "nbcm_revenue_targets"
-    __table_args__ = (UniqueConstraint("user_id", "month", name="revenue_target_once"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
-    month: Mapped[str] = mapped_column(String(7), index=True)
-    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_by: Mapped[User | None] = relationship(foreign_keys="Deal.created_by_id", lazy="joined")
 
 
 class MergedRecord(Base):
@@ -968,3 +1008,256 @@ class NotDuplicate(Base):
     second_id: Mapped[str] = mapped_column(String(36), index=True)
     decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- KPIs: what's measured, each person's and team's targets, and the results ----------------
+#
+# An administrator defines the KPIs (Settings → KPIs): each counts one of the
+# measures the CRM knows (app/kpis.py), perhaps narrowed by a filter (calls
+# only, collected visits only, one product), or is entered by hand. Whoever
+# sets goals gives each person, or a team, a target for a month.
+
+KPI_BETTER = ("higher", "lower")
+# A deal's priority, most urgent first.
+DEAL_PRIORITIES = ("urgent", "high", "normal", "low")
+
+
+class Kpi(Base):
+    __tablename__ = "nbcm_kpis"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Built-in KPIs have a code the field and sales screens look them up by.
+    code: Mapped[str | None] = mapped_column(String(40), unique=True, default=None)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # One of app/kpis.MEASURES, or "manual" (entered by hand each month).
+    measure: Mapped[str] = mapped_column(String(40))
+    # The measure's filter, if it takes one: {"kind": "call"}, {"outcome": "collected"}, {"productId": ...}.
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    # For a manual KPI: count, money or percent. Others take their measure's.
+    unit: Mapped[str] = mapped_column(String(10), default="count")
+    better: Mapped[str] = mapped_column(String(6), default="higher")
+    # Who it applies to: role ids. Empty: everyone.
+    roles: Mapped[list] = mapped_column(JSON, default=list)
+    # Status against the target (or the pace so far, this month), as a percentage: green from, amber from.
+    green_at: Mapped[int] = mapped_column(Integer, default=100)
+    amber_at: Mapped[int] = mapped_column(Integer, default=80)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class KpiTarget(Base):
+    """A KPI's target for a month (YYYY-MM), for one person or one team. A
+    team with none of its own is its people's added up (a rate: none)."""
+
+    __tablename__ = "nbcm_kpi_targets"
+    __table_args__ = (
+        UniqueConstraint("kpi_id", "month", "user_id", name="kpi_target_person_once"),
+        UniqueConstraint("kpi_id", "month", "team_id", name="kpi_target_team_once"),
+        CheckConstraint("(user_id IS NULL) <> (team_id IS NULL)", name="kpi_target_whose"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kpi_id: Mapped[str] = mapped_column(ForeignKey("nbcm_kpis.id", ondelete="CASCADE"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True, default=None)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="CASCADE"), index=True, default=None)
+    # Count: a whole number. Money: centavos. Percent: a whole percentage.
+    value: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class KpiEntry(Base):
+    """A manual KPI's result for a person and a month, entered by hand."""
+
+    __tablename__ = "nbcm_kpi_entries"
+    __table_args__ = (UniqueConstraint("kpi_id", "month", "user_id", name="kpi_entry_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kpi_id: Mapped[str] = mapped_column(ForeignKey("nbcm_kpis.id", ondelete="CASCADE"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    value: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(String(200), default=None)
+    entered_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Connection(Base):
+    """An outside service the CRM may connect to (Zoho Books first), as an
+    administrator set it up in Settings → Connections. What the service is
+    and which details it needs are in app/connections.py; the secrets among
+    them are kept encrypted, never in the clear."""
+
+    __tablename__ = "nbcm_connections"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    is_enabled: Mapped[bool] = mapped_column(default=False)
+    # The details that aren't secret (organization ID, data centre), by field key.
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    # The secret ones, as one encrypted JSON object (app/connections.py).
+    secrets: Mapped[str | None] = mapped_column(Text, default=None)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    check_ok: Mapped[bool | None] = mapped_column(default=None)
+    check_message: Mapped[str | None] = mapped_column(String(300), default=None)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+
+    updated_by: Mapped[User | None] = relationship(lazy="joined")
+
+
+# --- what needs someone's attention (app/attention.py) --------------------------------------
+
+
+class AttentionRule(Base):
+    """When something is worth a prompt on the home page: one row for everyone
+    (team_id None), and a row for a division that wants its own. Set in
+    Settings → Attention."""
+
+    __tablename__ = "nbcm_attention_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="CASCADE"), unique=True, default=None)
+    # A customer with no visit, call or meeting done for this long is "quiet".
+    quiet_days: Mapped[int] = mapped_column(Integer, default=45)
+    # Birthdays and anniversaries this many days ahead.
+    notice_days: Mapped[int] = mapped_column(Integer, default=7)
+    # A product's CLIDP running out within this many days.
+    clidp_days: Mapped[int] = mapped_column(Integer, default=30)
+    # A quote waiting for approval this many days is stuck.
+    stuck_days: Mapped[int] = mapped_column(Integer, default=2)
+
+
+class AttentionDismissal(Base):
+    """A prompt someone put aside: until a day (snoozed), or for good (None)."""
+
+    __tablename__ = "nbcm_attention_dismissals"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    until: Mapped[str | None] = mapped_column(String(10), default=None)
+
+
+# --- approved materials (Media) --------------------------------------------------------------
+
+
+class Mailbox(Base):
+    """One of a person's own mailboxes, connected to send from (app/mailbox.py):
+    Gmail, Outlook or Zoho Mail by their sign-in, or any provider by SMTP. A
+    person may have several (work and personal providers) and picks which one
+    each email goes from; one is their default. Its secrets (a refresh token,
+    or the SMTP password) are kept encrypted."""
+
+    __tablename__ = "nbcm_mail_accounts"
+    __table_args__ = (UniqueConstraint("user_id", "address", name="mail_account_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    provider: Mapped[str] = mapped_column(String(20))
+    address: Mapped[str] = mapped_column(String(254))
+    # Not secret: the SMTP server and port, Zoho's account id.
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    secrets: Mapped[str | None] = mapped_column(Text, default=None)
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_error: Mapped[str | None] = mapped_column(String(300), default=None)
+
+
+class MediaItem(Base):
+    """An approved presentation, PDF or video that reps show customers: a file
+    kept here (StoredFile), or a link to one kept elsewhere (a shared drive).
+    Shown only between its approval and expiry, and only to its divisions."""
+
+    __tablename__ = "nbcm_media"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str | None] = mapped_column(String(500), default=None)
+    file_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    file_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    url: Mapped[str | None] = mapped_column(String(1000), default=None)
+    # Product codes it's about, and the teams (divisions) it's for (empty: everyone).
+    products: Mapped[list] = mapped_column(JSON, default=list)
+    only_teams: Mapped[list] = mapped_column(JSON, default=list)
+    # YYYY-MM-DD. Not shown before approval or after expiry.
+    approved_on: Mapped[str] = mapped_column(String(10))
+    expires_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MediaView(Base):
+    """A material opened, and for which customer when opened from their page."""
+
+    __tablename__ = "nbcm_media_views"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    media_id: Mapped[str] = mapped_column(ForeignKey("nbcm_media.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), index=True, default=None)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# --- associations: records linked to one another, with a label (HubSpot) ----------------------
+
+ASSOCIATED = ("company", "contact", "deal")
+
+
+class AssociationLabel(Base):
+    """What a link between two kinds of record means, read from each side: a
+    doctor "Works at" a hospital, whose page lists them under "People here"."""
+
+    __tablename__ = "nbcm_association_labels"
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    from_type: Mapped[str] = mapped_column(String(10))
+    to_type: Mapped[str] = mapped_column(String(10))
+    name: Mapped[str] = mapped_column(String(60))
+    inverse_name: Mapped[str] = mapped_column(String(60))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class Association(Base):
+    """One record linked to another, with a label. Read both ways."""
+
+    __tablename__ = "nbcm_associations"
+    __table_args__ = (UniqueConstraint("label_code", "from_id", "to_id", name="association_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    label_code: Mapped[str] = mapped_column(ForeignKey("nbcm_association_labels.code", ondelete="CASCADE"), index=True)
+    from_type: Mapped[str] = mapped_column(String(10))
+    from_id: Mapped[str] = mapped_column(String(36), index=True)
+    to_type: Mapped[str] = mapped_column(String(10))
+    to_id: Mapped[str] = mapped_column(String(36), index=True)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ActivityLink(Base):
+    """An activity on more customers than its own: a visit note on the doctor and the hospital."""
+
+    __tablename__ = "nbcm_activity_links"
+
+    activity_id: Mapped[str] = mapped_column(ForeignKey("nbcm_activities.id", ondelete="CASCADE"), primary_key=True)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class EmailTemplate(Base):
+    """An approved email (Veeva's idea): written and approved once, sent by reps
+    with a personal note of their own. Its wording can't be changed when sent.
+    {customer}, {contact} and {me} are filled in."""
+
+    __tablename__ = "nbcm_email_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120))
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    only_teams: Mapped[list] = mapped_column(JSON, default=list)
+    approved_on: Mapped[str] = mapped_column(String(10))
+    expires_on: Mapped[str | None] = mapped_column(String(10), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

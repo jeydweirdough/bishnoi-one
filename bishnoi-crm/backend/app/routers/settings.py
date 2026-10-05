@@ -24,7 +24,7 @@ from app.api import Api, camel, changed
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import fields_for
-from app.models import FIELD_TYPES, Company, Contact, FormField, FormSection, Product, Quote
+from app.models import FIELD_TYPES, Company, Contact, CustomerType, FormField, FormSection, Product, Quote, Team
 from app.pricing import sales_settings
 from app.routers.deals import deal_lists
 
@@ -59,10 +59,22 @@ def field_out(f: FormField, used: int | None = None, db: Session | None = None) 
         "hidden": f.hidden,
         "inList": f.in_list,
         "options": options,
+        "optionNames": {o: n for o, n in (f.option_names or {}).items() if o in options},
         "sharedList": (f.entity, f.key) in SHARED_LISTS,
         "helpText": f.help_text,
         "placeholder": f.placeholder,
+        "unique": f.unique,
+        "onlyTeams": f.only_teams or [],
+        "exceptTeams": f.except_teams or [],
+        "onlyTypes": f.only_types or [],
+        "exceptTypes": f.except_types or [],
     }
+    if db is not None and f.type == "products":
+        # Every active product, to pick from (and, in Settings, to leave out).
+        out["picks"] = [{"value": p.code, "label": p.name, "hint": p.generic_name or ""} for p in db.scalars(select(Product).where(Product.is_active).order_by(Product.name))]
+    if db is not None and f.type == "molecule":
+        names = db.scalars(select(Product.generic_name).where(Product.is_active, Product.generic_name.is_not(None)).distinct())
+        out["picks"] = [{"value": n, "label": n, "hint": ""} for n in sorted(set(names), key=str.lower)]
     if used is not None:
         out["used"] = used
     return out
@@ -99,6 +111,12 @@ def read_form(me: CurrentUser, db: DB, entity: Entity, everything: bool = Query(
     return layout_out(db, entity, everything=everything)
 
 
+@router.get("/team-names")
+def team_names(me: CurrentUser, db: DB) -> list[dict]:
+    """Every team by name, for choosing which teams a field or customer type is for."""
+    return [{"id": t.id, "name": t.name, "isActive": t.is_active} for t in db.scalars(select(Team).order_by(Team.name))]
+
+
 class FieldIn(Api):
     # None: a field being added now.
     id: str | None = Field(None, max_length=36)
@@ -110,6 +128,15 @@ class FieldIn(Api):
     options: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(default_factory=list, max_length=100)
     help_text: str | None = Field(None, max_length=200)
     placeholder: str | None = Field(None, max_length=80)
+    # A short option's full name, by option ("MED ONCO": "Medical oncology").
+    option_names: dict[str, Annotated[str, Field(max_length=120)]] = Field(default_factory=dict, max_length=100)
+    unique: bool = False
+    # Whose records it's on: only these teams', or everyone's but these.
+    only_teams: list[Annotated[str, Field(max_length=36)]] = Field(default_factory=list, max_length=50)
+    except_teams: list[Annotated[str, Field(max_length=36)]] = Field(default_factory=list, max_length=50)
+    # Which customer types it's asked of: only these, or all but these.
+    only_types: list[Annotated[str, Field(max_length=40)]] = Field(default_factory=list, max_length=50)
+    except_types: list[Annotated[str, Field(max_length=40)]] = Field(default_factory=list, max_length=50)
 
 
 class SectionIn(Api):
@@ -200,6 +227,22 @@ def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: Lay
             shared = f.id is not None and (entity, fields[f.id].key) in SHARED_LISTS
             if kind in WITH_OPTIONS and not shared and len(clean_options(f.options)) < (1 if f.id and fields[f.id].standard else 2):
                 problems.append(f"{f.label} needs at least two options to pick from.")
+    known_teams = set(db.scalars(select(Team.id)))
+    known_types = set(db.scalars(select(CustomerType.code)))
+    for s in body.sections:
+        for f in s.fields:
+            if any(t not in known_teams for t in [*f.only_teams, *f.except_teams]):
+                problems.append(f"{f.label}: pick teams from the list.")
+            if any(t not in known_types for t in [*f.only_types, *f.except_types]):
+                problems.append(f"{f.label}: pick customer types from the list.")
+            locked = f.id is not None and fields[f.id].locked
+            if locked and (f.only_teams or f.except_teams or f.only_types or f.except_types):
+                problems.append(f"{f.label} is on every customer's form: it can't be for some teams or types only.")
+            kind = fields[f.id].type if f.id else f.type
+            if f.unique and kind not in ("text", "number", "email", "phone"):
+                problems.append(f"{f.label}: only text, number, email and phone fields can be unique.")
+            if f.unique and f.id and fields[f.id].standard:
+                problems.append(f"{f.label} is built in: it can't be made unique here.")
     for f in fields.values():
         if f.standard and f.id not in seen_fields:
             problems.append(f"{f.label} is built in: hide it instead of taking it off.")
@@ -237,7 +280,13 @@ def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: Lay
             field.in_list = f.in_list
             # A shared list's choices are kept where they belong, not here.
             shared = (entity, field.key) in SHARED_LISTS
-            field.options = clean_options(f.options) if field.type in WITH_OPTIONS and not shared else []
+            field.options = clean_options(f.options) if (field.type in WITH_OPTIONS or field.type in ("products", "customer")) and not shared else []
+            field.option_names = {o: n.strip() for o, n in f.option_names.items() if o in field.options and n.strip()}
+            field.unique = f.unique and not field.standard
+            field.only_teams = list(dict.fromkeys(f.only_teams))
+            field.except_teams = list(dict.fromkeys(f.except_teams))
+            field.only_types = list(dict.fromkeys(f.only_types)) if entity == "company" else []
+            field.except_types = list(dict.fromkeys(f.except_types)) if entity == "company" else []
             field.help_text = f.help_text
             field.placeholder = f.placeholder
             field.section_id = section.id

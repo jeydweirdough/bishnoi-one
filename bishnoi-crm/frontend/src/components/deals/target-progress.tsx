@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProgressRing } from "../progress-ring";
 import type { Format } from "@/src/platform/lib/format";
 import type { SalesFigures } from "@/src/platform/lib/types";
 
@@ -37,48 +38,46 @@ export function TargetProgress({
   const state = !target ? null : won >= target ? "met" : won >= pace ? "ahead" : won >= pace * 0.8 ? "close" : "behind";
   const words = { met: "Target met", ahead: "On pace", close: "Slightly behind pace", behind: "Behind pace" } as const;
   const tone = { met: "text-filed", ahead: "text-filed", close: "text-due-today", behind: "text-danger" } as const;
-  const fill = { met: "bg-filed", ahead: "bg-filed", close: "bg-due-today", behind: "bg-danger" } as const;
-  const width = target ? Math.min(100, (100 * won) / target) : 0;
-  const marker = target ? Math.min(100, (100 * pace) / target) : 0;
+  const ring = { met: "good", ahead: "good", close: "warn", behind: "bad" } as const;
+  const marker = target ? Math.min(100, (100 * pace) / target) : null;
 
   return (
     <div>
-      <p className="flex flex-wrap items-baseline justify-between gap-2 text-meta text-ink-3">
-        <span>{label}</span>
-        {state && <span className={`font-semibold ${tone[state]}`}>{words[state]}</span>}
-      </p>
-      <p className="mt-1 text-figure text-ink">
-        {fmt.peso(won)}
-        {target ? <span className="text-sm font-normal text-ink-3"> of {fmt.peso(target)}</span> : null}
-      </p>
+      <p className="text-meta text-ink-3">{label}</p>
       {target ? (
-        <>
-          <div
-            className="relative mt-2 h-2.5 rounded-full bg-bench"
-            role="img"
-            aria-label={`Won ${fmt.peso(won)} of a ${fmt.peso(target)} target; ${fmt.peso(pace)} expected by today`}
-          >
-            <span className={`block h-full rounded-full ${state ? fill[state] : "bg-hema"}`} style={{ width: `${width}%` }} />
-            <span className="absolute -top-0.5 h-3.5 w-0.5 bg-ink" style={{ left: `calc(${marker}% - 1px)` }} aria-hidden />
+        <div className="mt-2 flex items-center gap-4">
+          <ProgressRing
+            pct={figures.attainment}
+            pace={marker}
+            tone={state ? ring[state] : "plain"}
+            label={`Won ${fmt.peso(won)} of a ${fmt.peso(target)} target; ${fmt.peso(pace)} expected by today`}
+          />
+          <div className="min-w-0">
+            {state && <p className={`text-meta font-semibold ${tone[state]}`}>{words[state]}</p>}
+            <p className="text-figure leading-tight text-ink">{fmt.peso(won)}</p>
+            <p className="text-meta text-ink-3">of {fmt.peso(target)}</p>
+            <p className="mt-1 text-meta text-ink-3">
+              {fmt.peso(pace)} expected by today
+              {figures.winRate !== null && <> · {figures.winRate}% win rate</>}
+            </p>
           </div>
-          <p className="mt-1.5 text-meta text-ink-3">
-            {figures.attainment}% of target · {fmt.peso(pace)} expected by today
-            {figures.winRate !== null && <> · {figures.winRate}% win rate</>}
+        </div>
+      ) : (
+        <>
+          <p className="mt-1 text-figure text-ink">{fmt.peso(won)}</p>
+          <p className="mt-1 text-meta text-ink-3">
+            {fmt.plural(figures.wonCount, "deal")} won. No revenue target set for this period
+            {href ? (
+              <>
+                {" "}
+                <Link href={href} className="text-ink hover:underline">
+                  Set targets
+                </Link>
+              </>
+            ) : null}
+            .
           </p>
         </>
-      ) : (
-        <p className="mt-1 text-meta text-ink-3">
-          {fmt.plural(figures.wonCount, "deal")} won. No revenue target set for this period
-          {href ? (
-            <>
-              {" "}
-              <Link href={href} className="text-hema hover:underline">
-                Set targets
-              </Link>
-            </>
-          ) : null}
-          .
-        </p>
       )}
     </div>
   );

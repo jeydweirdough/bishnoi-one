@@ -107,7 +107,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                       className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,9rem)_7rem] md:items-center md:gap-4"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate font-semibold text-hema">{c.name}</span>
+                        <span className="block truncate font-semibold text-ink">{c.name}</span>
                         <span className="block truncate text-meta text-ink-3">{c.jobTitle ?? "—"}</span>
                       </span>
                       <span className="min-w-0 text-meta">

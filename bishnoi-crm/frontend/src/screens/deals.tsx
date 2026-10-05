@@ -1,4 +1,4 @@
-import { Download, Plus, Target } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Target } from "lucide-react";
 import Link from "next/link";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -6,18 +6,23 @@ import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
-import type { DealBoard, DealForecast, DealList, DealRow, DealStage, ForecastFigures, SalesFigures, SalesResults } from "@/src/platform/lib/types";
+import { Avatar } from "@/src/platform/ui/avatar";
+import type { DealBoard, DealForecast, DealList, DealRow, DealStage, DealSummary, ForecastFigures, SalesFigures, SalesResults } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { Filters, Pager } from "../components/crm/list-controls";
+import { NewDealButton } from "../components/deals/new-deal";
+import { PeriodPicker } from "../components/deals/period-picker";
 import { TargetProgress } from "../components/deals/target-progress";
-import { CATEGORY_LABELS, StageTag, closeLabel, periodsFrom } from "../components/deals/words";
+import { Donut, RAMP, SERIES } from "../components/deals/donut";
+import { CATEGORY_LABELS, PRIORITIES, PriorityFlag, StageTag, closeLabel, periodsFrom } from "../components/deals/words";
 import { shiftMonth } from "../components/field/words";
 
 export const metadata = { title: "Deals" };
 
-// The pipeline three ways:
-// - Board: open deals in a column per stage, with each column's value;
-// - List: every deal, open or closed, filtered;
+// Deals, as a sales team reads them:
+// - Open deals and Closed deals: the figures and three charts (by probability,
+//   stage and priority), then the deals as a table (sortable, filtered) or, for
+//   open ones, a board with a column per stage;
 // - Forecast: what each person expects to close in a month or quarter, by category;
 // - Results: what was won in a month or quarter, against the revenue targets.
 const SIZE = 50;
@@ -32,11 +37,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
   const fmt = makeFormat(me.org);
   const today = fmt.todayKey();
   const periods = periodsFrom(today);
-  const view = (["list", "forecast", "results"] as const).find((v) => v === one(params.view)) ?? "board";
+  // Old addresses: ?view=board is open deals on the board; ?view=list, the table.
+  const asked = one(params.view);
+  const view = (["closed", "forecast", "results"] as const).find((v) => v === asked) ?? "open";
+  const layout = view === "open" && (asked === "board" || one(params.layout) === "board") ? "board" : "table";
   const teamWide = me.role?.scope !== "own";
   const who = teamWide && one(params.who) !== "me" ? "team" : "me";
-  const href = (v: string, w = who) => {
-    const q = new URLSearchParams({ ...(v !== "board" && { view: v }), ...(w === "me" && teamWide && { who: w }) });
+  const href = (v: string, w = who, l = layout) => {
+    const q = new URLSearchParams({ ...(v !== "open" && { view: v }), ...(v === "open" && l === "board" && { layout: l }), ...(w === "me" && teamWide && { who: w }) });
     return `/deals${q.size ? `?${q}` : ""}`;
   };
   const owner = who === "me" ? "me" : "";
@@ -49,14 +57,12 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
         actions={
           <>
             {view === "results" && can(me, "goals.manage") && (
-              <LinkButton href={`/deals/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />}>
+              <LinkButton href={`/kpis/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />}>
                 Set targets
               </LinkButton>
             )}
             {can(me, "deals.create") && (
-              <LinkButton href="/deals/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                New deal
-              </LinkButton>
+              <NewDealButton />
             )}
           </>
         }
@@ -68,25 +74,46 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
         <ToggleLinks
           current={view}
           options={[
-            { value: "board", label: "Pipeline", href: href("board") },
-            { value: "list", label: "All deals", href: href("list") },
+            { value: "open", label: "Open deals", href: href("open") },
+            { value: "closed", label: "Closed", href: href("closed") },
             { value: "forecast", label: "Forecast", href: href("forecast") },
             { value: "results", label: "Results", href: href("results") },
           ]}
         />
         {teamWide && (
-          <ToggleLinks
-            current={who}
-            options={[
-              { value: "me", label: "Mine", href: href(view, "me") },
-              { value: "team", label: me.role?.scope === "all" ? "Everyone" : "My team", href: href(view, "team") },
-            ]}
-          />
+          <span className="ml-auto">
+            <ToggleLinks
+              current={who}
+              options={[
+                { value: "me", label: "Mine", href: href(view, "me") },
+                { value: "team", label: me.role?.scope === "all" ? "Everyone" : me.role?.scope === "managed" ? "My teams" : "My team", href: href(view, "team") },
+              ]}
+            />
+          </span>
         )}
       </div>
 
-      {view === "board" && <Board fmt={fmt} today={today} owner={owner} period={one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />}
-      {view === "list" && <List fmt={fmt} today={today} owner={owner} params={params} base={href("list")} />}
+      {(view === "open" || view === "closed") && (
+        <>
+          <Summary state={view} owner={owner} fmt={fmt} />
+          {view === "open" && (
+            <div className="mb-3">
+              <ToggleLinks
+                current={layout}
+                options={[
+                  { value: "table", label: "Table", href: href("open", who, "table") },
+                  { value: "board", label: "Board", href: href("open", who, "board") },
+                ]}
+              />
+            </div>
+          )}
+          {layout === "board" ? (
+            <Board fmt={fmt} today={today} owner={owner} period={one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />
+          ) : (
+            <Table fmt={fmt} today={today} owner={owner} state={view} params={params} base={href(view)} mayAdd={can(me, "deals.create")} />
+          )}
+        </>
+      )}
       {view === "results" && (
         <Results
           fmt={fmt}
@@ -99,6 +126,72 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
       )}
       {view === "forecast" && <Forecast fmt={fmt} period={one(params.period) || periods.thisMonth} periods={periods} showPeople={who === "team"} />}
     </>
+  );
+}
+
+/** The four cards above the deals: the figures, then the deals by probability, stage and priority. */
+async function Summary({ state, owner, fmt }: { state: "open" | "closed"; owner: string; fmt: Format }) {
+  const s = await load<DealSummary>(`/deals-summary?state=${state}${owner ? `&owner=${owner}` : ""}`);
+  const figures =
+    state === "open"
+      ? [
+          { label: "Pipeline value", value: fmt.peso(s.valueCentavos), note: fmt.plural(s.count, "open deal") },
+          { label: "Weighted by probability", value: fmt.peso(s.weightedCentavos), note: "What the pipeline is likely worth" },
+          { label: "Expected this month", value: fmt.peso(s.thisMonthCentavos), note: "Weighted, closing this month" },
+        ]
+      : [
+          { label: "Won", value: fmt.peso(s.wonCentavos), note: fmt.plural(s.wonCount, "deal") },
+          { label: "Deals lost", value: String(s.lostCount), note: s.count ? `${Math.round((100 * s.wonCount) / s.count)}% won` : "None closed yet" },
+        ];
+  const stageColor = (i: number) => SERIES[i % SERIES.length];
+  return (
+    <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.8fr)_repeat(3,minmax(0,1fr))]">
+      <Sheet className="px-5 py-4">
+        <SectionTitle>Summary</SectionTitle>
+        <ul className="mt-2 space-y-3">
+          {figures.map((f) => (
+            <li key={f.label}>
+              <p className="text-meta text-ink-3">{f.label}</p>
+              <p className="text-figure leading-tight text-ink">{f.value}</p>
+              <p className="text-meta text-ink-3">{f.note}</p>
+            </li>
+          ))}
+        </ul>
+      </Sheet>
+      {state === "open" && (
+        <Sheet className="px-5 py-4">
+          <SectionTitle>Probability</SectionTitle>
+          <div className="mt-3">
+            <Donut title="Open deals by probability" slices={s.byProbability.map((b, i) => ({ label: b.label, value: b.count, color: RAMP[i] }))} />
+          </div>
+        </Sheet>
+      )}
+      <Sheet className="px-5 py-4">
+        <SectionTitle>Stages</SectionTitle>
+        <div className="mt-3">
+          {s.byStage.length ? (
+            <Donut
+              title="Deals by stage"
+              slices={s.byStage.map((st, i) => ({ label: st.name, value: st.count, color: stageColor(i), note: fmt.peso(st.valueCentavos) }))}
+            />
+          ) : (
+            <p className="py-6 text-meta text-ink-3">No deals here yet.</p>
+          )}
+        </div>
+      </Sheet>
+      <Sheet className="px-5 py-4">
+        <SectionTitle>Priority</SectionTitle>
+        <div className="mt-3">
+          <Donut
+            title="Deals by priority"
+            slices={s.byPriority.map((b) => {
+              const p = PRIORITIES.find((x) => x.value === b.priority)!;
+              return { label: p.label, value: b.count, color: p.color };
+            })}
+          />
+        </div>
+      </Sheet>
+    </div>
   );
 }
 
@@ -142,7 +235,7 @@ async function Board({
           <Empty
             icon="trend"
             title="No open deals"
-            actions={mayAdd && <LinkButton href="/deals/new" icon={<Plus className="size-4" aria-hidden />}>New deal</LinkButton>}
+            actions={mayAdd && <NewDealButton variant="default" />}
           >
             Add a deal from a customer&apos;s page, or here, to see it move through the pipeline.
           </Empty>
@@ -180,8 +273,11 @@ async function Board({
 function DealCard({ deal, fmt, today }: { deal: DealRow; fmt: Format; today: string }) {
   const overdue = deal.state === "open" && deal.expectedCloseOn < today;
   return (
-    <Link href={`/deals/${deal.id}`} className="block rounded-[3px] border border-rule bg-sheet px-3 py-2.5 hover:border-hema">
-      <p className="truncate text-sm font-medium text-ink">{deal.name}</p>
+    <Link href={`/deals/${deal.id}`} className="block rounded-[6px] border border-rule bg-sheet px-3 py-2.5 hover:border-hema">
+      <p className="flex items-start justify-between gap-2">
+        <span className="truncate text-sm font-medium text-ink">{deal.name}</span>
+        {deal.priority && <PriorityFlag priority={deal.priority} />}
+      </p>
       <p className="truncate text-meta text-ink-3">{deal.company.name}</p>
       <p className="mt-1.5 flex items-baseline justify-between gap-2 text-meta">
         <span className="font-semibold text-ink">{fmt.peso(deal.valueCentavos)}</span>
@@ -195,105 +291,178 @@ function DealCard({ deal, fmt, today }: { deal: DealRow; fmt: Format; today: str
   );
 }
 
-async function List({
+const SORTS = ["name", "created", "value", "stage", "priority", "close"] as const;
+type SortKey = (typeof SORTS)[number];
+
+/** The deals as a table: a column for each thing a sales team asks about, each sortable. */
+async function Table({
   fmt,
   today,
   owner,
+  state,
   params,
   base,
+  mayAdd,
 }: {
   fmt: Format;
   today: string;
   owner: string;
+  state: "open" | "closed";
   params: Record<string, string | string[] | undefined>;
   base: string;
+  mayAdd: boolean;
 }) {
   const page = Math.max(1, Number(one(params.page)) || 1);
-  const state = one(params.state);
   const stage = one(params.stage);
+  const priority = one(params.priority);
   const closing = one(params.closing);
   const search = one(params.q);
+  const sort = SORTS.find((x) => x === one(params.sort));
+  const desc = one(params.desc) === "1";
   const q = new URLSearchParams({
+    state,
     limit: String(SIZE),
     offset: String((page - 1) * SIZE),
     ...(owner && { owner }),
-    ...(state && { state }),
     ...(stage && { stage }),
+    ...(priority && { priority }),
     ...(closing && { closing }),
     ...(search && { q: search }),
+    ...(sort && { sort, desc: String(desc) }),
   });
   const [list, stages] = await Promise.all([load<DealList>(`/deals?${q}`), load<DealStage[]>("/deal-stages")]);
-  const kept = new URLSearchParams(
-    Object.entries({ state, stage, closing, q: search }).filter(([, v]) => v) as [string, string][],
+  const kept = (extra: Record<string, string>) => {
+    const k = new URLSearchParams(Object.entries({ stage, priority, closing, q: search, ...(sort && { sort }), ...(desc && { desc: "1" }), ...extra }).filter(([, v]) => v) as [string, string][]);
+    return k.size ? `${base}${base.includes("?") ? "&" : "?"}${k}` : base;
+  };
+  const sortHref = (key: SortKey) => kept({ sort: key, desc: sort === key && !desc ? "1" : "" });
+  const Head = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
+    <th className={`px-3 py-2 font-medium ${right ? "text-right" : ""}`} aria-sort={sort === k ? (desc ? "descending" : "ascending") : undefined}>
+      <Link href={sortHref(k)} className="inline-flex items-center gap-1 hover:text-ink">
+        {children}
+        {sort === k && (desc ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />)}
+      </Link>
+    </th>
   );
+  const shownStages = stages.filter((s) => (state === "open" ? s.outcome === "open" : s.outcome !== "open"));
+
   return (
     <>
       <Filters
         search="Deal or customer"
         selects={[
-          { name: "state", label: "State", options: [{ value: "", label: "Open, won and lost" }, { value: "open", label: "Open" }, { value: "won", label: "Won" }, { value: "lost", label: "Lost" }] },
-          { name: "stage", label: "Stage", options: [{ value: "", label: "Every stage" }, ...stages.map((s) => ({ value: s.code, label: s.name }))] },
-          {
-            name: "closing",
-            label: "Closing",
-            options: [
-              { value: "", label: "Any time" },
-              { value: "overdue", label: "Overdue" },
-              { value: "this_month", label: "This month" },
-              { value: "next_month", label: "Next month" },
-              { value: "this_quarter", label: "This quarter" },
-            ],
-          },
+          { name: "stage", label: "Stage", options: [{ value: "", label: "Every stage" }, ...shownStages.map((s) => ({ value: s.code, label: s.name }))] },
+          { name: "priority", label: "Priority", options: [{ value: "", label: "Any priority" }, ...PRIORITIES.map((p) => ({ value: p.value ?? "none", label: p.label }))] },
+          ...(state === "open"
+            ? [
+                {
+                  name: "closing",
+                  label: "Closing",
+                  options: [
+                    { value: "", label: "Any time" },
+                    { value: "overdue", label: "Overdue" },
+                    { value: "this_month", label: "This month" },
+                    { value: "next_month", label: "Next month" },
+                    { value: "this_quarter", label: "This quarter" },
+                  ],
+                },
+              ]
+            : []),
         ]}
       />
-      <p className="mb-3 text-meta text-ink-2">
-        {fmt.plural(list.total, "deal")} worth {fmt.peso(list.valueCentavos)}
-      </p>
       <Sheet className="overflow-x-auto">
+        <p className="border-b border-rule px-5 py-2.5 text-meta text-ink-2">
+          {fmt.plural(list.total, "deal")} worth {fmt.peso(list.valueCentavos)}
+        </p>
         {list.items.length === 0 ? (
           <div className="px-5 py-2">
-            <Empty icon="trend" title="No deals match">
-              Clear a filter to see more.
+            <Empty
+              icon="trend"
+              title={stage || priority || closing || search ? "No deals match" : state === "open" ? "No open deals" : "No closed deals yet"}
+              actions={state === "open" && mayAdd && <NewDealButton variant="default" />}
+            >
+              {stage || priority || closing || search ? "Clear a filter to see more." : "Deals added on a customer's page, or here, show up in this table."}
             </Empty>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[60rem] text-sm">
             <thead>
               <tr className="border-b border-rule text-left text-meta text-ink-3">
-                <th className="px-5 py-2 font-medium">Deal</th>
-                <th className="px-3 py-2 font-medium">Stage</th>
-                <th className="px-3 py-2 text-right font-medium">Value</th>
-                <th className="px-3 py-2 font-medium">Close</th>
-                <th className="px-3 py-2 font-medium">Forecast</th>
-                <th className="px-5 py-2 font-medium">Owner</th>
+                <th className="px-5 py-2 font-medium">
+                  <Link href={sortHref("name")} className="inline-flex items-center gap-1 hover:text-ink">
+                    Deal
+                    {sort === "name" && (desc ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />)}
+                  </Link>
+                </th>
+                <th className="px-3 py-2 font-medium">Created by</th>
+                <Head k="created">Created</Head>
+                <Head k="value" right>
+                  Value
+                </Head>
+                <th className="px-3 py-2 font-medium">Assigned to</th>
+                <Head k="stage">Stage</Head>
+                <Head k="priority">Priority</Head>
+                {state === "open" && <th className="px-3 py-2 font-medium">Next step</th>}
+                <Head k="close">{state === "open" ? "Close date" : "Closed"}</Head>
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
               {list.items.map((d) => (
-                <tr key={d.id}>
+                <tr key={d.id} className="hover:bg-bench/40">
                   <td className="px-5 py-2.5">
-                    <Link href={`/deals/${d.id}`} className="font-medium text-hema hover:underline">
+                    <Link href={`/deals/${d.id}`} className="font-medium text-ink hover:underline">
                       {d.name}
                     </Link>
                     <p className="text-meta text-ink-3">{d.company.name}</p>
                   </td>
                   <td className="px-3 py-2.5">
+                    <Person who={d.createdBy} />
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{fmt.dateLabel(d.createdAt.slice(0, 10))}</td>
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">{fmt.peso(d.valueCentavos)}</td>
+                  <td className="px-3 py-2.5">
+                    <Person who={d.owner} />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <StageTag deal={d} />
                   </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">{fmt.peso(d.valueCentavos)}</td>
+                  <td className="px-3 py-2.5">
+                    <PriorityFlag priority={d.priority} />
+                  </td>
+                  {state === "open" && (
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {d.nextStep ? (
+                        <span className={d.nextStep.at.slice(0, 10) < today ? "font-semibold text-danger" : "text-ink-2"} title={d.nextStep.subject}>
+                          {fmt.dateLabel(d.nextStep.at.slice(0, 10))}
+                          <span className="block max-w-40 truncate text-meta text-ink-3">{d.nextStep.subject}</span>
+                        </span>
+                      ) : (
+                        <span className="text-meta text-ink-3">None planned</span>
+                      )}
+                    </td>
+                  )}
                   <td className={`px-3 py-2.5 whitespace-nowrap ${d.state === "open" && d.expectedCloseOn < today ? "font-semibold text-danger" : "text-ink-2"}`}>
                     {fmt.dateLabel(d.expectedCloseOn)}
+                    {d.state === "lost" && d.lostReason && <span className="block text-meta font-normal text-ink-3">{d.lostReason}</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-ink-2">{d.state === "lost" ? d.lostReason : CATEGORY_LABELS[d.forecastCategory]}</td>
-                  <td className="px-5 py-2.5 text-ink-2">{d.owner?.name ?? "No one"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </Sheet>
-      <Pager total={list.total} page={page} size={SIZE} base={kept.size ? `${base}${base.includes("?") ? "&" : "?"}${kept}` : base} />
+      <Pager total={list.total} page={page} size={SIZE} base={kept({})} />
     </>
+  );
+}
+
+function Person({ who }: { who: { id: string; name: string } | null }) {
+  if (!who) return <span className="text-meta text-ink-3">No one</span>;
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2">
+      <Avatar name={who.name} id={who.id} size="sm" />
+      {who.name}
+    </span>
   );
 }
 
@@ -316,7 +485,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
         {FORECAST_BARS.map((b) => (
           <Sheet key={b.key} className="px-4 py-3">
             <p className="flex items-center gap-2 text-meta text-ink-3">
-              <span className={`size-2.5 rounded-[2px] ${b.style}`} aria-hidden />
+              <span className={`size-2.5 rounded-[4px] ${b.style}`} aria-hidden />
               {b.label}
             </p>
             <p className="mt-1 text-figure text-ink">{fmt.peso(t[b.key] as number)}</p>
@@ -399,7 +568,7 @@ async function Results({
 
   return (
     <>
-      <Filters selects={[{ name: "period", label: "Period", options: resultPeriods(periods) }]} />
+      <PeriodPicker value={period} presets={resultPeriods(periods)} />
       <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,2fr)]">
         <Sheet className="px-5 py-4">
           <TargetProgress
@@ -409,7 +578,7 @@ async function Results({
             today={today}
             fmt={fmt}
             label={`Won in ${r.label}`}
-            href={mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/deals/targets?month=${r.period}` : undefined}
+            href={mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/kpis/targets?month=${r.period}` : undefined}
           />
         </Sheet>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
@@ -522,7 +691,7 @@ function Ranked({ fmt, rows, empty }: { fmt: Format; rows: { key: string; name: 
         <li key={x.key}>
           <p className="flex items-baseline justify-between gap-3 text-sm">
             {x.href ? (
-              <Link href={x.href} className="truncate text-hema hover:underline">
+              <Link href={x.href} className="truncate text-ink hover:underline">
                 {x.name}
               </Link>
             ) : (

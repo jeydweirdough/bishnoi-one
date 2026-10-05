@@ -1,5 +1,6 @@
 "use client";
 
+import { Select as AntSelect } from "antd";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -8,7 +9,9 @@ import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platfor
 import { createCompany, updateCompany, type CompanyInput } from "../../actions/crm";
 import type { Assignable, CompanyDetail, CompanyStatus, CustomerType, Duplicate, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "../extra/extra-fields";
+import { forTeam, layoutForTeam } from "../extra/teams";
 import { Duplicates } from "./duplicates";
+import { Lookalikes } from "./lookalikes";
 import { OwnerField } from "./owner-field";
 import { typeOptions } from "./words";
 import { useCan } from "../quick-add/can";
@@ -22,10 +25,13 @@ type Text = (typeof TEXT)[number];
 export function CompanyForm({
   people,
   types,
-  layout,
+  layout: everyTeamsLayout,
   company,
   priceGroups = [],
   initialName = "",
+  initialTeam,
+  initialType,
+  missingOnly = false,
   thenQuote = false,
 }: {
   people: Assignable[];
@@ -36,24 +42,63 @@ export function CompanyForm({
   priceGroups?: { code: string; name: string; isActive: boolean }[];
   /** A new customer's name, as typed where they weren't found. */
   initialName?: string;
+  /** The division (a team) and type picked in the add-customer pop-up. */
+  initialTeam?: string;
+  initialType?: string;
+  /** "Complete profile": only the profile fields still empty. */
+  missingOnly?: boolean;
   /** Added from "New quote": open their quote once they're saved. */
   thenQuote?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [ownerId, setOwnerId] = useState(
+    () =>
+      company?.owner.id ??
+      // In the division picked: oneself if one is in it, else its first person.
+      (initialTeam
+        ? (people.find((p) => p.isMe && p.team?.id === initialTeam) ?? people.find((p) => p.team?.id === initialTeam))?.id
+        : undefined) ??
+      people.find((p) => p.isMe)?.id ??
+      people[0]?.id ??
+      "",
+  );
+  // The form is the team's it's assigned to: the Rx team's has its own fields and types.
+  const teamOf = (id: string) => people.find((p) => p.id === id)?.team?.id ?? (id === company?.owner.id ? (company?.team?.id ?? null) : null);
+  const teamId = teamOf(ownerId);
+  const offered = types.filter((t) => forTeam(t, teamId) || t.code === company?.status);
+  const [status, setStatus] = useState<CompanyStatus>(
+    company?.status ?? (offered.some((t) => t.code === initialType) ? initialType! : undefined) ?? offered.find((t) => t.isActive)?.code ?? "",
+  );
+  // And the kind of customer: a doctor is profiled, a hospital isn't asked a birthday.
+  const ownLayout = layoutForTeam(everyTeamsLayout, teamId, status);
+  const empty = (key: string) => {
+    const v = company?.extra?.[key];
+    return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  };
+  // Kept as it opened, so a field filled in now doesn't jump off the form.
+  const [missingKeys] = useState(() => new Set(ownLayout.sections.flatMap((s) => s.fields).filter((f) => !f.standard && empty(f.key)).map((f) => f.key)));
+  const layout = missingOnly
+    ? { ...ownLayout, sections: ownLayout.sections.map((s) => ({ ...s, fields: s.fields.filter((f) => missingKeys.has(f.key)) })).filter((s) => s.fields.length) }
+    : ownLayout;
   const allFields = layout.sections.flatMap((s) => s.fields);
   const [values, setValues] = useState<Record<Text, string>>(() =>
     Object.fromEntries(TEXT.map((k) => [k, (company?.[k] as string | null) ?? (k === "name" ? initialName : "")])) as Record<Text, string>,
   );
   const can = useCan();
-  const [status, setStatus] = useState<CompanyStatus>(company?.status ?? types.find((t) => t.isActive)?.code ?? "");
   const [priceGroup, setPriceGroup] = useState(company?.priceGroupCode ?? "");
-  const [ownerId, setOwnerId] = useState(company?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [dupMessage, setDupMessage] = useState("");
-  const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(allFields, company?.extra));
+  const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(everyTeamsLayout.sections.flatMap((s) => s.fields), company?.extra));
+
+  /** A new person to assign it to: their team's form, and a type their team is offered. */
+  function assign(id: string) {
+    setOwnerId(id);
+    const next = types.filter((t) => t.isActive && forTeam(t, teamOf(id)));
+    if (!next.some((t) => t.code === status)) setStatus(next[0]?.code ?? status);
+  }
   const set = (k: Text) => (e: { target: { value: string } }) => setValues({ ...values, [k]: e.target.value });
   // What isn't on the form (hidden in Settings) isn't sent, so it stays as it was.
   const shown = new Set(allFields.map((f) => f.key));
@@ -105,10 +150,27 @@ export function CompanyForm({
     const hint = f.helpText ?? undefined;
     const placeholder = f.placeholder ?? undefined;
     switch (f.key) {
-      case "status":
+      case "status": {
+        const options = typeOptions(offered, company?.status);
         return (
           <div>
-            <Choice<CompanyStatus> name="status" legend={f.label} value={status} onChange={setStatus} options={typeOptions(types, company?.status)} />
+            {options.length > 5 ? (
+              <Field label={f.label} error={fields.status}>
+                {(p) => (
+                  <AntSelect
+                    id={p.id}
+                    className="w-full"
+                    value={status || undefined}
+                    onChange={(v) => setStatus(v)}
+                    options={options}
+                    showSearch={{ optionFilterProp: "label" }}
+                    placeholder="Type to search"
+                  />
+                )}
+              </Field>
+            ) : (
+              <Choice<CompanyStatus> name="status" legend={f.label} value={status} onChange={setStatus} options={options} />
+            )}
             {can("admin.types") && (
               <QuickAdd label="New customer type" title="New customer type">
                 {(done) => <AddCustomerType onAdded={setStatus} done={done} />}
@@ -116,8 +178,10 @@ export function CompanyForm({
             )}
           </div>
         );
+      }
       case "ownerId":
-        return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
+        // Nobody else to assign it to: it's theirs, nothing to ask.
+        return people.length > 1 ? <OwnerField people={people} value={ownerId} onChange={assign} error={fields.ownerId} label={f.label} /> : null;
       case "industry":
         return <ChoiceSelect field={f} value={values.industry} onChange={(v) => setValues({ ...values, industry: v })} error={fields.industry} />;
       case "leadSource":
@@ -132,7 +196,7 @@ export function CompanyForm({
         if (!(TEXT as readonly string[]).includes(f.key)) return null;
         const k = f.key as Text;
         const kind = f.type === "email" ? "email" : f.type === "phone" ? "tel" : "text";
-        return (
+        const input = (
           <Field label={f.label} optional={!f.required} error={fields[k]} hint={hint}>
             {(p) => (
               <Input
@@ -148,6 +212,15 @@ export function CompanyForm({
             )}
           </Field>
         );
+        if (k === "name" && !company) {
+          return (
+            <>
+              {input}
+              <Lookalikes name={values.name} phone={values.phone} email={values.email} />
+            </>
+          );
+        }
+        return input;
       }
     }
   }
@@ -161,7 +234,14 @@ export function CompanyForm({
       }}
       className="space-y-7"
     >
-      <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
+      <LayoutForm
+        layout={layout}
+        standard={standard}
+        draft={extra}
+        onChange={setExtra}
+        errors={fields}
+        linkNames={Object.fromEntries(Object.entries(company?.links ?? {}).map(([k, l]) => [k, l.name]))}
+      />
 
       {priceGroups.length > 0 && (
         <Field label="Price group" optional error={fields.priceGroupCode} hint="Its group's prices come first on quotes (Settings → Price rules).">
