@@ -116,4 +116,5 @@ def test_only_admins_set_the_default_accounts(client, ana, ben):
     assert {i["key"]: i["account"]["code"] for i in posting["items"]} == {
         "advances_account_id": "1200", "due_to_employees_account_id": "2100", "cash_account_id": "1000",
         "bank_account_id": "1010", "ewallet_account_id": "1020", "check_account_id": "1010",
+        "receivables_account_id": "1100", "sales_account_id": "4000", "output_tax_account_id": "2200",
     }

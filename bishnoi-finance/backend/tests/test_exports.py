@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 
 from .test_funds import KEY, approved, categories, release, spend
 from .test_ledger import accounts
-from .test_tax_api import app, ana, ben, client  # noqa: F401 (fixtures)
+from .test_roles import auditor
+from .test_tax_api import app, ana, ben, bearer, client, sign_in  # noqa: F401 (fixtures)
 
 
 def manila_today() -> date:
@@ -39,6 +40,27 @@ def test_only_finance_downloads_the_books(client):
     for path in ("/finance/exports/journal.csv", "/finance/exports/trial-balance.csv", "/finance/exports/funds.csv"):
         assert client.get(path).status_code == 401
         assert client.get(path, headers=KEY).status_code == 401  # an app's key isn't a Finance sign-in
+
+
+def test_each_download_needs_its_screens_permission(app, client, ana):  # noqa: F811 (fixtures)
+    books = ["/finance/exports/journal.csv", "/finance/exports/trial-balance.csv", f"/finance/exports/accounts/{accounts(client, ana)['1000']['id']}/statement.csv"]
+    # A role that sees marketing requests only gets their list, not the books.
+    cashier = client.post("/admin/roles", json={"name": "Cashier", "description": "Releases cash only.", "permissions": ["funds.view", "funds.release"]}, headers=ana)
+    made = client.post("/admin/users", json={"email": "cy@example.com", "fullName": "Cy Tan", "roleId": cashier.json()["id"], "password": "a long enough password 1"}, headers=ana)
+    assert made.status_code == 201, made.text
+    cy = bearer(sign_in(client, "cy@example.com", "a long enough password 1"))
+    sheet(client.get("/finance/exports/funds.csv", headers=cy))
+    for path in books:
+        assert client.get(path, headers=cy).status_code == 403
+    # The Auditor sees everything, so downloads everything.
+    aud = auditor(app, client)
+    for path in [*books, "/finance/exports/funds.csv"]:
+        sheet(client.get(path, headers=aud))
+
+
+def test_the_journal_names_invoice_entries(client, ben):  # noqa: F811 (fixtures)
+    rows = sheet(client.get("/finance/exports/journal.csv", params={"source": "invoice"}, headers=ben))
+    assert rows[1:] == []  # nothing invoiced yet, but the filter is the screen's
 
 
 def test_the_journal_one_line_per_row_oldest_first(client, ben):

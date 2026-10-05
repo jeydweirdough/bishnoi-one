@@ -1,10 +1,10 @@
 """Finance's books as spreadsheets: the journal, one account's statement, the
-trial balance and the fund requests, as CSV files Excel opens.
+trial balance and the marketing requests, as CSV files Excel opens.
 
 Read-only. Each file is built from the very answer its screen shows
 (app/routers/ledger.py, app/routers/funds.py), so a file and its screen
-always agree. Anyone signed in to Finance can download them, as they can see
-the screens.
+always agree, and needs the permission its screen needs (journal.view for
+the books, funds.view for marketing requests).
 
 Amounts are plain numbers (1234.50, -500.00), so a spreadsheet can add them
 up; words that a spreadsheet would run as a formula are made plain text.
@@ -21,7 +21,8 @@ from fastapi import APIRouter, Query, Response
 from sqlalchemy import select
 
 from app.config import Settings
-from app.deps import DB, CurrentUser, SettingsDep
+from app.access import permitted
+from app.deps import DB, SettingsDep
 from app.models import JournalEntry
 from app.routers.funds import Task, list_requests, today
 from app.routers.ledger import TYPE_LABELS, account_ledger, list_entries, trial_balance
@@ -32,6 +33,8 @@ router = APIRouter(prefix="/finance/exports", tags=["exports"])
 MAX_ROWS = 50_000
 # A spreadsheet runs a cell that starts with one of these as a formula.
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+# Where an entry came from, as the journal's filters name it.
+SOURCE_LABELS = {"manual": "Manual", "fund": "Marketing request", "invoice": "Invoice"}
 
 
 def text(value: object) -> str:
@@ -82,12 +85,12 @@ def span(since: date | None, until: date) -> str:
 
 @router.get("/journal.csv")
 def journal(
-    user: CurrentUser,
+    user: permitted("journal.view"),
     db: DB,
     settings: SettingsDep,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund"] | None = None,
+    source: Literal["manual", "fund", "invoice"] | None = None,
     q: str | None = Query(None, max_length=100),
 ) -> Response:
     """Every line of every entry asked for, oldest first: the general journal."""
@@ -96,7 +99,7 @@ def journal(
     numbers = dict(db.execute(select(JournalEntry.id, JournalEntry.number).where(JournalEntry.id.in_(reversed_by))).all()) if reversed_by else {}
     rows = (
         [
-            e["date"], e["number"], text(e["memo"]), text(e["reference"]), "Fund request" if e["source"] == "fund" else "Manual",
+            e["date"], e["number"], text(e["memo"]), text(e["reference"]), SOURCE_LABELS.get(e["source"], e["source"]),
             text(ln["account"]["code"]), text(ln["account"]["name"]), text(ln["description"]),
             side(settings, ln["debitCentavos"]), side(settings, ln["creditCentavos"]),
             text(e["postedBy"]), numbers.get(e["reversedById"], ""),
@@ -110,7 +113,7 @@ def journal(
 
 @router.get("/accounts/{account_id}/statement.csv")
 def statement(
-    user: CurrentUser,
+    user: permitted("journal.view"),
     db: DB,
     settings: SettingsDep,
     account_id: str,
@@ -135,7 +138,7 @@ def statement(
 
 
 @router.get("/trial-balance.csv")
-def trial_balance_file(user: CurrentUser, db: DB, settings: SettingsDep, until: date | None = Query(None, alias="to")) -> Response:
+def trial_balance_file(user: permitted("journal.view"), db: DB, settings: SettingsDep, until: date | None = Query(None, alias="to")) -> Response:
     tb = trial_balance(user=user, db=db, settings=settings, until=until)
     rows = [
         [
@@ -148,12 +151,12 @@ def trial_balance_file(user: CurrentUser, db: DB, settings: SettingsDep, until: 
     return csv_file(f"trial-balance-{tb['to']}.csv", ["Code", "Account", "Type", "Debit", "Credit"], rows)
 
 
-# --- fund requests -------------------------------------------------------------------------------
+# --- marketing requests --------------------------------------------------------------------------
 
 
 @router.get("/funds.csv")
-def funds(user: CurrentUser, db: DB, settings: SettingsDep, task: Task = "all", q: str | None = Query(None, max_length=100)) -> Response:
-    """The fund requests on one of Finance's lists (all of them by default):
+def funds(user: permitted("funds.view"), db: DB, settings: SettingsDep, task: Task = "all", q: str | None = Query(None, max_length=100)) -> Response:
+    """The marketing requests on one of Finance's lists (all of them by default):
     what was asked, approved, released, spent and settled."""
     items = list_requests(user=user, db=db, settings=settings, task=task, q=q, limit=MAX_ROWS)["items"]
     rows = []
@@ -180,4 +183,4 @@ def funds(user: CurrentUser, db: DB, settings: SettingsDep, task: Task = "all", 
         "Liquidation due", "Total expenses", "Charged to company", "Refund due", "Refund received", "Reimbursement due",
         "Reimbursement paid", "Closed on", "Cancel reason",
     ]
-    return csv_file(f"fund-requests-{task.replace('_', '-')}-{today(settings).isoformat()}.csv", header, rows)
+    return csv_file(f"marketing-requests-{task.replace('_', '-')}-{today(settings).isoformat()}.csv", header, rows)
