@@ -2,17 +2,17 @@
   "_what": "Which folder deploys to which Vercel project (.github/workflows/deploy.yml). Add a line when an app gets a Vercel project; a folder not listed here is never deployed. scope: empty when the projects are on the token owner's own Vercel account; a team's slug when they are in a team.",
   "scope": "",
   "projects": {
-    "nabhi-crm/frontend": "nabhi-crm",
-    "nabhi-crm/backend": "nabhi-crm-backend",
-    "nabhi-inventory/frontend": "nabhi-inventory",
-    "nabhi-inventory/backend": "nabhi-inventory-backend",
-    "nabhi-platform/frontend": "nabhi-platform",
-    "nabhi-platform/backend": "nabhi-platform-backend",
-    "nabhi-finance/frontend": "nabhi-finance",
-    "nabhi-finance/backend": "nabhi-finance-backend",
-    "nabhi-admin/frontend": "nabhi-admin",
-    "nabhi-admin/backend": "nabhi-admin-backend",
-    "nabhi-pharmacy/frontend": "nabhi-pharmacy",
-    "nabhi-pharmacy/backend": "nabhi-pharmacy-backend"
+    "bishnoi-crm/frontend": "nabhi-crm",
+    "bishnoi-crm/backend": "nabhi-crm-backend",
+    "bishnoi-inventory/frontend": "nabhi-inventory",
+    "bishnoi-inventory/backend": "nabhi-inventory-backend",
+    "bishnoi-platform/frontend": "nabhi-platform",
+    "bishnoi-platform/backend": "nabhi-platform-backend",
+    "bishnoi-finance/frontend": "nabhi-finance",
+    "bishnoi-finance/backend": "nabhi-finance-backend",
+    "bishnoi-admin/frontend": "nabhi-admin",
+    "bishnoi-admin/backend": "nabhi-admin-backend",
+    "bishnoi-pharmacy/frontend": "nabhi-pharmacy",
+    "bishnoi-pharmacy/backend": "nabhi-pharmacy-backend"
   }
 }

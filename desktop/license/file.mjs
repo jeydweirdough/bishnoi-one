@@ -1,14 +1,14 @@
-// A company's license, encrypted: the .nabhi file.
+// A company's license, encrypted: the .bishnoi file.
 //
 // Each client company has its own Supabase database. We hand the company two
 // IDs and one file:
 //   - the Company ID (NBH-GETMEDS-01): which company; not a secret;
 //   - the activation key (7KQ4M-2XD9P-...): the secret that opens the file;
-//   - the .nabhi license file: which Nabhi apps the company has, until when,
+//   - the .bishnoi license file: which Bishnoi One apps the company has, until when,
 //     and each app's database connection (with its password) and the Supabase
 //     project address, encrypted with that key.
-// A Nabhi app opens the file with the key once per PC, on activation (store.mjs
-// keeps it for every Nabhi app on that PC). This file is shared with the tool
+// A Bishnoi One app opens the file with the key once per PC, on activation (store.mjs
+// keeps it for every Bishnoi One app on that PC). This file is shared with the tool
 // that issues licenses, so the two always agree.
 //
 // The file is text (JSON). Its header is readable (which company, which apps,
@@ -21,7 +21,9 @@
 
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
 
-export const FORMAT = "nabhi-license";
+export const FORMAT = "bishnoi-license";
+// Files issued before the rename to Bishnoi One say "nabhi-license"; they still open.
+const FORMATS = [FORMAT, "nabhi-license"];
 export const VERSION = 1;
 
 // scrypt: about a quarter of a second and 64 MB per try on a normal PC.
@@ -129,7 +131,7 @@ function headerBytes(h) {
 }
 
 /**
- * Encrypts a company's connection into the text of a .nabhi file.
+ * Encrypts a company's connection into the text of a .bishnoi file.
  * secret: { databases: { crm: "postgresql://...", ... }, supabase?: { url, anonKey } }
  */
 export async function seal({ companyId, companyName, secret, activationKey, validDays = 30, now = new Date() }) {
@@ -163,25 +165,25 @@ export async function seal({ companyId, companyName, secret, activationKey, vali
   return JSON.stringify(file, null, 2) + "\n";
 }
 
-/** The readable header of a .nabhi file, without the key. */
+/** The readable header of a .bishnoi file, without the key. */
 export function readHeader(text) {
   let file;
   try {
     file = JSON.parse(text);
   } catch {
-    throw new LicenseError("This isn't a Nabhi license file.");
+    throw new LicenseError("This isn't a Bishnoi One license file.");
   }
-  if (file?.format !== FORMAT) throw new LicenseError("This isn't a Nabhi license file.");
-  if (file.version !== VERSION) throw new LicenseError("This license file is from a newer Nabhi. Update the Nabhi app to open it.");
+  if (!FORMATS.includes(file?.format)) throw new LicenseError("This isn't a Bishnoi One license file.");
+  if (file.version !== VERSION) throw new LicenseError("This license file is from a newer Bishnoi One. Update the Bishnoi One app to open it.");
   return file;
 }
 
-/** Opens a .nabhi file with its activation key: { header, secret }. */
+/** Opens a .bishnoi file with its activation key: { header, secret }. */
 export async function open(text, activationKey, { now = new Date() } = {}) {
   const file = readHeader(text);
   const key = normalizeKey(activationKey);
   if (file.kdf?.name !== "scrypt" || file.cipher?.name !== "aes-256-gcm") {
-    throw new LicenseError("This license file uses an encryption this Nabhi doesn't know. Update the Nabhi app.");
+    throw new LicenseError("This license file uses an encryption this Bishnoi One doesn't know. Update the Bishnoi One app.");
   }
   const params = { N: file.kdf.N, r: file.kdf.r, p: file.kdf.p, keyLength: KDF.keyLength };
   if (!(params.N >= 2 ** 14 && params.N <= 2 ** 20 && params.r <= 16 && params.p <= 4)) {

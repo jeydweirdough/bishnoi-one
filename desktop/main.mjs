@@ -1,12 +1,12 @@
-// One Nabhi app in a window of its own: `npm run nabhi-crm:app`.
+// One Bishnoi One app in a window of its own: `npm run bishnoi-crm:app`.
 //
 // scripts/run-app.mjs starts the app's API and screens, then this, which waits
 // for the screens to answer and opens them. Each app is a program of its own:
 // its own window, taskbar button, sign-in and saved settings. A link to
-// another Nabhi app opens in that app's window.
+// another Bishnoi One app opens in that app's window.
 //
 // Nothing opens without the company's license. It is set up once per PC, in
-// whichever Nabhi app comes first, and kept for all of them (license/store.mjs):
+// whichever Bishnoi One app comes first, and kept for all of them (license/store.mjs):
 // an app installed later opens with it already, as long as the license
 // includes that app.
 
@@ -23,9 +23,9 @@ import { endedMessage, licenseKeyOf, licensePath, licenseStore } from "./license
 const here = dirname(fileURLToPath(import.meta.url));
 const flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
 
-const folder = flag("nabhi-app");
+const folder = flag("bishnoi-app");
 const me = APPS[folder];
-const SUITE = "Nabhi";
+const SUITE = "Bishnoi One";
 
 let win = null;
 let wanted = null; // the page to open once the screens answer
@@ -39,14 +39,14 @@ const icon = () => {
   return existsSync(file) ? file : undefined;
 };
 
-// The screens title their pages "Customers · Nabhi"; the window says which app.
+// The screens title their pages "Customers · Bishnoi One"; the window says which app.
 const titled = (title) => (title === SUITE ? me.name : title.endsWith(` · ${SUITE}`) ? `${title.slice(0, -SUITE.length)}${me.name}` : title);
 
 // --- whose page is it ------------------------------------------------------------------------
 
 const LOCAL = new Set(["localhost", "127.0.0.1"]);
 
-/** The Nabhi app a page belongs to, or null for anywhere else. */
+/** The Bishnoi One app a page belongs to, or null for anywhere else. */
 function ownerOf(url) {
   try {
     const u = new URL(url);
@@ -58,12 +58,12 @@ function ownerOf(url) {
 }
 
 /**
- * This app's own pages stay in this window. So does signing in with a Nabhi
+ * This app's own pages stay in this window. So does signing in with a Bishnoi One
  * account: the Platform's sign-in page (/go) sends the person straight back here.
  */
 function stays(url) {
   const owner = ownerOf(url);
-  return owner === folder || (owner === "nabhi-platform" && new URL(url).pathname === "/go");
+  return owner === folder || (owner === "bishnoi-platform" && new URL(url).pathname === "/go");
 }
 
 function guard(contents) {
@@ -83,7 +83,7 @@ function guard(contents) {
   });
 }
 
-/** A link that leaves this app: to the other Nabhi app's window, or the browser. */
+/** A link that leaves this app: to the other Bishnoi One app's window, or the browser. */
 async function send(url) {
   const owner = ownerOf(url);
   if (!owner) {
@@ -91,7 +91,7 @@ async function send(url) {
     return;
   }
   if (!(await answers(APPS[owner].port))) return notRunning(owner);
-  spawn(process.execPath, [here, `--nabhi-app=${owner}`, `--nabhi-open=${url}`], { detached: true, stdio: "ignore" }).unref();
+  spawn(process.execPath, [here, `--bishnoi-app=${owner}`, `--bishnoi-open=${url}`], { detached: true, stdio: "ignore" }).unref();
 }
 
 function notRunning(owner) {
@@ -151,7 +151,7 @@ async function checkLicense() {
     return false;
   }
   if (!found.header.apps.includes(licenseKeyOf(folder))) {
-    const has = found.header.apps.map((a) => APPS[`nabhi-${a}`]?.name ?? a).join(", ");
+    const has = found.header.apps.map((a) => APPS[`bishnoi-${a}`]?.name ?? a).join(", ");
     await showLicense("problem", {
       error: `Your company's license doesn't include ${me.name}. It includes: ${has}. Ask your administrator for a license file that adds it, then choose "Use a renewed license file".`,
       header: found.header,
@@ -167,10 +167,10 @@ async function checkLicense() {
 function warnExpiry({ header, state }) {
   dialog.showMessageBox(win, {
     type: "warning",
-    title: "Nabhi license",
+    title: "Bishnoi One license",
     message: state.expired ? "The license has run out" : `The license runs out in ${Math.max(1, Math.ceil(state.days))} days`,
     detail: `Ask your administrator for the renewed license file, then choose Help > Use a renewed license file.${
-      state.expired ? ` Nabhi keeps working until ${state.graceUntil.slice(0, 10)}.` : ""
+      state.expired ? ` Bishnoi One keeps working until ${state.graceUntil.slice(0, 10)}.` : ""
     }`,
   });
 }
@@ -214,11 +214,11 @@ ipcMain.handle("license:remove", (event) => {
 });
 
 async function pickRenewedFile() {
-  const picked = await dialog.showOpenDialog(win, { title: "Renewed license file", filters: [{ name: "Nabhi license file", extensions: ["nabhi", "txt", "json"] }], properties: ["openFile"] });
+  const picked = await dialog.showOpenDialog(win, { title: "Renewed license file", filters: [{ name: "Bishnoi One license file", extensions: ["bishnoi", "nabhi", "txt", "json"] }], properties: ["openFile"] });
   if (picked.canceled || !picked.filePaths[0]) return;
   try {
     const header = await licenses.renew(readFileSync(picked.filePaths[0], "utf8"));
-    await dialog.showMessageBox(win, { message: "License renewed", detail: `Valid until ${header.expiresAt.slice(0, 10)}, for every Nabhi app on this PC.` });
+    await dialog.showMessageBox(win, { message: "License renewed", detail: `Valid until ${header.expiresAt.slice(0, 10)}, for every Bishnoi One app on this PC.` });
     start();
   } catch (e) {
     dialog.showErrorBox("Not renewed", failed(e).error);
@@ -234,7 +234,7 @@ async function confirmRemove() {
     cancelId: 1,
     title: "Remove the license from this PC",
     message: `Remove ${header?.companyName || "the company"}'s license from this PC?`,
-    detail: "Every Nabhi app on this PC stops opening until the license is set up again with the Company ID, the activation key and the license file. Nothing in the company's data changes.",
+    detail: "Every Bishnoi One app on this PC stops opening until the license is set up again with the Company ID, the activation key and the license file. Nothing in the company's data changes.",
   });
   if (answer.response !== 0) return;
   licenses.remove();
@@ -244,13 +244,13 @@ async function confirmRemove() {
 function showLicenseDetails() {
   const header = license?.header ?? licenses.header();
   dialog.showMessageBox(win, {
-    title: "Nabhi license",
+    title: "Bishnoi One license",
     message: header ? companyOf(header) : "No license is set up on this PC yet.",
     detail: header
       ? [
-          `Apps: ${header.apps.map((a) => APPS[`nabhi-${a}`]?.name ?? a).join(", ")}`,
+          `Apps: ${header.apps.map((a) => APPS[`bishnoi-${a}`]?.name ?? a).join(", ")}`,
           `Valid until ${header.expiresAt.slice(0, 10)}`,
-          "Kept for every Nabhi app on this PC, for this Windows account only.",
+          "Kept for every Bishnoi One app on this PC, for this Windows account only.",
         ].join("\n")
       : "",
   });
@@ -284,7 +284,7 @@ function boot() {
     title: me.name,
     icon: icon(),
     backgroundColor: "#eceef2",
-    // The bridge is only for Nabhi's own screens (preload.cjs); the app's screens get nothing.
+    // The bridge is only for Bishnoi One's own screens (preload.cjs); the app's screens get nothing.
     webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.once("ready-to-show", () => win.show());
@@ -303,7 +303,7 @@ function boot() {
     setTimeout(() => open(home()), 0);
   });
   menu();
-  const asked = flag("nabhi-open");
+  const asked = flag("bishnoi-open");
   start(asked && ownerOf(asked) === folder ? asked : home());
 }
 
@@ -330,7 +330,7 @@ function menu() {
         submenu: [{ role: "zoomIn" }, { role: "zoomOut" }, { role: "resetZoom" }, { type: "separator" }, { role: "togglefullscreen" }, { role: "toggleDevTools" }],
       },
       {
-        label: "Nabhi apps",
+        label: "Bishnoi One apps",
         submenu: Object.keys(APPS)
           .filter((f) => f !== folder)
           .map((f) => ({ label: APPS[f].name, click: () => send(webUrl(f)) })),
@@ -348,7 +348,7 @@ function menu() {
               dialog.showMessageBox(win, {
                 title: `About ${me.name}`,
                 message: me.name,
-                detail: `Development copy, run from the repo.\nScreens: ${home()}\nLicensed to: ${companyOf(license?.header) || "not set up yet"}\nSigned-in sessions and settings are kept for this app only; the license is shared by every Nabhi app.`,
+                detail: `Development copy, run from the repo.\nScreens: ${home()}\nLicensed to: ${companyOf(license?.header) || "not set up yet"}\nSigned-in sessions and settings are kept for this app only; the license is shared by every Bishnoi One app.`,
               }),
           },
         ],
@@ -366,12 +366,12 @@ if (!me) {
   // Set before anything is saved, so each app keeps its own sign-in and settings,
   // and so two apps can be open at once (the one-window lock is per folder).
   app.setName(me.name);
-  app.setPath("userData", join(app.getPath("appData"), "Nabhi development", folder));
-  // One license for every Nabhi app, outside any one app's folder.
+  app.setPath("userData", join(app.getPath("appData"), "Bishnoi One development", folder));
+  // One license for every Bishnoi One app, outside any one app's folder.
   licenses = licenseStore(licensePath(app.getPath("appData"), { development: !app.isPackaged }));
-  if (process.platform === "win32") app.setAppUserModelId(`ph.nabhi.${folder.replace("nabhi-", "")}.development`);
+  if (process.platform === "win32") app.setAppUserModelId(`ph.bishnoi.${folder.replace("bishnoi-", "")}.development`);
 
-  if (!app.requestSingleInstanceLock({ open: flag("nabhi-open") })) {
+  if (!app.requestSingleInstanceLock({ open: flag("bishnoi-open") })) {
     app.quit();
   } else {
     // Started again, or a link from another app: bring the window forward, on that page.

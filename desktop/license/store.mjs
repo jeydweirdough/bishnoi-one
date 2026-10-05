@@ -1,8 +1,8 @@
-// The license this PC runs under: kept once, for every Nabhi app.
+// The license this PC runs under: kept once, for every Bishnoi One app.
 //
-// It sits in one place for the Windows account, %APPDATA%\Nabhi\license.json,
+// It sits in one place for the Windows account, %APPDATA%\Bishnoi One\license.json,
 // outside any one app's own folder. So the company's administrator sets it up
-// once, in whichever Nabhi app they install first, and every Nabhi app
+// once, in whichever Bishnoi One app they install first, and every Bishnoi One app
 // installed after it (CRM, Inventory, Pharmacy...) opens with it already.
 //
 // What is kept: the license file exactly as issued (already encrypted), and
@@ -12,7 +12,7 @@
 // and unchanged. A renewed file for the same company replaces the old one and
 // opens with the key already kept.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { LicenseError, normalizeKey, open, readHeader } from "./file.mjs";
 import { lock as defaultLock, unlock as defaultUnlock } from "./protect.mjs";
@@ -107,10 +107,19 @@ export function endedMessage(header) {
   return `The license for ${header.companyName || header.companyId} ran out on ${header.expiresAt.slice(0, 10)}. Ask your administrator for the renewed license file.`;
 }
 
-/** The license file's key for an app folder: nabhi-crm is "crm". */
-export const licenseKeyOf = (folder) => folder.replace(/^nabhi-/, "");
+/** The license file's key for an app folder: bishnoi-crm is "crm". */
+export const licenseKeyOf = (folder) => folder.replace(/^bishnoi-/, "");
 
 /** Where the license is kept for this Windows account. Trying the apps from the repo keeps its own, apart from a real one. */
 export function licensePath(appData, { development }) {
-  return process.env.NABHI_LICENSE_FILE || join(appData, development ? "Nabhi development" : "Nabhi", "license.json");
+  if (process.env.BISHNOI_LICENSE_FILE) return process.env.BISHNOI_LICENSE_FILE;
+  const path = join(appData, development ? "Bishnoi One development" : "Bishnoi One", "license.json");
+  // Kept under "Nabhi" before the rename to Bishnoi One: brought over once, so
+  // a PC already licensed stays licensed. Windows unlocks it the same way.
+  const before = join(appData, development ? "Nabhi development" : "Nabhi", "license.json");
+  if (!existsSync(path) && existsSync(before)) {
+    mkdirSync(dirname(path), { recursive: true });
+    copyFileSync(before, path);
+  }
+  return path;
 }

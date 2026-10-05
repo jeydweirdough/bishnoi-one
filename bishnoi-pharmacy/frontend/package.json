@@ -1,0 +1,28 @@
+{
+  "name": "@bishnoi/pharmacy",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Prescriptions checked and verified, then dispensed from the right batch.",
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "lucide-react": "^1.47.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "sonner": "^2.0.8"
+  },
+  "scripts": {
+    "dev": "next dev --port 4307",
+    "build": "next build",
+    "start": "next start --port 4307",
+    "lint": "eslint"
+  }
+}

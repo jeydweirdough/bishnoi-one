@@ -1,0 +1,32 @@
+[project]
+name = "bishnoi-finance-api"
+version = "0.1.0"
+description = "Bishnoi One Finance API"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "cryptography>=44",
+    "fastapi>=0.141.1",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0",
+    "tzdata>=2026.4",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.uv]
+package = false
+
+# Vercel runs the API from this app object (its settings: Vercel's environment
+# variables). Locally, `uv run main.py` still starts it with reloading.
+[tool.vercel]
+entrypoint = "app.server:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

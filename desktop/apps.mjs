@@ -1,4 +1,4 @@
-// The Nabhi apps that open as a desktop app: what each is called, and where
+// The Bishnoi One apps that open as a desktop app: what each is called, and where
 // its screens run on this PC.
 //
 // The port is read from the app's own frontend/package.json (its dev script),
@@ -15,12 +15,12 @@ export const HOST = "localhost";
 
 // The mark and colour are for the icon (make-icons.mjs), until each app has its own artwork.
 const KNOWN = {
-  "nabhi-admin": { name: "Nabhi Admin", mark: "A", color: "#172233" },
-  "nabhi-crm": { name: "Nabhi CRM", mark: "C", color: "#3a3f9c" },
-  "nabhi-finance": { name: "Nabhi Finance", mark: "F", color: "#1f6f47" },
-  "nabhi-inventory": { name: "Nabhi Inventory", mark: "I", color: "#8a4b0f" },
-  "nabhi-pharmacy": { name: "Nabhi Pharmacy", mark: "Rx", color: "#0f6470" },
-  "nabhi-platform": { name: "Nabhi Platform", mark: "P", color: "#414d60" },
+  "bishnoi-admin": { name: "Bishnoi One Admin", mark: "A", color: "#172233" },
+  "bishnoi-crm": { name: "Bishnoi One CRM", mark: "C", color: "#3a3f9c" },
+  "bishnoi-finance": { name: "Bishnoi One Finance", mark: "F", color: "#1f6f47" },
+  "bishnoi-inventory": { name: "Bishnoi One Inventory", mark: "I", color: "#8a4b0f" },
+  "bishnoi-pharmacy": { name: "Bishnoi One Pharmacy", mark: "Rx", color: "#0f6470" },
+  "bishnoi-platform": { name: "Bishnoi One Platform", mark: "P", color: "#414d60" },
 };
 
 function port(folder) {

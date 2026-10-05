@@ -1,9 +1,9 @@
 # Benchmarks
 
-What every Nabhi app is measured against. Before a feature is designed, built
+What every Bishnoi One app is measured against. Before a feature is designed, built
 or reviewed, in any app, check it here.
 
-Five products are the benchmarks, each for what it does best. Nabhi is built
+Five products are the benchmarks, each for what it does best. Bishnoi One is built
 for **pharma distribution** first (decided 2026-09-25), which is why Veeva is
 one of them:
 

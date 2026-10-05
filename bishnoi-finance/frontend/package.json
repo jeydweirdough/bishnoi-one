@@ -1,0 +1,40 @@
+{
+  "name": "@bishnoi/finance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The money side of a quote.",
+  "exports": {
+    "./module.json": "./module.json",
+    "./actions": "./src/actions.ts",
+    "./screens/approvals": "./src/screens/approvals.tsx",
+    "./screens/letters": "./src/screens/letters.tsx",
+    "./screens/overview": "./src/screens/overview.tsx",
+    "./screens/payments": "./src/screens/payments.tsx",
+    "./components/finance-actions": "./src/components/finance-actions.tsx",
+    "./components/task-list": "./src/components/task-list.tsx",
+    "./components/approvals-bulk": "./src/components/approvals-bulk.tsx",
+    "./bulk-actions": "./src/bulk-actions.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "lucide-react": "^1.47.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "sonner": "^2.0.8"
+  },
+  "scripts": {
+    "dev": "next dev --port 4303",
+    "build": "next build",
+    "start": "next start --port 4303",
+    "lint": "eslint"
+  }
+}

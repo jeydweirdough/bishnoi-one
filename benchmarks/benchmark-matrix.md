@@ -55,7 +55,7 @@ request that changes what it describes.
 | C1 | One timeline any record can have (messages, activities, tracked fields) | Odoo ★ (`mail.thread`) | None. CRM activities link to a company or contact only. | open (proposed ADOPT: P1) |
 | C2 | Typed scheduled activities (type, due, assignee, link, done) | Odoo ★ (`mail.activity`) | CRM partial: kind, due time, done, owner; linked to companies and contacts only. Others: none. | open (proposed ADAPT: CRM's activity on C1's polymorphic link) |
 | C3 | Feed with posts, @mentions and followers | Salesforce ★ (Chatter) | None. Plat has ticket and incident notes. | open |
-| C4 | Structured interaction record (what was detailed, said, and how it landed) | Veeva (pattern) | CRM partial: field visits record an outcome, an amount and a receipt; not products detailed or reaction. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P6 |
+| C4 | Structured interaction record (what was detailed, said, and how it landed) | Veeva (pattern) | **Built 2026-10-01:** a visit records the products discussed in order, each with its key message and the doctor's reaction, and the next visit's objective; Field work sums a month's detailing. Samples given wait for sample management. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P6 |
 | C5 | Call plans with attainment | Veeva (pattern) | CRM partial: monthly field goals and a performance screen; no per-account visit frequency. | **ADOPT** (decided 2026-09-25, ICP: pharma first): P7 |
 
 ## E. Views and reporting
@@ -66,13 +66,13 @@ request that changes what it describes.
 | E2 | Filters stored as data | Odoo ★ (domains) | None: filters live in the URL, not saved. | open (proposed ADOPT with E1) |
 | E3 | Report types: pre-approved joins users filter without SQL | Salesforce ★ | Inv: about 15 dated reports with per-warehouse filters and CSV. Ph: six date-ranged reports. CRM: people and retention reports (CSV). Plat: dashboards. | open (proposed ADAPT: Inventory's report registry as the pattern) |
 | E4 | Documents (PDF) from the same data the screens use | Odoo ★ (QWeb) | None. CRM only accepts uploaded PDFs (guarantee letters). | open |
-| E5 | Receivables outstanding and ageing as a main screen | Marg ★ | CRM partial: what a doctor owes now (field collections); no ageing buckets. Others: none. | **ADOPT** (decided 2026-09-25, D4): a main screen in the Finance app, with invoices and payments |
+| E5 | Receivables outstanding and ageing as a main screen | Marg ★ | **Finance: Invoices → Receivables** (`routers/receivables.py`): what each customer owes on issued invoices, not yet due and 1-30, 31-60, 61-90, over 90 days late; sales invoices numbered from the BIR's ATP series, VAT from the engine, posted to receivables, sales and output VAT; payments posted against them. CRM partial: what a doctor owes now (field collections). | **ADOPT** (decided 2026-09-25, D4): a main screen in the Finance app, with invoices and payments |
 
 ## F. Selling and pricing
 
 | ID | Capability | Reference | Ours today | Decision |
 |---|---|---|---|---|
-| F1 | Pipeline stage separate from forecast category | Salesforce ★ | None: the CRM has no opportunities or deals. | **ADOPT** (decided 2026-09-25, D2): deals on customers, forecast category kept apart from the stage |
+| F1 | Pipeline stage separate from forecast category | Salesforce ★ | **Built 2026-10-01:** deals on customers; each stage gives a probability and a forecast category, which the deal then keeps as its own. Pipeline board and forecast by person (CRM → Deals). | **ADOPTED** (decided 2026-09-25, D2) |
 | F2 | Lead conversion in one transaction | Salesforce ★ | None: a lead is a company status, not its own record. | **SKIP** (decided 2026-09-25, D2): a lead stays a company status; there's no separate Lead record to convert |
 | F3 | Guided path: a checklist per stage on the record | Salesforce ★ | Ph partial: the 10 prescription checks before verifying (fixed in code). Others: none. | open (proposed ADAPT: make checklists data, like Ph's) |
 | F4 | Condition-based pricing: ordered, dated conditions | SAP ★ | CRM: an admin orders the price sources (customer-group price, team price, list price) and the adjustments (volume scale, promo, rep's discount, surcharge), switches each on or off, and adds dated rules; the most specific rule wins. Tax from Finance is the last step and is kept on the quote (Settings → Price rules). Inv, Ph: one price per item. | **ADOPT** (decided 2026-09-25, D4): ordered, dated conditions an admin sets; tax is the last step |

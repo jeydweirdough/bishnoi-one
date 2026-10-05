@@ -2,7 +2,7 @@
 
 Reference notes only. Nothing here is ADOPT until it has a row decision in
 [benchmark-matrix.md](benchmark-matrix.md). Veeva is the fifth benchmark,
-since Nabhi is built for pharma distribution first; see the note at the end.
+since Bishnoi One is built for pharma distribution first; see the note at the end.
 
 ## Salesforce: the metadata platform
 
