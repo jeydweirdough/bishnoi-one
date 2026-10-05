@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { buttonClass } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
+import { DownloadLink } from "../exports/download-link";
 import { ChartEditor, JournalForm, PostingEditor, ReverseButton } from "../ledger/forms";
 import { TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
 
@@ -12,6 +14,12 @@ import { TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Ent
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+const withQuery = (path: string, query: URLSearchParams) => (query.size ? `${path}?${query}` : path);
+
+// The journal shows this many entries; the download has all of them.
+const JOURNAL_LIMIT = 200;
+
+const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
 
 /** Every entry, newest first, with its lines: manual journals and those the fund steps post. */
 export default async function JournalPage({ searchParams }: { searchParams: Search }) {
@@ -19,17 +27,31 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
   const source = one(sp.source);
-  const query = new URLSearchParams({ limit: "200" });
-  if (source === "manual" || source === "fund") query.set("source", source);
+  const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
+  // What the page is showing: kept by the source links, the search form and the download.
+  const shown = new URLSearchParams();
+  if (source === "manual" || source === "fund") shown.set("source", source);
+  if (isDate(from)) shown.set("from", from);
+  if (isDate(to)) shown.set("to", to);
+  if (q) shown.set("q", q);
+  const query = new URLSearchParams(shown);
+  query.set("limit", String(JOURNAL_LIMIT));
   const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
   const filters = [
     { value: "", label: "All" },
     { value: "manual", label: "Manual journals" },
     { value: "fund", label: "Fund requests" },
   ];
+  const sourceHref = (value: string) => {
+    const next = new URLSearchParams(shown);
+    if (value) next.set("source", value);
+    else next.delete("source");
+    return withQuery("/ledger", next);
+  };
+  const searching = shown.has("from") || shown.has("to") || shown.has("q");
   return (
     <>
-      <PageHeader title="Journal entries">
+      <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/ledger/export", shown)} />}>
         All posted entries, newest first. Fund requests post their entries automatically at release, liquidation, refund and reimbursement. Posted entries
         are never edited: reverse an entry and post the correction.
       </PageHeader>
@@ -40,7 +62,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         {filters.map((f) => (
           <Link
             key={f.value}
-            href={f.value ? `/ledger?source=${f.value}` : "/ledger"}
+            href={sourceHref(f.value)}
             aria-current={source === f.value ? "page" : undefined}
             className={`rounded-[3px] border px-3 py-1 text-meta ${source === f.value ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
           >
@@ -48,11 +70,40 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           </Link>
         ))}
       </nav>
+      <form className="mb-4 flex flex-wrap items-end gap-3" action="/ledger" role="search">
+        {shown.has("source") && <input type="hidden" name="source" value={source} />}
+        <label className="text-meta text-ink-2">
+          From
+          <input type="date" name="from" defaultValue={from} className={inputClass} />
+        </label>
+        <label className="text-meta text-ink-2">
+          To
+          <input type="date" name="to" defaultValue={to} className={inputClass} />
+        </label>
+        <label className="text-meta text-ink-2">
+          Search
+          <input type="search" name="q" defaultValue={q} maxLength={100} placeholder="Entry no., memo or reference" className={`${inputClass} w-64`} />
+        </label>
+        <button type="submit" className={buttonClass("default", "sm")}>
+          Show
+        </button>
+        {searching && (
+          <Link href={withQuery("/ledger", new URLSearchParams(shown.has("source") ? { source } : {}))} className="text-meta text-hema hover:underline">
+            Clear
+          </Link>
+        )}
+      </form>
       {entries.items.length === 0 ? (
         <Sheet>
-          <Empty title="No entries yet" icon="lists">
-            Entries appear as cash advances are released and liquidated, or as manual journals are posted.
-          </Empty>
+          {searching ? (
+            <Empty title="No entries match" icon="lists">
+              Try other dates or words, or clear the search.
+            </Empty>
+          ) : (
+            <Empty title="No entries yet" icon="lists">
+              Entries appear as cash advances are released and liquidated, or as manual journals are posted.
+            </Empty>
+          )}
         </Sheet>
       ) : (
         <div className="space-y-3">
@@ -93,6 +144,11 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
               <p className="mt-1 text-meta text-ink-3">Posted by {e.postedBy}</p>
             </Sheet>
           ))}
+          {entries.items.length === JOURNAL_LIMIT && (
+            <p className="px-1 text-meta text-ink-3">
+              Showing the newest {JOURNAL_LIMIT} entries. Pick dates or search to find older ones, or download the CSV for all of them.
+            </p>
+          )}
         </div>
       )}
     </>
@@ -128,7 +184,11 @@ export async function AccountPage({ params, searchParams }: { params: Promise<{ 
   const a = ledger.account;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/ledger/accounts", label: "Chart of accounts" }]} title={`${a.code} · ${a.name}`}>
+      <PageHeader
+        crumbs={[{ href: "/ledger/accounts", label: "Chart of accounts" }]}
+        title={`${a.code} · ${a.name}`}
+        actions={<DownloadLink href={withQuery(`/ledger/accounts/${enc(a.id)}/export`, query)} />}
+      >
         {TYPE_LABELS[a.type as AccountType]} · balance {fmt.peso(ledger.closingCentavos)}
       </PageHeader>
       <form className="mb-4 flex flex-wrap items-end gap-3" action={`/ledger/accounts/${a.id}`}>
@@ -200,7 +260,7 @@ export async function TrialBalancePage({ searchParams }: { searchParams: Search 
   const balanced = tb.debitCentavos === tb.creditCentavos;
   return (
     <>
-      <PageHeader title="Trial balance">
+      <PageHeader title="Trial balance" actions={<DownloadLink href={`/ledger/trial-balance/export?to=${tb.to}`} />}>
         As of {fmt.dateLabel(tb.to)}. {balanced ? "Debits and credits are equal." : "Debits and credits do not agree: review the journal entries."}
       </PageHeader>
       <form className="mb-4 flex items-end gap-3" action="/ledger/trial-balance">

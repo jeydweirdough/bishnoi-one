@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { buttonClass } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
+import { DownloadLink } from "../exports/download-link";
 import { CategoriesEditor } from "../funds/categories-editor";
 import type { Chart } from "../ledger/types";
 import type { ExpenseCategory, FundRequest } from "../funds/types";
@@ -12,28 +14,38 @@ import type { ExpenseCategory, FundRequest } from "../funds/types";
 
 export type FundTask = "to_release" | "to_check" | "to_settle" | "to_liquidate" | "history";
 
-const TASKS: Record<FundTask, { title: string; intro: string; empty: string }> = {
+type Search = Promise<Record<string, string | string[] | undefined>>;
+
+// A list shows this many requests; the download has all of them.
+const LIST_LIMIT = 100;
+
+const TASKS: Record<FundTask, { path: string; title: string; intro: string; empty: string }> = {
   to_release: {
+    path: "/funds",
     title: "For release",
     intro: "Requests approved by the requester's Team Lead in the CRM, oldest first. Release the cash advance, or decline the release with a reason.",
     empty: "No requests for release.",
   },
   to_check: {
+    path: "/funds/review",
     title: "For review",
     intro: "Submitted liquidations, oldest first. Accept or reject each expense, then complete the review.",
     empty: "No liquidations for review.",
   },
   to_settle: {
+    path: "/funds/settlement",
     title: "For settlement",
     intro: "Reviewed liquidations with a balance: a refund due from the employee, or a reimbursement due to them.",
     empty: "Nothing for settlement.",
   },
   to_liquidate: {
+    path: "/funds/outstanding",
     title: "Outstanding",
     intro: "Cash advances released and not yet liquidated. Overdue items first.",
     empty: "No outstanding cash advances.",
   },
   history: {
+    path: "/funds/history",
     title: "History",
     intro: "Settled and cancelled requests, newest first.",
     empty: "No settled or cancelled requests yet.",
@@ -60,22 +72,55 @@ function Amount({ r, fmt }: { r: FundRequest; fmt: Format }) {
   );
 }
 
-export default async function FundsPage({ task }: { task: FundTask }) {
+export default async function FundsPage({ task, searchParams }: { task: FundTask; searchParams: Search }) {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
   const t = TASKS[task];
-  const list = await load<{ items: FundRequest[] }>(`/finance/funds?task=${task}`);
+  const sp = await searchParams;
+  const q = (typeof sp.q === "string" ? sp.q : "").trim().slice(0, 100);
+  const shown = new URLSearchParams({ task });
+  if (q) shown.set("q", q);
+  const list = await load<{ items: FundRequest[] }>(`/finance/funds?${shown}&limit=${LIST_LIMIT}`);
   const items = task === "to_liquidate" ? [...list.items].sort((a, b) => Number(b.overdue) - Number(a.overdue)) : list.items;
   // Where more than one status shares a page, each row says which.
   const mixed = task === "to_settle" || task === "history";
   return (
     <>
-      <PageHeader title={t.title}>{t.intro}</PageHeader>
+      <PageHeader title={t.title} actions={<DownloadLink href={`/funds/export?${shown}`} />}>
+        {t.intro}
+      </PageHeader>
+      <form className="mb-4 flex flex-wrap items-end gap-3" action={t.path} role="search">
+        <label className="text-meta text-ink-2">
+          Search
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            maxLength={100}
+            placeholder="Number, requester, purpose or customer"
+            className="ml-2 h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+          />
+        </label>
+        <button type="submit" className={buttonClass("default", "sm")}>
+          Search
+        </button>
+        {q && (
+          <Link href={t.path} className="text-meta text-hema hover:underline">
+            Clear
+          </Link>
+        )}
+      </form>
       <Sheet>
         {items.length === 0 ? (
-          <Empty title={t.empty} icon="payments">
-            Requests arrive from the CRM once a Team Lead approves them.
-          </Empty>
+          q ? (
+            <Empty title="No requests match" icon="payments">
+              Nothing here matches &ldquo;{q}&rdquo;. Try a request number or the requester&apos;s name.
+            </Empty>
+          ) : (
+            <Empty title={t.empty} icon="payments">
+              Requests arrive from the CRM once a Team Lead approves them.
+            </Empty>
+          )
         ) : (
           <ul className="divide-y divide-rule">
             {items.map((r) => (
@@ -107,6 +152,11 @@ export default async function FundsPage({ task }: { task: FundTask }) {
           </ul>
         )}
       </Sheet>
+      {items.length === LIST_LIMIT && (
+        <p className="mt-2 px-1 text-meta text-ink-3">
+          Showing the first {LIST_LIMIT} requests. Search to narrow the list, or download the CSV for all of them.
+        </p>
+      )}
     </>
   );
 }

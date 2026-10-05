@@ -163,7 +163,8 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
             <ul className="divide-y divide-rule">
               {r.entries.map((e) => (
                 <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 py-2 text-sm">
-                  <a href={`/ledger?source=fund#${e.number}`} className="font-mono text-meta font-semibold text-hema hover:underline">
+                  {/* Found by its number, so it's there however far back it is (the journal shows the newest 200). */}
+                  <a href={`/ledger?q=${encodeURIComponent(e.number)}#${e.number}`} className="font-mono text-meta font-semibold text-hema hover:underline">
                     {e.number}
                   </a>
                   <span className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</span>
