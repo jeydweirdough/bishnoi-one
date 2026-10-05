@@ -1,13 +1,15 @@
-# Nabhi Finance: a guide for the finance team
+# Bishnoi One Finance: a guide for the finance team
 
-This guide explains what Nabhi Finance does today, step by step, in the words
+This guide explains what Finance does today, step by step, in the words
 the screens use. It is for the people who will use it, not for developers.
 
 What Finance covers today:
 
-- **Fund requests (cash advances):** releasing money to employees, checking
+- **Marketing requests (cash advances):** releasing money to employees, checking
   their liquidations receipt by receipt, and settling refunds and
   reimbursements.
+- **Sales invoices:** BIR-numbered invoices, customer payments, and what each
+  customer owes and how late.
 - **Accounting:** a chart of accounts and a journal. Every fund step records
   its own journal entry, so the books stay up to date by themselves.
 - **Tax:** the company's BIR registration and the Philippine VAT rules, used to
@@ -19,25 +21,31 @@ What is **not** in Finance yet is listed at the end.
 
 ## 1. Signing in, and who can do what
 
-Everyone who uses Finance has one of two roles:
+Everyone who uses Finance has a **role**. Finance starts with three:
 
-| | Member | Admin |
-|---|---|---|
-| See every page, request and entry | ✓ | ✓ |
-| Release or decline a cash advance | ✓ | ✓ |
-| Review liquidations, record refunds and reimbursements | ✓ | ✓ |
-| Post a manual journal entry, or reverse an entry | ✓ | ✓ |
-| Work out a sale's tax, download spreadsheets | ✓ | ✓ |
-| Add or change accounts, default accounts and expense categories | | ✓ |
-| Change the company's tax registration, or add a new tax rate | | ✓ |
+| | Auditor | Finance Staff | Administrator |
+|---|---|---|---|
+| See every page, request, invoice and entry; download spreadsheets | ✓ | ✓ | ✓ |
+| Release or decline a cash advance | | ✓ | ✓ |
+| Review liquidations, record refunds and reimbursements | | ✓ | ✓ |
+| Post a manual journal entry, or reverse an entry | | ✓ | ✓ |
+| Make and issue sales invoices, record their payments | | ✓ | ✓ |
+| Void an invoice, set up invoice numbers | | | ✓ |
+| Add or change accounts, default accounts and expense categories | | | ✓ |
+| Change the company's tax registration, or add a new tax rate | | | ✓ |
+| Add people, make roles, read the activity log | Activity log only | | ✓ |
 
-If you sign in with your **Nabhi account**, your role comes from it: a Nabhi
-administrator (or an app admin for Finance) is an Admin here, and everyone else
-is a Member.
+An Administrator can also make **new roles** under **Administration → Roles**,
+ticking exactly what each may do (for example, a Cashier who may only release
+cash). Each person has one role, set under **Administration → Users**.
 
-A **red mark** in the sidebar tells Admins that something still needs setting up
-(a default account, an expense category's account, or the tax registration).
-Until it's set, the step that needs it can't be done.
+If you sign in with your **Bishnoi One account**, your role comes from it: an
+administrator of Finance there is an Administrator here; a role with the same
+name as one of Finance's roles is that role; anyone else is Finance Staff.
+
+A **red mark** in the sidebar tells Administrators that something still needs
+setting up (a default account, an expense category's account, invoice numbers,
+or the tax registration). Until it's set, the step that needs it can't be done.
 
 ---
 
@@ -56,14 +64,14 @@ employees** (money out and not yet accounted for), and of **Due to employees**
 
 ---
 
-## 3. Fund requests, from start to finish
+## 3. Marketing requests, from start to finish
 
 ### Where a request comes from
 
 1. An employee asks for money in the **CRM** (for example, a dinner with a
    doctor's clinic).
 2. Their **Team Lead approves** it in the CRM, for the full amount or less.
-3. The approved request arrives in Finance under **Fund requests → For release**.
+3. The approved request arrives in Finance under **Marketing requests → For release**.
 
 Finance never sees a request that hasn't been approved.
 
@@ -150,9 +158,59 @@ Food, all accepted. **Reimbursement due: ₱500.00.**
 
 ---
 
-## 4. Accounting
+## 4. Sales invoices and receivables
 
-### The entries fund requests make by themselves
+**Invoices** in the sidebar has three pages: **Sales invoices**, **Receivables**
+and **Invoice numbers**.
+
+### Invoice numbers (set up once, by an Administrator)
+
+Invoice numbers come from the BIR's **Authority to Print (ATP)**. On **Invoice
+numbers**, **Add a series** and enter what the ATP says: its number, the date it
+was issued, the first and last number, what is printed before the number (e.g.
+SI-) and how many digits. Once added, only its name can change, and it can be
+switched off. Each series shows how many numbers are left. A **red mark** in
+the sidebar means none are left: no invoice can be issued until a new series is
+added.
+
+### An invoice, from draft to paid
+
+1. **New invoice.** Fill in who it's for (customer, TIN, address; for a senior
+   citizen or PWD, their name and ID number), the items (description, quantity,
+   unit price, discount, VAT category), the invoice date and the payment terms
+   in days (30 by default; 0 for cash on delivery). If the CRM is linked,
+   **Find** a customer there to copy their name, TIN and address.
+   **Save as draft.** A draft can still be edited or deleted.
+2. **Issue the invoice.** It takes the next number from the series, and its
+   amounts and VAT are fixed from then on. An issued invoice is never edited:
+   to correct one, void it and make a new one.
+3. **Record a payment** when the customer pays: the date, amount, how
+   (Cash, Bank transfer, E-wallet or Check) and a reference (deposit slip,
+   check or OR number). It can be paid in parts, but never more than is owed.
+   When it's all paid, the invoice says **Paid in full**.
+4. **Void** (Administrators only), with the reason. A voided invoice keeps its
+   number. An invoice with payments can't be voided until they're taken off
+   (**Take off**, also Administrators only).
+
+### Receivables
+
+What each customer still owes on issued invoices, by how late it is: **Not yet
+due**, **1 to 30**, **31 to 60**, **61 to 90** and **Over 90 days late**, with the
+invoice numbers under each customer.
+
+### The entries invoices make by themselves
+
+| When | Debit | Credit |
+|---|---|---|
+| An invoice is issued | 1100 Accounts receivable (the total) | 4000 Sales (before VAT) and 2200 Output VAT payable (the VAT) |
+| A payment is recorded | Cash / Bank / E-wallet (how it was paid) | 1100 Accounts receivable |
+| An invoice is voided, or a payment taken off | The same entry reversed, dated that day | |
+
+---
+
+## 5. Accounting
+
+### The entries marketing requests make by themselves
 
 | When | Debit | Credit |
 |---|---|---|
@@ -167,7 +225,7 @@ default account isn't set, say), the step doesn't happen either.
 
 ### The starting chart of accounts
 
-Admins can add accounts, rename them, or switch them off. An account that already
+Administrators can add accounts, rename them, or switch them off. An account that already
 has entries keeps its type.
 
 | Code | Account | Type |
@@ -175,9 +233,11 @@ has entries keeps its type.
 | 1000 | Cash on hand | Asset |
 | 1010 | Cash in bank | Asset |
 | 1020 | E-wallet (GCash, Maya) | Asset |
+| 1100 | Accounts receivable | Asset |
 | 1200 | Advances to employees | Asset |
 | 2000 | Accounts payable | Liability |
 | 2100 | Due to employees | Liability |
+| 2200 | Output VAT payable | Liability |
 | 3000 | Owner's equity | Equity |
 | 4000 | Sales | Income |
 | 6100 | Food | Expense |
@@ -191,7 +251,8 @@ has entries keeps its type.
 
 These are the accounts the automatic entries use. At the start: Advances 1200,
 Due to employees 2100, Cash 1000, Bank transfer 1010, E-wallet 1020, and Check
-1010 (checks go through the bank account).
+1010 (checks go through the bank account); for invoices, Receivables 1100, Sales
+4000 and Output VAT 2200.
 
 ### Expense categories (Accounting → Expense categories)
 
@@ -217,7 +278,7 @@ detail and follow their category's account and rule.
   used.
 - **Posted entries are never edited or deleted.** To fix a mistake, **reverse**
   the entry (a new entry with the sides swapped), then post the correct one.
-- Filter by **All / Manual journals / Fund requests**, pick a **From / To** date,
+- Filter by **All / Manual journals / Marketing requests / Invoices**, pick a **From / To** date,
   or **Search** by entry number, memo or reference. The page shows the newest
   200 entries; the download has all of them.
 
@@ -230,7 +291,7 @@ detail and follow their category's account and rule.
 
 ### Downloading to Excel
 
-The Journal entries, account ledger, Trial balance and every Fund requests list
+The Journal entries, account ledger, Trial balance and every Marketing requests list
 have a **Download CSV** button. The file opens in Excel and contains what the
 page shows, with the same dates, filters and search, and **every** row, not just
 the first page:
@@ -238,19 +299,19 @@ the first page:
 - Amounts are plain numbers (1234.50, or -500.00 when negative), so Excel can
   add them up.
 - Text that Excel might mistake for a formula is shown exactly as typed.
-- The fund requests file has each request's approved, released, spent, refund
+- The marketing requests file has each request's approved, released, spent, refund
   and reimbursement amounts, and its dates.
 
 ---
 
-## 5. Tax
+## 6. Tax
 
 **Tax** in the sidebar has three tabs:
 
 - **Registration:** the company's registered name (exactly as on the BIR
   Certificate of Registration), trade name, TIN with its branch code (00000 for
   the head office), registered address, whether the company is VAT-registered,
-  and whether catalogue prices already include VAT. Admins fill this in once
+  and whether catalogue prices already include VAT. Administrators fill this in once
   (**Save registration**). Every Sales Invoice needs it.
 - **Rates:** each tax's rate by date. A change in the law is entered as a new
   rate from its first day, with the law or circular behind it. A sale is always
@@ -278,32 +339,30 @@ connected.
 
 ---
 
-## 6. Not in Finance yet
+## 7. Not in Finance yet
 
 - **Quote approvals, guarantee letter checks and letter payments** (DSWD, PCSO,
   and others) are done in the **CRM** today, by each team's **Team Lead**, not by
   Finance.
-- **Invoices, customer payments and receivables ageing:** planned as Finance's
-  next step.
 - **Supplier bills and payments** (accounts payable), **bank reconciliation**, and
   **separate books for 2mg Incorporated and Getmeds Philippines Inc.**: not
   started.
 
 ---
 
-## 7. Tell us if this doesn't match how you work
+## 8. Tell us if this doesn't match how you work
 
 Some choices are built in today but can change. Please tell us:
 
-1. **Who may do what.** Today any Finance member can release money, review the
-   same liquidation, and record the refund. Should releasing and reviewing be
-   done by different people?
+1. **Who may do what.** Finance Staff can release money, review the same
+   liquidation and record its refund. Roles can split these between people
+   (a Cashier who only releases, say). Should they be split, and how?
 2. **The liquidation period.** Receipts are due one week after release unless
    you pick another date. Is one week right?
 3. **Accounts and categories.** Do the starting accounts, codes and expense
    categories above match your own chart of accounts?
-4. **Reversing fund entries.** Today an entry a fund request made can be
-   reversed from the journal, like any other. Should those only change through
-   the request itself?
-5. **Anything you do outside Nabhi today** (spreadsheets, forms, reports) that
+4. **Reversing automatic entries.** Today an entry a marketing request made
+   can be reversed from the journal, like any other. Should those only change
+   through the request itself?
+5. **Anything you do outside Bishnoi One today** (spreadsheets, forms, reports) that
    you would like it to do instead.
