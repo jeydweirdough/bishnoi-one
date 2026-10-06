@@ -57,7 +57,7 @@ def get_settings_dep(request: Request, tenant: Annotated[Tenant, Depends(current
 
         overrides["org_name"] = standing(base, tenant.slug).name or tenant.slug
     if row is not None:
-        found = {"org_name": row.org_name, "org_currency": row.currency, "org_locale": row.locale, "org_timezone": row.timezone}
+        found = {"org_name": row.org_name, "org_currency": row.currency, "org_locale": row.locale, "org_timezone": row.timezone, "terms": row.terms}
         overrides |= {k: v for k, v in found.items() if v}
     return base.model_copy(update=overrides)
 

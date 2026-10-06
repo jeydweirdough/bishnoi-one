@@ -35,6 +35,8 @@ import { saveForm, type SectionDraft } from "../../actions/settings";
 import { ChipsInput } from "../admin/chips-input";
 import { Select as AntSelect } from "antd";
 import { TeamsFor, type TeamName } from "../admin/teams-for";
+import { useTerms } from "@/src/components/terms/provider";
+import type { Terms } from "@/src/components/terms/terms";
 
 // The form editor (Settings → Forms), laid out like Zoho's: the kinds of field
 // on the left, the form itself in the middle, the picked field's properties on
@@ -54,11 +56,12 @@ const KINDS: Kind[] = [
   { type: "phone", label: "Phone", icon: <Phone className="size-4" /> },
   { type: "url", label: "URL", icon: <Link2 className="size-4" /> },
   { type: "products", label: "Our products", icon: <Package className="size-4" /> },
-  { type: "molecule", label: "Molecule", icon: <FlaskConical className="size-4" /> },
+  { type: "molecule", label: "Product family", icon: <FlaskConical className="size-4" /> },
   { type: "customer", label: "Another customer", icon: <Building2 className="size-4" /> },
 ];
 const BUILT_IN_KINDS: Record<string, string> = { status: "Customer type", owner: "Owner", company: "Customer" };
-const kindLabel = (t: string) => KINDS.find((k) => k.type === t)?.label ?? BUILT_IN_KINDS[t] ?? t;
+// "molecule" is named in the company's own word (Settings → Terms): Molecule at GetMeds.
+const kindLabel = (t: string, words?: Terms) => (t === "molecule" && words ? words.genericName : KINDS.find((k) => k.type === t)?.label ?? BUILT_IN_KINDS[t] ?? t);
 const kindIcon = (t: string) => KINDS.find((k) => k.type === t)?.icon ?? <Lock className="size-4" />;
 
 /** What's fixed on a form and not the editor's to move. */
@@ -87,6 +90,7 @@ export function FormEditor({
   /** The customer types, for "Which customer types" (customers' form only). */
   kinds?: TeamName[];
 }) {
+  const terms = useTerms();
   const router = useRouter();
   const [saved, setSaved] = useState(() => fromLayout(layout));
   const [sections, setSections] = useState<S[]>(saved);
@@ -100,7 +104,7 @@ export function FormEditor({
   const update = (fn: (all: S[]) => S[]) => setSections((all) => fn(structuredClone(all)));
 
   function newField(type: string): F {
-    const label = `New ${kindLabel(type).toLowerCase()}`;
+    const label = `New ${kindLabel(type, terms).toLowerCase()}`;
     const taken = new Set(sections.flatMap((s) => s.fields.map((f) => f.label.toLowerCase())));
     let name = label;
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${label} ${n}`;
@@ -207,10 +211,10 @@ export function FormEditor({
                 onDragStart={() => setDragging({ kind: k.type })}
                 onDragEnd={() => setDragging(null)}
                 onClick={() => add(k.type)}
-                className="flex w-full cursor-grab items-center gap-2 rounded-[6px] border border-transparent px-2 py-1.5 text-left text-sm text-ink-2 hover:border-rule-strong hover:bg-bench hover:text-ink"
+                className="flex w-full cursor-grab items-center gap-2 rounded-[14px] border border-transparent px-2 py-1.5 text-left text-sm text-ink-2 hover:border-rule-strong hover:bg-bench hover:text-ink"
               >
                 <span className="text-ink-3">{k.icon}</span>
-                {k.label}
+                {kindLabel(k.type, terms)}
               </button>
             </li>
           ))}
@@ -244,13 +248,13 @@ export function FormEditor({
                 onChange={(e) => update((all) => ((all[i].title = e.target.value), all))}
                 className="min-w-0 flex-1 border-0 border-b border-transparent bg-transparent px-0 text-sm font-semibold text-ink hover:border-rule focus:border-hema focus:outline-none"
               />
-              <span className="inline-flex rounded-[6px] border border-rule-strong p-0.5 text-meta">
+              <span className="inline-flex rounded-[14px] border border-rule-strong p-0.5 text-meta">
                 {([1, 2] as const).map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => update((all) => ((all[i].columns = c), all))}
-                    className={`rounded-[4px] px-2 py-0.5 ${s.columns === c ? "bg-hema-tint font-semibold text-ink" : "text-ink-2"}`}
+                    className={`rounded-full px-2 py-0.5 ${s.columns === c ? "bg-hema-tint font-semibold text-ink" : "text-ink-2"}`}
                   >
                     {c} column{c === 2 ? "s" : ""}
                   </button>
@@ -275,7 +279,7 @@ export function FormEditor({
               </IconButton>
             </div>
             <ul
-              className={`mt-3 grid min-h-14 gap-2 ${s.columns === 2 ? "sm:grid-cols-2" : ""} rounded-[6px] ${dragging ? "outline-1 outline-offset-4 outline-rule-strong outline-dashed" : ""}`}
+              className={`mt-3 grid min-h-14 gap-2 ${s.columns === 2 ? "sm:grid-cols-2" : ""} rounded-[14px] ${dragging ? "outline-1 outline-offset-4 outline-rule-strong outline-dashed" : ""}`}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -299,7 +303,7 @@ export function FormEditor({
                     place(s.uid, f.uid);
                   }}
                   onClick={() => setPicked(f.uid)}
-                  className={`group flex cursor-pointer items-center gap-2 rounded-[6px] border px-2.5 py-2 text-sm ${
+                  className={`group flex cursor-pointer items-center gap-2 rounded-[14px] border px-2.5 py-2 text-sm ${
                     picked === f.uid ? "border-hema bg-hema-tint" : "border-rule-strong bg-sheet hover:border-hema"
                   } ${f.hidden ? "opacity-50" : ""} ${(f.type === "long_text" || f.type === "multi_choice") && s.columns === 2 ? "sm:col-span-2" : ""}`}
                 >
@@ -311,7 +315,7 @@ export function FormEditor({
                   </span>
                   {f.hidden && <EyeOff className="size-3.5 shrink-0 text-ink-3" aria-label="Hidden" />}
                   {f.standard && <Lock className="size-3.5 shrink-0 text-ink-3" aria-label="Built in" />}
-                  <span className="hidden shrink-0 text-meta text-ink-3 xl:inline">{kindLabel(f.type)}</span>
+                  <span className="hidden shrink-0 text-meta text-ink-3 xl:inline">{kindLabel(f.type, terms)}</span>
                 </li>
               ))}
             </ul>
@@ -346,7 +350,7 @@ export function FormEditor({
 
 function FixedBlock({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-[6px] border border-dashed border-rule-strong bg-bench/60 px-4 py-3 text-meta text-ink-3">
+    <div className="flex items-center gap-2 rounded-[14px] border border-dashed border-rule-strong bg-bench/60 px-4 py-3 text-meta text-ink-3">
       <Lock className="size-3.5 shrink-0" aria-hidden />
       {text}
     </div>
@@ -355,7 +359,7 @@ function FixedBlock({ text }: { text: string }) {
 
 function IconButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-ink disabled:opacity-30">
+    <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-ink disabled:opacity-30">
       {children}
     </button>
   );
@@ -408,6 +412,7 @@ function Properties({
   kinds: TeamName[];
   entity: CustomEntity;
 }) {
+  const terms = useTerms();
   const f = field;
   const withOptions = f.type === "choice" || f.type === "multi_choice";
   const box = (label: string, value: boolean, set: (v: boolean) => void, disabled = false, note?: string) => (
@@ -424,7 +429,7 @@ function Properties({
       <div>
         <p className="text-caps font-semibold text-ink-3 uppercase">{f.standard ? "Built-in field" : "Added field"}</p>
         <p className="mt-0.5 flex items-center gap-1.5 text-meta text-ink-2">
-          {kindIcon(f.type)} {kindLabel(f.type)}
+          {kindIcon(f.type)} {kindLabel(f.type, terms)}
         </p>
       </div>
       <Field label="Name">{(p) => <Input {...p} value={f.label} onChange={(e) => onChange({ label: e.target.value })} maxLength={80} />}</Field>
@@ -459,7 +464,7 @@ function Properties({
             options={kinds.map((k) => ({ value: k.id, label: k.name }))}
             showSearch={{ optionFilterProp: "label" }}
           />
-          <p className="text-meta text-ink-3">E.g. a doctor&apos;s hospital: Hospital, Cancer center. Its page lists who points at it.</p>
+          <p className="text-meta text-ink-3">E.g. a contact&apos;s organization: Head office, Branch. Its page lists who points at it.</p>
         </div>
       )}
       {f.type === "products" && (
@@ -496,7 +501,7 @@ function Properties({
             onChange={(onlyTypes, exceptTypes) => onChange({ onlyTypes, exceptTypes })}
             notes={{
               everyone: "Asked of every kind of customer.",
-              only: "Asked only of these kinds of customer (a doctor's profile, say).",
+              only: "Asked only of these kinds of customer (an individual's profile, say).",
               except: "Not asked of these kinds of customer.",
               placeholder: "Pick customer types",
             }}

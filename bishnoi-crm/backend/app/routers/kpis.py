@@ -12,6 +12,8 @@
 
 from datetime import date
 from typing import Annotated, Literal
+from app.pricing import sales_settings
+from app.terms import terms_of
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
@@ -42,6 +44,12 @@ def period_of(month: str, settings: Settings) -> Period:
     return Period(month=month, start=start, end=end, first_day=f"{month}-01", next_first_day=after.isoformat())
 
 
+def worded(db: Session, text: str) -> str:
+    """A measure's words in the company's own: "Accounts visited" is "Doctors visited" at GetMeds."""
+    many = terms_of(sales_settings(db).terms)["visited"]["many"]
+    return text.replace("Accounts", many).replace("accounts", many.lower())
+
+
 def kpi_out(db: Session, k: Kpi, roles: dict[str, str]) -> dict:
     measure = MEASURES.get(k.measure)
     flt = next(iter((k.filters or {}).items()), None)
@@ -58,7 +66,7 @@ def kpi_out(db: Session, k: Kpi, roles: dict[str, str]) -> dict:
         "name": k.name,
         "description": k.description,
         "measure": k.measure,
-        "measureLabel": measure.label if measure else "Entered by hand",
+        "measureLabel": worded(db, measure.label) if measure else "Entered by hand",
         "filters": k.filters or {},
         "filterLabel": flt_label,
         "unit": unit_of(k),
@@ -93,7 +101,7 @@ def list_kpis(me: CurrentUser, access: CurrentAccess, db: DB, everything: bool =
     roles = role_names(db)
     return {
         "items": [kpi_out(db, k, roles) for k in all_kpis(db, active_only=not everything)],
-        "measures": [{"key": key, "label": m.label, "unit": m.unit, "about": m.about, "filter": m.filter} for key, m in MEASURES.items()],
+        "measures": [{"key": key, "label": worded(db, m.label), "unit": m.unit, "about": worded(db, m.about), "filter": m.filter} for key, m in MEASURES.items()],
         "filterChoices": {key: list(values) for key, values in FILTER_CHOICES.items()},
         "roles": [{"id": i, "name": n} for i, n in sorted(roles.items(), key=lambda r: r[1].lower())],
     }

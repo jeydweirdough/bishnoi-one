@@ -17,8 +17,14 @@ HERE = {"latitude": 14.5547, "longitude": 121.0244, "accuracyM": 15}
 @pytest.fixture
 def field(app, client, ana) -> dict[str, dict]:
     """North: Fay and Finn (field agents) and Lia (their Team Lead). South: Sol
-    (field agent). Ana is the Administrator."""
+    (field agent). Ana is the Administrator. The company works as GetMeds does:
+    its field agents visit doctors (Settings → Terms, the Doctor type on)."""
     with app.state.sessions() as db:
+        from app.pricing import sales_settings
+        from app.terms import PHARMA
+
+        db.scalar(select(CustomerType).where(CustomerType.code == "doctor")).is_active = True
+        sales_settings(db).terms = dict(PHARMA)
         north, south = Team(name="North"), Team(name="South")
         db.add_all([north, south])
         db.flush()

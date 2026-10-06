@@ -52,6 +52,16 @@ def own_box(db, user_id: str, box_id: str) -> Mailbox:
     return box
 
 
+@router.get("/mailbox/detect")
+def detect_mailbox(me: CurrentUser, db: DB, settings: SettingsDep, address: str = Query(min_length=3, max_length=254)) -> dict:
+    """What connecting this address takes (app/mailbox.py detect): a sign-in, or a password."""
+    try:
+        clean = email_address(address)
+    except ValueError as e:
+        raise field_error("address", str(e)) from None
+    return {"address": clean, **mb.detect(db, settings, clean)}
+
+
 class StartIn(Api):
     provider: Literal["gmail", "outlook", "zoho_mail"]
 

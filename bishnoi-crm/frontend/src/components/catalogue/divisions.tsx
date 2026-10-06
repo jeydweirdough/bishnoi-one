@@ -14,7 +14,7 @@ export function DivisionTags({ teams }: { teams: DivisionOption[] }) {
   return (
     <span className="inline-flex flex-wrap gap-1">
       {teams.map((t) => (
-        <span key={t.id} className="inline-flex h-5 items-center rounded-[4px] border border-rule-strong px-1.5 text-stamp text-ink-2 uppercase">
+        <span key={t.id} className="inline-flex h-6 items-center rounded-full border border-ink px-2.5 text-meta font-medium whitespace-nowrap text-ink">
           {t.name}
         </span>
       ))}
@@ -49,7 +49,7 @@ export function DivisionPicker({
           {options.map((o) => (
             <label
               key={o.id}
-              className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
+              className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-[14px] border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
             >
               <input
                 type="checkbox"

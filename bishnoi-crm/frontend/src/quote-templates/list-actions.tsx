@@ -28,7 +28,7 @@ export function NewTemplate() {
   }
 
   const option = (value: "form" | "excel", title: string, body: string, icon: React.ReactNode) => (
-    <label className="flex cursor-pointer gap-3 rounded-[6px] border border-rule-strong p-3 has-checked:border-hema has-checked:bg-hema-tint">
+    <label className="flex cursor-pointer gap-3 rounded-[14px] border border-rule-strong p-3 has-checked:border-hema has-checked:bg-hema-tint">
       <input type="radio" name="kind" value={value} checked={kind === value} onChange={() => setKind(value)} className="mt-1 accent-hema" />
       <span className="text-ink-3">{icon}</span>
       <span>
@@ -43,7 +43,7 @@ export function NewTemplate() {
       <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => (setError(null), dialog.current?.showModal())}>
         New template
       </Button>
-      <dialog ref={dialog} className="m-auto w-full max-w-lg rounded-[4px] bg-sheet p-0 shadow-xl backdrop:bg-black/30">
+      <dialog ref={dialog} className="m-auto w-full max-w-lg rounded-full bg-sheet p-0 shadow-xl backdrop:bg-black/30">
         <form
           onSubmit={(e) => {
             e.preventDefault();

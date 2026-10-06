@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its staff, sessions and the platform's records.
     database_url: str = f"sqlite:///{(DATA_DIR / 'platform.db').as_posix()}"
+    # The online database (Neon) that `python -m app.tools.copy_database backup`
+    # copies into .data/backups/ each night. Unset: DATABASE_URL itself.
+    backup_from: str | None = None
     # The first Platform Admin, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + a database it
     # can reach and you can't). Once anyone exists these are ignored; remove the

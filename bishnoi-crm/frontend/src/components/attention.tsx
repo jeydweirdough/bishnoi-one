@@ -48,23 +48,22 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
   }
 
   return (
-    <section aria-labelledby="attention" className="mb-5 rounded-sheet border border-rule bg-sheet shadow-sheet">
-      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
+    <section aria-labelledby="attention" className="mb-5 rounded-[28px] bg-mint">
+      <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-2">
         <h2 id="attention" className="flex items-center gap-2 text-heading text-ink">
-          <CircleAlert className="size-[1.125rem] text-ink-3" aria-hidden />
-          Needs your attention
+                    Needs your attention
         </h2>
-        <span className="text-meta text-ink-3">{left.length === 1 ? "1 thing" : `${left.length} things`}</span>
+        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border-[1.5px] border-ink bg-sheet px-2 text-meta font-semibold text-ink" aria-label={left.length === 1 ? "1 thing" : `${left.length} things`}>{left.length}</span>
       </div>
-      <ul className="divide-y divide-rule">
+      <ul className="mx-6 divide-y divide-mint-2">
         {shown.map((p) => (
-          <li key={p.key} className="flex items-start gap-3 px-5 py-3">
-            <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-bench text-ink-2">{ICONS[p.kind] ?? <CircleAlert className="size-4" aria-hidden />}</span>
+          <li key={p.key} className="flex items-start gap-3.5 py-3.5">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full border-[1.5px] border-ink bg-sheet text-ink">{ICONS[p.kind] ?? <CircleAlert className="size-4" aria-hidden />}</span>
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-ink">{p.title}</p>
+              <p className="font-semibold text-ink">{p.title}</p>
               <p className="text-meta text-ink-3">{p.reason}</p>
             </div>
-            <Link href={p.href} className="shrink-0 self-center rounded-[6px] border border-rule px-3 py-1 text-sm text-ink hover:border-ink-3">
+            <Link href={p.href} className="shrink-0 self-center rounded-full border border-ink bg-sheet px-3.5 py-1 text-sm font-medium text-ink hover:bg-sage/40">
               {p.action}
             </Link>
             <Dropdown
@@ -85,7 +84,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
         ))}
       </ul>
       {left.length > SHOWN && (
-        <button type="button" onClick={() => setAll(!all)} className="w-full border-t border-rule px-5 py-2.5 text-left text-meta text-ink-2 hover:text-ink">
+        <button type="button" onClick={() => setAll(!all)} className="w-full border-t border-mint-2 px-6 py-3 text-left text-meta font-medium text-ink-2 hover:text-ink">
           {all ? "Show the top five" : `See all ${left.length}`}
         </button>
       )}

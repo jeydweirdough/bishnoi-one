@@ -155,7 +155,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
         </p>
       )}
       {roles.length > 1 && (
-        <div className="inline-flex flex-wrap gap-1 rounded-[4px] border border-rule bg-sheet p-1" role="tablist" aria-label="Role">
+        <div className="inline-flex flex-wrap gap-1 rounded-full border border-rule bg-sheet p-1" role="tablist" aria-label="Role">
           {roles.map((r) => (
             <button
               key={r.id}
@@ -163,7 +163,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
               role="tab"
               aria-selected={r.id === role}
               onClick={() => setRole(r.id)}
-              className={`rounded-[6px] px-3 py-1.5 text-meta ${r.id === role ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:bg-bench"}`}
+              className={`rounded-[14px] px-3 py-1.5 text-meta ${r.id === role ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:bg-bench"}`}
             >
               {r.name} · {r.people}
             </button>

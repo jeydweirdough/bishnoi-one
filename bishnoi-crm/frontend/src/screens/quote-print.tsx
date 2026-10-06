@@ -48,7 +48,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
           Back to the quote
         </LinkButton>
         {choices.length > 1 && (
-          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-[6px] border border-rule-strong bg-sheet p-0.5">
+          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-[14px] border border-rule-strong bg-sheet p-0.5">
             {choices.map((c) => {
               const on = (template?.id ?? "standard") === c.id;
               return (
@@ -56,7 +56,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
                   key={c.id}
                   href={`/print/quotes/${id}?template=${c.id}`}
                   aria-current={on ? "page" : undefined}
-                  className={`rounded-[4px] px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:text-ink"}`}
+                  className={`rounded-full px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:text-ink"}`}
                 >
                   {c.name}
                   {c.kind === "excel" ? " (Excel)" : ""}
@@ -77,7 +77,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
       </div>
 
       {doc && template?.kind === "excel" ? (
-        <section className="mx-auto my-8 max-w-[210mm] rounded-[4px] bg-sheet px-6 py-5 shadow-sm">
+        <section className="mx-auto my-8 max-w-[210mm] rounded-full bg-sheet px-6 py-5 shadow-sm">
           <h1 className="text-heading text-ink">{doc.template.name}</h1>
           <p className="mt-1 text-sm text-ink-2">
             This quotation is your Excel form, filled in: control no. <strong>{doc.controlNumber}</strong>, {doc.lines.length}{" "}
@@ -88,7 +88,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
             <FileSpreadsheet className="size-4" aria-hidden />
             Download Excel
           </a>
-          <p className="mt-3 text-meta text-ink-3">Open it in Excel to print it or save it as PDF before sending it to the patient.</p>
+          <p className="mt-3 text-meta text-ink-3">Open it in Excel to print it or save it as PDF before sending it to the customer.</p>
         </section>
       ) : doc ? (
         <article className={paper}>

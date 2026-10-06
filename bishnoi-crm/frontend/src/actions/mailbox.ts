@@ -16,6 +16,20 @@ export type MailboxInfo = {
   providers: { key: "gmail" | "outlook" | "zoho_mail"; name: string; ready: boolean }[];
 };
 
+/** What connecting an address takes: a sign-in button, or a password with the server already known. */
+export type MailboxDetect = {
+  address: string;
+  provider: string | null;
+  name: string;
+  signIn: "gmail" | "outlook" | "zoho_mail" | null;
+  smtp: { host: string; port: number; security: "starttls" | "ssl" | "none"; guessed: boolean };
+  help: { url: string; steps: string[] } | null;
+};
+
+export async function detectMailbox(address: string): Promise<Result<MailboxDetect>> {
+  return attempt(() => api.get<MailboxDetect>(`/mailbox/detect?address=${encodeURIComponent(address)}`));
+}
+
 /** Where to send the person to sign in with their provider. */
 export async function startMailbox(provider: "gmail" | "outlook" | "zoho_mail"): Promise<Result<{ url: string }>> {
   return attempt(() => api.post<{ url: string }>("/mailbox/start", { provider }));

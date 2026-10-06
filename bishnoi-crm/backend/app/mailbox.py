@@ -181,8 +181,10 @@ def connect_smtp(db: Session, settings: Settings, user_id: str, d: dict) -> Mail
     try:
         with _smtp(d["host"], d["port"], d["security"]) as server:
             server.login(d["username"], d["password"])
+    except smtplib.SMTPAuthenticationError:
+        raise MailboxError("That password didn't work. Gmail, Outlook, Zoho and Yahoo need an app password, not your usual one: follow the steps above to make one.") from None
     except (OSError, smtplib.SMTPException) as e:
-        raise MailboxError(f"Couldn't sign in to {d['host']} ({type(e).__name__}). Check the server, port, user name and password.") from None
+        raise MailboxError(f"Couldn't reach {d['host']} ({type(e).__name__}). Check your provider's settings, or ask your IT for them.") from None
     box = account(db, user_id, d["address"])
     box.provider, box.address, box.last_error = "smtp", d["address"], None
     box.values = {"host": d["host"], "port": d["port"], "security": d["security"], "username": d["username"]}
@@ -198,6 +200,125 @@ def _smtp(host: str, port: int, security: str):
     if security == "starttls":
         server.starttls()
     return server
+
+
+# --- working out a person's provider from their address ---------------------------------------
+#
+# So connecting a mailbox is one field: the address. Known addresses (gmail.com,
+# outlook.com…) are recognised by their domain; a company's own domain by where
+# its mail goes (its MX records: Google Workspace, Microsoft 365, Zoho). The
+# server settings come with it, so the person only gives a password.
+
+
+@dataclass(frozen=True)
+class Preset:
+    key: str
+    name: str
+    oauth: str | None  # the provider key to sign in with (PROVIDERS), when there is one
+    host: str
+    port: int
+    security: str
+    help_url: str
+    steps: tuple[str, ...]
+
+
+PRESETS = {
+    "google": Preset(
+        "google", "Google", "gmail", "smtp.gmail.com", 587, "starttls", "https://myaccount.google.com/apppasswords",
+        ("Open your Google account's App passwords page (the link below). Google asks for 2-Step Verification first if it's off.",
+         "Name it Bishnoi One CRM and press Create.", "Copy the 16-letter password Google shows, and paste it here."),
+    ),
+    "microsoft": Preset(
+        "microsoft", "Microsoft 365", "outlook", "smtp.office365.com", 587, "starttls", "https://mysignins.microsoft.com/security-info",
+        ("Open your Microsoft account's security info (the link below).", "Add a method: App password, and name it Bishnoi One CRM.",
+         "Copy the password it shows, and paste it here. If App password isn't offered, ask your IT to allow SMTP sending for your mailbox."),
+    ),
+    "outlook": Preset(
+        "outlook", "Outlook.com", "outlook", "smtp-mail.outlook.com", 587, "starttls", "https://account.live.com/proofs/AppPassword",
+        ("Open your Microsoft account's app passwords (the link below). It asks for two-step verification first if it's off.",
+         "Create a new app password.", "Copy it, and paste it here."),
+    ),
+    "zoho": Preset(
+        "zoho", "Zoho Mail", "zoho_mail", "smtp.zoho.com", 465, "ssl", "https://accounts.zoho.com/home#security/app_password",
+        ("Open Zoho's App passwords (the link below).", "Generate a new password, named Bishnoi One CRM.", "Copy it, and paste it here."),
+    ),
+    "zoho_in": Preset(
+        "zoho_in", "Zoho Mail", "zoho_mail", "smtp.zoho.in", 465, "ssl", "https://accounts.zoho.in/home#security/app_password",
+        ("Open Zoho's App passwords (the link below).", "Generate a new password, named Bishnoi One CRM.", "Copy it, and paste it here."),
+    ),
+    # A company's own domain on Zoho (Zoho Workplace): its own sending server.
+    "zoho_pro": Preset(
+        "zoho_pro", "Zoho Mail", "zoho_mail", "smtppro.zoho.com", 465, "ssl", "https://accounts.zoho.com/home#security/app_password",
+        ("Open Zoho's App passwords (the link below). Zoho asks you to turn on two-factor sign-in first if it's off.",
+         "Generate a new password, named Bishnoi One CRM.", "Copy it, and paste it here."),
+    ),
+    "zoho_pro_in": Preset(
+        "zoho_pro_in", "Zoho Mail", "zoho_mail", "smtppro.zoho.in", 465, "ssl", "https://accounts.zoho.in/home#security/app_password",
+        ("Open Zoho's App passwords (the link below). Zoho asks you to turn on two-factor sign-in first if it's off.",
+         "Generate a new password, named Bishnoi One CRM.", "Copy it, and paste it here."),
+    ),
+    "yahoo": Preset(
+        "yahoo", "Yahoo Mail", None, "smtp.mail.yahoo.com", 465, "ssl", "https://login.yahoo.com/myaccount/security/app-password",
+        ("Open Yahoo's App passwords (the link below).", "Generate one named Bishnoi One CRM.", "Copy it, and paste it here."),
+    ),
+}
+
+DOMAINS = {
+    "gmail.com": "google", "googlemail.com": "google",
+    "outlook.com": "outlook", "hotmail.com": "outlook", "live.com": "outlook", "msn.com": "outlook",
+    "zoho.com": "zoho", "zohomail.com": "zoho", "zoho.in": "zoho_in", "zohomail.in": "zoho_in",
+    "yahoo.com": "yahoo", "ymail.com": "yahoo", "yahoo.com.ph": "yahoo",
+}
+MX_HINTS = (("google.com", "google"), ("googlemail.com", "google"), ("outlook.com", "microsoft"), ("zoho.in", "zoho_pro_in"), ("zoho.com", "zoho_pro"), ("zoho.eu", "zoho_pro"), ("yahoodns.net", "yahoo"))
+
+
+_MX_SEEN: dict[str, str | None] = {}
+
+
+def _mx_hosts(domain: str) -> str | None:
+    """The domain's mail servers, as one string; None when they can't be had.
+    Plain DNS first; some networks drop it, so then DNS over HTTPS."""
+    try:
+        import dns.resolver
+
+        return " ".join(str(a.exchange).lower().rstrip(".") for a in dns.resolver.resolve(domain, "MX", lifetime=3))
+    except Exception:  # no answer, no network, not a domain: try the other way
+        pass
+    try:
+        r = httpx.get("https://dns.google/resolve", params={"name": domain, "type": "MX"}, timeout=4)
+        return " ".join(a.get("data", "").lower() for a in r.json().get("Answer", []))
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
+def _by_mx(domain: str) -> str | None:
+    """Where the domain's mail goes: Google Workspace, Microsoft 365, Zoho… (a few seconds at most, once per domain)."""
+    if domain in _MX_SEEN:
+        return _MX_SEEN[domain]
+    hosts = _mx_hosts(domain)
+    found = next((key for hint, key in MX_HINTS if hosts and hint in hosts), None)
+    if hosts is not None:  # an answer, even "none of these": kept; no answer: asked again next time
+        _MX_SEEN[domain] = found
+    return found
+
+
+def detect(db: Session, settings: Settings, address: str) -> dict:
+    """What connecting this address takes: a sign-in button, or a password with the server already known."""
+    domain = address.rsplit("@", 1)[-1].strip().lower()
+    key = DOMAINS.get(domain) or _by_mx(domain)
+    preset = PRESETS.get(key) if key else None
+    sign_in = preset.oauth if preset and preset.oauth and registration(db, settings, preset.oauth) is not None else None
+    if preset is None:
+        return {
+            "provider": None, "name": domain, "signIn": None,
+            "smtp": {"host": f"smtp.{domain}", "port": 587, "security": "starttls", "guessed": True},
+            "help": None,
+        }
+    return {
+        "provider": preset.key, "name": preset.name, "signIn": sign_in,
+        "smtp": {"host": preset.host, "port": preset.port, "security": preset.security, "guessed": False},
+        "help": {"url": preset.help_url, "steps": list(preset.steps)},
+    }
 
 
 # --- sending -----------------------------------------------------------------------------------

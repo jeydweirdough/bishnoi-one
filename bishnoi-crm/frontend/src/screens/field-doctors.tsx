@@ -9,13 +9,16 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { LogVisitButton } from "../components/field/log-visit";
 import type { Doctors } from "../components/field/types";
 import { isFieldAgent } from "../components/field/words";
+import { counted, lower, termsOf } from "../components/terms/terms";
 
-export const metadata = { title: "Doctors" };
+export const metadata = { title: "Field accounts" };
 
-/** The doctors someone visits, most owed first: what each owes and when they were last seen. */
+/** The accounts someone visits (the company's word: doctors at GetMeds), most owed first: what each owes and when they were last seen. */
 export default async function FieldDoctorsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
-  if (!can(me, "visits.view")) return <NoAccess what="doctors' balances" />;
+  const terms = termsOf(me);
+  const one = lower(terms.visited.one);
+  if (!can(me, "visits.view")) return <NoAccess what={`${one} balances`} />;
   const { q, owed } = await searchParams;
   const search = typeof q === "string" ? q : "";
   const onlyOwed = owed === "1";
@@ -27,14 +30,14 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
   return (
     <>
       <PageHeader
-        title="Doctors"
+        title={terms.visited.many}
         actions={
           can(me, "visits.create") && (
             <LogVisitButton requireLocation={isFieldAgent(me)} variant="primary" org={me.org} now={new Date().toISOString()} doctors={data.items.map((d) => ({ id: d.id, name: d.name }))} />
           )
         }
       >
-        {data.total} {data.total === 1 ? "doctor" : "doctors"} · {fmt.peso(data.owedCentavos)} owed in all
+        {counted(data.total, terms)} · {fmt.peso(data.owedCentavos)} owed in all
       </PageHeader>
 
       <form className="mb-4 flex flex-wrap items-center gap-3" action="/field/doctors">
@@ -42,14 +45,14 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
           name="q"
           defaultValue={search}
           placeholder="Search by name"
-          aria-label="Search doctors by name"
-          className="h-9 w-64 rounded-[6px] border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
+          aria-label={`Search ${lower(terms.visited.many)} by name`}
+          className="h-9 w-64 rounded-[14px] border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
         />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />
           Only those who owe
         </label>
-        <button type="submit" className="h-9 rounded-[6px] border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
+        <button type="submit" className="h-9 rounded-[14px] border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
           Show
         </button>
       </form>
@@ -57,7 +60,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
       <Sheet className="px-5 pt-2 pb-3">
         {data.items.length === 0 ? (
           <Empty
-            title="No doctors here"
+            title={`No ${lower(terms.visited.many)} here`}
             icon="customers"
             actions={
               search || onlyOwed ? (
@@ -65,21 +68,21 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
               ) : (
                 <>
                   {can(me, "customers.create") && (
-<NewCustomerButton label="Add a doctor" kind="doctor" icon={false} />
+<NewCustomerButton label={`Add a ${one}`} kind={terms.visitedType ?? undefined} icon={false} />
                   )}
                   {can(me, "goals.import") && <LinkButton href="/field/balances/import">Upload balances</LinkButton>}
                 </>
               )
             }
           >
-            {search || onlyOwed ? "Nothing matches. Clear the search to see them all." : "Doctors are customers of the type Doctor, given to you by your lead or the admin."}
+            {search || onlyOwed ? "Nothing matches. Clear the search to see them all." : `${terms.visited.many} are the customers you visit, given to you by your lead or the admin.`}
           </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th scope="col" className="py-2 pr-3 font-semibold">Doctor</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">{terms.visited.one}</th>
                   {showOwner && <th scope="col" className="px-3 py-2 font-semibold">Visited by</th>}
                   <th scope="col" className="px-3 py-2 font-semibold">Last visit</th>
                   <th scope="col" className="py-2 pl-3 text-right font-semibold">Owes</th>

@@ -9,8 +9,8 @@ export function EmailButton({ companyId, companyName }: { companyId: string; com
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="group flex w-14 flex-col items-center gap-1 text-meta text-ink-2 hover:text-ink">
-        <span className="grid size-10 place-items-center rounded-full border border-rule bg-sheet group-hover:border-ink-3">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-full border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink">
+        <span className="text-ink-3" aria-hidden>
           <Mail className="size-4" aria-hidden />
         </span>
         Email

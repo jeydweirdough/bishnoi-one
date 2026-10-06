@@ -28,6 +28,8 @@ from app.db import make_engine, make_sessions
 from app.tenants import for_tool
 from app.migrate import upgrade
 from app.models import Company, CustomerType, FormField, FormSection, Team
+from app.pricing import sales_settings
+from app.terms import PHARMA
 
 TOOL = "rx form tool"
 RX_TEAMS = ("STC", "URO", "B&B")
@@ -192,6 +194,12 @@ def set_up(db: Session) -> list[str]:
         if section is not None and section.title == "Who looks after it":
             section.title = "Assignment"
 
+    # A pharmaceutical company's words (Settings → Terms), unless it has chosen its own.
+    settings_row = sales_settings(db)
+    if not settings_row.terms:
+        settings_row.terms = dict(PHARMA)
+        done.append("Terms: doctors, clinic, detailing, molecule (Settings → Terms)")
+
     types = {t.code: t for t in db.scalars(select(CustomerType))}
     order = max((t.sort_order for t in types.values()), default=0)
     for code, name in RX_TYPES:
@@ -204,6 +212,9 @@ def set_up(db: Session) -> list[str]:
             db.add(kind)
             types[code] = kind
             done.append(f"Added the {name} type")
+        if not kind.is_active:
+            kind.is_active = True
+            done.append(f"Switched the {kind.name} type on")
         # Doctor is everyone's (field agents visit doctors); the rest are Rx's.
         if code != "doctor":
             kind.only_teams = add_to(kind.only_teams, rx)

@@ -141,10 +141,10 @@ MEASURES: dict[str, Measure] = {
     "customers_updated": Measure("Customers updated", "count", "Different customers whose details they updated.", None, _customers_updated),
     "activities": Measure("Activities done", "count", "Calls, meetings, emails, notes and tasks done in the month; one kind if picked.", "kind", _activities),
     "visits": Measure("Visits", "count", "Visits logged in the month; one outcome if picked.", "outcome", _visits),
-    "doctors_visited": Measure("Doctors visited", "count", "Different doctors visited in the month.", None, _doctors_visited),
+    "doctors_visited": Measure("Accounts visited", "count", "Different accounts visited in the month.", None, _doctors_visited),
     "collection_visits": Measure("Collection visits", "count", "Visits where a payment was collected.", None, _collection_visits),
     "collections_amount": Measure("Amount collected", "money", "Payments collected on visits.", None, _collections_amount),
-    "products_detailed": Measure("Products detailed", "count", "Products discussed on visits; one product if picked.", "productId", _products_detailed),
+    "products_detailed": Measure("Products presented", "count", "Products discussed on visits; one product if picked.", "productId", _products_detailed),
 }
 FILTER_CHOICES = {"kind": ACTIVITY_KINDS, "outcome": VISIT_OUTCOMES}
 UNITS = ("count", "money", "percent")

@@ -14,6 +14,8 @@ import type { VisitOutcome } from "./types";
 import { DetailingFields, type DetailDraft } from "./detailing-fields";
 import { locate, NO_LOCATION } from "./where";
 import { OUTCOMES } from "./words";
+import { useTerms } from "@/src/components/terms/provider";
+import { lower } from "@/src/components/terms/terms";
 
 type Doctor = { id: string; name: string };
 
@@ -40,6 +42,7 @@ function LogVisitForm({
 }) {
   const fmt = useMemo(() => makeFormat(org), [org]);
   const [companyId, setCompanyId] = useState(doctor?.id ?? "");
+  const terms = useTerms();
   const [outcome, setOutcome] = useState<VisitOutcome>("collected");
   const [at, setAt] = useState(() => localDateTime(new Date(now), org.timezone));
   const [amount, setAmount] = useState("");
@@ -62,7 +65,7 @@ function LogVisitForm({
     const missing: Record<string, string> = {};
     used.forEach((d, i) => {
       if (!d.productId) missing[`detailing.${i}.productId`] = "Pick the product.";
-      if (!d.reaction) missing[`detailing.${i}.reaction`] = "Pick how the doctor took it.";
+      if (!d.reaction) missing[`detailing.${i}.reaction`] = `Pick how the ${lower(terms.visited.one)} took it.`;
     });
     if (Object.keys(missing).length) {
       setDetails(used);
@@ -117,10 +120,10 @@ function LogVisitForm({
       className="space-y-4"
     >
       {!doctor && (
-        <Field label="Doctor" error={fields.companyId}>
+        <Field label={terms.visited.one} error={fields.companyId}>
           {(p) => (
             <Select {...p} value={companyId} onChange={(e) => setCompanyId(e.target.value)} required>
-              <option value="">Pick a doctor</option>
+              <option value="">Pick a {lower(terms.visited.one)}</option>
               {doctors.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -183,12 +186,12 @@ export function LogVisitButton({
       <Button variant={variant} icon={<MapPin className="size-4" aria-hidden />} onClick={() => dialog.current?.showModal()}>
         {label}
       </Button>
-      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-[6px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
+      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-[14px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
         <div className="flex items-center justify-between border-b border-rule px-5 py-3">
           <h2 id={titleId} className="text-heading">
             {form.doctor ? `Visit to ${form.doctor.name}` : "Log visit"}
           </h2>
-          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
+          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
             <X className="size-4" aria-hidden />
           </button>
         </div>

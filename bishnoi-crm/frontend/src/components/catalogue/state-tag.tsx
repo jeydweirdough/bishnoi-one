@@ -7,5 +7,5 @@ export function StateTag({ state }: { state: "running" | "upcoming" | "ended" | 
     off: "bg-bench text-ink-3",
   }[state];
   const label = { running: "Running", upcoming: "Upcoming", ended: "Ended", off: "Off" }[state];
-  return <span className={`inline-block rounded-[4px] px-2 py-0.5 text-meta ${look}`}>{label}</span>;
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-meta ${look}`}>{label}</span>;
 }

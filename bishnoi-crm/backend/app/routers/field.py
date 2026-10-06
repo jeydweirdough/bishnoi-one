@@ -24,6 +24,7 @@ import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
+from app.terms import terms_of
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
@@ -50,7 +51,6 @@ Manage = Annotated[Access, Depends(require("goals.manage"))]
 
 Outcome = Literal["collected", "promised", "not_in", "updated", "other"]
 MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
-DOCTOR = "doctor"
 # When locations are taken (hours, the company's own time): 6:00 to 20:00.
 WORK_HOURS = (6, 20)
 # A visit this close to its clinic's pin (less the phone's own uncertainty) was there.
@@ -222,7 +222,7 @@ def list_visits(
 def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: VisitIn) -> dict:
     doctor = db.get(Company, body.company_id)
     if doctor is None or not reaches(doctor, access):
-        raise field_error("companyId", "Pick a doctor you can see.")
+        raise field_error("companyId", "Pick someone you can see.")
     visited_at = to_utc(body.visited_at, settings) if body.visited_at else datetime.now(UTC)
     if visited_at > datetime.now(UTC) + timedelta(minutes=5):
         raise field_error("visitedAt", "A visit is logged once it's happened, so not in the future.")
@@ -394,7 +394,10 @@ def list_doctors(
     """Doctors within reach (the Doctor type, or anyone with a balance on file),
     most owed first."""
     with_balance = select(Balance.company_id)
-    query = within(select(Company), Company, access).where(or_(Company.status == DOCTOR, Company.id.in_(with_balance)))
+    # The customer type the company's field agents visit (Settings → Terms); any customer when none is set.
+    visited_type = terms_of(settings.terms)["visited_type"]
+    who = or_(Company.status == visited_type, Company.id.in_(with_balance)) if visited_type else True
+    query = within(select(Company), Company, access).where(who)
     if search:
         query = query.where(func.lower(Company.name).contains(search.strip().lower()))
     doctors = db.scalars(query.order_by(Company.name)).unique().all()

@@ -7,6 +7,8 @@ import { Field, Input, Select } from "@/src/platform/ui/field";
 import { visitBrief } from "../../actions/field";
 import type { Reaction, VisitBrief } from "./types";
 import { REACTIONS } from "./words";
+import { useTerms } from "@/src/components/terms/provider";
+import { lower } from "@/src/components/terms/terms";
 
 export type DetailDraft = { key: number; productId: string; message: string; reaction: Reaction | "" };
 
@@ -34,6 +36,7 @@ export function DetailingFields({
   errors: Record<string, string>;
 }) {
   const [brief, setBrief] = useState<VisitBrief | null>(null);
+  const terms = useTerms();
 
   useEffect(() => {
     let current = true;
@@ -56,7 +59,7 @@ export function DetailingFields({
   return (
     <div className="space-y-3">
       {shownBrief?.lastObjective && (
-        <p className="rounded-[6px] border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
+        <p className="rounded-[14px] border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
           <span className="font-semibold">Last visit&apos;s objective:</span> {shownBrief.lastObjective.text}
         </p>
       )}
@@ -65,7 +68,7 @@ export function DetailingFields({
           Products discussed <span className="font-normal text-ink-3">(optional, in the order you discussed them)</span>
         </legend>
         {rows.map((r, i) => (
-          <div key={r.key} className="rounded-[6px] border border-rule p-2.5">
+          <div key={r.key} className="rounded-[14px] border border-rule p-2.5">
             <div className="flex items-start gap-2">
               <span className="pt-2 text-meta font-semibold text-ink-3 tabular-nums">{i + 1}.</span>
               <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
@@ -82,7 +85,7 @@ export function DetailingFields({
                     </Select>
                   )}
                 </Field>
-                <Field label="How the doctor took it" error={errors[`detailing.${i}.reaction`]}>
+                <Field label={`How the ${lower(terms.visited.one)} took it`} error={errors[`detailing.${i}.reaction`]}>
                   {(p) => (
                     <Select {...p} value={r.reaction} onChange={(e) => set(r.key, { reaction: e.target.value as Reaction })}>
                       <option value="">Pick one</option>
@@ -101,13 +104,13 @@ export function DetailingFields({
                 </div>
               </div>
               <div className="flex flex-col gap-0.5">
-                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed earlier">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed earlier">
                   <ArrowUp className="size-3.5" aria-hidden />
                 </button>
-                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed later">
+                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed later">
                   <ArrowDown className="size-3.5" aria-hidden />
                 </button>
-                <button type="button" onClick={() => onRows(rows.filter((x) => x.key !== r.key))} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label="Take this product off">
+                <button type="button" onClick={() => onRows(rows.filter((x) => x.key !== r.key))} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label="Take this product off">
                   <X className="size-3.5" aria-hidden />
                 </button>
               </div>
@@ -120,7 +123,7 @@ export function DetailingFields({
           </Button>
         )}
       </fieldset>
-      <Field label="Next visit's objective" optional hint="Shown when the next visit to this doctor is logged." error={errors.nextObjective}>
+      <Field label="Next visit's objective" optional hint={`Shown when the next visit to this ${lower(terms.visited.one)} is logged.`} error={errors.nextObjective}>
         {(p) => <Input {...p} value={objective} onChange={(e) => onObjective(e.target.value)} maxLength={300} placeholder="e.g. Bring the dosing study" />}
       </Field>
     </div>

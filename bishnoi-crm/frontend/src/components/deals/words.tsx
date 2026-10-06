@@ -28,7 +28,7 @@ const STATE_STYLE: Record<DealRow["state"], string> = {
 /** The deal's stage, coloured by whether it's open, won or lost. */
 export function StageTag({ deal }: { deal: Pick<DealRow, "state" | "stage"> }) {
   return (
-    <span className={`inline-flex items-center rounded-[6px] px-2 py-0.5 text-meta font-semibold whitespace-nowrap ${STATE_STYLE[deal.state]}`}>
+    <span className={`inline-flex items-center rounded-[14px] px-2 py-0.5 text-meta font-semibold whitespace-nowrap ${STATE_STYLE[deal.state]}`}>
       {deal.stage.name}
     </span>
   );

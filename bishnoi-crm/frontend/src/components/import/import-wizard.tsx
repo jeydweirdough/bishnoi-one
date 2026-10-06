@@ -15,7 +15,7 @@ const WORDS: Record<ImportKind, { one: string; many: string; match: string }> = 
   balances: {
     one: "balance",
     many: "balances",
-    match: "Each row is matched to its doctor by name. The balances are added as of the date below; earlier ones stay as the history.",
+    match: "Each row is matched to its customer by name. The balances are added as of the date below; earlier ones stay as the history.",
   },
 };
 
@@ -185,7 +185,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                 {check.dryRun ? "to update" : "updated"}.
               </p>
               {check.problems.length > 0 && (
-                <div className="rounded-[6px] border border-danger/40 bg-danger-tint/40 px-4 py-3">
+                <div className="rounded-[14px] border border-danger/40 bg-danger-tint/40 px-4 py-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-danger">
                     <TriangleAlert className="size-4" aria-hidden />
                     {check.problems.length} {check.problems.length === 1 ? "row is" : "rows are"} {check.dryRun ? "skipped unless you fix them" : "skipped"}

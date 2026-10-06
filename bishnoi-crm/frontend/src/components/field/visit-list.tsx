@@ -5,11 +5,11 @@ import type { Visit } from "./types";
 import { distanceText, mapLink } from "./where";
 import { outcomeOf, reactionOf } from "./words";
 
-/** Where the visit was logged, against the clinic's pin: said plainly, with a map to check. */
-function Place({ v }: { v: Visit }) {
+/** Where the visit was logged, against the place's pin (`site`: the company's word, e.g. clinic): said plainly, with a map to check. */
+function Place({ v, site }: { v: Visit; site: string }) {
   if (!v.location) return <span className="text-ink-3">No location</span>;
   const words =
-    v.atClinic === true ? "At the clinic" : v.atClinic === false && v.distanceM !== null ? `${distanceText(v.distanceM)} from the clinic` : "Place saved";
+    v.atClinic === true ? `At the ${site}` : v.atClinic === false && v.distanceM !== null ? `${distanceText(v.distanceM)} from the ${site}` : "Place saved";
   return (
     <a href={mapLink(v.location)} target="_blank" rel="noopener noreferrer" className={`hover:underline ${v.atClinic === false ? "font-semibold text-danger" : "text-ink-2"}`}>
       {words}
@@ -18,7 +18,7 @@ function Place({ v }: { v: Visit }) {
 }
 
 /** Visits, newest first: who went, what came of it, and any payment collected. */
-export function VisitList({ visits, fmt, today, showDoctor = true, showWho = true }: { visits: Visit[]; fmt: Format; today: string; showDoctor?: boolean; showWho?: boolean }) {
+export function VisitList({ visits, fmt, today, showDoctor = true, showWho = true, site = "location" }: { visits: Visit[]; fmt: Format; today: string; showDoctor?: boolean; showWho?: boolean; site?: string }) {
   return (
     <ul className="divide-y divide-rule">
       {visits.map((v) => {
@@ -42,7 +42,7 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
                 {showWho && <> · {v.owner.name}</>}
                 {v.receiptNo && <> · Receipt {v.receiptNo}</>}
                 {" · "}
-                <Place v={v} />
+                <Place site={site} v={v} />
               </p>
               {v.detailing.length > 0 && (
                 <ol className="mt-1.5 space-y-0.5 text-sm">

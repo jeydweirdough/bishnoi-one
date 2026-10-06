@@ -144,7 +144,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
                 <span className="mb-1.5 block text-sm text-ink">
                   Personal note <span className="text-ink-3">(optional, goes on top)</span>
                 </span>
-                <Input.TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} placeholder="e.g. Good to see you at the clinic today." />
+                <Input.TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} placeholder="e.g. Good to see you at your office today." />
               </label>
               <div className="rounded-sheet border border-rule bg-bench px-3 py-2">
                 <p className="text-meta text-ink-3">Sent as approved, so it can&apos;t be changed here</p>

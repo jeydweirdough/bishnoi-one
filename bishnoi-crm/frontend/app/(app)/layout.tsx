@@ -8,6 +8,8 @@ import { api, getMe } from "@/src/platform/lib/api";
 import { FieldTracker } from "@/src/components/field/tracker";
 import { CanProvider } from "@/src/components/quick-add/can";
 import { isFieldAgent } from "@/src/components/field/words";
+import { TermsProvider } from "@/src/components/terms/provider";
+import { termsOf } from "@/src/components/terms/terms";
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const me = await getMe();
@@ -16,7 +18,9 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const unset = await api.get<Record<string, number>>("/unset").catch(() => undefined);
   return (
     <ShellLayout unset={unset}>
-      <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
+      <TermsProvider terms={termsOf(me)}>
+        <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
+      </TermsProvider>
       {isFieldAgent(me) && me.org && <FieldTracker userId={me.user.id} timeZone={me.org.timezone} />}
     </ShellLayout>
   );

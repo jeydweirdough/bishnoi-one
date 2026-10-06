@@ -26,7 +26,7 @@ export function NoAccess({ what }: { what: string }) {
 /** "Switched off", the same mark everywhere. */
 export function OffTag({ children = "Switched off" }: { children?: string }) {
   return (
-    <span className="inline-flex h-5 items-center rounded-[4px] border border-rule-strong px-1.5 text-stamp text-ink-3 uppercase">
+    <span className="inline-flex h-6 items-center rounded-full bg-[#f0f0ee] px-2.5 text-meta font-medium whitespace-nowrap text-ink-3">
       {children}
     </span>
   );

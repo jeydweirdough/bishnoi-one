@@ -34,7 +34,7 @@ function OrderList({
 }) {
   const all = toggle ? [...items, ...toggle.off] : items;
   return (
-    <ol className="divide-y divide-rule rounded-[6px] border border-rule">
+    <ol className="divide-y divide-rule rounded-[14px] border border-rule">
       {all.map((key) => {
         const on = items.includes(key);
         const n = items.indexOf(key);
@@ -126,7 +126,7 @@ export function ProcedureEditor({ rules }: { rules: PriceRules }) {
         <section>
           <h3 className="text-sm font-semibold">3 · Tax, last</h3>
           <p className="mb-2 text-meta text-ink-3">Worked out by Finance, by its tax rules, and kept on the quote as the invoice will show it.</p>
-          <label className={`flex items-center gap-2 rounded-[6px] border border-rule px-3 py-2 text-sm ${rules.financeLinked ? "" : "text-ink-3"}`}>
+          <label className={`flex items-center gap-2 rounded-[14px] border border-rule px-3 py-2 text-sm ${rules.financeLinked ? "" : "text-ink-3"}`}>
             <input type="checkbox" checked={tax} disabled={!edit || !rules.financeLinked} onChange={(e) => setTax(e.target.checked)} className="size-4 accent-hema" />
             Add tax from Finance
           </label>

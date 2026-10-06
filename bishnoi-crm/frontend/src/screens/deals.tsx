@@ -132,66 +132,119 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
 /** The four cards above the deals: the figures, then the deals by probability, stage and priority. */
 async function Summary({ state, owner, fmt }: { state: "open" | "closed"; owner: string; fmt: Format }) {
   const s = await load<DealSummary>(`/deals-summary?state=${state}${owner ? `&owner=${owner}` : ""}`);
-  const figures =
+  const pct = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : null);
+  const shown = (n: number | null) => (n === null ? "—" : `${n}%`);
+  const closed = s.wonCount + s.lostCount;
+  const likelyShare = pct(s.weightedCentavos, s.valueCentavos);
+  const winRate = pct(s.wonCount, closed);
+  // The figure first, large; what it is under it; then how it compares (a rate, a share).
+  const figures: Figure[] =
     state === "open"
       ? [
-          { label: "Pipeline value", value: fmt.peso(s.valueCentavos), note: fmt.plural(s.count, "open deal") },
-          { label: "Weighted by probability", value: fmt.peso(s.weightedCentavos), note: "What the pipeline is likely worth" },
-          { label: "Expected this month", value: fmt.peso(s.thisMonthCentavos), note: "Weighted, closing this month" },
+          { value: fmt.peso(s.valueCentavos), label: "Pipeline value", note: fmt.plural(s.count, "open deal") },
+          { value: shown(likelyShare), label: "Likely to close", note: `${fmt.peso(s.weightedCentavos)} weighted by probability`, ring: likelyShare },
+          {
+            value: fmt.peso(s.thisMonthCentavos),
+            label: "Expected this month",
+            note: pct(s.thisMonthCentavos, s.weightedCentavos) === null ? "Nothing weighted yet" : `${pct(s.thisMonthCentavos, s.weightedCentavos)}% of the weighted pipeline`,
+          },
+          { value: s.count ? fmt.peso(Math.round(s.valueCentavos / s.count)) : "—", label: "Average deal", note: "Value per open deal" },
         ]
       : [
-          { label: "Won", value: fmt.peso(s.wonCentavos), note: fmt.plural(s.wonCount, "deal") },
-          { label: "Deals lost", value: String(s.lostCount), note: s.count ? `${Math.round((100 * s.wonCount) / s.count)}% won` : "None closed yet" },
+          { value: shown(winRate), label: "Win rate", note: `${s.wonCount} won of ${closed} closed`, ring: winRate },
+          { value: fmt.peso(s.wonCentavos), label: "Won", note: fmt.plural(s.wonCount, "deal") },
+          { value: String(s.lostCount), label: "Deals lost", note: closed ? `${pct(s.lostCount, closed)}% of those closed` : "None closed yet" },
+          { value: s.wonCount ? fmt.peso(Math.round(s.wonCentavos / s.wonCount)) : "—", label: "Average won deal", note: "Value per deal won" },
         ];
   const stageColor = (i: number) => SERIES[i % SERIES.length];
+  const priorities = s.byPriority.map((b) => {
+    const p = PRIORITIES.find((x) => x.value === b.priority)!;
+    return { label: p.label, value: b.count, color: p.color };
+  });
+  const urgent = s.byPriority.filter((b) => b.priority === "urgent" || b.priority === "high").reduce((t, b) => t + b.count, 0);
+  const likely = s.byProbability[0]?.count ?? 0;
+  const top = [...s.byStage].sort((a, b) => b.count - a.count)[0];
+  const none = s.count === 0 ? (state === "open" ? "No open deals yet" : "No closed deals yet") : undefined;
   return (
-    <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,0.8fr)_repeat(3,minmax(0,1fr))]">
-      <Sheet className="px-5 py-4">
-        <SectionTitle>Summary</SectionTitle>
-        <ul className="mt-2 space-y-3">
-          {figures.map((f) => (
-            <li key={f.label}>
-              <p className="text-meta text-ink-3">{f.label}</p>
-              <p className="text-figure leading-tight text-ink">{f.value}</p>
-              <p className="text-meta text-ink-3">{f.note}</p>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
-      {state === "open" && (
-        <Sheet className="px-5 py-4">
-          <SectionTitle>Probability</SectionTitle>
-          <div className="mt-3">
+    <>
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {figures.map((f, n) => (
+          <FigureCard key={f.label} figure={f} first={n === 0} />
+        ))}
+      </div>
+      <div className={`mb-5 grid gap-3 ${state === "open" ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        {state === "open" && (
+          <Breakdown value={shown(pct(likely, s.count))} label="of open deals are 80% likely or more" title="By probability" empty={none} art="gauge">
             <Donut title="Open deals by probability" slices={s.byProbability.map((b, i) => ({ label: b.label, value: b.count, color: RAMP[i] }))} />
-          </div>
-        </Sheet>
-      )}
-      <Sheet className="px-5 py-4">
-        <SectionTitle>Stages</SectionTitle>
-        <div className="mt-3">
+          </Breakdown>
+        )}
+        <Breakdown value={top && s.count ? shown(pct(top.count, s.count)) : "—"} label={top && s.count ? `are at ${top.name}, the busiest stage` : "No deals in a stage yet"} title="By stage" empty={none} art="steps">
           {s.byStage.length ? (
-            <Donut
-              title="Deals by stage"
-              slices={s.byStage.map((st, i) => ({ label: st.name, value: st.count, color: stageColor(i), note: fmt.peso(st.valueCentavos) }))}
-            />
+            <Donut title="Deals by stage" slices={s.byStage.map((st, i) => ({ label: st.name, value: st.count, color: stageColor(i), note: fmt.peso(st.valueCentavos) }))} />
           ) : (
             <p className="py-6 text-meta text-ink-3">No deals here yet.</p>
           )}
+        </Breakdown>
+        <Breakdown value={shown(pct(urgent, s.count))} label="are urgent or high priority" title="By priority" empty={none} art="flag">
+          <Donut title="Deals by priority" slices={priorities} />
+        </Breakdown>
+      </div>
+    </>
+  );
+}
+
+type Figure = { value: string; label: string; note: string; ring?: number | null };
+
+/** One figure, as on the components page: the number large, then what it is, then how it compares. */
+function FigureCard({ figure: f, first }: { figure: Figure; first: boolean }) {
+  return (
+    <div className={`rounded-[22px] bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{f.value}</p>
+          <p className="mt-1 text-sm font-medium text-ink">{f.label}</p>
         </div>
-      </Sheet>
-      <Sheet className="px-5 py-4">
-        <SectionTitle>Priority</SectionTitle>
-        <div className="mt-3">
-          <Donut
-            title="Deals by priority"
-            slices={s.byPriority.map((b) => {
-              const p = PRIORITIES.find((x) => x.value === b.priority)!;
-              return { label: p.label, value: b.count, color: p.color };
-            })}
-          />
-        </div>
-      </Sheet>
+        {f.ring !== undefined && f.ring !== null && (
+          <svg viewBox="0 0 44 44" className="size-12 shrink-0" aria-hidden>
+            <circle cx="22" cy="22" r="17" fill="none" stroke="#e3eedf" strokeWidth="5" />
+            <circle
+              cx="22"
+              cy="22"
+              r="17"
+              fill="none"
+              stroke="#a8d69b"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray={`${(Math.min(100, f.ring) / 100) * 106.8} 106.8`}
+              transform="rotate(-90 22 22)"
+            />
+          </svg>
+        )}
+      </div>
+      <p className="mt-1 text-meta text-ink-3">{f.note}</p>
     </div>
+  );
+}
+
+/** A breakdown: its headline share first, then the chart that shows the rest. */
+function Breakdown({ value, label, title, empty, art, children }: { value: string; label: string; title: string; empty?: string; art?: string; children: React.ReactNode }) {
+  return (
+    <Sheet className="px-5 py-4">
+      <p className="text-caps text-ink-3 uppercase">{title}</p>
+      {empty ? (
+        <Empty compact icon="deals" art={art} title={empty}>
+          It fills in as deals are added.
+        </Empty>
+      ) : (
+        <>
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[1.5rem] leading-tight font-semibold text-ink tabular-nums">{value}</span>
+            <span className="text-sm text-ink-2">{label}</span>
+          </p>
+          <div className="mt-4">{children}</div>
+        </>
+      )}
+    </Sheet>
   );
 }
 
@@ -244,7 +297,7 @@ async function Board({
         <div className="-mx-4 overflow-x-auto px-4 pb-2">
           <div className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3">
             {board.columns.map((col) => (
-              <section key={col.stage.code} aria-label={col.stage.name} className="min-w-0 rounded-[4px] bg-bench/60 p-2">
+              <section key={col.stage.code} aria-label={col.stage.name} className="min-w-0 rounded-full bg-bench/60 p-2">
                 <header className="mb-2 px-1">
                   <h2 className="flex items-baseline justify-between gap-2 text-sm font-semibold text-ink">
                     {col.stage.name}
@@ -273,7 +326,7 @@ async function Board({
 function DealCard({ deal, fmt, today }: { deal: DealRow; fmt: Format; today: string }) {
   const overdue = deal.state === "open" && deal.expectedCloseOn < today;
   return (
-    <Link href={`/deals/${deal.id}`} className="block rounded-[6px] border border-rule bg-sheet px-3 py-2.5 hover:border-hema">
+    <Link href={`/deals/${deal.id}`} className="block rounded-[14px] border border-rule bg-sheet px-3 py-2.5 hover:border-hema">
       <p className="flex items-start justify-between gap-2">
         <span className="truncate text-sm font-medium text-ink">{deal.name}</span>
         {deal.priority && <PriorityFlag priority={deal.priority} />}
@@ -485,7 +538,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
         {FORECAST_BARS.map((b) => (
           <Sheet key={b.key} className="px-4 py-3">
             <p className="flex items-center gap-2 text-meta text-ink-3">
-              <span className={`size-2.5 rounded-[4px] ${b.style}`} aria-hidden />
+              <span className={`size-2.5 rounded-full ${b.style}`} aria-hidden />
               {b.label}
             </p>
             <p className="mt-1 text-figure text-ink">{fmt.peso(t[b.key] as number)}</p>

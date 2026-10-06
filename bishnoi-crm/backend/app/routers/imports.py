@@ -65,7 +65,7 @@ def fields_of(db: Session, kind: str) -> list[dict]:
     header might call it."""
     if kind == "balances":
         return [
-            {"key": "doctor", "label": "Doctor", "required": True, "aliases": ["doctor", "name", "doctorname", "customer", "customername", "account", "accountname", "physician"]},
+            {"key": "doctor", "label": "Customer", "required": True, "aliases": ["doctor", "name", "doctorname", "customer", "customername", "account", "accountname", "physician"]},
             {"key": "amount", "label": "Balance", "required": True, "aliases": ["balance", "amount", "amountdue", "due", "owed", "outstanding", "receivable", "total"]},
             {"key": "note", "label": "Note", "required": False, "aliases": ["note", "notes", "remarks", "memo"]},
         ]

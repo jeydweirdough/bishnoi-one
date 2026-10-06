@@ -25,7 +25,7 @@ export function Duplicates({
   quote?: boolean;
 }) {
   return (
-    <div role="alert" className="animate-reshape space-y-3 rounded-[6px] border border-rule-strong bg-bench/60 px-4 py-3">
+    <div role="alert" className="animate-reshape space-y-3 rounded-[14px] border border-rule-strong bg-bench/60 px-4 py-3">
       <p className="text-sm font-semibold text-ink">{message}</p>
       <ul className="space-y-1 text-meta">
         {found.map((d) => (

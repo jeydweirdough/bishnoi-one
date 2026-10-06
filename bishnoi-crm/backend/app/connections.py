@@ -53,7 +53,7 @@ SERVICES: tuple[Service, ...] = (
     Service(
         key="zoho_books",
         name="Zoho Books",
-        purpose="Invoices under each doctor's name, for the monthly rebate, and registering the rebate back in Zoho.",
+        purpose="Invoices under each customer's name, for the monthly rebate, and registering the rebate back in Zoho.",
         help_url="https://www.zoho.com/books/api/v3/oauth/",
         details=(
             Detail("data_centre", "Data centre", "Where your Zoho account is: the end of the address you sign in at.", options=ZOHO_CENTRES),

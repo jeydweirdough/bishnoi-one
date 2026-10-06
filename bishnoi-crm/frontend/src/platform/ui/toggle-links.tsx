@@ -21,7 +21,7 @@ export function ToggleLinks({ options, current }: { options: { href: string; lab
       options={options.map((o) => ({
         value: o.value,
         label: (
-          <Link href={o.href} scroll={false} aria-current={o.value === current ? "true" : undefined} className="block text-inherit">
+          <Link href={o.href} scroll={false} aria-current={o.value === current ? "true" : undefined} className="block !text-inherit">
             {o.label}
           </Link>
         ),

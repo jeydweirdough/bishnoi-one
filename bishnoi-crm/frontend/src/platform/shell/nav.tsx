@@ -1,17 +1,18 @@
 "use client";
 
-import { ArrowLeftRight, Mail, ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ArrowLeftRight, Mail, ChevronRight, LogOut, Menu, MoreHorizontal, UserRound, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { Dropdown, Modal, type MenuProps } from "antd";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
-import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
+import { termsOf } from "@/src/components/terms/terms";
 
 // The one place everyone finds their way.
 //
@@ -150,7 +151,7 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
       label: "Field work",
       pages: [
         ...only(may("goals.view"), { href: "/field", label: "Team progress", icon: "goals", exact: true, also: ["/field/goals", "/field/balances"] }),
-        ...only(may("visits.view"), { href: "/field/doctors", label: "Doctors", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
+        ...only(may("visits.view"), { href: "/field/doctors", label: termsOf(me).visited.many, icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
         ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
         ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
       ],
@@ -322,7 +323,7 @@ function Row({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-[6px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const className = `flex items-center gap-2.5 rounded-full px-3 text-sm ${nested ? "h-8" : "h-9"} ${
     current
       ? "bg-hema-tint font-semibold text-ink"
       : open
@@ -331,7 +332,7 @@ function Row({
   }`;
   const inside = (
     <>
-      {icon && <Icon name={icon} className={`size-4 ${current ? "text-ink" : open ? "text-ink-2" : "text-ink-3"}`} />}
+      {icon && <Icon name={icon} className={`size-4 ${current ? "text-sage-deep" : open ? "text-ink-2" : "text-ink-3"}`} />}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -501,7 +502,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[6px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-full px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
     >
       <Icon name={icon} className="size-4 text-ink-3" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -605,7 +606,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[6px] px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-sm ${
           open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
         }`}
       >
@@ -621,7 +622,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[6px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-[14px] border border-rule bg-bench p-1 shadow-lg"
           >
             {items.map((e) => (
               <a
@@ -629,7 +630,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-full px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -863,55 +864,67 @@ function placeOf(pathname: string, me: Me): string | null {
 
 function Account({ me }: { me: Me }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const [pending, setPending] = useState(false);
+  const switchHref =
+    THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)
+      ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
+      : null;
+  // What's used now and then sits behind ⋯, so the sidebar's foot is only who you are.
+  const items: MenuProps["items"] = [
+    { key: "account", label: "Your account", icon: <UserRound className="size-4" aria-hidden /> },
+    // The CRM sends email from each person's own mailbox.
+    ...(process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? [{ key: "mailbox", label: "Mailbox", icon: <Mail className="size-4" aria-hidden /> }] : []),
+    // Each company has its own data here. Someone who works for more than one
+    // picks the other on Bishnoi One, which sends them back signed in there.
+    ...(switchHref ? [{ key: "switch", label: "Switch company", icon: <ArrowLeftRight className="size-4" aria-hidden /> }] : []),
+    { type: "divider" as const },
+    { key: "signout", label: "Sign out", icon: <LogOut className="size-4" aria-hidden /> },
+  ];
+  function pick({ key }: { key: string }) {
+    if (key === "account") router.push("/account");
+    else if (key === "mailbox") router.push("/account/mailbox");
+    else if (key === "switch" && switchHref) window.location.href = switchHref;
+    else if (key === "signout") setLeaving(true);
+  }
+  const here = pathname === "/account" || pathname.startsWith("/account/");
   return (
     <div className="border-t border-rule pt-4">
-      <Link
-        href="/account"
-        aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[6px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
-      >
-        <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-        <span className="min-w-0">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-ink" : ""}`}>{me.user.fullName}</span>
-          <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
-        </span>
-      </Link>
-      {/* The CRM sends email from each person's own mailbox. */}
-      {process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" && (
-        <Link
-          href="/account/mailbox"
-          aria-current={pathname.startsWith("/account/mailbox") ? "page" : undefined}
-          className={`mt-1 flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-sm ${pathname.startsWith("/account/mailbox") ? "bg-hema-tint text-ink" : "text-ink-2 hover:bg-sheet"}`}
-        >
-          <Mail className="size-4" aria-hidden />
-          Mailbox
+      <div className={`flex items-center gap-1 rounded-full pr-1 ${here ? "bg-hema-tint" : ""}`}>
+        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 ${here ? "" : "hover:bg-sheet"}`}>
+          <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
+            <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
+          </span>
         </Link>
-      )}
-      {/* Each company has its own data here. Someone who works for more than
-          one picks the other on Bishnoi One, which sends them back signed in there. */}
-      {THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) && (
-        <a
-          href={`${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`}
-          className="mt-1 flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-sm text-ink-2 hover:bg-sheet"
-        >
-          <ArrowLeftRight className="size-4" aria-hidden />
-          Switch company
-        </a>
-      )}
-      <ConfirmButton
-        label="Sign out"
-        icon={<LogOut className="size-4" aria-hidden />}
-        triggerVariant="quiet"
-        triggerSize="sm"
-        triggerClassName="mt-2 w-full !justify-start"
+        <Dropdown menu={{ items, onClick: pick }} trigger={["click"]} placement="topRight">
+          <button
+            type="button"
+            aria-label="Account options"
+            title="Account options"
+            className="grid size-9 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
+          >
+            <MoreHorizontal className="size-5" aria-hidden />
+          </button>
+        </Dropdown>
+      </div>
+      <Modal
+        open={leaving}
         title="Sign out?"
-        body="You'll need your email and password to get back in."
-        confirmLabel="Sign out"
-        danger={false}
-        onConfirm={async () => {
+        okText="Sign out"
+        cancelText="Cancel"
+        confirmLoading={pending}
+        onCancel={() => !pending && setLeaving(false)}
+        onOk={async () => {
+          setPending(true);
           await signOut();
         }}
-      />
+        width={400}
+      >
+        You&apos;ll need your email and password to get back in.
+      </Modal>
     </div>
   );
 }
@@ -924,15 +937,20 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
   const place = placeOf(pathname, me);
 
   const brand = (
-    <Link href="/" className="block border-b-[3px] border-double border-ink pb-2">
-      {/* No company on the platform: a Developer Admin has not opened one, and
-          saying a company name there would be saying something untrue. */}
-      <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
-      {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Bishnoi One" alone leaves you working out from the port
-          whether the screen in front of you is missing or simply elsewhere. */}
-      <span className="block truncate text-base leading-tight font-semibold text-ink">
-        {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+    <Link href="/" className="flex items-center gap-2.5 border-b border-rule pb-4">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-bold tracking-tight text-white" aria-hidden>
+        B1
+      </span>
+      <span className="min-w-0">
+        {/* Which app this is, not only which product. Each one is its own site on
+            its own address, so "Bishnoi One" alone leaves you working out from the port
+            whether the screen in front of you is missing or simply elsewhere. */}
+        <span className="block truncate text-sm leading-tight font-semibold text-ink">
+          {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+        </span>
+        {/* No company on the platform: a Developer Admin has not opened one, and
+            saying a company name there would be saying something untrue. */}
+        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
       </span>
     </Link>
   );
@@ -957,7 +975,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[6px] pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

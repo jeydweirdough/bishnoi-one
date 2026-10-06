@@ -10,7 +10,7 @@ export const isFieldAgent = (me: Me) => can(me, "visits.create") && !can(me, "qu
 export const OUTCOMES: { value: VisitOutcome; label: string; past: string }[] = [
   { value: "collected", label: "Collected", past: "Collected a payment" },
   { value: "promised", label: "Promised to pay", past: "Promised to pay" },
-  { value: "not_in", label: "Not in", past: "Doctor not in" },
+  { value: "not_in", label: "Not in", past: "Not in when visited" },
   { value: "updated", label: "Updated details", past: "Updated their details" },
   { value: "other", label: "Other", past: "Visited" },
 ];
@@ -31,8 +31,8 @@ export const outcomeOf = (value: VisitOutcome) => OUTCOMES.find((o) => o.value =
 
 /** The four goals, in the order they're shown. `money`: counted in centavos. */
 export const MEASURES: { key: keyof FieldCounts; label: string; money?: boolean }[] = [
-  { key: "doctorsVisited", label: "Doctors visited" },
-  { key: "doctorsUpdated", label: "Doctors updated" },
+  { key: "doctorsVisited", label: "Accounts visited" },
+  { key: "doctorsUpdated", label: "Accounts updated" },
   { key: "amountCentavos", label: "Amount collected", money: true },
   { key: "collectionVisits", label: "Collection visits" },
 ];

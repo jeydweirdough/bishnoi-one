@@ -10,6 +10,8 @@ import type { Org } from "@/src/platform/lib/types";
 import { setGoals } from "../../actions/field";
 import type { FieldCounts, GoalsPayload } from "./types";
 import { MEASURES } from "./words";
+import { useTerms } from "@/src/components/terms/provider";
+import { worded } from "@/src/components/terms/terms";
 
 type Draft = Record<keyof FieldCounts, string>;
 const EMPTY: Draft = { doctorsVisited: "", doctorsUpdated: "", amountCentavos: "", collectionVisits: "" };
@@ -33,6 +35,7 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
   const lastMonth = new Map(previous.people.filter((p) => p.goal).map((p) => [p.person.id, p.goal]));
   const noneYet = data.people.every((p) => !p.goal);
 
+  const terms = useTerms();
   const set = (id: string, key: keyof FieldCounts, value: string) => setDrafts({ ...drafts, [id]: { ...drafts[id], [key]: value } });
 
   function save() {
@@ -87,7 +90,7 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
               <th scope="col" className="py-2 pr-3 font-semibold">Person</th>
               {MEASURES.map((m) => (
                 <th key={m.key} scope="col" className="px-2 py-2 font-semibold">
-                  {m.label}
+                  {worded(m.label, terms)}
                   {m.money && " (₱)"}
                 </th>
               ))}
@@ -103,7 +106,7 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
                 {MEASURES.map((m) => (
                   <td key={m.key} className="px-2 py-2">
                     <CellInput
-                      aria-label={`${m.label} for ${p.person.name}`}
+                      aria-label={`${worded(m.label, terms)} for ${p.person.name}`}
                       inputMode={m.money ? "decimal" : "numeric"}
                       value={drafts[p.person.id][m.key]}
                       onChange={(e) => set(p.person.id, m.key, e.target.value)}

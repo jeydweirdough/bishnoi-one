@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
 import type { CompanySettings, CustomEntity, FormLayout } from "@/src/platform/lib/types";
+import type { Terms } from "@/src/components/terms/terms";
 
 // Settings: the forms, and company & quotes. The API checks admin.settings on
 // each and logs every change.
@@ -125,4 +126,20 @@ export async function addAssociationLabel(label: { fromType: string; toType: str
 
 export async function changeAssociationLabel(code: string, change: Partial<{ name: string; inverseName: string; isActive: boolean }>): Promise<Result<AssociationLabel[]>> {
   return attempt(() => api.patch<AssociationLabel[]>(`/admin/association-labels/${enc(code)}`, change));
+}
+
+/** The company's own words (Settings → Terms), saved whole. */
+export type TermsSettings = {
+  terms: Terms;
+  general: Terms;
+  pharma: Terms;
+  customerTypes: { code: string; name: string }[];
+};
+
+export async function saveTerms(terms: Terms): Promise<Result<TermsSettings>> {
+  return attempt(async () => {
+    const saved = await api.put<TermsSettings>("/admin/terms", terms);
+    refresh();
+    return saved;
+  });
 }

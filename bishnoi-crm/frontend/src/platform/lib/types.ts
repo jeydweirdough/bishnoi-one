@@ -48,6 +48,14 @@ export type Org = {
   timezone: string;
   /** Decimal places the currency keeps: two for pesos, none for yen. Two when the API doesn't say. */
   minorUnits?: number;
+  /** The company's own words (Settings → Terms; src/components/terms). */
+  terms?: {
+    visited: { one: string; many: string };
+    visitedType: string | null;
+    detailing: string;
+    site: string;
+    genericName: string;
+  };
 };
 
 /** One company as the switcher lists it. `isMine` is false for a company a

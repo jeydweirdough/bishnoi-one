@@ -5,28 +5,65 @@ import { ConfigProvider, theme } from "antd";
 import type { ReactNode } from "react";
 
 /**
- * Ant Design for every screen: its components, in Poppins, with Ant's own
- * blue and corners. The registry writes Ant's styles into the page on the
- * server, so nothing flashes unstyled. The design tokens in globals.css carry
- * the same palette for what's still drawn with Tailwind.
+ * Ant Design for every screen, in the sign-in page's look (Desktop:
+ * bishnoi-one-crm-components.html): ink for what you press, sage for progress
+ * and what's done, mint for hover and what's selected; fields and buttons as
+ * pills, cards and dialogs with soft corners. The registry writes Ant's styles
+ * into the page on the server, so nothing flashes unstyled. The design tokens
+ * in globals.css carry the same palette for what's drawn with Tailwind.
  */
+const INK = "#141414";
+const MINT = "#f1f7ee";
+const SAGE = "#a8d69b";
+
 export const ANT_THEME = {
   algorithm: theme.defaultAlgorithm,
   token: {
     fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif",
-    colorPrimary: "#1677ff",
-    colorSuccess: "#52c41a",
-    colorWarning: "#faad14",
-    colorError: "#ff4d4f",
-    borderRadius: 6,
-    colorBgLayout: "#f5f5f5",
-    colorText: "#1f1f1f",
-    colorLink: "#1f1f1f",
+    colorPrimary: INK,
+    colorInfo: "#1f4f8a",
+    colorSuccess: "#3f6f35",
+    colorWarning: "#b07400",
+    colorError: "#b42318",
+    colorText: INK,
+    colorTextSecondary: "#3b3b3b",
+    colorTextTertiary: "#6a6a6a",
+    colorBorder: "#8a8a8a",
+    colorBorderSecondary: "#ececea",
+    colorBgLayout: "#fafaf8",
+    colorLink: INK,
     colorLinkHover: "#000000",
+    controlItemBgActive: MINT,
+    controlItemBgHover: "#f4f4f2",
+    controlOutline: "rgba(127, 176, 112, 0.35)",
+    borderRadius: 20,
+    borderRadiusLG: 22,
+    borderRadiusSM: 12,
+    borderRadiusXS: 8,
+    controlHeight: 36,
+    controlHeightSM: 28,
+    controlHeightLG: 44,
+    boxShadow: "0 10px 30px rgba(20, 20, 20, 0.12)",
+    boxShadowSecondary: "0 10px 30px rgba(20, 20, 20, 0.12)",
   },
   components: {
-    // Text is near black, never blue: blue is for primary buttons and focus only.
-    Segmented: { itemSelectedColor: "#1f1f1f" },
+    Button: { primaryShadow: "none", defaultShadow: "none", dangerShadow: "none", defaultBorderColor: INK, defaultHoverBg: MINT, defaultHoverBorderColor: INK, defaultHoverColor: INK, fontWeight: 500 },
+    Input: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK },
+    InputNumber: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK },
+    Select: { activeOutlineColor: "rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, optionSelectedBg: MINT, optionSelectedFontWeight: 500 },
+    DatePicker: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, cellActiveWithRangeBg: MINT },
+    // The selected filter is ink, as on the components page.
+    Segmented: { itemSelectedBg: INK, itemSelectedColor: "#ffffff", trackBg: "#ffffff", trackPadding: 3, borderRadius: 999, borderRadiusSM: 999 },
+    Tabs: { inkBarColor: INK, itemSelectedColor: INK, itemHoverColor: INK, itemActiveColor: INK },
+    Table: { headerBg: "#fbfbfa", headerColor: "#6a6a6a", rowHoverBg: MINT, rowSelectedBg: MINT, rowSelectedHoverBg: "#e8f2e3", borderColor: "#ececea" },
+    Card: { borderRadiusLG: 22 },
+    Modal: { borderRadiusLG: 22 },
+    Tag: { borderRadiusSM: 999, defaultBg: "#f0f0ee" },
+    Menu: { itemSelectedBg: MINT, itemSelectedColor: INK, itemBorderRadius: 999 },
+    Progress: { defaultColor: SAGE, remainingColor: "#e3eedf" },
+    Switch: { colorPrimary: INK, colorPrimaryHover: "#2b2b2b" },
+    Checkbox: { colorPrimary: INK, colorPrimaryHover: "#2b2b2b", borderRadiusSM: 6 },
+    Radio: { colorPrimary: INK },
   },
 };
 

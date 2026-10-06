@@ -57,3 +57,19 @@ def test_the_first_administrator_is_made_in_one_company_only(tmp_path):
             assert db.query(User).count() == 0
     finally:
         app.state.tenants.close()
+
+
+def test_a_new_company_speaks_in_general_terms_until_it_says_otherwise(client, ana):
+    """Settings → Terms: general words for a new company; its own once set."""
+    org = client.get("/auth/me", headers=ana).json()["org"]
+    assert org["terms"]["visited"] == {"one": "Account", "many": "Accounts"} and org["terms"]["visitedType"] is None
+    terms = client.get("/admin/terms", headers=ana).json()
+    assert terms["pharma"]["visited"]["many"] == "Doctors"
+    # The Doctor type is there, switched off, for a company that wants it.
+    assert client.put("/admin/terms", headers=ana, json={**terms["pharma"], "visitedType": "nope"}).status_code == 422
+    saved = client.put("/admin/terms", headers=ana, json=terms["pharma"])
+    assert saved.status_code == 200, saved.text
+    org = client.get("/auth/me", headers=ana).json()["org"]
+    assert org["terms"]["visited"]["many"] == "Doctors" and org["terms"]["site"] == "Clinic"
+    measures = {m["key"]: m["label"] for m in client.get("/kpis?all=1", headers=ana).json()["measures"]}
+    assert measures["doctors_visited"] == "Doctors visited"

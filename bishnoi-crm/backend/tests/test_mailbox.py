@@ -165,3 +165,28 @@ def test_several_mailboxes_and_choosing_from(client, ana, crew, google, monkeypa
     assert client.put(f"/mailbox/{other['id']}/default", headers=crew["ria"]).json()["mailboxes"][0]["id"] == other["id"]
     assert [e["subject"] for e in client.get("/emails", headers=crew["ria"]).json()["items"]] == ["Hi", "Hi"]
     assert client.get("/emails", headers=crew["rex"]).json()["total"] == 0
+
+
+def test_one_field_works_out_what_connecting_takes(client, ana, monkeypatch):
+    """Account → Mailbox asks only for the address first; the CRM works out the rest."""
+    from app import mailbox
+
+    monkeypatch.setattr(mailbox, "_by_mx", lambda domain: "google" if domain == "getmeds.ph" else None)
+    gmail = client.get("/mailbox/detect", params={"address": "Ana@Gmail.com"}, headers=ana).json()
+    assert gmail["address"] == "ana@gmail.com" and gmail["provider"] == "google" and gmail["smtp"]["host"] == "smtp.gmail.com"
+    assert gmail["signIn"] is None and gmail["help"]["url"].startswith("https://")  # Google sign-in isn't set up here: an app password, with steps
+    company = client.get("/mailbox/detect", params={"address": "ana@getmeds.ph"}, headers=ana).json()
+    assert company["name"] == "Google" and not company["smtp"]["guessed"]
+    other = client.get("/mailbox/detect", params={"address": "ana@example.org"}, headers=ana).json()
+    assert other["provider"] is None and other["smtp"] == {"host": "smtp.example.org", "port": 587, "security": "starttls", "guessed": True}
+    assert client.get("/mailbox/detect", params={"address": "not an email"}, headers=ana).status_code == 422
+
+
+def test_a_company_domain_on_zoho_sends_through_zohos_business_server(client, ana, monkeypatch):
+    from app import mailbox
+
+    monkeypatch.setattr(mailbox, "_by_mx", lambda domain: "zoho_pro")
+    found = client.get("/mailbox/detect", params={"address": "ana@getmeds.ph"}, headers=ana).json()
+    assert found["name"] == "Zoho Mail" and found["smtp"]["host"] == "smtppro.zoho.com" and found["smtp"]["port"] == 465
+    personal = client.get("/mailbox/detect", params={"address": "ana@zoho.com"}, headers=ana).json()
+    assert personal["smtp"]["host"] == "smtp.zoho.com"

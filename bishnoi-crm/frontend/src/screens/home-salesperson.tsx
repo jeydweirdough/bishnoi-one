@@ -117,7 +117,7 @@ export async function SalespersonHome() {
                 Your quotes
               </SectionTitle>
               {approver && toApprove.total > 0 && (
-                <Link href="/quotes?task=approvals" className="mt-1 flex items-center justify-between rounded-[6px] bg-hema-tint px-3 py-2 text-sm font-medium text-ink hover:underline">
+                <Link href="/quotes?task=approvals" className="mt-1 flex items-center justify-between rounded-[14px] bg-hema-tint px-3 py-2 text-sm font-medium text-ink hover:underline">
                   {toApprove.total} {toApprove.total === 1 ? "quote is" : "quotes are"} waiting for your approval
                   <span aria-hidden>→</span>
                 </Link>

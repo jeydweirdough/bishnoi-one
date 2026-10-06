@@ -25,6 +25,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import fields_for
 from app.models import FIELD_TYPES, Company, Contact, CustomerType, FormField, FormSection, Product, Quote, Team
+from app import terms as terms_mod
 from app.pricing import sales_settings
 from app.routers.deals import deal_lists
 
@@ -369,3 +370,47 @@ def update_company(access: Manage, me: CurrentUser, db: DB, settings: SettingsDe
     fresh = settings.model_copy(update={names[k]: v for k, v in wanted.items() if k in names and v})
     return company_out(db, fresh)
 
+
+
+# --- terms: the company's own words (app/terms.py) ---------------------------------------
+
+
+def terms_out(db: Session) -> dict:
+    s = sales_settings(db)
+    types = db.scalars(select(CustomerType).where(CustomerType.is_active).order_by(CustomerType.sort_order, CustomerType.name))
+    return {
+        "terms": terms_mod.out(s.terms),
+        "general": terms_mod.out(None),
+        "pharma": terms_mod.out(terms_mod.PHARMA),
+        "customerTypes": [{"code": t.code, "name": t.name} for t in types],
+    }
+
+
+@router.get("/admin/terms")
+def read_terms(access: Manage, db: DB) -> dict:
+    return terms_out(db)
+
+
+class VisitedIn(Api):
+    one: str = Field(min_length=1, max_length=40)
+    many: str = Field(min_length=1, max_length=40)
+
+
+class TermsIn(Api):
+    visited: VisitedIn
+    visited_type: str | None = Field(None, max_length=40)
+    detailing: str = Field(min_length=1, max_length=60)
+    site: str = Field(min_length=1, max_length=40)
+    generic_name: str = Field(min_length=1, max_length=40)
+
+
+@router.put("/admin/terms")
+def save_terms(access: Manage, me: CurrentUser, db: DB, body: TermsIn) -> dict:
+    """The company's own words. Saved whole; what matches the general word is still kept, so it stays as chosen."""
+    if body.visited_type and db.get(CustomerType, body.visited_type) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"loc": ["body", "visitedType"], "msg": "Pick one of the customer types.", "type": "value_error"}])
+    s = sales_settings(db)
+    s.terms = {"visited": body.visited.model_dump(), "visited_type": body.visited_type or None, "detailing": body.detailing, "site": body.site, "generic_name": body.generic_name}
+    audit(db, me, "terms.updated", target="Terms", target_type="settings")
+    db.commit()
+    return terms_out(db)

@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { FormError } from "@/src/platform/ui/field";
-import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { addAssociation, findTargets, removeAssociation, type AssocKind, type Associations } from "../../actions/associations";
 
 const HREF: Record<AssocKind, string> = { company: "/companies", contact: "/contacts", deal: "/deals" };
@@ -74,7 +74,7 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
         Associations
       </SectionTitle>
       {data.groups.length === 0 ? (
-        <p className="py-2 text-meta text-ink-3">Nothing linked yet. Link the hospital they work at, the group it&apos;s part of, or who decides on a deal.</p>
+        <Empty compact icon="customers" title="Nothing linked yet">Link where they work, the group it&apos;s part of, or who decides on a deal.</Empty>
       ) : (
         <div className="mt-1 space-y-3">
           {data.groups.map((g) => (

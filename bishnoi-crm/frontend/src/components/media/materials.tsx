@@ -176,7 +176,7 @@ export function Materials({
           {items.map((m) => (
             <li key={m.id} className={`flex flex-col rounded-sheet border border-rule bg-sheet p-4 shadow-sheet ${m.isCurrent ? "" : "opacity-70"}`}>
               <div className="flex items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-[6px] bg-bench text-ink-2">
+                <span className="grid size-9 shrink-0 place-items-center rounded-[14px] bg-bench text-ink-2">
                   {m.kind === "link" ? <Link2 className="size-4" aria-hidden /> : <FileText className="size-4" aria-hidden />}
                 </span>
                 <div className="min-w-0 flex-1">

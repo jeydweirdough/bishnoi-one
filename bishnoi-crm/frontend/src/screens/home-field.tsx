@@ -8,6 +8,7 @@ import { LogVisitButton } from "../components/field/log-visit";
 import { Meters } from "../components/field/meters";
 import type { Doctors, Performance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
+import { lower, termsOf } from "../components/terms/terms";
 
 /** A field agent's day: how the month is going against their goals, who owes
  *  the most, and what they logged lately. Logging a visit is the one big button. */
@@ -37,7 +38,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
       </PageHeader>
       <AttentionPanel />
 
-      {mine && <Meters actual={mine.actual} goal={mine.goal} fmt={fmt} />}
+      {mine && <Meters actual={mine.actual} goal={mine.goal} fmt={fmt} terms={termsOf(me)} />}
 
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <Sheet className="px-5 pt-4 pb-3">
@@ -95,7 +96,7 @@ export async function FieldHome({ me }: { me: Me & { org: Org } }) {
               After each visit, use Log visit: what came of it, and any payment collected.
             </Empty>
           ) : (
-            <VisitList visits={visits.items} fmt={fmt} today={today} showWho={false} />
+            <VisitList visits={visits.items} fmt={fmt} today={today} showWho={false} site={lower(termsOf(me).site)} />
           )}
         </Sheet>
       </div>

@@ -1,18 +1,18 @@
 import { CUSTOMER_STATUSES, QUOTE_STATES } from "../lib/labels";
 import type { CustomerStatus, Quote } from "../lib/types";
 
-// Status is printed in ink, never coloured: dashed = lead (not yet a customer),
-// solid = active, outlined = inactive.
+// Status as a pill, and always in words: dashed = lead (not yet a customer),
+// sage = active, grey = inactive.
 const statusStyle: Record<CustomerStatus, string> = {
   lead: "border border-dashed border-ink-2 text-ink-2",
-  active: "border border-ink bg-ink text-white",
-  inactive: "border border-rule-strong text-ink-3",
+  active: "border border-transparent bg-[#e6f2e1] text-[#3f6f35]",
+  inactive: "border border-transparent bg-[#f0f0ee] text-ink-3",
 };
 
 export function StatusMark({ status }: { status: CustomerStatus }) {
   return (
     <span
-      className={`inline-flex h-5 items-center rounded-[4px] px-1.5 text-stamp uppercase ${statusStyle[status]}`}
+      className={`inline-flex h-6 items-center rounded-full px-2.5 text-meta font-medium whitespace-nowrap ${statusStyle[status]}`}
     >
       {CUSTOMER_STATUSES[status]}
     </span>
@@ -25,10 +25,10 @@ export function StatusMark({ status }: { status: CustomerStatus }) {
 export function QuoteStateMark({ state }: { state: Quote["state"] }) {
   if (state === "rejected") return <Flag letter="!">{QUOTE_STATES.rejected}</Flag>;
   if (state === "ready") {
-    return <span className="text-stamp whitespace-nowrap text-ink-3 uppercase">{QUOTE_STATES.ready}</span>;
+    return <span className="inline-flex h-6 items-center rounded-full bg-[#e6f2e1] px-2.5 text-meta font-medium whitespace-nowrap text-[#3f6f35]">{QUOTE_STATES.ready}</span>;
   }
   return (
-    <span className="inline-flex h-5 shrink-0 items-center rounded-[4px] border border-dashed border-ink-2 px-1.5 text-stamp whitespace-nowrap text-ink-2 uppercase">
+    <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-dashed border-ink-2 px-2.5 text-meta font-medium whitespace-nowrap text-ink-2">
       {QUOTE_STATES.waiting}
     </span>
   );
@@ -40,7 +40,7 @@ export function Flag({ letter, children }: { letter: string; children: React.Rea
     <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-eosin">
       <span
         aria-hidden
-        className="inline-flex size-[18px] items-center justify-center rounded-[4px] border border-eosin text-stamp leading-none"
+        className="inline-flex size-[18px] items-center justify-center rounded-full border border-eosin text-stamp leading-none"
       >
         {letter}
       </span>

@@ -139,7 +139,7 @@ STARTING_ROLES += (
     ),
     (
         FIELD_AGENT,
-        "Visits their own doctors and collects what they owe; sees their own goals.",
+        "Visits their own accounts and collects what they owe; sees their own goals.",
         "own",
         frozenset(
             _grant("customers", actions=("view", "edit"))

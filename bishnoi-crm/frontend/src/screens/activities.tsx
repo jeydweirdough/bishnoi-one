@@ -115,7 +115,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
           />
         )}
         {personName && (
-          <span className="inline-flex items-center gap-2 rounded-[6px] border border-hema bg-hema-tint px-2.5 py-1 text-meta text-ink">
+          <span className="inline-flex items-center gap-2 rounded-[14px] border border-hema bg-hema-tint px-2.5 py-1 text-meta text-ink">
             {personName}&apos;s only
             <a href={href(view, "team").replace(/[?&]person=[^&]*/, "")} className="font-semibold hover:underline" aria-label="Show the whole team">
               ✕

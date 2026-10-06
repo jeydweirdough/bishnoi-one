@@ -64,8 +64,8 @@ export function AssociationLabels({ initial }: { initial: AssociationLabel[] }) 
       <Sheet>
         <div className="grid gap-3 border-b border-rule px-5 py-2 text-meta font-medium text-ink-3 sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
           <span>Between</span>
-          <span>Read from the first (a doctor…)</span>
-          <span>Read from the other (…the hospital)</span>
+          <span>Read from the first (a contact…)</span>
+          <span>Read from the other (…their organization)</span>
           <span />
         </div>
         <ul className="divide-y divide-rule">

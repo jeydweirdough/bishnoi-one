@@ -9,6 +9,7 @@ import { RouteMap } from "../components/field/route-map";
 import type { Performance, Route, RouteDays } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
 import { distanceText } from "../components/field/where";
+import { lower, termsOf } from "../components/terms/terms";
 
 export const metadata = { title: "Route" };
 
@@ -56,7 +57,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
               key={p.id}
               href={link(route.day, p.id)}
               aria-current={p.id === route.person.id ? "page" : undefined}
-              className={`rounded-[6px] border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:border-control"}`}
+              className={`rounded-[14px] border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:border-control"}`}
             >
               {p.name}
             </Link>
@@ -65,12 +66,12 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
       )}
 
       <nav aria-label="Day" className="mb-4 flex items-center gap-2">
-        <Link href={link(shiftDay(route.day, -1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
+        <Link href={link(shiftDay(route.day, -1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-44 text-center text-heading">{route.day === route.today ? "Today" : fmt.dateLabel(route.day)}</span>
         {route.day < route.today ? (
-          <Link href={link(shiftDay(route.day, 1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
+          <Link href={link(shiftDay(route.day, 1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (
@@ -91,11 +92,11 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
         </div>
         <div className="px-5 py-4">
           <span className="block text-figure">{route.visits.length}</span>
-          <span className="block text-meta text-ink-3">{atClinic} at the clinic</span>
+          <span className="block text-meta text-ink-3">{atClinic} at the {lower(termsOf(me).site)}</span>
         </div>
         <div className="px-5 py-4">
           <span className={`block text-figure ${elsewhere ? "text-danger" : ""}`}>{elsewhere}</span>
-          <span className="block text-meta text-ink-3">Logged away from the clinic</span>
+          <span className="block text-meta text-ink-3">Logged away from the {lower(termsOf(me).site)}</span>
         </div>
       </Sheet>
 
@@ -108,7 +109,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
           <Sheet className="px-5 pt-4 pb-2">
             <SectionTitle icon="visit">Visits</SectionTitle>
             {route.visits.length ? (
-              <VisitList visits={route.visits} fmt={fmt} today={route.today} showWho={false} />
+              <VisitList visits={route.visits} fmt={fmt} today={route.today} showWho={false} site={lower(termsOf(me).site)} />
             ) : (
               <p className="py-4 text-meta text-ink-3">No visits logged this day.</p>
             )}

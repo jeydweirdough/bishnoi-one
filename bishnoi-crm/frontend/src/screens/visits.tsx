@@ -11,6 +11,7 @@ import { LogVisitButton } from "../components/field/log-visit";
 import type { Doctors, Performance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
 import { isFieldAgent, shiftMonth } from "../components/field/words";
+import { lower, termsOf } from "../components/terms/terms";
 
 export const metadata = { title: "Visits" };
 
@@ -39,14 +40,14 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
         {visits.total} {visits.total === 1 ? "visit" : "visits"} · {fmt.peso(collected)} collected
       </PageHeader>
       <nav aria-label="Month" className="mb-4 flex items-center gap-2">
-        <Link href={link(shiftMonth(month, -1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
+        <Link href={link(shiftMonth(month, -1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-36 text-center text-heading">
           {fmt.monthLabel(month)} {month.slice(0, 4)}
         </span>
         {month < perf.thisMonth && (
-          <Link href={link(shiftMonth(month, 1))} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
+          <Link href={link(shiftMonth(month, 1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         )}
@@ -72,7 +73,7 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
             Visits show up here as they&apos;re logged.
           </Empty>
         ) : (
-          <VisitList visits={visits.items} fmt={fmt} today={fmt.todayKey()} showWho={me.role?.scope !== "own"} />
+          <VisitList visits={visits.items} fmt={fmt} today={fmt.todayKey()} showWho={me.role?.scope !== "own"} site={lower(termsOf(me).site)} />
         )}
       </Sheet>
     </>

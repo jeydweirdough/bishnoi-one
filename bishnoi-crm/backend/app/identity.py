@@ -4,6 +4,7 @@ from app.access import access_of
 from app.config import Settings
 from app.models import User
 from app.permissions import ADMIN_PERMISSIONS
+from app import terms
 
 MODULE = {"key": "crm", "name": "CRM", "kind": "crm"}
 ORG_ID = "00000000-0000-4000-8000-000000004302"
@@ -22,6 +23,8 @@ def org_out(settings: Settings) -> dict:
         "minorUnits": settings.org_minor_units,
         "locale": settings.org_locale,
         "timezone": settings.org_timezone,
+        # The company's own words (Settings → Terms): "Doctors" at GetMeds, "Accounts" elsewhere.
+        "terms": terms.out(settings.terms),
     }
 
 

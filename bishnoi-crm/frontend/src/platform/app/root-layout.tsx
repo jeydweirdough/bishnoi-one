@@ -31,7 +31,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
           position="top-center"
           toastOptions={{
             classNames: {
-              toast: "!rounded-[8px] !border-0 !shadow-overlay !font-sans !text-sm !text-ink",
+              toast: "!rounded-[22px] !border-0 !shadow-overlay !font-sans !text-sm !text-ink",
               description: "!text-ink-2",
             },
           }}

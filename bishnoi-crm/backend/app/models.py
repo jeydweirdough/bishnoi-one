@@ -440,6 +440,8 @@ class SalesSettings(Base):
     company_address: Mapped[str | None] = mapped_column(String(300), default=None)
     company_tin: Mapped[str | None] = mapped_column(String(40), default=None)
     company_contact: Mapped[str | None] = mapped_column(String(200), default=None)
+    # The company's own words (app/terms.py); None: the general ones.
+    terms: Mapped[dict | None] = mapped_column(JSON, default=None)
     # The last time the product list was brought over from Inventory, and why
     # the last try failed (None: it didn't).
     inventory_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

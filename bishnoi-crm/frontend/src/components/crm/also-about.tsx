@@ -31,7 +31,7 @@ export function AlsoAbout({ value, onChange, except }: { value: string[]; onChan
         options={options}
         onFocus={() => options.length === 0 && search("")}
         showSearch={{ filterOption: false, onSearch: search }}
-        placeholder="E.g. the hospital, so it shows there too"
+        placeholder="E.g. their organization, so it shows there too"
         notFoundContent="Nothing by that name"
       />
     </label>

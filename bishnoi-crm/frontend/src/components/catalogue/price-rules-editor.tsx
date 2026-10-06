@@ -100,7 +100,7 @@ export function PriceGroupsEditor({ rules }: { rules: PriceRules }) {
           {adding && (
             <li className="flex flex-wrap items-end gap-2 px-5 py-3">
               <CellInput className="w-28 !text-left" aria-label="Code" placeholder="HOSP" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoFocus />
-              <CellInput className="w-56 !text-left" aria-label="Name" placeholder="Hospital" value={name} onChange={(e) => setName(e.target.value)} />
+              <CellInput className="w-56 !text-left" aria-label="Name" placeholder="Wholesale" value={name} onChange={(e) => setName(e.target.value)} />
               <Button size="sm" variant="primary" loading={pending} onClick={add} disabled={!code.trim() || !name.trim()}>
                 Add
               </Button>
@@ -180,7 +180,7 @@ export function PriceRulesEditor({ rules, products, types, org }: { rules: Price
                   <p className="flex flex-wrap items-center gap-1.5 font-medium">
                     {r.name}
                     {edit && (
-                      <button type="button" onClick={() => setEditing(r)} title={`Change ${r.name}`} aria-label={`Change ${r.name}`} className="rounded-[6px] p-1 text-ink-3 hover:bg-hema-tint hover:text-ink">
+                      <button type="button" onClick={() => setEditing(r)} title={`Change ${r.name}`} aria-label={`Change ${r.name}`} className="rounded-[14px] p-1 text-ink-3 hover:bg-hema-tint hover:text-ink">
                         <Pencil className="size-3.5" aria-hidden />
                       </button>
                     )}
@@ -279,7 +279,7 @@ function RuleForm({
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" error={fields.name}>
-            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "volume" ? "Bulk orders" : kind === "surcharge" ? "Cold chain" : "Amoxil for hospitals"} autoFocus />}
+            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "volume" ? "Bulk orders" : kind === "surcharge" ? "Cold chain" : "Brand X for distributors"} autoFocus />}
           </Field>
           <Field label="Product" optional={kind !== "group_price"} error={fields.productId}>
             {(p) => (

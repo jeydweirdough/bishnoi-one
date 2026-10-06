@@ -22,7 +22,7 @@ export function Donut({ title, slices, total, totalLabel = "Total" }: { title: s
   return (
     <div className="flex items-center gap-4">
       <svg viewBox="0 0 120 120" className="size-28 shrink-0 -rotate-90" role="img" aria-label={`${title}: ${slices.map((s) => `${s.label} ${s.value}`).join(", ")}`}>
-        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--color-bench)" strokeWidth="14" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--color-mint-2)" strokeWidth="14" />
         {arcs.map((a) => (
           <circle
             key={a.label}
@@ -39,21 +39,23 @@ export function Donut({ title, slices, total, totalLabel = "Total" }: { title: s
           </circle>
         ))}
         <g className="rotate-90" style={{ transformOrigin: "60px 60px" }}>
-          <text x="60" y="55" textAnchor="middle" className="fill-ink-3 text-[0.6875rem]">
-            {totalLabel}
-          </text>
-          <text x="60" y="73" textAnchor="middle" className="fill-ink text-[1.25rem] font-semibold">
+          {/* The number first, then what it counts. */}
+          <text x="60" y="64" textAnchor="middle" className="fill-ink text-[1.5rem] font-semibold">
             {total ?? sum}
+          </text>
+          <text x="60" y="80" textAnchor="middle" className="fill-ink-3 text-[0.6875rem]">
+            {totalLabel === "Total" ? (total ?? sum) === 1 ? "deal" : "deals" : totalLabel}
           </text>
         </g>
       </svg>
-      {/* One column: each part's full name, and its count beside it. */}
-      <ul className="min-w-0 flex-1 space-y-1.5 text-meta">
+      {/* One column: each part's share first (what the eye reads), then its name and count. */}
+      <ul className="min-w-0 flex-1 space-y-2 text-meta">
         {slices.map((s) => (
-          <li key={s.label} className="flex items-baseline gap-2" title={s.note}>
+          <li key={s.label} className="flex items-baseline gap-2.5" title={s.note}>
+            <span className="w-10 shrink-0 text-right text-sm font-semibold text-ink tabular-nums">{sum ? `${Math.round((100 * s.value) / sum)}%` : "—"}</span>
             <span className="size-2 shrink-0 translate-y-[-1px] rounded-full" style={{ background: s.color }} aria-hidden />
-            <span className="min-w-0 flex-1 text-ink-2">{s.label}</span>
-            <span className="font-semibold text-ink tabular-nums">{s.value}</span>
+            <span className="min-w-0 flex-1 truncate text-ink-2">{s.label}</span>
+            <span className="text-ink-3 tabular-nums">{s.value}</span>
           </li>
         ))}
       </ul>

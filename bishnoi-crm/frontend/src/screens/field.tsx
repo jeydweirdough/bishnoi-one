@@ -8,6 +8,7 @@ import { makeFormat, type Format } from "@/src/platform/lib/format";
 import { NoAccess } from "../components/admin/words";
 import type { DetailingSummary, PersonMonth, Performance } from "../components/field/types";
 import { MEASURES, REACTIONS, progress, shiftMonth } from "../components/field/words";
+import { counted, termsOf, worded, type Terms } from "../components/terms/terms";
 
 export const metadata = { title: "Field work" };
 
@@ -28,7 +29,7 @@ function Cell({ actual, goal, money, fmt }: { actual: number; goal: number | und
   );
 }
 
-function Table({ people, month, fmt }: { people: PersonMonth[]; month: string; fmt: Format }) {
+function Table({ people, month, fmt, terms }: { people: PersonMonth[]; month: string; fmt: Format; terms: Terms }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[48rem] text-sm">
@@ -37,7 +38,7 @@ function Table({ people, month, fmt }: { people: PersonMonth[]; month: string; f
             <th scope="col" className="py-2 pr-3 font-semibold">Person</th>
             {MEASURES.map((m) => (
               <th key={m.key} scope="col" className="px-3 py-2 text-right font-semibold">
-                {m.label}
+                {worded(m.label, terms)}
               </th>
             ))}
           </tr>
@@ -72,6 +73,7 @@ function Table({ people, month, fmt }: { people: PersonMonth[]; month: string; f
  *  team) and the admin (everyone), who also sets the goals. */
 export default async function FieldPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
+  const terms = termsOf(me);
   if (!can(me, "goals.view")) return <NoAccess what="the field work tracker" />;
   const asked = (await searchParams).month;
   const data = await load<Performance>(`/field/performance${typeof asked === "string" ? `?month=${enc(asked)}` : ""}`);
@@ -103,14 +105,14 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
       </PageHeader>
 
       <nav aria-label="Month" className="mb-4 flex items-center gap-2">
-        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
+        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-36 text-center text-heading">
           {fmt.monthLabel(month)} {month.slice(0, 4)}
         </span>
         {month < data.thisMonth ? (
-          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-[6px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
+          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (
@@ -127,7 +129,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
         {MEASURES.map((m) => (
           <div key={m.key} className="px-5 py-4">
             <span className="block text-figure text-ink">{m.money ? fmt.peso(data.totals[m.key]) : data.totals[m.key]}</span>
-            <span className="mt-0.5 block text-meta text-ink-3">{m.label}, everyone</span>
+            <span className="mt-0.5 block text-meta text-ink-3">{worded(m.label, terms)}, everyone</span>
           </div>
         ))}
       </Sheet>
@@ -148,7 +150,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
             Give someone the Field agent role (People and access) and they show up here.
           </Empty>
         ) : (
-          <Table people={data.people} month={month} fmt={fmt} />
+          <Table terms={terms} people={data.people} month={month} fmt={fmt} />
         )}
       </Sheet>
       {behind.length > 0 && month === data.thisMonth && (
@@ -156,7 +158,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
           Still short of a goal this month: {behind.map((p) => p.person.name).join(", ")}.
         </p>
       )}
-      {detailing && <Detailing summary={detailing} />}
+      {detailing && <Detailing summary={detailing} terms={terms} />}
     </>
   );
 }
@@ -172,10 +174,10 @@ const SWATCH: Record<string, string> = {
 };
 
 /** The month's detailing: each product, on how many visits and doctors, and how doctors took it. */
-function Detailing({ summary }: { summary: DetailingSummary }) {
+function Detailing({ summary, terms }: { summary: DetailingSummary; terms: Terms }) {
   return (
     <Sheet className="mt-5 px-5 pt-3 pb-4">
-      <SectionTitle icon="visit">Products detailed</SectionTitle>
+      <SectionTitle icon="visit">{terms.detailing}</SectionTitle>
       <p className="mb-3 text-meta text-ink-3">
         {summary.detailedVisits} of {summary.visits} {summary.visits === 1 ? "visit" : "visits"} this month recorded the products discussed.
       </p>
@@ -189,7 +191,7 @@ function Detailing({ summary }: { summary: DetailingSummary }) {
                 <span className="text-sm">
                   <span className="font-medium text-ink">{p.product.name}</span>
                   <span className="block text-meta text-ink-3">
-                    {p.visits} {p.visits === 1 ? "visit" : "visits"} · {p.doctors} {p.doctors === 1 ? "doctor" : "doctors"}
+                    {p.visits} {p.visits === 1 ? "visit" : "visits"} · {counted(p.doctors, terms)}
                   </span>
                 </span>
                 <div
@@ -207,7 +209,7 @@ function Detailing({ summary }: { summary: DetailingSummary }) {
           <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-meta text-ink-3">
             {REACTIONS.map((r) => (
               <span key={r.value} className="inline-flex items-center gap-1.5">
-                <span className={`size-2.5 rounded-[4px] ${SWATCH[r.value]}`} aria-hidden />
+                <span className={`size-2.5 rounded-full ${SWATCH[r.value]}`} aria-hidden />
                 {r.label}
               </span>
             ))}

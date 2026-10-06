@@ -67,10 +67,10 @@ export function KpiEditor({ catalogue, products }: { catalogue: KpiCatalogue; pr
                     <p className="text-meta text-ink-3">For {k.roles.length ? k.roles.map((r) => r.name).join(", ") : "everyone"}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
-                    <button type="button" onClick={() => move(i, -1)} disabled={i === 0 || pending} className="rounded-[6px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} up`}>
+                    <button type="button" onClick={() => move(i, -1)} disabled={i === 0 || pending} className="rounded-[14px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} up`}>
                       <ArrowUp className="size-4" aria-hidden />
                     </button>
-                    <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1 || pending} className="rounded-[6px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} down`}>
+                    <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1 || pending} className="rounded-[14px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} down`}>
                       <ArrowDown className="size-4" aria-hidden />
                     </button>
                     <Button size="sm" variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />} onClick={() => setEditing(k.id)}>

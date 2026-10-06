@@ -115,7 +115,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
         e.preventDefault();
         submit();
       }}
-      className="mt-3 space-y-4 rounded-[6px] bg-bench px-4 py-4"
+      className="mt-3 space-y-4 rounded-[14px] bg-bench px-4 py-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {!kind && (

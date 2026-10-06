@@ -3,6 +3,8 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import type { Pin, RoutePoint, Visit } from "./types";
+import { useTerms } from "@/src/components/terms/provider";
+import { lower } from "@/src/components/terms/terms";
 
 type MapVisit = Visit & { clinic: Pin | null };
 
@@ -15,6 +17,7 @@ const DANGER = "#b42318";
 const GREY = "#8a8f98";
 
 export function RouteMap({ points, visits }: { points: RoutePoint[]; visits: MapVisit[] }) {
+  const terms = useTerms();
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,7 +49,7 @@ export function RouteMap({ points, visits }: { points: RoutePoint[]; visits: Map
             ],
             { color: HEMA, weight: 1, fillOpacity: 0.25 },
           )
-            .bindTooltip(`${v.company.name}: clinic`)
+            .bindTooltip(`${v.company.name}: ${lower(terms.site)}`)
             .addTo(map);
           bounds.push(at);
         }
@@ -54,7 +57,7 @@ export function RouteMap({ points, visits }: { points: RoutePoint[]; visits: Map
           const at: [number, number] = [v.location.latitude, v.location.longitude];
           const color = v.atClinic === true ? HEMA : v.atClinic === false ? DANGER : GREY;
           L.circleMarker(at, { radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2 })
-            .bindTooltip(`${v.company.name}${v.atClinic === false && v.distanceM !== null ? ` · logged ${v.distanceM} m from the clinic` : ""}`)
+            .bindTooltip(`${v.company.name}${v.atClinic === false && v.distanceM !== null ? ` · logged ${v.distanceM} m from the ${lower(terms.site)}` : ""}`)
             .addTo(map);
           bounds.push(at);
         }
@@ -68,5 +71,5 @@ export function RouteMap({ points, visits }: { points: RoutePoint[]; visits: Map
     };
   }, [points, visits]);
 
-  return <div ref={box} role="img" aria-label="The day's route on a map" className="h-[28rem] w-full rounded-[6px] bg-bench" />;
+  return <div ref={box} role="img" aria-label="The day's route on a map" className="h-[28rem] w-full rounded-[14px] bg-bench" />;
 }

@@ -40,13 +40,13 @@ export function QuickAdd({ label, title, children }: { label: string; title: str
             ref={dialog}
             aria-labelledby={titleId}
             onClose={() => setOpen(false)}
-            className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-[6px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30"
+            className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-[14px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30"
           >
             <div className="flex items-center justify-between border-b border-rule px-5 py-3">
               <h2 id={titleId} className="text-heading">
                 {title}
               </h2>
-              <button type="button" onClick={close} className="rounded-[6px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
+              <button type="button" onClick={close} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
                 <X className="size-4" aria-hidden />
               </button>
             </div>

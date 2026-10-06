@@ -185,7 +185,7 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
       <div
         role="status"
         title={pill.hint}
-        className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-[6px] bg-sheet px-3 py-1.5 text-meta text-ink-2 shadow-overlay"
+        className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-[14px] bg-sheet px-3 py-1.5 text-meta text-ink-2 shadow-overlay"
       >
         <span aria-hidden className={`size-2 rounded-full ${dot}`} />
         {pill.text}
