@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'admin.db').as_posix()}"
+    # The online database (Neon) that `python -m app.tools.copy_database backup`
+    # copies into .data/backups/ each night. Unset: DATABASE_URL itself.
+    backup_from: str | None = None
     # The first administrator, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + Supabase).
     # Once anyone exists these are ignored; remove the password afterwards.
