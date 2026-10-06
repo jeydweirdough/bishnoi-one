@@ -23,7 +23,6 @@ export const SETTINGS_PAGES = [
   { href: "/admin/settings/kpis", label: "KPIs", permission: "admin.settings" },
   { href: "/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
-  { href: "/admin/settings/funds", label: "Marketing request purposes", permission: "admin.settings" },
   { href: "/admin/settings/associations", label: "Associations", permission: "admin.settings" },
   { href: "/admin/settings/emails", label: "Approved emails", permission: "admin.settings" },
   { href: "/admin/settings/attention", label: "Attention", permission: "admin.settings" },

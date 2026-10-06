@@ -546,68 +546,6 @@ class StoredFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-# --- marketing requests: money asked for ahead of spending it ---------------------------------
-#
-# A salesperson or field agent asks here, their Team Lead approves here, and
-# Bishnoi One Finance releases it and checks how it was spent (app/funds.py).
-
-
-class FundPurpose(Base):
-    """What money is asked for (a partnership dinner, transport). Whether it's
-    liquidated (receipts and unused funds back) goes with the purpose; the Team Lead
-    can still change it on a request when approving."""
-
-    __tablename__ = "nbcm_fund_purposes"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    name: Mapped[str] = mapped_column(String(80), unique=True)
-    description: Mapped[str | None] = mapped_column(String(300), default=None)
-    liquidate: Mapped[bool] = mapped_column(default=True)
-    is_active: Mapped[bool] = mapped_column(default=True)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-
-
-FUND_REQUEST_STATUSES = (
-    # Here: waiting on the Team Lead, and what they decided.
-    "pending", "declined", "cancelled", "approved",
-    # Finance's, mirrored from it once it has the request.
-    "to_release", "to_liquidate", "to_check", "to_return", "to_reimburse", "closed",
-)
-
-
-class FundRequest(Owned, Base):
-    """One request for money. The owner is who asked, and who liquidates it."""
-
-    __tablename__ = "nbcm_fund_requests"
-    __table_args__ = (CheckConstraint(f"status IN {FUND_REQUEST_STATUSES}", name="fund_request_status"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    number: Mapped[str] = mapped_column(String(24), unique=True)
-    purpose_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_fund_purposes.id", ondelete="SET NULL"), default=None)
-    # As it was when asked, so renaming a purpose never rewrites a request.
-    purpose_name: Mapped[str] = mapped_column(String(80))
-    liquidate: Mapped[bool] = mapped_column(default=True)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
-    needed_on: Mapped[str | None] = mapped_column(String(10), default=None)
-    details: Mapped[str] = mapped_column(Text)
-    # The customer it's for, if any (the partner at the dinner).
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), default=None)
-    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
-    # The Team Lead's decision.
-    approved_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
-    decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    decision_note: Mapped[str | None] = mapped_column(String(500), default=None)
-    # Finance's copy, as it last answered, and why sending it failed (None: it didn't).
-    finance: Mapped[dict | None] = mapped_column(JSON, default=None)
-    finance_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    finance_error: Mapped[str | None] = mapped_column(String(300), default=None)
-
-    owner: Mapped[User] = relationship(foreign_keys="FundRequest.owner_id", lazy="joined")
-    decided_by: Mapped[User | None] = relationship(foreign_keys="FundRequest.decided_by_id", lazy="joined")
-    company: Mapped["Company | None"] = relationship(lazy="joined")
-
-
 # --- settings: the forms (Administration → Settings → Forms) --------------------------
 #
 # Every form (a company, a contact, a product, a quote) is laid out in sections,

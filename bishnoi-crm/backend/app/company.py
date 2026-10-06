@@ -77,6 +77,8 @@ def _ask(settings: Settings, slug: str) -> Standing:
     except (ValueError, KeyError, InvalidSignature, TypeError, json.JSONDecodeError):
         return Standing(False, "The platform's answer about this company couldn't be checked. Ask your Bishnoi One administrator.", until=time.time() + 300)
     name, company_id, until = claims.get("companyName") or slug, claims.get("company"), float(claims["exp"])
+    if claims.get("status") == "paused":
+        return Standing(False, f"{name}'s Bishnoi One access is paused until {claims.get('pausedUntil') or 'later'}. It comes back by itself then.", company_id, name, until)
     if claims.get("status") != "active":
         return Standing(False, f"{name} is suspended on Bishnoi One Platform, so the CRM can't be used. Ask your Bishnoi One administrator.", company_id, name, until)
     if not claims.get("granted"):

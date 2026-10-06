@@ -57,7 +57,7 @@ type SubPage = { href: string; label: string; also?: string[]; count?: number; e
 /** `count`: how many things there wait on this person. */
 type CrmPage = Page & { exact?: boolean; subpages?: SubPage[]; count?: number };
 
-/** How many things wait on this person, by kind (the API's /funds/waiting). */
+/** How many things wait on this person, by kind (none are counted in the CRM today). */
 export type Waiting = Record<string, number>;
 
 /** How many things aren't set up yet, by kind (the API's /unset): only the
@@ -153,24 +153,6 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         ...only(may("visits.view"), { href: "/field/doctors", label: "Doctors", icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
         ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
         ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
-        // Money asked for ahead of spending it. Counted: what waits on the
-        // Team Lead's decision, and the requester's own money to account for.
-        ...only(may("funds.view"), {
-          href: "/funds",
-          label: "Marketing requests",
-          icon: "payments",
-          count: (waiting.toApprove ?? 0) + (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0),
-          subpages: [
-            // Only on itself: a request (/funds/<id>) may be someone else's.
-            { href: "/funds", label: "My requests", exact: true, count: (waiting.toLiquidate ?? 0) + (waiting.toReturn ?? 0) },
-            ...(may("funds.approve")
-              ? [
-                  { href: "/funds/approve", label: "For approval", count: waiting.toApprove ?? 0 },
-                  { href: "/funds/team", label: me.role?.scope === "all" ? "All requests" : "Team requests" },
-                ]
-              : []),
-          ],
-        }),
       ],
     },
     {

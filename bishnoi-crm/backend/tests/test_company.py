@@ -20,11 +20,11 @@ def b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def company_pass(status="active", granted=True, slug="getmeds", key=KEY, exp=None) -> str:
+def company_pass(status="active", granted=True, slug="getmeds", key=KEY, exp=None, **more) -> str:
     head = b64(json.dumps({"alg": "EdDSA", "typ": "JWT"}).encode())
     body = b64(json.dumps({
         "iss": "bishnoi-platform", "aud": "crm", "kind": "company", "company": "co-1", "slug": slug,
-        "companyName": "GetMeds", "status": status, "granted": granted, "exp": exp or int(time.time()) + 3600,
+        "companyName": "GetMeds", "status": status, "granted": granted, "exp": exp or int(time.time()) + 3600, **more,
     }).encode())
     return f"{head}.{body}.{b64(key.sign(f'{head}.{body}'.encode()))}"
 
@@ -114,3 +114,9 @@ def test_on_this_computer_only_the_dev_companies(client):
     r = client.post("/auth/login", json={"email": "ana@example.com", "password": PASSWORD}, headers={"X-Bishnoi-Company": "nowhere"})
     assert r.status_code == 403 and "no company" in r.json()["detail"]
     assert client.get("/auth/company", headers={"X-Bishnoi-Company": "Not A Slug!"}).status_code == 400
+
+
+def test_a_paused_company_is_told_until_when(client, platform):
+    platform["answer"] = Answer(200, {"pass": company_pass(status="paused", pausedUntil="Mon 12 Oct 2026, 8:00 AM")})
+    r = sign_in(client)
+    assert r.status_code == 403 and "paused until Mon 12 Oct 2026, 8:00 AM" in r.json()["detail"]

@@ -57,9 +57,6 @@ AREAS: tuple[Area, ...] = (
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.
     Area("goals", "Targets and balances", "Field work", ("view", "manage", "import")),
-    # Money asked for ahead of spending it (a partnership dinner): funds.create
-    # asks, funds.approve approves the requests in reach; Finance releases it.
-    Area("funds", "Marketing requests", "Field work", ("view", "create", "approve")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
     Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )
@@ -121,7 +118,6 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
             | _grant("reports", actions=("view", "export"))
             | _grant("visits")
             | _grant("goals", actions=("view",))
-            | _grant("funds", actions=("view", "create", "approve"))
         ),
     ),
     (
@@ -131,7 +127,6 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         frozenset(
             _grant("customers", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
             | _grant("dashboard", "products", actions=("view",))
-            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )
@@ -151,7 +146,6 @@ STARTING_ROLES += (
             | _grant("visits", actions=("view", "create", "edit"))
             | _grant("activities", actions=("view", "create", "edit"))
             | _grant("dashboard", actions=("view",))
-            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )
