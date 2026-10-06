@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     # Not a setting: the company of the request these settings are for, set
     # by app/deps.py, and sent on to the other apps (X-Bishnoi-Company).
     company: str | None = None
+    # Not a setting either: the company's own words (app/terms.py), set by app/deps.py.
+    terms: dict | None = None
     dev_companies: list[str] = ["getmeds", "northwind"]
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
