@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import logo from "@/src/components/assets/logo.png";
 import { appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
 import { buttonClass } from "../ui/button";
 import { APP_NAME } from "../lib/labels";
@@ -8,7 +10,7 @@ import { LoginForm, type Demo } from "./login-form";
 // Each Bishnoi One app signs in on its own page, so the tab says which one it is:
 // six sign-in tabs that all read the same thing are six tabs you have to guess at.
 export const metadata: Metadata = {
-  title: thisAppLabel() ? `Sign in to ${thisAppLabel()}` : "Sign in",
+  title: { absolute: thisAppLabel() ? `Sign in to ${APP_NAME} ${thisAppLabel()}` : `Sign in to ${APP_NAME}` },
 };
 
 // Shown only when SHOW_DEMO_ACCOUNTS=1 (development). This app's own backend
@@ -35,6 +37,16 @@ function platformSignIn(): string | null {
   return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
 }
 
+// The panel's circles: soft white and navy over the blue, so they read as
+// light and shade on it rather than as more blue.
+const CIRCLES: { className: string; background: string }[] = [
+  { className: "-top-[16vmin] left-[34%] size-[34vmin]", background: "rgb(255 255 255 / 0.18)" },
+  { className: "-top-[10vmin] -right-[8vmin] size-[30vmin]", background: "linear-gradient(200deg, #1379b8 0%, #0c3a68 80%)" },
+  { className: "top-[48%] -left-[14vmin] size-[32vmin]", background: "linear-gradient(160deg, rgb(255 255 255 / 0.35) 0%, rgb(255 255 255 / 0.08) 100%)" },
+  { className: "-bottom-[6vmin] -right-[4vmin] size-[16vmin]", background: "rgb(255 255 255 / 0.2)" },
+  { className: "bottom-[7vmin] right-[8vmin] size-[6vmin]", background: "#0c3a68" },
+];
+
 export async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : "/";
@@ -44,55 +56,62 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
   const bishnoiAccount = platformSignIn();
   const demo = await demoAccounts();
   const app = thisAppLabel();
+  // No company name here, and not by omission: nobody has signed in yet, so
+  // which company this is isn't known. Which *app* is known, and is said
+  // plainly: each one signs in separately.
+  const name = app ? `${APP_NAME} ${app}` : APP_NAME;
+  const notice = expired
+    ? "Your session ended. Log in again to pick up where you left off."
+    : denied
+      ? `The account you're signed in with doesn't work in ${name}. Log in with one that does.`
+      : undefined;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-start px-4 py-10 sm:justify-center">
-      <LoginForm next={next} demo={demo.items} demoPassword={demo.password}>
-        {/* No company name here, and not by omission: nobody has signed in
-            yet, so which company this is isn't known. One sign-in page serves
-            every company on the platform. The company's own name appears the
-            moment there is a person to read it from.
-
-            Which *app* is known, though, and is said plainly. Each one signs
-            in separately, and a person should see what they are entering
-            rather than read it off the address bar. The shell is every app at
-            once, so it has no name of its own to add. */}
-        <div className="border-b-[3px] border-double border-ink pb-3">
-          {app ? (
-            <>
-              <p className="text-stamp text-ink-3 uppercase">{APP_NAME}</p>
-              <p className="text-heading leading-tight">{app}</p>
-            </>
-          ) : (
-            <p className="text-heading">{APP_NAME}</p>
-          )}
-        </div>
-        <h1 className="mt-6 text-title">Sign in</h1>
-        {expired && <p className="mt-1 text-ink-2">Your session ended. Sign in again to pick up where you left off.</p>}
-        {denied && (
-          <p className="mt-1 text-ink-2">
-            The account you're signed in with doesn't work in {app ?? "this app"}. Sign in with one that does.
-          </p>
-        )}
-        {refused && (
-          <p role="alert" className="mt-3 rounded-[3px] bg-danger-tint px-3 py-2 text-sm text-danger">
-            {refused}
-          </p>
-        )}
-        {bishnoiAccount && (
-          <div className="mt-6">
-            <a href={bishnoiAccount} className={buttonClass("primary", "md", "w-full justify-center")}>
-              Sign in with your Bishnoi One account
-            </a>
-            <p className="mt-4 flex items-center gap-3 text-meta text-ink-3">
-              <span className="h-px flex-1 bg-rule" aria-hidden />
-              or with an account of {app ?? "this app"} only
-              <span className="h-px flex-1 bg-rule" aria-hidden />
-            </p>
-          </div>
-        )}
-      </LoginForm>
-      <p className="mt-4 text-center text-meta text-ink-3">Forgot your password? Ask your admin to reset it.</p>
+    <main className="min-h-dvh bg-sheet">
+      <LoginForm
+        next={next}
+        demo={demo.items}
+        demoPassword={demo.password}
+        notice={notice}
+        before={
+          <>
+            {refused && (
+              <p role="alert" className="mt-4 rounded-[14px] bg-danger-tint px-3 py-2 text-sm text-danger">
+                {refused}
+              </p>
+            )}
+            {bishnoiAccount && (
+              <div className="mt-6">
+                <a href={bishnoiAccount} className={buttonClass("primary", "md", "w-full justify-center")}>
+                  Log in with your Bishnoi One account
+                </a>
+                <p className="mt-4 flex items-center gap-3 text-meta text-ink-3">
+                  <span className="h-px flex-1 bg-rule" aria-hidden />
+                  or with an account of {app ?? "this app"} only
+                  <span className="h-px flex-1 bg-rule" aria-hidden />
+                </p>
+              </div>
+            )}
+          </>
+        }
+        brand={
+          <span className="flex flex-col items-center gap-3">
+            <Image src={logo} alt="" aria-hidden className="h-14 w-auto" priority />
+            <span className="text-lg font-bold tracking-tight text-[#0c3a68]">{name}</span>
+          </span>
+        }
+        panel={
+          <>
+            {CIRCLES.map((c) => (
+              <span key={c.className} aria-hidden className={`absolute rounded-full ${c.className}`} style={{ background: c.background }} />
+            ))}
+            <div className="relative flex flex-col items-center gap-5">
+              <Image src={logo} alt="" aria-hidden className="h-[clamp(7rem,16vmin,10rem)] w-auto" priority />
+              <p className="text-center text-[clamp(1.375rem,2vw,1.75rem)] leading-tight font-semibold tracking-tight text-white">{name}</p>
+            </div>
+          </>
+        }
+      />
     </main>
   );
 }

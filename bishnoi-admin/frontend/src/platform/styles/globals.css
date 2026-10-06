@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * The Geima look: every record is a white sheet on a cool grey bench.
+ * The Geima look: every record is a white sheet on a white page, lifted by its shadow.
  * - One ink for actions: hematoxylin violet marks buttons, links, focus and selection. Nothing else.
  * - Eosin appears only inside flags (e.g. overdue), always with words, never colour alone.
  * - Status is printed in ink: dashed = lead, solid = active, outlined = inactive.
@@ -53,6 +53,10 @@
 
   --color-bench: #eceef2;
   --color-sheet: #ffffff;
+  /* The sidebar's panel, and its section titles (GetMEDS blue). */
+  --color-rail: #f6f7f9;
+  --color-section: #1d9fda;
+  --color-section-hover: #1789bd;
   --color-ink: #1b1d22;
   --color-ink-2: #454a54;
   --color-ink-3: #636973;
@@ -108,7 +112,7 @@
 @layer base {
   html {
     color-scheme: light;
-    background: var(--color-bench);
+    background: var(--color-sheet);
     color: var(--color-ink);
     -webkit-text-size-adjust: 100%;
   }

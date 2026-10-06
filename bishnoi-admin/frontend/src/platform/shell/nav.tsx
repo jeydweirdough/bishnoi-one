@@ -2,7 +2,9 @@
 
 import { ChevronRight, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import logo from "@/src/components/assets/logo.png";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
 import { ConfirmButton } from "../ui/confirm";
@@ -211,14 +213,14 @@ function Row({
 }) {
   const className = `flex items-center gap-2.5 rounded-[3px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
     current
-      ? "bg-hema-tint font-semibold text-hema"
+      ? "bg-sheet font-semibold text-ink shadow-[0_1px_2px_rgb(20_22_30/0.08)]"
       : open
-        ? "font-semibold text-ink hover:bg-sheet"
-        : "text-ink-2 hover:bg-sheet hover:text-ink"
+        ? "font-semibold text-ink hover:bg-bench"
+        : "text-ink hover:bg-bench"
   }`;
   const inside = (
     <>
-      <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />
+      <Icon name={icon} className={`size-4 ${current ? "text-section" : "text-ink"}`} />
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -288,9 +290,9 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink hover:bg-bench"
     >
-      <Icon name={icon} className="size-4 text-ink-3" />
+      <Icon name={icon} className="size-4 text-ink" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <Icon name="external" className="size-3.5 text-ink-3" />
       <span className="sr-only">(opens in a new tab)</span>
@@ -407,10 +409,10 @@ function AppSwitcher({ items }: { items: Away[] }) {
         aria-expanded={open}
         aria-haspopup="menu"
         className={`flex h-9 w-full items-center gap-2.5 rounded-[3px] px-3 text-sm ${
-          open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
+          open ? "bg-bench font-semibold text-ink" : "text-ink hover:bg-bench"
         }`}
       >
-        <Icon name="apps" className="size-4 text-ink-3" />
+        <Icon name="apps" className="size-4 text-ink" />
         <span className="min-w-0 flex-1 truncate text-left">Other apps</span>
         <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
@@ -448,7 +450,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-5">
-      <p className="mb-1 px-3 text-caps text-ink-3 uppercase">{label}</p>
+      <p className="mb-1 px-3 text-meta font-semibold text-section">{label}</p>
       <div className="space-y-0.5">{children}</div>
     </div>
   );
@@ -651,7 +653,7 @@ function placeOf(pathname: string, me: Me): string | null {
   }
   const execPage = EXECUTIVE_PAGES.find((p) => isCurrent(p, pathname, p.href === "/"));
   if (execPage) {
-    return `Executive Admin · ${execPage.label}`;
+    return `Bishnoi One Admin · ${execPage.label}`;
   }
 
   // In a module's own app every path below it is that module's; in the shell
@@ -675,7 +677,7 @@ function Account({ me }: { me: Me }) {
       <Link
         href="/account"
         aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
+        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-bench"}`}
       >
         <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
         <span className="min-w-0">
@@ -709,23 +711,26 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const place = placeOf(pathname, me);
 
   const brand = (
-    <Link href="/" className="block border-b-[3px] border-double border-ink pb-2">
+    <Link href="/" className="flex items-center gap-2.5">
+      <Image src={logo} alt="" aria-hidden className="h-8 w-auto shrink-0" priority />
+      <span className="block min-w-0">
       {/* No company on the platform: a Developer Admin has not opened one, and
           saying a company name there would be saying something untrue. */}
-      <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
+      <span className="block truncate text-meta font-semibold text-section">{me.org?.brandName ?? "Platform"}</span>
       {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Bishnoi One" alone leaves you working out from the port
+          its own address, so the product name alone leaves you working out from the port
           whether the screen in front of you is missing or simply elsewhere. */}
-      <span className="block truncate text-base leading-tight font-semibold text-ink">
+      <span className="block text-base leading-tight font-semibold text-ink">
         {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+      </span>
       </span>
     </Link>
   );
 
   return (
     <>
-      {/* Desktop: a fixed column on the bench. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
+      {/* Desktop: a light grey column beside the page, a rule between them. */}
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto border-r border-rule bg-rail px-3 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
           <Links me={me} unset={unset} />
@@ -734,7 +739,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
       </aside>
 
       {/* Phone and tablet: a top bar with a menu, saying where you are. */}
-      <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-30 border-b border-rule bg-sheet/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-36 shrink-0">{brand}</div>
           <button
@@ -742,7 +747,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-bench"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

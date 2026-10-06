@@ -24,14 +24,19 @@ There is no sign-up page. Accounts are made from the command line:
 
 | Command | Does |
 |---|---|
-| `uv run python -m app.tools.users add --email … --name "…" [--admin]` | Makes an account; asks for its password |
+| `uv run python -m app.tools.users add --email … --name "…" [--role "…" \| --admin]` | Makes an account (Executive Assistant unless told otherwise); asks for its password |
 | `uv run python -m app.tools.users list` | Lists accounts |
-| `uv run python -m app.tools.users demo` | Makes this app's demo accounts, password `demo1234` (development only; listed in `app/demo.py`) |
+| `uv run python -m app.tools.users roles` | Lists roles and how many people have each |
+| `uv run python -m app.tools.users role --email … --role "…"` | Changes someone's role (never the last administrator's) |
+| `uv run python -m app.tools.users demo` | Makes this app's demo accounts, one per role, password `demo1234`, and seeds sample records (development only; listed in `app/demo.py`) |
 | `uv run python -m app.tools.users password --email …` | Sets a new password; ends that person's sessions |
 | `uv run python -m app.tools.users disable --email …` | Switches the account off; ends its sessions |
 | `uv run python -m app.tools.users enable --email …` | Switches it back on |
 
-`--admin` accounts can run this app's settings; the rest just use it.
+The roles start as Administrator (everything, can't be changed), Executive
+Assistant, Compliance Officer and Auditor (read-only). What each may do is in
+`app/permissions.py`; administrators can change that from the app. `--admin`
+is short for `--role Administrator`.
 
 ## Sign-in endpoints
 

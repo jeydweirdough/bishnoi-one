@@ -25,6 +25,16 @@ from app.models import (
     new_id,
     utcnow,
 )
+from app.permissions import (
+    ADMINISTRATOR,
+    AUDITOR,
+    COMPLIANCE_OFFICER,
+    EXECUTIVE_ASSISTANT,
+    ROLE_ADMIN_ID,
+    ROLE_AUDITOR_ID,
+    ROLE_COMPLIANCE_ID,
+    ROLE_EXEC_ASST_ID,
+)
 from app.security import hash_password
 
 DEMO_PASSWORD = "demo1234"
@@ -35,16 +45,21 @@ class Demo:
     group: str
     email: str
     name: str
-    role: str
-    admin: bool = False
+    role: str  # what the sign-in page shows: "<role> · <what they do>"
+    role_id: str
+
+    @property
+    def admin(self) -> bool:
+        return self.role_id == ROLE_ADMIN_ID
 
 
+# One of every starting role (app/permissions.py), so each can be tried.
 DEMO_ACCOUNTS: tuple[Demo, ...] = (
-    Demo("Executive Admin", "deo@pharmacrm.test", "Deo Castillo", "Department Staff · Executive Admin"),
-    Demo("Executive Admin", "mila@pharmacrm.test", "Mila Aguilar", "Management · sees every division"),
-    Demo("Executive Admin", "ramon@pharmacrm.test", "Ramon Santos", "Executive · everything, read-only"),
-    Demo("Executive Admin", "teresa@pharmacrm.test", "Teresa Abad", "Department Staff · Human Resource"),
-    Demo("Admin", "carmen@pharmacrm.test", "Carmen Villanueva", "Admin · every setting, owns the company", admin=True),
+    Demo("Executive Office", "deo@pharmacrm.test", "Deo Castillo", f"{EXECUTIVE_ASSISTANT} · permits, leases, tickets day to day", ROLE_EXEC_ASST_ID),
+    Demo("Executive Office", "mila@pharmacrm.test", "Mila Aguilar", f"{EXECUTIVE_ASSISTANT} · expatriate visas and VIP logistics", ROLE_EXEC_ASST_ID),
+    Demo("Executive Office", "teresa@pharmacrm.test", "Teresa Abad", f"{COMPLIANCE_OFFICER} · BOC, FDA, SEC, BIR, LGU, visas, contracts", ROLE_COMPLIANCE_ID),
+    Demo("Executive Office", "ramon@pharmacrm.test", "Ramon Santos", f"{AUDITOR} · everything and the activity log, read-only", ROLE_AUDITOR_ID),
+    Demo("Administration", "carmen@pharmacrm.test", "Carmen Villanueva", f"{ADMINISTRATOR} · every setting, users and roles", ROLE_ADMIN_ID),
 )
 
 

@@ -7,7 +7,7 @@ from app.permissions import ADMIN_PERMISSIONS
 
 # This app's module, as the screens' sidebar and door check read it. None: the
 # Platform app, which works above any one company.
-MODULE: dict | None = {"key": "exec", "name": "Executive Admin", "kind": "department"}
+MODULE: dict | None = {"key": "exec", "name": "Admin", "kind": "department"}
 # The Platform app's people are its Developer Admins.
 DEVELOPER_ADMIN_APP = False
 ORG_ID = "00000000-0000-4000-8000-000000004300"

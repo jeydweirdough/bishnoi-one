@@ -29,7 +29,7 @@ export async function UsersPage() {
       <PageHeader
         title="Users"
       >
-        Who can sign in to Executive Admin, and the role each one has.
+        Who can sign in to Bishnoi One Admin, and the role each one has.
       </PageHeader>
       <UsersEditor data={data} meId={me.user.id} when={when} />
     </>
@@ -130,7 +130,7 @@ export async function AuditPage({
       <PageHeader
         title="Activity log"
       >
-        Every change made in Executive Admin, and who made it.
+        Every change made in Bishnoi One Admin, and who made it.
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
         <span className="text-meta font-semibold text-ink-2 mr-1">Show:</span>

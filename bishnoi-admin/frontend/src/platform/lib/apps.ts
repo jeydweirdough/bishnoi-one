@@ -89,7 +89,7 @@ export const appOf = (key: string): AppName | null => (NAMES.has(key) ? (key as 
 export const isOurs = (app: AppName): boolean => !THIS_APP || THIS_APP === app;
 
 const LABELS: Record<AppName, string> = {
-  exec: "Executive Admin",
+  exec: "Admin",
   crm: "CRM",
   finance: "Finance",
   inventory: "Inventory",

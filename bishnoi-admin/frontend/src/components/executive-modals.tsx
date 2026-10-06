@@ -1002,7 +1002,7 @@ export function TicketUpdateModal({
       return;
     }
     const newStatus = (formData.get("newStatus") as string) || undefined;
-    const authorName = (formData.get("authorName") as string) || "Executive Admin";
+    const authorName = (formData.get("authorName") as string) || "Bishnoi One Admin";
 
     const res = await addTicketUpdate(ticket.id, {
       authorName,
@@ -1035,7 +1035,7 @@ export function TicketUpdateModal({
           <input
             name="authorName"
             required
-            defaultValue="Executive Admin"
+            defaultValue="Bishnoi One Admin"
             className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>

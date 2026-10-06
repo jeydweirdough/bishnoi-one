@@ -2,14 +2,21 @@ import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
+import icon from "@/src/components/assets/icon.png";
+import { thisAppLabel } from "../lib/apps";
 import { APP_NAME } from "../lib/labels";
 
-// Poppins has no variable version, so each weight in use is loaded by name.
+// Poppins isn't a variable font, so each weight the screens use is named.
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-/** What every Bishnoi One app calls itself, unless it says otherwise. */
+// The product and which app this is, so the tab reads "Bishnoi One Admin".
+const NAME = thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME;
+
+/** What every app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
-  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
+  title: { default: NAME, template: `%s · ${NAME}` },
+  // Square, so the browser doesn't squash the tall logo into the tab.
+  icons: { icon: icon.src, apple: icon.src },
   description: "Customers, calls, visits and follow-ups for every division and team.",
 };
 
