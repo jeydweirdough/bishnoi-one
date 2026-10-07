@@ -267,6 +267,9 @@ class Activity(Owned, Base):
     products: Mapped[list] = mapped_column(JSON, default=list)
     outcome: Mapped[str | None] = mapped_column(Text, default=None)
     discussed: Mapped[list] = mapped_column(JSON, default=list)
+    # An email sent from the person's own email app: the screenshot it was logged with (StoredFile).
+    proof_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    proof_name: Mapped[str | None] = mapped_column(String(200), default=None)
 
     company: Mapped[Company | None] = relationship(lazy="joined")
     contact: Mapped[Contact | None] = relationship(lazy="joined")

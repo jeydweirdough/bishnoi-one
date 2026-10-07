@@ -1,5 +1,6 @@
-"""Imports: products (with their prices), people's accounts, and what doctors
-owe (balances, from accounting), from a spreadsheet (.xlsx or .csv).
+"""Imports: products (with their prices), people's accounts, what doctors
+owe (balances, from accounting), and customers with everything on their
+form (app/customer_sheet.py), from a spreadsheet (.xlsx or .csv).
 
 1. /imports/{kind}/read: the file is read, never kept. What comes back is its
    headers, its rows, the fields they can go into, and a first guess at which
@@ -14,8 +15,13 @@ those are updated, not added twice. A balance is matched to its doctor by name
 listed for fixing. Each upload adds balances as of one date; they never
 replace older ones, which stay as the history.
 
+A customer is matched by its customer code: a row with one updates that
+customer, a row without one adds a new customer (names may repeat: the same
+hospital can be a customer of several divisions).
+
 Products need products.create and products.edit; people need admin.users;
-balances need goals.import.
+balances need goals.import; customers need customers.create to add and
+customers.edit to update, within the person's reach.
 """
 
 import csv
@@ -32,6 +38,7 @@ from sqlalchemy.orm import Session
 from app.access import Access, CurrentAccess, keep_an_administrator
 from app.api import Api, email_address
 from app.audit import audit
+from app.customer_sheet import import_customers, import_fields
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import _value, fields_for
 from app.inventory import SRP
@@ -41,12 +48,17 @@ from app.security import check_password_rules, hash_password
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
-Kind = Literal["products", "people", "balances"]
+Kind = Literal["products", "people", "balances", "customers"]
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 5000
 
 
 def allowed(access: Access, kind: str) -> None:
+    if kind == "customers":
+        access.require("customers.view")
+        if not (access.can("customers.create") or access.can("customers.edit")):
+            access.require("customers.create")
+        return
     need = {"products": ("products.create", "products.edit"), "people": ("admin.users",), "balances": ("goals.import",)}[kind]
     for permission in need:
         access.require(permission)
@@ -63,6 +75,8 @@ def normal(text: str) -> str:
 def fields_of(db: Session, kind: str) -> list[dict]:
     """Each field: its key, its label, whether it's required, and other names a
     header might call it."""
+    if kind == "customers":
+        return import_fields(db)
     if kind == "balances":
         return [
             {"key": "doctor", "label": "Customer", "required": True, "aliases": ["doctor", "name", "doctorname", "customer", "customername", "account", "accountname", "physician"]},
@@ -408,8 +422,15 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setting
         i = body.mapping.get(key)
         return row[i].strip() if i is not None and 0 <= i < len(row) and row[i] is not None else ""
 
-    run = {"products": import_products, "people": import_people, "balances": import_balances}[kind]
-    made, changed, problems = run(db, me, body, get, settings.inventory_linked) if kind == "products" else run(db, me, body, get)
+    if kind == "customers" and body.mapping.get("name") is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each customer's name.")
+    if kind == "customers":
+        made, changed, problems = import_customers(db, access, me, body, get)
+        if made or changed:
+            audit(db, me, "customers.imported", target=f"{made} added, {changed} updated", target_type="company")
+    else:
+        run = {"products": import_products, "people": import_people, "balances": import_balances}[kind]
+        made, changed, problems = run(db, me, body, get, settings.inventory_linked) if kind == "products" else run(db, me, body, get)
     if body.dry_run:
         db.rollback()
     else:
@@ -421,6 +442,6 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setting
         "problems": problems,
         # New products without some required column in the file still import when
         # every row that needs it has it; this names what wasn't picked at all.
-        "unmapped": [m for m in missing if m not in ("Code", "Email", "Doctor", "Balance")],
+        "unmapped": [m for m in missing if m not in ("Code", "Email", "Doctor", "Balance", "Name")],
     }
 

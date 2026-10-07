@@ -1,4 +1,4 @@
-import { Copy } from "lucide-react";
+import { Copy, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -54,6 +54,16 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
             {can(me, "customers.edit") && (
               <LinkButton href="/companies/duplicates" icon={<Copy className="size-4" aria-hidden />}>
                 Possible duplicates
+              </LinkButton>
+            )}
+            {(can(me, "customers.create") || can(me, "customers.edit")) && (
+              <LinkButton href="/companies/import" icon={<Upload className="size-4" aria-hidden />}>
+                Import
+              </LinkButton>
+            )}
+            {can(me, "reports.export") && (
+              <LinkButton href={`/companies/export${here.size ? `?${here}` : ""}`} download icon={<Download className="size-4" aria-hidden />}>
+                {filtered ? "Export these" : "Export"}
               </LinkButton>
             )}
             {can(me, "customers.create") && (

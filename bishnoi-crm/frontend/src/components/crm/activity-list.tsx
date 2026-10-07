@@ -103,6 +103,13 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
         </p>
         <p className={`mt-0.5 text-ink ${done && a.isPlanned ? "text-ink-3 line-through decoration-ink-3/60" : ""}`}>{a.subject}</p>
         {a.body && <p className="mt-0.5 whitespace-pre-line text-meta text-ink-2">{a.body}</p>}
+        {/* Sent from their own email app: the screenshot it was logged with. */}
+        {a.hasProof && (
+          <a href={`/activities/${a.id}/proof`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint">
+            <Icon name="email" className="size-3.5" />
+            See the screenshot
+          </a>
+        )}
         {(a.products?.length ?? 0) > 0 && !done && <p className="mt-0.5 text-meta text-ink-2">To discuss: {a.products!.map((p) => p.name).join(", ")}</p>}
         {a.outcome && <p className="mt-0.5 whitespace-pre-line text-meta text-ink-2">Outcome: {a.outcome}</p>}
         {(a.discussed?.length ?? 0) > 0 && <p className="mt-0.5 text-meta text-ink-2">Discussed: {a.discussed!.map((p) => p.name).join(", ")}</p>}

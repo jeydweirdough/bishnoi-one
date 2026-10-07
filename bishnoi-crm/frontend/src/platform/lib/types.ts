@@ -1024,6 +1024,8 @@ export type ActivityItem = {
   discussed?: { code: string; name: string }[];
   /** More customers it's about than its own. */
   alsoOn?: Ref[];
+  /** An email sent from the person's own email app: a screenshot of it sent is kept as proof. */
+  hasProof?: boolean;
   company: Ref | null;
   contact: Ref | null;
   owner: Ref;

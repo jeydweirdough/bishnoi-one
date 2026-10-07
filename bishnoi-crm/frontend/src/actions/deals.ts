@@ -109,9 +109,9 @@ export async function saveTargets(month: string, targets: { userId: string; amou
 // --- picking the customer for a new deal ---
 
 /** Customers in reach whose name (or city, or industry) matches, for the new-deal picker. */
-export async function findCustomers(q: string): Promise<{ id: string; name: string; city: string | null }[]> {
-  const found = await api.get<{ items: { id: string; name: string; city: string | null }[] }>(
+export async function findCustomers(q: string): Promise<{ id: string; name: string; city: string | null; email: string | null }[]> {
+  const found = await api.get<{ items: { id: string; name: string; city: string | null; email: string | null }[] }>(
     `/companies?limit=20&sort=name${q.trim() ? `&q=${enc(q.trim())}` : ""}`,
   );
-  return found.items.map((c) => ({ id: c.id, name: c.name, city: c.city }));
+  return found.items.map((c) => ({ id: c.id, name: c.name, city: c.city, email: c.email ?? null }));
 }

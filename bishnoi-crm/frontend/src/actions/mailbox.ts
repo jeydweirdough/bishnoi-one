@@ -63,6 +63,23 @@ export async function readMailbox(): Promise<MailboxInfo | null> {
   return api.get<MailboxInfo>("/mailbox").catch(() => null);
 }
 
+export type EmailDraft = { companyId: string | null; contactId: string | null; to: string[]; templateId?: string; note?: string; subject?: string; body?: string };
+
+/** The email exactly as it should be sent, to copy into the person's own email app. */
+export async function prepareEmail(input: EmailDraft): Promise<Result<{ to: string[]; subject: string; body: string }>> {
+  return attempt(() => api.post<{ to: string[]; subject: string; body: string }>("/email/prepare", input));
+}
+
+/** An email sent from the person's own email app, logged on the customer with a screenshot of it sent. */
+export async function logEmail(input: EmailDraft, proof: FormData): Promise<Result<ActivityItem>> {
+  return attempt(async () => {
+    proof.set("email", JSON.stringify(input));
+    const r = await api.upload<ActivityItem>("/email/log", proof);
+    refresh();
+    return r;
+  });
+}
+
 /** Sends from the person's own mailbox; kept on the customer as an email. */
 export async function sendEmail(input: { companyId: string | null; contactId: string | null; to: string[]; mailboxId?: string; subject?: string; body?: string; templateId?: string; note?: string }): Promise<Result<ActivityItem>> {
   return attempt(async () => {

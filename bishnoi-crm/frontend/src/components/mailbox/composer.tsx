@@ -6,7 +6,8 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { FormError } from "@/src/platform/ui/field";
 import { findCustomers } from "../../actions/deals";
-import { customerAddresses, listTemplates, readMailbox, sendEmail, type EmailTemplate, type MailboxInfo } from "../../actions/mailbox";
+import { customerAddresses, listTemplates, prepareEmail, readMailbox, sendEmail, type EmailDraft, type EmailTemplate, type MailboxInfo } from "../../actions/mailbox";
+import { OwnAppSend } from "./own-app-send";
 
 type Option = { value: string; label: string };
 export type ComposeFor = { id: string; name: string };
@@ -16,6 +17,10 @@ export type ComposeFor = { id: string; name: string };
  * picked in From (Zoho Mail, Gmail, Outlook, or any by SMTP), and is kept on
  * the customer. An approved email is sent as approved, with a personal note on
  * top; or the person writes their own.
+ *
+ * When the CRM can't send it (no mailbox connected, or the provider refused),
+ * the same email is copied into the person's own email app instead, and logged
+ * with a screenshot of it sent (own-app-send.tsx).
  */
 export function Composer({ open, onClose, customer }: { open: boolean; onClose: () => void; customer?: ComposeFor }) {
   const [box, setBox] = useState<MailboxInfo | null>(null);
@@ -25,6 +30,8 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
   const [companyName, setCompanyName] = useState(customer?.name ?? "");
   const [customers, setCustomers] = useState<Option[]>(customer ? [{ value: customer.id, label: customer.name }] : []);
   const [people, setPeople] = useState<Option[]>([]);
+  // The customer's addresses have been looked up (so "none saved" can be said).
+  const [looked, setLooked] = useState(false);
   const [to, setTo] = useState<string[]>([]);
   const [template, setTemplate] = useState("");
   const [note, setNote] = useState("");
@@ -32,6 +39,9 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Sending from the person's own email app: the email as it goes, once prepared.
+  const [own, setOwn] = useState<{ draft: EmailDraft; ready: { to: string[]; subject: string; body: string } } | null>(null);
+  const [failed, setFailed] = useState(false);
   const picked = templates.find((t) => t.id === template) ?? null;
   const fill = (text: string) => text.replaceAll("{customer}", companyName || "the customer").replaceAll("{me}", "you").replaceAll("{contact}", "");
 
@@ -47,71 +57,132 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
   }, [open]);
 
   useEffect(() => {
+    setLooked(false);
     if (!companyId) return setPeople([]);
+    let current = true;
     start(async () => {
       const c = await customerAddresses(companyId);
-      if (!c) return;
+      // Another customer was picked meanwhile: this answer is for the old one.
+      if (!c || !current) return;
       const found = [
         ...(c.email ? [{ value: c.email, label: `${c.name} · ${c.email}` }] : []),
         ...c.contacts.filter((x) => x.email).map((x) => ({ value: x.email!, label: `${x.name} · ${x.email}` })),
       ];
       setPeople(found);
+      setLooked(true);
       setTo((now) => (now.length ? now : found.slice(0, 1).map((f) => f.value)));
+      if (found.length) setError((e) => (e === "Who is it to?" ? null : e));
     });
+    return () => {
+      current = false;
+    };
   }, [companyId]);
 
   function searchCustomers(q: string) {
-    start(async () => setCustomers((await findCustomers(q)).map((c) => ({ value: c.id, label: c.city ? `${c.name} · ${c.city}` : c.name }))));
+    start(async () => setCustomers((await findCustomers(q)).map((c) => ({ value: c.id, label: [c.name, c.email ?? "no email saved", c.city].filter(Boolean).join(" · ") }))));
+  }
+
+  const draft = (): EmailDraft =>
+    picked
+      ? { companyId: companyId || null, contactId: null, to, templateId: picked.id, note: note.trim() || undefined }
+      : { companyId: companyId || null, contactId: null, to, subject: subject.trim(), body: body.trim() };
+
+  /** To the two steps: copy it into your own email, then log it with a screenshot. */
+  function ownApp() {
+    if (to.length === 0) return setError("Who is it to?");
+    start(async () => {
+      const d = draft();
+      const r = await prepareEmail(d);
+      if (!r.ok) return setError(r.fields ? Object.values(r.fields)[0] : r.error);
+      setError(null);
+      setOwn({ draft: d, ready: r.data });
+    });
+  }
+
+  function reset() {
+    setNote("");
+    setSubject("");
+    setBody("");
+    setTemplate("");
+    setError(null);
+    setOwn(null);
+    setFailed(false);
+    if (!customer) {
+      setCompanyId("");
+      setCompanyName("");
+      setTo([]);
+    }
   }
 
   function send() {
     if (to.length === 0) return setError("Who is it to?");
     start(async () => {
-      const r = await sendEmail(
-        picked
-          ? { companyId: companyId || null, contactId: null, to, mailboxId: from || undefined, templateId: picked.id, note: note.trim() || undefined }
-          : { companyId: companyId || null, contactId: null, to, mailboxId: from || undefined, subject: subject.trim(), body: body.trim() },
-      );
-      if (!r.ok) return setError(r.fields ? Object.values(r.fields)[0] : r.error);
+      const r = await sendEmail({ ...draft(), mailboxId: from || undefined });
+      if (!r.ok) {
+        // Not a mistake in the email: the provider wouldn't send it. Offer the other way.
+        setFailed(!r.fields);
+        return setError(r.fields ? Object.values(r.fields)[0] : r.error);
+      }
       const via = box?.mailboxes.find((m) => m.id === from);
       toast.success("Email sent", { description: via ? `${r.data.subject}, from ${via.address} (${via.providerName})` : r.data.subject });
-      setNote("");
-      setSubject("");
-      setBody("");
-      setTemplate("");
-      setError(null);
-      if (!customer) {
-        setCompanyId("");
-        setCompanyName("");
-        setTo([]);
-      }
+      reset();
       onClose();
     });
   }
 
   const none = box !== null && box.mailboxes.length === 0;
   return (
-    <Modal open={open} title="New email" onCancel={onClose} onOk={send} okText="Send" okButtonProps={{ disabled: none || !box }} confirmLoading={pending} width={640} destroyOnHidden={false}>
-      {none ? (
-        <p className="py-2 text-sm text-ink">
-          Connect a mailbox first (Zoho Mail, Gmail, Outlook or any by SMTP), so emails go out from your own address:{" "}
-          <Link href="/account/mailbox" className="underline">
-            Mailbox
-          </Link>
-          .
-        </p>
+    <Modal
+      open={open}
+      title={own ? "Send it from your own email" : "New email"}
+      onCancel={() => {
+        setOwn(null);
+        onClose();
+      }}
+      onOk={none ? ownApp : send}
+      okText={none ? "Next: copy it into your email" : "Send"}
+      okButtonProps={{ disabled: !box }}
+      confirmLoading={pending}
+      width={640}
+      destroyOnHidden={false}
+      footer={own ? null : undefined}
+    >
+      {own ? (
+        <>
+          <button type="button" onClick={() => setOwn(null)} className="mb-2 text-meta text-ink-2 hover:text-ink hover:underline">
+            ← Back to the email
+          </button>
+          <OwnAppSend
+            draft={own.draft}
+            ready={own.ready}
+            onLogged={() => {
+              reset();
+              onClose();
+            }}
+          />
+        </>
       ) : (
         <div className="space-y-4 pt-1">
-          <label className="block">
-            <span className="mb-1.5 block text-sm text-ink">From</span>
-            <Select
-              className="w-full"
-              value={from || undefined}
-              onChange={setFrom}
-              loading={!box}
-              options={(box?.mailboxes ?? []).map((m) => ({ value: m.id, label: `${m.address} · ${m.providerName}${m.isDefault ? " (default)" : ""}` }))}
-            />
-          </label>
+          {none ? (
+            <p className="rounded-[14px] bg-mint px-4 py-3 text-sm text-ink-2">
+              Your mailbox isn&apos;t connected, so you&apos;ll send this from your own email, then log it here with a screenshot.{" "}
+              <Link href="/account/mailbox" className="font-semibold text-ink underline">
+                Connect your mailbox
+              </Link>{" "}
+              to send from the CRM instead.
+            </p>
+          ) : (
+            <label className="block">
+              <span className="mb-1.5 block text-sm text-ink">From</span>
+              <Select
+                className="w-full"
+                value={from || undefined}
+                onChange={setFrom}
+                loading={!box}
+                options={(box?.mailboxes ?? []).map((m) => ({ value: m.id, label: `${m.address} · ${m.providerName}${m.isDefault ? " (default)" : ""}` }))}
+              />
+            </label>
+          )}
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Customer</span>
             <Select
@@ -132,7 +203,23 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">To</span>
-            <Select mode="tags" className="w-full" value={to} onChange={setTo} options={people} placeholder="Type an address, or pick one" tokenSeparators={[",", " "]} />
+            <Select
+              mode="tags"
+              className="w-full"
+              value={to}
+              onChange={(v) => {
+                setTo(v);
+                if (v.length) setError((e) => (e === "Who is it to?" ? null : e));
+              }}
+              options={people}
+              placeholder="Type an address, or pick one"
+              tokenSeparators={[",", " "]}
+            />
+            {looked && people.length === 0 && (
+              <span className="mt-1 block text-meta text-ink-3">
+                {companyName || "This customer"} has no email saved, nor do their contacts. Type the address; to keep it for next time, add it on their page.
+              </span>
+            )}
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Approved email</span>
@@ -165,6 +252,14 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
             </>
           )}
           <FormError message={error} />
+          {failed && !none && (
+            <p className="text-sm text-ink-2">
+              It didn&apos;t go through your mailbox.{" "}
+              <button type="button" onClick={ownApp} className="font-semibold text-ink underline">
+                Send it from your own email instead
+              </button>
+            </p>
+          )}
         </div>
       )}
     </Modal>

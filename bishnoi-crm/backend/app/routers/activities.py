@@ -139,6 +139,8 @@ def activity_out(activity: Activity, access: Access) -> dict:
         "outcome": activity.outcome,
         "discussed": product_names(object_session(activity), activity.discussed or []),
         "alsoOn": also_on(object_session(activity), activity),
+        # Sent from the person's own email app: a screenshot of it sent is kept as proof.
+        "hasProof": bool(activity.proof_ref),
         "company": {"id": activity.company.id, "name": activity.company.name} if activity.company else None,
         "contact": {"id": activity.contact.id, "name": activity.contact.full_name} if activity.contact else None,
         "owner": person_out(activity.owner),

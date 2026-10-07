@@ -2,10 +2,11 @@
 from it. What's sent is kept on the customer as an email activity."""
 
 import html
+import secrets
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, or_, select
 from pydantic import Field, field_validator
 
@@ -14,9 +15,9 @@ from app.access import CurrentAccess
 from app.api import Api, email_address, field_error, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Activity, EmailTemplate, Mailbox, Team
+from app.models import Activity, EmailTemplate, Mailbox, StoredFile, Team
 from app.pricing import today
-from app.routers.activities import activity_out, linked
+from app.routers.activities import activity_out, get_activity, linked
 from app.scope import within
 
 router = APIRouter(tags=["mailbox"])
@@ -261,21 +262,7 @@ def send_email(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setting
         box = next(iter(mb.mailboxes(db, me.id)), None)
     if box is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Connect your mailbox first (Account → Mailbox), so emails go out from your own address.")
-    if body.template_id:
-        template = db.get(EmailTemplate, body.template_id)
-        if template is None or not offered(template, me.team_id, today(settings.org_timezone)):
-            raise field_error("templateId", "Pick one of the approved emails.")
-        fill = {"customer": company.name if company else "", "contact": contact.full_name if contact else "", "me": me.full_name}
-        subject = render(template.subject, fill)
-        text = render(template.body, fill)
-        if body.note and body.note.strip():
-            text = body.note.strip() + "\n\n" + text
-    else:
-        if not (body.subject and body.subject.strip()):
-            raise field_error("subject", "Give it a subject.")
-        if not (body.body and body.body.strip()):
-            raise field_error("body", "Write the email.")
-        subject, text = body.subject.strip(), body.body.strip()
+    subject, text = drafted(db, me, settings, company, contact, body)
     try:
         mb.send(db, settings, box, me.full_name, body.to, subject, text, as_html(text))
     except mb.MailboxError as e:
@@ -315,3 +302,93 @@ def sent_emails(
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = db.scalars(query.order_by(Activity.at.desc()).limit(limit).offset(offset)).unique().all()
     return {"items": [activity_out(a, access) for a in rows], "total": total}
+
+
+# --- when the CRM can't send it: from the person's own email app, with proof ------------------
+#
+# No mailbox connected, or the provider refused: the email is written here as
+# usual, copied into the person's own email app and sent from there, and then
+# logged on the customer with a screenshot of it sent. The screenshot is the
+# proof; without one, nothing is logged.
+
+PROOF_BYTES = 4 * 1024 * 1024
+PROOF_KINDS = {b"\x89PNG": "image/png", b"\xff\xd8\xff": "image/jpeg", b"RIFF": "image/webp"}
+
+
+def drafted(db, me, settings, company, contact, body: EmailIn) -> tuple[str, str]:
+    """The email as it goes: an approved one filled in (with the note on top), or the person's own."""
+    if body.template_id:
+        template = db.get(EmailTemplate, body.template_id)
+        if template is None or not offered(template, me.team_id, today(settings.org_timezone)):
+            raise field_error("templateId", "Pick one of the approved emails.")
+        fill = {"customer": company.name if company else "", "contact": contact.full_name if contact else "", "me": me.full_name}
+        subject, text = render(template.subject, fill), render(template.body, fill)
+        if body.note and body.note.strip():
+            text = body.note.strip() + "\n\n" + text
+        return subject, text
+    if not (body.subject and body.subject.strip()):
+        raise field_error("subject", "Give it a subject.")
+    if not (body.body and body.body.strip()):
+        raise field_error("body", "Write the email.")
+    return body.subject.strip(), body.body.strip()
+
+
+@router.post("/email/prepare")
+def prepare_email(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, body: EmailIn) -> dict:
+    """The email exactly as it should be sent, to copy into the person's own email app."""
+    access.require("activities.create")
+    company, contact = linked(db, access, body.company_id, body.contact_id)
+    subject, text = drafted(db, me, settings, company, contact, body)
+    return {"to": body.to, "subject": subject, "body": text}
+
+
+@router.post("/email/log", status_code=status.HTTP_201_CREATED)
+async def log_email(
+    access: CurrentAccess,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    email: Annotated[str, Form(max_length=40000)],
+    proof: Annotated[UploadFile, File()],
+) -> dict:
+    """An email sent from the person's own email app, kept on the customer with a screenshot of it sent."""
+    access.require("activities.create")
+    try:
+        body = EmailIn.model_validate_json(email)
+    except ValueError:
+        raise field_error("email", "The email's details didn't come through. Try again.") from None
+    company, contact = linked(db, access, body.company_id, body.contact_id)
+    subject, text = drafted(db, me, settings, company, contact, body)
+    data = await proof.read(PROOF_BYTES + 1)
+    if not data:
+        raise field_error("proof", "Attach a screenshot of the email in your Sent folder.")
+    if len(data) > PROOF_BYTES:
+        raise field_error("proof", "The screenshot is over 4 MB. Take it again, or crop it to the email.")
+    kind = next((v for magic, v in PROOF_KINDS.items() if data.startswith(magic)), None)
+    if kind is None or (kind == "image/webp" and data[8:12] != b"WEBP"):
+        raise field_error("proof", "Attach a screenshot: a PNG, JPG or WebP picture.")
+    ref = secrets.token_hex(16)
+    db.add(StoredFile(ref=ref, content_type=kind, data=data))
+    now = datetime.now(UTC)
+    activity = Activity(
+        kind="email", subject=subject, at=now, done_at=now, direction="out",
+        body=f"Sent from their own email app to {', '.join(body.to)} (a screenshot is kept as proof)\n\n{text}",
+        company_id=company.id if company else None, contact_id=contact.id if contact else None, owner_id=me.id, team_id=me.team_id, created_by_id=me.id,
+        proof_ref=ref, proof_name=(proof.filename or "screenshot")[:200],
+    )
+    db.add(activity)
+    db.flush()
+    audit(db, me, "email.logged", target=subject, target_type="activity", target_id=activity.id, fields=["sent from their own email app", "screenshot"])
+    db.commit()
+    db.refresh(activity)
+    return activity_out(activity, access)
+
+
+@router.get("/activities/{activity_id}/proof")
+def email_proof(access: CurrentAccess, db: DB, activity_id: str) -> Response:
+    """The screenshot an email was logged with, for whoever can see the email."""
+    activity = get_activity(db, access, activity_id)
+    stored = db.get(StoredFile, activity.proof_ref) if activity.proof_ref else None
+    if stored is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This email has no screenshot.")
+    return Response(stored.data, media_type=stored.content_type, headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"})

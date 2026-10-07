@@ -42,14 +42,14 @@ type LinkButtonProps = Omit<ComponentProps<"a">, "href" | "type" | "color"> & {
   prefetch?: boolean;
 };
 
-/** A link drawn as an Ant button. A plain click moves within the app; Ctrl-click and the like still open a new tab. */
+/** A link drawn as an Ant button. A plain click moves within the app; Ctrl-click and the like still open a new tab, and a `download` link fetches its file. */
 export function LinkButton({ href, variant = "default", size = "md", icon, children, onClick, scroll, prefetch, ...rest }: LinkButtonProps) {
   const router = useRouter();
   // Load the page ahead when the pointer comes near, as a Next link does.
-  const ahead = () => prefetch !== false && router.prefetch(href);
+  const ahead = () => prefetch !== false && rest.download === undefined && router.prefetch(href);
   function go(e: MouseEvent<HTMLAnchorElement>) {
     onClick?.(e);
-    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || rest.target === "_blank") return;
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || rest.target === "_blank" || rest.download !== undefined) return;
     e.preventDefault();
     router.push(href, { scroll: scroll ?? true });
   }

@@ -57,7 +57,7 @@ def test_price_list_offers_the_catalogue(client, crew, ids):
     assert [t["code"] for t in got["priceTypes"]] == ["PATIENT", "TRADE", "DOCTOR", "SPECIAL"]
     amox = next(p for p in got["products"] if p["code"] == "AMX-500")
     assert amox["prices"] == {"PATIENT": 145000, "TRADE": 118000, "DOCTOR": 130000}
-    assert {i["code"] for i in got["issuers"]} == {"DSWD", "PCSO", "MAYOR"}
+    assert {i["code"] for i in got["issuers"]} == {"DSWD", "PCSO", "MAYOR", "OP"}
     assert len(got["promos"]) == 3 and len(got["bundles"]) == 2
 
 

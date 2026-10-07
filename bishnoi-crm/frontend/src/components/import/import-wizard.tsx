@@ -12,6 +12,11 @@ import { readImport, runImport, type ImportFile, type ImportKind, type ImportRes
 const WORDS: Record<ImportKind, { one: string; many: string; match: string }> = {
   products: { one: "product", many: "products", match: "A product already here (same code) is updated; the rest are added." },
   people: { one: "person", many: "people", match: "Someone already here (same email) is updated; the rest are added as new accounts." },
+  customers: {
+    one: "customer",
+    many: "customers",
+    match: "A row with a customer code updates that customer; a row without one is added as new. Pick lists take the short code or the full name; a hospital, by its name or code.",
+  },
   balances: {
     one: "balance",
     many: "balances",
@@ -101,6 +106,15 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             Read file
           </Button>
         </form>
+        {kind === "customers" && !file && (
+          <p className="mt-3 text-meta text-ink-3">
+            Starting from nothing?{" "}
+            <a href="/companies/export?template=true" download className="font-semibold text-ink underline">
+              Download a blank sheet
+            </a>{" "}
+            with our columns. To change many customers at once, export them from Customers, edit the file, and import it here.
+          </p>
+        )}
         {file && (
           <p className="mt-3 text-sm text-ink-2">
             <strong>{file.fileName}</strong>: {file.rows.length} {file.rows.length === 1 ? "row" : "rows"}, {file.headers.length} columns.

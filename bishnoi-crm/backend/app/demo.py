@@ -112,7 +112,7 @@ DEMO_PRICE_TYPES: tuple[tuple[str, str, str, str, bool, bool], ...] = (
 )
 
 # code, name
-DEMO_ISSUERS: tuple[tuple[str, str], ...] = (("DSWD", "DSWD"), ("PCSO", "PCSO"), ("MAYOR", "Office of the Mayor"))
+DEMO_ISSUERS: tuple[tuple[str, str], ...] = (("DSWD", "DSWD"), ("PCSO", "PCSO"), ("MAYOR", "Office of the Mayor"), ("OP", "Office of the President"))
 
 # code, name, generic name, strength, form, unit, prices in pesos (PATIENT, TRADE, DOCTOR)
 DEMO_PRODUCTS: tuple[tuple[str, str, str, str, str, str, tuple[int, int, int]], ...] = (
