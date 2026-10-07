@@ -81,6 +81,12 @@ Within a few minutes the **Sync branches** action copies your work into the
 `bishnoi-admin/` folder on `main`, and brings anything changed on `main` back here.
 You don't do anything: the next `git pull` has it.
 
+**GitHub says this branch is "ahead of" and "behind" `main`?** Ignore it; it
+always will. It counts commits, not files: `main` has every app's commits,
+and the sync's copies here count as new ones. The files are what matter, and
+the sync keeps them the same. Don't press "Sync fork", "Contribute" or
+"Compare & pull request": there's nothing to merge by hand.
+
 Working on `main` instead, with every app? Use the `bishnoi-admin/` folder and the
 same commands; your pushes reach this branch the same way. Push a change to
 one place only, never to both.
