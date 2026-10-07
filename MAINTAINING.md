@@ -19,7 +19,7 @@ The repo has three actions, in `.github/workflows/`:
 | Action | Runs when | What it does |
 |---|---|---|
 | **Sync branches** (`sync-branches.yml`) | any push to `main` or a `bishnoi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `README.md`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
 | **Deploy <app>** (`deploy-<app>.yml`, one per app) | only by hand: **Run workflow** | Checks the app is set up, then deploys it to Vercel; stops and says what to do when it isn't ([below](#deployments-on-vercel-only-when-you-ask)). |
 
 Set these once:

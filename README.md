@@ -61,7 +61,9 @@ bishnoi/
 | `main` | **Everything**: every app, each in its own folder |
 | `bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`, … | **One app only**, named after it |
 
-An app branch holds the same files as that app's folder on `main`. You can
+An app branch holds the same files as that app's folder on `main`, with its
+own `README.md` on top: open the branch on GitHub to see how to clone, run,
+pull, push and deploy just that app. You can
 work on either one; GitHub keeps them matched for you
 ([section 9](#9-what-happens-after-you-push)).
 
@@ -939,6 +941,7 @@ name. Inside it, add:
 | `frontend/` | the screens: start from another app's `frontend/` |
 | `backend/` | the API: start from another app's `backend/` |
 | `.gitignore` | copy it from another app |
+| `README.md` | your branch's front page on GitHub: copy it from another app, and change the app's name, what it does, its ports and its deploy workflow |
 | `GIT-GUIDE.md` | copy it from another app, and change the app name and ports |
 | `.github/workflows/sync-branches.yml` | copy `.github/workflows/sync-branches.yml` from the top of the repo, **unchanged** |
 
