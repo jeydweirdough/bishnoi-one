@@ -129,11 +129,8 @@ class Settings(BaseSettings):
     # in X-Bishnoi-Key. Empty: nothing outside can read them.
     integration_keys: list[SecretStr] = []
 
-    # The key the secrets of Settings → Connections are encrypted with (a Fernet
-    # key: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())").
-    # Unset in development: one is made in .data/connections.key. Unset in
-    # production: connections can't be saved. Changing it loses the saved secrets.
-    connections_key: SecretStr | None = None
+    # No CONNECTIONS_KEY any more: outside services are connected on the platform,
+    # and the CRM's own secrets use the key it gives (app/connections.py).
 
     @property
     def inventory_linked(self) -> bool:

@@ -147,8 +147,9 @@ they call each other, so set them up in this order.
 1. **Database logins.** On Supabase, run `scripts/supabase/app-users.sql`
    (SQL Editor). It gives each app its own login; copy each app's address
    from the result (the pooler, port 6543).
-2. **Keys.** `node scripts/deploy-keys.mjs` prints every key the apps use to
-   trust each other, beside the project and setting each goes in. Shown once.
+2. **Key.** `node scripts/deploy-keys.mjs` prints the Platform's signing key
+   (`PASS_SIGNING_KEY`), the one key made by hand. Shown once. Every other key
+   comes from the Platform's Connections page (step 6).
 3. **Projects.** On Vercel, make any project that doesn't exist yet, named as
    in `.github/deploy.json` (`bishnoi-<app>` for the screens, Root Directory
    `bishnoi-<app>/frontend`; `bishnoi-<app>-backend` for the API, Root Directory
@@ -158,7 +159,11 @@ they call each other, so set them up in this order.
    Production).
 5. **Deploy**: Actions → Deploy <app>, Platform first. Each deploys its API, then its screens.
 6. **Platform > Applications:** set each app's address to its screens'
-   address. A Bishnoi One account opens an app only at that address.
+   address and its API. A Bishnoi One account opens an app only at that address.
+   Then **Platform > Connections:** make each app's connect key, put it on the
+   app's API as `PLATFORM_APP_KEY`, and switch on the links between the apps.
+   A company's outside services (Zoho Books, Gmail, Outlook, Zoho Mail) are
+   filled in on the Platform too: **Companies > the company > Connections**.
 7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
    `FIRST_ADMIN_PASSWORD` from the project and redeploy.
 8. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
@@ -172,23 +177,15 @@ they call each other, so set them up in this order.
 | `DATABASE_URL` | Its login from step 1 |
 | `ALLOWED_HOSTS` | `["bishnoi-<app>-backend.vercel.app"]`, its own address |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
-| `PLATFORM_PUBLIC_KEY` | From step 2 (not the Platform itself) |
+| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not the Platform itself): its public key is fetched from there |
+| `PLATFORM_APP_KEY` | Its connect key, from Platform > Connections (step 6; not the Platform itself) |
 
 **Only some APIs:**
 
 | Project | Setting | Value |
 |---|---|---|
 | `bishnoi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
-| `bishnoi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-crm-backend` | `INVENTORY_API_URL` | `https://bishnoi-one-inventory-backend.vercel.app` |
-| | `INVENTORY_API_KEY` | From step 2 |
-| | `INVENTORY_APP_URL` | `https://bishnoi-one-inventory.vercel.app` |
-| | `FINANCE_API_URL` | `https://bishnoi-one-finance-backend.vercel.app` |
-| | `FINANCE_API_KEY` | From step 2 |
-| | `PHARMACY_API_URL` | `https://bishnoi-one-pharmacy-backend.vercel.app` |
-| | `PHARMACY_API_KEY` | From step 2 |
+| `bishnoi-crm-backend` | `CRM_APP_URL` | `https://bishnoi-one-crm.vercel.app` (links in emails) |
 | | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
 
 **Every screens project** (`bishnoi-<app>`). The `NEXT_PUBLIC_` ones are built
@@ -383,8 +380,9 @@ To set it up:
 1. Make the platform's key pair once: in `bishnoi-platform/backend`,
    `uv run python -m app.passes`. It prints both halves.
 2. Platform API on Vercel: `PASS_SIGNING_KEY` = the private half (secret).
-3. Each app's API on Vercel: `PLATFORM_PUBLIC_KEY` = the public half (not
-   secret; also shown at the platform API's `/pass/key`).
+3. Each app's API on Vercel: `PLATFORM_API_URL` = the platform's API. The app
+   fetches the public half from its `/pass/key`, and again when the key is
+   replaced; `PLATFORM_PUBLIC_KEY` is only for pinning it.
 4. Each app's screens on Vercel: `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` = the
    platform's address. The sign-in page then shows "Sign in with your Bishnoi One
    account".

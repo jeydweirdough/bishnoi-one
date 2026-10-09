@@ -36,6 +36,7 @@ from app.routers import (
     unset,
     users,
 )
+from app.routers import services as services_router
 from app.routers import settings as settings_router
 from app.traffic import traffic
 
@@ -112,4 +113,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(public.router)
     app.include_router(connections.router)
+    app.include_router(services_router.router)
     return app

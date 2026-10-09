@@ -516,7 +516,7 @@ after you change a file.
 | App | Setting | Default | What it does |
 |---|---|---|---|
 | CRM, Inventory, Pharmacy, Platform | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | not set | Makes the first administrator on start, **only** while the app has no accounts. For hosts where you can't run the users tool (Vercel). Remove the password after you've signed in. |
-| CRM, Inventory | `PLATFORM_API_URL` | not set | Bishnoi One Platform's API, where the app checks that a company is registered, active and given the app. Needs `PLATFORM_PUBLIC_KEY`. Not set: on this computer the companies in `DEV_COMPANIES` are allowed; in production, none. |
+| CRM, Inventory | `PLATFORM_API_URL` | not set | Bishnoi One Platform's API, where the app checks that a company is registered, active and given the app; its public key, for passes, is fetched from there too. Not set: on this computer the companies in `DEV_COMPANIES` are allowed; in production, none. |
 | CRM, Inventory | `FIRST_ADMIN_COMPANY` | not set | The one company whose database gets the `FIRST_ADMIN_*` account (each company has its own database). Not set: `DEFAULT_COMPANY` on this computer, none in production, where a company's administrators sign in with their Bishnoi One account. |
 | CRM, Inventory | `DEFAULT_COMPANY`, `DEV_COMPANIES` | `getmeds`, `["getmeds","northwind"]` | This computer only: the company a request is for when it doesn't say, and the companies allowed without the Platform. Ignored in production. |
 | Inventory, Pharmacy | `EXPIRY_WARNING_DAYS` | `90` | A batch expiring within this many days is flagged "expiring soon". |

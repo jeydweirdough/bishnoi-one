@@ -142,6 +142,9 @@ class Application(Base):
     connect_key_made_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # When it last asked for its links: how the platform knows it's connected.
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The key it encrypts its own secrets with (each person's mailbox, its order
+    # links), given with its links: made once, kept encrypted, the same through new connect keys.
+    data_key: Mapped[str | None] = mapped_column(Text, default=None)
     # Retired applications stay for their history, out of the lists.
     is_active: Mapped[bool] = mapped_column(default=True)
     status_override: Mapped[str | None] = mapped_column(String(16), default=None)
@@ -198,6 +201,27 @@ class AppLink(Base):
     secret: Mapped[str] = mapped_column(Text)
     made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ServiceConnection(Base):
+    """A company's details for an outside service (Zoho Books, Gmail...): which
+    ones and what they need are in app/services.py. The secret ones are one
+    encrypted JSON object; the applications that use the service are given them."""
+
+    __tablename__ = "nbpl_service_connections"
+    __table_args__ = (UniqueConstraint("company_id", "service", name="nbpl_service_connection_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    service: Mapped[str] = mapped_column(String(40))
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    secrets: Mapped[str | None] = mapped_column(Text, default=None)
+    is_enabled: Mapped[bool] = mapped_column(default=False)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    check_ok: Mapped[bool | None] = mapped_column(default=None)
+    check_message: Mapped[str | None] = mapped_column(String(300), default=None)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_users.id", ondelete="SET NULL"), default=None)
 
 
 class CompanyApp(Base):

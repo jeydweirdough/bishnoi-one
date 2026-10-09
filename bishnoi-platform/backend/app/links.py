@@ -99,7 +99,16 @@ def links_for(db: Session, settings: Settings, app: Application) -> dict:
             uses[target.key] = {"apiUrl": target.api_url, "appUrl": target.app_url, "key": secret}
         if target.id == app.id:
             used_by[caller.key] = secret
-    return {"app": app.key, "appUrl": app.app_url, "uses": uses, "usedBy": used_by, "askAgainIn": ASK_AGAIN}
+    return {"app": app.key, "appUrl": app.app_url, "uses": uses, "usedBy": used_by, "dataKey": data_key(settings, app), "askAgainIn": ASK_AGAIN}
+
+
+def data_key(settings: Settings, app: Application) -> str | None:
+    """The key the application encrypts its own secrets with: made the first
+    time it's asked for, then the same. None when it can't be read (the
+    platform's signing key changed): the application keeps the one it had."""
+    if app.data_key is None:
+        app.data_key = seal(settings, Fernet.generate_key().decode())
+    return unseal(settings, app.data_key)
 
 
 def link_state(link: AppLink, caller: Application, target: Application, health: dict[str, str]) -> tuple[str, str]:

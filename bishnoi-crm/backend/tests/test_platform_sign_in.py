@@ -105,7 +105,8 @@ def test_a_role_this_app_doesnt_have(client, linked):
 
 
 def test_someone_switched_off_here_stays_out(app, client, linked):
-    assert take(client, make_pass()).status_code == 200
+    r = take(client, make_pass())
+    assert r.status_code == 200, r.text
     with app.state.sessions() as db:
         db.query(User).filter_by(email="jade@getmeds.test").update({"is_active": False})
         db.commit()
@@ -146,3 +147,35 @@ def test_the_pass_and_the_platform_must_agree_on_the_company(app, client, linked
         assert take(client, make_pass(company="co-1")).status_code == 200
     finally:
         company.forget()
+
+
+def test_the_platforms_key_is_fetched_from_the_platform(app, client, monkeypatch):
+    """No PLATFORM_PUBLIC_KEY on the server: the CRM asks the platform for it, and again when it's replaced."""
+    import httpx
+
+    from app import company, platform_pass
+    from tests.test_company import Answer, company_pass
+
+    platform_pass.forget_key()
+    company.forget()
+    app.state.settings.platform_public_key = None
+    app.state.settings.platform_api_url = "https://platform.test"
+    asked = []
+    keys = {"now": "not-the-key="}
+
+    def get(url, params=None, headers=None, timeout=None):
+        if url.endswith("/pass/key"):
+            asked.append(url)
+            return Answer(200, {"publicKey": keys["now"]})
+        return Answer(200, {"pass": company_pass(key=KEY)})
+
+    monkeypatch.setattr(httpx, "get", get)
+    monkeypatch.setattr(platform_pass, "AGAIN", 0)
+    # The first key it was given is wrong (the platform replaced it): it asks again, and the pass is taken.
+    platform_pass.public_key(app.state.settings)
+    keys["now"] = PUBLIC
+    r = take(client, make_pass(company="co-1"))  # the company the stand-in platform has
+    assert r.status_code == 200, r.text
+    assert len(asked) == 2
+    platform_pass.forget_key()
+    company.forget()

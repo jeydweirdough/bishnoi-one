@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr | None = None
     # How long a sign-in lasts.
     session_hours: int = 10
-    # Signing in with a Bishnoi One account: the platform's public key, base64 (its
-    # /pass/key). Unset: only this app's own accounts sign in.
+    # Signing in with a Bishnoi One account: the platform's API. Its public key
+    # is fetched from there (app/platform_pass.py); PLATFORM_PUBLIC_KEY, when set,
+    # is used instead. Neither set: only this app's own accounts sign in.
+    platform_api_url: str | None = None
     platform_public_key: str | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5

@@ -136,7 +136,7 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     this app doesn't have. The platform decides who may open this application;
     this only refuses someone switched off here."""
     try:
-        claims = platform_pass.check(body.token, settings.platform_public_key, APP_KEY)
+        claims = platform_pass.check_for(settings, body.token, APP_KEY)
     except platform_pass.PassRefused as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
     now = datetime.now(UTC)

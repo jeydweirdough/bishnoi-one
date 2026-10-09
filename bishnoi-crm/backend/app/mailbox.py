@@ -2,8 +2,8 @@
 inbox, C7).
 
 Gmail, Outlook and Zoho Mail are connected by the person's own sign-in with
-the provider (OAuth): the CRM is registered with each provider once, in
-Settings → Connections; the person signs in and allows sending, and the CRM
+the provider (OAuth): the CRM is registered with each provider once, on
+Bishnoi One Platform (the company's Connections); the person signs in and allows sending, and the CRM
 keeps the refresh token it's given, encrypted. Any other provider connects by
 SMTP: server, port, user name and password, the password encrypted too.
 
@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app import connections as svc
 from app.config import Settings
-from app.models import Connection, Mailbox
+from app.models import Mailbox
 
 REDIRECT_PATH = "/account/mailbox/callback"
 STATE_MINUTES = 15
@@ -52,12 +52,9 @@ PROVIDERS = {
 
 
 def registration(db: Session, settings: Settings, key: str) -> dict | None:
-    """The company's registration with a provider (Settings → Connections), if it's switched on and filled in."""
-    row = db.get(Connection, key)
-    if row is None or not row.is_enabled:
-        return None
-    details = {**(row.values or {}), **svc.unseal(settings, row.secrets)}
-    return details if not svc.missing(svc.BY_KEY[key], row.values or {}, svc.unseal(settings, row.secrets)) else None
+    """The company's registration with a provider, if it's switched on and filled
+    in: set on Bishnoi One Platform (Companies → the company → Connections)."""
+    return svc.service(settings, key, settings.company or db.info.get("tenant"))
 
 
 def redirect_uri(settings: Settings) -> str:
@@ -103,7 +100,7 @@ def read_state(settings: Settings, state: str) -> tuple[str, str]:
 def sign_in_url(db: Session, settings: Settings, user_id: str, key: str) -> str:
     reg = registration(db, settings, key)
     if reg is None:
-        raise MailboxError(f"{PROVIDERS[key].name} isn't set up for the company yet. An administrator sets it up in Settings → Connections.")
+        raise MailboxError(f"{PROVIDERS[key].name} isn't set up for the company yet. A Bishnoi One administrator sets it up on the Platform: Companies → your company → Connections.")
     auth, _ = _endpoints(key, reg)
     params = {
         "client_id": reg["client_id"],

@@ -6,7 +6,8 @@ asks the platform GET /connect/links and is told:
 - for each application it uses (Inventory, Finance, Pharmacy): where its API
   is, where its screens are, and the key to call it with;
 - for each application that uses it (Finance): the key that caller sends;
-- where its own screens are (for sign-in with Gmail, Outlook and Zoho Mail).
+- where its own screens are (for sign-in with Gmail, Outlook and Zoho Mail);
+- the key it encrypts its own secrets with (app/connections.py).
 
 Those are laid over the settings on every request (app/deps.py), so the code
 that calls Inventory reads settings.inventory_api_url as before, whichever
@@ -65,7 +66,8 @@ def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
         return None, RETRY
     try:
         body = r.json()
-        return {"uses": dict(body.get("uses") or {}), "usedBy": dict(body.get("usedBy") or {}), "appUrl": body.get("appUrl")}, float(body.get("askAgainIn") or 300)
+        found = {"uses": dict(body.get("uses") or {}), "usedBy": dict(body.get("usedBy") or {}), "appUrl": body.get("appUrl"), "dataKey": body.get("dataKey")}
+        return found, float(body.get("askAgainIn") or 300)
     except ValueError:
         log.error("Links: the platform's answer wasn't readable.")
         return None, RETRY

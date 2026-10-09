@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from app import connections
 from app import mailbox as mb
 from tests.test_customers import company, crew  # noqa: F401 (crew is a fixture)
 
@@ -37,9 +38,21 @@ def google(monkeypatch):
     return sent
 
 
+# The company's services as the platform gives them (Companies → the company → Connections).
+ON: dict[str, dict] = {}
+
+
+@pytest.fixture(autouse=True)
+def platform_services(monkeypatch):
+    ON.clear()
+    monkeypatch.setattr(connections, "services", lambda settings, company=None: dict(ON))
+    yield
+    ON.clear()
+
+
 def set_up_gmail(client, ana):
-    r = client.put("/admin/connections/gmail", json={"values": GMAIL, "enabled": True}, headers=ana)
-    assert r.status_code == 200, r.text
+    """Gmail switched on for the company, on the platform."""
+    ON["gmail"] = GMAIL
 
 
 def test_connect_gmail_and_send_from_it(client, ana, crew, google):

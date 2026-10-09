@@ -1032,10 +1032,9 @@ class KpiEntry(Base):
 
 
 class Connection(Base):
-    """An outside service the CRM may connect to (Zoho Books first), as an
-    administrator set it up in Settings → Connections. What the service is
-    and which details it needs are in app/connections.py; the secrets among
-    them are kept encrypted, never in the clear."""
+    """No longer used (since 2026-10-09): outside services are connected on
+    Bishnoi One Platform, per company (app/connections.py). The table stays
+    for what was saved in it before."""
 
     __tablename__ = "nbcm_connections"
 
@@ -1214,7 +1213,7 @@ class QuoteLink(Base):
     """A link a rep gives a customer to order from (app/routers/quote_links.py):
     the customer searches the medicines at their own prices, picks quantities,
     and a quote is made for them, the rep's. It works once, until it expires.
-    It's found by its hash; the link itself is kept encrypted (CONNECTIONS_KEY),
+    It's found by its hash; the link itself is kept encrypted (app/connections.py),
     so its maker can copy it again, and the database alone can't open it."""
 
     __tablename__ = "nbcm_quote_links"

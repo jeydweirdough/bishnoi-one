@@ -131,7 +131,7 @@ def sign_in_with_platform(body: PlatformIn, request: Request, response: Response
     only refuses someone switched off here."""
     base: Settings = request.app.state.settings
     try:
-        claims = platform_pass.check(body.token, base.platform_public_key, APP_KEY)
+        claims = platform_pass.check_for(base, body.token, APP_KEY)
     except platform_pass.PassRefused as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
     slug = clean(claims.get("companySlug"))

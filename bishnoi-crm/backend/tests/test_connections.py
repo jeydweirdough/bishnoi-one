@@ -1,77 +1,70 @@
-"""Settings → Connections: administrators keep the details for Zoho Books;
-secrets are encrypted, never shown again, and testing tries them on Zoho."""
+"""Outside services are connected on Bishnoi One Platform, per company, and the
+CRM is given them (app/connections.py): nothing about them is kept here. The
+platform is stood in for."""
 
-from app import connections
-from app.models import Connection
+import httpx
+import pytest
+from pydantic import SecretStr
 
-ZOHO = {
-    "data_centre": "com",
-    "organization_id": "60012345",
-    "client_id": "1000.ABC",
-    "client_secret": "s3cret-client-value",
-    "refresh_token": "1000.refresh-token-value",
-}
+from app import company, connections, platform_links
+from tests.test_company import PUBLIC, Answer, company_pass
+
+GMAIL = {"client_id": "123.apps.googleusercontent.com", "client_secret": "google-secret-value"}
 
 
-def details(conn) -> dict:
-    return {d["key"]: d for d in conn["details"]}
+@pytest.fixture
+def platform(app, monkeypatch):
+    """A stand-in platform: `services` is what it gives GetMeds; `asked` counts the questions."""
+    company.forget()
+    connections.forget()
+    platform_links.forget()
+    app.state.settings = app.state.settings.model_copy(update={"platform_app_key": SecretStr("bpk.crm.test"), "platform_api_url": "https://platform.test", "platform_public_key": PUBLIC})
+    state = {"services": {"gmail": GMAIL}, "asked": 0, "down": False}
+
+    def get(url, params=None, headers=None, timeout=None):
+        if url.endswith("/public/company-pass"):
+            return Answer(200, {"pass": company_pass()})
+        assert headers == {"X-Bishnoi-App-Key": "bpk.crm.test"}
+        if url.endswith("/connect/links"):
+            return Answer(200, {"uses": {}, "usedBy": {}, "dataKey": "6K1f3fL0eF3_1ExqhW0Y1n7mJm6r8Y0Vb4J2l7nA9cQ=", "askAgainIn": 300})
+        assert url == "https://platform.test/connect/services" and params == {"company": "getmeds"}
+        state["asked"] += 1
+        if state["down"]:
+            raise httpx.ConnectError("down")
+        return Answer(200, {"company": "getmeds", "services": state["services"], "askAgainIn": 300})
+
+    monkeypatch.setattr(httpx, "get", get)
+    yield state
+    company.forget()
+    connections.forget()
+    platform_links.forget()
 
 
 def test_only_administrators_see_connections(client, ana, ben):
     assert client.get("/admin/connections", headers=ben).status_code == 403
-    zoho = next(c for c in client.get("/admin/connections", headers=ana).json() if c["key"] == "zoho_books")
-    assert (zoho["key"], zoho["name"], zoho["enabled"], zoho["check"]) == ("zoho_books", "Zoho Books", False, None)
-    assert "Organization ID" in zoho["missing"] and details(zoho)["client_secret"]["saved"] is False
+    page = client.get("/admin/connections", headers=ana).json()
+    # Not connected to the platform: nothing is on, and the page says why.
+    assert page["connected"] is False and not any(s["on"] for s in page["services"])
 
 
-def test_secrets_are_kept_encrypted_and_never_come_back(app, client, ana):
-    saved = client.put("/admin/connections/zoho_books", json={"values": ZOHO}, headers=ana).json()
-    d = details(saved)
-    assert d["organization_id"]["value"] == "60012345" and saved["missing"] == []
-    assert (d["client_secret"]["saved"], d["client_secret"]["ending"], "value" in d["client_secret"]) == (True, "alue", False)
-    assert "s3cret" not in str(saved)
-    with app.state.sessions() as db:
-        row = db.get(Connection, "zoho_books")
-        assert "s3cret" not in (row.secrets or "") and "client_secret" not in row.values
-    # Leaving a secret out keeps it; sending it empty removes it.
-    again = client.put("/admin/connections/zoho_books", json={"values": {"organization_id": "60099999"}}, headers=ana).json()
-    assert details(again)["refresh_token"]["saved"] and details(again)["organization_id"]["value"] == "60099999"
-    cleared = client.put("/admin/connections/zoho_books", json={"values": {"client_secret": ""}}, headers=ana).json()
-    assert details(cleared)["client_secret"]["saved"] is False and cleared["missing"] == ["Client secret"]
-    # The audit log names what changed, never the values.
-    log = client.get("/admin/audit?action=connection.", headers=ana).json()
-    assert "s3cret" not in str(log)
+def test_the_platform_says_which_services_are_on(client, ana, platform):
+    page = client.get("/admin/connections", headers=ana).json()
+    assert page["connected"] is True and {s["key"]: s["on"] for s in page["services"]} == {"zoho_books": False, "gmail": True, "outlook": False, "zoho_mail": False}
+    # Asked once, then the answer is kept; while the platform is down, the last answer stands.
+    client.get("/admin/connections", headers=ana)
+    assert platform["asked"] == 1
+    connections._known["getmeds"] = (connections._known["getmeds"][0], connections._known["getmeds"][1], 0.0)
+    platform["down"] = True
+    assert next(s for s in client.get("/admin/connections", headers=ana).json()["services"] if s["key"] == "gmail")["on"] is True
+    # Nothing to save here any more: it's done on the platform.
+    assert client.put("/admin/connections/gmail", json={"values": GMAIL}, headers=ana).status_code in (404, 405)
 
 
-def test_switching_on_needs_every_required_detail(client, ana):
-    r = client.put("/admin/connections/zoho_books", json={"values": {"organization_id": "1"}, "enabled": True}, headers=ana)
-    assert r.status_code == 409 and "Client ID" in r.json()["detail"]
-    on = client.put("/admin/connections/zoho_books", json={"values": ZOHO, "enabled": True}, headers=ana).json()
-    assert on["enabled"] is True
-    r = client.put("/admin/connections/zoho_books", json={"values": {"refresh_token": ""}}, headers=ana)
-    assert r.status_code == 409 and "Refresh token" in r.json()["detail"]
-    r = client.put("/admin/connections/zoho_books", json={"values": {"data_centre": "mars"}}, headers=ana)
-    assert r.status_code == 422
+def test_the_crms_own_secrets_use_the_platforms_key(app, platform):
+    from cryptography.fernet import Fernet
 
-
-def test_testing_tries_the_details_on_zoho(client, ana, monkeypatch):
-    client.put("/admin/connections/zoho_books", json={"values": ZOHO}, headers=ana)
-    tried = {}
-
-    def fake_zoho(given):
-        tried.update(given)
-        return "Connected to Getmeds Inc."
-
-    monkeypatch.setitem(connections.CHECKS, "zoho_books", fake_zoho)
-    ok = client.post("/admin/connections/zoho_books/check", headers=ana).json()
-    assert ok["check"]["ok"] is True and ok["check"]["message"] == "Connected to Getmeds Inc."
-    assert tried["client_secret"] == "s3cret-client-value" and tried["organization_id"] == "60012345"
-
-    def refused(_):
-        raise connections.CheckFailed("Zoho didn't accept the client ID, secret and refresh token (invalid_code).")
-
-    monkeypatch.setitem(connections.CHECKS, "zoho_books", refused)
-    bad = client.post("/admin/connections/zoho_books/check", headers=ana).json()
-    assert bad["check"]["ok"] is False and "invalid_code" in bad["check"]["message"]
-    # Changing a detail forgets the last test.
-    assert client.put("/admin/connections/zoho_books", json={"values": {"client_id": "1000.NEW"}}, headers=ana).json()["check"] is None
+    settings = app.state.settings
+    sealed = connections.seal(settings, {"refresh_token": "rt"})
+    assert connections.unseal(settings, sealed) == {"refresh_token": "rt"}
+    # Sealed with the key the platform gave, so it reads the same on any server.
+    assert Fernet(b"6K1f3fL0eF3_1ExqhW0Y1n7mJm6r8Y0Vb4J2l7nA9cQ=").decrypt(sealed.encode()) == b'{"refresh_token": "rt"}'

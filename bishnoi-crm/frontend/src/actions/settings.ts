@@ -57,50 +57,13 @@ export async function addChoice(entity: CustomEntity, key: string, label: string
 
 // --- connections to outside services (Settings → Connections) ---
 
-export type ConnectionDetail = {
-  key: string;
-  label: string;
-  hint: string;
-  secret: boolean;
-  required: boolean;
-  options: { value: string; label: string }[];
-  /** Not secret: what's saved. */
-  value?: string | null;
-  /** Secret: whether one is saved, and its last four characters (empty when it's short). */
-  saved?: boolean;
-  ending?: string;
+/** Which services the CRM can use for this company: they're connected on Bishnoi One Platform. */
+export type Connections = {
+  /** Whether the CRM has its connect key, so it can ask the platform at all. */
+  connected: boolean;
+  company: string | null;
+  services: { key: string; name: string; purpose: string; on: boolean }[];
 };
-
-export type ConnectionInfo = {
-  key: string;
-  name: string;
-  purpose: string;
-  helpUrl: string;
-  enabled: boolean;
-  details: ConnectionDetail[];
-  missing: string[];
-  check: { at: string; ok: boolean; message: string } | null;
-  updatedAt: string | null;
-  updatedBy: { id: string; name: string } | null;
-};
-
-/** Saves what changed. A secret left out stays as saved; one sent as "" is removed. */
-export async function saveConnection(key: string, values: Record<string, string>, enabled?: boolean): Promise<Result<ConnectionInfo>> {
-  return attempt(async () => {
-    const saved = await api.put<ConnectionInfo>(`/admin/connections/${enc(key)}`, { values, enabled });
-    refresh();
-    return saved;
-  });
-}
-
-/** Tries the saved details on the service; the answer is kept and shown. */
-export async function checkConnection(key: string): Promise<Result<ConnectionInfo>> {
-  return attempt(async () => {
-    const checked = await api.post<ConnectionInfo>(`/admin/connections/${enc(key)}/check`, {});
-    refresh();
-    return checked;
-  });
-}
 
 // --- Settings → Attention: when something is worth a prompt on the home page ---
 

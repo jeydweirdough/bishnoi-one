@@ -11,6 +11,8 @@ import { ActivityList } from "@/src/components/activity-list";
 import { getStaff } from "@/src/components/gate";
 import { Count, IncidentSeverityMark, IncidentStatusMark, KindMark, SeverityMark, Tabs, TicketStatusMark } from "@/src/components/marks";
 import { CompanyApps } from "@/src/components/organizations/company-apps";
+import { ServiceCard } from "@/src/components/organizations/service-card";
+import type { ServiceInfo } from "@/src/actions/services";
 import { SuspendCompany } from "@/src/components/organizations/company-tools";
 import { EditLink, SuspendedTag } from "@/src/components/organizations/record-tools";
 import { Structure } from "@/src/components/organizations/structure";
@@ -20,7 +22,7 @@ import { ago, plural, when } from "@/src/lib/words";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-const TABS = ["overview", "applications", "structure", "users", "issues", "activity"] as const;
+const TABS = ["overview", "applications", "connections", "structure", "users", "issues", "activity"] as const;
 type Tab = (typeof TABS)[number];
 
 const getCompany = (id: string) => load<{ company: CompanyDetail }>(`/platform/companies/${enc(id)}`).then((b) => b.company);
@@ -70,6 +72,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         tabs={[
           { key: "overview", label: "Overview", href: href("overview") },
           { key: "applications", label: "Applications", href: href("applications"), count: company.applications.length },
+          { key: "connections", label: "Connections", href: href("connections") },
           { key: "structure", label: "Structure", href: href("structure"), count: company.units.length },
           { key: "users", label: "Users", href: href("users"), count: company.userCount },
           { key: "issues", label: "Issues", href: href("issues"), count: company.openTickets + company.activeIncidents.length },
@@ -79,11 +82,36 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
       {tab === "overview" && <Overview company={company} />}
       {tab === "applications" && <Applications company={company} canChange={staff.canAdminister} />}
+      {tab === "connections" && <Connections company={company} canChange={staff.canAdminister} />}
       {tab === "structure" && <Structure companyId={company.id} companyName={company.name} units={company.units} canChange={staff.canAdminister} />}
       {tab === "users" && <People company={company} canAdd={staff.canAdminister} />}
       {tab === "issues" && <Issues company={company} />}
       {tab === "activity" && <Activity company={company} />}
     </>
+  );
+}
+
+/** The outside services this company's applications use: filled in here, given to each application that uses them. */
+async function Connections({ company, canChange }: { company: CompanyDetail; canChange: boolean }) {
+  const { services } = await load<{ services: ServiceInfo[] }>(`/platform/companies/${enc(company.id)}/services`);
+  return (
+    <div className="max-w-3xl space-y-4">
+      <p className="text-meta text-ink-3">
+        The details {company.name}&apos;s applications need to reach outside services. Secrets are kept encrypted and never shown again once saved; only the
+        applications that use a service are given it, so nothing is kept on their servers.
+      </p>
+      {services.map((s) => (
+        <ServiceCard
+          key={s.key}
+          companyId={company.id}
+          service={s}
+          canChange={canChange}
+          checkedWhen={s.check ? ago(s.check.at) : null}
+          updatedWhen={s.updatedAt ? ago(s.updatedAt) : null}
+        />
+      ))}
+      {!canChange && <p className="text-meta text-ink-3">A Platform Admin changes these.</p>}
+    </div>
   );
 }
 

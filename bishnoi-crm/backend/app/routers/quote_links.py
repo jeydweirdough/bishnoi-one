@@ -147,7 +147,7 @@ def make_link(db, me: User, settings, company: Company | None, body: "LinkIn") -
     try:
         sealed = seal(settings, {"token": token})
     except NoKey:
-        sealed = None  # production with no CONNECTIONS_KEY: it works, but can't be copied again
+        sealed = None  # online and not connected to the platform: it works, but can't be copied again
     link = QuoteLink(
         token_hash=token_hash(token),
         token_sealed=sealed,

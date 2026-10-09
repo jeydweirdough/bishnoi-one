@@ -26,6 +26,7 @@ import httpx
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from app import platform_pass
 from app.config import Settings
 from app.platform_pass import ISSUERS, LEEWAY, _b64
 
@@ -77,8 +78,8 @@ def _read(token: str, public_key: str, slug: str) -> dict:
 
 def _ask(settings: Settings, slug: str) -> Standing:
     """The platform's answer, checked."""
-    if not settings.platform_api_url or not settings.platform_public_key:
-        return unavailable("PLATFORM_API_URL or PLATFORM_PUBLIC_KEY isn't set on the server.", until=time.time() + 60)
+    if not settings.platform_api_url:
+        return unavailable("PLATFORM_API_URL isn't set on the server.", until=time.time() + 60)
     try:
         r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/public/company-pass", params={"app": APP_KEY, "company": slug}, timeout=10)
     except httpx.HTTPError:
@@ -88,9 +89,14 @@ def _ask(settings: Settings, slug: str) -> Standing:
     if r.status_code != 200:
         raise ConnectionError
     try:
-        claims = _read(r.json()["pass"], settings.platform_public_key, slug)
+        token = r.json()["pass"]
+        try:
+            claims = _read(token, platform_pass.public_key(settings), slug)
+        except (InvalidSignature, TypeError):
+            # The platform's key may have been replaced: fetch it again, once.
+            claims = _read(token, platform_pass.public_key(settings, again=True), slug)
     except (ValueError, KeyError, InvalidSignature, TypeError, json.JSONDecodeError):
-        return unavailable(f"the Platform's pass for {slug!r} didn't verify: is PLATFORM_PUBLIC_KEY the Platform's current key?", until=time.time() + 300)
+        return unavailable(f"the Platform's pass for {slug!r} didn't verify: is PLATFORM_PUBLIC_KEY (if set) the Platform's current key?", until=time.time() + 300)
     name, company_id, until = claims.get("companyName") or slug, claims.get("company"), float(claims["exp"])
     if claims.get("status") == "paused":
         return Standing(False, f"{name}'s Bishnoi One access is paused until {claims.get('pausedUntil') or 'later'}. It comes back by itself then.", company_id, name, until)

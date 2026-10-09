@@ -17,7 +17,9 @@ def asks(client, connect_key: str):
 def test_applications_learn_their_links_from_the_platform(client, ana, ben):
     crm_key, inventory_key = connect(client, ana, "crm"), connect(client, ana, "inventory")
     assert crm_key.startswith("bpk.crm.")
-    assert asks(client, crm_key).json() == {"app": "crm", "appUrl": "http://localhost:4302", "uses": {}, "usedBy": {}, "askAgainIn": 300}
+    answer = asks(client, crm_key).json()
+    assert answer.pop("dataKey")  # its own secrets' key (tests/test_services.py)
+    assert answer == {"app": "crm", "appUrl": "http://localhost:4302", "uses": {}, "usedBy": {}, "askAgainIn": 300}
     assert asks(client, "bpk.crm.made-up").status_code == 401
 
     # Only links the applications understand are offered, and made.
