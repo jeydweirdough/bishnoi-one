@@ -770,9 +770,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
 
   const brand = (
     <Link href="/" className="flex items-center gap-2.5 border-b border-rule pb-4">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-bold tracking-tight text-white" aria-hidden>
-        B1
-      </span>
+      <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 shrink-0" />
       <span className="min-w-0">
         {/* Which app this is, not only which product. Each one is its own site on
             its own address, so "Bishnoi One" alone leaves you working out from the port

@@ -763,15 +763,18 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const place = placeOf(pathname, me);
 
   const brand = (
-    <Link href="/" className="block border-b-[3px] border-double border-ink pb-2">
-      {/* No company on the platform: a Developer Admin has not opened one, and
-          saying a company name there would be saying something untrue. */}
-      <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
-      {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so "Bishnoi One" alone leaves you working out from the port
-          whether the screen in front of you is missing or simply elsewhere. */}
-      <span className="block truncate text-base leading-tight font-semibold text-ink">
-        {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+    <Link href="/" className="flex items-center gap-2.5 border-b-[3px] border-double border-ink pb-2">
+      <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 shrink-0" />
+      <span className="min-w-0">
+        {/* No company on the platform: a Developer Admin has not opened one, and
+            saying a company name there would be saying something untrue. */}
+        <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
+        {/* Which app this is, not only which product. Each one is its own site on
+            its own address, so "Bishnoi One" alone leaves you working out from the port
+            whether the screen in front of you is missing or simply elsewhere. */}
+        <span className="block truncate text-base leading-tight font-semibold text-ink">
+          {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+        </span>
       </span>
     </Link>
   );

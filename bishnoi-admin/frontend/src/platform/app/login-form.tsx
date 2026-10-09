@@ -138,9 +138,7 @@ export function LoginForm({
               href={bishnoiAccount}
               className="group flex items-center gap-3 rounded-full bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
             >
-              <span className="flex size-9 items-center justify-center rounded-full bg-white text-[13px] font-bold tracking-tight text-[#141414]" aria-hidden>
-                B1
-              </span>
+              <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 rounded-full bg-white p-0.5" />
               Your Bishnoi One account
             </a>
           </div>
