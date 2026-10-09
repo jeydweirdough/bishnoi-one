@@ -182,12 +182,12 @@ they call each other, so set them up in this order.
 | `bishnoi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
 | `bishnoi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
 | `bishnoi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
+| `bishnoi-crm-backend` | `INVENTORY_API_URL` | `https://bishnoi-one-inventory-backend.vercel.app` |
 | | `INVENTORY_API_KEY` | From step 2 |
-| | `INVENTORY_APP_URL` | `https://nabhi-inventory.vercel.app` |
-| | `FINANCE_API_URL` | `https://nabhi-finance-backend.vercel.app` |
+| | `INVENTORY_APP_URL` | `https://bishnoi-one-inventory.vercel.app` |
+| | `FINANCE_API_URL` | `https://bishnoi-one-finance-backend.vercel.app` |
 | | `FINANCE_API_KEY` | From step 2 |
-| | `PHARMACY_API_URL` | `https://nabhi-pharmacy-backend.vercel.app` |
+| | `PHARMACY_API_URL` | `https://bishnoi-one-pharmacy-backend.vercel.app` |
 | | `PHARMACY_API_KEY` | From step 2 |
 | | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
 
@@ -196,9 +196,9 @@ in, so redeploy the screens after changing them:
 
 | Setting | Value |
 |---|---|
-| `API_URL` | Its own API, e.g. `https://nabhi-crm-backend.vercel.app` |
-| `PLATFORM_API_URL` | `https://nabhi-platform-backend.vercel.app` (announcements) |
-| `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` | `https://nabhi-platform.vercel.app` (the Bishnoi One account button; not on the Platform itself) |
+| `API_URL` | Its own API, e.g. `https://bishnoi-one-crm-backend.vercel.app` |
+| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (announcements) |
+| `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` | `https://bishnoi-one-platform.vercel.app` (the Bishnoi One account button; not on the Platform itself) |
 | `NEXT_PUBLIC_BISHNOI_CRM_URL`, `_INVENTORY_URL`, `_FINANCE_URL`, `_EXEC_URL`, `_PHARMACY_URL` | Each app's screens, for links between the apps |
 
 Leave `SHOW_DEMO_ACCOUNTS` unset online. The addresses above are the
@@ -224,7 +224,7 @@ Variables**, then redeploy it):
 2. **bishnoi-inventory-backend:** `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **bishnoi-crm-backend:**
    - `INVENTORY_API_URL` = the Inventory API's address, e.g.
-     `https://nabhi-inventory-backend.vercel.app` (no `/` at the end).
+     `https://bishnoi-one-inventory-backend.vercel.app` (no `/` at the end).
    - `INVENTORY_API_KEY` = the key.
    - `INVENTORY_APP_URL` = Inventory's screens, for the "Add it in Inventory"
      button (optional).
@@ -262,7 +262,7 @@ rules.
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `FINANCE_API_URL` = Finance's API address (e.g.
-   `https://nabhi-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
+   `https://bishnoi-one-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
    one computer) and `FINANCE_API_KEY` = the key.
 4. Restart both. In Finance, an admin fills in **Tax → Registration** (VAT
    status, registered name, TIN and address, as the invoice shows them).
@@ -317,7 +317,7 @@ ordered until a pharmacist in Pharmacy verifies its prescription.
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `PHARMACY_API_URL` = Pharmacy's API address (e.g.
-   `https://nabhi-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
+   `https://bishnoi-one-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
    one computer) and `PHARMACY_API_KEY` = the key.
 4. Restart both.
 

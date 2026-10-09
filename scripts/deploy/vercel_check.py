@@ -4,7 +4,7 @@ Run by each app's Deploy workflow (.github/workflows/deploy-<app>.yml), from
 the repo's root, with VERCEL_TOKEN (and VERCEL_SCOPE, for a team) set:
 
     python3 scripts/deploy/vercel_check.py check  --app bishnoi-crm --part "screens and API"
-    python3 scripts/deploy/vercel_check.py health --project nabhi-crm-backend --side backend
+    python3 scripts/deploy/vercel_check.py health --project bishnoi-one-crm-backend --side backend
 
 `check` goes through what the app needs (.github/deploy.json): its code can
 run on Vercel, the token works, its Vercel projects exist with the right Root

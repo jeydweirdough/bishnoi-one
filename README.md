@@ -457,7 +457,7 @@ the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
 | Platform | `bishnoi-platform/backend` | `bishnoi-platform/frontend` |
 
 Use the addresses Vercel actually gives your projects (e.g.
-`nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
+`bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
 screens' `API_URL` must both name it.
 
 **Pushing doesn't deploy.** To put an app online, the repo owner opens
@@ -572,7 +572,7 @@ the CRM tells its users the other app can't be reached; nothing breaks.
 
 The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
 `PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
-`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://nabhi-finance.vercel.app`.
+`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://bishnoi-one-finance.vercel.app`.
 `NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
 change one.
 

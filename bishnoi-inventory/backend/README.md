@@ -108,14 +108,14 @@ disk, so the data lives in Postgres, pictures included.
 |---|---|
 | `DATABASE_URL` | Postgres. On Supabase, the **Transaction pooler** address (port 6543); a `#`, `@` or `/` in the password is written `%23`, `%40`, `%2F`. On Neon, Storage → Create Database sets it for you. |
 | `ENVIRONMENT` | `production` (hides `/docs` and the demo accounts) |
-| `ALLOWED_HOSTS` | the API's own address, as JSON: `["nabhi-inventory-backend.vercel.app"]` |
+| `ALLOWED_HOSTS` | the API's own address, as JSON: `["bishnoi-one-inventory-backend.vercel.app"]` |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | the first administrator (password at least 8 characters). Made on start into a database with no accounts; ignored once anyone exists. Remove the password after signing in. |
 
 **Screens project:**
 
 | Name | Value |
 |---|---|
-| `API_URL` | the API's address: `https://nabhi-inventory-backend.vercel.app` |
+| `API_URL` | the API's address: `https://bishnoi-one-inventory-backend.vercel.app` |
 | `NEXT_PUBLIC_BISHNOI_APP` | `inventory` (read at build time: redeploy after changing it) |
 
 The first request builds the tables and, with the `FIRST_ADMIN_*` settings,
