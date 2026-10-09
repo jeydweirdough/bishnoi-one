@@ -19,7 +19,7 @@ export function OrderLinksBoard({ links, choices, slug, mayMake }: { links: Quot
           </Empty>
         </Sheet>
       ) : (
-        <LinkList links={links} choices={choices} onChanged={() => router.refresh()} showCustomer />
+        <LinkList links={links} choices={choices} slug={slug} onChanged={() => router.refresh()} showCustomer />
       )}
     </>
   );

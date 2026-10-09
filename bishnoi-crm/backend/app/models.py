@@ -1213,13 +1213,16 @@ class EmailTemplate(Base):
 class QuoteLink(Base):
     """A link a rep gives a customer to order from (app/routers/quote_links.py):
     the customer searches the medicines at their own prices, picks quantities,
-    and a quote is made for them, the rep's. It works once, until it expires;
-    only its hash is kept, so the link itself can't be read back."""
+    and a quote is made for them, the rep's. It works once, until it expires.
+    It's found by its hash; the link itself is kept encrypted (CONNECTIONS_KEY),
+    so its maker can copy it again, and the database alone can't open it."""
 
     __tablename__ = "nbcm_quote_links"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    # The link, encrypted: None on links made before it could be copied again.
+    token_sealed: Mapped[str | None] = mapped_column(Text, default=None)
     # None: for someone not a customer yet; they say who they are when they order, and become the rep's customer.
     company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True, default=None)
     contact_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_contacts.id", ondelete="SET NULL"), default=None)

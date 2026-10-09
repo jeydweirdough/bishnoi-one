@@ -28,6 +28,7 @@ from sqlalchemy import select
 from app.access import Access, CurrentAccess
 from app.api import Api, digits, iso, not_found
 from app.audit import audit
+from app.connections import NoKey, seal, unseal
 from app.deps import DB, CurrentUser, SettingsDep, as_utc
 from app.extra import check_extra
 from app.models import Company, Contact, QuoteLink, User
@@ -129,7 +130,7 @@ def my_links(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsD
 
 
 def make_link(db, me: User, settings, company: Company | None, body: "LinkIn") -> dict:
-    """A new link: its address is in the answer this once, to copy and send; afterwards only its hash is kept."""
+    """A new link: its address is in the answer, to copy and send; its maker can copy it again while it works."""
     book = book_of(db, company, me, today(settings.org_timezone))
     types = listed_types(book)
     if not types:
@@ -143,8 +144,13 @@ def make_link(db, me: User, settings, company: Company | None, body: "LinkIn") -
         if contact is None or company is None or contact.company_id != company.id:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "contactId"], "msg": "Pick one of this customer's contacts."}])
     token = new_token()
+    try:
+        sealed = seal(settings, {"token": token})
+    except NoKey:
+        sealed = None  # production with no CONNECTIONS_KEY: it works, but can't be copied again
     link = QuoteLink(
         token_hash=token_hash(token),
+        token_sealed=sealed,
         company_id=company.id if company else None,
         contact_id=contact.id if contact else None,
         price_type=kind.code,
@@ -180,6 +186,18 @@ def own_link(db, access: Access, me: User, link_id: str) -> QuoteLink:
     if link is None or not (link.owner_id == me.id or (link.company is not None and reaches(link.company, access))):
         raise not_found("link")
     return link
+
+
+@router.get("/quote-links/{link_id}/token")
+def link_token(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, link_id: str) -> dict:
+    """The link again, to copy and send, while it hasn't been used."""
+    link = own_link(db, access, me, link_id)
+    if link.used_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This link was used: it made its quote. Make a new link for the next order.")
+    token = unseal(settings, link.token_sealed).get("token")
+    if not token:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This link can't be copied again: it was made before links were kept. Delete it and make a new one.")
+    return {"token": token}
 
 
 def link_name(link: QuoteLink) -> str:

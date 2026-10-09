@@ -9,7 +9,7 @@ import { DialogPanel, FieldRow } from "@/src/platform/ui/dialog";
 import { FormError } from "@/src/platform/ui/field";
 import { Pill } from "@/src/platform/ui/figures";
 import { Combobox } from "@/src/platform/ui/pickers";
-import { changeQuoteLink, deleteQuoteLink, makeQuoteLink, quoteLinks, type QuoteLink, type QuoteLinks } from "../../actions/quote-links";
+import { changeQuoteLink, deleteQuoteLink, makeQuoteLink, quoteLinks, quoteLinkToken, type QuoteLink, type QuoteLinks } from "../../actions/quote-links";
 
 const LIFETIMES = [1, 4, 24, 72, 168];
 const LIFETIME_WORDS: Record<number, string> = { 1: "1 hour", 4: "4 hours", 24: "1 day", 72: "3 days", 168: "1 week" };
@@ -17,6 +17,13 @@ const STATE = { open: { text: "Open", tone: "good" }, used: { text: "Used", tone
 const when = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
 type Choices = Pick<QuoteLinks, "priceTypes" | "lifetimes">;
+
+const address = (slug: string, token: string) => `${window.location.origin}/order/${slug}/${token}`;
+
+async function copyText(text: string) {
+  await navigator.clipboard.writeText(text).catch(() => null);
+  toast.success("Link copied", { description: "Send it: it works once." });
+}
 
 /** How long it works, and which price it shows: the same two fields to make a link and to change one. */
 function LinkFields({ choices, hours, setHours, priceType, setPriceType, hoursLabel = "How long it works" }: { choices: Choices | null; hours: number; setHours: (h: number) => void; priceType: string | null; setPriceType: (t: string) => void; hoursLabel?: string }) {
@@ -68,7 +75,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
     start(async () => {
       const r = await makeQuoteLink(companyId, hours, priceType);
       if (!r.ok) return setError(r.error);
-      setMade(`${window.location.origin}/order/${slug}/${r.data.token}`);
+      setMade(address(slug, r.data.token));
       setCopied(false);
       setData(await quoteLinks(companyId));
       onMade?.();
@@ -77,9 +84,8 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
 
   async function copy() {
     if (!made) return;
-    await navigator.clipboard.writeText(made).catch(() => null);
+    await copyText(made);
     setCopied(true);
-    toast.success("Link copied", { description: "Send it: it works once." });
   }
 
   return (
@@ -96,7 +102,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         </p>
 
         {made ? (
-          <DialogPanel title="Send this link" hint="It's shown once. If it's lost, delete it below and make another.">
+          <DialogPanel title="Send this link" hint="You can copy it again from the list while it works.">
             <div className="flex items-center gap-2">
               <input readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-full border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
               <Button variant="primary" icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} onClick={copy}>
@@ -120,7 +126,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         {companyId && (data?.items.length ?? 0) > 0 && (
           <section className="mt-6">
             <p className="mb-2 text-sm font-medium text-ink">Links made lately</p>
-            <LinkList links={data!.items} choices={data} onChanged={reload} />
+            <LinkList links={data!.items} choices={data} slug={slug} onChanged={reload} />
           </section>
         )}
       </Modal>
@@ -130,12 +136,21 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
 
 /**
  * Links, newest first: until when each works (or when it was used), whose it
- * is, its quote, and beside it the ⋯ to change it, switch it off or on, or delete it.
+ * is, its quote, and beside it Copy (while it's open) and the ⋯ to change it,
+ * switch it off or on, or delete it.
  */
-export function LinkList({ links, choices, onChanged, showCustomer = false }: { links: QuoteLink[]; choices: Choices | null; onChanged: () => void; showCustomer?: boolean }) {
+export function LinkList({ links, choices, slug, onChanged, showCustomer = false }: { links: QuoteLink[]; choices: Choices | null; slug: string; onChanged: () => void; showCustomer?: boolean }) {
   const [editing, setEditing] = useState<QuoteLink | null>(null);
   const [deleting, setDeleting] = useState<QuoteLink | null>(null);
   const [pending, start] = useTransition();
+
+  function copy(l: QuoteLink) {
+    start(async () => {
+      const r = await quoteLinkToken(l.id);
+      if (!r.ok) return void toast.error(r.error);
+      await copyText(address(slug, r.data.token));
+    });
+  }
 
   function flip(l: QuoteLink, on: boolean) {
     start(async () => {
@@ -181,6 +196,11 @@ export function LinkList({ links, choices, onChanged, showCustomer = false }: { 
             </span>
             <span className="flex shrink-0 items-center gap-2">
               <Pill tone={STATE[l.state].tone}>{STATE[l.state].text}</Pill>
+              {l.state === "open" && (
+                <Button size="sm" icon={<Copy className="size-3.5" aria-hidden />} disabled={pending} onClick={() => copy(l)}>
+                  Copy link
+                </Button>
+              )}
               <Dropdown
                 trigger={["click"]}
                 placement="bottomRight"

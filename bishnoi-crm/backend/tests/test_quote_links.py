@@ -146,3 +146,15 @@ def test_the_customer_asks_for_another_price_and_someone_decides(client, crew, i
     other = make_link(client, crew["ria"], acme, priceType="PATIENT")
     r = client.post(f"/public/quote-links/{other['token']}", json={"lines": [{"productId": ids["AMX-500"], "quantity": 1, "askedPriceCentavos": 999999}]}, headers=PUBLIC)
     assert r.status_code == 201 and r.json()["totalCentavos"] == 145000
+
+
+
+def test_the_maker_copies_the_link_again(client, crew, ids):
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    link = make_link(client, crew["ria"], acme)
+    r = client.get(f"/quote-links/{link['id']}/token", headers=crew["ria"])
+    assert r.status_code == 200 and r.json()["token"] == link["token"]
+    assert "token" not in client.get(f"/companies/{acme['id']}/quote-links", headers=crew["ria"]).json()["items"][0]
+    assert client.get(f"/quote-links/{link['id']}/token", headers=crew["sam"]).status_code == 404
+    client.post(f"/public/quote-links/{link['token']}", json={"lines": [{"productId": ids["AMX-500"], "quantity": 1}]}, headers=PUBLIC)
+    assert client.get(f"/quote-links/{link['id']}/token", headers=crew["ria"]).status_code == 409

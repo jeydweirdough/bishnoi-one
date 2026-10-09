@@ -32,6 +32,11 @@ export async function changeQuoteLink(id: string, change: { hours?: number; pric
   return attempt(() => api.patch<QuoteLink>(`/quote-links/${enc(id)}`, change));
 }
 
+/** The link again, to copy and send, while it hasn't been used. */
+export async function quoteLinkToken(id: string): Promise<Result<{ token: string }>> {
+  return attempt(() => api.get<{ token: string }>(`/quote-links/${enc(id)}/token`));
+}
+
 /** Gone from the list, and it can't be opened; a quote it made stays. */
 export async function deleteQuoteLink(id: string): Promise<Result> {
   return attempt(async () => {
