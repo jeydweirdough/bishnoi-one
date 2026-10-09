@@ -416,7 +416,7 @@ function NewPriceType({ onDone }: { onDone: () => void }) {
   return (
     <form
       noValidate
-      className="mt-3 animate-reshape space-y-3 rounded-[3px] border border-rule p-4"
+      className="mt-3 animate-reshape space-y-3 rounded-[12px] border border-rule p-4"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
@@ -527,7 +527,7 @@ function IssuerForm({ issuer, onDone }: { issuer?: Issuer; onDone: () => void })
   return (
     <form
       noValidate
-      className={`animate-reshape space-y-3 ${issuer ? "" : "mt-3 rounded-[3px] border border-rule p-4"}`}
+      className={`animate-reshape space-y-3 ${issuer ? "" : "mt-3 rounded-[12px] border border-rule p-4"}`}
       onSubmit={(e) => {
         e.preventDefault();
         const trimmed = name.trim();

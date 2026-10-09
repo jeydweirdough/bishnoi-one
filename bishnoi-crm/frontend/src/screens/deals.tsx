@@ -14,6 +14,7 @@ import { NewDealButton } from "../components/deals/new-deal";
 import { PeriodPicker } from "../components/deals/period-picker";
 import { TargetProgress } from "../components/deals/target-progress";
 import { Donut, RAMP, SERIES } from "../components/deals/donut";
+import { Breakdown, FigureCard, type Figure } from "../components/deals/figure-card";
 import { CATEGORY_LABELS, PRIORITIES, PriorityFlag, StageTag, closeLabel, periodsFrom } from "../components/deals/words";
 import { shiftMonth } from "../components/field/words";
 
@@ -57,7 +58,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
         actions={
           <>
             {view === "results" && can(me, "goals.manage") && (
-              <LinkButton href={`/kpis/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />}>
+              <LinkButton href={`/performance/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />}>
                 Set targets
               </LinkButton>
             )}
@@ -190,61 +191,6 @@ async function Summary({ state, owner, fmt }: { state: "open" | "closed"; owner:
         </Breakdown>
       </div>
     </>
-  );
-}
-
-type Figure = { value: string; label: string; note: string; ring?: number | null };
-
-/** One figure, as on the components page: the number large, then what it is, then how it compares. */
-function FigureCard({ figure: f, first }: { figure: Figure; first: boolean }) {
-  return (
-    <div className={`rounded-[22px] bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{f.value}</p>
-          <p className="mt-1 text-sm font-medium text-ink">{f.label}</p>
-        </div>
-        {f.ring !== undefined && f.ring !== null && (
-          <svg viewBox="0 0 44 44" className="size-12 shrink-0" aria-hidden>
-            <circle cx="22" cy="22" r="17" fill="none" stroke="#e3eedf" strokeWidth="5" />
-            <circle
-              cx="22"
-              cy="22"
-              r="17"
-              fill="none"
-              stroke="#a8d69b"
-              strokeWidth="5"
-              strokeLinecap="round"
-              strokeDasharray={`${(Math.min(100, f.ring) / 100) * 106.8} 106.8`}
-              transform="rotate(-90 22 22)"
-            />
-          </svg>
-        )}
-      </div>
-      <p className="mt-1 text-meta text-ink-3">{f.note}</p>
-    </div>
-  );
-}
-
-/** A breakdown: its headline share first, then the chart that shows the rest. */
-function Breakdown({ value, label, title, empty, art, children }: { value: string; label: string; title: string; empty?: string; art?: string; children: React.ReactNode }) {
-  return (
-    <Sheet className="px-5 py-4">
-      <p className="text-caps text-ink-3 uppercase">{title}</p>
-      {empty ? (
-        <Empty compact icon="deals" art={art} title={empty}>
-          It fills in as deals are added.
-        </Empty>
-      ) : (
-        <>
-          <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[1.5rem] leading-tight font-semibold text-ink tabular-nums">{value}</span>
-            <span className="text-sm text-ink-2">{label}</span>
-          </p>
-          <div className="mt-4">{children}</div>
-        </>
-      )}
-    </Sheet>
   );
 }
 
@@ -631,7 +577,7 @@ async function Results({
             today={today}
             fmt={fmt}
             label={`Won in ${r.label}`}
-            href={mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/kpis/targets?month=${r.period}` : undefined}
+            href={mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/performance/targets?month=${r.period}` : undefined}
           />
         </Sheet>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">

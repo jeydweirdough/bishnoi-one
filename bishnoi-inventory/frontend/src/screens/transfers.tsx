@@ -1,7 +1,7 @@
 import { ArrowRight, Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteTransfer, transferStep } from "../actions/inventory";
 import { TransferForm } from "../components/document-forms";
 import { PickForm, type PickLine } from "../components/pick-form";
@@ -12,15 +12,15 @@ import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { batchChoices, given, referenceOf } from "../lib/reference";
 import type { BatchRow, Reference, Transfer, TransferBrief } from "../lib/types";
-import { availability } from "./orders";
 
 export async function TransfersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, at } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
-  const transfers = await load<TransferBrief[]>(`/inventory/transfers${query(f)}`);
+  const { transfers } = await loadQuery<{ transfers: TransferBrief[] }>(`query Transfers($q: String, $status: String) { transfers(q: $q, status: $status) }`, given(f), ["transfers"]);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/transfers${query({ q: f.q, status })}` });
   return (
     <>
@@ -59,17 +59,20 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
-  const [t, ref] = await Promise.all([load<Transfer>(`/inventory/transfers/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { transfer: t, reference: ref } = await loadQuery<{ transfer: Transfer; reference: Pick<Reference, "warehouses"> }>(
+    `query Transfer($id: String!) { transfer(id: $id) ${referenceOf("warehouses")} }`,
+    { id },
+    ["transfer", "reference"],
+  );
   const pending = t.status === "draft" || t.status === "requested";
-  const pickLines: PickLine[] = t.status === "approved" && may("transfers.dispatch")
-    ? await Promise.all(t.lines.map(async (l) => ({
-        id: l.id,
-        product: l.product,
-        quantity: l.quantity,
-        batches: l.product.trackBatches
-          ? (await load<BatchRow[]>(`/inventory/batches${query({ product: l.product.id, warehouse: t.from.id })}`)).map((b) => ({ id: b.id, label: `${b.batchNo}${b.expiresOn ? `, expires ${day(b.expiresOn)}` : ""} (${b.onHand})` }))
-          : [],
-      })))
+  // The batches each batch-tracked line could leave from: the sending
+  // warehouse's batches in one read, rather than one per line.
+  const dispatching = t.status === "approved" && may("transfers.dispatch");
+  const { batches } = dispatching && t.lines.some((l) => l.product.trackBatches)
+    ? await loadQuery<{ batches: BatchRow[] }>(`query Batches($w: String) { batches(warehouse: $w) }`, { w: t.from.id }, ["batches"])
+    : { batches: [] as BatchRow[] };
+  const pickLines: PickLine[] = dispatching
+    ? t.lines.map((l) => ({ id: l.id, product: l.product, quantity: l.quantity, batches: l.product.trackBatches ? batchChoices(batches, l.product.id, day) : [] }))
     : [];
   const destination = ref.warehouses.find((w) => w.id === t.to.id)?.locations.filter((l) => l.isActive) ?? [];
 
@@ -141,10 +144,14 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
   );
 }
 
+/** The transfer form's lists, with what's free per product per warehouse. */
+const TRANSFER_FORM = `${referenceOf("products", "warehouses")} availability`;
+type TransferFormData = { reference: Pick<Reference, "products" | "warehouses">; availability: Record<string, number> };
+
 export async function NewTransferPage() {
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
-  const [ref, available] = await Promise.all([load<Reference>("/inventory/reference"), availability()]);
+  const { reference: ref, availability: available } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }]} title="New transfer" />
@@ -157,7 +164,11 @@ export async function EditTransferPage({ params }: { params: Params<{ id: string
   const { id } = await params;
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
-  const [t, ref, available] = await Promise.all([load<Transfer>(`/inventory/transfers/${enc(id)}`), load<Reference>("/inventory/reference"), availability()]);
+  const { transfer: t, reference: ref, availability: available } = await loadQuery<TransferFormData & { transfer: Transfer }>(
+    `query EditTransfer($id: String!) { transfer(id: $id) ${TRANSFER_FORM} }`,
+    { id },
+    ["transfer", "reference", "availability"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }, { href: `/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />

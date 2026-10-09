@@ -1,6 +1,7 @@
 "use client";
 
-import { Eraser, ImagePlus, PenLine, Trash2, Upload } from "lucide-react";
+import { Eraser, PenLine, Trash2 } from "lucide-react";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { removeTemplateImage, uploadTemplateFile } from "@/src/actions/quote-templates";
@@ -21,7 +22,6 @@ export function TemplateImage({
   const [drawing, setDrawing] = useState(false);
   const [pending, start] = useTransition();
   const [version, setVersion] = useState(0); // bumped after a change, so the new image is fetched
-  const file = useRef<HTMLInputElement>(null);
   const noun = which === "logo" ? "logo" : "e-signature";
 
   function send(blob: Blob, name: string) {
@@ -58,21 +58,16 @@ export function TemplateImage({
       {drawing && which === "signature" ? (
         <SignaturePad busy={pending} onDone={(blob) => send(blob, "signature.png")} onCancel={() => setDrawing(false)} />
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <input
-            ref={file}
-            type="file"
+        <div className="space-y-3">
+          <FileDrop
             accept="image/png,image/jpeg"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) send(f, f.name);
-              e.target.value = "";
-            }}
+            note={which === "logo" ? "PNG or JPG, up to 2 MB" : "PNG or JPG with a white or clear background, up to 2 MB"}
+            maxBytes={2 * 1024 * 1024}
+            busy={pending}
+            keep
+            onFile={(f) => f && send(f, f.name)}
           />
-          <Button size="sm" loading={pending} icon={which === "logo" ? <ImagePlus className="size-4" aria-hidden /> : <Upload className="size-4" aria-hidden />} onClick={() => file.current?.click()}>
-            {has ? "Replace" : "Upload"} {which === "logo" ? "logo" : "image"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
           {which === "signature" && (
             <Button size="sm" icon={<PenLine className="size-4" aria-hidden />} onClick={() => setDrawing(true)}>
               Draw signature
@@ -83,12 +78,13 @@ export function TemplateImage({
               Remove
             </Button>
           )}
+          </div>
         </div>
       )}
       <p className="text-meta text-ink-3">
         {which === "logo"
-          ? "PNG or JPG, up to 2 MB. It goes on the top left of the quotation."
-          : "PNG or JPG with a white or clear background, or draw it here. It goes above the authorized representative's name."}
+          ? "It goes on the top left of the quotation."
+          : "Upload it, or draw it here. It goes above the authorized representative's name."}
       </p>
     </div>
   );

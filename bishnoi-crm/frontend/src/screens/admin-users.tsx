@@ -8,7 +8,7 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow } from "@/src/platform/lib/types";
 import { NoAccess, OffTag } from "../components/admin/words";
 import { Filters } from "../components/crm/list-controls";
-import { Stat, Stats } from "../components/stats";
+import { FigureCard } from "@/src/platform/ui/figures";
 
 export const metadata = { title: "Users" };
 
@@ -92,11 +92,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
       </PageHeader>
 
       {/* Three figures, each a filter: the few things an administrator acts on. */}
-      <Stats columns={3}>
-        <Stat label="Active" value={active.length} note={`${count("week")} signed in this week`} href="/admin/users" />
-        <Stat label="Never signed in" value={count("never")} flag href="/admin/users?status=never" />
-        <Stat label="Switched off" value={count("off")} href="/admin/users?status=off" />
-      </Stats>
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <FigureCard first figure={{ value: String(active.length), label: "Active", note: `${count("week")} signed in this week`, href: "/admin/users" }} />
+        <FigureCard figure={{ value: String(count("never")), label: "Never signed in", note: count("never") ? "Send them their sign-in again" : "Everyone has signed in", alert: count("never") > 0, href: "/admin/users?status=never" }} />
+        <FigureCard figure={{ value: String(count("off")), label: "Switched off", note: "Can't sign in; their records stay", href: "/admin/users?status=off" }} />
+      </div>
 
       <Filters
         search="Name, email or employee ID"

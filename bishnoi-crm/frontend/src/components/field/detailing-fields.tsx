@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { Field, Input, Select } from "@/src/platform/ui/field";
 import { visitBrief } from "../../actions/field";
 import type { Reaction, VisitBrief } from "./types";
@@ -104,15 +104,15 @@ export function DetailingFields({
                 </div>
               </div>
               <div className="flex flex-col gap-0.5">
-                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed earlier">
+                <IconButton onClick={() => move(i, -1)} disabled={i === 0} size="sm" label="Discussed earlier">
                   <ArrowUp className="size-3.5" aria-hidden />
-                </button>
-                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label="Discussed later">
+                </IconButton>
+                <IconButton onClick={() => move(i, 1)} disabled={i === rows.length - 1} size="sm" label="Discussed later">
                   <ArrowDown className="size-3.5" aria-hidden />
-                </button>
-                <button type="button" onClick={() => onRows(rows.filter((x) => x.key !== r.key))} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label="Take this product off">
+                </IconButton>
+                <IconButton onClick={() => onRows(rows.filter((x) => x.key !== r.key))} tone="danger" size="sm" label="Take this product off">
                   <X className="size-3.5" aria-hidden />
-                </button>
+                </IconButton>
               </div>
             </div>
           </div>

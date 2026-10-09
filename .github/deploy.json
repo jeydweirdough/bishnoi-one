@@ -59,14 +59,8 @@
           "PLATFORM_PUBLIC_KEY": "From node scripts/deploy-keys.mjs (the Platform's /pass/key shows it too)."
         },
         "recommended": {
-          "CONNECTIONS_KEY": "Encrypts what Settings > Connections saves (Zoho, mailboxes). Without it nothing can be connected online.",
-          "INVENTORY_API_URL": "Products and stock from Inventory, e.g. https://nabhi-inventory-backend.vercel.app (with INVENTORY_API_KEY).",
-          "INVENTORY_API_KEY": "From node scripts/deploy-keys.mjs; Inventory's INTEGRATION_KEYS holds the same key.",
-          "INVENTORY_APP_URL": "Inventory's screens, for the Add it in Inventory link.",
-          "FINANCE_API_URL": "Tax on quotes from Finance (with FINANCE_API_KEY).",
-          "FINANCE_API_KEY": "From node scripts/deploy-keys.mjs.",
-          "PHARMACY_API_URL": "The pharmacist's check of Rx quotes (with PHARMACY_API_KEY).",
-          "PHARMACY_API_KEY": "From node scripts/deploy-keys.mjs."
+          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, Inventory, Finance and Pharmacy aren't linked.",
+          "CONNECTIONS_KEY": "Encrypts what Settings > Connections saves (Zoho, mailboxes). Without it nothing can be connected online."
         }
       },
       "frontend": {
@@ -88,7 +82,7 @@
           "PLATFORM_PUBLIC_KEY": "From node scripts/deploy-keys.mjs."
         },
         "recommended": {
-          "INTEGRATION_KEYS": "Lets the CRM read products and stock, e.g. [\"crm:<key>\"], from node scripts/deploy-keys.mjs."
+          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, the CRM can't read products and stock."
         }
       },
       "frontend": {
@@ -103,8 +97,9 @@
       "ready": true,
       "backend": {
         "recommended": {
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://nabhi-platform-backend.vercel.app: where it asks what it's linked to.",
+          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, the CRM can't send Rx quotes for checking.",
           "PLATFORM_PUBLIC_KEY": "Sign-in with a Bishnoi One account. Without it, only Pharmacy's own accounts sign in.",
-          "INTEGRATION_KEYS": "Lets the CRM send Rx quotes for checking, e.g. [\"crm:<key>\"].",
           "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
         }
       },
@@ -119,8 +114,9 @@
       "ready": true,
       "backend": {
         "recommended": {
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://nabhi-platform-backend.vercel.app: where it asks what it's linked to.",
+          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, the CRM can't ask for tax, and Finance can't read the CRM's customers.",
           "PLATFORM_PUBLIC_KEY": "Sign-in with a Bishnoi One account. Without it, only Finance's own accounts sign in.",
-          "INTEGRATION_KEYS": "Lets the CRM ask for tax and marketing request payments, e.g. [\"crm:<key>\"].",
           "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
         }
       },

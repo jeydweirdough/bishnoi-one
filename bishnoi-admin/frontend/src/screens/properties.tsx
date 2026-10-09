@@ -1,41 +1,38 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { deleteProperty } from "@/src/actions/executive";
 import { ExportButton, ImportButton } from "@/src/components/sheet-actions";
-import { CountdownBadge } from "@/src/components/countdown-badge";
 import { PropertyModal } from "@/src/components/executive-modals";
+import { DueCell, NameCell, RecordTable, Tag } from "@/src/components/record-table";
 import type { PropertyRecord } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
-import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
-import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader } from "@/src/platform/ui/sheet";
 
 /** What this person's role lets them do here; the API checks the same. */
 type Can = { create: boolean; edit: boolean; delete: boolean };
 const ALL: Can = { create: true, edit: true, delete: true };
 
-export function PropertiesScreen({ properties: initialProperties, canImport = false, can = ALL }: { properties: PropertyRecord[]; canImport?: boolean; can?: Can }) {
-  const [properties, setProperties] = useState<PropertyRecord[]>(initialProperties);
-  const [selectedType, setSelectedType] = useState<string>("all");
-  // The sidebar's red count on Properties: leases not ended with no rent written down.
-  const [onlyNoRent, setOnlyNoRent] = useState(false);
-  const noRent = properties.filter((p) => p.monthlyRent === null && p.status !== "terminated");
-  const [modalProperty, setModalProperty] = useState<PropertyRecord | null | "new">(null);
+const TYPES: Record<string, string> = { office: "Office", warehouse: "Warehouse", depot: "Depot", parking: "Parking", expat_housing: "Staff residence" };
+const peso = (n: number | null) => (n == null ? null : `₱${n.toLocaleString("en-PH", { maximumFractionDigits: 0 })}`);
+/** The sidebar's red count on Properties: leases not ended with no rent written down. */
+const noRent = (p: PropertyRecord) => p.monthlyRent === null && p.status !== "terminated";
 
-  const types = [
-    { key: "all", label: "All" },
-    { key: "office", label: "Offices" },
-    { key: "warehouse", label: "Warehouses" },
-    { key: "depot", label: "Depots" },
-    { key: "parking", label: "Parking" },
-  ];
+function standing(p: PropertyRecord): { text: string; tone: "good" | "warn" | "bad" | "mute" } {
+  if (p.status === "terminated") return { text: "Ended", tone: "mute" };
+  if ((p.daysRemaining ?? 0) < 0) return { text: "Lease ended", tone: "bad" };
+  if ((p.daysRemaining ?? 999) <= 90) return { text: "Renewal due", tone: "warn" };
+  return { text: "Current", tone: "good" };
+}
 
-  const filtered = (onlyNoRent ? noRent : properties).filter(
-    (p) => selectedType === "all" || p.propertyType === selectedType
-  );
+/** Offices, warehouses and depots, as the CRM's list. */
+export function PropertiesScreen({ properties, canImport = false, can = ALL }: { properties: PropertyRecord[]; canImport?: boolean; can?: Can }) {
+  const [gone, setGone] = useState<string[]>([]);
+  const [modal, setModal] = useState<PropertyRecord | null | "new">(null);
+  const rows = properties.filter((p) => !gone.includes(p.id));
+  const missing = rows.filter(noRent).length;
 
   return (
     <>
@@ -46,137 +43,70 @@ export function PropertiesScreen({ properties: initialProperties, canImport = fa
             <ExportButton kind="properties" />
             {canImport && <ImportButton href="/properties/import" />}
             {can.create && (
-              <Button variant="primary" onClick={() => setModalProperty("new")}>
-                <Icon name="properties" className="mr-1.5 size-4" />
+              <Button variant="primary" onClick={() => setModal("new")}>
+                <Icon name="properties" className="size-4" />
                 New property
               </Button>
             )}
           </>
         }
       >
-        Offices, warehouses and depots the company leases or owns, with lease end dates, rent and utility accounts.
-        {(noRent.length > 0 || onlyNoRent) && (
-          <span className="mt-1 block text-danger">
-            {onlyNoRent ? "Showing the properties with no monthly rent." : `${noRent.length} ${noRent.length === 1 ? "property has" : "properties have"} no monthly rent.`}{" "}
-            <button type="button" onClick={() => setOnlyNoRent(!onlyNoRent)} className="font-semibold underline">
-              {onlyNoRent ? "Show every property" : `Show ${noRent.length === 1 ? "it" : "them"}`}
-            </button>
+        {rows.length} properties · offices, warehouses and depots, with lease end dates, rent and utility accounts
+        {missing > 0 && (
+          <span className="mt-1 block font-medium text-danger">
+            {missing} {missing === 1 ? "property has" : "properties have"} no monthly rent. Pick &quot;No rent&quot; below to see {missing === 1 ? "it" : "them"}.
           </span>
         )}
       </PageHeader>
 
-      <HealthStrip label="leases" {...healthOf(properties.map((pr) => pr.daysRemaining), 90)} />
+      <RecordTable
+        rows={rows}
+        searchLabel={`Search ${rows.length} properties`}
+        search={(p) => [p.name, p.address, p.lessorName, p.assignedManager, p.utilitiesInfo].join(" ")}
+        filter={{
+          label: "Show",
+          options: { office: "Offices", warehouse: "Warehouses", depot: "Depots", norent: "No rent" },
+          matches: (p, key) => (key === "norent" ? noRent(p) : p.propertyType === key),
+        }}
+        emptyIcon="properties"
+        empty={{ title: "No properties yet", body: can.create ? "Add the first property, or import them from a spreadsheet." : "They appear here once they're added." }}
+        rowTone={(p) => ((p.daysRemaining ?? 0) < 0 && p.status !== "terminated" ? "bad" : null)}
+        columns={[
+          {
+            key: "name",
+            label: "Property",
+            render: (p) => (
+              <NameCell
+                name={p.name}
+                sub={p.address}
+                filled={standing(p).tone === "warn" || standing(p).tone === "bad"}
+                what="property"
+                onEdit={can.edit ? () => setModal(p) : undefined}
+                onDelete={
+                  can.delete
+                    ? async () => {
+                        const r = await deleteProperty(p.id);
+                        if (!r.ok) {
+                          toast.error(r.error);
+                          return false;
+                        }
+                        setGone((g) => [...g, p.id]);
+                        toast.success("Property deleted", { description: p.name });
+                      }
+                    : undefined
+                }
+              />
+            ),
+          },
+          { key: "type", label: "Type", kind: "hide-sm", render: (p) => <Tag>{TYPES[p.propertyType] ?? p.propertyType}</Tag> },
+          { key: "lessor", label: "Lessor", kind: "hide-sm", render: (p) => <span className="block">{p.lessorName}{p.lessorContact && <span className="block text-[12.5px] text-ink-3">{p.lessorContact}</span>}</span> },
+          { key: "ends", label: "Lease ends", render: (p) => <DueCell date={p.leaseEnd} days={p.daysRemaining} note={p.noticeDeadlineDays ? `${p.noticeDeadlineDays} days' notice` : undefined} /> },
+          { key: "rent", label: "A month", kind: "num", render: (p) => peso(p.monthlyRent) ?? <span className="font-medium text-danger">Not set</span> },
+          { key: "status", label: "Status", render: (p) => <Tag tone={standing(p).tone} dot>{standing(p).text}</Tag> },
+        ]}
+      />
 
-      {/* Filter Tabs */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <div className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
-          {types.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setSelectedType(t.key)}
-              className={`rounded-[2px] px-3 py-1 text-meta transition-colors ${
-                selectedType === t.key
-                  ? "bg-hema-tint font-semibold text-hema"
-                  : "text-ink-2 hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Sheet>
-        {filtered.length === 0 ? (
-          <Empty title="No properties here" icon="properties">
-            Choose another category, or add a property.
-          </Empty>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {filtered.map((pr) => (
-              <li
-                key={pr.id}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3.5 transition-colors hover:bg-bench/40"
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <div className="mt-0.5 shrink-0">
-                    <CountdownBadge daysRemaining={pr.daysRemaining} urgencyTier={pr.urgencyTier} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-semibold text-sm text-ink">{pr.name}</span>
-                      {/* Edit and delete sit with the record they act on. */}
-                      <span className="inline-flex items-center">
-                        {can.edit && (
-                          <button
-                            type="button"
-                            onClick={() => setModalProperty(pr)}
-                            aria-label="Edit property"
-                            title="Edit property"
-                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                          >
-                            <Pencil className="size-3.5" aria-hidden />
-                          </button>
-                        )}
-                        {can.delete && (
-                          <ConfirmButton
-                            label={<span className="sr-only">Delete property</span>}
-                            icon={<Trash2 className="size-3.5" aria-hidden />}
-                            triggerTitle="Delete property"
-                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                  title={`Delete ${pr.name}?`}
-                            body="This property and its lease alerts are deleted. This cannot be undone."
-                            confirmLabel="Delete property"
-                            danger
-                            triggerVariant="quiet"
-                            triggerSize="sm"
-                            onConfirm={async () => {
-                            await deleteProperty(pr.id);
-                            setProperties((prev) => prev.filter((item) => item.id !== pr.id));
-                            }}
-                            
-                          />
-                        )}
-                      </span>
-                      <span className="inline-block rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3 first-letter:uppercase">
-                        {pr.propertyType}
-                      </span>
-                    </div>
-
-                    <p className="mt-0.5 text-meta text-ink-3">
-                      {pr.address} · Lessor: <span className="font-medium text-ink-2">{pr.lessorName}</span>
-                      {pr.lessorContact && <> ({pr.lessorContact})</>}
-                      {pr.noticeDeadlineDays && <> · Notice deadline: <span className="font-medium text-ink-2">{pr.noticeDeadlineDays}d prior</span></>}
-                      {pr.utilitiesInfo && <> · Meter/Acc: <span className="font-mono text-ink-2">{pr.utilitiesInfo}</span></>}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <span className="block text-meta font-semibold text-ink tabular-nums">
-                      {pr.monthlyRent ? `PHP ${pr.monthlyRent.toLocaleString("en-PH", { minimumFractionDigits: 2 })}/mo` : "—"}
-                    </span>
-                    <span className="block text-stamp text-ink-3">
-                      Lease ends {new Date(pr.leaseEnd).toLocaleDateString("en-PH", { dateStyle: "medium" })}
-                      {pr.escalationRatePct ? ` · +${pr.escalationRatePct}% esc.` : ""}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Sheet>
-
-      {modalProperty !== null && (
-        <PropertyModal
-          property={modalProperty === "new" ? null : modalProperty}
-          onClose={() => setModalProperty(null)}
-        />
-      )}
+      {modal !== null && <PropertyModal property={modal === "new" ? null : modal} onClose={() => setModal(null)} />}
     </>
   );
 }

@@ -5,9 +5,9 @@ table belongs to, whatever database it ends up in. Changes to them go through
 a migration (migrations/versions)."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -271,3 +271,114 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+
+# --- Fleet, travel and devices (the executive assistant's trackers) ---------------
+# What the office looks after day to day, moved in from the JASMINE TASKS
+# workbook (2026-10-08): the company's vehicles and their renewals, the sales
+# team's fuel cards, doctors' hotel and flight sponsorships, and the laptops,
+# phones and SIMs handed out.
+
+class Vehicle(Base):
+    """A company car: its registration, insurance and maintenance falling due."""
+
+    __tablename__ = "nbad_vehicles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(140))  # "Ford Ranger AT"
+    plate: Mapped[str | None] = mapped_column(String(20), default=None, index=True)
+    year_model: Mapped[int | None] = mapped_column(Integer, default=None)
+    color: Mapped[str | None] = mapped_column(String(60), default=None)
+    owner_name: Mapped[str | None] = mapped_column(String(200), default=None)  # registered owner, and who has it
+    registration_due: Mapped[date | None] = mapped_column(Date, default=None)
+    insurance_due: Mapped[date | None] = mapped_column(Date, default=None)
+    pms_due: Mapped[date | None] = mapped_column(Date, default=None)  # preventive maintenance
+    fleet_card: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class FleetCard(Base):
+    """A fuel card given to a salesperson: their allowance, the car it's for, and whether it works."""
+
+    __tablename__ = "nbad_fleet_cards"
+    __table_args__ = (
+        CheckConstraint("status IN ('processing', 'handed_over', 'with_hr', 'returned')", name="nbad_fleet_card_status"),
+        CheckConstraint("card_state IN ('active', 'blocked')", name="nbad_fleet_card_state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    requested_on: Mapped[date | None] = mapped_column(Date, default=None)
+    holder_name: Mapped[str] = mapped_column(String(140), index=True)
+    company_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    monthly_allowance: Mapped[float | None] = mapped_column(default=None)  # pesos a month
+    allowance_note: Mapped[str | None] = mapped_column(String(80), default=None)  # when it's not pesos: "200 liters a month"
+    fuel_type: Mapped[str | None] = mapped_column(String(60), default=None)
+    plate: Mapped[str | None] = mapped_column(String(20), default=None)
+    conduction_sticker: Mapped[str | None] = mapped_column(String(30), default=None)  # a new car's, before its plate
+    vehicle_unit: Mapped[str | None] = mapped_column(String(140), default=None)
+    status: Mapped[str] = mapped_column(String(16), default="processing")
+    card_state: Mapped[str] = mapped_column(String(10), default="active")
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class TravelSponsorship(Base):
+    """A doctor's hotel stay or flight the company pays for, asked for by a rep."""
+
+    __tablename__ = "nbad_travel_sponsorships"
+    __table_args__ = (
+        CheckConstraint("kind IN ('hotel', 'flight')", name="nbad_travel_kind"),
+        CheckConstraint("status IN ('for_approval', 'for_processing', 'approved', 'booked', 'cancelled')", name="nbad_travel_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    requested_on: Mapped[date | None] = mapped_column(Date, default=None)
+    rep_name: Mapped[str] = mapped_column(String(140), index=True)  # the medical sales associate who asked
+    doctor_name: Mapped[str] = mapped_column(String(140), index=True)
+    doctor_birthdate: Mapped[date | None] = mapped_column(Date, default=None)  # airlines ask for it
+    kind: Mapped[str] = mapped_column(String(10), default="hotel")
+    travel_dates: Mapped[str | None] = mapped_column(String(140), default=None)  # as agreed: "November 25-27, 2026"
+    starts_on: Mapped[date | None] = mapped_column(Date, default=None)  # the first day, for the countdown
+    hotel_or_flight: Mapped[str | None] = mapped_column(String(200), default=None)
+    status: Mapped[str] = mapped_column(String(16), default="for_approval")
+    approved_on: Mapped[date | None] = mapped_column(Date, default=None)
+    next_step: Mapped[str | None] = mapped_column(String(200), default=None)  # "For confirmation", "For payment"
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class DeviceIssue(Base):
+    """A laptop, phone or SIM handed to someone, and who signed for it."""
+
+    __tablename__ = "nbad_device_issues"
+    __table_args__ = (CheckConstraint("condition IN ('brand_new', 'repaired', 'used')", name="nbad_device_condition"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    issued_on: Mapped[date | None] = mapped_column(Date, default=None)
+    issued_to: Mapped[str] = mapped_column(String(200), index=True)
+    laptop: Mapped[str | None] = mapped_column(String(140), default=None)
+    phone: Mapped[str | None] = mapped_column(String(140), default=None)
+    sim: Mapped[str | None] = mapped_column(String(60), default=None)
+    condition: Mapped[str] = mapped_column(String(10), default="brand_new")
+    signed_by: Mapped[str | None] = mapped_column(String(140), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class RecordEvent(Base):
+    """What happened to a vehicle, fuel card, sponsorship or device issue, for
+    its history: added, changed, renewed, PMS done, booked, blocked, a note."""
+
+    __tablename__ = "nbad_record_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    record_type: Mapped[str] = mapped_column(String(20), index=True)  # vehicles, fleet-cards, travel, devices
+    record_id: Mapped[str] = mapped_column(String(36), index=True)
+    kind: Mapped[str] = mapped_column(String(30))  # added, changed, registration_renewed, note...
+    text: Mapped[str] = mapped_column(String(500))
+    by_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

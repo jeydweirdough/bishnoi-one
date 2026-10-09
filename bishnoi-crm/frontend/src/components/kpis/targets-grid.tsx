@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button, LinkButton } from "@/src/platform/ui/button";
+import { Button, LinkButton, TextButton } from "@/src/platform/ui/button";
 import { CellInput, FormError } from "@/src/platform/ui/field";
-import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { KpiDef, KpiTargets, Org } from "@/src/platform/lib/types";
 import { saveKpiTargets, type EntryChange, type TargetChange } from "../../actions/kpis";
@@ -20,7 +20,7 @@ const key = (who: string, kpi: string) => `${who}|${kpi}`;
  * targets are added up instead (shown faintly). Manual KPIs also get their
  * results here, typed in.
  */
-export function TargetsGrid({ org, data, previous, monthName, previousName }: { org: Org; data: KpiTargets; previous: KpiTargets; monthName: string; previousName: string }) {
+export function TargetsGrid({ org, data, previous, monthName, previousName, resultsHref = "/performance" }: { org: Org; data: KpiTargets; previous: KpiTargets; monthName: string; previousName: string; resultsHref?: string }) {
   const fmt = useMemo(() => makeFormat(org), [org]);
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -141,9 +141,9 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
       {noneYet && hadBefore && (
         <p className="text-sm">
           No targets set for {monthName} yet.{" "}
-          <button
-            type="button"
-            className="font-semibold text-ink hover:underline"
+          <TextButton
+           
+            size="inherit" className="font-semibold"
             onClick={() => {
               const before = fill(previous);
               setPeople(before.people);
@@ -151,7 +151,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
             }}
           >
             Start from {previousName}&apos;s
-          </button>
+          </TextButton>
         </p>
       )}
       {roles.length > 1 && (
@@ -173,7 +173,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
       <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
         <SectionTitle>People</SectionTitle>
         {rolePeople.length === 0 ? (
-          <p className="py-4 text-meta text-ink-3">No KPI applies to anyone yet. Say who each KPI is for under Settings → KPIs.</p>
+          <Empty icon="goals" art="gauge" title="Nothing is measured for anyone yet" actions={<LinkButton href="/admin/settings/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
         ) : (
           <table className="w-full text-sm">
             <thead>{head}</thead>
@@ -248,7 +248,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
       {shownManual.length > 0 && rolePeople.length > 0 && (
         <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
           <SectionTitle>Results entered by hand</SectionTitle>
-          <p className="mb-2 text-meta text-ink-3">For KPIs the CRM can&apos;t count: type each person&apos;s result for {monthName}.</p>
+          <p className="mb-2 text-meta text-ink-3">For measures the CRM can&apos;t count: type each person&apos;s result for {monthName}.</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
@@ -298,8 +298,8 @@ export function TargetsGrid({ org, data, previous, monthName, previousName }: { 
         <Button type="submit" variant="primary" loading={pending}>
           Save targets
         </Button>
-        <LinkButton href={`/kpis?month=${data.month}`} variant="quiet">
-          See the scorecard
+        <LinkButton href={`${resultsHref}?month=${data.month}`} variant="quiet">
+          See the results
         </LinkButton>
       </div>
     </form>

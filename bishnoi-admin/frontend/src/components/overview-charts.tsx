@@ -60,7 +60,7 @@ function SplitBar({ parts, name }: { parts: { key: string; value: number; color:
         )}
       </div>
       {note && (
-        <div className="pointer-events-none absolute -top-8 left-0 z-10 rounded-[3px] bg-ink px-2 py-1 text-meta whitespace-nowrap text-white shadow-overlay">
+        <div className="pointer-events-none absolute -top-8 left-0 z-10 rounded-[12px] bg-ink px-2 py-1 text-meta whitespace-nowrap text-white shadow-overlay">
           {note.value} {note.label} ({Math.round((note.value / total) * 100)}%)
         </div>
       )}
@@ -137,7 +137,7 @@ export function healthOf(days: (number | null | undefined)[], windowDays: number
 export function HealthStrip({ label, total, current, dueSoon, overdue, windowDays }: { label: string } & ReturnType<typeof healthOf>) {
   const status = statusOf({ total, dueSoon, overdue });
   return (
-    <div className="mb-5 rounded-[3px] bg-sheet px-5 py-4 shadow-sheet">
+    <div className="mb-5 rounded-[12px] bg-sheet px-5 py-4 shadow-sheet">
       <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-sm font-semibold text-ink">
           {total} {label}
@@ -164,7 +164,7 @@ export function HealthStrip({ label, total, current, dueSoon, overdue, windowDay
 export function RequestsStrip({ open, late, resolved }: { open: number; late: number; resolved: number }) {
   const status: Status = late > 0 ? { label: "Past target date", mark: "!", color: BAD } : { label: "On time", mark: "✓", color: GOOD };
   return (
-    <div className="mb-5 rounded-[3px] bg-sheet px-5 py-4 shadow-sheet">
+    <div className="mb-5 rounded-[12px] bg-sheet px-5 py-4 shadow-sheet">
       <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-sm font-semibold text-ink">{open} open</p>
         <StatusLabel status={status} />
@@ -188,6 +188,7 @@ const AREAS = [
   { key: "expatriates", label: "Expatriates" },
   { key: "documents", label: "Documents" },
   { key: "properties", label: "Leases" },
+  { key: "vehicles", label: "Vehicles" },
 ] as const;
 
 /** "Oct", and "Jan 2027" where the year turns, so a month never reads like a date. */
@@ -276,7 +277,7 @@ export function RenewalsChart({ months }: { months: RenewalMonth[] }) {
                       />
                     )}
                     {hover === i && (
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-[3px] bg-ink px-2.5 py-1.5 text-meta whitespace-nowrap text-white shadow-overlay">
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-[12px] bg-ink px-2.5 py-1.5 text-meta whitespace-nowrap text-white shadow-overlay">
                         <p className="font-semibold">
                           {monthLabel(m.month, i, months)}: {totals[i]}
                         </p>

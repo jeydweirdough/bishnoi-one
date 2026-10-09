@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteSupplier, saveSupplier } from "../actions/inventory";
 import { POStamp } from "../components/stamps";
 import { RecordTools } from "../components/record-tools";
@@ -11,6 +11,7 @@ import { SupplierForm } from "../components/supplier-form";
 import { Chips, Figures, Filters, NoAccess, RowLink, Table, Td } from "../components/ui";
 import { param, query } from "../lib/labels";
 import { context, type Params, type Search } from "../lib/page";
+import { given } from "../lib/reference";
 import type { Supplier, SupplierRow } from "../lib/types";
 
 const rate = (r: number | null | undefined) => (r == null ? "—" : `${Math.round(r * 100)}%`);
@@ -20,7 +21,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
   if (!may("suppliers.view")) return <NoAccess what="suppliers" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), state: param(s, "state") || "active" };
-  const suppliers = await load<SupplierRow[]>(`/inventory/suppliers${query(f)}`);
+  const { suppliers } = await loadQuery<{ suppliers: SupplierRow[] }>(`query Suppliers($q: String, $state: String) { suppliers(q: $q, state: $state) }`, given(f), ["suppliers"]);
   return (
     <>
       <PageHeader
@@ -59,7 +60,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
   const { id } = await params;
   const { fmt, may, day } = await context();
   if (!may("suppliers.view")) return <NoAccess what="suppliers" />;
-  const x = await load<Supplier>(`/inventory/suppliers/${enc(id)}`);
+  const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   const perf = x.performance;
   return (
     <>
@@ -188,7 +189,7 @@ export async function EditSupplierPage({ params }: { params: Params<{ id: string
   const { id } = await params;
   const { may } = await context();
   if (!may("suppliers.edit")) return <NoAccess what="changing suppliers" />;
-  const x = await load<Supplier>(`/inventory/suppliers/${enc(id)}`);
+  const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/suppliers", label: "Suppliers" }, { href: `/suppliers/${x.id}`, label: x.name }]} title={`Edit ${x.name}`} />

@@ -1,5 +1,5 @@
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { getFrame } from "@/src/platform/lib/api";
 import { AlertList } from "../components/alerts";
 import { NoAccess } from "../components/ui";
 import { context } from "../lib/page";
@@ -10,7 +10,8 @@ export const metadata = { title: "Alerts" };
 export default async function AlertsPage() {
   const { may, me } = await context();
   if (!may("dashboard.view")) return <NoAccess what="alerts" />;
-  const alerts = await load<Alert[]>("/inventory/alerts");
+  // The sidebar's counts already read them: the same request.
+  const alerts = ((await getFrame()).alerts ?? []) as Alert[];
   const warn = (me as unknown as { settings?: { expiryWarningDays: number } }).settings?.expiryWarningDays ?? 90;
   return (
     <>

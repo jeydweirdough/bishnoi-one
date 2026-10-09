@@ -1,5 +1,6 @@
 "use client";
 
+import { Empty } from "@/src/platform/ui/sheet";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isPending, useActivityFeed } from "../components/activity-feed";
@@ -27,7 +28,7 @@ export function Timeline({
   const fmt = makeFormat(org);
   const activities = feed?.activities ?? given;
   if (activities.length === 0) {
-    return <p className="py-3 text-meta text-ink-3">Nothing logged yet. Everything your team records against this customer shows up here.</p>;
+    return <Empty compact icon="activity" title="Nothing logged yet">Everything your team records against this customer shows up here.</Empty>;
   }
   return (
     <ol className="divide-y divide-rule">

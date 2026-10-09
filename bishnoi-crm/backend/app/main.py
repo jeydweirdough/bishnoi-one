@@ -15,8 +15,10 @@ from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.inventory import srp_type
 from app.tenants import HEADER, Tenants, clean
+from app import graphql_api
 from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, exports, field, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, connections, attention, media, associations, mailbox
 from app.routers import settings as settings_router
+from app.routers import quote_links, sharing
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -44,7 +46,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # would let one person into all of them.
         if tenant.slug == (clean(settings.first_admin_company) or (clean(settings.default_company) if not settings.is_production else None)):
             make_first_admin(tenant.sessions, settings)
-        if settings.inventory_linked:
+        from app.platform_links import effective
+
+        if effective(settings).inventory_linked:
             # The SRP price type, there before any page asks for the price types.
             with tenant.sessions() as db:
                 srp_type(db)
@@ -84,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bulk.router)
     app.include_router(customer_types.router)
     app.include_router(companies.router)
+    app.include_router(graphql_api.router)
     app.include_router(contacts.router)
     app.include_router(duplicates.router)
     app.include_router(activities.router)
@@ -109,5 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(mailbox.router)
     app.include_router(crm.router)
     app.include_router(unset.router)
+    app.include_router(sharing.router)
+    app.include_router(quote_links.router)
     app.include_router(integration.router)
     return app

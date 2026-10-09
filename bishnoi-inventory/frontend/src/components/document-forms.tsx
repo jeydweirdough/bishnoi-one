@@ -29,7 +29,7 @@ const active = <T extends { isActive: boolean }>(items: T[], keep?: string, id: 
 export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }: {
   org: Org;
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses">;
   order?: PO;
   preset?: { supplierId?: string; productId?: string; quantity?: string };
 }) {
@@ -100,7 +100,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
 export function OrderForm({ org, reference, order, available, canAdd = {} }: {
   org: Org;
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "products" | "units" | "warehouses">;
   order?: Order;
   /** What's free per product, per warehouse: "productId:warehouseId" → units. */
   available: Record<string, number>;
@@ -165,7 +165,7 @@ export function OrderForm({ org, reference, order, available, canAdd = {} }: {
   );
 }
 
-export function TransferForm({ org, reference, transfer, available, canAdd = {} }: { org: Org; reference: Reference; transfer?: Transfer; available: Record<string, number>; canAdd?: CanAdd }) {
+export function TransferForm({ org, reference, transfer, available, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "warehouses">; transfer?: Transfer; available: Record<string, number>; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
   const { pending, error, fields, save } = useSave();
   const { added, remember } = useAdded();

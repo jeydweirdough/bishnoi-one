@@ -34,6 +34,8 @@ export default async function AccountPage() {
   const team = account?.team?.name ?? me.team?.name ?? (teams.length ? teams.join(", ") : null);
   const groups = Object.entries(Object.groupBy(account?.areas ?? [], (a) => a.group));
 
+  console.log("AccountPage", { me, account, team, groups });
+
   return (
     <>
       <PageHeader title="Your account">Your picture and what you can reach. Your admin sets your name, email, role and team.</PageHeader>

@@ -16,7 +16,6 @@ export function MonthBars({
   current: string;
 }) {
   const top = Math.max(1, ...points.map((p) => p.value));
-  const best = points.reduce((b, p) => (p.value > b.value ? p : b), points[0]);
   return (
     <div>
       <div className="flex h-44 items-end gap-1.5 border-b border-rule-strong" role="img" aria-label={`${label} by month`}>
@@ -24,11 +23,8 @@ export function MonthBars({
           const running = p.month === current;
           return (
             <div key={p.month} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end" title={`${p.monthLabel}: ${p.text}${running ? " so far" : ""}`}>
-              {(p === best || running) && p.value > 0 && (
-                <span className="mb-1 truncate text-center text-[0.6875rem] font-semibold text-ink-2 tabular-nums">{p.text}</span>
-              )}
               <span
-                className={`block rounded-t-[4px] transition-colors ${running ? "bg-[#86b6ef]" : "bg-[#2a78d6]"} group-hover:bg-[#1c5cab]`}
+                className={`block rounded-t-[4px] transition-colors ${running ? "bg-[#cfe8c6]" : "bg-sage"} group-hover:bg-sage-deep`}
                 style={{ height: `${Math.max(p.value ? 2 : 0, (100 * p.value) / top)}%` }}
               />
             </div>

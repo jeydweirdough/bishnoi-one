@@ -1,116 +1,118 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { useActionState, useId, useRef, useState, type ReactNode } from "react";
+import { useActionState, useId, useRef, useState } from "react";
 import { signIn, type SignInState } from "../actions/session";
-import { Spinner } from "../ui/button";
 
 /** `group` heads a run of accounts, so a long list stays scannable. */
 export type Demo = { email: string; who: string; role: string; group: string };
 
-// Underlined fields, as on the sign-in design: no box, a rule beneath that
-// turns blue while typing in it.
-// GetMEDS blue (#1d9fda) from a lighter blue at the top left to navy at the bottom right.
-const PANEL = "linear-gradient(150deg, #5cc3ee 0%, #1d9fda 40%, #1379b8 70%, #0c4f8c 100%)";
-
-const line =
-  "block h-10 w-full min-w-0 border-0 border-b border-rule-strong bg-transparent px-0 text-sm text-ink placeholder:text-ink-3/70 focus:border-section focus:outline-none aria-[invalid=true]:border-danger";
+// The sign-in form's own look (src/components/sign-in/showcase.tsx has the
+// picture beside it): rounded fields with a grey outline, a black button.
+const FIELD =
+  "block h-12 w-full rounded-full border border-[#8a8a8a] bg-white px-6 text-sm text-[#141414] placeholder:text-[#7a7a7a] transition-colors focus:border-[#141414] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a8d69b] aria-[invalid=true]:border-danger";
 
 /**
- * The sign-in screen: the blue panel (its contents in `panel`) and the form
- * beside it. In development this app's demo accounts follow the form, and
- * picking one fills it. On a phone the panel is hidden and `brand` heads the
- * form instead.
+ * Work email and password, then Sign in (the CRM's form, without the company:
+ * Executive Admin keeps one company's records). In development, the demo accounts
+ * sit under the form, closed, and picking one fills it.
  */
 export function LoginForm({
   next,
   demo,
   demoPassword,
-  notice,
-  before,
-  brand,
-  panel,
+  bishnoiAccount,
 }: {
   next: string;
   demo: Demo[];
   demoPassword: string | null;
-  notice?: ReactNode;
-  /** Above the email field: a refused sign-in from the platform, and the other way in. */
-  before?: ReactNode;
-  brand: ReactNode;
-  panel: ReactNode;
+  /** Where "Sign in with your Bishnoi One account" goes; null when the platform isn't set up. */
+  bishnoiAccount: string | null;
 }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
-  const email = useRef<HTMLInputElement>(null);
   const password = useRef<HTMLInputElement>(null);
-  const [picked, setPicked] = useState<string | null>(null);
+  const ids = { email: useId(), password: useId(), forgot: useId() };
+  const [emailValue, setEmailValue] = useState(state?.email ?? "");
+  const [passwordValue, setPasswordValue] = useState("");
   const [shown, setShown] = useState(false);
-  const id = useId();
+  const [forgot, setForgot] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
 
   function fillDemo(address: string) {
     setPicked(address);
-    if (email.current) email.current.value = address;
-    if (password.current && demoPassword) password.current.value = demoPassword;
+    setEmailValue(address);
+    if (demoPassword) setPasswordValue(demoPassword);
     password.current?.focus();
   }
 
-  const form = (
-    <div className="mx-auto w-full max-w-[26rem]">
-      {/* The panel is hidden on a narrow screen, so the logo and name come here instead. */}
-      <div className="mb-10 lg:hidden">{brand}</div>
-      <h1 className="text-[2rem] leading-tight font-bold tracking-tight text-[#0c3a68]">Log in</h1>
-      {notice && <p className="mt-2 text-meta text-ink-2">{notice}</p>}
-      {before}
-
-      <form action={action} className="mt-8 space-y-6" noValidate>
+  return (
+    <div className="w-full">
+      <form action={action} className="space-y-3" noValidate>
         <input type="hidden" name="next" value={next} />
         <div>
-          <label htmlFor={`${id}-email`} className="block text-meta text-ink-3">
-            Email
+          <label htmlFor={ids.email} className="sr-only">
+            Work email
           </label>
           <input
-            id={`${id}-email`}
-            ref={email}
+            id={ids.email}
             name="email"
             type="email"
+            className={FIELD}
+            placeholder="Work email"
             autoComplete="username"
             inputMode="email"
-            defaultValue={state?.email}
-            aria-invalid={state?.error ? true : undefined}
+            value={emailValue}
+            onChange={(e) => setEmailValue(e.target.value)}
             required
             autoFocus
-            className={line}
           />
         </div>
-        <div>
-          <label htmlFor={`${id}-password`} className="block text-meta text-ink-3">
+        <div className="relative">
+          <label htmlFor={ids.password} className="sr-only">
             Password
           </label>
-          <div className="relative">
-            <input
-              id={`${id}-password`}
-              ref={password}
-              name="password"
-              type={shown ? "text" : "password"}
-              autoComplete="current-password"
-              aria-invalid={state?.error ? true : undefined}
-              required
-              className={`${line} pr-9`}
-            />
-            <button
-              type="button"
-              onClick={() => setShown(!shown)}
-              aria-label={shown ? "Hide password" : "Show password"}
-              aria-pressed={shown}
-              className="absolute inset-y-0 right-0 flex w-9 items-center justify-end text-[#0c3a68] hover:text-section"
-            >
-              {shown ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
-            </button>
-          </div>
+          <input
+            id={ids.password}
+            ref={password}
+            name="password"
+            type={shown ? "text" : "password"}
+            className={`${FIELD} pr-14`}
+            placeholder="Password"
+            autoComplete="current-password"
+            value={passwordValue}
+            onChange={(e) => setPasswordValue(e.target.value)}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShown((s) => !s)}
+            aria-label={shown ? "Hide password" : "Show password"}
+            aria-pressed={shown}
+            className="absolute top-1/2 right-4 -translate-y-1/2 rounded-full p-1.5 text-[#6a6a6a] hover:text-[#141414] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:outline-none"
+          >
+            {shown ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
+          </button>
         </div>
 
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setForgot((f) => !f)}
+            aria-expanded={forgot}
+            aria-controls={ids.forgot}
+            className="text-meta font-medium text-[#141414] hover:underline focus-visible:underline focus-visible:outline-none"
+          >
+            Forgot password?
+          </button>
+        </div>
+        {forgot && (
+          <p id={ids.forgot} className="rounded-2xl bg-[#f1f7ee] px-5 py-2.5 text-meta text-[#3b3b3b]">
+            Passwords are reset by your administrator. Ask them for a new one, then change it from your account page.
+          </p>
+        )}
+
         {state?.error && (
-          <p role="alert" className="text-meta text-danger">
+          <p role="alert" className="rounded-2xl bg-danger-tint px-5 py-2.5 text-sm text-danger">
             {state.error}
           </p>
         )}
@@ -118,69 +120,74 @@ export function LoginForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex h-10 w-full max-w-[14rem] items-center justify-center gap-2 rounded-full bg-section text-sm font-semibold text-white transition-colors hover:bg-section-hover disabled:opacity-70"
+          className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-[#141414] text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-70"
         >
-          {pending && <Spinner />}
-          {pending ? "Logging in…" : "Log in"}
+          {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
-      <p className="mt-5 text-[0.75rem] text-ink-3">
-        Forgot password? <span className="font-medium text-section">Ask your administrator to reset it.</span>
-      </p>
+      {bishnoiAccount && (
+        <div className="mt-8">
+          <p className="flex items-center gap-4 text-sm text-[#3b3b3b]">
+            <span className="h-px flex-1 bg-[#d6d6d6]" aria-hidden />
+            or continue with
+            <span className="h-px flex-1 bg-[#d6d6d6]" aria-hidden />
+          </p>
+          <div className="mt-5 flex justify-center">
+            <a
+              href={bishnoiAccount}
+              className="group flex items-center gap-3 rounded-full bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-white text-[13px] font-bold tracking-tight text-[#141414]" aria-hidden>
+                B1
+              </span>
+              Your Bishnoi One account
+            </a>
+          </div>
+        </div>
+      )}
 
       {demo.length > 0 && (
-        <section aria-labelledby={`${id}-demo`} className="mt-10 border-t border-rule pt-6">
-          <h2 id={`${id}-demo`} className="text-meta font-semibold text-ink">
-            Use a demo account
-          </h2>
-          <p className="mt-0.5 text-[0.6875rem] text-ink-3">
-            Picking one fills the form
-            {demoPassword ? (
-              <>
-                . Password <span className="font-semibold text-ink-2">{demoPassword}</span>
-              </>
-            ) : null}
-            .
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {demo.map((d) => {
-              const on = picked === d.email;
-              return (
-                <li key={d.email}>
-                  <button
-                    type="button"
-                    onClick={() => fillDemo(d.email)}
-                    title={`${d.role} — ${d.email}`}
-                    aria-pressed={on}
-                    className={`rounded-full border px-3 py-1.5 text-meta transition-colors ${
-                      on ? "border-section bg-section/10 text-ink" : "border-rule bg-sheet text-ink hover:border-section"
-                    }`}
-                  >
-                    <span className="font-semibold">{d.who}</span>
-                    <span className="text-ink-3"> · {shortRole(d.role)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <details className="mt-8 rounded-2xl border border-[#e2e2e2] px-5 py-3 text-meta">
+          <summary className="cursor-pointer font-medium text-[#3b3b3b]">
+            Demo accounts (this computer only){demoPassword ? ` · password ${demoPassword}` : ""}
+          </summary>
+          <div className="mt-2 max-h-64 overflow-y-auto">
+            {groups(demo).map(([group, people]) => (
+              <section key={group} className="mt-3">
+                <h3 className="text-caps text-[#6a6a6a] uppercase">{group}</h3>
+                <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                  {people.map((d) => (
+                    <li key={d.email}>
+                      <button
+                        type="button"
+                        onClick={() => fillDemo(d.email)}
+                        title={`${d.role} — ${d.email}`}
+                        aria-pressed={picked === d.email}
+                        className={`rounded-full border px-3 py-1 transition-colors ${
+                          picked === d.email ? "border-[#5e8f52] bg-[#f1f7ee] text-[#141414]" : "border-[#cfcfcf] bg-white text-[#141414] hover:border-[#5e8f52]"
+                        }`}
+                      >
+                        <span className="font-medium">{d.who}</span>
+                        <span className="text-[#6a6a6a]"> · {shortRole(d.role)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );
+}
 
-  return (
-    <div className="grid min-h-dvh w-full lg:grid-cols-2">
-      <section
-        aria-label="About this app"
-        style={{ background: PANEL }}
-        className="relative hidden items-center justify-center overflow-hidden p-10 lg:flex"
-      >
-        {panel}
-      </section>
-      <div className="flex flex-col justify-center px-5 py-12 sm:px-8">{form}</div>
-    </div>
-  );
+/** Accounts under their group headings, in the order they came. */
+function groups(demo: Demo[]): [string, Demo[]][] {
+  const byGroup = new Map<string, Demo[]>();
+  for (const d of demo) byGroup.set(d.group, [...(byGroup.get(d.group) ?? []), d]);
+  return [...byGroup];
 }
 
 /** "Rep · B2C MD Telesales" -> "Rep": the chip says what they are; hovering says the rest. */

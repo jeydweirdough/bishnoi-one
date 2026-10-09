@@ -56,6 +56,9 @@ def require(permission: str) -> Callable[[Access], Access]:
         access.require(permission)
         return access
 
+    # Read by GraphQL (app/graphql_core.py), which calls the same route functions
+    # and checks the same permission.
+    check.permission = permission  # type: ignore[attr-defined]
     return check
 
 
@@ -75,6 +78,7 @@ def permitted(permission: str) -> type[User]:
         access.require(permission)
         return access.user
 
+    check.permission = permission  # type: ignore[attr-defined]
     return Annotated[User, Depends(check)]  # type: ignore[return-value]
 
 

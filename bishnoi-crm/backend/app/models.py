@@ -37,6 +37,8 @@ class Team(Base):
     # The manager over the team (above its team lead): with a role whose scope
     # is "managed", they reach every team they manage, and its people.
     manager_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), index=True, default=None)
+    # Its customers named to other divisions (look-alikes, customer fields): app/routers/sharing.py.
+    share_customers: Mapped[bool] = mapped_column(default=True, server_default="1")
 
 
 class Role(Base):
@@ -270,6 +272,8 @@ class Activity(Owned, Base):
     # An email sent from the person's own email app: the screenshot it was logged with (StoredFile).
     proof_ref: Mapped[str | None] = mapped_column(String(32), default=None)
     proof_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    # Where a meeting (or an online call) happens: its Google Meet, Zoom or Teams link.
+    meeting_link: Mapped[str | None] = mapped_column(String(500), default=None)
 
     company: Mapped[Company | None] = relationship(lazy="joined")
     contact: Mapped[Contact | None] = relationship(lazy="joined")
@@ -1204,3 +1208,30 @@ class EmailTemplate(Base):
     expires_on: Mapped[str | None] = mapped_column(String(10), default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class QuoteLink(Base):
+    """A link a rep gives a customer to order from (app/routers/quote_links.py):
+    the customer searches the medicines at their own prices, picks quantities,
+    and a quote is made for them, the rep's. It works once, until it expires;
+    only its hash is kept, so the link itself can't be read back."""
+
+    __tablename__ = "nbcm_quote_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    # None: for someone not a customer yet; they say who they are when they order, and become the rep's customer.
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True, default=None)
+    contact_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_contacts.id", ondelete="SET NULL"), default=None)
+    # The price the customer sees: one of the price types (Settings → Pricing).
+    price_type: Mapped[str] = mapped_column(String(40))
+    owner_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    quote_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_quotes.id", ondelete="SET NULL"), default=None)
+
+    company: Mapped[Company | None] = relationship(lazy="joined")
+    contact: Mapped[Contact | None] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="QuoteLink.owner_id", lazy="joined")

@@ -1,10 +1,11 @@
 import { Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
-import { PRODUCT_STATUSES, param, query } from "../lib/labels";
+import { PRODUCT_STATUSES, param } from "../lib/labels";
 import { context, type Search } from "../lib/page";
+import { given, referenceOf } from "../lib/reference";
 import type { ProductRow, Reference } from "../lib/types";
 
 export const metadata = { title: "Products" };
@@ -14,7 +15,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock"), missing: param(s, "missing") };
-  const [products, ref] = await Promise.all([load<ProductRow[]>(`/inventory/products${query(f)}`), load<Reference>("/inventory/reference")]);
+  const { products, reference: ref } = await loadQuery<{ products: ProductRow[]; reference: Pick<Reference, "categories" | "brands" | "suppliers"> }>(
+    `query Products($q: String, $category: String, $brand: String, $supplier: String, $status: String, $stock: String, $missing: Boolean) {
+      products(q: $q, category: $category, brand: $brand, supplier: $supplier, status: $status, stock: $stock, missing: $missing)
+      ${referenceOf("categories", "brands", "suppliers")}
+    }`,
+    given({ ...f, missing: Boolean(f.missing) }),
+    ["products", "reference"],
+  );
   // Variants sit under their product, so the catalogue reads Product → 1 mL, 3 mL, 5 mL.
   const ids = new Set(products.map((p) => p.id));
   const tops = products.filter((p) => !p.parentId || !ids.has(p.parentId));

@@ -320,7 +320,7 @@ def drafted(db, me, settings, company, contact, body: EmailIn) -> tuple[str, str
     if body.template_id:
         template = db.get(EmailTemplate, body.template_id)
         if template is None or not offered(template, me.team_id, today(settings.org_timezone)):
-            raise field_error("templateId", "Pick one of the approved emails.")
+            raise field_error("templateId", "Pick one of the email templates.")
         fill = {"customer": company.name if company else "", "contact": contact.full_name if contact else "", "me": me.full_name}
         subject, text = render(template.subject, fill), render(template.body, fill)
         if body.note and body.note.strip():

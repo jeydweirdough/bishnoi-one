@@ -1,13 +1,15 @@
 "use client";
 
-import { DatePicker, Input, Modal, Select, Tag } from "antd";
+import { Modal, Tag } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { DateInput } from "@/src/platform/ui/pickers";
 import dayjs from "dayjs";
 import { Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { FormError } from "@/src/platform/ui/field";
-import { Sheet } from "@/src/platform/ui/sheet";
+import { FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Sheet, Empty } from "@/src/platform/ui/sheet";
 import { saveTemplate, type EmailTemplate } from "../../actions/mailbox";
 
 type Option = { value: string; label: string };
@@ -34,7 +36,7 @@ function Editor({ t, teams, onDone }: { t: EmailTemplate | null; teams: Option[]
     });
   }
   return (
-    <Modal open title={t ? "Change approved email" : "New approved email"} onCancel={onDone} onOk={save} okText="Save" confirmLoading={pending} width={640}>
+    <Modal open title={t ? "Change email template" : "New email template"} onCancel={onDone} onOk={save} okText="Save" confirmLoading={pending} width={640}>
       <div className="space-y-4 pt-1">
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Name (what reps pick)</span>
@@ -46,23 +48,23 @@ function Editor({ t, teams, onDone }: { t: EmailTemplate | null; teams: Option[]
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Wording, as approved</span>
-          <Input.TextArea rows={8} value={v.body} onChange={(e) => setV({ ...v, body: e.target.value })} maxLength={20000} />
+          <Textarea rows={8} value={v.body} onChange={(e) => setV({ ...v, body: e.target.value })} maxLength={20000} />
           <span className="mt-1 block text-meta text-ink-3">{"{customer}, {contact} and {me} are filled in when it's sent. Reps can add a personal note on top, never change this."}</span>
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Divisions</span>
-          <Select mode="multiple" className="w-full" value={v.onlyTeams} onChange={(onlyTeams) => setV({ ...v, onlyTeams })} options={teams} placeholder="Everyone" showSearch={{ optionFilterProp: "label" }} />
+          <Combobox mode="multiple" className="w-full" value={v.onlyTeams} onChange={(onlyTeams) => setV({ ...v, onlyTeams })} options={teams} placeholder="Everyone" showSearch={{ optionFilterProp: "label" }} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Approved on</span>
-            <DatePicker className="w-full" value={dayjs(v.approvedOn)} onChange={(d) => d && setV({ ...v, approvedOn: d.format("YYYY-MM-DD") })} allowClear={false} format="D MMM YYYY" />
+            <DateInput type="date" value={v.approvedOn} onChange={(e) => e.target.value && setV({ ...v, approvedOn: e.target.value })} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">
               Expires on <span className="text-ink-3">(optional)</span>
             </span>
-            <DatePicker className="w-full" value={v.expiresOn ? dayjs(v.expiresOn) : null} onChange={(d) => setV({ ...v, expiresOn: d ? d.format("YYYY-MM-DD") : null })} format="D MMM YYYY" />
+            <DateInput type="date" value={v.expiresOn ?? ""} min={v.approvedOn} onChange={(e) => setV({ ...v, expiresOn: e.target.value || null })} />
           </label>
         </div>
         <FormError message={error} />
@@ -71,18 +73,20 @@ function Editor({ t, teams, onDone }: { t: EmailTemplate | null; teams: Option[]
   );
 }
 
-/** Settings → Approved emails: what reps may send from a customer's page, worded as approved. */
+/** Settings → Email templates: what reps may send from a customer's page, in the wording set here. */
 export function EmailTemplates({ items, teams }: { items: EmailTemplate[]; teams: Option[] }) {
   const [editing, setEditing] = useState<EmailTemplate | "new" | null>(null);
   const [, start] = useTransition();
   return (
     <div className="max-w-3xl space-y-4">
-      <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
-        New approved email
-      </Button>
+      {items.length > 0 && (
+        <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
+          New email template
+        </Button>
+      )}
       <Sheet>
         {items.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-ink-3">None yet. Write the emails reps may send, as approved.</p>
+          <Empty icon="email" title="No email templates yet" actions={<Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>Write the first one</Button>}>Write the emails reps send from a customer's page. Reps add a personal note; the wording stays as written here.</Empty>
         ) : (
           <ul className="divide-y divide-rule">
             {items.map((t) => (

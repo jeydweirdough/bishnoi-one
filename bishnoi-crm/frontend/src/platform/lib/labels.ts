@@ -118,6 +118,7 @@ export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
 };
 
 export function approvalReason(reason: ApprovalReason, quote: Pick<Quote, "priceTypeName">): string {
+  if (reason === "asked") return "The customer asked for another price (see the notes)";
   return reason === "price" ? `${quote.priceTypeName} needs approval` : "An extra discount is over the limit";
 }
 

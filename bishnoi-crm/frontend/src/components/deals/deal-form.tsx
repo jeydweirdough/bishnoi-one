@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button, LinkButton } from "@/src/platform/ui/button";
+import { Button, LinkButton, IconButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { DealPriority, Assignable, Deal, DealLists, DealStage, ForecastCategory, Org, PriceList } from "@/src/platform/lib/types";
@@ -272,14 +272,14 @@ export function DealForm({
                   <Field label="Quantity" error={fields[`lines.${i}.quantity`]}>
                     {(p) => <Input {...p} inputMode="numeric" value={l.quantity} onChange={(e) => setLine(l.key, { quantity: e.target.value })} />}
                   </Field>
-                  <button
-                    type="button"
+                  <IconButton
+                   
                     onClick={() => setLines(lines.filter((x) => x.key !== l.key))}
-                    className="flex h-9 items-center justify-center text-ink-3 hover:text-danger"
-                    aria-label={`Remove product ${i + 1}`}
+                    tone="danger" className="h-9"
+                    label={`Remove product ${i + 1}`}
                   >
                     <Trash2 className="size-4" aria-hidden />
-                  </button>
+                  </IconButton>
                 </li>
               ))}
             </ul>

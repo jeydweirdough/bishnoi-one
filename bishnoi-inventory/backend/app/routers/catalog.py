@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile,
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.access import allowed
 from app.api import Api, changed, conflict, field_error, found, iso, not_found
@@ -61,31 +62,50 @@ def category_path(c: Category | None) -> str | None:
 @router.get("/reference")
 def reference(_: CurrentUser, db: DB) -> dict:
     """The lists forms pick from: categories, brands, units, suppliers,
-    warehouses with their locations, and products."""
-    categories = db.scalars(select(Category)).all()
+    warehouses with their locations, and products. GraphQL reads each list on
+    its own (app/graphql_api.py), so a page gets only the lists it picks from."""
+    return {name: part(db) for name, part in REFERENCE.items()}
+
+
+def reference_categories(db: Session) -> list[dict]:
+    return sorted(
+        ({"id": c.id, "name": c.name, "path": category_path(c), "parentId": c.parent_id, "isActive": c.is_active} for c in db.scalars(select(Category))),
+        key=lambda c: c["path"].lower(),
+    )
+
+
+def reference_brands(db: Session) -> list[dict]:
+    return [{"id": b.id, "name": b.name, "isActive": b.is_active} for b in db.scalars(select(Brand).order_by(func.lower(Brand.name)))]
+
+
+def reference_units(db: Session) -> list[dict]:
+    return [{"code": u.code, "name": u.name, "isActive": u.is_active} for u in db.scalars(select(Unit).order_by(Unit.name))]
+
+
+def reference_suppliers(db: Session) -> list[dict]:
+    return [{**supplier_ref(s), "isActive": s.is_active} for s in db.scalars(select(Supplier).order_by(func.lower(Supplier.name)))]
+
+
+def reference_warehouses(db: Session) -> list[dict]:
     locations: dict[str, list[dict]] = {}
     for loc in db.scalars(select(Location).order_by(Location.is_default.desc(), Location.code)):
         locations.setdefault(loc.warehouse_id, []).append({"id": loc.id, "code": loc.code, "name": loc.name, "isDefault": loc.is_default, "isActive": loc.is_active})
+    return [{**warehouse_ref(w), "isActive": w.is_active, "locations": locations.get(w.id, [])} for w in db.scalars(select(Warehouse).order_by(Warehouse.code))]
+
+
+def reference_products(db: Session) -> list[dict]:
     products = db.scalars(select(Product).where(Product.product_type != "service").order_by(func.lower(Product.name)))
-    return {
-        "categories": sorted(
-            ({"id": c.id, "name": c.name, "path": category_path(c), "parentId": c.parent_id, "isActive": c.is_active} for c in categories),
-            key=lambda c: c["path"].lower(),
-        ),
-        "brands": [{"id": b.id, "name": b.name, "isActive": b.is_active} for b in db.scalars(select(Brand).order_by(func.lower(Brand.name)))],
-        "units": [{"code": u.code, "name": u.name, "isActive": u.is_active} for u in db.scalars(select(Unit).order_by(Unit.name))],
-        "suppliers": [
-            {**supplier_ref(s), "isActive": s.is_active} for s in db.scalars(select(Supplier).order_by(func.lower(Supplier.name)))
-        ],
-        "warehouses": [
-            {**warehouse_ref(w), "isActive": w.is_active, "locations": locations.get(w.id, [])}
-            for w in db.scalars(select(Warehouse).order_by(Warehouse.code))
-        ],
-        "products": [
-            {**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id}
-            for p in products
-        ],
-    }
+    return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id} for p in products]
+
+
+REFERENCE = {
+    "categories": reference_categories,
+    "brands": reference_brands,
+    "units": reference_units,
+    "suppliers": reference_suppliers,
+    "warehouses": reference_warehouses,
+    "products": reference_products,
+}
 
 
 # --- categories -------------------------------------------------------------------------

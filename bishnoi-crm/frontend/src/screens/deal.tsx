@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
-import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader, Particulars, SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -121,7 +121,7 @@ export default async function DealPage({ params }: { params: Params }) {
               </ul>
             )}
             {deal.lines.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">No products on it: its value was typed in.{deal.can.edit ? " Edit the deal to value it by products." : ""}</p>
+              <Empty compact icon="products" title="No products on it">Its value was typed in.{deal.can.edit ? " Edit the deal to value it by products." : ""}</Empty>
             ) : (
               <table className="mt-2 w-full text-sm">
                 <thead>
@@ -164,7 +164,7 @@ export default async function DealPage({ params }: { params: Params }) {
               Quotes
             </SectionTitle>
             {deal.quotes.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">No quotes yet. A quote made with New quote here is linked to this deal, and can be what wins it.</p>
+              <Empty compact icon="quotes" title="No quotes yet">A quote made with New quote here is linked to this deal, and can be what wins it.</Empty>
             ) : (
               <ul className="mt-1 divide-y divide-rule">
                 {deal.quotes.map((q) => (

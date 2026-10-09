@@ -1,6 +1,7 @@
 "use client";
 
-import { DatePicker, Segmented, Select } from "antd";
+import { DatePicker, Segmented } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import dayjs, { type Dayjs } from "dayjs";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -44,7 +45,7 @@ export function PeriodPicker({ value, presets }: { value: string; presets: { val
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <label className="block">
         <span className="mb-1.5 block text-sm text-ink">Period</span>
-        <Select
+        <Combobox
           className="w-48"
           value={custom ? CUSTOM : value}
           onChange={(v) => {

@@ -170,7 +170,7 @@ export function ImportWizard({ kind }: { kind: ImportKind }) {
                 </p>
               )}
               {check.problems.length > 0 && (
-                <div className="rounded-[3px] border border-danger/40 bg-danger-tint/40 px-4 py-3">
+                <div className="rounded-[12px] border border-danger/40 bg-danger-tint/40 px-4 py-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-danger">
                     <TriangleAlert className="size-4" aria-hidden />
                     {check.problems.length} {check.problems.length === 1 ? "row is" : "rows are"} {check.dryRun ? "skipped unless you fix them" : "skipped"}

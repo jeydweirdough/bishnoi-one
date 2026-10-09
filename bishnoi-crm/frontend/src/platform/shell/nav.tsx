@@ -116,10 +116,12 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
           href: "/companies",
           label: "Customers",
           icon: "customers",
-          also: ["/contacts", "/customers"],
+          also: ["/contacts", "/customers", "/order-links"],
           subpages: [
             { href: "/companies", label: "Customers", also: ["/customers"] },
             { href: "/contacts", label: "Contacts" },
+            // Links a customer, or someone who becomes one, orders their medicines from.
+            ...(may("quotes.view") ? [{ href: "/order-links", label: "Order links" }] : []),
           ],
         }),
         ...only((selling || admin) && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
@@ -131,20 +133,22 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         // Approved materials: everyone shows them; an administrator keeps them.
         ...only(may("customers.view") || may("admin.settings"), { href: "/media", label: "Media", icon: "letters" }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
-        // Everyone's own scorecard; whoever sets goals sets the targets too.
-        {
-          href: "/kpis",
-          label: "KPIs",
+        // Performance: results against targets. A salesperson's is on their
+        // dashboard (with its breakdown a click away), an administrator's in
+        // Settings; whoever leads people has it here, and sets the targets.
+        ...only(!admin && !(selling && me.role?.scope === "own"), {
+          href: "/performance",
+          label: "Performance",
           icon: "goals" as const,
           ...(may("goals.manage")
             ? {
                 subpages: [
-                  { href: "/kpis", label: "Scorecard", exact: true },
-                  { href: "/kpis/targets", label: "Targets" },
+                  { href: "/performance", label: "Results", exact: true },
+                  { href: "/performance/targets", label: "Targets" },
                 ],
               }
             : {}),
-        },
+        }),
       ],
     },
     {

@@ -21,7 +21,7 @@ const cell = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm 
  * filled in; each line takes its batch, expiry and serial numbers as the
  * product needs them.
  */
-export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; reference: Reference; order?: PO; canAdd?: CanAdd }) {
+export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses">; order?: PO; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
   const { pending, error, fields, save } = useSave();
   // Added from here ("+ New …"), listed until the page's own lists have them.

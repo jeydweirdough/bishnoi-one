@@ -49,11 +49,21 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader title="Retention">
+      <PageHeader
+        title="Retention"
+        actions={
+          mayExport && (
+            <a href={`/retention/export?${query}`} download className={buttonClass("default")}>
+              <Download className="size-4" aria-hidden />
+              Export CSV
+            </a>
+          )
+        }
+      >
         A customer is kept when they get a quote. At risk after {rules.atRiskDays} days without one, lost after {rules.lostDays}. Showing {whose}.
       </PageHeader>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2 empty:hidden">
         {data.canSeeTeam && (
           <ToggleLinks
             current={view}
@@ -69,64 +79,14 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
             options={[{ value: "", label: "Every team", href: href("team") }, ...data.teams.map((t) => ({ value: t.id, label: t.name, href: href("team", t.id) }))]}
           />
         )}
-        {mayExport && (
-          <a href={`/retention/export?${query}`} download className={buttonClass("default", "sm")}>
-            <Download className="size-4" aria-hidden />
-            Export CSV
-          </a>
-        )}
       </div>
 
       <RetentionFigures summary={data.summary} rules={rules} />
 
-      <div className={view === "team" ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start" : ""}>
-        <Sheet className="px-5 pt-4 pb-4">
-          <SectionTitle icon="trend">Retention by month</SectionTitle>
-          <p className="text-meta text-ink-3">
-            Each month compares the {rules.lostDays} days up to its last day with the {rules.lostDays} days before.
-          </p>
-          <TrendChart points={data.trend} title={`Retention by month, ${whose}`} org={me.org} />
-        </Sheet>
-
-        {view === "team" && (
-          <Sheet className="px-5 pt-4 pb-3">
-            <SectionTitle icon="reps">By rep</SectionTitle>
-            {data.reps.length === 0 ? (
-              <p className="py-3 text-meta text-ink-3">No customers here yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[30rem] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-rule text-caps text-ink-3 uppercase">
-                      <th scope="col" className="py-2 pr-3 font-semibold">Owner</th>
-                      <th scope="col" className="px-2 py-2 text-right font-semibold">Customers</th>
-                      <th scope="col" className="px-2 py-2 text-right font-semibold">At risk</th>
-                      <th scope="col" className="px-2 py-2 text-right font-semibold">Kept</th>
-                      <th scope="col" className="py-2 pl-2 text-right font-semibold">Retention</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-rule tabular-nums">
-                    {data.reps.map((r) => (
-                      <tr key={r.id ?? "nobody"}>
-                        <th scope="row" className="py-2 pr-3 text-left font-medium">
-                          {r.name ?? <span className="text-ink-3">No owner</span>}
-                        </th>
-                        <td className="px-2 py-2 text-right">{r.customers}</td>
-                        <td className="px-2 py-2 text-right">{r.atRisk}</td>
-                        <td className="px-2 py-2 text-right text-ink-2">{r.base ? `${r.retained} of ${r.base}` : "—"}</td>
-                        <td className="py-2 pl-2 text-right font-semibold">{rateLabel(r.rate)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Sheet>
-        )}
-      </div>
-
+      {/* Who to call comes before how it's going: the page is for keeping customers. */}
       <SelectionProvider key={query} items={bulk ? winnable.map((row) => ({ id: row.customerId, name: row.name })) : []}>
-        <Sheet className="mt-5 px-5 pt-4 pb-2">
+        <div id="worth-a-call" className="scroll-mt-6" />
+        <Sheet className="mb-5 px-5 pt-4 pb-2">
           <SectionTitle icon="worthACall">Worth a call</SectionTitle>
           <p className="text-meta text-ink-3">At risk first, the ones closest to lost at the top; then those lost lately, while they&apos;re still winnable.</p>
           {data.watch.length === 0 ? (
@@ -195,6 +155,60 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
         </Sheet>
         {bulk && <WinBackBulk org={me.org} />}
       </SelectionProvider>
+
+      <div className={view === "team" ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start" : ""}>
+        <Sheet className="px-5 pt-4 pb-4">
+          <SectionTitle icon="trend">Retention by month</SectionTitle>
+          <p className="text-meta text-ink-3">
+            Each month compares the {rules.lostDays} days up to its last day with the {rules.lostDays} days before.
+          </p>
+          {data.trend.some((p) => p.rate !== null) ? (
+            <TrendChart points={data.trend} title={`Retention by month, ${whose}`} org={me.org} />
+          ) : (
+            <Empty compact icon="trend" title="No month to show yet">
+              Each month fills in once there&apos;s a {rules.lostDays}-day window to compare it with.
+            </Empty>
+          )}
+        </Sheet>
+
+        {view === "team" && (
+          <Sheet className="px-5 pt-4 pb-3">
+            <SectionTitle icon="reps">By rep</SectionTitle>
+            {data.reps.length === 0 ? (
+              <Empty compact icon="retention" title="No customers here yet">Customers land here by how long since they last bought.</Empty>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[30rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+                      <th scope="col" className="py-2 pr-3 font-semibold">Owner</th>
+                      <th scope="col" className="px-2 py-2 text-right font-semibold">Customers</th>
+                      <th scope="col" className="px-2 py-2 text-right font-semibold">At risk</th>
+                      <th scope="col" className="px-2 py-2 text-right font-semibold">Kept</th>
+                      <th scope="col" className="py-2 pl-2 text-right font-semibold">Retention</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rule tabular-nums">
+                    {data.reps.map((r) => (
+                      <tr key={r.id ?? "nobody"}>
+                        <th scope="row" className="py-2 pr-3 text-left font-medium">
+                          {r.name ?? <span className="text-ink-3">No owner</span>}
+                        </th>
+                        <td className="px-2 py-2 text-right">{r.customers}</td>
+                        <td className="px-2 py-2 text-right">{r.atRisk}</td>
+                        <td className="px-2 py-2 text-right text-ink-2">{r.base ? `${r.retained} of ${r.base}` : "—"}</td>
+                        <td className="py-2 pl-2 text-right font-semibold">{rateLabel(r.rate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Sheet>
+        )}
+      </div>
+
+
     </>
   );
 }

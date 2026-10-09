@@ -1,6 +1,6 @@
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteWarehouse } from "../actions/inventory";
 import { RecordTools } from "../components/record-tools";
 import { Figures, NoAccess, RowLink, Table, Td } from "../components/ui";
@@ -11,7 +11,7 @@ import type { Warehouse, WarehouseRow } from "../lib/types";
 export async function WarehousesPage() {
   const { fmt, may } = await context();
   if (!may("warehouses.view")) return <NoAccess what="warehouses" />;
-  const warehouses = await load<WarehouseRow[]>("/inventory/warehouses");
+  const { warehouses } = await loadQuery<{ warehouses: WarehouseRow[] }>("query Warehouses { warehouses }", {}, ["warehouses"]);
   return (
     <>
       <PageHeader title="Warehouses">Every place stock is kept. Each has its own stock, and locations (zones, racks, bins) inside it.</PageHeader>
@@ -42,7 +42,7 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
   const { id } = await params;
   const { fmt, may } = await context();
   if (!may("warehouses.view")) return <NoAccess what="warehouses" />;
-  const w = await load<Warehouse>(`/inventory/warehouses/${enc(id)}`);
+  const { warehouse: w } = await loadQuery<{ warehouse: Warehouse }>(`query Warehouse($id: String!) { warehouse(id: $id) }`, { id }, ["warehouse"]);
   const s = w.summary;
   const manage = may("warehouses.manage");
   return (

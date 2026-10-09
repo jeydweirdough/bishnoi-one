@@ -1,13 +1,16 @@
 "use client";
 
-import { DatePicker, Input, Modal, Select, Tag, Upload } from "antd";
+import { Dropdown, Modal, Tag } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { DateInput } from "@/src/platform/ui/pickers";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import dayjs from "dayjs";
-import { ExternalLink, FileText, Link2, Plus, Upload as UploadIcon } from "lucide-react";
+import { ExternalLink, FileText, Link2, MoreHorizontal, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
-import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { FormError } from "@/src/platform/ui/field";
+import { Empty, Sheet } from "@/src/platform/ui/sheet";
+import { Button, IconButton } from "@/src/platform/ui/button";
+import { FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { deleteMaterial, openMaterial, saveMaterial, switchMaterial, type Material } from "../../actions/media";
 
 type Option = { value: string; label: string };
@@ -40,6 +43,9 @@ export function OpenButton({ item, companyId }: { item: Material; companyId: str
     </Button>
   );
 }
+
+/** The divisions list's "everyone" choice: no division picked. */
+const EVERYONE = "__everyone__";
 
 /** Adding or changing one, for an administrator: what it is, a file or a link, its products, divisions and dates. */
 function MaterialForm({
@@ -94,12 +100,12 @@ function MaterialForm({
           <span className="mb-1.5 block text-sm text-ink">
             What it&apos;s for <span className="text-ink-3">(optional)</span>
           </span>
-          <Input.TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
+          <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
         </label>
         <div>
           <span className="mb-1.5 block text-sm text-ink">The material</span>
-          <Select
-            className="mb-2 w-full"
+          <Combobox
+            className="w-full"
             value={kind}
             onChange={setKind}
             options={[
@@ -107,32 +113,50 @@ function MaterialForm({
               { value: "link", label: "A link to it on the shared drive (bigger decks, videos)" },
             ]}
           />
+          <div className="mt-3">
           {kind === "file" ? (
-            <Upload beforeUpload={(f) => (setFile(f), false)} maxCount={1} onRemove={() => setFile(null)} accept=".pdf,.pptx,.png,.jpg,.jpeg">
-              <Button icon={<UploadIcon className="size-4" aria-hidden />}>{item?.kind === "file" ? `Replace ${item.fileName ?? "the file"}` : "Choose the file"}</Button>
-            </Upload>
+            <FileDrop
+              accept=".pdf,.pptx,.png,.jpg,.jpeg"
+              note="PDF, PowerPoint or a picture, up to 4 MB"
+              maxBytes={4 * 1024 * 1024}
+              current={item?.kind === "file" ? { name: item.fileName ?? "The file" } : null}
+              onFile={setFile}
+            />
           ) : (
             <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" prefix={<Link2 className="size-4 text-ink-3" aria-hidden />} />
           )}
+          </div>
         </div>
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Products</span>
-          <Select mode="multiple" className="w-full" value={picked} onChange={setPicked} options={products} showSearch={{ optionFilterProp: "label" }} placeholder="The products it's about" />
+          <Combobox mode="multiple" className="w-full" value={picked} onChange={setPicked} options={products} showSearch={{ optionFilterProp: "label" }} placeholder="The products it's about" />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-sm text-ink">Divisions</span>
-          <Select mode="multiple" className="w-full" value={onlyTeams} onChange={setOnlyTeams} options={teams} showSearch={{ optionFilterProp: "label" }} placeholder="Everyone" />
+          <span className="mb-1.5 block text-sm text-ink">Who can show it</span>
+          {/* "Everyone" is a choice of its own: picking a division narrows it, picking Everyone opens it to all again. */}
+          <Combobox
+            mode="multiple"
+            className="w-full"
+            value={onlyTeams.length ? onlyTeams : [EVERYONE]}
+            onChange={(picked: string[]) => {
+              const added = picked.find((v) => !onlyTeams.includes(v) && v !== EVERYONE);
+              setOnlyTeams(picked.at(-1) === EVERYONE && !added ? [] : picked.filter((v) => v !== EVERYONE));
+            }}
+            options={[{ value: EVERYONE, label: "Everyone, every division" }, ...teams]}
+            showSearch={{ optionFilterProp: "label" }}
+          />
+          <span className="mt-1 block text-meta text-ink-3">{onlyTeams.length ? "Only these divisions see it in Media." : "Every division sees it. Pick divisions to show it to them only."}</span>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Approved on</span>
-            <DatePicker className="w-full" value={dayjs(approvedOn)} onChange={(d) => d && setApprovedOn(d.format("YYYY-MM-DD"))} allowClear={false} format="D MMM YYYY" />
+            <DateInput type="date" value={approvedOn} onChange={(e) => e.target.value && setApprovedOn(e.target.value)} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">
               Expires on <span className="text-ink-3">(optional)</span>
             </span>
-            <DatePicker className="w-full" value={expiresOn ? dayjs(expiresOn) : null} onChange={(d) => setExpiresOn(d ? d.format("YYYY-MM-DD") : null)} format="D MMM YYYY" />
+            <DateInput type="date" value={expiresOn ?? ""} min={approvedOn} onChange={(e) => setExpiresOn(e.target.value || null)} />
           </label>
         </div>
         <FormError message={error} />
@@ -157,10 +181,12 @@ export function Materials({
 }) {
   const [editing, setEditing] = useState<Material | "new" | null>(null);
   const [, start] = useTransition();
+  const [deleting, setDeleting] = useState<Material | null>(null);
+  const [removing, remove] = useTransition();
   const teamName = (id: string) => teams.find((t) => t.value === id)?.label ?? "A removed team";
   return (
     <>
-      {canManage && (
+      {canManage && items.length > 0 && (
         <div className="mb-4">
           <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
             Add material
@@ -168,68 +194,117 @@ export function Materials({
         </div>
       )}
       {items.length === 0 ? (
-        <p className="rounded-sheet border border-rule bg-sheet px-5 py-8 text-center text-sm text-ink-3">
-          {canManage ? "No materials yet. Add the approved decks and PDFs reps show customers." : "No approved materials for your division yet."}
-        </p>
+        <Sheet>
+          {canManage ? (
+            <Empty
+              icon="letters"
+              title="No materials yet"
+              actions={
+                <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
+                  Add the first material
+                </Button>
+              }
+            >
+              Add the approved decks, PDFs and links reps show customers, with the products and divisions they&apos;re for.
+            </Empty>
+          ) : (
+            <Empty icon="letters" title="Nothing approved for your division yet">
+              Approved presentations, PDFs and videos show up here once an administrator adds them. Ask them for what you need to show customers.
+            </Empty>
+          )}
+        </Sheet>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <>
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((m) => (
-            <li key={m.id} className={`flex flex-col rounded-sheet border border-rule bg-sheet p-4 shadow-sheet ${m.isCurrent ? "" : "opacity-70"}`}>
+            <li key={m.id} className={`flex flex-col rounded-sheet border border-rule bg-sheet p-5 shadow-sheet ${m.isCurrent ? "" : "opacity-75"}`}>
+              {/* What it is, with the ways to manage it beside its name. */}
               <div className="flex items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-[14px] bg-bench text-ink-2">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-bench text-ink-2">
                   {m.kind === "link" ? <Link2 className="size-4" aria-hidden /> : <FileText className="size-4" aria-hidden />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ink">{m.title}</p>
-                  {m.description && <p className="mt-0.5 text-meta text-ink-2">{m.description}</p>}
+                  <p className="truncate font-semibold text-ink">{m.title}</p>
+                  {m.description && <p className="mt-0.5 line-clamp-2 text-meta text-ink-3">{m.description}</p>}
                 </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {m.products.map((p) => (
-                  <Tag key={p.code}>{p.name}</Tag>
-                ))}
-                {m.onlyTeams.map((t) => (
-                  <Tag key={t} color="processing">
-                    {teamName(t)}
-                  </Tag>
-                ))}
-                {!m.isCurrent && <Tag color="error">{m.isActive ? "Not current" : "Switched off"}</Tag>}
-              </div>
-              <p className="mt-2 text-meta text-ink-3">
-                Approved {dayjs(m.approvedOn).format("D MMM YYYY")}
-                {m.expiresOn && ` · until ${dayjs(m.expiresOn).format("D MMM YYYY")}`}
-                {canManage && m.opened30d !== undefined && ` · opened ${m.opened30d} ${m.opened30d === 1 ? "time" : "times"} in 30 days`}
-              </p>
-              <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-                <OpenButton item={m} companyId={companyId} />
                 {canManage && (
-                  <>
-                    <Button size="sm" onClick={() => setEditing(m)}>
-                      Change
-                    </Button>
-                    <Button size="sm" variant="quiet" onClick={() => start(async () => void (await switchMaterial(m.id, !m.isActive)))}>
-                      {m.isActive ? "Switch off" : "Switch on"}
-                    </Button>
-                    <ConfirmButton
-                      label="Delete"
-                      triggerSize="sm"
-                      title={`Delete ${m.title}?`}
-                      body="Reps won't see it any more, and its openings are forgotten. Switch it off instead to keep them."
-                      confirmLabel="Delete material"
-                      onConfirm={async () => {
-                        const r = await deleteMaterial(m.id);
-                        if (!r.ok) {
-                          toast.error(r.error);
-                          return false;
-                        }
-                      }}
-                    />
-                  </>
+                  <Dropdown
+                    trigger={["click"]}
+                    placement="bottomRight"
+                    menu={{
+                      items: [
+                        { key: "change", label: "Change" },
+                        { key: "switch", label: m.isActive ? "Switch off" : "Switch on" },
+                        { type: "divider" },
+                        { key: "delete", label: "Delete", danger: true },
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === "change") setEditing(m);
+                        if (key === "switch") start(async () => void (await switchMaterial(m.id, !m.isActive)));
+                        if (key === "delete") setDeleting(m);
+                      },
+                    }}
+                  >
+                    <IconButton className="-mt-1 -mr-1" label={`Manage ${m.title}`}>
+                      <MoreHorizontal className="size-4" aria-hidden />
+                    </IconButton>
+                  </Dropdown>
                 )}
+              </div>
+
+              {/* Where it stands, then what it's about. */}
+              {(!m.isCurrent || m.onlyTeams.length > 0) && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {!m.isCurrent && <Tag color="error">{m.isActive ? "Not current" : "Switched off"}</Tag>}
+                  {m.onlyTeams.map((t) => (
+                    <Tag key={t}>{teamName(t)}</Tag>
+                  ))}
+                </div>
+              )}
+              {m.products.length > 0 && (
+                <p className="mt-3 text-meta text-ink-2">
+                  <span className="text-ink-3">For </span>
+                  {m.products.map((p) => p.name).join(", ")}
+                </p>
+              )}
+
+              {/* The one thing to do with it, and its dates. */}
+              <div className="mt-auto pt-4">
+                <div className="flex items-center justify-between gap-3 border-t border-rule pt-3">
+                  <OpenButton item={m} companyId={companyId} />
+                  <p className="text-right text-meta text-ink-3">
+                    {m.expiresOn ? `Until ${dayjs(m.expiresOn).format("D MMM YYYY")}` : `Approved ${dayjs(m.approvedOn).format("D MMM YYYY")}`}
+                    {canManage && m.opened30d !== undefined && (
+                      <span className="block">
+                        Opened {m.opened30d} {m.opened30d === 1 ? "time" : "times"} in 30 days
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             </li>
           ))}
         </ul>
+        <Modal
+          open={deleting !== null}
+          title={deleting ? `Delete ${deleting.title}?` : ""}
+          onCancel={() => setDeleting(null)}
+          okText="Delete material"
+          okButtonProps={{ danger: true }}
+          confirmLoading={removing}
+          onOk={() =>
+            deleting &&
+            remove(async () => {
+              const r = await deleteMaterial(deleting.id);
+              if (!r.ok) return void toast.error(r.error);
+              setDeleting(null);
+            })
+          }
+          width={440}
+        >
+          <p className="text-sm text-ink-2">Reps won&apos;t see it any more, and its openings are forgotten. Switch it off instead to keep them.</p>
+        </Modal>
+        </>
       )}
       {editing && <MaterialForm item={editing === "new" ? null : editing} products={products} teams={teams} onDone={() => setEditing(null)} />}
     </>

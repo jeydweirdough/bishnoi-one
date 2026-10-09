@@ -2,16 +2,20 @@ import { Download } from "lucide-react";
 import Link from "next/link";
 import { buttonClass } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { cache } from "react";
+import { enc, loadQuery } from "@/src/platform/lib/api";
 import { FilterSelect, Filters, NoAccess } from "../components/ui";
 import { param, query } from "../lib/labels";
 import { context, type Params, type Search } from "../lib/page";
+import { given, referenceOf } from "../lib/reference";
 import type { Reference, Report, ReportInfo } from "../lib/types";
+
+const reportList = cache(async () => (await loadQuery<{ reports: ReportInfo[] }>("query Reports { reports }", {}, ["reports"])).reports);
 
 export async function ReportsPage() {
   const { may } = await context();
   if (!may("reports.view")) return <NoAccess what="reports" />;
-  const reports = await load<ReportInfo[]>("/inventory/reports");
+  const reports = await reportList();
   const groups = [...new Set(reports.map((r) => r.group))];
   return (
     <>
@@ -37,7 +41,7 @@ export async function ReportsPage() {
 
 export async function generateReportMetadata({ params }: { params: Params<{ key: string }> }) {
   const { key } = await params;
-  const reports = await load<ReportInfo[]>("/inventory/reports");
+  const reports = await reportList();
   return { title: reports.find((r) => r.key === key)?.title ?? "Report" };
 }
 
@@ -47,7 +51,11 @@ export async function ReportPage({ params, searchParams }: { params: Params<{ ke
   if (!may("reports.view")) return <NoAccess what="reports" />;
   const s = await searchParams;
   const f = { warehouse: param(s, "warehouse"), from: param(s, "from"), to: param(s, "to") };
-  const [r, ref] = await Promise.all([load<Report>(`/inventory/reports/${enc(key)}${query(f)}`), load<Reference>("/inventory/reference")]);
+  const { report: r, reference: ref } = await loadQuery<{ report: Report; reference: Pick<Reference, "warehouses"> }>(
+    `query Report($key: String!, $warehouse: String, $from: String, $to: String) { report(key: $key, warehouse: $warehouse, from: $from, to: $to) ${referenceOf("warehouses")} }`,
+    { key, ...given(f) },
+    ["report", "reference"],
+  );
 
   const show = (kind: string, v: string | number | null) => {
     if (v === null || v === undefined || v === "") return <span className="text-ink-3">—</span>;

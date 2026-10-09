@@ -1,6 +1,8 @@
 "use client";
 
-import { Input, Modal, Select } from "antd";
+import { Input } from "@/src/platform/ui/field";
+import { Modal } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -13,10 +15,13 @@ import { Lookalikes } from "./lookalikes";
 type Choices = { people: Assignable[]; types: CustomerType[] };
 
 /** Where the form goes next: the division (as a team), the type and the name chosen here. */
-function formHref(team: string, kind: string, name: string, thenQuote: boolean) {
+/** What opens once the customer is saved: their new quote or deal. */
+export type Then = "quote" | "deal" | null;
+
+function formHref(team: string, kind: string, name: string, then: Then) {
   const q = new URLSearchParams({ team, type: kind });
   if (name.trim()) q.set("name", name.trim());
-  if (thenQuote) q.set("then", "quote");
+  if (then) q.set("then", then);
   return `/companies/new?${q}`;
 }
 
@@ -30,14 +35,14 @@ export function CustomerStart({
   choices,
   kind: fixedKind,
   initialName = "",
-  thenQuote = false,
+  then = null,
   onDone,
 }: {
   choices: Choices;
   /** Asked for one kind only ("Add a doctor"): the type isn't asked. */
   kind?: string;
   initialName?: string;
-  thenQuote?: boolean;
+  then?: Then;
   onDone?: () => void;
 }) {
   const router = useRouter();
@@ -53,7 +58,7 @@ export function CustomerStart({
   function go() {
     if (!ready) return;
     onDone?.();
-    router.push(formHref(team, picked, name, thenQuote));
+    router.push(formHref(team, picked, name, then));
   }
 
   return (
@@ -67,7 +72,7 @@ export function CustomerStart({
       {teams.length > 1 && (
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Division</span>
-          <Select
+          <Combobox
             className="w-full"
             value={team || undefined}
             onChange={(v) => setTeam(v)}
@@ -79,7 +84,7 @@ export function CustomerStart({
       {!fixedKind && (
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">What kind of customer?</span>
-          <Select
+          <Combobox
             className="w-full"
             size="large"
             value={picked || undefined}
@@ -93,7 +98,7 @@ export function CustomerStart({
       )}
       <label className="block">
         <span className="mb-1.5 block text-sm text-ink">Name</span>
-        <Input size="large" value={name} onChange={(e) => setName(e.target.value)} placeholder="Write it the way it should read in the list" autoFocus={Boolean(fixedKind)} />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Write it the way it should read in the list" autoFocus={Boolean(fixedKind)} />
       </label>
       <Lookalikes name={name} phone="" email="" />
       <div className="flex justify-end gap-2 pt-1">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { getCompanyMe, load } from "@/src/platform/lib/api";
+import { getCompanyMe, loadQuery } from "@/src/platform/lib/api";
 import { RolesEditor, UsersEditor } from "../components/admin";
 import type { AdminUsers, AuditEntry, PageData, RolesData } from "@/src/lib/types";
 
@@ -17,7 +17,7 @@ export async function UsersPage() {
       </Sheet>
     );
   }
-  const data = await load<AdminUsers>("/admin/users");
+  const data = (await loadQuery<{ users: AdminUsers }>("query Users { users }", {}, ["users"])).users;
   const when = Object.fromEntries(
     data.items.map((u) => [
       u.id,
@@ -47,7 +47,7 @@ export async function RolesPage() {
       </Sheet>
     );
   }
-  const data = await load<RolesData>("/admin/roles");
+  const data = (await loadQuery<{ roles: RolesData }>("query Roles { roles }", {}, ["roles"])).roles;
   return (
     <>
       <PageHeader
@@ -116,13 +116,11 @@ export async function AuditPage({
   const s = await searchParams;
   const actionParam = typeof s?.action === "string" ? s.action : "";
   const beforeParam = typeof s?.before === "string" ? s.before : "";
-  const queryParts = [];
-  if (actionParam) queryParts.push(`action=${encodeURIComponent(actionParam)}`);
-  if (beforeParam) queryParts.push(`before=${encodeURIComponent(beforeParam)}`);
-  queryParts.push("limit=50");
-  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
-
-  const page = await load<PageData<AuditEntry>>(`/admin/audit${qs}`);
+  const { audit: page } = await loadQuery<{ audit: PageData<AuditEntry> }>(
+    `query Audit($action: String, $before: Int) { audit(action: $action, before: $before, limit: 50) }`,
+    { ...(actionParam ? { action: actionParam } : {}), ...(beforeParam ? { before: Number(beforeParam) } : {}) },
+    ["audit"],
+  );
   const last = page.items.at(-1);
 
   return (

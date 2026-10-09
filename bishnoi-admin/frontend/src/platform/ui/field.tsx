@@ -6,7 +6,7 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 // Underlined fields: transparent, a control-grey rule underneath, the rule
 // thickens to ink on focus. The label always sits above, never inside.
 const control =
-  "block w-full min-w-0 bg-transparent border-0 border-b border-control rounded-none px-0 text-sm text-ink placeholder:text-ink-3/80 focus:outline-none focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:border-hema aria-[invalid=true]:border-danger disabled:text-ink-3";
+  "block w-full min-w-0 bg-sheet border border-rule-strong px-4 text-sm text-ink placeholder:text-ink-3/80 hover:border-control focus:outline-none focus:border-ink focus:ring-3 focus:ring-mint-2 aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
 
 type FieldProps = {
   label: string;
@@ -38,7 +38,7 @@ export function Field({ label, hint, error, optional, className = "", children }
 }
 
 export function Input({ className = "", ...rest }: ComponentProps<"input">) {
-  return <input className={`h-9 ${control} ${className}`} {...rest} />;
+  return <input className={`h-10 rounded-full ${control} ${className}`} {...rest} />;
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
@@ -46,7 +46,7 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
   return (
     <input
       type="file"
-      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[3px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
+      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[12px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
       {...rest}
     />
   );
@@ -60,23 +60,23 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
 export function CellInput({ className = "", ...rest }: ComponentProps<"input">) {
   return (
     <input
-      className={`h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-right text-sm tabular-nums hover:border-control focus:border-hema focus:outline-none aria-[invalid=true]:border-danger ${className}`}
+      className={`h-8 rounded-[12px] border border-rule-strong bg-sheet px-2 text-right text-sm tabular-nums hover:border-control focus:border-hema focus:outline-none aria-[invalid=true]:border-danger ${className}`}
       {...rest}
     />
   );
 }
 
 export function Textarea({ className = "", ...rest }: ComponentProps<"textarea">) {
-  return <textarea className={`min-h-20 resize-y py-2 ${control} ${className}`} {...rest} />;
+  return <textarea className={`min-h-20 resize-y rounded-[16px] py-2.5 ${control} ${className}`} {...rest} />;
 }
 
 export function Select({ className = "", children, ...rest }: ComponentProps<"select">) {
   return (
     <div className="relative">
-      <select className={`h-9 appearance-none pr-7 ${control} ${className}`} {...rest}>
+      <select className={`h-10 appearance-none rounded-full pr-9 ${control} ${className}`} {...rest}>
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-1 size-4 -translate-y-1/2 text-ink-3" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-ink-3" />
     </div>
   );
 }
@@ -102,7 +102,7 @@ export function Choice<T extends string>({
         {options.map((o) => (
           <label
             key={o.value}
-            className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-[3px] border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-hema has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
+            className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-[12px] border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-hema has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
           >
             <input
               type="radio"
@@ -124,7 +124,7 @@ export function Choice<T extends string>({
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
   return (
-    <p role="alert" className="animate-reshape rounded-[3px] bg-danger-tint px-3 py-2 text-meta text-danger">
+    <p role="alert" className="animate-reshape rounded-[12px] bg-danger-tint px-3 py-2 text-meta text-danger">
       {message}
     </p>
   );

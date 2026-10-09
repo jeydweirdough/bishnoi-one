@@ -1,5 +1,5 @@
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { CatalogList, type CatalogItem } from "../components/catalog-list";
 import { NoAccess } from "../components/ui";
 import { context } from "../lib/page";
@@ -10,7 +10,7 @@ import type { BrandRow, CategoryRow, UnitRow } from "../lib/types";
 async function page(kind: "categories" | "brands" | "units", title: string, blurb: string, items: (raw: unknown) => CatalogItem[]) {
   const { me, may } = await context();
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
-  const raw = await load<unknown>(`/inventory/${kind}`);
+  const raw = (await loadQuery<Record<string, unknown>>(`query Catalog { ${kind} }`, {}, [kind]))[kind];
   return (
     <>
       <PageHeader title={title}>{blurb}</PageHeader>

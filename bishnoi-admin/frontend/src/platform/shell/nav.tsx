@@ -1,10 +1,8 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, MoreHorizontal, UserRound, X } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import logo from "@/src/components/assets/logo.png";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
 import { ConfirmButton } from "../ui/confirm";
@@ -211,16 +209,16 @@ function Row({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-[3px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const className = `flex items-center gap-2.5 rounded-full px-3 text-sm ${nested ? "h-8" : "h-9"} ${
     current
-      ? "bg-sheet font-semibold text-ink shadow-[0_1px_2px_rgb(20_22_30/0.08)]"
+      ? "bg-hema-tint font-semibold text-ink"
       : open
-        ? "font-semibold text-ink hover:bg-bench"
-        : "text-ink hover:bg-bench"
+        ? "font-semibold text-ink hover:bg-sheet"
+        : "text-ink-2 hover:bg-sheet hover:text-ink"
   }`;
   const inside = (
     <>
-      <Icon name={icon} className={`size-4 ${current ? "text-section" : "text-ink"}`} />
+      <Icon name={icon} className={`size-4 ${current ? "text-sage-deep" : open ? "text-ink-2" : "text-ink-3"}`} />
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -290,7 +288,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink hover:bg-bench"
+      className="flex h-9 items-center gap-2.5 rounded-[12px] px-3 text-sm text-ink hover:bg-bench"
     >
       <Icon name={icon} className="size-4 text-ink" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -408,7 +406,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[3px] px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-[12px] px-3 text-sm ${
           open ? "bg-bench font-semibold text-ink" : "text-ink hover:bg-bench"
         }`}
       >
@@ -424,7 +422,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[3px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-[12px] border border-rule bg-bench p-1 shadow-lg"
           >
             {items.map((e) => (
               <a
@@ -432,7 +430,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-[3px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-[12px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -450,7 +448,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-5">
-      <p className="mb-1 px-3 text-meta font-semibold text-section">{label}</p>
+      <p className="mb-1 px-3 text-caps text-ink-3 uppercase">{label}</p>
       <div className="space-y-0.5">{children}</div>
     </div>
   );
@@ -474,8 +472,8 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
 }
 
 /** The executive pages this person's role sees, with what isn't set up yet on each. */
-const executivePages = (me: Me, unset: Unset): Page[] =>
-  EXECUTIVE_PAGES.filter((p) => !p.reach || p.reach(me)).map((p) =>
+const executivePages = (me: Me, unset: Unset, pages: Page[] = EXECUTIVE_PAGES): Page[] =>
+  pages.filter((p) => !p.reach || p.reach(me)).map((p) =>
     p.href === "/documents" ? { ...p, missing: missingOf(unset, ["documentExpiry"]) } : p.href === "/properties" ? { ...p, missing: missingOf(unset, ["propertyRent"]) } : p,
   );
 
@@ -483,14 +481,27 @@ const executivePages = (me: Me, unset: Unset): Page[] =>
 const sees = (permission: string) => (me: Me) => me.permissions?.includes(permission) ?? me.canManageSettings;
 
 const EXECUTIVE_PAGES: Page[] = [
-  { href: "/", label: "Overview", icon: "overview", reach: sees("dashboard.view") },
+  { href: "/", label: "Home", icon: "home", reach: sees("dashboard.view") },
   { href: "/notifications", label: "Renewal alerts", icon: "notifications", reach: sees("notifications.view") },
+];
+
+/** The CRM's kind of menu: headed sections, each the work it holds. */
+const COMPLIANCE_PAGES: Page[] = [
   { href: "/permits", label: "Permits", icon: "permits", reach: sees("permits.view") },
   { href: "/immigration", label: "Expatriates", icon: "immigration", reach: sees("immigration.view") },
   { href: "/documents", label: "Documents", icon: "documents", reach: sees("documents.view") },
   { href: "/properties", label: "Properties", icon: "properties", reach: sees("properties.view") },
-  { href: "/tickets", label: "Office requests", icon: "tickets", reach: sees("tickets.view") },
 ];
+const OFFICE_PAGES: Page[] = [{ href: "/tickets", label: "Office requests", icon: "tickets", reach: sees("tickets.view") }];
+
+/** The executive assistant's trackers, under their own heading. */
+const FLEET_PAGES: Page[] = [
+  { href: "/vehicles", label: "Vehicles", icon: "vehicles", reach: sees("vehicles.view") },
+  { href: "/fuel-cards", label: "Fuel cards", icon: "fuelCards", reach: sees("vehicles.view") },
+  { href: "/travel", label: "Hotel and flights", icon: "travel", reach: sees("travel.view") },
+  { href: "/devices", label: "Devices issued", icon: "devices", reach: sees("devices.view") },
+];
+const fleetPages = (me: Me): Page[] => FLEET_PAGES.filter((p) => !p.reach || p.reach(me));
 
 function adminPagesFor(me: Me): Page[] {
   const may = (permission: string) => me.permissions?.includes(permission) ?? me.canManageSettings;
@@ -575,12 +586,25 @@ function Links({ me, unset }: { me: Me; unset: Unset }) {
       )}
       {/* Executive Admin's primary operational workspace */}
       {isOurs("exec") && (
-        <Group label={appLabel("exec")}>
-          <Flat
-            groups={[{ pages: executivePages(me, unset) }]}
-            overviewHref="/"
-          />
-        </Group>
+        <>
+          <div className="mt-2">
+            <Flat groups={[{ pages: executivePages(me, unset) }]} overviewHref="/" />
+          </div>
+          {(
+            [
+              ["Compliance", executivePages(me, unset, COMPLIANCE_PAGES)],
+              ["Fleet and travel", fleetPages(me)],
+              ["Office", executivePages(me, unset, OFFICE_PAGES)],
+            ] as [string, Page[]][]
+          ).map(
+            ([label, pages]) =>
+              pages.length > 0 && (
+                <Group key={label} label={label}>
+                  <Flat groups={[{ pages }]} />
+                </Group>
+              ),
+          )}
+        </>
       )}
       {/* The CRM, as one set of pages. */}
       {crm.length > 0 && isOurs("crm") && (
@@ -672,33 +696,67 @@ function placeOf(pathname: string, me: Me): string | null {
 
 function Account({ me }: { me: Me }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
+  // Closes on a click elsewhere or Escape, as a menu does.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => menu.current && !menu.current.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const here = pathname === "/account" || pathname.startsWith("/account/");
+  // The CRM's foot (without Ant Design): who you are, and the rest behind ⋯.
   return (
     <div className="border-t border-rule pt-4">
-      <Link
-        href="/account"
-        aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-bench"}`}
-      >
-        <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-        <span className="min-w-0">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-hema" : ""}`}>{me.user.fullName}</span>
-          <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
-        </span>
-      </Link>
-      <ConfirmButton
-        label="Sign out"
-        icon={<LogOut className="size-4" aria-hidden />}
-        triggerVariant="quiet"
-        triggerSize="sm"
-        triggerClassName="mt-2 w-full !justify-start"
-        title="Sign out?"
-        body="You'll need your email and password to get back in."
-        confirmLabel="Sign out"
-        danger={false}
-        onConfirm={async () => {
-          await signOut();
-        }}
-      />
+      <div ref={menu} className={`relative flex items-center gap-1 rounded-full pr-1 ${here ? "bg-hema-tint" : ""}`}>
+        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 ${here ? "" : "hover:bg-sheet"}`}>
+          <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
+            <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
+          </span>
+        </Link>
+        <button
+          type="button"
+          aria-label="Account options"
+          title="Account options"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => setOpen((o) => !o)}
+          className="grid size-9 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
+        >
+          <MoreHorizontal className="size-5" aria-hidden />
+        </button>
+        {open && (
+          <div role="menu" className="absolute right-0 bottom-full z-40 mb-2 w-52 rounded-[16px] border border-rule bg-sheet p-1.5 shadow-overlay">
+            <Link role="menuitem" href="/account" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-sm text-ink hover:bg-mint">
+              <UserRound className="size-4" aria-hidden />
+              Your account
+            </Link>
+            <div className="my-1 border-t border-rule" />
+            <ConfirmButton
+              label="Sign out"
+              icon={<LogOut className="size-4" aria-hidden />}
+              triggerVariant="quiet"
+              triggerSize="sm"
+              triggerClassName="w-full !justify-start !rounded-[10px] !px-3 !text-ink !font-normal"
+              title="Sign out?"
+              body="You'll need your email and password to get back in."
+              confirmLabel="Sign out"
+              danger={false}
+              onConfirm={async () => {
+                await signOut();
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -711,18 +769,20 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const place = placeOf(pathname, me);
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2.5">
-      <Image src={logo} alt="" aria-hidden className="h-8 w-auto shrink-0" priority />
-      <span className="block min-w-0">
-      {/* No company on the platform: a Developer Admin has not opened one, and
-          saying a company name there would be saying something untrue. */}
-      <span className="block truncate text-meta font-semibold text-section">{me.org?.brandName ?? "Platform"}</span>
-      {/* Which app this is, not only which product. Each one is its own site on
-          its own address, so the product name alone leaves you working out from the port
-          whether the screen in front of you is missing or simply elsewhere. */}
-      <span className="block text-base leading-tight font-semibold text-ink">
-        {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+    <Link href="/" className="flex items-center gap-2.5 border-b border-rule pb-4">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-bold tracking-tight text-white" aria-hidden>
+        B1
       </span>
+      <span className="min-w-0">
+        {/* Which app this is, not only which product. Each one is its own site on
+            its own address, so "Bishnoi One" alone leaves you working out from the port
+            whether the screen in front of you is missing or simply elsewhere. */}
+        <span className="block truncate text-sm leading-tight font-semibold text-ink">
+          {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
+        </span>
+        {/* No company on the platform: a Developer Admin has not opened one, and
+            saying a company name there would be saying something untrue. */}
+        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
       </span>
     </Link>
   );
@@ -730,7 +790,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   return (
     <>
       {/* Desktop: a light grey column beside the page, a rule between them. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto border-r border-rule bg-rail px-3 py-6 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
         <div>
           <div className="mb-6 px-3">{brand}</div>
           <Links me={me} unset={unset} />
@@ -739,7 +799,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
       </aside>
 
       {/* Phone and tablet: a top bar with a menu, saying where you are. */}
-      <div className="sticky top-0 z-30 border-b border-rule bg-sheet/95 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-36 shrink-0">{brand}</div>
           <button
@@ -747,7 +807,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-bench"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

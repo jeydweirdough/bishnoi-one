@@ -1,14 +1,18 @@
 "use client";
 
-import { DatePicker, Input, Modal, Select } from "antd";
+import { Modal } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { DateTimeField } from "@/src/platform/ui/pickers";
 import dayjs, { type Dayjs } from "dayjs";
 import { PhoneCall } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { FormError } from "@/src/platform/ui/field";
+import { FieldRow } from "@/src/platform/ui/dialog";
+import { FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { callChoices, createActivity } from "../../actions/crm";
 import { findCustomers } from "../../actions/deals";
+import { CustomerNotFound } from "../quick-add/customer-not-found";
 
 type Option = { value: string; label: string };
 
@@ -24,9 +28,11 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
   const [companyId, setCompanyId] = useState(customer?.id ?? "");
   const [when, setWhen] = useState<Dayjs | null>(dayjs().add(1, "day").hour(9).minute(0).second(0));
   const [objective, setObjective] = useState("");
+  const [link, setLink] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [typed, setTyped] = useState("");
 
   function show() {
     setOpen(true);
@@ -35,6 +41,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
   }
 
   function search(q: string) {
+    setTyped(q.trim());
     start(async () => setCustomers((await findCustomers(q)).map((c) => ({ value: c.id, label: c.city ? `${c.name} · ${c.city}` : c.name }))));
   }
 
@@ -45,6 +52,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
         kind: "meeting",
         subject: objective.trim(),
         objective: objective.trim(),
+        meetingLink: link.trim() || null,
         products: picked,
         body: null,
         at: when.format("YYYY-MM-DDTHH:mm"),
@@ -58,6 +66,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
       toast.success("Call planned", { description: `${when.format("ddd D MMM, h:mm A")}: ${objective.trim()}` });
       setOpen(false);
       setObjective("");
+      setLink("");
       setPicked([]);
       setError(null);
     });
@@ -68,11 +77,13 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
       <Button variant={variant} icon={<PhoneCall className="size-4" aria-hidden />} onClick={show}>
         New call
       </Button>
-      <Modal open={open} title="New call" onCancel={() => setOpen(false)} onOk={save} okText="Plan the call" confirmLoading={pending} width={520} destroyOnHidden>
-        <div className="space-y-4 pt-1">
+      <Modal open={open} title="New call" onCancel={() => setOpen(false)} onOk={save} okText="Plan the call" confirmLoading={pending} width={600} destroyOnHidden>
+        <div className="space-y-4">
+          {/* Who and when, side by side; then what it's for. */}
+          <FieldRow>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Who it&apos;s with</span>
-            <Select
+            <Combobox
               className="w-full"
               value={companyId || undefined}
               onChange={setCompanyId}
@@ -80,21 +91,39 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
               disabled={Boolean(customer)}
               showSearch={{ filterOption: false, onSearch: search }}
               placeholder="Type a customer's name"
+              notFoundContent={
+                <CustomerNotFound
+                  typed={typed}
+                  loading={pending}
+                  onAdded={(c) => {
+                    setCustomers((o) => [{ value: c.id, label: c.name }, ...o]);
+                    setCompanyId(c.id);
+                  }}
+                />
+              }
             />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">When</span>
-            <DatePicker className="w-full" showTime={{ format: "h:mm A", minuteStep: 15 }} format="ddd D MMM YYYY, h:mm A" value={when} onChange={setWhen} />
+            <DateTimeField value={when ? when.format("YYYY-MM-DDTHH:mm") : ""} onChange={(v) => setWhen(v ? dayjs(v) : null)} />
           </label>
+          </FieldRow>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Objective</span>
             <Input value={objective} onChange={(e) => setObjective(e.target.value)} maxLength={300} placeholder="e.g. Get Onco One on their formulary" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">
+              Video call link <span className="text-ink-3">(optional)</span>
+            </span>
+            <Input type="url" inputMode="url" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} placeholder="https://meet.google.com/abc-defg-hij" />
+            <span className="mt-1 block text-meta text-ink-3">When it&apos;s online: a Join button shows on the calendar and in your to do.</span>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm text-ink">
               Products to discuss <span className="text-ink-3">(optional)</span>
             </span>
-            <Select
+            <Combobox
               mode="multiple"
               className="w-full"
               value={picked}
@@ -103,6 +132,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
               loading={!products}
               showSearch={{ optionFilterProp: "label" }}
               placeholder="Type a product"
+              notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">No product by that name. Products are added under Catalogue → Products.</p>}
             />
           </label>
           <FormError message={error} />
@@ -150,11 +180,11 @@ export function CallOutcome({
       <div className="space-y-4 pt-1">
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">What came of it</span>
-          <Input.TextArea rows={3} value={outcome} onChange={(e) => setOutcome(e.target.value)} maxLength={5000} placeholder="e.g. Interested; wants samples next week" />
+          <Textarea rows={3} value={outcome} onChange={(e) => setOutcome(e.target.value)} maxLength={5000} placeholder="e.g. Interested; wants samples next week" />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Products discussed</span>
-          <Select mode="multiple" className="w-full" value={discussed} onChange={setDiscussed} options={options} showSearch={{ optionFilterProp: "label" }} />
+          <Combobox mode="multiple" className="w-full" value={discussed} onChange={setDiscussed} options={options} showSearch={{ optionFilterProp: "label" }} />
         </label>
       </div>
     </Modal>

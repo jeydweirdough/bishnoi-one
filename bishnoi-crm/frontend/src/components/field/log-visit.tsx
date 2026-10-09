@@ -1,8 +1,9 @@
 "use client";
 
-import { MapPin, X } from "lucide-react";
+import { Modal } from "antd";
+import { MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
@@ -178,33 +179,22 @@ export function LogVisitButton({
   doctors?: Doctor[];
   requireLocation?: boolean;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const router = useRouter();
-  const titleId = useId();
   return (
     <>
-      <Button variant={variant} icon={<MapPin className="size-4" aria-hidden />} onClick={() => dialog.current?.showModal()}>
+      <Button variant={variant} icon={<MapPin className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         {label}
       </Button>
-      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-[14px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
-        <div className="flex items-center justify-between border-b border-rule px-5 py-3">
-          <h2 id={titleId} className="text-heading">
-            {form.doctor ? `Visit to ${form.doctor.name}` : "Log visit"}
-          </h2>
-          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-        <div className="max-h-[75vh] overflow-y-auto px-5 pt-4 pb-5">
+      <Modal open={open} title={form.doctor ? `Visit to ${form.doctor.name}` : "Log visit"} onCancel={() => setOpen(false)} footer={null} width={560}>
           <LogVisitForm
             {...form}
             onDone={() => {
-              dialog.current?.close();
+              setOpen(false);
               router.refresh();
             }}
           />
-        </div>
-      </dialog>
+      </Modal>
     </>
   );
 }

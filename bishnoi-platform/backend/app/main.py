@@ -26,6 +26,7 @@ from app.routers import (
     auth,
     communications,
     companies,
+    connections,
     dashboard,
     identity,
     incidents,
@@ -110,4 +111,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(communications.router)
     app.include_router(settings_router.router)
     app.include_router(public.router)
+    app.include_router(connections.router)
     return app

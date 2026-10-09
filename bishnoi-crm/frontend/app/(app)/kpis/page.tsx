@@ -1,2 +1,6 @@
-// The route. The screen is in src/, so it can be read on its own.
-export { default, metadata } from "../../../src/screens/kpis";
+import { redirect } from "next/navigation";
+import { query } from "../../../src/screens/performance-settings";
+
+export default async function Moved({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirect(`/performance${await query(searchParams)}`);
+}

@@ -52,6 +52,10 @@ def get_settings_dep(request: Request, tenant: Annotated[Tenant, Depends(current
         from app.company import standing
 
         overrides["org_name"] = standing(base, tenant.slug).name or tenant.slug
+    # What Inventory is linked to, as the platform says (Connections); nothing when not connected.
+    from app.platform_links import overrides as links
+
+    overrides |= links(base)
     return base.model_copy(update=overrides)
 
 

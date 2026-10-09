@@ -1,6 +1,8 @@
 "use client";
 
-import { Input, Select } from "antd";
+
+import { Input } from "@/src/platform/ui/field";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
@@ -79,11 +81,11 @@ export function AssociationLabels({ initial }: { initial: AssociationLabel[] }) 
         <div className="grid gap-3 sm:grid-cols-[9rem_9rem_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <label className="block">
             <span className="mb-1 block text-meta text-ink-2">From</span>
-            <Select className="w-full" value={from} onChange={setFrom} options={KINDS} />
+            <Combobox className="w-full" value={from} onChange={setFrom} options={KINDS} />
           </label>
           <label className="block">
             <span className="mb-1 block text-meta text-ink-2">To</span>
-            <Select className="w-full" value={to} onChange={setTo} options={KINDS} />
+            <Combobox className="w-full" value={to} onChange={setTo} options={KINDS} />
           </label>
           <label className="block">
             <span className="mb-1 block text-meta text-ink-2">Read from the first</span>

@@ -4,7 +4,7 @@
 // marker in the corner saying so.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
-import { api, getMe } from "@/src/platform/lib/api";
+import { getFrame } from "@/src/platform/lib/api";
 import { FieldTracker } from "@/src/components/field/tracker";
 import { CanProvider } from "@/src/components/quick-add/can";
 import { isFieldAgent } from "@/src/components/field/words";
@@ -12,10 +12,10 @@ import { TermsProvider } from "@/src/components/terms/provider";
 import { termsOf } from "@/src/components/terms/terms";
 
 export default async function Layout({ children }: { children: ReactNode }) {
-  const me = await getMe();
-  // What isn't set up yet (a product with no price), in red. A count that
-  // can't be had is left out rather than stopping the page.
-  const unset = await api.get<Record<string, number>>("/unset").catch(() => undefined);
+  // Who you are and what isn't set up yet (a product with no price, in red):
+  // one request, shared with the page below (lib/api.ts getFrame).
+  const { me, unset: counts } = await getFrame();
+  const unset = counts ?? undefined;
   return (
     <ShellLayout unset={unset}>
       <TermsProvider terms={termsOf(me)}>

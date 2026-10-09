@@ -1,10 +1,12 @@
 "use client";
 
-import { Input, Modal, Select } from "antd";
+import { TextButton } from "@/src/platform/ui/button";
+import { Modal } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { FormError } from "@/src/platform/ui/field";
+import { FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { findCustomers } from "../../actions/deals";
 import { customerAddresses, listTemplates, prepareEmail, readMailbox, sendEmail, type EmailDraft, type EmailTemplate, type MailboxInfo } from "../../actions/mailbox";
 import { OwnAppSend } from "./own-app-send";
@@ -12,10 +14,13 @@ import { OwnAppSend } from "./own-app-send";
 type Option = { value: string; label: string };
 export type ComposeFor = { id: string; name: string };
 
+
+/** "No template" in the template list: a value of its own, as an empty one reads as nothing picked. */
+const OWN = "own";
 /**
  * Writing an email in the CRM. It goes out through the provider of the mailbox
  * picked in From (Zoho Mail, Gmail, Outlook, or any by SMTP), and is kept on
- * the customer. An approved email is sent as approved, with a personal note on
+ * the customer. A template is sent as it's written, with a personal note on
  * top; or the person writes their own.
  *
  * When the CRM can't send it (no mailbox connected, or the provider refused),
@@ -45,7 +50,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
   const picked = templates.find((t) => t.id === template) ?? null;
   const fill = (text: string) => text.replaceAll("{customer}", companyName || "the customer").replaceAll("{me}", "you").replaceAll("{contact}", "");
 
-  // Opened: the person's mailboxes and approved emails, and who the customer's addresses are.
+  // Opened: the person's mailboxes and email templates, and who the customer's addresses are.
   useEffect(() => {
     if (!open) return;
     start(async () => {
@@ -149,9 +154,9 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
     >
       {own ? (
         <>
-          <button type="button" onClick={() => setOwn(null)} className="mb-2 text-meta text-ink-2 hover:text-ink hover:underline">
+          <TextButton onClick={() => setOwn(null)} tone="muted" className="mb-2">
             ← Back to the email
-          </button>
+          </TextButton>
           <OwnAppSend
             draft={own.draft}
             ready={own.ready}
@@ -174,7 +179,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
           ) : (
             <label className="block">
               <span className="mb-1.5 block text-sm text-ink">From</span>
-              <Select
+              <Combobox
                 className="w-full"
                 value={from || undefined}
                 onChange={setFrom}
@@ -185,7 +190,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
           )}
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">Customer</span>
-            <Select
+            <Combobox
               className="w-full"
               value={companyId || undefined}
               onChange={(v, o) => {
@@ -198,12 +203,13 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
               allowClear={!customer}
               onFocus={() => !customer && customers.length === 0 && searchCustomers("")}
               showSearch={{ filterOption: false, onSearch: searchCustomers }}
+              notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">No customer by that name. You can still type an email address in To below.</p>}
               placeholder="Who it's about: it's kept on their page"
             />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">To</span>
-            <Select
+            <Combobox
               mode="tags"
               className="w-full"
               value={to}
@@ -222,8 +228,14 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
             )}
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm text-ink">Approved email</span>
-            <Select className="w-full" value={template} onChange={setTemplate} options={[{ value: "", label: "None: write my own" }, ...templates.map((t) => ({ value: t.id, label: t.name }))]} />
+            <span className="mb-1.5 block text-sm text-ink">Template</span>
+            <Combobox
+              className="w-full"
+              value={template || OWN}
+              onChange={(v) => setTemplate(v === OWN ? "" : v)}
+              options={[{ value: OWN, label: "No template: write my own" }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+            />
+            {templates.length > 0 && <span className="mt-1 block text-meta text-ink-3">A template is sent as it&apos;s written; you can add a personal note to it.</span>}
           </label>
           {picked ? (
             <>
@@ -231,7 +243,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
                 <span className="mb-1.5 block text-sm text-ink">
                   Personal note <span className="text-ink-3">(optional, goes on top)</span>
                 </span>
-                <Input.TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} placeholder="e.g. Good to see you at your office today." />
+                <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} placeholder="e.g. Good to see you at your office today." />
               </label>
               <div className="rounded-sheet border border-rule bg-bench px-3 py-2">
                 <p className="text-meta text-ink-3">Sent as approved, so it can&apos;t be changed here</p>
@@ -247,7 +259,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-sm text-ink">Message</span>
-                <Input.TextArea rows={8} value={body} onChange={(e) => setBody(e.target.value)} maxLength={20000} />
+                <Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} maxLength={20000} />
               </label>
             </>
           )}

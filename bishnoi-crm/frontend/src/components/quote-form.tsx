@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FileInput, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { promoTerms } from "@/src/platform/lib/labels";
@@ -328,7 +329,7 @@ export function QuoteForm({
               <li key={l.key} className={`grid gap-x-3 gap-y-3 py-3 sm:items-start ${LINE_GRID}`}>
                 <div className="min-w-0">
                   <span className={mobileLabel}>{priceList.bundles.length > 0 ? "Product or bundle" : "Product"}</span>
-                  <select
+                  <Select
                     aria-label={`Line ${i + 1}: ${offeredBundles.length ? "product or bundle" : "product"}`}
                     aria-invalid={errorFor(`${at}.productId`) || errorFor(`${at}.bundleId`) ? true : undefined}
                     value={l.bundleId ? `b:${l.bundleId}` : l.productId}
@@ -364,7 +365,7 @@ export function QuoteForm({
                         ))}
                       </optgroup>
                     )}
-                  </select>
+                  </Select>
                   {product?.genericName && <p className="mt-0.5 text-meta text-ink-3">{product.genericName}</p>}
                   {product && stock?.linked && !stock.error && (
                     <p className="mt-1">
@@ -428,14 +429,14 @@ export function QuoteForm({
                   {l.bundleId ? (
                     <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">The set price</p>
                   ) : promos.length > 0 ? (
-                    <select aria-label={`Line ${i + 1}: promo`} value={l.promoId} onChange={(e) => setLine(l.key, { promoId: e.target.value })} className={cell}>
+                    <Select aria-label={`Line ${i + 1}: promo`} value={l.promoId} onChange={(e) => setLine(l.key, { promoId: e.target.value })} className={cell}>
                       <option value="">No promo</option>
                       {promos.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name} ({promoTerms(fmt, p)})
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   ) : (
                     <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">{l.productId ? "None for this product" : "—"}</p>
                   )}
@@ -449,7 +450,7 @@ export function QuoteForm({
                     <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">—</p>
                   ) : l.discountKind ? (
                     <div className="flex items-end gap-1.5">
-                      <select
+                      <Select
                         aria-label={`Line ${i + 1}: extra discount`}
                         value={l.discountKind}
                         onChange={(e) => setLine(l.key, { discountKind: e.target.value as LineDraft["discountKind"] })}
@@ -457,7 +458,7 @@ export function QuoteForm({
                       >
                         <option value="percent">% off</option>
                         <option value="amount">{fmt.symbol} off</option>
-                      </select>
+                      </Select>
                       <input
                         aria-label={`Line ${i + 1}: discount ${l.discountKind === "percent" ? "percent" : "amount"}`}
                         inputMode="decimal"
@@ -643,8 +644,8 @@ export function QuoteForm({
               {(p) => <Input {...p} name="letterAmount" inputMode="decimal" placeholder="0.00" />}
             </Field>
           </div>
-          <Field label="The letter" hint="A PDF, or a clear photo (JPG or PNG), up to 8 MB" error={fields.letterFile ?? fields.letter}>
-            {(p) => <FileInput {...p} ref={letterFile} accept="application/pdf,image/jpeg,image/png" />}
+          <Field label="The letter" error={fields.letterFile ?? fields.letter}>
+            {(p) => <FileDrop {...p} ref={letterFile} accept="application/pdf,image/jpeg,image/png" note="A PDF, or a clear photo (JPG or PNG), up to 8 MB" maxBytes={8 * 1024 * 1024} />}
           </Field>
         </fieldset>
       )}

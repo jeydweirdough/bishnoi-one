@@ -17,6 +17,7 @@ companies in DEV_COMPANIES are allowed; in production, none is.
 
 import base64
 import json
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -30,6 +31,20 @@ from app.platform_pass import ISSUERS, LEEWAY, _b64
 
 APP_KEY = "crm"
 GRACE = 24 * 3600  # how long a last good answer stands while the platform can't be reached
+
+
+log = logging.getLogger(__name__)
+
+# What a person is told when the server isn't set up or can't reach the
+# platform: it's not theirs to fix, so the details go to the server's log.
+UNAVAILABLE = "Signing in isn't available right now. Try again in a few minutes; if it keeps happening, tell your administrator."
+UNREACHABLE = "Signing in isn't available right now. Try again in a moment."
+
+
+def unavailable(detail: str, until: float = 0.0, message: str = UNAVAILABLE) -> "Standing":
+    """A setup problem: logged for whoever runs the server, a plain line for the person."""
+    log.error("Company check: %s", detail)
+    return Standing(False, message, until=until)
 
 
 @dataclass(frozen=True)
@@ -63,7 +78,7 @@ def _read(token: str, public_key: str, slug: str) -> dict:
 def _ask(settings: Settings, slug: str) -> Standing:
     """The platform's answer, checked."""
     if not settings.platform_api_url or not settings.platform_public_key:
-        return Standing(False, "The CRM can't check its company: set PLATFORM_API_URL and PLATFORM_PUBLIC_KEY on the server.", until=time.time() + 60)
+        return unavailable("PLATFORM_API_URL or PLATFORM_PUBLIC_KEY isn't set on the server.", until=time.time() + 60)
     try:
         r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/public/company-pass", params={"app": APP_KEY, "company": slug}, timeout=10)
     except httpx.HTTPError:
@@ -75,7 +90,7 @@ def _ask(settings: Settings, slug: str) -> Standing:
     try:
         claims = _read(r.json()["pass"], settings.platform_public_key, slug)
     except (ValueError, KeyError, InvalidSignature, TypeError, json.JSONDecodeError):
-        return Standing(False, "The platform's answer about this company couldn't be checked. Ask your Bishnoi One administrator.", until=time.time() + 300)
+        return unavailable(f"the Platform's pass for {slug!r} didn't verify: is PLATFORM_PUBLIC_KEY the Platform's current key?", until=time.time() + 300)
     name, company_id, until = claims.get("companyName") or slug, claims.get("company"), float(claims["exp"])
     if claims.get("status") == "paused":
         return Standing(False, f"{name}'s Bishnoi One access is paused until {claims.get('pausedUntil') or 'later'}. It comes back by itself then.", company_id, name, until)
@@ -90,7 +105,7 @@ def standing(settings: Settings, slug: str) -> Standing:
     """Whether this company may use the CRM now."""
     if not settings.platform_api_url:
         if settings.is_production:
-            return Standing(False, "The CRM can't check companies: set PLATFORM_API_URL and PLATFORM_PUBLIC_KEY on the server.")
+            return unavailable("PLATFORM_API_URL isn't set on the server (ENVIRONMENT is production, so no company is allowed without it).")
         if slug in {c.strip().lower() for c in settings.dev_companies}:
             return Standing(True, slug, None, slug, until=float("inf"))
         return Standing(False, f"There's no company \"{slug}\" on this computer. Try one of: {', '.join(settings.dev_companies)}.")
@@ -105,7 +120,7 @@ def standing(settings: Settings, slug: str) -> Standing:
         good = _good.get(slug)
         if good and now - good[1] < GRACE:
             return good[0]
-        found = Standing(False, "The CRM can't reach Bishnoi One Platform to check the company. Try again in a moment.", until=now + 30)
+        found = unavailable(f"can't reach the Platform at {settings.platform_api_url}.", until=now + 30, message=UNREACHABLE)
     with _lock:
         _last[slug] = found
         if found.ok:

@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     # Signing in with a Bishnoi One account: the platform's public key, base64 (its
     # /pass/key). Unset: only this app's own accounts sign in.
     platform_public_key: str | None = None
+    # Bishnoi One Platform's API: where Pharmacy asks what it's linked to.
+    platform_api_url: str | None = None
+    # Pharmacy's connect key, made on the platform's Connections page. With it,
+    # the platform says what Pharmacy is linked to and the keys between them
+    # (app/platform_links.py), and INTEGRATION_KEYS are no longer needed.
+    # Unset: those settings are used, as before.
+    platform_app_key: SecretStr | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15

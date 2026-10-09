@@ -3,7 +3,7 @@
 import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, TextButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { connectSmtp, detectMailbox, disconnectMailbox, makeDefaultMailbox, startMailbox, type MailboxDetect, type MailboxInfo } from "../../actions/mailbox";
@@ -134,10 +134,10 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
           </>
         ) : (
           <>
-            <button type="button" onClick={() => setFound(null)} className="mb-3 inline-flex items-center gap-1.5 text-meta text-ink-2 hover:text-ink">
+            <TextButton onClick={() => setFound(null)} tone="muted" className="mb-3">
               <ArrowLeft className="size-3.5" aria-hidden />
               Another address
-            </button>
+            </TextButton>
             <SectionTitle icon="email">{found.address}</SectionTitle>
             <p className="mt-1 text-sm text-ink-3">{found.provider ? `A ${found.name} mailbox.` : "We don't know this provider, so it needs its settings."}</p>
 
@@ -171,9 +171,9 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
                 {server && (
                   <div>
                     {!found.smtp.guessed && (
-                      <button type="button" onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced} className="text-meta text-ink-3 hover:text-ink hover:underline">
+                      <TextButton onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced} tone="muted">
                         {advanced ? "Hide the server settings" : `Server settings (already set for ${found.name})`}
-                      </button>
+                      </TextButton>
                     )}
                     {advanced && (
                       <div className="mt-3 grid gap-3 rounded-[18px] border border-rule px-4 py-4 sm:grid-cols-2">

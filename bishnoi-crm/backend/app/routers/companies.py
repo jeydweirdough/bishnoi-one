@@ -22,6 +22,7 @@ from app.models import Activity, ActivityLink, Company, Contact, Deal, FormField
 from app.routers.activities import activity_out
 from app.routers.customer_types import check_type, first_type
 from app.routers.deals import check_source
+from app.routers.sharing import shown_to
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -170,7 +171,8 @@ def link_options(access: View, db: DB, field: str = Query(max_length=40), q: str
         query = query.where(Company.status.in_(found.options))
     if q.strip():
         query = query.where(func.lower(Company.name).like(f"%{q.strip().lower()}%"))
-    return [{"id": c.id, "name": c.name, "teamName": c.team.name if c.team else None} for c in db.scalars(query).unique()]
+    # A division that keeps its customers to itself isn't offered to the others.
+    return [{"id": c.id, "name": c.name, "teamName": c.team.name if c.team else None} for c in db.scalars(query).unique() if shown_to(c, access)]
 
 
 @router.get("/lookalikes")
@@ -202,6 +204,8 @@ def find_lookalikes(
         for c in db.scalars(select(Company).where(Company.phone.is_not(None))).unique():
             if digits(c.phone) == wanted:
                 found.setdefault(c.id, c)
+    # A division that keeps its customers to itself isn't named to the others.
+    shown = [c for c in found.values() if shown_to(c, access)]
     return [
         {
             "id": c.id,
@@ -211,7 +215,7 @@ def find_lookalikes(
             "owner": c.owner.full_name if reaches(c, access) else None,
             "canOpen": reaches(c, access),
         }
-        for c in list(found.values())[:6]
+        for c in shown[:6]
     ]
 
 

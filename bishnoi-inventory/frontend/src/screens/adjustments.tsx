@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { adjustmentStep, countStep, withdrawAdjustment } from "../actions/inventory";
 import { AdjustmentForm, CountSheet, StartCount } from "../components/adjust-forms";
 import { RecordTools } from "../components/record-tools";
@@ -11,13 +11,14 @@ import { StepButton } from "../components/step-button";
 import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query, signed } from "../lib/labels";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { referenceOf } from "../lib/reference";
 import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, ReasonOption, Reference } from "../lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
   const status = param(await searchParams, "status");
-  const rows = await load<AdjustmentBrief[]>(`/inventory/adjustments${query({ status })}`);
+  const { adjustments: rows } = await loadQuery<{ adjustments: AdjustmentBrief[] }>(`query Adjustments($status: String) { adjustments(status: $status) }`, status ? { status } : {}, ["adjustments"]);
   const chip = (s: string, label: string) => ({ value: s, label, href: `/adjustments${query({ status: s })}` });
   return (
     <>
@@ -56,7 +57,7 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
-  const a = await load<Adjustment>(`/inventory/adjustments/${enc(id)}`);
+  const { adjustment: a } = await loadQuery<{ adjustment: Adjustment }>(`query Adjustment($id: String!) { adjustment(id: $id) }`, { id }, ["adjustment"]);
   const pending = a.status === "pending";
   return (
     <>
@@ -106,7 +107,11 @@ export async function NewAdjustmentPage({ searchParams }: { searchParams: Search
   const { may } = await context();
   if (!may("adjustments.create")) return <NoAccess what="writing adjustments" />;
   const s = await searchParams;
-  const [ref, reasons, batches] = await Promise.all([load<Reference>("/inventory/reference"), load<ReasonOption[]>("/inventory/adjustments/reasons"), load<BatchRow[]>("/inventory/batches")]);
+  const { reference: ref, reasons, batches } = await loadQuery<{ reference: Pick<Reference, "products" | "units" | "warehouses">; reasons: ReasonOption[]; batches: BatchRow[] }>(
+    `query NewAdjustment { ${referenceOf("products", "units", "warehouses")} reasons: adjustmentReasons batches }`,
+    {},
+    ["reference", "reasons", "batches"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/adjustments", label: "Adjustments" }]} title="New adjustment">
@@ -122,7 +127,11 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
   const s = await searchParams;
   const status = param(s, "status");
-  const [rows, ref] = await Promise.all([load<CountBrief[]>(`/inventory/counts${query({ status })}`), load<Reference>("/inventory/reference")]);
+  const { counts: rows, reference: ref } = await loadQuery<{ counts: CountBrief[]; reference: Pick<Reference, "categories" | "warehouses"> }>(
+    `query Counts($status: String) { counts(status: $status) ${referenceOf("categories", "warehouses")} }`,
+    status ? { status } : {},
+    ["counts", "reference"],
+  );
   return (
     <>
       <PageHeader title="Inventory counts">
@@ -160,7 +169,11 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
-  const [c, ref] = await Promise.all([load<Count>(`/inventory/counts/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { count: c, reference: ref } = await loadQuery<{ count: Count; reference: Pick<Reference, "products"> }>(
+    `query Count($id: String!) { count(id: $id) ${referenceOf("products")} }`,
+    { id },
+    ["count", "reference"],
+  );
   const days = Object.fromEntries(c.lines.filter((l) => l.batch?.expiresOn).map((l) => [l.batch!.expiresOn!, day(l.batch!.expiresOn!)]));
   return (
     <>

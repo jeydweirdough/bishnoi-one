@@ -69,8 +69,8 @@ def test_a_registered_company_signs_in(client, platform):
         (Answer(404), "isn't registered on Bishnoi One Platform"),
         (Answer(200, {"pass": company_pass(status="suspended")}), "is suspended"),
         (Answer(200, {"pass": company_pass(granted=False)}), "isn't set up to use the CRM"),
-        (Answer(200, {"pass": company_pass(key=Ed25519PrivateKey.generate())}), "couldn't be checked"),
-        (Answer(200, {"pass": company_pass(slug="another")}), "couldn't be checked"),
+        (Answer(200, {"pass": company_pass(key=Ed25519PrivateKey.generate())}), "isn't available right now"),
+        (Answer(200, {"pass": company_pass(slug="another")}), "isn't available right now"),
     ],
 )
 def test_no_sign_in_without_a_registered_company(client, platform, answer, says):
@@ -98,14 +98,16 @@ def test_a_short_outage_keeps_the_last_good_answer(client, platform):
     assert sign_in(client).status_code == 403
 
 
-def test_production_needs_the_platform_and_a_company(app, client):
+def test_production_needs_the_platform_and_a_company(app, client, caplog):
     company.forget()
     app.state.settings = app.state.settings.model_copy(update={"environment": "production"})
     try:
         r = sign_in(client)  # not saying which company: there's no default in production
         assert r.status_code == 400 and "Say which company" in r.json()["detail"]
         r = client.post("/auth/login", json={"email": "ana@example.com", "password": PASSWORD}, headers={"X-Bishnoi-Company": "getmeds"})
-        assert r.status_code == 403 and "PLATFORM_API_URL" in r.json()["detail"]
+        # Not the person's to fix: they're told plainly, and the setting is named in the server's log.
+        assert r.status_code == 403 and "isn't available right now" in r.json()["detail"] and "PLATFORM" not in r.json()["detail"]
+        assert "PLATFORM_API_URL" in caplog.text
     finally:
         app.state.settings = app.state.settings.model_copy(update={"environment": "development"})
 

@@ -37,7 +37,7 @@ const hqKey = (d: string, t: string, h: string) => `${d}/${t}/${h}`;
 
 /** A node's frame. Switched-off things are dashed and faint; the selected one carries the hema ring. */
 function frame(off: boolean, selected: boolean): string {
-  const base = "flex h-10 items-center gap-2 rounded-[3px] border px-2.5 text-sm transition-colors";
+  const base = "flex h-10 items-center gap-2 rounded-[12px] border px-2.5 text-sm transition-colors";
   if (selected) return `${base} border-hema bg-sheet ring-2 ring-hema/15`;
   if (off) return `${base} border-dashed border-rule-strong bg-bench/50 text-ink-3`;
   return `${base} border-rule bg-sheet shadow-[0_1px_2px_rgb(20_22_30/0.06)] hover:border-control`;
@@ -45,7 +45,7 @@ function frame(off: boolean, selected: boolean): string {
 
 function Off() {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center rounded-[2px] border border-rule-strong px-1 text-stamp text-ink-3 uppercase">
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rule-strong px-1 text-stamp text-ink-3 uppercase">
       Off
     </span>
   );
@@ -69,7 +69,7 @@ function Levels() {
         <li key={level.name} className="flex items-center gap-1">
           {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
           <span
-            className={`inline-flex h-7 items-center gap-1.5 rounded-[3px] border px-2 text-meta ${
+            className={`inline-flex h-7 items-center gap-1.5 rounded-[12px] border px-2 text-meta ${
               level.add ? "border-rule bg-sheet text-ink-2" : "border-dashed border-rule-strong text-ink-3"
             }`}
           >
@@ -125,7 +125,7 @@ function NameField({
         }
       }}
     >
-      <div className="flex h-10 items-center gap-1.5 rounded-[3px] border border-hema bg-sheet pr-1 pl-2.5 ring-2 ring-hema/15">
+      <div className="flex h-10 items-center gap-1.5 rounded-[12px] border border-hema bg-sheet pr-1 pl-2.5 ring-2 ring-hema/15">
         <Icon name={icon} className="size-4 text-ink-3" />
         <input
           aria-label={label}
@@ -145,7 +145,7 @@ function NameField({
           aria-label={saveLabel}
           title={saveLabel}
           disabled={name.length < 2 || unchanged || pending}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] bg-hema text-white hover:bg-hema-hover disabled:opacity-40"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-hema text-white hover:bg-hema-hover disabled:opacity-40"
         >
           <Check className="size-4" aria-hidden />
         </button>
@@ -155,7 +155,7 @@ function NameField({
           title="Cancel (Esc)"
           onClick={onCancel}
           disabled={pending}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] text-ink-3 hover:bg-bench hover:text-ink"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-[12px] text-ink-3 hover:bg-bench hover:text-ink"
         >
           <X className="size-4" aria-hidden />
         </button>
@@ -173,7 +173,7 @@ function AddHere({ label, full, onClick }: { label: string; full: string; onClic
       type="button"
       onClick={onClick}
       aria-label={full}
-      className="flex h-10 w-full items-center gap-2 rounded-[3px] border border-dashed border-rule-strong px-2.5 text-sm font-semibold text-ink-3 hover:border-hema hover:bg-hema-tint hover:text-hema focus-visible:border-hema focus-visible:text-hema"
+      className="flex h-10 w-full items-center gap-2 rounded-[12px] border border-dashed border-rule-strong px-2.5 text-sm font-semibold text-ink-3 hover:border-hema hover:bg-hema-tint hover:text-hema focus-visible:border-hema focus-visible:text-hema"
     >
       <Plus className="size-4 shrink-0" aria-hidden />
       <span className="truncate">{label}</span>
@@ -197,7 +197,7 @@ function IconChoice({ value, onPick }: { value: IconName; onPick: (icon: IconNam
           aria-label={label}
           title={label}
           onClick={() => onPick(name)}
-          className={`inline-flex size-7 items-center justify-center rounded-[3px] border ${
+          className={`inline-flex size-7 items-center justify-center rounded-[12px] border ${
             value === name ? "border-hema bg-hema-tint text-hema" : "border-rule text-ink-3 hover:border-control"
           }`}
         >
@@ -488,7 +488,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                       aria-label={count ? `${count} headquarters in ${team.name}: ${open ? "fold" : "show"}` : `Add a headquarters to ${team.name}`}
                       title={count ? `${count} headquarters` : "Add a headquarters"}
                       onClick={() => toggleHeadquarters(d.code, team)}
-                      className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[3px] px-1.5 text-meta tabular-nums hover:bg-bench ${
+                      className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[12px] px-1.5 text-meta tabular-nums hover:bg-bench ${
                         open ? "bg-bench text-ink" : "text-ink-3"
                       }`}
                     >
@@ -571,7 +571,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
         <ul className={s.list} aria-label={`${company}: departments, divisions, teams and headquarters`}>
           <li className={s.item}>
             <div className={`${s.node} ${s.root}`}>
-              <div className="flex h-10 items-center gap-2 rounded-[3px] bg-ink px-3 text-sm font-semibold text-white">
+              <div className="flex h-10 items-center gap-2 rounded-[12px] bg-ink px-3 text-sm font-semibold text-white">
                 <Icon name="company" className="size-4 text-white/75" />
                 <span className="truncate">{company}</span>
               </div>
@@ -629,7 +629,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                               aria-label={`Change ${dep.name}`}
                               title="Rename, change its icon, switch it off"
                               onClick={() => select(nodeKey)}
-                              className={`inline-flex size-7 shrink-0 items-center justify-center rounded-[3px] hover:bg-bench ${
+                              className={`inline-flex size-7 shrink-0 items-center justify-center rounded-[12px] hover:bg-bench ${
                                 isSelected ? "bg-bench text-ink" : "text-ink-3"
                               }`}
                             >

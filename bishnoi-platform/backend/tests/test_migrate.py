@@ -40,4 +40,4 @@ def test_takes_over_a_database_from_before_migrations(tmp_path):
     assert "users" not in tables and "sessions" not in tables
     with engine.connect() as c:
         assert c.execute(text("SELECT email, last_sign_in_at FROM nbpl_users")).all() == [("jun@x.test", None)]
-    assert (tmp_path / "old.db.before-0004").exists()
+    assert list(tmp_path.glob("old.db.before-*"))  # a copy, named after the newest revision

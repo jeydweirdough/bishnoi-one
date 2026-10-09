@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Bars } from "@/src/platform/ui/bars";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { AlertList } from "../components/alerts";
 import { Figures, NoAccess } from "../components/ui";
 import { MOVEMENT_KINDS, ORDER_KINDS, referenceHref, signed } from "../lib/labels";
@@ -15,7 +15,7 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const { fmt, may, at } = await context();
   if (!may("dashboard.view")) return <NoAccess what="the dashboard" />;
-  const d = await load<Dashboard>("/inventory/dashboard");
+  const { dashboard: d } = await loadQuery<{ dashboard: Dashboard }>("query Dashboard { dashboard }", {}, ["dashboard"]);
   const t = d.totals;
 
   return (

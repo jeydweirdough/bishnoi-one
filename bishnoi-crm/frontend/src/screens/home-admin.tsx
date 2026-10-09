@@ -3,19 +3,18 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton } from "@/src/platform/ui/button";
-import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { can } from "@/src/platform/lib/access";
-import { load } from "@/src/platform/lib/api";
+import { query } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { DealSummary, Me, ModuleRetention, Org, PeopleInsights, PersonInsight, SalesResults } from "@/src/platform/lib/types";
 import { dayOf } from "../components/crm/follow-up-rows";
 import { Donut, SERIES } from "../components/deals/donut";
+import { Breakdown, FigureCard, type Figure } from "../components/deals/figure-card";
 import { TargetProgress } from "../components/deals/target-progress";
 import type { Performance } from "../components/field/types";
 import { MonthBars } from "../components/month-bars";
-import { ProgressRing } from "../components/progress-ring";
-import { Stat, Stats } from "../components/stats";
 
 type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
@@ -44,104 +43,139 @@ type SortKey = keyof typeof SORTS;
 export async function AdminDashboard({ me, params = {} }: { me: Me & { org: Org }; params?: Params }) {
   const fmt = makeFormat(me.org);
   const reports = can(me, "reports.view");
-  const none = Promise.resolve(null);
-  const [trend, results, deals, retention, field, insights] = await Promise.all([
-    reports ? load<Trend>("/sales/trend?months=12") : none,
-    reports && can(me, "deals.view") ? load<SalesResults>("/sales/results?view=team") : none,
-    can(me, "deals.view") ? load<DealSummary>("/deals-summary?state=open") : none,
-    can(me, "customers.view") ? load<ModuleRetention>("/retention?view=team").catch(() => null) : none,
-    can(me, "goals.view") ? load<Performance>("/field/performance").catch(() => null) : none,
-    load<PeopleInsights>("/insights/people"),
-  ]);
+  // Home's one request: each figure only when the person may see it.
+  const { data } = await query<{ trend?: Trend | null; results?: SalesResults | null; deals?: DealSummary | null; retention?: ModuleRetention | null; field?: Performance | null; insights: PeopleInsights | null }>(
+    `query AdminHome($reports: Boolean!, $results: Boolean!, $deals: Boolean!, $customers: Boolean!, $goals: Boolean!) {
+      trend: salesTrend(months: 12) @include(if: $reports)
+      results: salesResults(view: "team") @include(if: $results)
+      deals: dealsSummary(state: "open") @include(if: $deals)
+      retention(view: "team") @include(if: $customers)
+      field: fieldPerformance @include(if: $goals)
+      insights: peopleInsights
+    }`,
+    { reports, results: reports && can(me, "deals.view"), deals: can(me, "deals.view"), customers: can(me, "customers.view"), goals: can(me, "goals.view") },
+  );
+  const trend = data.trend ?? null;
+  const results = data.results ?? null;
+  const deals = data.deals ?? null;
+  const retention = data.retention ?? null;
+  const field = data.field ?? null;
+  if (!data.insights) throw new Error("Home couldn't read how each person is doing.");
+  const insights = data.insights;
   const today = dayOf(new Date().toISOString(), me.org.timezone);
   const points = trend?.points ?? [];
   const now = points[points.length - 1];
   const last = points[points.length - 2];
   const totals = results?.totals;
 
+  const year = points.reduce((t, p) => t + p.wonCentavos, 0);
+  const growth = trend?.growth ?? null;
+  const busiest = deals ? [...deals.byStage].sort((x, y) => y.count - x.count)[0] : undefined;
+  const quoted = now?.quotedCentavos ?? insights.totals.quotedThisMonthCentavos;
+  const kept = retention?.summary.rate !== null && retention?.summary.rate !== undefined ? Math.round(retention.summary.rate * 100) : null;
+  const winRate = totals?.winRate ?? null;
+  const top: Figure[] = [
+    {
+      value: fmt.peso(deals?.weightedCentavos ?? 0),
+      label: "Pipeline, weighted",
+      note: deals ? `${fmt.peso(deals.valueCentavos)} in ${fmt.plural(deals.count, "open deal")}` : "Deals aren't open to your role",
+      ring: deals && deals.valueCentavos ? Math.round((100 * deals.weightedCentavos) / deals.valueCentavos) : null,
+      href: "/deals",
+    },
+    { value: fmt.peso(quoted), label: "Quoted this month", note: last ? `${change(now?.quotedCentavos ?? 0, last.quotedCentavos) ?? "—"} on last month` : `${insights.totals.quotesWaiting} waiting`, href: "/quotes" },
+    {
+      value: String(now?.newCustomers ?? insights.totals.newCustomersThisMonth),
+      label: "New customers this month",
+      note: last ? `Last month ${last.newCustomers}` : `${insights.totals.customers} in all`,
+      href: "/companies",
+    },
+    {
+      value: winRate === null ? "—" : `${winRate}%`,
+      label: "Win rate this month",
+      note: totals && totals.wonCount + totals.lostCount ? `${fmt.plural(totals.wonCount, "deal")} won, ${totals.lostCount} lost` : "No deals decided yet",
+      ring: winRate,
+      href: "/deals?view=closed",
+    },
+  ];
+  const small: Figure[] = [
+    {
+      value: field ? fmt.peso(field.totals.amountCentavos) : "—",
+      label: "Collected this month",
+      note: field ? (field.totals.collectionVisits ? fmt.plural(field.totals.collectionVisits, "collection visit") : "No collection visits yet") : "Field work isn't open to your role",
+      href: "/field",
+    },
+    {
+      value: kept === null ? "—" : `${kept}%`,
+      label: "Customers kept",
+      note: retention ? (kept === null ? "Nothing to measure yet" : `${retention.summary.atRisk} at risk · ${retention.summary.lostNow} lost`) : "Retention isn't open to your role",
+      ring: kept,
+      href: "/retention",
+      alert: (retention?.summary.atRisk ?? 0) > 0,
+    },
+  ];
+
   return (
     <>
       <PageHeader title="Dashboard">How the company is selling: revenue and its growth, the pipeline, and how each person is doing.</PageHeader>
 
-      <Stats columns={4}>
-        <Stat
-          label="Revenue won this month"
-          value={fmt.peso(now?.wonCentavos ?? totals?.wonCentavos ?? 0)}
-          note={last ? `Last month ${fmt.peso(last.wonCentavos)}` : undefined}
-          href="/deals?view=results"
-        />
-        <Stat label="Pipeline, weighted" value={fmt.peso(deals?.weightedCentavos ?? 0)} note={deals ? `${fmt.peso(deals.valueCentavos)} in ${fmt.plural(deals.count, "open deal")}` : undefined} href="/deals" />
-        <Stat
-          label="Quoted this month"
-          value={fmt.peso(now?.quotedCentavos ?? insights.totals.quotedThisMonthCentavos)}
-          note={last ? `${change(now?.quotedCentavos ?? 0, last.quotedCentavos) ?? "—"} on last month` : `${insights.totals.quotesWaiting} waiting`}
-          href="/quotes"
-        />
-        <Stat
-          label="New customers this month"
-          value={now?.newCustomers ?? insights.totals.newCustomersThisMonth}
-          note={last ? `Last month ${last.newCustomers}` : `${insights.totals.customers} in all`}
-          href="/companies"
-        />
-      </Stats>
+      {/* As on the Deals page: the figure first, large; what it is; then how it compares. */}
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {top.map((f, n) => (
+          <FigureCard key={f.label} figure={f} first={n === 0} />
+        ))}
+      </div>
 
-      <div className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <Card title="Sales growth" action={trend?.growth !== null && trend?.growth !== undefined ? <Growth pct={trend.growth} /> : null}>
-          {points.length ? (
-            <>
-              <p className="mb-3 text-meta text-ink-3">Revenue won each month, the last 12. The light column is this month so far.</p>
-              <MonthBars
-                label="Revenue won"
-                current={trend!.thisMonth}
-                points={points.map((p) => ({ month: p.month, value: p.wonCentavos, text: fmt.pesoCompact(p.wonCentavos), monthLabel: fmt.monthLabel(p.month).slice(0, 3) }))}
-              />
-            </>
-          ) : (
-            <Quiet>Your role can&apos;t see sales reports.</Quiet>
-          )}
-        </Card>
+      <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <Breakdown
+          title="Sales growth"
+          value={fmt.peso(year)}
+          label={growth === null ? "won in the last 12 months" : `won in the last 12 months · ${growth >= 0 ? "+" : "−"}${Math.abs(growth)}% last full month on the one before`}
+          empty={!trend ? "Sales reports aren't open to your role" : points.some((p) => p.wonCentavos > 0) ? undefined : "Nothing won yet"}
+          emptyNote={trend ? "Revenue won each month shows here as deals are won." : "Ask an administrator for Reports → View."}
+          art="steps"
+          action={<SmallLink href="/deals?view=results">Results</SmallLink>}
+        >
+          <MonthBars
+            label="Revenue won"
+            current={trend?.thisMonth ?? ""}
+            points={points.map((p) => ({ month: p.month, value: p.wonCentavos, text: fmt.pesoCompact(p.wonCentavos), monthLabel: fmt.monthLabel(p.month).slice(0, 3) }))}
+          />
+          <p className="mt-2 text-meta text-ink-3">Revenue won each month, the last 12. The light column is this month so far.</p>
+        </Breakdown>
 
-        <div className="grid gap-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Card title="Revenue against target" action={<SmallLink href="/kpis/targets">Targets</SmallLink>}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Sheet className="px-5 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-caps text-ink-3 uppercase">Revenue against target</p>
+              <SmallLink href="/performance/targets">Targets</SmallLink>
+            </div>
+            <div className="mt-2">
               {totals && results ? (
-                <TargetProgress figures={totals} start={results.start} end={results.end} today={today} fmt={fmt} label={`Won in ${results.label}`} href="/kpis/targets" />
+                <TargetProgress figures={totals} start={results.start} end={results.end} today={today} fmt={fmt} label={`Won in ${results.label}`} href="/performance/targets" withWinRate={false} />
               ) : (
-                <Quiet>No sales results to show.</Quiet>
+                <Empty compact icon="goals" art="gauge" title="No sales results to show">
+                  They fill in as deals are won.
+                </Empty>
               )}
-            </Card>
-            <Card title="Pipeline by stage" action={<SmallLink href="/deals">Deals</SmallLink>}>
-              {deals && deals.byStage.length ? (
-                <Donut title="Open deals by stage" totalLabel="Deals" slices={deals.byStage.map((s, i) => ({ label: s.name, value: s.count, color: SERIES[i % SERIES.length], note: fmt.peso(s.valueCentavos) }))} />
-              ) : (
-                <Quiet>No open deals yet.</Quiet>
-              )}
-            </Card>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Small
-              title="Win rate this month"
-              ring={totals?.winRate ?? null}
-              value={totals?.winRate !== null && totals?.winRate !== undefined ? `${totals.winRate}%` : "—"}
-              note={totals ? `${fmt.plural(totals.wonCount, "deal")} won, ${totals.lostCount} lost` : "No deals decided"}
-              href="/deals?view=closed"
-            />
-            <Small
-              title="Collected this month"
-              value={field ? fmt.peso(field.totals.amountCentavos) : "—"}
-              note={field ? fmt.plural(field.totals.collectionVisits, "collection visit") : "No field work to show"}
-              href="/field"
-            />
-            <Small
-              title="Customers kept"
-              ring={retention?.summary.rate !== null && retention?.summary.rate !== undefined ? retention.summary.rate * 100 : null}
-              value={retention?.summary.rate !== null && retention?.summary.rate !== undefined ? `${Math.round(retention.summary.rate * 100)}%` : "—"}
-              note={retention ? `${retention.summary.atRisk} at risk · ${retention.summary.lostNow} lost` : "No retention to show"}
-              href="/retention"
-              alert={(retention?.summary.atRisk ?? 0) > 0}
-            />
-          </div>
+            </div>
+          </Sheet>
+          <Breakdown
+            title="Pipeline by stage"
+            value={busiest && deals?.count ? `${Math.round((100 * busiest.count) / deals.count)}%` : "—"}
+            label={busiest ? `are at ${busiest.name}, the busiest stage` : ""}
+            empty={deals && deals.count ? undefined : "No open deals yet"}
+            art="steps"
+            action={<SmallLink href="/deals">Deals</SmallLink>}
+          >
+            <Donut title="Open deals by stage" totalLabel="Deals" slices={(deals?.byStage ?? []).map((st, i) => ({ label: st.name, value: st.count, color: SERIES[i % SERIES.length], note: fmt.peso(st.valueCentavos) }))} />
+          </Breakdown>
         </div>
+      </div>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
+        {small.map((f) => (
+          <FigureCard key={f.label} figure={f} />
+        ))}
       </div>
 
       <People fmt={fmt} insights={insights} results={results} params={params} />
@@ -279,54 +313,9 @@ function People({ fmt, insights, results, params }: { fmt: Format; insights: Peo
   );
 }
 
-function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <Sheet className="px-5 py-4">
-      <SectionTitle action={action}>{title}</SectionTitle>
-      <div className="mt-2">{children}</div>
-    </Sheet>
-  );
-}
-
-/** A small figure; with `ring`, a percentage shown as a ring, and its title and note beside it. */
-function Small({ title, value, note, href, alert, ring }: { title: string; value: string; note: string; href: string; alert?: boolean; ring?: number | null }) {
-  const noteLine = <span className={`block text-meta ${alert ? "font-semibold text-due-today" : "text-ink-3"}`}>{note}</span>;
-  return (
-    <Sheet className="px-5 py-4">
-      {ring !== undefined ? (
-        <Link href={href} className="flex items-center gap-3 hover:[&_.title]:text-ink">
-          <ProgressRing pct={ring} size="sm" label={`${title}: ${value}`} />
-          <span className="min-w-0">
-            <span className="title block text-sm font-medium text-ink">{title}</span>
-            {noteLine}
-          </span>
-        </Link>
-      ) : (
-        <Link href={href} className="block hover:[&_.figure]:text-ink">
-          <span className="block text-meta text-ink-3">{title}</span>
-          <span className="figure mt-1 block text-figure leading-tight text-ink">{value}</span>
-          {noteLine}
-        </Link>
-      )}
-    </Sheet>
-  );
-}
-
-function Growth({ pct }: { pct: number }) {
-  const up = pct >= 0;
-  return (
-    <span className={`inline-flex items-center gap-1 text-meta font-semibold ${up ? "text-filed" : "text-danger"}`} title="Last full month against the one before">
-      {up ? <ArrowUp className="size-3.5" aria-hidden /> : <ArrowDown className="size-3.5" aria-hidden />}
-      {up ? "+" : "−"}
-      {Math.abs(pct)}% last month
-    </span>
-  );
-}
-
 const SmallLink = ({ href, children }: { href: string; children: ReactNode }) => (
   <Link href={href} className="text-meta text-ink hover:underline">
     {children}
   </Link>
 );
 
-const Quiet = ({ children }: { children: ReactNode }) => <p className="py-6 text-meta text-ink-3">{children}</p>;

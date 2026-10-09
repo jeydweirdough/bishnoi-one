@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { RolesEditor, UsersEditor } from "../components/admin";
 import { Chips, NoAccess } from "../components/ui";
 import { param, query, referenceHref } from "../lib/labels";
@@ -11,7 +11,7 @@ import type { AdminUsers, AuditEntry, Page, RolesData } from "../lib/types";
 export async function UsersPage() {
   const { me, may, fmt } = await context();
   if (!may("admin.users")) return <NoAccess what="managing users" />;
-  const data = await load<AdminUsers>("/admin/users");
+  const { users: data } = await loadQuery<{ users: AdminUsers }>("query Users { users }", {}, ["users"]);
   const when = Object.fromEntries(data.items.map((u) => [u.id, fmt.whenLabel(u.lastSignInAt).toLowerCase()]));
   return (
     <>
@@ -24,7 +24,7 @@ export async function UsersPage() {
 export async function RolesPage() {
   const { me, may } = await context();
   if (!may("admin.roles")) return <NoAccess what="roles & permissions" />;
-  const data = await load<RolesData>("/admin/roles");
+  const { roles: data } = await loadQuery<{ roles: RolesData }>("query Roles { roles }", {}, ["roles"]);
   return (
     <>
       <PageHeader title="Users & roles">Each role is a set of permissions, area by area. Give people the role that fits their job.</PageHeader>
@@ -93,7 +93,11 @@ export async function AuditPage({ searchParams }: { searchParams: Search }) {
   const s = await searchParams;
   const action = FILTERS.find((f) => f.key === param(s, "action"))?.key ?? "";
   const before = param(s, "before");
-  const page = await load<Page<AuditEntry>>(`/admin/audit${query({ action, before, limit: 50 })}`);
+  const { audit: page } = await loadQuery<{ audit: Page<AuditEntry> }>(
+    `query Audit($action: String, $before: Int) { audit(action: $action, before: $before, limit: 50) }`,
+    { ...(action ? { action } : {}), ...(before ? { before: Number(before) } : {}) },
+    ["audit"],
+  );
   const last = page.items.at(-1);
   return (
     <>

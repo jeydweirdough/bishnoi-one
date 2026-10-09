@@ -1,6 +1,7 @@
 "use client";
 
-import { AutoComplete, Select as AntSelect } from "antd";
+import { AutoComplete } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import type { ReactNode } from "react";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { FormEntityProvider } from "../quick-add/can";
@@ -68,7 +69,7 @@ export function SearchChoice({ field, value, onChange, error }: { field: FormFie
   return (
     <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
       {(p) => (
-        <AntSelect
+        <Combobox
           id={p.id}
           aria-describedby={p["aria-describedby"]}
           status={error ? "error" : undefined}
@@ -85,7 +86,7 @@ export function SearchChoice({ field, value, onChange, error }: { field: FormFie
               {o.data.full && <span className="truncate text-meta text-ink-3">{o.data.full}</span>}
             </span>
           )}
-          notFoundContent="Nothing matches"
+          notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">Not one of the choices. An administrator adds choices under Settings → Forms.</p>}
         />
       )}
     </Field>
@@ -155,7 +156,7 @@ export function FieldInput({
     return (
       <Field label={f.label} optional={!f.required} error={error} hint={f.helpText ?? undefined}>
         {(p) => (
-          <AntSelect
+          <Combobox
             id={p.id}
             mode="multiple"
             className="w-full"
@@ -171,7 +172,7 @@ export function FieldInput({
                 {o.data.hint && <span className="truncate text-meta text-ink-3">{o.data.hint}</span>}
               </span>
             )}
-            notFoundContent="Nothing matches"
+            notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">Not one of the choices. An administrator adds choices under Settings → Forms.</p>}
           />
         )}
       </Field>

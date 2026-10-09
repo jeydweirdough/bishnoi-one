@@ -1,23 +1,38 @@
+import { CustomerSharingButton } from "../components/crm/customer-sharing";
 import { Copy, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
-import { getCompanyMe, load } from "@/src/platform/lib/api";
+import { getCompanyMe, loadQuery } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
-import type { Assignable, CompanyRow, CustomerType, Paged } from "@/src/platform/lib/types";
+import type { Assignable, CompanyRow, CustomerType, FormLayout } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { RecordsBulk } from "../components/crm/records-bulk";
 import { StatusTag, typeOptions } from "../components/crm/words";
-import { customFields } from "../components/extra/load";
+import { layoutFields } from "../components/extra/load";
 import { extraText } from "../components/extra/extra-values";
 
 export const metadata = { title: "Customers" };
 
 const SIZE = 50;
+
+// The list's one request: the customers with only what a row shows, the types,
+// the form's added fields, and the people (only when bulk changes are offered).
+const CUSTOMERS = `query Customers($q: String, $status: String, $owner: String, $limit: Int, $offset: Int, $withPeople: Boolean!) {
+  companies(q: $q, status: $status, owner: $owner, limit: $limit, offset: $offset) {
+    total
+    items { id code name status industry city country contactCount lastActivityAt extra owner { id name } can { edit delete } }
+  }
+  people @include(if: $withPeople) { id name isMe team { id name } }
+  customerTypes { code name color sortOrder isActive companies onlyTeams exceptTeams }
+  form(entity: "company")
+}`;
+type Row = Pick<CompanyRow, "id" | "code" | "name" | "status" | "industry" | "city" | "country" | "contactCount" | "lastActivityAt" | "extra" | "owner" | "can">;
+type Answer = { companies: { total: number; items: Row[] } | null; people?: Assignable[] | null; customerTypes: CustomerType[] | null; form: FormLayout | null };
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
@@ -27,18 +42,17 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const params = await searchParams;
   const [q, status, owner] = [one(params.q), one(params.status), one(params.owner)];
   const page = Math.max(1, Number(one(params.page)) || 1);
-  const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
-  if (q) query.set("q", q);
-  if (status) query.set("status", status);
-  if (owner) query.set("owner", owner);
   const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
   const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
-  const [list, people, types, fields] = await Promise.all([
-    load<Paged<CompanyRow>>(`/companies?${query}`),
-    bulkAllowed ? load<Assignable[]>("/people/assignable") : Promise.resolve([] as Assignable[]),
-    load<CustomerType[]>("/customer-types"),
-    customFields("company"),
-  ]);
+  const answer = await loadQuery<Answer>(
+    CUSTOMERS,
+    { q: q || null, status: status || null, owner: owner || null, limit: SIZE, offset: (page - 1) * SIZE, withPeople: bulkAllowed },
+    ["companies"],
+  );
+  const list = answer.companies!;
+  const people = answer.people ?? [];
+  const types = answer.customerTypes ?? [];
+  const fields = answer.form ? layoutFields(answer.form).filter((f) => !f.standard) : [];
   // Fields an admin added and chose to show in the list: under each name, after the industry.
   const inList = fields.filter((f) => f.inList);
   const fmt = makeFormat(me.org);
@@ -51,6 +65,8 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         title="Customers"
         actions={
           <>
+            {/* Whether a division's customers show to the others: the administrator's, and a manager's for their divisions. */}
+            {(can(me, "admin.teams") || me.role?.scope === "managed") && <CustomerSharingButton />}
             {can(me, "customers.edit") && (
               <LinkButton href="/companies/duplicates" icon={<Copy className="size-4" aria-hidden />}>
                 Possible duplicates

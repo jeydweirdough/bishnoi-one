@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "python-multipart>=0.0.32",
     "sqlalchemy>=2.0",
+    "strawberry-graphql>=0.270",
     "tzdata>=2026.4",
     "uvicorn[standard]>=0.53.0",
 ]

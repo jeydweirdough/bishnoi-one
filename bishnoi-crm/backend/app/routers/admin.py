@@ -455,6 +455,7 @@ def team_out(team: Team, members: int = 0, db: DB | None = None) -> dict:
         "isActive": team.is_active,
         "memberCount": members,
         "manager": {"id": manager.id, "name": manager.full_name} if manager else None,
+        "shareCustomers": team.share_customers,
     }
 
 

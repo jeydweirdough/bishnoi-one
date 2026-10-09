@@ -122,8 +122,58 @@ export async function load<T>(path: string): Promise<T> {
   }
 }
 
+// --- GraphQL: what a page reads, in one request (the API's app/graphql_api.py) ---------------
+// The rule: a page's reads come through GraphQL; saving, sign-in, files and
+// app-to-app calls stay REST (the `api` above).
+
+export type GraphQLError = { message: string; path?: (string | number)[]; extensions?: { code?: string; status?: number } };
+
+/** One query: its data, and the errors of any field that couldn't be read (the rest still comes). */
+export async function query<T>(document: string, variables?: Record<string, unknown>): Promise<{ data: T; errors: GraphQLError[] }> {
+  let res: { data: T | null; errors?: GraphQLError[] };
+  try {
+    res = await api.post<{ data: T | null; errors?: GraphQLError[] }>("/graphql", { query: document, variables: variables ?? {} });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) redirect("/login?expired=1");
+    throw error;
+  }
+  const errors = res.errors ?? [];
+  if (errors.some((e) => e.extensions?.code === "UNAUTHENTICATED")) redirect("/login?expired=1");
+  if (!res.data) throw new ApiError(500, errors[0]?.message ?? "The page couldn't be read.");
+  return { data: res.data, errors };
+}
+
+/**
+ * For pages, as `load` is for REST: the query's data, where each of `needed`
+ * must have come back. One that's not found or out of reach shows the 404
+ * page; any other failure shows the error page. The other fields may be null
+ * (a section the person can't see), and the page leaves those out.
+ */
+export async function loadQuery<T extends Record<string, unknown>>(document: string, variables: Record<string, unknown> = {}, needed: (keyof T & string)[] = []): Promise<T> {
+  const { data, errors } = await query<T>(document, variables);
+  for (const key of needed) {
+    if (data[key] != null) continue;
+    const why = errors.find((e) => e.path?.[0] === key);
+    if (why?.extensions?.status === 404 || why?.extensions?.status === 403) notFound();
+    throw new ApiError(why?.extensions?.status ?? 500, why?.message ?? `The page couldn't read ${key}.`);
+  }
+  return data;
+}
+
+/**
+ * Every page's frame in one request: who is signed in (with what they can
+ * reach) and the menu's red counts. Cached for the whole render, so the
+ * layout and the page share it.
+ */
+export const getFrame = cache(async (): Promise<{ me: Me; unset: Record<string, number> | null }> => {
+  const { data } = await query<{ me: Me | null; unset: Record<string, number> | null }>("query Frame { me unset }");
+  // A count that can't be had is left out rather than stopping the page; who you are can't be.
+  if (!data.me) return { me: await load<Me>("/auth/me"), unset: data.unset };
+  return { me: data.me, unset: data.unset };
+});
+
 /** Who is signed in and what they can reach. Fetched once per request, however many layouts ask. */
-export const getMe = cache(() => load<Me>("/auth/me"));
+export const getMe = cache(async () => (await getFrame()).me);
 
 /**
  * `getMe()` for a page that belongs to a company.

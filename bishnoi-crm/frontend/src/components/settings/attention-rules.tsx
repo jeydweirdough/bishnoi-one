@@ -1,6 +1,7 @@
 "use client";
 
-import { InputNumber, Select } from "antd";
+import { InputNumber } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
@@ -82,7 +83,7 @@ export function AttentionRulesEditor({ initial }: { initial: AttentionRules }) {
       ))}
       {free.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <Select className="w-56" placeholder="A division with its own" value={adding} onChange={setAdding} options={free.map((t) => ({ value: t.id, label: t.name }))} />
+          <Combobox className="w-56" placeholder="A division with its own" value={adding} onChange={setAdding} options={free.map((t) => ({ value: t.id, label: t.name }))} />
           <Button
             disabled={!adding}
             onClick={() =>

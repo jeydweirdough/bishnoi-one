@@ -1,6 +1,7 @@
 "use client";
 
-import { Select, Segmented } from "antd";
+import { Segmented } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { useState } from "react";
 
 /** A team something can be for (Settings → Forms and Customer types). */
@@ -58,7 +59,7 @@ export function TeamsFor({
         ]}
       />
       {mode !== "everyone" && (
-        <Select
+        <Combobox
           mode="multiple"
           className="w-full"
           value={picked}

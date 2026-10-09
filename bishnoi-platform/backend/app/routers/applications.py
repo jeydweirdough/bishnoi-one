@@ -40,7 +40,7 @@ KEY = re.compile(r"[a-z][a-z0-9-]{1,39}")
 
 
 class UrlFields(Api):
-    @field_validator("app_url", "health_url", check_fields=False)
+    @field_validator("app_url", "health_url", "api_url", check_fields=False)
     @classmethod
     def _url(cls, v):
         return check_url(v)
@@ -52,6 +52,8 @@ class ApplicationIn(UrlFields):
     description: str | None = Field(None, max_length=2000)
     app_url: str | None = Field(None, max_length=500)
     health_url: str | None = Field(None, max_length=500)
+    # Its API, for the applications linked to it (Connections).
+    api_url: str | None = Field(None, max_length=500)
     version: str | None = Field(None, max_length=40)
 
     @field_validator("key")
@@ -67,6 +69,8 @@ class ApplicationPatch(UrlFields):
     description: str | None = Field(None, max_length=2000)
     app_url: str | None = Field(None, max_length=500)
     health_url: str | None = Field(None, max_length=500)
+    # Its API, for the applications linked to it (Connections).
+    api_url: str | None = Field(None, max_length=500)
     version: str | None = Field(None, max_length=40)
     is_active: bool | None = None
     status_override: Literal["degraded", "maintenance", "outage"] | None = None
@@ -111,7 +115,10 @@ def app_out(a: Application, check: HealthCheck | None = None, **extra) -> dict:
         "description": a.description,
         "appUrl": a.app_url,
         "healthUrl": a.health_url,
+        "apiUrl": a.api_url,
         "version": a.version,
+        "connected": bool(a.connect_key_hash),
+        "connectedAt": iso(a.connected_at),
         "isActive": a.is_active,
         "status": monitor.app_status(a, check),
         "statusOverride": a.status_override,

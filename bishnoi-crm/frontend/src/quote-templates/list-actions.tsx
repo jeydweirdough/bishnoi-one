@@ -2,7 +2,8 @@
 
 import { FileSpreadsheet, PenLine, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { Modal } from "antd";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createTemplate, deleteTemplate } from "@/src/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
@@ -12,7 +13,7 @@ import { Field, FormError, Input } from "@/src/platform/ui/field";
 /** Starts a template: a name and how it's made, then its page for the rest. */
 export function NewTemplate() {
   const router = useRouter();
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"form" | "excel">("excel");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export function NewTemplate() {
     start(async () => {
       const r = await createTemplate({ name: name.trim(), kind });
       if (!r.ok) return setError(r.error);
-      dialog.current?.close();
+      setOpen(false);
       router.push(`/admin/settings/quote-templates/${r.data.id}`);
     });
   }
@@ -40,18 +41,17 @@ export function NewTemplate() {
 
   return (
     <>
-      <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => (setError(null), dialog.current?.showModal())}>
+      <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => (setError(null), setOpen(true))}>
         New template
       </Button>
-      <dialog ref={dialog} className="m-auto w-full max-w-lg rounded-full bg-sheet p-0 shadow-xl backdrop:bg-black/30">
+      <Modal open={open} title="New quotation template" onCancel={() => setOpen(false)} footer={null} width={520}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             make();
           }}
-          className="space-y-4 p-5"
+          className="space-y-4"
         >
-          <h2 className="text-heading text-ink">New quotation template</h2>
           <Field label="Name" hint="For example: PCSO, Getmeds; or Office of the President, 2MG.">
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus required />}
           </Field>
@@ -61,8 +61,8 @@ export function NewTemplate() {
             {option("form", "Design it here", "Letterhead, wording and signatory as fields. Printed from the quote.", <PenLine className="size-5" aria-hidden />)}
           </fieldset>
           <FormError message={error} />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="quiet" onClick={() => dialog.current?.close()}>
+          <div className="dialog-actions">
+            <Button type="button" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" loading={pending} disabled={name.trim().length < 2}>
@@ -70,7 +70,7 @@ export function NewTemplate() {
             </Button>
           </div>
         </form>
-      </dialog>
+      </Modal>
     </>
   );
 }

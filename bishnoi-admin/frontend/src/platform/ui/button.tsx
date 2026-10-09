@@ -5,18 +5,18 @@ type Variant = "primary" | "default" | "quiet" | "danger";
 type Size = "md" | "sm";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[3px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
 
 const variants: Record<Variant, string> = {
   primary: "bg-hema text-white hover:bg-hema-hover",
-  default: "bg-sheet text-ink border border-rule-strong hover:border-control",
-  quiet: "text-hema hover:bg-hema-tint",
+  default: "bg-sheet text-ink border border-ink hover:bg-mint",
+  quiet: "text-ink hover:bg-mint",
   danger: "bg-danger text-white hover:brightness-95",
 };
 
 const sizes: Record<Size, string> = {
-  md: "h-9 px-4 text-sm",
-  sm: "h-8 px-3 text-meta",
+  md: "h-10 px-5 text-sm",
+  sm: "h-8 px-3.5 text-meta",
 };
 
 export function buttonClass(variant: Variant = "default", size: Size = "md", extra = "") {

@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Copy, ExternalLink, ImagePlus, X } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Check, Copy, ExternalLink, X } from "lucide-react";
+import { FileDrop } from "@/src/platform/ui/file-drop";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { FormError } from "@/src/platform/ui/field";
 import { logEmail, type EmailDraft } from "../../actions/mailbox";
 
@@ -23,7 +24,6 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const picker = useRef<HTMLInputElement>(null);
   const to = ready.to.join(", ");
 
   useEffect(() => {
@@ -129,24 +129,18 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
           Sent? Attach a screenshot of it
         </h3>
         <p className="mt-1 text-meta text-ink-3">Open the email in your Sent folder and take a screenshot (Windows: Win+Shift+S), then paste it here with Ctrl+V or pick the file. It&apos;s kept on the customer as proof it went.</p>
-        <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
         {preview ? (
           <div className="relative mt-3 overflow-hidden rounded-[14px] border border-rule">
             {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the picked file */}
             <img src={preview} alt="The screenshot to attach" className="max-h-56 w-full object-contain bg-bench" />
-            <button type="button" onClick={() => setShot(null)} aria-label="Remove the screenshot" className="absolute top-2 right-2 grid size-8 place-items-center rounded-full bg-ink text-white">
+            <IconButton onClick={() => setShot(null)} label="Remove the screenshot" tone="solid" className="absolute top-2 right-2">
               <X className="size-4" aria-hidden />
-            </button>
+            </IconButton>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => picker.current?.click()}
-            className="mt-3 flex w-full flex-col items-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed border-rule-strong bg-bench px-4 py-6 text-sm text-ink-2 hover:border-ink hover:bg-mint"
-          >
-            <ImagePlus className="size-6 text-ink-3" aria-hidden />
-            Paste the screenshot (Ctrl+V), or click to pick it
-          </button>
+          <div className="mt-3">
+            <FileDrop accept="image/png,image/jpeg,image/webp" note="Or paste it with Ctrl+V. PNG, JPG or WEBP" onFile={(f) => f && pick(f)} />
+          </div>
         )}
       </section>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { QuickAction } from "@/src/platform/ui/button";
 import { Mail } from "lucide-react";
 import { useState } from "react";
 import { Composer } from "./composer";
@@ -9,12 +10,12 @@ export function EmailButton({ companyId, companyName }: { companyId: string; com
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-full border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink">
+      <QuickAction onClick={() => setOpen(true)} >
         <span className="text-ink-3" aria-hidden>
           <Mail className="size-4" aria-hidden />
         </span>
         Email
-      </button>
+      </QuickAction>
       <Composer open={open} onClose={() => setOpen(false)} customer={{ id: companyId, name: companyName }} />
     </>
   );

@@ -14,6 +14,7 @@ from app.discord import logs_for, mirror_audit
 from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.tenants import HEADER, Tenants, clean
+from app import graphql_api
 from app.routers import adjustments, admin, auth, catalog, insight, integration, orders, purchasing, stock, transfers, unset, warehouses
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -71,6 +72,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "inventory"}
 
-    for module in (auth, admin, catalog, warehouses, stock, purchasing, orders, transfers, adjustments, insight, integration, unset):
+    for module in (auth, admin, catalog, warehouses, stock, purchasing, orders, transfers, adjustments, insight, integration, unset, graphql_api):
         app.include_router(module.router)
     return app

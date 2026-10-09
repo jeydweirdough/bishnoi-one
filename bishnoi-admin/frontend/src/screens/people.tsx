@@ -54,7 +54,7 @@ export default async function PeoplePage() {
                   </span>
                   <span className="text-meta">
                     {!p.isActive && (
-                      <span className="inline-flex h-5 items-center rounded-[2px] border border-rule-strong px-1.5 text-stamp text-ink-3 uppercase">
+                      <span className="inline-flex h-5 items-center rounded-full border border-rule-strong px-1.5 text-stamp text-ink-3 uppercase">
                         Switched off
                       </span>
                     )}

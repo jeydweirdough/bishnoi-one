@@ -21,11 +21,11 @@ export const SETTINGS_PAGES = [
   { href: "/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
   { href: "/admin/settings/terms", label: "Terms", permission: "admin.settings" },
   { href: "/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
-  { href: "/admin/settings/kpis", label: "KPIs", permission: "admin.settings" },
+  { href: "/admin/settings/performance", label: "Performance", permission: "admin.settings" },
   { href: "/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
   { href: "/admin/settings/associations", label: "Associations", permission: "admin.settings" },
-  { href: "/admin/settings/emails", label: "Approved emails", permission: "admin.settings" },
+  { href: "/admin/settings/emails", label: "Email templates", permission: "admin.settings" },
   { href: "/admin/settings/attention", label: "Attention", permission: "admin.settings" },
   { href: "/admin/settings/connections", label: "Connections", permission: "admin.settings" },
 ] as const;

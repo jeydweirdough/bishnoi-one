@@ -231,7 +231,7 @@ export function BulkBar({
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay"
+      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-[12px] bg-sheet px-4 py-3 shadow-overlay"
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <p aria-live="polite" className="font-semibold">

@@ -335,7 +335,7 @@ function OrderSteps({ role, steps, grants, toggle }: {
             <p className="text-caps text-ink-3 uppercase">{group.group}</p>
             <div className="mt-1">
               {group.steps.map((step) => (
-                <label key={step.action} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[3px] px-1 text-sm hover:bg-bench/40">
+                <label key={step.action} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-1 text-sm hover:bg-bench/40">
                   <input
                     type="checkbox"
                     aria-label={`${role}: ${step.label} (orders)`}

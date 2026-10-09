@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Input, Modal } from "antd";
+import { Input } from "@/src/platform/ui/field";
+import { Alert, Modal } from "antd";
 import { ArrowLeftRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -110,7 +111,6 @@ export function TransferCustomer({ companyId, companyName }: { companyId: string
           <div className="space-y-2">
             <p className="text-sm text-ink-2">Type the employee ID of the salesperson who takes {companyName} over.</p>
             <Input
-              size="large"
               autoFocus
               value={code}
               onChange={(e) => {

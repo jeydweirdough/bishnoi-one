@@ -6,10 +6,11 @@ import type { KpiTargets } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { shiftMonth } from "../components/field/words";
 import { TargetsGrid } from "../components/kpis/targets-grid";
+import { IN_MENU, type Place } from "./performance";
 
-export const metadata = { title: "KPI targets" };
+export const metadata = { title: "Targets" };
 
-export default async function KpiTargetsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function KpiTargetsPage({ searchParams, place = IN_MENU }: { searchParams: Promise<Record<string, string | string[] | undefined>>; place?: Place }) {
   const me = await getCompanyMe();
   if (!can(me, "goals.manage")) return <NoAccess what="setting targets" />;
   const asked = (await searchParams).month;
@@ -20,11 +21,12 @@ export default async function KpiTargetsPage({ searchParams }: { searchParams: P
   const name = `${fmt.monthLabel(data.month)} ${data.month.slice(0, 4)}`;
   return (
     <>
-      <PageHeader title={`Targets for ${name}`} crumbs={[{ href: `/kpis?month=${data.month}`, label: "KPIs" }]}>
-        Each KPI&apos;s target for the month, per person and per team. Leave a box empty for no target. Which KPIs there are, and who they&apos;re for, is set
-        under Settings → KPIs.
+      <PageHeader title={`Targets for ${name}`} crumbs={place.tabs ? undefined : [{ href: `${place.results}?month=${data.month}`, label: "Performance" }]}>
+        Each measure&apos;s target for the month, per person and per team. Leave a box empty for no target. What is measured, and for whom, is set under
+        Settings → Performance.
       </PageHeader>
-      <TargetsGrid org={me.org} data={data} previous={previous} monthName={name} previousName={fmt.monthLabel(before)} />
+      {place.tabs}
+      <TargetsGrid org={me.org} data={data} previous={previous} monthName={name} previousName={fmt.monthLabel(before)} resultsHref={place.results} />
     </>
   );
 }

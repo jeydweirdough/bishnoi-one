@@ -1,5 +1,6 @@
 "use client";
 
+import { Empty } from "@/src/platform/ui/sheet";
 import { Plus } from "lucide-react";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -97,7 +98,7 @@ export function FollowUpsPanel({
 
   return (
     <div>
-      {open.length === 0 && !adding && <p className="py-3 text-meta text-ink-3">No open follow-ups.</p>}
+      {open.length === 0 && !adding && <Empty compact icon="followUps" title="No open follow-ups">Plan the next step with this customer, and it shows here until it's done.</Empty>}
       {open.length > 0 && (
         <ul className="divide-y divide-rule">
           {open.map((f) => (

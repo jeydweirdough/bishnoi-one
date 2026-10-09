@@ -42,8 +42,12 @@ export type Application = {
   name: string;
   description: string | null;
   appUrl: string | null;
+  apiUrl: string | null;
   healthUrl: string | null;
   version: string | null;
+  /** Has a connect key (Connections), and when it last asked for its links. */
+  connected: boolean;
+  connectedAt: string | null;
   isActive: boolean;
   status: Health;
   statusOverride: "degraded" | "maintenance" | "outage" | null;

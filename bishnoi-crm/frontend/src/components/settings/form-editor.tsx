@@ -27,13 +27,13 @@ import {
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { Field, Input } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import type { CustomEntity, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 import { saveForm, type SectionDraft } from "../../actions/settings";
 import { ChipsInput } from "../admin/chips-input";
-import { Select as AntSelect } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { TeamsFor, type TeamName } from "../admin/teams-for";
 import { useTerms } from "@/src/components/terms/provider";
 import type { Terms } from "@/src/components/terms/terms";
@@ -357,14 +357,6 @@ function FixedBlock({ text }: { text: string }) {
   );
 }
 
-function IconButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-[14px] p-1 text-ink-3 hover:bg-bench hover:text-ink disabled:opacity-30">
-      {children}
-    </button>
-  );
-}
-
 /** Who a field is on the form for: everyone, only some teams (the Rx team's own fields), or everyone but some. */
 function WhoFor({ field: f, teams, onChange }: { field: F; teams: TeamName[]; onChange: (patch: Partial<F>) => void }) {
   return (
@@ -455,7 +447,7 @@ function Properties({
       {f.type === "customer" && entity === "company" && (
         <div className="space-y-1">
           <p className="text-sm text-ink">Which customer types it can be</p>
-          <AntSelect
+          <Combobox
             mode="multiple"
             className="w-full"
             value={f.options}
@@ -470,7 +462,7 @@ function Properties({
       {f.type === "products" && (
         <div className="space-y-1">
           <p className="text-sm text-ink">Products not offered</p>
-          <AntSelect
+          <Combobox
             mode="multiple"
             className="w-full"
             value={f.options}

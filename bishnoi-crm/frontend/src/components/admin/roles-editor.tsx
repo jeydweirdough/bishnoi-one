@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, TextButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
@@ -237,9 +237,9 @@ function Permissions({
                     <div className="flex items-center justify-between gap-2 text-sm">
                       <span className="min-w-0 text-ink">{area.name}</span>
                       {!locked && area.actions.length > 1 && (
-                        <button type="button" onClick={() => all(area, !every)} className="shrink-0 text-meta text-ink hover:underline md:hidden">
+                        <TextButton onClick={() => all(area, !every)} className="shrink-0 md:hidden">
                           {every ? "None" : "All"}
-                        </button>
+                        </TextButton>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -264,9 +264,9 @@ function Permissions({
                         );
                       })}
                       {!locked && area.actions.length > 1 && (
-                        <button type="button" onClick={() => all(area, !every)} className="ml-1 hidden text-meta text-ink hover:underline md:inline">
+                        <TextButton onClick={() => all(area, !every)} className="ml-1 hidden md:inline">
                           {every ? "None" : "All"}
-                        </button>
+                        </TextButton>
                       )}
                     </div>
                   </li>

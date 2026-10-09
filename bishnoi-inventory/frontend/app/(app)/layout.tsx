@@ -2,29 +2,16 @@
 // things wait on this person beside each place they work in.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
-import { api } from "@/src/platform/lib/api";
-import type { Alert } from "@/src/lib/types";
-
-async function waiting(): Promise<Record<string, number>> {
-  try {
-    // The API only lists what this person's role may act on.
-    const alerts = await api.get<Alert[]>("/inventory/alerts");
-    return Object.fromEntries(alerts.map((a) => [a.key, a.count]));
-  } catch {
-    // Counts are a help, not the page: without them the sidebar still works.
-    return {};
-  }
-}
-
-/** What isn't set up yet (a product with no price), for the sidebar's red counts. */
-async function unset(): Promise<Record<string, number>> {
-  return api.get<Record<string, number>>("/inventory/unset").catch(() => ({}));
-}
+import { getFrame } from "@/src/platform/lib/api";
 
 export default async function Layout({ children }: { children: ReactNode }) {
-  const [counts, missing] = await Promise.all([waiting(), unset()]);
+  // One request with who you are: the API only lists what this person's role
+  // may act on, and what isn't set up yet (a product with no price). Counts are
+  // a help, not the page: without them the sidebar still works.
+  const { alerts, unset } = await getFrame();
+  const waiting = Object.fromEntries((alerts ?? []).map((a) => [a.key, a.count]));
   return (
-    <ShellLayout waiting={counts} unset={missing}>
+    <ShellLayout waiting={waiting} unset={unset ?? {}}>
       {children}
     </ShellLayout>
   );

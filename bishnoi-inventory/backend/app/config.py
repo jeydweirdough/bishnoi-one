@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # registered, active and given Inventory (app/company.py). Each company has
     # a database of its own (app/tenants.py), made the first time it's used.
     platform_api_url: str | None = None
+    # Inventory's connect key, made on the platform's Connections page. With it,
+    # the platform says what Inventory is linked to and the keys between them
+    # (app/platform_links.py), and INTEGRATION_KEYS are no longer needed.
+    # Unset: those settings are used, as before.
+    platform_app_key: SecretStr | None = None
     # On this computer only (never in production): the company a request is for
     # when it doesn't say, and the companies allowed while the platform isn't
     # set up here (PLATFORM_API_URL unset).

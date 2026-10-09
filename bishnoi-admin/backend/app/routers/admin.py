@@ -359,6 +359,30 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
                     }
                 )
 
+    # Fleet and travel: a car's dates within 60 days, a trip within 14 that isn't approved or booked.
+    from app.routers.operations import summary as fleet_summary, vehicle_dues
+
+    fleet = fleet_summary(db, settings)
+    for v in fleet["vehicles"]:
+        car = " ".join(x for x in (v.name, v.plate) if x)
+        for due in vehicle_dues(v, today):
+            if due["daysRemaining"] <= 60:
+                highlights.append({
+                    "entityType": f"vehicle_{due['what']}", "entityId": v.id, "title": car, "subtitle": due["label"],
+                    "reference": v.owner_name or "Company vehicle", "dueDate": due["date"],
+                    "daysRemaining": due["daysRemaining"], "urgencyTier": due["urgencyTier"], "actionPath": f"/vehicles/{v.id}",
+                })
+    for t in fleet["trips"]:
+        if t.starts_on and t.status in ("for_approval", "for_processing"):
+            days = (t.starts_on - today).days
+            if days <= 14:
+                highlights.append({
+                    "entityType": "travel", "entityId": t.id, "title": t.doctor_name,
+                    "subtitle": f"{'Hotel' if t.kind == 'hotel' else 'Flight'} not settled · asked by {t.rep_name}",
+                    "reference": t.travel_dates or "", "dueDate": t.starts_on.isoformat(),
+                    "daysRemaining": days, "urgencyTier": urgency_tier(days), "actionPath": f"/travel/{t.id}",
+                })
+
     # Sort countdown highlights by urgency (most overdue first, then fewest days remaining)
     highlights.sort(key=lambda x: x["daysRemaining"])
 
@@ -369,6 +393,7 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
         "expatriates": ("Expatriates", "/immigration", 60, [im.expiration_date.date() for im in all_immig]),
         "documents": ("Documents", "/documents", 60, [d.expiration_date.date() for d in all_docs if d.expiration_date]),
         "properties": ("Leases", "/properties", 90, [pr.lease_end.date() for pr in all_props]),
+        "vehicles": ("Vehicles", "/vehicles", 30, [d for v in fleet["vehicles"] for d in (v.registration_due, v.insurance_due, v.pms_due) if d]),
     }
     health = []
     for key, (label, href, window, dates) in dated.items():
@@ -422,13 +447,14 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
                 "totalOpen": tickets_open,
                 "urgent": tickets_urgent,
             },
+            **fleet["stats"],
             "notifications": {
                 "totalActive": len(active_notifs),
                 "unread": notifs_unread,
                 "critical": notifs_critical,
             },
         },
-        "countdownHighlights": highlights[:10],
+        "countdownHighlights": highlights,
     }
 
 

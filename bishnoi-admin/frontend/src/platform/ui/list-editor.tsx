@@ -57,7 +57,7 @@ export function IconButton({
       title={label}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] hover:bg-bench/60 hover:text-ink disabled:pointer-events-none disabled:opacity-30 ${
+      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-[12px] hover:bg-bench/60 hover:text-ink disabled:pointer-events-none disabled:opacity-30 ${
         pressed ? "bg-hema-tint text-hema" : "text-ink-3"
       }`}
     >
@@ -93,7 +93,7 @@ function IconRow({
           aria-label={label}
           title={label}
           onClick={() => onPick(name)}
-          className={`inline-flex size-7 items-center justify-center rounded-[3px] border ${
+          className={`inline-flex size-7 items-center justify-center rounded-[12px] border ${
             value === name ? "border-hema bg-hema-tint text-hema" : "border-rule text-ink-3 hover:border-control"
           }`}
         >

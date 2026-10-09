@@ -2,7 +2,8 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Particulars, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { cache } from "react";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteProduct } from "../actions/inventory";
 import { ProductImages, SupplierPrices } from "../components/product-extras";
 import { RecordTools } from "../components/record-tools";
@@ -11,16 +12,25 @@ import { MOVEMENT_KINDS, PRODUCT_STATUSES, PRODUCT_TYPES, referenceHref, signed 
 import { context, type Params } from "../lib/page";
 import type { Product, Reference } from "../lib/types";
 
+// The page and its title share one request.
+const productPage = cache((id: string) =>
+  loadQuery<{ product: Product; reference: Pick<Reference, "suppliers"> }>(
+    `query Product($id: String!) { product(id: $id) reference { suppliers { id code name isActive } } }`,
+    { id },
+    ["product", "reference"],
+  ),
+);
+
 export async function generateMetadata({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
-  return { title: (await load<Product>(`/inventory/products/${enc(id)}`)).name };
+  return { title: (await productPage(id)).product.name };
 }
 
 export default async function ProductPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, fmt, may, at, day } = await context();
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
-  const [p, ref] = await Promise.all([load<Product>(`/inventory/products/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { product: p, reference: ref } = await productPage(id);
   const groups = p.variantCount > 0;
   const lv = p.level;
 

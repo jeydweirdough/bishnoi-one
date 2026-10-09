@@ -16,7 +16,7 @@ import { PanelActions, PanelButton } from "../support/panel";
 // declaring its status over what the check says. Platform Admins only; the
 // screens don't draw these for Support.
 
-type Details = { key: string; name: string; description: string; appUrl: string; healthUrl: string; version: string };
+type Details = { key: string; name: string; description: string; appUrl: string; apiUrl: string; healthUrl: string; version: string };
 
 function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => void }) {
   const router = useRouter();
@@ -26,6 +26,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
     name: app?.name ?? "",
     description: app?.description ?? "",
     appUrl: app?.appUrl ?? "",
+    apiUrl: app?.apiUrl ?? "",
     healthUrl: app?.healthUrl ?? "",
     version: app?.version ?? "",
   });
@@ -38,6 +39,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
       name: v.name.trim(),
       description: orNull(v.description),
       appUrl: orNull(v.appUrl),
+      apiUrl: orNull(v.apiUrl),
       healthUrl: orNull(v.healthUrl),
       version: orNull(v.version),
     };
@@ -96,6 +98,9 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
       </Field>
       <Field label="Where people open it" optional hint="The address of its screens." error={fieldError(fields, "appUrl")}>
         {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://" value={v.appUrl} onChange={set("appUrl")} />}
+      </Field>
+      <Field label="Its API" optional hint="Where the applications linked to it call it (Connections), e.g. https://crm-api.example.com." error={fieldError(fields, "apiUrl")}>
+        {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://" value={v.apiUrl} onChange={set("apiUrl")} />}
       </Field>
       <Field
         label="Health address"

@@ -1,11 +1,13 @@
 "use client";
 
-import { Modal, Select } from "antd";
+import { Modal } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { Link2, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { CustomerNotFound } from "../quick-add/customer-not-found";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton, TextButton } from "@/src/platform/ui/button";
 import { FormError } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { addAssociation, findTargets, removeAssociation, type AssocKind, type Associations } from "../../actions/associations";
@@ -23,6 +25,7 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
   const [adding, setAdding] = useState<string | null>(null); // "label:side"
   const [other, setOther] = useState("");
   const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+  const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const picked = data.labels.find((l) => `${l.label}:${l.side}` === adding) ?? null;
@@ -30,6 +33,7 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
   if (data.groups.length === 0 && data.labels.length === 0) return null;
 
   function search(otherType: AssocKind, q: string) {
+    setTyped(q.trim());
     start(async () => setOptions((await findTargets(otherType, q)).map((t) => ({ value: t.id, label: t.hint ? `${t.name} · ${t.hint}` : t.name }))));
   }
 
@@ -84,9 +88,9 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
                   {g.name} <span className="text-ink-3">({g.items.length})</span>
                 </p>
                 {data.labels.some((l) => l.label === g.label && l.side === g.side) && (
-                  <button type="button" className="text-meta text-ink-3 hover:text-ink" onClick={() => open(`${g.label}:${g.side}`)} aria-label={`Add to ${g.name}`}>
+                  <TextButton tone="muted" onClick={() => open(`${g.label}:${g.side}`)} aria-label={`Add to ${g.name}`}>
                     + Add
-                  </button>
+                  </TextButton>
                 )}
               </div>
               <ul className="mt-1 divide-y divide-rule">
@@ -101,9 +105,9 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
                       <span className="min-w-0 flex-1 truncate text-ink">{i.name}</span>
                     )}
                     {i.canRemove && i.associationId && (
-                      <button type="button" className="text-ink-3 hover:text-danger" aria-label={`Unlink ${i.name}`} onClick={() => unlink(i.associationId!)}>
+                      <IconButton tone="danger" size="sm" label={`Unlink ${i.name}`} onClick={() => unlink(i.associationId!)}>
                         <X className="size-3.5" aria-hidden />
-                      </button>
+                      </IconButton>
                     )}
                   </li>
                 ))}
@@ -116,19 +120,34 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
         <div className="space-y-4 pt-1">
           <label className="block">
             <span className="mb-1.5 block text-sm text-ink">How they&apos;re linked</span>
-            <Select className="w-full" value={adding ?? undefined} onChange={(k) => open(k)} options={data.labels.map((l) => ({ value: `${l.label}:${l.side}`, label: l.name }))} />
+            <Combobox className="w-full" value={adding ?? undefined} onChange={(k) => open(k)} options={data.labels.map((l) => ({ value: `${l.label}:${l.side}`, label: l.name }))} />
           </label>
           {picked && (
             <label className="block">
               <span className="mb-1.5 block text-sm text-ink">{WHICH[picked.otherType]}</span>
-              <Select
+              <Combobox
                 className="w-full"
                 value={other || undefined}
                 onChange={setOther}
                 options={options}
                 showSearch={{ filterOption: false, onSearch: (q) => search(picked.otherType, q) }}
                 placeholder="Type a name to search"
-                notFoundContent="Nothing by that name"
+                notFoundContent={
+                  picked.otherType === "company" ? (
+                    <CustomerNotFound
+                      typed={typed}
+                      onAdded={(c) => {
+                        setOptions((o) => [{ value: c.id, label: c.name }, ...o]);
+                        setOther(c.id);
+                      }}
+                    />
+                  ) : (
+                    <p className="px-1 py-3 text-center text-meta text-ink-3">
+                      {typed ? <>No {picked.otherType} called &ldquo;{typed}&rdquo; yet. </> : null}
+                      {picked.otherType === "contact" ? "Contacts are added on a customer's page, under Contacts." : "Deals are added under Deals → New deal."}
+                    </p>
+                  )
+                }
               />
             </label>
           )}

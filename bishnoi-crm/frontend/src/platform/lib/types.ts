@@ -486,7 +486,7 @@ export type PriceList = {
   bundles: Pick<Bundle, "id" | "code" | "name" | "priceCentavos" | "asOneLine" | "items">[];
 };
 
-export type ApprovalReason = "price" | "discount";
+export type ApprovalReason = "price" | "discount" | "asked";
 
 export type QuoteLine = {
   productId: string;
@@ -577,6 +577,8 @@ export type Quote = {
     note: string | null;
     by: Person | null;
     at: string | null;
+    /** Who it waits on, while pending: the team's approvers, else its manager, else whoever reaches every team. */
+    approvers: { id: string; name: string; role: string; isMe?: boolean }[];
   };
   letter: {
     number: string;
@@ -1018,6 +1020,8 @@ export type ActivityItem = {
   direction: "in" | "out" | null;
   /** A planned call: what it's for, and the products to bring up. */
   objective?: string | null;
+  /** Where a meeting (or an online call) happens: its Google Meet, Zoom or Teams link. */
+  meetingLink?: string | null;
   products?: { code: string; name: string }[];
   /** Once done: what came of it, and the products discussed. */
   outcome?: string | null;

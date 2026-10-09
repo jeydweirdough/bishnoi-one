@@ -1,5 +1,6 @@
 "use client";
 
+import { JoinLink } from "./crm/join-link";
 import { Check, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
@@ -25,6 +26,8 @@ export type FollowUpRow = {
   doneByName?: string | null;
   doneAt?: string | null;
   canEdit: boolean;
+  /** A meeting's link: Join beside it. */
+  meetingLink?: string | null;
 };
 
 export function FollowUpItem({ row, today, org, showCustomer = true }: { row: FollowUpRow; today: string; org: Org; showCustomer?: boolean }) {
@@ -97,6 +100,11 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           )}
           {meta}
         </p>
+        {row.meetingLink && !done && (
+          <div className="mt-1.5">
+            <JoinLink link={row.meetingLink} size="sm" />
+          </div>
+        )}
       </div>
       <div className="shrink-0 pt-0.5 text-right text-meta">
         {saving ? (

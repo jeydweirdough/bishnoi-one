@@ -1,7 +1,8 @@
 """Everything a role can be allowed to do in Executive Admin, and the starting roles.
 
 A permission is "<area>.<action>", e.g. "permits.create" or "admin.users".
-Executive Admin manages corporate permits, immigration, documents, leases, tickets, and administration.
+Executive Admin manages corporate permits, immigration, documents, leases, tickets,
+the company's vehicles and fuel cards, travel sponsorships, devices issued, and administration.
 """
 
 from dataclasses import dataclass
@@ -39,6 +40,9 @@ AREAS: tuple[Area, ...] = (
     Area("immigration", "Expatriate & visa compliance", "Immigration", CRUD),
     Area("documents", "Corporate documents & insurance", "Legal & Corporate", CRUD),
     Area("properties", "Properties & lease management", "Real Estate", CRUD),
+    Area("vehicles", "Company vehicles and fuel cards", "Fleet and travel", CRUD),
+    Area("travel", "Hotel and flight sponsorships", "Fleet and travel", CRUD),
+    Area("devices", "Laptops, phones and SIMs issued", "Fleet and travel", CRUD),
     Area(
         "tickets",
         "Office concerns & service desk",
@@ -96,6 +100,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         VIEW_ALL
         | _grant("permits", "immigration", "documents", "properties", actions=("create", "edit"))
         | _grant("tickets", actions=("create", "edit", "assign", "resolve"))
+        | _grant("vehicles", "travel", "devices", actions=("create", "edit"))
         | _grant("notifications", actions=("acknowledge", "resolve")),
     ),
     (

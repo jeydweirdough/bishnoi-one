@@ -5,7 +5,7 @@ import { NoAccess } from "../components/admin/words";
 import { EmailTemplates } from "../components/settings/email-templates";
 import type { EmailTemplate } from "../actions/mailbox";
 
-export const metadata = { title: "Approved emails" };
+export const metadata = { title: "Email templates" };
 
 export default async function EmailTemplatesPage() {
   const me = await getCompanyMe();
@@ -13,7 +13,7 @@ export default async function EmailTemplatesPage() {
   const [items, teams] = await Promise.all([load<EmailTemplate[]>("/email-templates?all=true"), load<{ id: string; name: string; isActive: boolean }[]>("/team-names")]);
   return (
     <>
-      <PageHeader title="Settings">The emails reps may send from a customer&apos;s page, worded as approved. Reps add a personal note; they can&apos;t change the wording.</PageHeader>
+      <PageHeader title="Settings">The emails reps may send from a customer&apos;s page, worded as written. Reps add a personal note; they can&apos;t change the wording.</PageHeader>
       <EmailTemplates items={items} teams={teams.filter((t) => t.isActive).map((t) => ({ value: t.id, label: t.name }))} />
     </>
   );

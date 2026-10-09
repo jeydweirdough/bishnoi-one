@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { enc, loadQuery } from "@/src/platform/lib/api";
 import { deletePurchaseOrder, purchaseOrderStep } from "../actions/inventory";
 import { PurchaseOrderForm } from "../components/document-forms";
 import { ReceiveForm } from "../components/receive-form";
@@ -12,14 +12,18 @@ import { StepButton } from "../components/step-button";
 import { Chips, ExpiryMark, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { given, referenceOf } from "../lib/reference";
 import type { Backorder, PO, POBrief, Receipt, ReceiptBrief, Reference } from "../lib/types";
+
+// The purchase order and receiving forms pick from the same lists.
+const FORM_LISTS = referenceOf("products", "suppliers", "units", "warehouses");
 
 export async function PurchaseOrdersPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, day } = await context();
   if (!may("purchasing.view")) return <NoAccess what="purchase orders" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
-  const orders = await load<POBrief[]>(`/inventory/purchase-orders${query(f)}`);
+  const { orders } = await loadQuery<{ orders: POBrief[] }>(`query PurchaseOrders($q: String, $status: String) { orders: purchaseOrders(q: $q, status: $status) }`, given(f), ["orders"]);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/purchase-orders${query({ q: f.q, status })}` });
   return (
     <>
@@ -64,7 +68,11 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
   const { id } = await params;
   const { me, fmt, may, at, day } = await context();
   if (!may("purchasing.view")) return <NoAccess what="purchase orders" />;
-  const [po, ref] = await Promise.all([load<PO>(`/inventory/purchase-orders/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { po, reference: ref } = await loadQuery<{ po: PO; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(
+    `query PurchaseOrder($id: String!) { po: purchaseOrder(id: $id) ${FORM_LISTS} }`,
+    { id },
+    ["po", "reference"],
+  );
   const open = po.status === "ordered" || po.status === "partial";
   const outstanding = po.lines.reduce((n, l) => n + l.outstanding, 0);
 
@@ -175,7 +183,7 @@ export async function NewPurchaseOrderPage({ searchParams }: { searchParams: Sea
   const { me, may } = await context();
   if (!may("purchasing.create")) return <NoAccess what="writing purchase orders" />;
   const s = await searchParams;
-  const ref = await load<Reference>("/inventory/reference");
+  const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(`query NewPurchaseOrder { ${FORM_LISTS} }`, {}, ["reference"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/purchase-orders", label: "Purchase orders" }]} title="New purchase order" />
@@ -188,7 +196,11 @@ export async function EditPurchaseOrderPage({ params }: { params: Params<{ id: s
   const { id } = await params;
   const { me, may } = await context();
   if (!may("purchasing.edit")) return <NoAccess what="changing purchase orders" />;
-  const [po, ref] = await Promise.all([load<PO>(`/inventory/purchase-orders/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { po, reference: ref } = await loadQuery<{ po: PO; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(
+    `query EditPurchaseOrder($id: String!) { po: purchaseOrder(id: $id) ${FORM_LISTS} }`,
+    { id },
+    ["po", "reference"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/purchase-orders", label: "Purchase orders" }, { href: `/purchase-orders/${po.id}`, label: po.number }]} title={`Edit ${po.number}`} />
@@ -201,7 +213,7 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
   if (!may("receiving.view")) return <NoAccess what="receiving" />;
   const q = param(await searchParams, "q");
-  const receipts = await load<ReceiptBrief[]>(`/inventory/receipts${query({ q })}`);
+  const { receipts } = await loadQuery<{ receipts: ReceiptBrief[] }>(`query Receipts($q: String) { receipts(q: $q) }`, given({ q }), ["receipts"]);
   return (
     <>
       <PageHeader
@@ -222,7 +234,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("receiving.view")) return <NoAccess what="receiving" />;
-  const r = await load<Receipt>(`/inventory/receipts/${enc(id)}`);
+  const { receipt: r } = await loadQuery<{ receipt: Receipt }>(`query Receipt($id: String!) { receipt(id: $id) }`, { id }, ["receipt"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title={r.number} actions={may("stock.view") && <LinkButton href={`/movements?q=${enc(r.number)}`}>Its movements</LinkButton>}>
@@ -259,7 +271,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
 export async function NewReceiptPage() {
   const { me, may } = await context();
   if (!may("receiving.receive")) return <NoAccess what="receiving stock" />;
-  const ref = await load<Reference>("/inventory/reference");
+  const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(`query NewReceipt { ${FORM_LISTS} }`, {}, ["reference"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title="Receive stock">
@@ -273,7 +285,7 @@ export async function NewReceiptPage() {
 export async function BackordersPage() {
   const { me, fmt, may, day } = await context();
   if (!may("purchasing.view")) return <NoAccess what="purchase orders" />;
-  const rows = await load<Backorder[]>("/inventory/backorders");
+  const { backorders: rows } = await loadQuery<{ backorders: Backorder[] }>("query Backorders { backorders }", {}, ["backorders"]);
   return (
     <>
       <PageHeader title="Backorders">Everything still owed on placed purchase orders, soonest expected first.</PageHeader>

@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteOrder, orderStep } from "../actions/inventory";
 import { OrderForm } from "../components/document-forms";
 import { PickForm, type PickLine } from "../components/pick-form";
@@ -12,14 +12,15 @@ import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Stamp, Table, Td, Trail } from "../components/ui";
 import { ORDER_KINDS, param, query } from "../lib/labels";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
-import type { BatchRow, Order, OrderBrief, Reference, Reservation, StockOverview } from "../lib/types";
+import { batchChoices, given, referenceOf } from "../lib/reference";
+import type { BatchRow, Order, OrderBrief, Reference, Reservation } from "../lib/types";
 
 export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day, at } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind") };
-  const orders = await load<OrderBrief[]>(`/inventory/orders${query(f)}`);
+  const { orders } = await loadQuery<{ orders: OrderBrief[] }>(`query Orders($q: String, $status: String, $kind: String) { orders(q: $q, status: $status, kind: $kind) }`, given(f), ["orders"]);
   const issued = f.status === "issued";
   const chip = (status: string, label: string) => ({ value: status, label, href: `/orders${query({ ...f, status })}` });
   return (
@@ -60,18 +61,16 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
-  const o = await load<Order>(`/inventory/orders/${enc(id)}`);
+  const { order: o } = await loadQuery<{ order: Order }>(`query Order($id: String!) { order(id: $id) }`, { id }, ["order"]);
   const held = o.status === "confirmed" || o.status === "picking";
-  // The batches each batch-tracked line could come from, soonest to expire first.
-  const pickLines: PickLine[] = held && may("orders.issue")
-    ? await Promise.all(o.lines.map(async (l) => ({
-        id: l.id,
-        product: l.product,
-        quantity: l.quantity,
-        batches: l.product.trackBatches
-          ? (await load<BatchRow[]>(`/inventory/batches${query({ product: l.product.id, warehouse: o.warehouse.id })}`)).map((b) => ({ id: b.id, label: `${b.batchNo}${b.expiresOn ? `, expires ${day(b.expiresOn)}` : ""} (${b.onHand})` }))
-          : [],
-      })))
+  // The batches each batch-tracked line could come from, soonest to expire
+  // first: the warehouse's batches in one read, rather than one per line.
+  const picking = held && may("orders.issue");
+  const { batches } = picking && o.lines.some((l) => l.product.trackBatches)
+    ? await loadQuery<{ batches: BatchRow[] }>(`query Batches($w: String) { batches(warehouse: $w) }`, { w: o.warehouse.id }, ["batches"])
+    : { batches: [] as BatchRow[] };
+  const pickLines: PickLine[] = picking
+    ? o.lines.map((l) => ({ id: l.id, product: l.product, quantity: l.quantity, batches: l.product.trackBatches ? batchChoices(batches, l.product.id, day) : [] }))
     : [];
   const short = o.lines.filter((l) => l.available !== null && l.available < l.quantity);
 
@@ -146,16 +145,14 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   );
 }
 
-/** What's free, per product per warehouse, for the order and transfer forms. */
-export async function availability(): Promise<Record<string, number>> {
-  const stock = await load<StockOverview>("/inventory/stock");
-  return Object.fromEntries(stock.items.map((r) => [`${r.product.id}:${r.warehouse.id}`, r.available]));
-}
+/** The order form's lists, with what's free per product per warehouse ("productId:warehouseId" → units). */
+const ORDER_FORM = `${referenceOf("products", "units", "warehouses")} availability`;
+type OrderFormData = { reference: Pick<Reference, "products" | "units" | "warehouses">; availability: Record<string, number> };
 
 export async function NewOrderPage() {
   const { me, may } = await context();
   if (!may("orders.create")) return <NoAccess what="writing orders" />;
-  const [ref, available] = await Promise.all([load<Reference>("/inventory/reference"), availability()]);
+  const { reference: ref, availability: available } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order" />
@@ -168,7 +165,11 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
   const { id } = await params;
   const { me, may } = await context();
   if (!may("orders.edit")) return <NoAccess what="changing orders" />;
-  const [o, ref, available] = await Promise.all([load<Order>(`/inventory/orders/${enc(id)}`), load<Reference>("/inventory/reference"), availability()]);
+  const { order: o, reference: ref, availability: available } = await loadQuery<OrderFormData & { order: Order }>(
+    `query EditOrder($id: String!) { order(id: $id) ${ORDER_FORM} }`,
+    { id },
+    ["order", "reference", "availability"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
@@ -180,7 +181,7 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
 export async function ReservationsPage() {
   const { fmt, may, day } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
-  const rows = await load<Reservation[]>("/inventory/reservations");
+  const { reservations: rows } = await loadQuery<{ reservations: Reservation[] }>("query Reservations { reservations }", {}, ["reservations"]);
   return (
     <>
       <PageHeader title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>

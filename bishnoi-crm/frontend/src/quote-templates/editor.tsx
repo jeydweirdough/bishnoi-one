@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveTemplate, uploadTemplateFile } from "@/src/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
@@ -233,7 +234,6 @@ export function TemplateEditor({ initial, options }: Props) {
 
 /** The uploaded Excel form: which sheet, and what the CRM found on it. */
 function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplate; onSaved: (t: QuoteTemplate) => void; placeholders: { key: string; label: string }[] }) {
-  const file = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const excel = template.excel;
 
@@ -275,26 +275,15 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
         Upload your quotation sheet as it is. The CRM finds the patient name, contact number, address, hospital, date issued, control number, the
         products table, the grand total and the signature line by their labels, and fills them in for each quote.
       </p>
-      <input
-        ref={file}
-        type="file"
-        accept=".xlsx,.xlsm"
-        className="sr-only"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) upload(f);
-          e.target.value = "";
-        }}
-      />
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <Button loading={pending} icon={<FileSpreadsheet className="size-4" aria-hidden />} onClick={() => file.current?.click()}>
-          {excel ? "Replace the form" : "Upload the form"}
-        </Button>
-        {excel && (
-          <p className="text-sm text-ink-2">
-            <strong>{excel.name}</strong>
-          </p>
-        )}
+      <div className="mt-3">
+        <FileDrop
+          accept=".xlsx,.xlsm"
+          note={excel ? "Drop another to replace it. Excel (.xlsx)" : "Your quotation sheet in Excel (.xlsx)"}
+          busy={pending}
+          keep
+          current={excel ? { name: excel.name } : null}
+          onFile={(f) => f && upload(f)}
+        />
       </div>
 
       {excel && (

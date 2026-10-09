@@ -1,16 +1,17 @@
-import { Plus } from "lucide-react";
+import { OrderLinkButton } from "../components/quotes/order-link-button";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
-import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
+import { api, enc, getCompanyMe, query } from "@/src/platform/lib/api";
+import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, CustomerType, DealList, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
+import type { Assignable, CustomerType, DealList, FormLayout, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { AssociationsPanel } from "../components/crm/associations-panel";
-import { loadRecord } from "../components/crm/merged";
 import { QuotesPanel } from "../components/quotes-panel";
-import { formLayout } from "../components/extra/load";
 import { layoutForTeam } from "../components/extra/teams";
 import { DetailSections } from "../components/crm/detail-sections";
 import { EmptyArt } from "../components/crm/empty-art";
@@ -37,10 +38,52 @@ import { lower, termsOf } from "../components/terms/terms";
 
 type Params = Promise<{ id: string }>;
 
+// The customer page's one request: the customer, the lists its forms pick
+// from, and its quotes, visits and deals when the person may see them.
+const CUSTOMER = `query Customer($id: String!, $quotes: Boolean!, $visits: Boolean!, $deals: Boolean!) {
+  company(id: $id) {
+    id code name status priceGroupCode industry leadSource website email phone city country
+    owner { id name } team { id name } contactCount lastActivityAt updatedAt extra can { edit delete }
+    address notes createdAt links linkedHere contacts { id name jobTitle email phone } activities
+  }
+  people { id name isMe team { id name } }
+  customerTypes { code name color sortOrder isActive companies onlyTeams exceptTeams }
+  form(entity: "company")
+  quotes(company: $id, limit: 20) @include(if: $quotes)
+  visits(company: $id, limit: 30) @include(if: $visits)
+  doctorBalance(companyId: $id) @include(if: $visits)
+  deals(company: $id, limit: 10) @include(if: $deals)
+}`;
+type CustomerAnswer = {
+  company: CompanyDetail | null;
+  people: Assignable[] | null;
+  customerTypes: CustomerType[] | null;
+  form: FormLayout | null;
+  quotes?: Paged<Quote> | null;
+  visits?: Paged<Visit> | null;
+  doctorBalance?: DoctorBalance | null;
+  deals?: DealList | null;
+};
+
+/** Read once per render: the tab's title and the page share it (plain arguments, so the cache matches). */
+const customerPage = cache(async (id: string, quotes: boolean, visits: boolean, deals: boolean) => {
+  const { data, errors } = await query<CustomerAnswer>(CUSTOMER, { id, quotes, visits, deals });
+  if (data.company) return data as CustomerAnswer & { company: CompanyDetail };
+  const why = errors.find((e) => e.path?.[0] === "company")?.extensions?.status;
+  if (why !== 404) throw new Error(errors[0]?.message ?? "The customer couldn't be read.");
+  // Merged into another customer: its old links lead to the one kept.
+  const merged = await api.get<{ newId: string }>(`/merged/${enc(id)}`).catch(() => null);
+  if (merged) redirect(`/companies/${merged.newId}`);
+  notFound();
+});
+
+const pageFor = (me: Awaited<ReturnType<typeof getCompanyMe>>, id: string) => customerPage(id, can(me, "quotes.view"), can(me, "visits.view"), can(me, "deals.view"));
+
 export async function generateMetadata({ params }: { params: Params }) {
   const { id } = await params;
   try {
-    return { title: (await load<CompanyDetail>(`/companies/${enc(id)}`)).name };
+    const me = await getCompanyMe();
+    return { title: (await pageFor(me, id)).company.name };
   } catch {
     return { title: "Customer" };
   }
@@ -59,19 +102,15 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
   const me = await getCompanyMe();
   if (!can(me, "customers.view")) return <NoAccess what="customers" />;
   const { id } = await params;
-  const seesQuotes = can(me, "quotes.view");
-  const seesVisits = can(me, "visits.view");
-  const seesDeals = can(me, "deals.view");
-  const [company, people, quotes, types, fields, visits, owed, deals] = await Promise.all([
-    loadRecord<CompanyDetail>("companies", id),
-    load<Assignable[]>("/people/assignable"),
-    seesQuotes ? load<Paged<Quote>>(`/quotes?company=${enc(id)}&limit=20`) : null,
-    load<CustomerType[]>("/customer-types"),
-    formLayout("company"),
-    seesVisits ? load<Paged<Visit>>(`/visits?company=${enc(id)}&limit=30`) : null,
-    seesVisits ? load<DoctorBalance>(`/field/doctors/${enc(id)}`) : null,
-    seesDeals ? load<DealList>(`/deals?company=${enc(id)}&limit=10`) : null,
-  ]);
+  const answer = await pageFor(me, id);
+  const { company } = answer;
+  const people = answer.people ?? [];
+  const types = answer.customerTypes ?? [];
+  const fields = answer.form ?? { entity: "company" as const, sections: [] };
+  const quotes = answer.quotes ?? null;
+  const visits = answer.visits ?? null;
+  const owed = answer.doctorBalance ?? null;
+  const deals = answer.deals ?? null;
   const fmt = makeFormat(me.org);
   const mayLog = can(me, "activities.create") && company.can.edit;
   const asked = (await searchParams).tab;
@@ -205,9 +244,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
               />
             )}
             {can(me, "quotes.create") && (
-              <LinkButton href={`/companies/${company.id}/quotes/new`} variant={mayVisit && isDoctor ? "default" : "primary"} icon={<Plus className="size-4" aria-hidden />}>
-                New quote
-              </LinkButton>
+              <>
+                {/* The medicine search: a quick quote here, or a link for the customer to order from. */}
+                <OrderLinkButton companyId={company.id} companyName={company.name} slug={me.org.slug} />
+                <LinkButton href={`/companies/${company.id}/quotes/quick`} icon={<Search className="size-4" aria-hidden />}>
+                  Quick quote
+                </LinkButton>
+                <LinkButton href={`/companies/${company.id}/quotes/new`} variant={mayVisit && isDoctor ? "default" : "primary"} icon={<Plus className="size-4" aria-hidden />}>
+                  New quote
+                </LinkButton>
+              </>
             )}
           </div>
         </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { Modal, Select } from "antd";
+import { Modal } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/src/platform/ui/button";
 import { findCustomers } from "../../actions/deals";
+import { CustomerNotFound } from "../quick-add/customer-not-found";
 
 type Option = { value: string; label: string };
 
@@ -13,21 +15,27 @@ type Option = { value: string; label: string };
 function CustomerPicker({ value, onChange, autoFocus }: { value: string | null; onChange: (id: string | null) => void; autoFocus?: boolean }) {
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, start] = useTransition();
+  const [typed, setTyped] = useState("");
+  // Whether there are any customers at all: the first, empty search says.
+  const [none, setNone] = useState(false);
   const seq = useRef(0);
 
   function search(q: string) {
     const mine = ++seq.current;
+    setTyped(q.trim());
     start(async () => {
       const found = await findCustomers(q).catch(() => []);
       // Only the latest search's answer counts.
-      if (mine === seq.current) setOptions(found.map((c) => ({ value: c.id, label: c.city ? `${c.name} · ${c.city}` : c.name })));
+      if (mine !== seq.current) return;
+      setOptions(found.map((c) => ({ value: c.id, label: c.city ? `${c.name} · ${c.city}` : c.name })));
+      if (!q.trim()) setNone(found.length === 0);
     });
   }
 
   useEffect(() => search(""), []);
 
   return (
-    <Select
+    <Combobox
       showSearch={{ filterOption: false, onSearch: search }}
       autoFocus={autoFocus}
       value={value}
@@ -35,7 +43,19 @@ function CustomerPicker({ value, onChange, autoFocus }: { value: string | null; 
       options={options}
       loading={loading}
       placeholder="Type a customer's name"
-      notFoundContent={loading ? "Looking…" : "No customer by that name"}
+      notFoundContent={
+        <CustomerNotFound
+          typed={typed}
+          loading={loading}
+          none={none}
+          what="customer"
+          onAdded={(c) => {
+            setOptions((o) => [{ value: c.id, label: c.name }, ...o]);
+            setNone(false);
+            onChange(c.id);
+          }}
+        />
+      }
       className="w-full"
       size="large"
       allowClear
@@ -49,6 +69,7 @@ export function NewDealButton({ variant = "primary", label = "New deal" }: { var
   const [customer, setCustomer] = useState<string | null>(null);
   const router = useRouter();
   const go = () => customer && router.push(`/deals/new?company=${encodeURIComponent(customer)}`);
+  const close = () => setOpen(false);
   return (
     <>
       <Button variant={variant} icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)} aria-haspopup="dialog">
@@ -57,7 +78,7 @@ export function NewDealButton({ variant = "primary", label = "New deal" }: { var
       <Modal
         open={open}
         title="New deal"
-        onCancel={() => setOpen(false)}
+        onCancel={close}
         onOk={go}
         okText="Continue"
         okButtonProps={{ disabled: !customer }}

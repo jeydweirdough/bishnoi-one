@@ -1,11 +1,12 @@
 "use client";
 
-import { Input, Segmented } from "antd";
+import { SearchInput } from "@/src/platform/ui/field";
+import { Segmented } from "antd";
 import { PenSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/src/platform/ui/button";
-import { Sheet } from "@/src/platform/ui/sheet";
+import { Sheet, Empty } from "@/src/platform/ui/sheet";
 import type { ActivityItem } from "@/src/platform/lib/types";
 import { sentEmails, type MailboxInfo } from "../../actions/mailbox";
 import { Composer } from "./composer";
@@ -50,7 +51,7 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
             ]}
           />
         )}
-        <Input.Search className="max-w-xs" allowClear value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search subject or message" />
+        <SearchInput className="max-w-xs" allowClear value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search subject or message" />
         <span className="ml-auto text-meta text-ink-3">
           {box.mailboxes.length ? (
             <>
@@ -72,7 +73,21 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
           <h2 className="text-heading text-ink">Sent</h2>
         </div>
         {list.items.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-ink-3">{q ? "Nothing matches." : "Nothing sent yet. Emails sent from the CRM show here and on the customer's page."}</p>
+          q ? (
+            <Empty icon="email" title="No email matches">Try another name or word.</Empty>
+          ) : (
+            <Empty
+              icon="email"
+              title="Nothing sent yet"
+              actions={
+                <Button variant="primary" icon={<PenSquare className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+                  Write the first email
+                </Button>
+              }
+            >
+              Emails sent from the CRM show here and on the customer&apos;s page.
+            </Empty>
+          )
         ) : (
           <ul className="divide-y divide-rule">
             {list.items.map((a) => {

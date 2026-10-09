@@ -27,6 +27,7 @@ export const PLATFORM_GROUPS: { label: string; pages: PlatformPage[] }[] = [
     pages: [
       { href: "/applications", label: "Applications", icon: "apps" },
       { href: "/monitoring", label: "Monitoring", icon: "monitoring" },
+      { href: "/connections", label: "Connections", icon: "teams" },
       { href: "/incidents", label: "Incidents", icon: "incidents" },
       { href: "/support", label: "Support", icon: "support" },
     ],

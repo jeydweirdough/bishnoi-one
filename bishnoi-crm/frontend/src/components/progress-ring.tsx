@@ -9,7 +9,7 @@ const STROKE: Record<RingTone, string> = {
   good: "var(--color-filed)",
   warn: "var(--color-due-today)",
   bad: "var(--color-danger)",
-  plain: "var(--color-hema)",
+  plain: "var(--color-sage)",
   none: "var(--color-rule-strong)",
 };
 
@@ -41,7 +41,7 @@ export function ProgressRing({
   const angle = tick !== null ? (tick / 100) * 2 * Math.PI - Math.PI / 2 : 0;
   return (
     <svg viewBox="0 0 100 100" className={`${size === "xs" ? "size-11" : size === "sm" ? "size-16" : "size-24"} shrink-0`} role="img" aria-label={label}>
-      <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-bench)" strokeWidth={size === "xs" ? 12 : 9} />
+      <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-mint-2)" strokeWidth={size === "xs" ? 12 : 9} />
       {filled > 0 && (
         <circle
           cx="50"

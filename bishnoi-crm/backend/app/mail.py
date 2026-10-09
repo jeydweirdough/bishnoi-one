@@ -119,7 +119,7 @@ def link(settings: Settings, path: str) -> tuple[str, str] | None:
 # --- what's sent ----------------------------------------------------------------------------
 
 # Why a quote waits for approval (app/pricing.py), in words.
-REASONS = {"discount": "a discount above the limit", "price": "a price type that needs approval"}
+REASONS = {"discount": "a discount above the limit", "price": "a price type that needs approval", "asked": "the customer asking for another price"}
 
 
 def approvers_of(db: Session, quote: Quote) -> list[User]:

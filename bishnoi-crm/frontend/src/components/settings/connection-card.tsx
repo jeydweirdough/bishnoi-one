@@ -1,11 +1,11 @@
 "use client";
 
-import { Input as AntInput, Switch, Tag } from "antd";
+import { Switch, Tag } from "antd";
 import { ExternalLink } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Button, TextButton } from "@/src/platform/ui/button";
+import { Field, FormError, Input, Select, PasswordInput } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { checkConnection, saveConnection, type ConnectionInfo } from "../../actions/settings";
 
@@ -120,7 +120,7 @@ export function ConnectionCard({ connection: c, checkedWhen, updatedWhen }: Prop
               <Field key={d.key} label={d.label} hint={d.hint} error={fields[d.key]} optional={!d.required}>
                 {(p) => (
                   <div className="space-y-1">
-                    <AntInput.Password
+                    <PasswordInput
                       id={p.id}
                       aria-describedby={p["aria-describedby"]}
                       status={fields[d.key] ? "error" : undefined}
@@ -130,9 +130,9 @@ export function ConnectionCard({ connection: c, checkedWhen, updatedWhen }: Prop
                       placeholder={removing ? "Will be removed when you save" : d.saved ? `Saved${d.ending ? `, ends in ${d.ending}` : ""}. Type to replace.` : "Not saved yet"}
                     />
                     {d.saved && !removing && (
-                      <button type="button" className="text-meta text-ink-3 hover:text-ink hover:underline" onClick={() => set(d.key, "")}>
+                      <TextButton tone="muted" onClick={() => set(d.key, "")}>
                         Remove the saved {d.label.toLowerCase()}
-                      </button>
+                      </TextButton>
                     )}
                   </div>
                 )}

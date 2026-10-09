@@ -1,8 +1,8 @@
 "use client";
 
 import { Alert, Input as AntInput, Radio, type InputRef } from "antd";
-import { ChevronDown } from "lucide-react";
 import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
+import { DateInput, type FieldChange } from "./pickers";
 
 // Fields are Ant Design's: boxed, Ant's border, blue on focus, red when
 // invalid. The label always sits above, never inside.
@@ -30,7 +30,7 @@ export function Field({ label, hint, error, optional, className = "", children }
   const note = error || hint;
   return (
     <div className={`min-w-0 ${className}`}>
-      <label htmlFor={id} className="mb-1.5 block text-sm text-ink">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">
         {label}
         {optional && <span className="font-normal text-ink-3"> (optional)</span>}
       </label>
@@ -44,7 +44,13 @@ export function Field({ label, hint, error, optional, className = "", children }
   );
 }
 
-export function Input({ ref, size: _size, ...rest }: ComponentProps<"input">) {
+/** A text field; `prefix` and `suffix` sit inside it (an icon, a unit). */
+export function Input({ ref, size: _size, ...rest }: Omit<ComponentProps<"input">, "prefix"> & { prefix?: ReactNode; suffix?: ReactNode; onPressEnter?: () => void; status?: "error" | "warning" | "" }) {
+  // Dates and times: the CRM's one picker (the date first, then the time), not the browser's.
+  if (rest.type === "date" || rest.type === "datetime-local" || rest.type === "time") {
+    const { type, onChange, prefix: _prefix, suffix: _suffix, ...field } = rest;
+    return <DateInput {...field} type={type as "date" | "datetime-local" | "time"} onChange={onChange as unknown as (e: FieldChange) => void} />;
+  }
   return (
     <AntInput
       ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
@@ -52,6 +58,22 @@ export function Input({ ref, size: _size, ...rest }: ComponentProps<"input">) {
       {...(rest as ComponentProps<typeof AntInput>)}
     />
   );
+}
+
+/** A password: hidden as typed, with the eye to show it. */
+export function PasswordInput({ ref, size: _size, ...rest }: ComponentProps<"input"> & { status?: "error" | "warning" | "" | string }) {
+  return (
+    <AntInput.Password
+      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
+      status={rest["aria-invalid"] ? "error" : undefined}
+      {...(rest as ComponentProps<typeof AntInput.Password>)}
+    />
+  );
+}
+
+/** A search box: the magnifier, and `onSearch` on Enter or its button. */
+export function SearchInput(props: ComponentProps<typeof AntInput.Search>) {
+  return <AntInput.Search allowClear {...props} />;
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
@@ -91,16 +113,8 @@ export function Textarea({ ref, ...rest }: ComponentProps<"textarea">) {
   );
 }
 
-export function Select({ className = "", children, ...rest }: ComponentProps<"select">) {
-  return (
-    <div className="relative">
-      <select className={`h-8 appearance-none pr-8 ${control} ${className}`} {...rest}>
-        {children}
-      </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-ink-3" />
-    </div>
-  );
-}
+/** Every dropdown is the CRM's combobox (src/platform/ui/pickers.tsx): typed into to find an option. */
+export { Select } from "./pickers";
 
 /** A row of mutually exclusive options that reads like ticks on a form. */
 export function Choice<T extends string>({

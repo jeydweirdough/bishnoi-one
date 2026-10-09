@@ -3,3 +3,38 @@
 @import "../src/platform/styles/globals.css";
 
 @source "../src";
+
+/* Scrollbars in the Bishnoi One look: thin, rounded, quiet until used. The
+   thumb is the rule colour and turns sage under the pointer; no track. */
+/* Firefox only: in Chrome, Edge and Brave these would switch off the rounded thumb below. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-rule-strong, #d6d6d4) transparent;
+  }
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-rule-strong, #d6d6d4);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-sage, #a8d69b);
+}
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-sage-deep, #4f7f44);
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}

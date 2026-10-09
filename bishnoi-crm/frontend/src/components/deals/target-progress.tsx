@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProgressRing } from "../progress-ring";
+import { Pill } from "@/src/platform/ui/figures";
 import type { Format } from "@/src/platform/lib/format";
 import type { SalesFigures } from "@/src/platform/lib/types";
 
@@ -23,6 +24,7 @@ export function TargetProgress({
   fmt,
   label,
   href,
+  withWinRate = true,
 }: {
   figures: Pick<SalesFigures, "wonCentavos" | "wonCount" | "targetCentavos" | "attainment" | "winRate">;
   start: string;
@@ -31,6 +33,8 @@ export function TargetProgress({
   fmt: Format;
   label: string;
   href?: string;
+  /** Off where the win rate has a card of its own (the dashboard). */
+  withWinRate?: boolean;
 }) {
   const target = figures.targetCentavos;
   const won = figures.wonCentavos;
@@ -39,7 +43,7 @@ export function TargetProgress({
   const words = { met: "Target met", ahead: "On pace", close: "Slightly behind pace", behind: "Behind pace" } as const;
   const ring = { met: "good", ahead: "good", close: "warn", behind: "bad" } as const;
   const marker = target ? Math.min(100, (100 * pace) / target) : null;
-  const pill = { met: "bg-[#e6f2e1] text-[#3f6f35]", ahead: "bg-[#e6f2e1] text-[#3f6f35]", close: "bg-[#fbf0d9] text-[#8a5a00]", behind: "bg-danger-tint text-danger" } as const;
+  const pill = { met: "good", ahead: "good", close: "warn", behind: "bad" } as const;
   const bar = { met: "bg-sage", ahead: "bg-sage", close: "bg-[#e8c27a]", behind: "bg-danger" } as const;
 
   return (
@@ -62,10 +66,9 @@ export function TargetProgress({
             />
           </div>
           {state && (
-            <span className={`mt-3 inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium ${pill[state]}`}>
-              <span className="size-1.5 rounded-full bg-current" aria-hidden />
+            <Pill tone={pill[state]} className="mt-3">
               {words[state]}
-            </span>
+            </Pill>
           )}
           <div className="relative mt-3 h-2 rounded-full bg-mint-2" aria-hidden>
             <span className={`absolute inset-y-0 left-0 rounded-full ${bar[state ?? "ahead"]}`} style={{ width: `${Math.min(100, figures.attainment ?? 0)}%` }} />
@@ -73,7 +76,7 @@ export function TargetProgress({
           </div>
           <p className="mt-2 text-meta text-ink-3">
             {fmt.peso(pace)} expected by today
-            {figures.winRate !== null && <> · {figures.winRate}% win rate</>}
+            {withWinRate && figures.winRate !== null && <> · {figures.winRate}% win rate</>}
           </p>
         </div>
       ) : (

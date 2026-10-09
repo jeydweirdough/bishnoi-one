@@ -64,6 +64,13 @@ def stock_overview(
     return {"items": rows, "total": total}
 
 
+def available(_: View, db: DB) -> dict[str, int]:
+    """What's free per product per warehouse ("product:warehouse"), for the order
+    and transfer forms. Read through GraphQL: the overview's rows without the rest."""
+    products = list(db.scalars(select(Product.id).where(Product.product_type != "service")))
+    return {f"{pid}:{wid}": level["available"] for (pid, wid), level in by_warehouse(db, products).items()}
+
+
 def movement_out(m: Movement) -> dict:
     return {
         "id": m.id,

@@ -7,12 +7,14 @@ activities.view / create / edit / delete, within the person's reach; a
 company or contact linked to one must be within reach too.
 """
 
+import re
+from urllib.parse import urlsplit
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, object_session
 
@@ -51,8 +53,32 @@ class ActivityFields(Api):
     products: list[Annotated[str, Field(max_length=40)]] | None = Field(None, max_length=30)
     outcome: str | None = Field(None, max_length=5000)
     discussed: list[Annotated[str, Field(max_length=40)]] | None = Field(None, max_length=30)
+    # Where a meeting or an online call happens: a Google Meet, Zoom or Teams link (web addresses only).
+    meeting_link: str | None = Field(None, max_length=500)
     # More customers it's about than its own (the doctor's hospital): it shows on each.
     also_company_ids: list[Annotated[str, Field(max_length=36)]] | None = Field(None, max_length=10)
+
+
+    @field_validator("meeting_link")
+    @classmethod
+    def _web_address(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if not v:
+            return None
+        wrong = ValueError("Paste the meeting's web link, starting with https://")
+        # Another kind of address ("javascript:", "mailto:") is refused, never turned into a web one.
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(?!//)", v) and not re.match(r"^[\w.-]+:\d+(/|$)", v):
+            raise wrong
+        if "://" not in v:
+            v = f"https://{v}"
+        parts = urlsplit(v)
+        try:
+            parts.port  # noqa: B018 (raises on a port that isn't one)
+        except ValueError:
+            raise wrong from None
+        if parts.scheme not in ("https", "http") or not parts.hostname or "." not in parts.hostname or " " in v:
+            raise wrong
+        return v
 
 
 class ActivityIn(ActivityFields):
@@ -135,6 +161,7 @@ def activity_out(activity: Activity, access: Access) -> dict:
         "durationMinutes": activity.duration_minutes,
         "direction": activity.direction,
         "objective": activity.objective,
+        "meetingLink": activity.meeting_link,
         "products": product_names(object_session(activity), activity.products or []),
         "outcome": activity.outcome,
         "discussed": product_names(object_session(activity), activity.discussed or []),
@@ -267,6 +294,7 @@ def create_activity(access: Create, me: CurrentUser, db: DB, settings: SettingsD
         duration_minutes=body.duration_minutes if body.kind in ("call", "meeting") else None,
         direction=body.direction if body.kind in ("call", "email") else None,
         objective=body.objective,
+        meeting_link=body.meeting_link if body.kind in ("meeting", "call") else None,
         products=check_products(db, body.products, "products"),
         outcome=body.outcome,
         discussed=check_products(db, body.discussed, "discussed"),

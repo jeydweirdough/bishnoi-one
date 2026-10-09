@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader, SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -111,7 +111,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
             {route.visits.length ? (
               <VisitList visits={route.visits} fmt={fmt} today={route.today} showWho={false} site={lower(termsOf(me).site)} />
             ) : (
-              <p className="py-4 text-meta text-ink-3">No visits logged this day.</p>
+              <Empty compact icon="visit" title="No visits this day">Visits logged with their location show here as a route.</Empty>
             )}
           </Sheet>
         </div>
@@ -129,7 +129,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
               ))}
             </ul>
           ) : (
-            <p className="py-3 text-meta text-ink-3">No days on the road yet this month.</p>
+            <Empty compact icon="trend" title="No days on the road yet">Each day with a visit logged shows here, this month.</Empty>
           )}
           <p className="mt-3 border-t border-rule pt-3 text-meta text-ink-3">Routes are kept {route.keptDays} days; each day&apos;s distance stays after that.</p>
         </Sheet>

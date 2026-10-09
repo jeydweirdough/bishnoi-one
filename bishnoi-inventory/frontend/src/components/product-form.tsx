@@ -47,7 +47,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
   org: Org;
   /** What this person may add from here without leaving the form. */
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "brands" | "categories" | "suppliers" | "units">;
   product?: Product;
   /** Products a new one could be a variant of. */
   parents: { id: string; name: string; sku: string }[];

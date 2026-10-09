@@ -94,7 +94,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
               </LinkButton>
             )}
             {data.canSetGoals && (
-              <LinkButton href={`/kpis/targets?month=${month}`} variant="primary" icon={<Target className="size-4" aria-hidden />}>
+              <LinkButton href={`/performance/targets?month=${month}`} variant="primary" icon={<Target className="size-4" aria-hidden />}>
                 Set targets
               </LinkButton>
             )}
@@ -182,7 +182,7 @@ function Detailing({ summary, terms }: { summary: DetailingSummary; terms: Terms
         {summary.detailedVisits} of {summary.visits} {summary.visits === 1 ? "visit" : "visits"} this month recorded the products discussed.
       </p>
       {summary.products.length === 0 ? (
-        <p className="py-2 text-meta text-ink-3">No products recorded on visits yet. Agents add them when they log a visit.</p>
+        <Empty compact icon="products" title="No products recorded yet">Agents add the products they discussed when they log a visit.</Empty>
       ) : (
         <>
           <ul className="space-y-3">

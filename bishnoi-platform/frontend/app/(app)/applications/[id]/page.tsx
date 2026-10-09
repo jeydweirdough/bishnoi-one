@@ -119,6 +119,13 @@ function Overview({ app }: { app: ApplicationDetail }) {
                   </a>
                 ) : null,
               ],
+              ["Its API", app.apiUrl ? <span className="font-mono text-meta break-all">{app.apiUrl}</span> : "None, so no other application can use it"],
+              [
+                "Connected",
+                <Link key="c" href="/connections" className="text-hema hover:underline">
+                  {app.connected ? (app.connectedAt ? `Yes, asked ${ago(app.connectedAt)}` : "Key made, not connected yet") : "No"}
+                </Link>,
+              ],
               ["Health address", app.healthUrl ? <span className="font-mono text-meta break-all">{app.healthUrl}</span> : "None, so it isn't checked"],
               ["Version", app.version],
               ["Users", plural(app.userCount, "person", "people")],

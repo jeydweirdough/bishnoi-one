@@ -89,7 +89,7 @@ export async function sendEmail(input: { companyId: string | null; contactId: st
   });
 }
 
-// --- approved emails: templates an administrator writes and approves ---
+// --- email templates: written by an administrator, sent by reps as written ---
 
 export type EmailTemplate = {
   id: string;

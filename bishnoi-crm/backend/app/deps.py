@@ -59,6 +59,10 @@ def get_settings_dep(request: Request, tenant: Annotated[Tenant, Depends(current
     if row is not None:
         found = {"org_name": row.org_name, "org_currency": row.currency, "org_locale": row.locale, "org_timezone": row.timezone, "terms": row.terms}
         overrides |= {k: v for k, v in found.items() if v}
+    # What the CRM is linked to, as the platform says (Connections); nothing when not connected.
+    from app.platform_links import overrides as links  # here, like app.company above
+
+    overrides |= links(base)
     return base.model_copy(update=overrides)
 
 

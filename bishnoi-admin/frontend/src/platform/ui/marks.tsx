@@ -12,7 +12,7 @@ const statusStyle: Record<CustomerStatus, string> = {
 export function StatusMark({ status }: { status: CustomerStatus }) {
   return (
     <span
-      className={`inline-flex h-5 items-center rounded-[2px] px-1.5 text-stamp uppercase ${statusStyle[status]}`}
+      className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp uppercase ${statusStyle[status]}`}
     >
       {CUSTOMER_STATUSES[status]}
     </span>
@@ -28,7 +28,7 @@ export function QuoteStateMark({ state }: { state: Quote["state"] }) {
     return <span className="text-stamp whitespace-nowrap text-ink-3 uppercase">{QUOTE_STATES.ready}</span>;
   }
   return (
-    <span className="inline-flex h-5 shrink-0 items-center rounded-[2px] border border-dashed border-ink-2 px-1.5 text-stamp whitespace-nowrap text-ink-2 uppercase">
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-dashed border-ink-2 px-1.5 text-stamp whitespace-nowrap text-ink-2 uppercase">
       {QUOTE_STATES.waiting}
     </span>
   );
@@ -40,7 +40,7 @@ export function Flag({ letter, children }: { letter: string; children: React.Rea
     <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-eosin">
       <span
         aria-hidden
-        className="inline-flex size-[18px] items-center justify-center rounded-[2px] border border-eosin text-stamp leading-none"
+        className="inline-flex size-[18px] items-center justify-center rounded-full border border-eosin text-stamp leading-none"
       >
         {letter}
       </span>

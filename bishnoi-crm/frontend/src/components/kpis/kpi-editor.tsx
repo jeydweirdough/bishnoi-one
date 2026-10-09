@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Choice, Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
@@ -14,7 +14,7 @@ import { FILTER_WORDS, UNIT_LABELS, words } from "./words";
 
 type Product = { id: string; name: string };
 
-/** Settings → KPIs: the list, in the order screens show them, each editable in place; and a new one. */
+/** Settings → Performance: the list, in the order screens show them, each editable in place; and a new one. */
 export function KpiEditor({ catalogue, products }: { catalogue: KpiCatalogue; products: Product[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<string | "new" | null>(null);
@@ -36,7 +36,7 @@ export function KpiEditor({ catalogue, products }: { catalogue: KpiCatalogue; pr
       <div className="flex justify-end">
         {editing !== "new" && (
           <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
-            New KPI
+            New measure
           </Button>
         )}
       </div>
@@ -67,12 +67,12 @@ export function KpiEditor({ catalogue, products }: { catalogue: KpiCatalogue; pr
                     <p className="text-meta text-ink-3">For {k.roles.length ? k.roles.map((r) => r.name).join(", ") : "everyone"}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
-                    <button type="button" onClick={() => move(i, -1)} disabled={i === 0 || pending} className="rounded-[14px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} up`}>
+                    <IconButton onClick={() => move(i, -1)} disabled={i === 0 || pending} size="sm" label={`Move ${k.name} up`}>
                       <ArrowUp className="size-4" aria-hidden />
-                    </button>
-                    <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1 || pending} className="rounded-[14px] p-1.5 text-ink-3 hover:bg-bench disabled:opacity-30" aria-label={`Move ${k.name} down`}>
+                    </IconButton>
+                    <IconButton onClick={() => move(i, 1)} disabled={i === items.length - 1 || pending} size="sm" label={`Move ${k.name} down`}>
                       <ArrowDown className="size-4" aria-hidden />
-                    </button>
+                    </IconButton>
                     <Button size="sm" variant="quiet" icon={<Pencil className="size-3.5" aria-hidden />} onClick={() => setEditing(k.id)}>
                       Edit
                     </Button>
@@ -133,7 +133,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
         setError(r.fields ? null : r.error);
         return;
       }
-      toast.success(kpi ? "KPI saved" : `${r.data.name} added`);
+      toast.success(kpi ? "Measure saved" : `${r.data.name} added`);
       router.refresh();
       onDone();
     });
@@ -155,7 +155,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
         <Field label="What it means" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} placeholder="Shown next to it" />}
         </Field>
-        <Field label="What it measures" error={fields.measure} hint={fixed ? "A built-in KPI keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
+        <Field label="What it measures" error={fields.measure} hint={fixed ? "A built-in measure keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
           {(p) => (
             <Select
               {...p}
@@ -249,7 +249,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
       <FormError message={error} />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          {kpi ? "Save" : "Add KPI"}
+          {kpi ? "Save" : "Add measure"}
         </Button>
         <Button variant="quiet" onClick={onDone}>
           Cancel

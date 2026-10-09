@@ -1,3 +1,4 @@
+import { Avatar } from "@/src/platform/ui/avatar";
 import { FileText } from "lucide-react";
 import { PriceSource, RuleAdjustments, TaxSummary } from "./tax-summary";
 import Link from "next/link";
@@ -222,7 +223,7 @@ export async function QuoteView({
             ) : (
               <>
                 {approval.status === "pending" ? (
-                  <Flag letter="!">Waiting for an approver</Flag>
+                  <Waiting approvers={approval.approvers ?? []} />
                 ) : (
                   <Decision fmt={fmt} label={APPROVAL_STATUSES[approval.status]} by={approval.by} at={approval.at} note={approval.note} />
                 )}
@@ -283,5 +284,40 @@ export async function QuoteView({
         </div>
       </Sheet>
     </div>
+  );
+}
+
+/** Who a quote waits on: "your approval" when it's you (the buttons follow), else the approvers by name. */
+function Waiting({ approvers }: { approvers: { id: string; name: string; role: string; isMe?: boolean }[] }) {
+  const mine = approvers.some((a) => a.isMe);
+  const others = approvers.filter((a) => !a.isMe);
+  const names = (list: typeof approvers) => (list.length === 1 ? list[0].name : list.length === 2 ? `${list[0].name} or ${list[1].name}` : `${list[0].name} or ${list.length - 1} others`);
+  if (!approvers.length) {
+    return (
+      <>
+        <Flag letter="!">Waiting for an approver</Flag>
+        <p className="mt-1 text-meta text-ink-3">Nobody who can approve quotes reaches this team yet. An administrator gives a role Quotes → Approve.</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <Flag letter="!">{mine ? "Waiting for your approval" : `Waiting for ${names(approvers)}`}</Flag>
+      {mine ? (
+        others.length > 0 && <p className="mt-1 text-meta text-ink-3">Also: {others.map((a) => a.name).join(", ")} can approve it.</p>
+      ) : (
+        <ul className="mt-1.5 space-y-1">
+          {approvers.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 text-sm text-ink">
+              <Avatar name={a.name} id={a.id} size="sm" />
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{a.name}</span>
+                <span className="block text-meta text-ink-3">{a.role} · can approve this quote</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
-import { Field, FileInput, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { readImport, runImport, type ImportFile, type ImportKind, type ImportResult } from "../../actions/imports";
 
@@ -97,14 +98,25 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             e.preventDefault();
             read(new FormData(e.currentTarget));
           }}
-          className="mt-3 flex flex-wrap items-end gap-3"
+          className="mt-3 space-y-3"
         >
-          <Field label="Spreadsheet" className="min-w-64 flex-1">
-            {(p) => <FileInput {...p} name="file" accept=".xlsx,.xlsm,.csv" onChange={(e) => e.currentTarget.form?.requestSubmit()} />}
+          <Field label="Spreadsheet">
+            {(p) => (
+              <FileDrop
+                {...p}
+                name="file"
+                accept=".xlsx,.xlsm,.csv"
+                note="Excel (.xlsx) or CSV, with the column names in the first row"
+                busy={pending && !file}
+                onChange={(e) => e.currentTarget.form?.requestSubmit()}
+              />
+            )}
           </Field>
+          <div className="flex justify-end">
           <Button type="submit" loading={pending && !file} icon={<FileSpreadsheet className="size-4" aria-hidden />}>
             Read file
           </Button>
+          </div>
         </form>
         {kind === "customers" && !file && (
           <p className="mt-3 text-meta text-ink-3">
@@ -145,7 +157,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                         {f.required && <span className="text-danger"> *</span>}
                       </th>
                       <td className="px-3 py-2">
-                        <select
+                        <Select
                           aria-label={`Column for ${f.label}`}
                           value={col ?? ""}
                           onChange={(e) => map(f.key, e.target.value)}
@@ -157,7 +169,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                               {h}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </td>
                       <td className="max-w-64 truncate py-2 pl-3 text-ink-2">{col !== null && col !== undefined ? first[col] || <span className="text-ink-3">empty</span> : <span className="text-ink-3">—</span>}</td>
                     </tr>

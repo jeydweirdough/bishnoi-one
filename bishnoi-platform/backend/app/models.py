@@ -132,7 +132,16 @@ class Application(Base):
     # Where people open it, and where the platform asks whether it is up.
     app_url: Mapped[str | None] = mapped_column(String(500), default=None)
     health_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    # Its API, which other applications call when they're linked to it.
+    api_url: Mapped[str | None] = mapped_column(String(500), default=None)
     version: Mapped[str | None] = mapped_column(String(40), default=None)
+    # The key it connects to the platform with (PLATFORM_APP_KEY on its server):
+    # only its hash is kept, and the last characters to tell keys apart.
+    connect_key_hash: Mapped[str | None] = mapped_column(String(64), default=None)
+    connect_key_hint: Mapped[str | None] = mapped_column(String(12), default=None)
+    connect_key_made_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When it last asked for its links: how the platform knows it's connected.
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # Retired applications stay for their history, out of the lists.
     is_active: Mapped[bool] = mapped_column(default=True)
     status_override: Mapped[str | None] = mapped_column(String(16), default=None)
@@ -172,6 +181,23 @@ class Integration(Base):
     status: Mapped[str] = mapped_column(String(16), default="unknown")
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AppLink(Base):
+    """One application uses another (the CRM uses Inventory): the caller is
+    given the other's address and a key, the other accepts that key. The key
+    is kept encrypted (app/links.py); switching the link off takes it from both."""
+
+    __tablename__ = "nbpl_app_links"
+    __table_args__ = (UniqueConstraint("from_app_id", "to_app_id", name="nbpl_app_link_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    from_app_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    to_app_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    is_on: Mapped[bool] = mapped_column(default=True)
+    secret: Mapped[str] = mapped_column(Text)
+    made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class CompanyApp(Base):

@@ -30,8 +30,14 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   "mailbox.connected": "Connected a mailbox",
   "mailbox.disconnected": "Disconnected a mailbox",
   "email.sent": "Sent an email",
-  "email_template.added": "Added an approved email",
-  "email_template.changed": "Changed an approved email",
+  "email_template.added": "Added an email template",
+  "quote_link.created": "Made an order link for a customer",
+  "quote_link.switched_off": "Switched off an order link",
+  "quote_link.changed": "Changed an order link",
+  "quote_link.deleted": "Deleted an order link",
+  "team.sharing_on": "Showed a division's customers to other divisions",
+  "team.sharing_off": "Kept a division's customers to itself",
+  "email_template.changed": "Changed an email template",
 };
 
 /** The filters the audit log offers: every action whose code starts with the key. */

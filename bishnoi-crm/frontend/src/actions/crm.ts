@@ -95,6 +95,8 @@ export type ActivityInput = {
   ownerId: string | null;
   /** A planned call: what it's for and the products to bring up (codes). */
   objective?: string | null;
+  /** A meeting's (or an online call's) link. */
+  meetingLink?: string | null;
   products?: string[];
   /** Once done: what came of it, and the products discussed (codes). */
   outcome?: string | null;

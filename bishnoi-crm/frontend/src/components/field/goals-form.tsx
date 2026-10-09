@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button, LinkButton } from "@/src/platform/ui/button";
+import { Button, LinkButton, TextButton } from "@/src/platform/ui/button";
 import { CellInput, FormError } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
@@ -74,13 +74,13 @@ export function GoalsForm({ org, month, monthName, data, previous, previousName 
       {noneYet && lastMonth.size > 0 && (
         <p className="mb-3 text-sm">
           No goals set for {monthName} yet.{" "}
-          <button
-            type="button"
-            className="font-semibold text-ink hover:underline"
+          <TextButton
+           
+            size="inherit" className="font-semibold"
             onClick={() => setDrafts(Object.fromEntries(data.people.map((p) => [p.person.id, toDraft(lastMonth.get(p.person.id) ?? null)])))}
           >
             Start from {previousName}&apos;s
-          </button>
+          </TextButton>
         </p>
       )}
       <div className="overflow-x-auto">

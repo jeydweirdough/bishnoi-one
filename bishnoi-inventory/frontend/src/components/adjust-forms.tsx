@@ -22,7 +22,7 @@ const cell = "h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 t
  */
 export function AdjustmentForm({ reference, reasons, batches, approves, preset, canAdd = {} }: {
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "products" | "units" | "warehouses">;
   reasons: ReasonOption[];
   /** Every batch with stock, for picking which one. */
   batches: BatchRow[];
@@ -173,7 +173,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
 }
 
 /** Starting a count of one warehouse, or of one category in it. */
-export function StartCount({ reference, warehouseId, canAdd = {} }: { reference: Reference; warehouseId?: string; canAdd?: CanAdd }) {
+export function StartCount({ reference, warehouseId, canAdd = {} }: { reference: Pick<Reference, "categories" | "warehouses">; warehouseId?: string; canAdd?: CanAdd }) {
   const { pending, error, fields, save } = useSave();
   const [w, setW] = useState(warehouseId || reference.warehouses.find((x) => x.isActive)?.id || "");
   const [category, setCategory] = useState("");
@@ -203,7 +203,7 @@ export function StartCount({ reference, warehouseId, canAdd = {} }: { reference:
  * The count sheet: what the system expected on each line, and what was
  * found. Blank means not counted yet. Differences show as they're typed.
  */
-export function CountSheet({ count, reference, canCount, day }: { count: Count; reference: Reference; canCount: boolean; day: Record<string, string> }) {
+export function CountSheet({ count, reference, canCount, day }: { count: Count; reference: Pick<Reference, "products">; canCount: boolean; day: Record<string, string> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const open = count.status === "open" && canCount;

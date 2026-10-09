@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomerSharingButton } from "../crm/customer-sharing";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,7 +22,10 @@ export type ManagerOption = { id: string; name: string };
 export function TeamsEditor({ teams, managers = [] }: { teams: TeamRow[]; managers?: ManagerOption[] }) {
   return (
     <div className="space-y-5">
-      <AddTeam />
+      <div className="flex flex-wrap items-center gap-2">
+        <AddTeam />
+        <CustomerSharingButton />
+      </div>
       <Sheet>
         {teams.length === 0 ? (
           <Empty icon="teams" title="No teams yet">

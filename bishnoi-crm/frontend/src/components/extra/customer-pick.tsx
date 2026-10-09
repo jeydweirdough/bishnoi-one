@@ -1,6 +1,6 @@
 "use client";
 
-import { Select } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Field } from "@/src/platform/ui/field";
 import type { FormFieldDef } from "@/src/platform/lib/types";
@@ -46,7 +46,7 @@ export function CustomerPick({
   return (
     <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
       {(p) => (
-        <Select
+        <Combobox
           id={p.id}
           className="w-full"
           allowClear
@@ -57,7 +57,7 @@ export function CustomerPick({
           loading={loading}
           showSearch={{ filterOption: false, onSearch: search }}
           placeholder={field.placeholder ?? "Type a name to search"}
-          notFoundContent={loading ? "Looking…" : "Not in the CRM yet"}
+          notFoundContent={loading ? "Looking…" : `Not in the CRM yet. Add them under Customers, then pick them here.`}
           optionRender={(o) => (
             <span className="flex items-baseline justify-between gap-3">
               <span>{o.data.label}</span>

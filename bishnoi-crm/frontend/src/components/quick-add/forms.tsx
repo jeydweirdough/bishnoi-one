@@ -28,7 +28,7 @@ function useSave() {
   return { pending, failed, run };
 }
 
-function Shell({ onSubmit, pending, failed, saveLabel, children }: { onSubmit: () => void; pending: boolean; failed: Failed | null; saveLabel: string; children: React.ReactNode }) {
+function Shell({ onSubmit, pending, failed, saveLabel, cancel, children }: { onSubmit: () => void; pending: boolean; failed: Failed | null; saveLabel: string; cancel?: () => void; children: React.ReactNode }) {
   return (
     <form
       noValidate
@@ -41,9 +41,16 @@ function Shell({ onSubmit, pending, failed, saveLabel, children }: { onSubmit: (
     >
       {children}
       <FormError message={failed && !Object.keys(failed.fields ?? {}).length ? failed.error : null} />
-      <Button type="submit" variant="primary" loading={pending}>
-        {saveLabel}
-      </Button>
+      <div className="dialog-actions">
+        {cancel && (
+          <Button type="button" onClick={cancel} disabled={pending}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" variant="primary" loading={pending}>
+          {saveLabel}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -54,6 +61,7 @@ export function AddChoice({ entity, fieldKey, fieldLabel, onAdded, done }: { ent
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and pick it"
       pending={pending}
       failed={failed}
@@ -80,6 +88,7 @@ export function AddCustomerType({ onAdded, done }: { onAdded: (code: string) => 
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and pick it"
       pending={pending}
       failed={failed}
@@ -102,11 +111,12 @@ export function AddCustomerType({ onAdded, done }: { onAdded: (code: string) => 
 }
 
 /** A customer, by name: the rest can be filled in on their page. */
-export function AddCustomer({ onAdded, done }: { onAdded: (customer: { id: string; name: string }) => void; done: () => void }) {
-  const [name, setName] = useState("");
+export function AddCustomer({ onAdded, done, initialName = "" }: { onAdded: (customer: { id: string; name: string }) => void; done: () => void; initialName?: string }) {
+  const [name, setName] = useState(initialName);
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and pick them"
       pending={pending}
       failed={failed}
@@ -133,6 +143,7 @@ export function AddTeam({ onAdded, done }: { onAdded: (team: { id: string; name:
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and pick it"
       pending={pending}
       failed={failed}
@@ -170,6 +181,7 @@ export function AddIssuer({ onAdded, done }: { onAdded: (code: string) => void; 
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and pick it"
       pending={pending}
       failed={failed}
@@ -223,6 +235,7 @@ export function AddProduct({
   const { pending, failed, run } = useSave();
   return (
     <Shell
+      cancel={done}
       saveLabel="Add and put it on the quote"
       pending={pending}
       failed={failed}

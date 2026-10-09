@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.models import (
     ComplianceRecord,
+    TravelSponsorship,
+    Vehicle,
     CorporateDocument,
     ImmigrationRecord,
     Notification,
@@ -293,5 +295,60 @@ def sync_notifications(db: Session, settings: Settings) -> int:
                     )
                     count += 1
 
+    count += _fleet_and_travel(db, today)
+
     db.commit()
     return count
+
+
+# How far ahead each vehicle date raises an alert, and what it's called.
+VEHICLE_ALERTS = (
+    ("registration_due", "vehicle_registration", "Registration", 45),
+    ("insurance_due", "vehicle_insurance", "Insurance", 45),
+    ("pms_due", "vehicle_pms", "Maintenance (PMS)", 14),
+)
+TRIP_ALERT_DAYS = 14  # a trip this close that isn't approved or booked yet
+
+
+def _keep_alert(db: Session, entity_type: str, entity_id: str, due: date | None, within: int, today: date, title: str, message: str) -> int:
+    """One open alert while the date is inside its window; closed by itself once it isn't (changed, or done)."""
+    existing = db.scalar(
+        select(Notification).where(Notification.entity_type == entity_type, Notification.entity_id == entity_id, Notification.is_resolved.is_(False))
+    )
+    days = (due - today).days if due else None
+    if days is None or days > within:
+        if existing:
+            existing.is_resolved = True
+            existing.updated_at = utcnow()
+        return 0
+    when = datetime(due.year, due.month, due.day, tzinfo=UTC)
+    if existing:
+        existing.days_remaining, existing.severity, existing.title, existing.message, existing.due_date = days, severity_from_days(days), title, message, when
+        existing.updated_at = utcnow()
+        return 0
+    db.add(Notification(id=new_id(), entity_type=entity_type, entity_id=entity_id, severity=severity_from_days(days), title=title, message=message, days_remaining=days, due_date=when))
+    return 1
+
+
+def _fleet_and_travel(db: Session, today: date) -> int:
+    """Vehicles' registration, insurance and maintenance; trips close at hand and not settled."""
+    made = 0
+    for v in db.scalars(select(Vehicle)).all():
+        car = " ".join(x for x in (v.name, v.plate) if x)
+        for attr, entity_type, label, within in VEHICLE_ALERTS:
+            due = getattr(v, attr)
+            days = (due - today).days if due else 0
+            message = (
+                f"{label} is {abs(days)} day(s) overdue." if days < 0 else f"{label} is due in {days} day(s), on {due.strftime('%b %d, %Y')}." if due else ""
+            )
+            made += _keep_alert(db, entity_type, v.id, due, within, today, f"{car}: {label.lower()}", message)
+    for t in db.scalars(select(TravelSponsorship)).all():
+        open_ = t.status in ("for_approval", "for_processing")
+        due = t.starts_on if open_ else None
+        days = (due - today).days if due else 0
+        what = "hotel stay" if t.kind == "hotel" else "flight"
+        message = f"Starts in {days} day(s) and is still {'waiting for approval' if t.status == 'for_approval' else 'being processed'}. Asked for by {t.rep_name}."
+        if days < 0:
+            message = f"Was due to start {abs(days)} day(s) ago and is still {'waiting for approval' if t.status == 'for_approval' else 'being processed'}."
+        made += _keep_alert(db, "travel", t.id, due, TRIP_ALERT_DAYS, today, f"{t.doctor_name}: {what} not settled", message)
+    return made

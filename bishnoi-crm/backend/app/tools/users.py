@@ -111,6 +111,15 @@ def make_demo(db: Session) -> None:
                 for model in (Company, Contact, Activity, Quote):
                     db.execute(update(model).where(model.owner_id == user.id).values(team_id=user.team_id))
             updated += 1
+    # A demo manager manages their divisions (a team that has its own manager keeps them).
+    for d in DEMO_ACCOUNTS:
+        user = db.scalar(select(User).where(func.lower(User.email) == d.email))
+        for name in d.manages:
+            team = team_named(db, name, make=True)
+            if user is not None and team.manager_id is None:
+                team.manager_id = user.id
+                audit(db, TOOL, "team.updated", target=team.name, target_type="team", target_id=team.id, fields=["managerId"])
+    db.flush()
     # Demo employee IDs (EMP-0001 on), for the customer transfer. Ones already set stay.
     for number, d in enumerate(DEMO_ACCOUNTS, 1):
         user = db.scalar(select(User).where(func.lower(User.email) == d.email))

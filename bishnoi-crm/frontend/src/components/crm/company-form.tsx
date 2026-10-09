@@ -1,6 +1,7 @@
 "use client";
 
-import { Select as AntSelect } from "antd";
+import type { Then } from "./new-customer";
+import { Combobox } from "@/src/platform/ui/pickers";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -32,7 +33,7 @@ export function CompanyForm({
   initialTeam,
   initialType,
   missingOnly = false,
-  thenQuote = false,
+  then = null,
 }: {
   people: Assignable[];
   types: CustomerType[];
@@ -48,7 +49,8 @@ export function CompanyForm({
   /** "Complete profile": only the profile fields still empty. */
   missingOnly?: boolean;
   /** Added from "New quote": open their quote once they're saved. */
-  thenQuote?: boolean;
+  /** What opens once a new customer is saved: their new quote or deal. */
+  then?: Then;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -131,8 +133,10 @@ export function CompanyForm({
         result = await createCompany({ ...input, allowDuplicate });
       }
       if (result.ok) {
-        toast.success(company ? "Changes saved" : "Customer added", { description: thenQuote ? `Now their quote: ${result.data.name}` : result.data.name });
-        router.push(thenQuote && !company ? `/companies/${result.data.id}/quotes/new` : `/companies/${result.data.id}`);
+        toast.success(company ? "Changes saved" : "Customer added", { description: then ? `Now their ${then}: ${result.data.name}` : result.data.name });
+        router.push(
+          company || !then ? `/companies/${result.data.id}` : then === "quote" ? `/companies/${result.data.id}/quotes/new` : `/deals/new?company=${encodeURIComponent(result.data.id)}`,
+        );
         router.refresh();
         return;
       }
@@ -157,7 +161,7 @@ export function CompanyForm({
             {options.length > 5 ? (
               <Field label={f.label} error={fields.status}>
                 {(p) => (
-                  <AntSelect
+                  <Combobox
                     id={p.id}
                     className="w-full"
                     value={status || undefined}
@@ -263,13 +267,13 @@ export function CompanyForm({
 
       <FormError message={error} />
       {duplicates.length > 0 && (
-        <Duplicates message={dupMessage} found={duplicates} base="/companies" pending={pending} onAddAnyway={() => submit(true)} quote={thenQuote} />
+        <Duplicates message={dupMessage} found={duplicates} base="/companies" pending={pending} onAddAnyway={() => submit(true)} quote={then === "quote"} />
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
           {company ? "Save changes" : "Add customer"}
         </Button>
-        <LinkButton href={company ? `/companies/${company.id}` : thenQuote ? "/quotes" : "/companies"} variant="quiet">
+        <LinkButton href={company ? `/companies/${company.id}` : then === "quote" ? "/quotes" : then === "deal" ? "/deals" : "/companies"} variant="quiet">
           Cancel
         </LinkButton>
       </div>

@@ -158,7 +158,7 @@ def check_kpi(db: Session, k: Kpi) -> None:
         raise field_error("roles", "Pick roles from the list.")
     taken = db.scalar(select(Kpi).where(func.lower(Kpi.name) == k.name.lower(), Kpi.id != k.id))
     if taken is not None:
-        raise field_error("name", "Another KPI already has this name.")
+        raise field_error("name", "Another measure already has this name.")
 
 
 @router.post("/admin/kpis", status_code=status.HTTP_201_CREATED)
@@ -189,12 +189,12 @@ def create_kpi(access: Configure, me: CurrentUser, db: DB, body: KpiIn) -> dict:
 def update_kpi(access: Configure, me: CurrentUser, db: DB, kpi_id: str, body: KpiFields) -> dict:
     k = db.get(Kpi, kpi_id)
     if k is None:
-        raise not_found("KPI")
+        raise not_found("measure")
     wanted = changed(body)
     if k.code and ({"measure", "filters"} & set(wanted)) and (wanted.get("measure", k.measure) != k.measure or (wanted.get("filters") or {}) != (k.filters or {})):
-        raise HTTPException(status.HTTP_409_CONFLICT, "A built-in KPI keeps what it measures. Add a new KPI to measure something else.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "A built-in measure keeps what it measures. Add a new measure for something else.")
     if "name" in wanted and not wanted["name"]:
-        raise field_error("name", "Give the KPI a name.")
+        raise field_error("name", "Give the measure a name.")
     if "description" in wanted:
         wanted["description"] = (wanted["description"] or "").strip() or None
     fields = []
@@ -216,9 +216,9 @@ def delete_kpi(access: Configure, me: CurrentUser, db: DB, kpi_id: str) -> Respo
     """A KPI and its targets and results go. A built-in one is switched off instead."""
     k = db.get(Kpi, kpi_id)
     if k is None:
-        raise not_found("KPI")
+        raise not_found("measure")
     if k.code:
-        raise HTTPException(status.HTTP_409_CONFLICT, "A built-in KPI can't be deleted. Switch it off instead.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "A built-in measure can't be deleted. Switch it off instead.")
     audit(db, me, "kpi.deleted", target=k.name, target_type="kpi", target_id=k.id)
     db.delete(k)
     db.commit()

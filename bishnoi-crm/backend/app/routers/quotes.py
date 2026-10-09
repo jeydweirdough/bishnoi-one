@@ -185,7 +185,7 @@ def deal_ref(db: Session, deal_id: str | None) -> dict | None:
     return {"id": deal.id, "name": deal.name} if deal else None
 
 
-def quote_out(db: Session, q: Quote, access: Access) -> dict:
+def quote_out(db: Session, q: Quote, access: Access, approvers: bool = True) -> dict:
     team = db.get(Team, q.team_id) if q.team_id else None
     company = db.get(Company, q.company_id) if q.company_id else None
     contact = db.get(Contact, q.contact_id) if q.contact_id else None
@@ -236,6 +236,11 @@ def quote_out(db: Session, q: Quote, access: Access) -> dict:
             "note": q.approval_note,
             "by": by(q.approval_by_id, q.approval_by_name),
             "at": iso(q.approval_at),
+            # Who it waits on, by name (as the waiting email goes to them): the
+            # team's approvers, else its manager, else whoever reaches every team.
+            "approvers": [{"id": u.id, "name": u.full_name, "role": u.role.name, "isMe": u.id == access.user_id} for u in mail.approvers_of(db, q)]
+            if approvers and q.approval_status == "pending"
+            else [],
         },
         "letter": letter,
         "payment": {"status": q.payment_status, "paidCentavos": q.paid_centavos, "payments": q.payments},
@@ -307,6 +312,83 @@ async def read_letter(upload: UploadFile) -> tuple[bytes, str, str]:
     return data, kind[0], kind[1]
 
 
+def save_quote(
+    db: Session,
+    settings,
+    me: User,
+    company: Company | None,
+    contact: Contact | None,
+    body: QuoteIn,
+    priced: dict,
+    kind_,
+    issuer,
+    deal: Deal | None,
+    extra: dict | None,
+    rules,
+    stored: dict | None = None,
+    data: bytes | None = None,
+) -> Quote:
+    """A priced quote saved for its customer, owned by `me`: numbered, in the
+    audit log, and the approvers told when it waits for one. Making a quote here
+    and through a customer's order link (app/routers/quote_links.py) is the same
+    step, so the same rules hold for both."""
+    on = today(settings.org_timezone)
+    who = (contact.full_name + (f", {company.name}" if company else "")) if contact else company.name
+    reasons = priced["approvalReasons"]
+    record = Quote(
+        number=next_number(db, on),
+        company_id=company.id if company else None,
+        contact_id=contact.id if contact else None,
+        deal_id=deal.id if deal else None,
+        customer_name=who[:200],
+        price_type=kind_.code,
+        price_type_name=kind_.name,
+        rx=body.rx,
+        payer=issuer.code if issuer else "self",
+        payer_name=issuer.name if issuer else None,
+        notes=body.notes,
+        lines=priced["lines"],
+        gross_centavos=priced["grossCentavos"],
+        promo_discount_centavos=priced["promoDiscountCentavos"],
+        discount_centavos=priced["discountCentavos"],
+        total_centavos=priced["totalCentavos"],
+        tax=priced.get("tax"),
+        approval_status="pending" if reasons else "none",
+        approval_reasons=reasons,
+        letter=(
+            {"number": body.letter.number, "issuedOn": body.letter.issued_on.isoformat(), "amountCentavos": body.letter.amount_centavos, "file": stored}
+            if issuer
+            else None
+        ),
+        letter_status="pending" if issuer else "none",
+        payment_status="unpaid" if issuer else "none",
+        payments=[],
+        valid_until=(date.fromisoformat(on) + timedelta(days=rules.quote_valid_days)).isoformat(),
+        terms=rules.quote_terms,
+        extra=extra,
+        owner_id=me.id,
+        team_id=me.team_id,
+        created_by_id=me.id,
+    )
+    db.add(record)
+    try:
+        db.flush()
+    except IntegrityError:  # two quotes took the same number at once; the next one is free
+        db.rollback()
+        record.number = next_number(db, on)
+        db.add(record)
+        db.flush()
+    if stored is not None:
+        # Kept in the database, with the quote: saved together or not at all.
+        db.add(StoredFile(ref=stored["ref"], content_type=stored["contentType"], data=data))
+    audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
+    db.commit()
+    db.refresh(record)
+    if record.approval_status == "pending":
+        mail.quote_waiting(db, settings, record, me)
+    return record
+
+
 @router.post("/{kind}/{record_id}/quotes", status_code=status.HTTP_201_CREATED)
 async def create_quote(
     access: Create,
@@ -370,59 +452,7 @@ async def create_quote(
         name = Path(letter_file.filename).name[:120] or f"letter{ext}"
         stored = {"ref": ref, "ext": ext, "name": name, "contentType": content_type, "size": len(data)}
 
-    who = (contact.full_name + (f", {company.name}" if company else "")) if contact else company.name
-    reasons = priced["approvalReasons"]
-    record = Quote(
-        number=next_number(db, on),
-        company_id=company.id if company else None,
-        contact_id=contact.id if contact else None,
-        deal_id=deal.id if deal else None,
-        customer_name=who[:200],
-        price_type=kind_.code,
-        price_type_name=kind_.name,
-        rx=body.rx,
-        payer=issuer.code if issuer else "self",
-        payer_name=issuer.name if issuer else None,
-        notes=body.notes,
-        lines=priced["lines"],
-        gross_centavos=priced["grossCentavos"],
-        promo_discount_centavos=priced["promoDiscountCentavos"],
-        discount_centavos=priced["discountCentavos"],
-        total_centavos=priced["totalCentavos"],
-        tax=priced.get("tax"),
-        approval_status="pending" if reasons else "none",
-        approval_reasons=reasons,
-        letter=(
-            {"number": body.letter.number, "issuedOn": body.letter.issued_on.isoformat(), "amountCentavos": body.letter.amount_centavos, "file": stored}
-            if issuer
-            else None
-        ),
-        letter_status="pending" if issuer else "none",
-        payment_status="unpaid" if issuer else "none",
-        payments=[],
-        valid_until=(date.fromisoformat(on) + timedelta(days=rules.quote_valid_days)).isoformat(),
-        terms=rules.quote_terms,
-        extra=extra,
-        owner_id=me.id,
-        team_id=me.team_id,
-        created_by_id=me.id,
-    )
-    db.add(record)
-    try:
-        db.flush()
-    except IntegrityError:  # two quotes took the same number at once; the next one is free
-        db.rollback()
-        record.number = next_number(db, on)
-        db.add(record)
-        db.flush()
-    if stored is not None:
-        # Kept in the database, with the quote: saved together or not at all.
-        db.add(StoredFile(ref=stored["ref"], content_type=stored["contentType"], data=data))
-    audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
-    db.commit()
-    db.refresh(record)
-    if record.approval_status == "pending":
-        mail.quote_waiting(db, settings, record, me)
+    record = save_quote(db, settings, me, company, contact, body, priced, kind_, issuer, deal, extra, rules, stored, data if stored is not None else None)
     return quote_out(db, record, access)
 
 
@@ -468,7 +498,7 @@ def list_quotes(
         query = query.where(or_(func.lower(Quote.number).like(like), func.lower(Quote.customer_name).like(like)))
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     quotes = db.scalars(query.order_by(Quote.created_at.desc()).limit(limit).offset(offset)).unique().all()
-    return {"items": [quote_out(db, x, access) for x in quotes], "total": total}
+    return {"items": [quote_out(db, x, access, approvers=False) for x in quotes], "total": total}
 
 
 @router.get("/quotes/{quote_id}")

@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { Chips, ExpiryMark, FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
 import { MOVEMENT_FILTERS, MOVEMENT_KINDS, param, query, referenceHref, signed } from "../lib/labels";
 import { context, type Search } from "../lib/page";
+import { given, referenceOf } from "../lib/reference";
 import type { BatchRow, Movement, Page, Reference, SerialRow, StockOverview } from "../lib/types";
 
-const warehouseOptions = (ref: Reference) => [{ value: "", label: "Every warehouse" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
+const warehouseOptions = (ref: Pick<Reference, "warehouses">) => [{ value: "", label: "Every warehouse" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
 
 export async function StockPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may } = await context();
   if (!may("stock.view")) return <NoAccess what="stock levels" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), warehouse: param(s, "warehouse"), category: param(s, "category"), state: param(s, "state") };
-  const [data, ref] = await Promise.all([load<StockOverview>(`/inventory/stock${query(f)}`), load<Reference>("/inventory/reference")]);
+  const { stock: data, reference: ref } = await loadQuery<{ stock: StockOverview; reference: Pick<Reference, "warehouses" | "categories"> }>(
+    `query Stock($q: String, $warehouse: String, $category: String, $state: String) { stock(q: $q, warehouse: $warehouse, category: $category, state: $state) ${referenceOf("warehouses", "categories")} }`,
+    given(f),
+    ["stock", "reference"],
+  );
   const t = data.total;
   const chip = (state: string, label: string) => ({ value: state, label, href: `/stock${query({ ...f, state })}` });
 
@@ -78,8 +83,16 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
   const s = await searchParams;
   const f = { q: param(s, "q"), product: param(s, "product"), warehouse: param(s, "warehouse"), kind: param(s, "kind"), from: param(s, "from"), to: param(s, "to") };
   const before = param(s, "before");
-  const [page, ref] = await Promise.all([load<Page<Movement>>(`/inventory/movements${query({ ...f, before, limit: 50 })}`), load<Reference>("/inventory/reference")]);
-  const product = f.product ? ref.products.find((p) => p.id === f.product) : null;
+  // The product named in the filter comes with the page; the whole product list doesn't.
+  const { page, reference: ref, product } = await loadQuery<{ page: Page<Movement>; reference: Pick<Reference, "warehouses">; product?: { id: string; name: string; sku: string } | null }>(
+    `query Movements($q: String, $product: String, $warehouse: String, $kind: String, $from: String, $to: String, $before: Int, $productId: String!, $named: Boolean!) {
+      page: movements(q: $q, product: $product, warehouse: $warehouse, kind: $kind, from: $from, to: $to, before: $before, limit: 50)
+      ${referenceOf("warehouses")}
+      product(id: $productId) @include(if: $named)
+    }`,
+    { ...given(f), ...(before ? { before: Number(before) } : {}), productId: f.product, named: Boolean(f.product) },
+    ["page", "reference"],
+  );
   const last = page.items.at(-1);
 
   return (
@@ -153,7 +166,11 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
   if (!may("stock.view")) return <NoAccess what="batches" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), warehouse: param(s, "warehouse"), expiry: param(s, "expiry"), empty: param(s, "empty") };
-  const [batches, ref] = await Promise.all([load<BatchRow[]>(`/inventory/batches${query(f)}`), load<Reference>("/inventory/reference")]);
+  const { batches, reference: ref } = await loadQuery<{ batches: BatchRow[]; reference: Pick<Reference, "warehouses"> }>(
+    `query Batches($q: String, $warehouse: String, $expiry: String, $empty: Boolean) { batches(q: $q, warehouse: $warehouse, expiry: $expiry, empty: $empty) ${referenceOf("warehouses")} }`,
+    given({ ...f, empty: Boolean(f.empty) }),
+    ["batches", "reference"],
+  );
   const chip = (expiry: string, label: string) => ({ value: expiry, label, href: `/batches${query({ ...f, expiry })}` });
 
   return (
@@ -198,7 +215,7 @@ export async function SerialsPage({ searchParams }: { searchParams: Search }) {
   const { may, at } = await context();
   if (!may("stock.view")) return <NoAccess what="serial numbers" />;
   const q = param(await searchParams, "q");
-  const units = q ? await load<SerialRow[]>(`/inventory/serials${query({ q })}`) : [];
+  const units = q ? (await loadQuery<{ serials: SerialRow[] }>(`query Serials($q: String!) { serials(q: $q) }`, { q }, ["serials"])).serials : [];
   return (
     <>
       <PageHeader title="Serial numbers">Find a serial-numbered unit: where it is now, and everywhere it has been.</PageHeader>

@@ -60,6 +60,7 @@ export function LogActivity({
   const [at, setAt] = useState(() => (kindOf(initialKind).planned ? tomorrowMorning(org.timezone) : localDateTime(new Date(now), org.timezone)));
   const [planned, setPlanned] = useState(kindOf(initialKind).planned);
   const [duration, setDuration] = useState("");
+  const [link, setLink] = useState("");
   const [direction, setDirection] = useState<"out" | "in">("out");
   const [contact, setContact] = useState(contactId ?? "");
   const [company, setCompany] = useState(companyId ?? "");
@@ -91,6 +92,7 @@ export function LogActivity({
       companyId: company || null,
       contactId: contact || null,
       durationMinutes: (kind === "call" || kind === "meeting") && duration ? Number(duration) : null,
+      meetingLink: (kind === "call" || kind === "meeting") && link.trim() ? link.trim() : null,
       direction: kind === "call" || kind === "email" ? direction : null,
       ownerId: ownerId || null,
       alsoCompanyIds: alsoAbout,
@@ -136,6 +138,16 @@ export function LogActivity({
       <Field label="Details" optional error={fields.body}>
         {(p) => <Textarea {...p} rows={2} value={body} onChange={(e) => setBody(e.target.value)} />}
       </Field>
+      {(kind === "meeting" || kind === "call") && (
+        <Field
+          label={kind === "meeting" ? "Meeting link" : "Video call link"}
+          optional
+          error={fields.meetingLink}
+          hint={kind === "meeting" ? "Paste the Google Meet, Zoom or Teams link: a Join button shows wherever the meeting does." : "When the call is online: paste its link, and it can be joined from here."}
+        >
+          {(p) => <Input {...p} type="url" inputMode="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://meet.google.com/abc-defg-hij" maxLength={500} />}
+        </Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={info.planned ? "When it's due" : "When"} error={fields.at}>
           {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}
