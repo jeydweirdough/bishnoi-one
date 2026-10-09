@@ -2,6 +2,7 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
+import { loadAddresses } from "./addresses";
 import { platformHome } from "./apps";
 import { SESSION_COOKIE } from "./session-cookie";
 import type { Me, Org } from "./types";
@@ -188,7 +189,10 @@ export async function getCompanyMe(): Promise<Me & { org: Org }> {
   // The companies list is the Platform app's. Only the shell serves it at
   // "/platform", so this asks where it actually is rather than sending a
   // module app to a path it has never had.
-  if (me.org === null) redirect(platformHome());
+  if (me.org === null) {
+    await loadAddresses();
+    redirect(platformHome());
+  }
   return me as Me & { org: Org };
 }
 

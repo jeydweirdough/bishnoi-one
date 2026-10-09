@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
-import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
+import { addressKnown, THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
@@ -872,7 +872,7 @@ function Account({ me }: { me: Me }) {
   const [leaving, setLeaving] = useState(false);
   const [pending, setPending] = useState(false);
   const switchHref =
-    THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)
+    THIS_APP && THIS_APP !== "platform" && addressKnown("platform")
       ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
       : null;
   // What's used now and then sits behind ⋯, so the sidebar's foot is only who you are.

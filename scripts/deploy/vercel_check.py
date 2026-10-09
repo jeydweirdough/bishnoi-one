@@ -1,6 +1,6 @@
 """Before and after an app goes on Vercel: is everything set up, and did it start?
 
-Run by each app's Deploy workflow (.github/workflows/deploy-<app>.yml), from
+Run by the Deploy workflow (.github/workflows/deploy.yml) for each ticked app, from
 the repo's root, with VERCEL_TOKEN (and VERCEL_SCOPE, for a team) set:
 
     python3 scripts/deploy/vercel_check.py check  --app bishnoi-crm --part "screens and API"
@@ -267,9 +267,9 @@ def check(app: str, part: str) -> int:
                 other_api = config["projects"].get(f"{other}/backend")
                 found = vercel.project(other_api) if other_api else None
                 if found is None:
-                    report.block(f"{other_name}'s API isn't on Vercel", f"{why} Run **Deploy {other_name}** first.")
+                    report.block(f"{other_name}'s API isn't on Vercel", f"{why} Tick **{other_name}** in Actions > Deploy too (it goes first), or deploy it first.")
                 else:
-                    is_live(report, vercel, found, f"{other_name}'s API ({other_api})", f"{why} Run **Deploy {other_name}** first.")
+                    is_live(report, vercel, found, f"{other_name}'s API ({other_api})", f"{why} Tick **{other_name}** in Actions > Deploy too (it goes first), or deploy it first.")
 
     if report.blocked:
         report.write("Blocked: nothing was deployed. Do the steps below, then run this workflow again.")

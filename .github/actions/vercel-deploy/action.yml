@@ -2,7 +2,7 @@
 # .github/workflows/deploy-app.yml once the check has passed. Needs
 # VERCEL_TOKEN (and VERCEL_SCOPE, for a team) in the job's environment.
 name: Deploy to Vercel
-description: Deploys one project to production, checks it answers, and tags the commit as deployed.
+description: Deploys one project to production, checks it answers, and marks the commit as deployed (refs/deployed/<project>).
 inputs:
   project:
     description: The Vercel project's name
@@ -14,7 +14,7 @@ runs:
   using: composite
   steps:
     - name: Deploy ${{ inputs.project }}
-      # bash -eo pipefail: a failed deploy fails the step, so it isn't tagged as deployed.
+      # bash -eo pipefail: a failed deploy fails the step, so it isn't marked as deployed.
       shell: bash
       run: |
         scope="${VERCEL_SCOPE:-$(python3 -c 'import json; print(json.load(open(".github/deploy.json")).get("scope", ""))')}"
@@ -29,6 +29,11 @@ runs:
       shell: bash
       run: python3 scripts/deploy/vercel_check.py health --project "${{ inputs.project }}" --side "${{ inputs.side }}"
 
+    # Kept as refs/deployed/<project>, not a tag: a tag that moves clashes with
+    # everyone's copy on their next pull. See what's live with
+    # git ls-remote origin "refs/deployed/*". The old tag of the same name goes.
     - name: Remember this commit as deployed
       shell: bash
-      run: git push -f origin "HEAD:refs/tags/deployed/${{ inputs.project }}"
+      run: |
+        git push -f origin "HEAD:refs/deployed/${{ inputs.project }}"
+        git push origin ":refs/tags/deployed/${{ inputs.project }}" 2>/dev/null || true

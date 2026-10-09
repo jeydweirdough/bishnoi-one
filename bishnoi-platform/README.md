@@ -93,7 +93,7 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy Platform → Run workflow**. First: every other app checks companies and Bishnoi One sign-ins there.
+On GitHub: **Actions → Deploy → Run workflow**, ticking this app. First: every other app checks companies and Bishnoi One sign-ins there.
 
 It checks everything is set up first, and stops with what to do next when
 something isn't. Nothing goes online until someone runs it.

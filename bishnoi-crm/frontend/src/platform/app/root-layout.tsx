@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { APP_NAME } from "../lib/labels";
+import { Addresses } from "./addresses";
 import { AntTheme } from "./ant-theme";
 
 // Poppins has no variable version, so each weight in use is loaded by name.
@@ -26,6 +27,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${poppins.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
+        <Addresses />
         <AntTheme>{children}</AntTheme>
         <Toaster
           position="top-center"

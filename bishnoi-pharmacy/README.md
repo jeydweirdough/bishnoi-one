@@ -93,7 +93,7 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy Pharmacy → Run workflow**. Any time.
+On GitHub: **Actions → Deploy → Run workflow**, ticking this app. Any time.
 
 It checks everything is set up first, and stops with what to do next when
 something isn't. Nothing goes online until someone runs it.

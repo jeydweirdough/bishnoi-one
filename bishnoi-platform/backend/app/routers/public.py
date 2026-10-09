@@ -22,6 +22,15 @@ from app.routers.communications import showing
 router = APIRouter(prefix="/public", tags=["public"])
 
 
+@router.get("/applications")
+def addresses(db: DB) -> dict:
+    """Where each application's screens are, as Applications says: every app's
+    sidebar, sign-in button and redirects read them from here, so a new domain
+    is set once, here, and every app follows. Not a secret: they're web addresses."""
+    apps = db.scalars(select(Application).where(Application.is_active, Application.app_url.is_not(None)))
+    return {"addresses": {a.key: a.app_url.rstrip("/") for a in apps}, "askAgainIn": 300}
+
+
 @router.get("/notices")
 def notices(db: DB, table: Notices, app: str | None = None, company: str | None = None) -> dict:
     return {

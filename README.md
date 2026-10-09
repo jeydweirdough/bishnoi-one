@@ -433,14 +433,12 @@ password, and uses **Switch company** in the app's menu.
 
 ```
 API_URL=https://<this app's API address>.vercel.app
-NEXT_PUBLIC_BISHNOI_CRM_URL=https://<the CRM's screens address>.vercel.app
-NEXT_PUBLIC_BISHNOI_INVENTORY_URL=https://<Inventory's screens address>.vercel.app
+PLATFORM_API_URL=https://<the Platform's API address>.vercel.app
 ```
 
-- Add one `NEXT_PUBLIC_BISHNOI_<APP>_URL` for each other app you've put
-  online, so the sidebar's links between apps go to the right place
-  ([section 6](#screens-settings-every-app)). These are read when the
-  screens are built: redeploy after you set or change one.
+- The other apps' addresses come from **Platform > Applications**: set each
+  app's screens address there once. A new domain is changed there, and every
+  app follows within 5 minutes, with no redeploy.
 - Each app already knows which app it is: `NEXT_PUBLIC_BISHNOI_APP` isn't
   needed.
 - Don't set `SHOW_DEMO_ACCOUNTS` online.
@@ -461,9 +459,10 @@ Use the addresses Vercel actually gives your projects (e.g.
 screens' `API_URL` must both name it.
 
 **Pushing doesn't deploy.** To put an app online, the repo owner opens
-**Actions → Deploy <app> → Run workflow** on GitHub (one workflow per app).
-It checks the app is set up first and, when it isn't, stops before deploying
-and says what to do next (MAINTAINING.md, "Deployments on Vercel").
+**Actions → Deploy → Run workflow** on GitHub, ticking the apps to deploy
+(the Platform goes first). It checks each app is set up first and, when one
+isn't, stops before deploying it and says what to do next (MAINTAINING.md,
+"Deployments on Vercel").
 
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
@@ -565,16 +564,16 @@ the CRM tells its users the other app can't be reached; nothing breaks.
 | Setting | Default | What it does |
 |---|---|---|
 | `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
-| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API, for the announcements above every page. Unreachable: none show. |
+| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API: every other app's address (Platform > Applications) and the announcements above every page. Unreachable: the last addresses it had (or the ones below) are used, and no announcements show. |
 | `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
 | `NEXT_PUBLIC_BISHNOI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
-| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |
+| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Only a fallback, while the Platform can't be reached: the apps' addresses come from Platform > Applications. Not needed online. |
 
 The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
 `PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
 `NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://bishnoi-one-finance.vercel.app`.
 `NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
-change one.
+change one. Better: leave them unset and change the address on the Platform.
 
 ### Complete files, app by app
 

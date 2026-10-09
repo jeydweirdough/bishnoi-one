@@ -84,7 +84,7 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy In-Licensing → Run workflow**. Not ready for Vercel yet: the run says what's missing.
+On GitHub: **Actions → Deploy → Run workflow**, ticking this app. Not ready for Vercel yet: the run says what's missing.
 
 It checks everything is set up first, and stops with what to do next when
 something isn't. Nothing goes online until someone runs it.

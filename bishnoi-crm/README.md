@@ -93,7 +93,7 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy CRM → Run workflow**. After the Platform.
+On GitHub: **Actions → Deploy → Run workflow**, ticking this app. After the Platform.
 
 It checks everything is set up first, and stops with what to do next when
 something isn't. Nothing goes online until someone runs it.

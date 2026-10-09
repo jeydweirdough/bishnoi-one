@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { loadAddresses } from "../lib/addresses";
 import { SIGN_IN } from "@/src/components/sign-in/copy";
 import { Showcase } from "@/src/components/sign-in/showcase";
-import { appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
+import { addressKnown, appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
 import { api } from "../lib/api";
 import { LoginForm, type Demo } from "./login-form";
 
@@ -30,7 +31,7 @@ async function demoAccounts(): Promise<{ items: Demo[]; password: string | null 
  * address is set for this build (NEXT_PUBLIC_BISHNOI_PLATFORM_URL).
  */
 function platformSignIn(): string | null {
-  if (!THIS_APP || THIS_APP === "platform" || !(process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)) return null;
+  if (!THIS_APP || THIS_APP === "platform" || !addressKnown("platform")) return null;
   const back = `${appUrl(THIS_APP)}/auth/platform`;
   return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
 }
@@ -40,6 +41,7 @@ function platformSignIn(): string | null {
  * picture beside it (src/components/sign-in/showcase.tsx).
  */
 export async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await loadAddresses();
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : "/";
   const expired = params.expired === "1";

@@ -281,3 +281,13 @@ def test_dashboard(client, ana):
     assert d["recent"][0]["action"] == "user.created"
     options = client.get("/platform/options", headers=ana).json()
     assert len(options["applications"]) == 8 and len(options["staff"]) == 2
+
+
+def test_every_app_reads_the_addresses_from_here(client, ana):
+    """Applications holds each app's screens address; the apps read it without signing in."""
+    addresses = client.get("/public/applications").json()["addresses"]
+    assert addresses["crm"] == "http://localhost:4302" and "platform" in addresses
+    crm = next(a for a in client.get("/platform/applications", headers=ana).json()["applications"] if a["key"] == "crm")
+    r = client.patch(f"/platform/applications/{crm['id']}", json={"appUrl": "https://crm.getmeds.ph/"}, headers=ana)
+    assert r.status_code == 200, r.text
+    assert client.get("/public/applications").json()["addresses"]["crm"] == "https://crm.getmeds.ph"

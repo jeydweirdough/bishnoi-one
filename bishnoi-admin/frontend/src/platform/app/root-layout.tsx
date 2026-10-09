@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Addresses } from "./addresses";
 import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
@@ -32,6 +33,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${poppins.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
+        <Addresses />
         {children}
         <Toaster
           position="top-center"

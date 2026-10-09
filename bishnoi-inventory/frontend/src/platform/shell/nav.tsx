@@ -8,7 +8,7 @@ import { Avatar } from "../ui/avatar";
 import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
-import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
+import { addressKnown, THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
@@ -981,7 +981,7 @@ function Account({ me }: { me: Me }) {
       </Link>
       {/* Each company has its own data here. Someone who works for more than
           one picks the other on Bishnoi One, which sends them back signed in there. */}
-      {THIS_APP && THIS_APP !== "platform" && (process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL) && (
+      {THIS_APP && THIS_APP !== "platform" && addressKnown("platform") && (
         <a
           href={`${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`}
           className="mt-1 flex items-center gap-2 rounded-[3px] px-3 py-1.5 text-sm text-ink-2 hover:bg-sheet"

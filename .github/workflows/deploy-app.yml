@@ -1,6 +1,5 @@
-# How every app goes on Vercel. Not run by itself: each app has its own
-# workflow (deploy-<app>.yml: Actions > Deploy CRM, Deploy Inventory, ...) that
-# runs this one for that app, only when you press Run workflow.
+# How every app goes on Vercel. Not run by itself: Actions > Deploy
+# (deploy.yml) runs it for each app you tick, only when you press Run workflow.
 #
 # 1. Check: is everything set up (.github/deploy.json, scripts/deploy/vercel_check.py)?
 #    The token, the app's Vercel projects and their Root Directory, their
@@ -12,8 +11,8 @@
 # 3. Deploy the API, then the screens (they call it), each checked afterwards:
 #    the API's /health, the screens' sign-in page.
 #
-# Each project's last deployed commit is kept as a tag (deployed/<project>),
-# so the repo's Tags say what's live.
+# Each project's last deployed commit is kept as refs/deployed/<project> (not a
+# tag, so pulls don't clash): git ls-remote origin "refs/deployed/*" says what's live.
 name: Deploy an app
 
 on:
@@ -35,7 +34,7 @@ on:
         required: false # its absence is reported by the check, with what to do
 
 permissions:
-  contents: write # the deployed/<project> tags
+  contents: write # the refs/deployed/<project> markers
 
 env:
   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

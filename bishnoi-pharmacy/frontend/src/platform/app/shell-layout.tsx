@@ -5,6 +5,7 @@ import { Notices } from "./notices";
 import { ViewingBanner } from "../shell/viewing-banner";
 import { redirect } from "next/navigation";
 import { getMe } from "../lib/api";
+import { loadAddresses } from "../lib/addresses";
 import { THIS_APP, canUseThisApp, platformHome, thisAppLabel } from "../lib/apps";
 import { LinkButton } from "../ui/button";
 import { Sheet } from "../ui/sheet";
@@ -34,6 +35,7 @@ function NoCompany() {
 
 /** `unset`: how many things aren't set up yet, by kind, for the sidebar's red counts. */
 export async function ShellLayout({ children, unset }: { children: React.ReactNode; unset?: Unset }) {
+  await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
   // the cookie is shared — so somebody signed in to an app that is theirs

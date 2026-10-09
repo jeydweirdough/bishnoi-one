@@ -1,5 +1,5 @@
 {
-  "_what": "What each app's Deploy workflow (.github/workflows/deploy-<app>.yml) checks before it puts the app on Vercel. projects: which folder deploys to which Vercel project (a folder not listed is never deployed). scope: empty when the projects are on the token owner's own Vercel account; a team's slug when they are in a team (the repo variable VERCEL_SCOPE overrides it). apps: per app, whether its code can run on Vercel yet, which apps must be online before it, and the Production environment variables its projects need (required: deploying stops without them; recommended: it goes ahead and says what's missing; never: deploying stops while it's set). Only the names are checked, never the values.",
+  "_what": "What the Deploy workflow (.github/workflows/deploy.yml) checks for each ticked app before it puts the app on Vercel. projects: which folder deploys to which Vercel project (a folder not listed is never deployed). scope: empty when the projects are on the token owner's own Vercel account; a team's slug when they are in a team (the repo variable VERCEL_SCOPE overrides it). apps: per app, whether its code can run on Vercel yet, which apps must be online before it, and the Production environment variables its projects need (required: deploying stops without them; recommended: it goes ahead and says what's missing; never: deploying stops while it's set). Only the names are checked, never the values.",
   "scope": "",
   "projects": {
     "bishnoi-crm/frontend": "bishnoi-one-crm",
@@ -62,8 +62,7 @@
       },
       "frontend": {
         "recommended": {
-          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens: the Sign in with your Bishnoi One account button and Switch company.",
-          "PLATFORM_API_URL": "The Platform's API, for announcements."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app. Every other app's address (the sidebar's links, the Bishnoi One account button) is read from there (Platform > Applications), and announcements; no NEXT_PUBLIC_BISHNOI_*_URL needed."
         }
       }
     },
@@ -83,8 +82,7 @@
       },
       "frontend": {
         "recommended": {
-          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens: the Sign in with your Bishnoi One account button and Switch company.",
-          "PLATFORM_API_URL": "The Platform's API, for announcements."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app. Every other app's address (the sidebar's links, the Bishnoi One account button) is read from there (Platform > Applications), and announcements; no NEXT_PUBLIC_BISHNOI_*_URL needed."
         }
       }
     },
@@ -100,7 +98,7 @@
       },
       "frontend": {
         "recommended": {
-          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app. Every other app's address (the sidebar's links, the Bishnoi One account button) is read from there (Platform > Applications), and announcements; no NEXT_PUBLIC_BISHNOI_*_URL needed."
         }
       }
     },
@@ -116,7 +114,7 @@
       },
       "frontend": {
         "recommended": {
-          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app. Every other app's address (the sidebar's links, the Bishnoi One account button) is read from there (Platform > Applications), and announcements; no NEXT_PUBLIC_BISHNOI_*_URL needed."
         }
       }
     },
@@ -131,7 +129,7 @@
       },
       "frontend": {
         "recommended": {
-          "NEXT_PUBLIC_BISHNOI_PLATFORM_URL": "The Platform's screens, for the Bishnoi One account button."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app. Every other app's address (the sidebar's links, the Bishnoi One account button) is read from there (Platform > Applications), and announcements; no NEXT_PUBLIC_BISHNOI_*_URL needed."
         }
       }
     },
