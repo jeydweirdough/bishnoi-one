@@ -8,6 +8,7 @@ import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { getMe, load } from "@/src/platform/lib/api";
 import { Decide } from "@/src/components/access/decide";
 import { StaffControls } from "@/src/components/access/staff-controls";
+import { StaffForm } from "@/src/components/access/staff-form";
 import { getStaff } from "@/src/components/gate";
 import { Count, Tabs } from "@/src/components/marks";
 import { SuspendedTag } from "@/src/components/organizations/record-tools";
@@ -343,6 +344,12 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
         </Sheet>
 
         <div className="space-y-5">
+          {canChange && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-meta text-ink-3">The staff who sign in to this console.</p>
+              <StaffForm />
+            </div>
+          )}
           {roles.staffRoles.map((r) => (
             <Sheet key={r.role}>
               <div className="px-5 pt-4 pb-2">
@@ -353,7 +360,7 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
               </div>
               {r.holders.length === 0 ? (
                 <Empty title={`Nobody is ${r.name} yet`} icon="person">
-                  {r.role === "admin" ? "Make a Support member a Platform Admin below." : "Staff accounts are made with the platform's users tool."}
+                  {r.role === "admin" ? "Make a Support member a Platform Admin below, or add one with Add staff." : canChange ? "Add one with Add staff above." : "A Platform Admin adds staff."}
                 </Empty>
               ) : (
                 <ul className="divide-y divide-rule border-t border-rule" role="list">

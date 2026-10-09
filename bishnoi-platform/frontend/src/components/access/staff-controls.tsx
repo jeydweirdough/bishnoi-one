@@ -1,14 +1,19 @@
 "use client";
 
+import { KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { updateStaff } from "../../actions/users";
+import { deleteStaff, resetStaffPassword, updateStaff } from "../../actions/users";
 import type { Staff } from "../../lib/types";
+import { ICON_TRIGGER, ICON_TRIGGER_DANGER } from "../organizations/record-tools";
+import { showPassword, StaffForm } from "./staff-form";
 
 /**
- * Beside a staff member: moving them between Platform Admin and Support, and
- * switching their account off or on. Nobody changes themselves (the API says
- * so too), so the platform can't be left with nobody to run it by one slip.
+ * Beside a staff member: changing their name or email, moving them between
+ * Platform Admin and Support, switching their account off or on, a new
+ * password, and deleting it. Nobody does these to themselves, and the last
+ * Platform Admin stays (the API says so too), so the platform can't be left
+ * with nobody to run it by one slip.
  */
 export function StaffControls({ person }: { person: Staff }) {
   const admin = person.role === "admin";
@@ -24,7 +29,28 @@ export function StaffControls({ person }: { person: Staff }) {
   }
 
   return (
-    <span className="flex flex-wrap gap-2">
+    <span className="flex flex-wrap items-center gap-2">
+      <StaffForm person={person} />
+      <ConfirmButton
+        label={<span className="sr-only">Reset {person.fullName}&apos;s password</span>}
+        icon={<KeyRound className="size-4" aria-hidden />}
+        triggerTitle={`Reset ${person.fullName}'s password`}
+        triggerVariant="quiet"
+        triggerSize="sm"
+        triggerClassName={ICON_TRIGGER}
+        danger={false}
+        title={`Reset ${person.fullName}'s password?`}
+        body={`A new password is made and shown once. ${first} is signed out everywhere, signs in with it, then changes it under Account.`}
+        confirmLabel="Reset password"
+        onConfirm={async () => {
+          const result = await resetStaffPassword(person.id);
+          if (!result.ok) {
+            toast.error(result.error);
+            return false;
+          }
+          showPassword(person.fullName, result.data);
+        }}
+      />
       <ConfirmButton
         label={admin ? "Make Support" : "Make Platform Admin"}
         triggerSize="sm"
@@ -52,6 +78,25 @@ export function StaffControls({ person }: { person: Staff }) {
         }
         confirmLabel={person.isActive ? "Switch off" : "Switch on"}
         onConfirm={() => change({ isActive: !person.isActive }, person.isActive ? "Account switched off" : "Account switched on")}
+      />
+      <ConfirmButton
+        label={<span className="sr-only">Delete {person.fullName}&apos;s account</span>}
+        icon={<Trash2 className="size-4" aria-hidden />}
+        triggerTitle={`Delete ${person.fullName}'s account`}
+        triggerVariant="quiet"
+        triggerSize="sm"
+        triggerClassName={ICON_TRIGGER_DANGER}
+        title={`Delete ${person.fullName}'s account?`}
+        body={`${first} can't sign in any more, and the account can't be brought back. Tickets and incidents they had stay, with nobody on them. To keep the account, switch it off instead.`}
+        confirmLabel="Delete account"
+        onConfirm={async () => {
+          const result = await deleteStaff(person.id);
+          if (!result.ok) {
+            toast.error(result.error);
+            return false;
+          }
+          toast.success("Account deleted", { description: person.fullName });
+        }}
       />
     </span>
   );
