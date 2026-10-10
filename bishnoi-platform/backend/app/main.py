@@ -73,7 +73,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logging.getLogger("bishnoi.discord").warning("[discord:announcements] couldn't read them yet, trying again in a minute: %s", e)
 
     app.add_middleware(
-        CORSMiddleware,
+        RegisteredOrigins,
+        sessions=app.state.sessions,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
@@ -115,3 +116,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(connections.router)
     app.include_router(services_router.router)
     return app
+
+
+class RegisteredOrigins(CORSMiddleware):
+    """CORS where the allowed origins are the applications' own addresses
+    (Applications), read every minute, as well as CORS_ORIGINS: registering an
+    application lets its pages call the Platform from the browser."""
+
+    def __init__(self, app, sessions, **options) -> None:
+        super().__init__(app, **options)
+        self._sessions = sessions
+        self._known: tuple[float, set[str]] = (0.0, set())
+
+    def _registered(self) -> set[str]:
+        import time
+        from urllib.parse import urlsplit
+
+        from sqlalchemy import select
+
+        from app.models import Application
+
+        at, known = self._known
+        if time.monotonic() - at < 60:
+            return known
+        try:
+            with self._sessions() as db:
+                urls = db.scalars(select(Application.app_url).where(Application.is_active, Application.app_url.is_not(None))).all()
+            known = {f"{u.scheme}://{u.netloc}" for u in map(urlsplit, urls) if u.scheme and u.netloc}
+        except Exception:  # the database is out of reach: keep what was known
+            pass
+        self._known = (time.monotonic(), known)
+        return known
+
+    def is_allowed_origin(self, origin: str) -> bool:
+        return super().is_allowed_origin(origin) or origin.rstrip("/") in self._registered()

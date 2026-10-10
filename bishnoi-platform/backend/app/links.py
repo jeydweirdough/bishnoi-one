@@ -18,6 +18,7 @@ A connect key is kept only as its hash; it's shown once, when it's made.
 """
 
 import base64
+import logging
 import hashlib
 import secrets
 from datetime import datetime
@@ -69,9 +70,11 @@ def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def make_connect_key(app: Application) -> str:
+def make_connect_key(app: Application, settings: Settings | None = None) -> str:
     """A new connect key for this application; the old one stops working."""
     key = f"bpk.{app.key}.{secrets.token_urlsafe(32)}"
+    if settings is not None:
+        app.connect_key_sealed = seal(settings, key)
     app.connect_key_hash = hash_key(key)
     app.connect_key_hint = key[-6:]
     app.connect_key_made_at = utcnow()
@@ -133,3 +136,57 @@ def link_state(link: AppLink, caller: Application, target: Application, health: 
 
 def seen(app: Application, when: datetime | None = None) -> None:
     app.connected_at = when or utcnow()
+
+
+# --- delivering the connect key to the application's own address ---
+
+log = logging.getLogger("platform.links")
+_asked: dict[str, float] = {}  # by application key: when it last asked (a hello)
+ASK_EVERY = 30  # seconds between deliveries an application can ask for
+
+
+def deliver(sessions, settings: Settings, app_id: str) -> str:
+    """Sends the application its connect key, signed, to the API address
+    registered for it (Applications): only whoever runs that address gets it.
+    Makes the key the first time. Returns what happened, in words."""
+    import httpx
+
+    from app.passes import connect_pass
+
+    with sessions() as db:
+        app = db.get(Application, app_id)
+        if app is None or not app.is_active or not app.api_url:
+            return "No API address registered for it."
+        key = unseal(settings, app.connect_key_sealed) if app.connect_key_sealed else None
+        if key is None or hash_key(key) != app.connect_key_hash:
+            key = make_connect_key(app, settings)
+            db.commit()
+        token = connect_pass(settings, app, key)
+        url = app.api_url.rstrip("/") + "/platform/connect"
+    try:
+        r = httpx.post(url, json={"token": token}, timeout=10)
+    except httpx.HTTPError as e:
+        log.warning("Links: couldn't deliver the connect key to %s (%s).", url, e.__class__.__name__)
+        return f"Couldn't reach {url}."
+    if r.status_code >= 300:
+        log.warning("Links: %s answered %s to the connect key.", url, r.status_code)
+        return f"{url} answered {r.status_code}."
+    return "Delivered."
+
+
+def deliver_later(sessions, settings: Settings, app_id: str) -> None:
+    """deliver(), without making the caller wait (the application may be the one asking)."""
+    import threading
+
+    threading.Thread(target=deliver, args=(sessions, settings, app_id), name="deliver-connect-key", daemon=True).start()
+
+
+def may_ask(app_key: str) -> bool:
+    """At most one delivery every ASK_EVERY seconds per application."""
+    import time
+
+    now = time.monotonic()
+    if now - _asked.get(app_key, -ASK_EVERY) < ASK_EVERY:
+        return False
+    _asked[app_key] = now
+    return True

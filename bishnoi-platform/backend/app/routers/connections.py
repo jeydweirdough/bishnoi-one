@@ -17,7 +17,7 @@ platform except to the two applications on the link.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -109,14 +109,32 @@ def _app(db: Session, app_id: str) -> Application:
     return a
 
 
+class HelloIn(Api):
+    app: str = Field(min_length=2, max_length=40)
+
+
+@router.post("/connect/hello", status_code=status.HTTP_202_ACCEPTED)
+def hello(body: HelloIn, request: Request, settings: SettingsDep, db: DB) -> dict:
+    """An application asks for its connect key. It isn't answered here: the key
+    is sent to the API address registered for that application (Applications),
+    so asking in another's name gets the asker nothing."""
+    found = db.scalar(select(Application).where(Application.key == body.app, Application.is_active))
+    if found is not None and found.api_url and links.may_ask(found.key):
+        links.deliver_later(request.app.state.sessions, settings, found.id)
+    return {"sent": "to the address registered for it, if there is one"}
+
+
 @router.post("/platform/applications/{app_id}/connect-key")
-def new_connect_key(app_id: str, db: DB, me: AdminUser) -> dict:
+def new_connect_key(app_id: str, request: Request, db: DB, settings: SettingsDep, me: AdminUser) -> dict:
     a = _app(db, app_id)
     replaced = bool(a.connect_key_hash)
-    key = links.make_connect_key(a)
+    key = links.make_connect_key(a, settings)
     audit(db, me, "application.connect_key_replaced" if replaced else "application.connect_key_made", target=a.name, target_type="application", target_id=a.id, application_id=a.id)
     db.commit()
-    return {"key": key, "replaced": replaced}
+    # Sent to the application's own address too, so nothing has to be copied onto its server.
+    if a.api_url:
+        links.deliver_later(request.app.state.sessions, settings, a.id)
+    return {"key": key, "replaced": replaced, "delivered": bool(a.api_url)}
 
 
 @router.delete("/platform/applications/{app_id}/connect-key", status_code=status.HTTP_204_NO_CONTENT)

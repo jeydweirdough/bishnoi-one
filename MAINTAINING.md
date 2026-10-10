@@ -161,8 +161,9 @@ they call each other, so set them up in this order.
 5. **Deploy**: Actions → Deploy, tick the apps (the Platform goes first). Each deploys its API, then its screens.
 6. **Platform > Applications:** set each app's address to its screens'
    address and its API. A Bishnoi One account opens an app only at that address.
-   Then **Platform > Connections:** make each app's connect key, put it on the
-   app's API as `PLATFORM_APP_KEY`, and switch on the links between the apps.
+   Then **Platform > Connections:** switch on the links between the apps. Each
+   app's connect key is sent to its registered API address, signed, when it
+   first asks: nothing to copy onto Vercel.
    A company's outside services (Zoho Books, Gmail, Outlook, Zoho Mail) are
    filled in on the Platform too: **Companies > the company > Connections**.
 7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
@@ -179,7 +180,6 @@ they call each other, so set them up in this order.
 | `ALLOWED_HOSTS` | `["bishnoi-<app>-backend.vercel.app"]`, its own address |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
 | `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not the Platform itself): its public key is fetched from there |
-| `PLATFORM_APP_KEY` | Its connect key, from Platform > Connections (step 6; not the Platform itself) |
 
 **Only some APIs:**
 

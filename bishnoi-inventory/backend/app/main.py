@@ -74,4 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for module in (auth, admin, catalog, warehouses, stock, purchasing, orders, transfers, adjustments, insight, integration, unset, graphql_api):
         app.include_router(module.router)
+    from app import platform_connect
+
+    app.include_router(platform_connect.router)
     return app

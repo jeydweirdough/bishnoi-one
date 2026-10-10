@@ -58,7 +58,15 @@ _known: dict[str, tuple[dict | None, float, float]] = {}
 
 def connected(settings: Settings) -> bool:
     """Whether the CRM can ask the platform at all."""
-    return bool(settings.platform_app_key and settings.platform_api_url)
+    from app.platform_connect import connect_key
+
+    return bool(settings.platform_api_url and connect_key(settings))
+
+
+def _key(settings: Settings) -> str:
+    from app.platform_connect import connect_key
+
+    return connect_key(settings) or ""
 
 
 def _ask(settings: Settings, company: str) -> tuple[dict | None, float]:
@@ -67,7 +75,7 @@ def _ask(settings: Settings, company: str) -> tuple[dict | None, float]:
         r = httpx.get(
             f"{settings.platform_api_url.rstrip('/')}/connect/services",
             params={"company": company},
-            headers={"X-Bishnoi-App-Key": settings.platform_app_key.get_secret_value()},
+            headers={"X-Bishnoi-App-Key": _key(settings)},
             timeout=5,
         )
     except httpx.HTTPError as e:

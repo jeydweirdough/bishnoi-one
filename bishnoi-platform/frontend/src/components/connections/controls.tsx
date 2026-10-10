@@ -14,7 +14,7 @@ function ShowKey({ appName, appKey, value, onHide }: { appName: string; appKey: 
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-2 w-full rounded-[14px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
-      <p className="font-semibold">{appName}&apos;s connect key. It&apos;s shown this once.</p>
+      <p className="font-semibold">{appName}&apos;s connect key: sent to {appName}&apos;s address. It&apos;s shown here this once.</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <code className="min-w-0 flex-1 rounded-[8px] bg-bench px-2 py-1.5 font-mono text-meta break-all">{value}</code>
         <Button
@@ -34,9 +34,11 @@ function ShowKey({ appName, appKey, value, onHide }: { appName: string; appKey: 
       </div>
       <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-meta text-ink-2">
         <li>
-          On {appName}&apos;s server, set <code className="font-mono">PLATFORM_APP_KEY</code> to it: in <code className="font-mono">bishnoi-{appKey}/backend/.env</code> on a computer, or in its API&apos;s Vercel project settings online.
+          Nothing to copy online: the Platform sends the key to {appName}&apos;s API address (Applications), signed, and {appName} keeps it. It connects within a minute, and this page says so.
         </li>
-        <li>Restart {appName}, or deploy it again. It connects within a minute, and this page says so.</li>
+        <li>
+          Only for a copy of {appName} at another address (this computer): set <code className="font-mono">PLATFORM_APP_KEY</code> to it in <code className="font-mono">bishnoi-{appKey}/backend/.env</code>.
+        </li>
       </ol>
       <button type="button" onClick={onHide} className="mt-2 text-meta text-ink-3 hover:text-ink hover:underline">
         Done, hide it

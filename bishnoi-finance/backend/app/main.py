@@ -63,6 +63,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "finance"}
 
+    from app import platform_connect
+
+    app.include_router(platform_connect.router)
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(finance.router)

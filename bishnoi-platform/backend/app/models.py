@@ -149,6 +149,8 @@ class Application(Base):
     # only its hash is kept, and the last characters to tell keys apart.
     connect_key_hash: Mapped[str | None] = mapped_column(String(64), default=None)
     connect_key_hint: Mapped[str | None] = mapped_column(String(12), default=None)
+    # The key itself, encrypted (app/links.py), to deliver to the application's address again.
+    connect_key_sealed: Mapped[str | None] = mapped_column(Text, default=None)
     connect_key_made_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # When it last asked for its links: how the platform knows it's connected.
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

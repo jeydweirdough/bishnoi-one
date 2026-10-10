@@ -52,6 +52,9 @@ def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
     if r.status_code == 401:
         # Replaced or disconnected on the platform: no links until a new key is set here.
         log.error("Links: the platform doesn't take PLATFORM_APP_KEY (it was replaced, or Inventory was disconnected). Make a new key on its Connections page.")
+        from app.platform_connect import replaced
+
+        replaced(settings)
         return dict(NOTHING), 60
     if r.status_code != 200:
         log.error("Links: the platform answered %s.", r.status_code)
@@ -66,9 +69,11 @@ def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
 
 def answer(settings: Settings) -> dict | None:
     """The platform's word on this application's links; None when not connected."""
-    if not settings.platform_app_key or not settings.platform_api_url:
+    from app.platform_connect import connect_key  # here: it reads the settings module first
+
+    key = connect_key(settings)
+    if not key or not settings.platform_api_url:
         return None
-    key = settings.platform_app_key.get_secret_value()
     now = time.time()
     with _lock:
         last, had_at, next_at = _known.get(key, (None, 0.0, 0.0))

@@ -63,4 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for module in (auth, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers, integration, unset):
         app.include_router(module.router)
+    from app import platform_connect
+
+    app.include_router(platform_connect.router)
     return app

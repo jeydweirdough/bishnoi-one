@@ -38,8 +38,8 @@ const STATE: Record<LinkRow["state"], { mark: Health; label: string }> = {
 
 /** Whether an application is connected, in a line. */
 function connection(a: App): { mark: Health; text: string } {
-  if (!a.connected) return { mark: "unknown", text: "Not connected: make its connect key." };
-  if (!a.connectedAt) return { mark: "degraded", text: "Key made, but it hasn't connected yet: put the key on its server." };
+  if (!a.connected) return { mark: "unknown", text: "Not connected yet: it asks when it first starts, or make its connect key here." };
+  if (!a.connectedAt) return { mark: "degraded", text: "Key made, but it hasn't connected yet: check its API address under Applications, and that it's running." };
   const quiet = Date.now() - Date.parse(a.connectedAt) > 60 * 60 * 1000;
   return quiet ? { mark: "degraded", text: `Last connected ${ago(a.connectedAt)}. Is it running?` } : { mark: "operational", text: `Connected · asked ${ago(a.connectedAt)}` };
 }
@@ -116,9 +116,8 @@ export default async function ConnectionsPage() {
         <Sheet className="px-5 pt-4 pb-2">
           <SectionTitle icon="apps">Applications</SectionTitle>
           <p className="text-meta text-ink-3">
-            Each application connects with its own key, set on its server as <code className="font-mono">PLATFORM_APP_KEY</code>, beside the platform&apos;s address (
-            <code className="font-mono">PLATFORM_API_URL</code>) and public key (<code className="font-mono">PLATFORM_PUBLIC_KEY</code>). Nothing else about the
-            other applications goes on its server.
+            Each application needs only the platform&apos;s address on its server (<code className="font-mono">PLATFORM_API_URL</code>). Its connect key is sent to
+            the API address registered for it (Applications), signed, when it first asks, or when you make a new one here: nothing is copied onto its server.
           </p>
           <ul className="mt-2 divide-y divide-rule">
             {data.applications.map((a) => {

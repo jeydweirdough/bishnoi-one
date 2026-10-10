@@ -82,6 +82,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "crm"}
 
+    from app import platform_connect
+
+    app.include_router(platform_connect.router)
     app.include_router(auth.router)
     app.include_router(admin.router)
     # Before the record routers, so /companies/bulk isn't read as a company's id.

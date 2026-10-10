@@ -55,8 +55,7 @@
       },
       "backend": {
         "required": {
-          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app (the CRM checks each company there).",
-          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). Through it the Platform gives this app everything else: the other apps' addresses and keys, the company's outside services (Zoho, email providers) and the key for its own secrets. Without it, Inventory, Finance, Pharmacy, Zoho and the mailboxes aren't connected, and order links can't be copied again."
+          "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app (the CRM checks each company there)."
         },
         "recommended": {}
       },
@@ -76,9 +75,7 @@
         "required": {
           "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app (Inventory checks each company there)."
         },
-        "recommended": {
-          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). Through it the Platform gives this app everything else: the other apps' addresses and keys, the company's outside services (Zoho, email providers) and the key for its own secrets. Without it, the CRM can't read products and stock."
-        }
+        "recommended": {}
       },
       "frontend": {
         "recommended": {
@@ -92,7 +89,6 @@
       "backend": {
         "recommended": {
           "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app: sign-in with a Bishnoi One account (its key is fetched from there) and what Pharmacy is linked to.",
-          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, the CRM can't send Rx quotes for checking.",
           "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
         }
       },
@@ -108,7 +104,6 @@
       "backend": {
         "recommended": {
           "PLATFORM_API_URL": "The Platform's API, e.g. https://bishnoi-one-platform-backend.vercel.app: sign-in with a Bishnoi One account (its key is fetched from there) and what Finance is linked to.",
-          "PLATFORM_APP_KEY": "Its connect key, from the Platform's Connections page (Make its connect key). The Platform then gives it every link and key between the apps, so nothing else about the other apps goes here. Without it, the CRM can't ask for tax, and Finance can't read the CRM's customers.",
           "FIRST_ADMIN_EMAIL": "The first administrator (with FIRST_ADMIN_NAME and FIRST_ADMIN_PASSWORD)."
         }
       },

@@ -125,6 +125,21 @@ def company_pass(settings: Settings, company: Company, app: Application, granted
     return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
 
 
+# A connect pass: an application's connect key, delivered to the address
+# registered for it (app/links.py deliver), so nobody copies it onto a server.
+CONNECT_LIFETIME = 120  # seconds
+
+
+def connect_pass(settings: Settings, app: Application, key: str) -> str:
+    """Signed: this application's connect key. The application checks it with
+    the platform's public key, as a sign-in pass, then keeps the key."""
+    now = int(time.time())
+    header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
+    claims = {"iss": ISSUER, "aud": app.key, "kind": "connect", "key": key, "iat": now, "exp": now + CONNECT_LIFETIME, "jti": secrets.token_urlsafe(18)}
+    signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
+    return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
+
+
 if __name__ == "__main__":
     key = new_signing_key()
     pub = Ed25519PrivateKey.from_private_bytes(base64.b64decode(key)).public_key().public_bytes(
