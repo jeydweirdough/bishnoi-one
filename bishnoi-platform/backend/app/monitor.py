@@ -45,11 +45,23 @@ class Answer:
     detail: str | None
 
 
+def _ipv4_localhost(url: str) -> str:
+    """localhost as 127.0.0.1: on Windows "localhost" tries IPv6 (::1) first,
+    where the apps don't listen, and each check waited seconds before falling back."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    if parts.hostname == "localhost":
+        port = f":{parts.port}" if parts.port else ""
+        return urlunsplit(parts._replace(netloc=f"127.0.0.1{port}"))
+    return url
+
+
 def probe(url: str, timeout: float, slow_ms: int) -> Answer:
     """One look at one address. Replaced in tests, which have nothing to call."""
     started = time.perf_counter()
     try:
-        response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
+        response = httpx.get(_ipv4_localhost(url), timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
     except httpx.TimeoutException:
         return Answer("down", None, None, f"No answer within {timeout:g} seconds.")
     except httpx.HTTPError:

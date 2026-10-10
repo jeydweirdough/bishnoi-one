@@ -1,7 +1,7 @@
 "use client";
 
 import { Pill } from "./figures";
-import { Gauge, GaugeArc, GaugeText, GaugeTrack, GaugeValue, GaugeZones } from "./gauge";
+import { Gauge, GaugeArc, GaugeText, GaugeTrack, GaugeZones } from "./gauge";
 
 /**
  * One measure read against a known scale with a good, a watch and a bad
@@ -98,7 +98,10 @@ export function HealthGauge({
               {empty}
             </GaugeText>
           ) : (
-            <GaugeValue y={-12} fontSize={44} color={INK} format={format} />
+            // The real value, even off the scale (38.8% on a 90 to 100% dial): only the arc stops at the end.
+            <GaugeText y={-12} fontSize={44} color={INK} weight="semibold" className="tabular-nums">
+              {format(value)}
+            </GaugeText>
           )}
         </Gauge>
       </div>
