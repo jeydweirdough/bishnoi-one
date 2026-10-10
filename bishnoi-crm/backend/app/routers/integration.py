@@ -42,6 +42,7 @@ def customer_out(c: Company) -> dict:
     tin = (c.extra or {}).get("tin")
     return {
         "id": c.id,
+        "no": c.no,
         "name": c.name,
         "status": c.status,
         "address": ", ".join(p for p in (c.address, c.city) if p) or None,

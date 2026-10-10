@@ -7,7 +7,7 @@ a migration (migrations/versions)."""
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, FetchedValue, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -23,9 +23,12 @@ def new_id() -> str:
 
 class User(Base):
     __tablename__ = "nbil_users"
-    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"), Index("nbil_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -48,3 +51,9 @@ class SignInSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User)

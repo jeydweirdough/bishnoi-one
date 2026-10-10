@@ -78,6 +78,7 @@ class GrantIn(Api):
 def user_out(p: Identity, company: Company | None = None, **extra) -> dict:
     return {
         "id": p.id,
+        "no": p.no,
         "fullName": p.full_name,
         "email": p.email,
         "title": p.title,
@@ -301,6 +302,17 @@ def withdraw_application(user_id: str, app_id: str, db: DB, me: AdminUser) -> Re
     audit(db, me, "access.withdrawn", target=f"{p.email} · {app.name}", target_type="user", target_id=p.id,
           company_id=p.company_id, application_id=app_id)
     db.delete(g)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone from the platform: their applications and sign-ins go with them;
+    tickets they raised stay, with nobody on them. Suspending keeps the person."""
+    p = _person(db, user_id)
+    audit(db, me, "user.deleted", category="security", target=p.email, target_type="user", target_id=p.id, company_id=p.company_id)
+    db.delete(p)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -61,6 +61,7 @@ def serialize_permit(p: ComplianceRecord, settings: Settings) -> dict[str, Any]:
     days = calculate_days_remaining(p.expiration_date, settings)
     return {
         "id": p.id,
+        "no": p.no,
         "title": p.title,
         "category": p.category,
         "agency": p.agency,
@@ -83,6 +84,7 @@ def serialize_immigration(im: ImmigrationRecord, settings: Settings) -> dict[str
     days = calculate_days_remaining(im.expiration_date, settings)
     return {
         "id": im.id,
+        "no": im.no,
         "individualName": im.individual_name,
         "designation": im.designation,
         "nationality": im.nationality,
@@ -106,6 +108,7 @@ def serialize_document(d: CorporateDocument, settings: Settings) -> dict[str, An
     days = calculate_days_remaining(d.expiration_date, settings)
     return {
         "id": d.id,
+        "no": d.no,
         "title": d.title,
         "category": d.category,
         "counterparty": d.counterparty,
@@ -129,6 +132,7 @@ def serialize_property(pr: PropertyRecord, settings: Settings) -> dict[str, Any]
     days = calculate_days_remaining(pr.lease_end, settings)
     return {
         "id": pr.id,
+        "no": pr.no,
         "name": pr.name,
         "propertyType": pr.property_type,
         "address": pr.address,
@@ -1143,6 +1147,7 @@ class PasswordIn(Api):
 def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
     return {
         "id": user.id,
+        "no": user.no,
         "email": user.email,
         "fullName": user.full_name,
         "isActive": user.is_active,

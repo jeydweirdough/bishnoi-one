@@ -58,7 +58,7 @@ function Reporter({
     return (
       <div>
         <p className="mb-1 text-meta font-medium text-ink-2">Reported by</p>
-        <p className="flex items-center justify-between gap-3 rounded-[3px] border border-rule px-3 py-2 text-sm">
+        <p className="flex items-center justify-between gap-3 rounded-[14px] border border-rule px-3 py-2 text-sm">
           <span className="min-w-0">
             <b className="font-semibold">{picked.name}</b>
             <span className="text-ink-2">
@@ -67,7 +67,7 @@ function Reporter({
               {picked.companyName && ` · ${picked.companyName}`}
             </span>
           </span>
-          <button type="button" onClick={() => onPick(null)} aria-label={`Not ${picked.name}`} title={`Not ${picked.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink">
+          <button type="button" onClick={() => onPick(null)} aria-label={`Not ${picked.name}`} title={`Not ${picked.name}`} className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-ink">
             <X className="size-4" aria-hidden />
           </button>
         </p>
@@ -88,7 +88,7 @@ function Reporter({
           ) : found.length === 0 ? (
             <p className="text-ink-3">Nobody on the platform matches. Write their name or email below.</p>
           ) : (
-            <ul className="divide-y divide-rule rounded-[3px] border border-rule">
+            <ul className="divide-y divide-rule rounded-[18px] border border-rule">
               {found.map((u) => (
                 <li key={u.id}>
                   <button type="button" onClick={() => onPick(u)} className="w-full px-3 py-2 text-left hover:bg-hema-tint">

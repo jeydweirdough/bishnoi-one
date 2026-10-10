@@ -186,6 +186,7 @@ REQUIRED = ("code", "generic_name", "dosage_form", "unit", "rx_class", "price_ce
 def medicine_out(m: Medicine, stock: int | None = None, available: int | None = None) -> dict:
     return {
         "id": m.id,
+        "no": m.no,
         "code": m.code,
         "genericName": m.generic_name,
         "label": m.label,

@@ -203,16 +203,16 @@ function Row({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-[3px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const className = `flex items-center gap-2.5 rounded-full px-3 text-sm ${nested ? "h-8" : "h-9"} ${
     current
-      ? "bg-hema-tint font-semibold text-hema"
+      ? "bg-hema-tint font-semibold text-ink"
       : open
         ? "font-semibold text-ink hover:bg-sheet"
         : "text-ink-2 hover:bg-sheet hover:text-ink"
   }`;
   const inside = (
     <>
-      <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />
+      <Icon name={icon} className={`size-4 ${current ? "text-sage-deep" : open ? "text-ink-2" : "text-ink-3"}`} />
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
       {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
@@ -282,7 +282,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-full px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
     >
       <Icon name={icon} className="size-4 text-ink-3" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -386,7 +386,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[3px] px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-sm ${
           open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
         }`}
       >
@@ -402,7 +402,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[3px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-[18px] border border-rule bg-sheet p-1.5 shadow-overlay"
           >
             {items.map((e) => (
               <a
@@ -410,7 +410,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-[3px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-full px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -683,11 +683,11 @@ function Account({ me }: { me: Me }) {
       <Link
         href="/account"
         aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
+        className={`flex items-center gap-2.5 rounded-full px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
       >
         <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
         <span className="min-w-0">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-hema" : ""}`}>{me.user.fullName}</span>
+          <span className={`block truncate text-sm font-semibold `}>{me.user.fullName}</span>
           <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
         </span>
       </Link>
@@ -717,18 +717,18 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   const place = placeOf(pathname, me);
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2.5 border-b-[3px] border-double border-ink pb-2">
+    <Link href="/" className="flex items-center gap-2.5 border-b border-rule pb-4">
       <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 shrink-0" />
       <span className="min-w-0">
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
         {/* Which app this is, not only which product. Each one is its own site on
             its own address, so "Bishnoi One" alone leaves you working out from the port
             whether the screen in front of you is missing or simply elsewhere. */}
-        <span className="block truncate text-base leading-tight font-semibold text-ink">
+        <span className="block truncate text-sm leading-tight font-semibold text-ink">
           {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
         </span>
+        {/* No company on the platform: a Developer Admin has not opened one, and
+            saying a company name there would be saying something untrue. */}
+        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
       </span>
     </Link>
   );
@@ -753,7 +753,7 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

@@ -93,6 +93,7 @@ def can_of(company: Company, access: Access) -> dict:
 def company_row(company: Company, access: Access, contacts: int = 0, last_activity=None) -> dict:
     return {
         "id": company.id,
+        "no": company.no,
         "code": company.code,
         "name": company.name,
         "status": company.status,

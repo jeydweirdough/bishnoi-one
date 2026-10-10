@@ -5,10 +5,10 @@ import { Check, Minus } from "lucide-react";
 import Link from "next/link";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
-import { getMe, load } from "@/src/platform/lib/api";
+import { load } from "@/src/platform/lib/api";
 import { Decide } from "@/src/components/access/decide";
-import { StaffControls } from "@/src/components/access/staff-controls";
-import { StaffForm } from "@/src/components/access/staff-form";
+import { DeleteRecord } from "@/src/components/delete-record";
+import { StaffAccounts } from "@/src/components/access/staff-accounts";
 import { getStaff } from "@/src/components/gate";
 import { Count, Tabs } from "@/src/components/marks";
 import { SuspendedTag } from "@/src/components/organizations/record-tools";
@@ -118,6 +118,15 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
                   )}
                 </div>
                 {r.status === "pending" && canDecide && <Decide request={r} canApprove={r.companyHasApp} />}
+                {canDecide && (
+                  <DeleteRecord
+                    kind="request"
+                    id={r.id}
+                    name={`${r.user.name}'s request for ${r.application.name}`}
+                    done="Request deleted"
+                    body="It goes from the list, decided or not. Access already given stays; take it away on the person's page."
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -269,7 +278,7 @@ async function Applications() {
 }
 
 async function RolesTab({ canChange }: { canChange: boolean }) {
-  const [roles, me] = await Promise.all([load<Roles>("/platform/access/roles"), getMe()]);
+  const roles = await load<Roles>("/platform/access/roles");
   const holders = roles.staffRoles.reduce((n, r) => n + r.holders.length, 0);
   const levels = [
     {
@@ -343,56 +352,7 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
           </table>
         </Sheet>
 
-        <div className="space-y-5">
-          {canChange && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-meta text-ink-3">The staff who sign in to this console.</p>
-              <StaffForm />
-            </div>
-          )}
-          {roles.staffRoles.map((r) => (
-            <Sheet key={r.role}>
-              <div className="px-5 pt-4 pb-2">
-                <SectionTitle icon={r.role === "admin" ? "roles" : "support"}>
-                  {r.role === "admin" ? "Platform Admins" : "Support"}
-                  <Count n={r.holders.length} />
-                </SectionTitle>
-              </div>
-              {r.holders.length === 0 ? (
-                <Empty title={`Nobody is ${r.name} yet`} icon="person">
-                  {r.role === "admin" ? "Make a Support member a Platform Admin below, or add one with Add staff." : canChange ? "Add one with Add staff above." : "A Platform Admin adds staff."}
-                </Empty>
-              ) : (
-                <ul className="divide-y divide-rule border-t border-rule" role="list">
-                  {r.holders.map((s) => {
-                    const self = s.id === me.user.id;
-                    return (
-                      <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-                        <span className="min-w-0 flex-1 basis-56">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className={`font-semibold ${s.isActive ? "text-ink" : "text-ink-3"}`}>{s.fullName}</span>
-                            {self && <span className="rounded-[2px] bg-hema-tint px-1.5 text-stamp text-hema uppercase">You</span>}
-                            {!s.isActive && <SuspendedTag label="Switched off" />}
-                          </span>
-                          <span className="block truncate text-meta text-ink-3">
-                            {s.email} · last signed in {ago(s.lastSignInAt)}
-                            {s.activeSessions > 0 && ` · ${plural(s.activeSessions, "session")} open`}
-                          </span>
-                        </span>
-                        {canChange &&
-                          (self ? (
-                            <span className="text-meta text-ink-3">Another Platform Admin changes your account.</span>
-                          ) : (
-                            <StaffControls person={s} />
-                          ))}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Sheet>
-          ))}
-        </div>
+        <StaffAccounts canChange={canChange} />
       </div>
     </div>
   );

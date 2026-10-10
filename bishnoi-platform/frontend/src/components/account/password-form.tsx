@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, PasswordInput } from "@/src/platform/ui/field";
 import { changePassword } from "../../actions/platform";
 
 /** Your current password, then the new one twice. Every other sign-in of
@@ -50,13 +50,13 @@ export function PasswordForm() {
     >
       <p className="text-meta text-ink-3">Changing it ends your other sign-ins, on any other computer or browser. This one carries on.</p>
       <Field label="Current password" error={fields.currentPassword}>
-        {(p) => <Input {...p} type="password" autoComplete="current-password" value={v.current} onChange={set("current")} />}
+        {(p) => <PasswordInput {...p} autoComplete="current-password" value={v.current} onChange={set("current")} />}
       </Field>
       <Field label="New password" error={fields.newPassword} hint="At least 8 characters.">
-        {(p) => <Input {...p} type="password" autoComplete="new-password" value={v.next} onChange={set("next")} />}
+        {(p) => <PasswordInput {...p} autoComplete="new-password" value={v.next} onChange={set("next")} />}
       </Field>
       <Field label="New password again" error={fields.repeat}>
-        {(p) => <Input {...p} type="password" autoComplete="new-password" value={v.repeat} onChange={set("repeat")} />}
+        {(p) => <PasswordInput {...p} autoComplete="new-password" value={v.repeat} onChange={set("repeat")} />}
       </Field>
       <div>
         <FormError message={error} />

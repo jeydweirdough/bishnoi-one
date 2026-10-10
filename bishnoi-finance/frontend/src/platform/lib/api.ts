@@ -124,7 +124,12 @@ export async function load<T>(path: string): Promise<T> {
 }
 
 /** Who is signed in and what they can reach. Fetched once per request, however many layouts ask. */
-export const getMe = cache(() => load<Me>("/auth/me"));
+/** Around every signed-in page: who is signed in and what isn't set up. One request (/finance/frame), once per page. */
+export type Frame = { me: Me; unset: Record<string, number>; waiting: Record<string, number> | null; };
+export const getFrame = cache(() => load<Frame>("/finance/frame"));
+
+/** Who is signed in and what they can reach: from the frame, so it costs no request of its own. */
+export const getMe = cache(async () => (await getFrame()).me);
 
 /**
  * `getMe()` for a page that belongs to a company.

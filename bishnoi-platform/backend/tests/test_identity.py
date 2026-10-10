@@ -164,3 +164,18 @@ def test_suspended_at_one_company_she_still_works_at_the_other(client, ana, jade
     assert r.status_code == 200, r.text
     me = client.get("/identity/me", headers={"Authorization": f"Bearer {r.json()['accessToken']}"}).json()
     assert me["company"]["slug"] == "northwind" and [c["slug"] for c in me["companies"]] == ["northwind"]
+
+
+def test_a_platform_admin_deletes_a_user(client, ana, ben):
+    from tests.conftest import app_id, make_company
+
+    getmeds = make_company(client, ana)
+    crm = app_id(client, ana, "crm")
+    body = {"companyId": getmeds["id"], "fullName": "Rita Cruz", "email": "rita@getmeds.ph", "applications": [{"applicationId": crm, "role": "Salesperson"}]}
+    r = client.post("/platform/users", json=body, headers=ana)
+    assert r.status_code == 201, r.text
+    rita = r.json()["user"]["id"]
+    assert client.delete(f"/platform/users/{rita}", headers=ben).status_code == 403  # Support can't
+    assert client.delete(f"/platform/users/{rita}", headers=ana).status_code == 204
+    assert client.get(f"/platform/users/{rita}", headers=ana).status_code == 404
+    assert client.get("/platform/users", params={"q": "rita"}, headers=ana).json()["total"] == 0

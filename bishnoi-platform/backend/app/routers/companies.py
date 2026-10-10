@@ -125,6 +125,7 @@ class UnitPatch(Api):
 def company_out(c: Company, **extra) -> dict:
     return {
         "id": c.id,
+        "no": c.no,
         "name": c.name,
         "slug": c.slug,
         "status": c.status,
@@ -375,3 +376,17 @@ def reaches(incident: Incident, company_id: str, app_ids: set[str]) -> bool:
     if incident.company_ids:
         return company_id in incident.company_ids
     return incident.application_id in app_ids
+
+
+@router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company(company_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone from the platform: its people, their access, its structure, its
+    applications and connections. Tickets it raised stay, with no company on them.
+    What it keeps in each application (the CRM's customers...) isn't touched here."""
+    c = _company(db, company_id)
+    people = db.scalar(select(func.count()).select_from(Identity).where(Identity.company_id == c.id)) or 0
+    audit(db, me, "company.deleted", category="security", target=c.name, target_type="company", target_id=c.id, fields=[f"{people} people"] if people else ())
+    db.execute(delete(Identity).where(Identity.company_id == c.id))
+    db.delete(c)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

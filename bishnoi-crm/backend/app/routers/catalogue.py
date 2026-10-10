@@ -202,6 +202,7 @@ def update_settings(access: Edit, me: CurrentUser, db: DB, body: SettingsPatch) 
 def product_out(p: Product, access: Access) -> dict:
     return {
         "id": p.id,
+        "no": p.no,
         "code": p.code,
         "name": p.name,
         "genericName": p.generic_name,

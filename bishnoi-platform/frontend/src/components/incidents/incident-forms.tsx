@@ -34,7 +34,7 @@ function CompanyTicks({ options, value, onChange, appName, error }: { options: O
       {options.length > 8 && (
         <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a company" aria-label="Find a company" className="mb-2" />
       )}
-      <div className="max-h-44 overflow-y-auto rounded-[3px] border border-rule px-3 py-1">
+      <div className="max-h-44 overflow-y-auto rounded-[18px] border border-rule px-3 py-1">
         {options.length === 0 ? (
           <p className="py-2 text-meta text-ink-3">No companies on the platform yet.</p>
         ) : (

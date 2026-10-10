@@ -4,7 +4,7 @@ import { Pencil, UserPlus } from "lucide-react";
 import { useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Choice, Field, FormError, Input } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, Input, PasswordInput } from "@/src/platform/ui/field";
 import { createStaff, updateStaff } from "../../actions/users";
 import type { Staff } from "../../lib/types";
 import { ICON_TRIGGER } from "../organizations/record-tools";
@@ -82,7 +82,7 @@ export function StaffForm({ person }: { person?: Staff }) {
         ref={dialog}
         onCancel={(e) => pending && e.preventDefault()}
         aria-labelledby={titleId}
-        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay"
+        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-[22px] bg-sheet p-0 text-ink shadow-overlay"
       >
         <form onSubmit={save} className="space-y-4 p-5">
           <h2 id={titleId} className="text-heading">
@@ -95,7 +95,7 @@ export function StaffForm({ person }: { person?: Staff }) {
             <>
               <Choice name="role" legend="Role" value={role} options={ROLES} onChange={setRole} />
               <Field label="Password" optional hint="Leave it empty and one is made, shown once. At least 8 characters.">
-                {(p) => <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={256} autoComplete="new-password" />}
+                {(p) => <PasswordInput {...p} value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={256} autoComplete="new-password" />}
               </Field>
             </>
           )}

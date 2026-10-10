@@ -11,7 +11,7 @@ export function workState(u: Pick<PlatformUser, "status" | "companyStatus">): st
 
 /** "Company admin", a small stamp beside a name. */
 export function AdminStamp({ label = "Company admin" }: { label?: string }) {
-  return <span className="inline-flex h-5 shrink-0 items-center rounded-[2px] bg-hema-tint px-1.5 text-stamp whitespace-nowrap text-hema uppercase">{label}</span>;
+  return <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-hema-tint px-1.5 text-stamp whitespace-nowrap text-hema uppercase">{label}</span>;
 }
 
 /** Platform users as rows: who, where, which applications as what, and whether they can work. */

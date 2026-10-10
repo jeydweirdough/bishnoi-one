@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, Input, PasswordInput, Select } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { checkService, saveService, type ServiceInfo } from "../../actions/services";
 
@@ -13,7 +13,7 @@ const APP_NAMES: Record<string, string> = { crm: "the CRM", inventory: "Inventor
 /** A stamp beside the name: on or off, and how its last test went. */
 function Stamp({ children, tone = "plain" }: { children: string; tone?: "plain" | "good" | "bad" }) {
   const look = tone === "good" ? "border-hema text-hema" : tone === "bad" ? "border-danger text-danger" : "border-ink-2 text-ink-2";
-  return <span className={`inline-flex h-5 shrink-0 items-center rounded-[2px] border px-1.5 text-stamp whitespace-nowrap uppercase ${look}`}>{children}</span>;
+  return <span className={`inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-stamp whitespace-nowrap uppercase ${look}`}>{children}</span>;
 }
 
 type Props = { companyId: string; service: ServiceInfo; canChange: boolean; checkedWhen: string | null; updatedWhen: string | null };
@@ -126,9 +126,8 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
                 <Field key={d.key} label={d.label} hint={d.hint} error={fields[d.key]} optional={!d.required}>
                   {(p) => (
                     <div className="space-y-1">
-                      <Input
+                      <PasswordInput
                         {...p}
-                        type="password"
                         value={typed ?? ""}
                         onChange={(e) => set(d.key, e.target.value)}
                         autoComplete="new-password"

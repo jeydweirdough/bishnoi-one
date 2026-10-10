@@ -77,3 +77,16 @@ def test_logout(client):
     headers = bearer(sign_in(client))
     assert client.post("/auth/logout", headers=headers).status_code == 204
     assert client.get("/auth/me", headers=headers).status_code == 401
+
+
+def test_you_change_your_own_name_and_email(client, ana):
+    from tests.conftest import PASSWORD, sign_in
+
+    r = client.patch("/auth/me", json={"fullName": "Ana R. Reyes"}, headers=ana)
+    assert r.status_code == 200 and r.json()["user"]["fullName"] == "Ana R. Reyes"
+    # A new email needs your password, and can't be someone else's.
+    assert client.patch("/auth/me", json={"email": "ana.reyes@example.com"}, headers=ana).status_code == 422
+    assert client.patch("/auth/me", json={"email": "ben@example.com", "currentPassword": PASSWORD}, headers=ana).status_code == 422
+    r = client.patch("/auth/me", json={"email": "Ana.Reyes@example.com", "currentPassword": PASSWORD}, headers=ana)
+    assert r.status_code == 200 and r.json()["user"]["email"] == "ana.reyes@example.com"
+    assert sign_in(client, "ana.reyes@example.com").status_code == 200

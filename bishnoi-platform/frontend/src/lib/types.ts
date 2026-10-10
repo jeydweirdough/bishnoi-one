@@ -9,6 +9,8 @@ export type Check = { status: "operational" | "degraded" | "down"; ms: number | 
 // ---- Organizations ----
 
 export type Company = {
+  /** Its number, from 40000001 up: for paging and lookups (the id stays the key). */
+  no: number | null;
   id: string;
   name: string;
   slug: string;
@@ -37,6 +39,8 @@ export type CompanyDetail = Company & {
 // ---- Applications ----
 
 export type Application = {
+  /** Its number, from 40000001 up: for paging and lookups (the id stays the key). */
+  no: number | null;
   id: string;
   key: string;
   name: string;
@@ -87,6 +91,8 @@ export type Integration = {
 
 export type ApplicationDetail = Application & {
   uptime: number | null;
+  /** What counts as slow (Settings > Monitoring), in ms. */
+  slowMs?: number;
   userCount: number;
   companies: { id: string; name: string; status: Company["status"]; userCount: number }[];
   deployments: Deployment[];
@@ -99,6 +105,8 @@ export type ApplicationDetail = Application & {
 // ---- Users and access ----
 
 export type PlatformUser = {
+  /** Its number, from 40000001 up: for paging and lookups (the id stays the key). */
+  no: number | null;
   id: string;
   fullName: string;
   email: string;
@@ -172,6 +180,8 @@ export type AppAccess = {
 };
 
 export type Staff = {
+  /** Its number, from 40000001 up: for paging and lookups (the id stays the key). */
+  no: number | null;
   id: string;
   fullName: string;
   email: string;
@@ -265,6 +275,8 @@ export type HealthReport = {
   overall: "operational" | "degraded" | "down";
   checkedAt: string | null;
   staleSeconds: number;
+  /** What counts as slow (Settings > Monitoring), in ms. */
+  slowMs: number;
   platformApi: { status: "operational" | "degraded"; failedPercent: number; averageMs: number | null };
   database: { status: Health } & Partial<Check>;
   applications: { id: string; key: string; name: string; status: Health; statusNote: string | null; uptime: number | null; lastCheck: Check | null; monitored: boolean }[];

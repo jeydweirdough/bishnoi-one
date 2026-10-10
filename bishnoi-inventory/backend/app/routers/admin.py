@@ -63,6 +63,7 @@ class PasswordIn(Api):
 def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
     return {
         "id": user.id,
+        "no": user.no,
         "email": user.email,
         "fullName": user.full_name,
         "isActive": user.is_active,

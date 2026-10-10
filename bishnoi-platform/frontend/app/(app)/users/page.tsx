@@ -7,6 +7,7 @@ import { load } from "@/src/platform/lib/api";
 import { getStaff } from "@/src/components/gate";
 import { Tabs } from "@/src/components/marks";
 import { Filters } from "@/src/components/organizations/filters";
+import { StaffAccounts } from "@/src/components/access/staff-accounts";
 import { EndSession } from "@/src/components/users/end-session";
 import { UserRows } from "@/src/components/users/user-rows";
 import type { Options, PlatformUser, StaffSession } from "@/src/lib/types";
@@ -19,7 +20,8 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "
 
 export default async function UsersPage({ searchParams }: { searchParams: Search }) {
   const params = await searchParams;
-  const tab = one(params.tab) === "sessions" ? "sessions" : "users";
+  const asked = one(params.tab);
+  const tab = asked === "sessions" || asked === "staff" ? asked : "users";
   const staff = await getStaff();
 
   return (
@@ -35,16 +37,27 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
           )
         }
       >
-        {tab === "users" ? "The people at the companies, and the applications each may use." : "Who is signed in to this console."}
+        {tab === "users"
+          ? "The people at the companies, and the applications each may use."
+          : tab === "staff"
+            ? "The staff who sign in to this console: Platform Admins and Support."
+            : "Who is signed in to this console."}
       </PageHeader>
       <Tabs
         current={tab}
         tabs={[
           { key: "users", label: "All users", href: "/users" },
+          { key: "staff", label: "Staff", href: "/users?tab=staff" },
           { key: "sessions", label: "Staff sign-ins", href: "/users?tab=sessions" },
         ]}
       />
-      {tab === "users" ? <AllUsers params={params} canAdd={staff.canAdminister} /> : <Sessions canEndOthers={staff.canAdminister} />}
+      {tab === "users" && <AllUsers params={params} canAdd={staff.canAdminister} />}
+      {tab === "staff" && (
+        <div className="max-w-3xl">
+          <StaffAccounts canChange={staff.canAdminister} />
+        </div>
+      )}
+      {tab === "sessions" && <Sessions canEndOthers={staff.canAdminister} />}
     </>
   );
 }
@@ -149,7 +162,7 @@ async function Sessions({ canEndOthers }: { canEndOthers: boolean }) {
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-ink">{s.staff.name}</span>
                     <span className="text-meta text-ink-3">{s.staff.roleName}</span>
-                    {s.isYours && <span className="rounded-[2px] bg-hema-tint px-1.5 text-stamp text-hema uppercase">This is you</span>}
+                    {s.isYours && <span className="rounded-full bg-hema-tint px-1.5 text-stamp text-hema uppercase">This is you</span>}
                   </span>
                   <span className="block text-meta text-ink-3">
                     {s.staff.email}

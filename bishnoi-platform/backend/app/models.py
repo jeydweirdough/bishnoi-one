@@ -15,7 +15,7 @@ should reach what, and what is happening across all of it.
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -41,9 +41,12 @@ STAFF_ROLES = ("admin", "member")  # admin: Platform Admin. member: Support.
 
 class User(Base):
     __tablename__ = "nbpl_users"
-    __table_args__ = (_one_of("role", STAFF_ROLES, "nbpl_user_role"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (_one_of("role", STAFF_ROLES, "nbpl_user_role"), Index("nbpl_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -78,9 +81,12 @@ UNIT_KINDS = ("department", "branch")
 
 class Company(Base):
     __tablename__ = "nbpl_companies"
-    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(120))
     slug: Mapped[str] = mapped_column(String(40), unique=True)
     status: Mapped[str] = mapped_column(String(16), default="active")
@@ -120,11 +126,15 @@ INTEGRATION_STATUSES = ("operational", "degraded", "down", "unknown")
 
 class Application(Base):
     __tablename__ = "nbpl_applications"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("status_override IS NULL OR status_override IN ('degraded', 'maintenance', 'outage')", name="nbpl_application_override"),
+        Index("nbpl_applications_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     # The app key the screens use (crm, inventory, platform...).
     key: Mapped[str] = mapped_column(String(40), unique=True)
     name: Mapped[str] = mapped_column(String(120))
@@ -247,12 +257,16 @@ class Identity(Base):
     once and switch between them (app/routers/identity.py)."""
 
     __tablename__ = "nbpl_identities"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         _one_of("status", IDENTITY_STATUSES, "nbpl_identity_status"),
         UniqueConstraint("company_id", "email", name="nbpl_identity_email"),
+        Index("nbpl_identities_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="RESTRICT"), index=True)
     full_name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(254), index=True)
@@ -534,3 +548,9 @@ class PlatformSetting(Base):
     value: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_by: Mapped[str | None] = mapped_column(String(254), default=None)
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Identity, Company, Application)

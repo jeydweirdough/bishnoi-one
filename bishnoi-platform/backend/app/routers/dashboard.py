@@ -6,7 +6,7 @@ staff, open incidents), in one call.
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from app import platform_settings
 from app.api import iso
@@ -27,6 +27,12 @@ SEVERITY_RANK = {"minor": 1, "major": 2, "critical": 3}
 
 def count(db, model, *where) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*where)) or 0
+
+
+def all_and(db, model, when) -> tuple[int, int]:
+    """How many there are, and how many of them are `when`: one query."""
+    total, matching = db.execute(select(func.count(), func.coalesce(func.sum(case((when, 1), else_=0)), 0)).select_from(model)).one()
+    return total or 0, matching or 0
 
 
 def banner_incidents(db, settings) -> list[Incident]:
@@ -63,12 +69,14 @@ def dashboard(request: Request, db: DB, settings: SettingsDep, _: CurrentUser) -
         key=lambda n: n["startsAt"],
     )[:5]
     recent = db.scalars(select(AuditEntry).order_by(AuditEntry.created_at.desc()).limit(10)).all()
+    companies_all, companies_active = all_and(db, Company, Company.status == "active")
+    users_all, users_active = all_and(db, Identity, Identity.status == "active")
     return {
         "counts": {
-            "companies": count(db, Company),
-            "activeCompanies": count(db, Company, Company.status == "active"),
-            "users": count(db, Identity),
-            "activeUsers": count(db, Identity, Identity.status == "active"),
+            "companies": companies_all,
+            "activeCompanies": companies_active,
+            "users": users_all,
+            "activeUsers": users_active,
             "applications": count(db, Application, Application.is_active),
             "openTickets": len(open_tickets),
             "activeIncidents": len(active),
@@ -104,3 +112,14 @@ def options(db: DB, _: CurrentUser) -> dict:
                       for i in db.scalars(select(Incident).where(Incident.status != "resolved").order_by(Incident.started_at.desc()))],
         "now": iso(datetime.now(UTC)),
     }
+
+
+@router.get("/frame")
+def frame(db: DB, settings: SettingsDep, me: CurrentUser) -> dict:
+    """What every signed-in screen needs around its own content, in one request:
+    who is signed in, the incidents for the banner, and what isn't set up yet.
+    The same answers as /auth/me, /platform/banner and /platform/unset."""
+    from app.identity import me_out
+    from app.routers.unset import unset
+
+    return {"me": me_out(me, settings), "banner": banner(db, settings, me), "unset": unset(me, db)}

@@ -13,6 +13,7 @@ import { Count, IncidentSeverityMark, IncidentStatusMark, KindMark, SeverityMark
 import { CompanyApps } from "@/src/components/organizations/company-apps";
 import { ServiceCard } from "@/src/components/organizations/service-card";
 import type { ServiceInfo } from "@/src/actions/services";
+import { DeleteRecord } from "@/src/components/delete-record";
 import { SuspendCompany } from "@/src/components/organizations/company-tools";
 import { EditLink, SuspendedTag } from "@/src/components/organizations/record-tools";
 import { Structure } from "@/src/components/organizations/structure";
@@ -51,6 +52,14 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               <>
                 <EditLink href={`/companies/${company.id}/edit`} what={company.name} />
                 <SuspendCompany id={company.id} name={company.name} status={company.status} people={company.userCount} />
+                <DeleteRecord
+                  kind="company"
+                  id={company.id}
+                  name={company.name}
+                  after="/companies"
+                  done="Company deleted"
+                  body={`${company.name} goes from the platform with its ${company.userCount === 1 ? "1 person" : `${company.userCount} people`}, their access, its structure and connections. Tickets it raised stay. Its data inside each application (the CRM's customers, Inventory's stock) isn't touched. It can't be undone; to keep it, suspend it instead.`}
+                />
               </>
             )}
           </>
@@ -62,6 +71,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           </span>
         ) : (
           <>
+            {company.no && <span className="tabular-nums">No. {company.no} · </span>}
             {company.slug} · {plural(company.userCount, "user")} · {plural(company.appCount, "application")}
           </>
         )}

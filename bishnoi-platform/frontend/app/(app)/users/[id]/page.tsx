@@ -12,7 +12,7 @@ import { EditLink, SuspendedTag } from "@/src/components/organizations/record-to
 import { Grants } from "@/src/components/users/grants";
 import { RequestAccess } from "@/src/components/users/request-form";
 import { AdminStamp, workState } from "@/src/components/users/user-rows";
-import { MakePassword, SuspendUser } from "@/src/components/users/user-tools";
+import { DeleteUser, MakePassword, SuspendUser } from "@/src/components/users/user-tools";
 import type { Options, PlatformUserDetail, RequestStatus } from "@/src/lib/types";
 import { ago, when } from "@/src/lib/words";
 
@@ -50,11 +50,13 @@ export default async function UserPage({ params }: Props) {
                 <EditLink href={`/users/${user.id}/edit`} what={user.fullName} />
                 <MakePassword id={user.id} name={user.fullName} hasPassword={user.hasPassword} />
                 <SuspendUser id={user.id} name={user.fullName} status={user.status} />
+                <DeleteUser id={user.id} name={user.fullName} />
               </>
             )}
           </>
         }
       >
+        {user.no && <span className="tabular-nums">No. {user.no} · </span>}
         {user.title ? `${user.title} at ` : "At "}
         <Link href={`/companies/${user.companyId}`} className="text-hema hover:underline">
           {user.companyName ?? "their company"}

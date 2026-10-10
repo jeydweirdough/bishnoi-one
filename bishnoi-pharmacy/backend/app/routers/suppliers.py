@@ -40,6 +40,7 @@ class SupplierPatch(Api):
 def supplier_out(s: Supplier, deliveries: int = 0, last: object = None) -> dict:
     return {
         "id": s.id,
+        "no": s.no,
         "name": s.name,
         "contactPerson": s.contact_person,
         "phone": s.phone,

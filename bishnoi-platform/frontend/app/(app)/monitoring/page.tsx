@@ -10,6 +10,7 @@ import { HealthMark, Tabs } from "@/src/components/marks";
 import { CheckNow } from "@/src/components/monitoring/check-now";
 import { TrafficChart } from "@/src/components/monitoring/traffic-chart";
 import { checkLine, msText, uptimeText } from "@/src/components/applications/words";
+import { HealthGauges } from "@/src/components/health-gauges";
 import type { Health, HealthReport, Traffic } from "@/src/lib/types";
 import { HEALTH, ago, when } from "@/src/lib/words";
 
@@ -94,10 +95,14 @@ async function HealthView() {
             <time dateTime={report.checkedAt ?? undefined} title={when(report.checkedAt)}>
               {sinceWords}
             </time>
-            . Rechecked when someone opens a screen and the last check is more than {report.staleSeconds} s old; the platform runs nothing on a timer.
+            . Rechecked in the background when someone opens a screen and the last check is more than {report.staleSeconds} s old; Check now asks straight away.
           </p>
         </div>
         <CheckNow />
+      </Sheet>
+
+      <Sheet className="px-5 pt-5 pb-5">
+        <HealthGauges health={report} />
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-1">

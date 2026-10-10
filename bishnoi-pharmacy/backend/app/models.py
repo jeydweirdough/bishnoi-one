@@ -19,7 +19,7 @@ comes from, takes it off that batch's stock, and records the sale.
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -64,8 +64,12 @@ class RolePermission(Base):
 
 class User(Base):
     __tablename__ = "nbph_users"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbph_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -167,12 +171,16 @@ MEDICINE_STATUSES = ("active", "inactive", "discontinued")
 
 class Medicine(Base):
     __tablename__ = "nbph_medicines"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("rx_class IN ('otc', 'rx', 'dangerous')", name="medicine_rx_class"),
         CheckConstraint("status IN ('active', 'inactive', 'discontinued')", name="medicine_status"),
+        Index("nbph_medicines_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     code: Mapped[str] = mapped_column(String(40), unique=True)
     generic_name: Mapped[str] = mapped_column(String(160), index=True)
     brand_id: Mapped[str | None] = mapped_column(ForeignKey("nbph_brands.id", ondelete="SET NULL"), index=True, default=None)
@@ -205,8 +213,12 @@ class Medicine(Base):
 
 class Supplier(Base):
     __tablename__ = "nbph_suppliers"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbph_suppliers_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(160), unique=True)
     contact_person: Mapped[str | None] = mapped_column(String(120), default=None)
     phone: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -307,9 +319,12 @@ PERSON_KINDS = ("patient", "customer")
 
 class Patient(Base):
     __tablename__ = "nbph_patients"
-    __table_args__ = (CheckConstraint("kind IN ('patient', 'customer')", name="patient_kind"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint("kind IN ('patient', 'customer')", name="patient_kind"), Index("nbph_patients_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     kind: Mapped[str] = mapped_column(String(10), default="patient")
     full_name: Mapped[str] = mapped_column(String(160), index=True)
     birth_date: Mapped[date | None] = mapped_column(Date, default=None)
@@ -524,3 +539,9 @@ class SaleReturn(Base):
 
     sale: Mapped[Sale] = relationship(lazy="joined")
     by: Mapped[User | None] = relationship(lazy="joined")
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Medicine, Supplier, Patient)

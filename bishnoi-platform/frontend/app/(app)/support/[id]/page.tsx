@@ -5,6 +5,8 @@ import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { KindMark, Lifecycle, SeverityMark, TicketStatusMark } from "@/src/components/marks";
 import { TicketFields } from "@/src/components/support/ticket-fields";
+import { DeleteRecord } from "@/src/components/delete-record";
+import { getStaff } from "@/src/components/gate";
 import { AddNote, EditTicketWords } from "@/src/components/support/ticket-forms";
 import type { Options, TicketDetail, TicketNote } from "@/src/lib/types";
 import { TICKET_KINDS, TICKET_STATUSES, ago, when } from "@/src/lib/words";
@@ -56,7 +58,7 @@ function Note({ note }: { note: TicketNote }) {
 
 export default async function TicketPage({ params }: { params: Params }) {
   const { id } = await params;
-  const [ticket, options] = await Promise.all([getTicket(id), load<Options>("/platform/options")]);
+  const [ticket, options, staff] = await Promise.all([getTicket(id), load<Options>("/platform/options"), getStaff()]);
   const newestFirst = [...ticket.notes].reverse();
 
   return (
@@ -65,7 +67,21 @@ export default async function TicketPage({ params }: { params: Params }) {
         crumbs={[{ href: `/support?kind=${ticket.kind}`, label: `Support · ${TICKET_KINDS[ticket.kind].many}` }]}
         title={`${ticket.number} ${ticket.title}`}
         // Its title and description are the ticket's own words, so their editor sits with the title.
-        tools={<EditTicketWords ticket={ticket} />}
+        tools={
+          <>
+            <EditTicketWords ticket={ticket} />
+            {staff.canAdminister && (
+              <DeleteRecord
+                kind="ticket"
+                id={ticket.id}
+                name={`${ticket.number} ${ticket.title}`}
+                after="/support"
+                done="Ticket deleted"
+                body="It goes with its notes: for a ticket raised by mistake, or a test. It can't be undone; to keep it, close it instead."
+              />
+            )}
+          </>
+        }
       >
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <KindMark kind={ticket.kind} />

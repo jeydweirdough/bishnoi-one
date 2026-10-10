@@ -21,6 +21,7 @@ def person(user: User | None) -> dict | None:
 def product_ref(p: Product) -> dict:
     return {
         "id": p.id,
+        "no": p.no,
         "sku": p.sku,
         "name": p.name,
         "unit": p.unit_code,
@@ -31,7 +32,7 @@ def product_ref(p: Product) -> dict:
 
 
 def warehouse_ref(w: Warehouse | None) -> dict | None:
-    return {"id": w.id, "code": w.code, "name": w.name} if w else None
+    return {"id": w.id, "no": w.no, "code": w.code, "name": w.name} if w else None
 
 
 def location_ref(loc: Location | None) -> dict | None:
@@ -39,7 +40,7 @@ def location_ref(loc: Location | None) -> dict | None:
 
 
 def supplier_ref(s: Supplier | None) -> dict | None:
-    return {"id": s.id, "code": s.code, "name": s.name} if s else None
+    return {"id": s.id, "no": s.no, "code": s.code, "name": s.name} if s else None
 
 
 def expiry_state(expires_on: date | None, warning_days: int) -> str | None:

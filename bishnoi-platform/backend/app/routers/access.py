@@ -257,6 +257,7 @@ def application_access(db: DB, _: CurrentUser) -> dict:
 def staff_out(u: User, sessions: int = 0) -> dict:
     return {
         "id": u.id,
+        "no": u.no,
         "fullName": u.full_name,
         "email": u.email,
         "role": u.role,
@@ -425,5 +426,18 @@ def end_session(session_id: str, db: DB, me: CurrentUser, address: Address) -> R
     owner = db.get(User, s.user_id)
     audit(db, me, "auth.session_ended", category="security", target=owner.email if owner else "", target_type="staff",
           target_id=s.user_id, address=address)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/access/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_request(request_id: str, db: DB, me: AdminUser) -> Response:
+    """A request logged by mistake, or no longer wanted: gone, decided or not."""
+    r = db.get(AccessRequest, request_id)
+    if r is None:
+        raise not_found("request")
+    person = db.get(Identity, r.identity_id)
+    audit(db, me, "access.request_deleted", target=person.email if person else "", target_type="user", target_id=r.identity_id, application_id=r.application_id)
+    db.delete(r)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

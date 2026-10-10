@@ -1,22 +1,24 @@
+// Buttons are Ant Design's (ant-button.tsx). What's left here is for a plain
+// <a> or <label> that has to look like one: an Ant button's shape, in classes
+// a server-rendered page can use.
+export { Button, LinkButton } from "./ant-button";
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
-
-type Variant = "primary" | "default" | "quiet" | "danger";
-type Size = "md" | "sm";
+import type * as React from "react";
+import type { Size, Variant } from "./ant-button";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[3px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
 
 const variants: Record<Variant, string> = {
   primary: "bg-hema text-white hover:bg-hema-hover",
-  default: "bg-sheet text-ink border border-rule-strong hover:border-control",
-  quiet: "text-hema hover:bg-hema-tint",
-  danger: "bg-danger text-white hover:brightness-95",
+  default: "bg-sheet text-ink border border-ink hover:bg-mint",
+  quiet: "text-ink-2 hover:bg-[#f4f4f2] hover:text-ink",
+  danger: "bg-danger text-white hover:bg-[#941c13]",
 };
 
 const sizes: Record<Size, string> = {
-  md: "h-9 px-4 text-sm",
-  sm: "h-8 px-3 text-meta",
+  md: "h-9 px-[18px] text-sm",
+  sm: "h-7 px-3 text-sm",
 };
 
 export function buttonClass(variant: Variant = "default", size: Size = "md", extra = "") {
@@ -32,46 +34,70 @@ export function Spinner({ className = "" }: { className?: string }) {
   );
 }
 
-type ButtonProps = ComponentProps<"button"> & {
-  variant?: Variant;
-  size?: Size;
-  /** Shows a spinner and blocks clicks while the action runs. */
-  loading?: boolean;
-  icon?: ReactNode;
-};
+const ICON_TONES = {
+  default: "text-ink-3 hover:bg-bench hover:text-ink",
+  /** On a mint or grey surface. */
+  soft: "text-ink-2 hover:bg-sheet hover:text-ink",
+  danger: "text-ink-3 hover:bg-danger-tint hover:text-danger",
+  /** On a picture or a dark surface. */
+  solid: "bg-ink text-white hover:bg-hema-hover",
+} as const;
 
-export function Button({
-  variant = "default",
+/** A button that is only an icon (⋯, ✕, ↑ ↓, ‹ ›): round, and named for screen readers by `label`. */
+export function IconButton({
+  label,
+  tone = "default",
   size = "md",
-  loading = false,
-  icon,
-  disabled,
   className = "",
+  pressed,
   children,
-  type = "button",
   ...rest
-}: ButtonProps) {
+}: Omit<React.ComponentProps<"button">, "aria-label"> & { label: string; tone?: keyof typeof ICON_TONES; size?: "sm" | "md"; pressed?: boolean }) {
   return (
     <button
-      type={type}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
-      className={buttonClass(variant, size, className)}
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      title={label}
+      className={`grid shrink-0 place-items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${size === "sm" ? "size-7" : "size-8"} ${pressed ? "bg-hema-tint text-ink" : ICON_TONES[tone]} ${className}`}
       {...rest}
     >
-      {loading ? <Spinner /> : icon}
       {children}
     </button>
   );
 }
 
-type LinkButtonProps = ComponentProps<typeof Link> & { variant?: Variant; size?: Size; icon?: ReactNode };
-
-export function LinkButton({ variant = "default", size = "md", icon, className = "", children, ...rest }: LinkButtonProps) {
+/** An action written as words in a sentence or a row ("Change", "Show all"): underlined on hover. */
+export function TextButton({ tone = "ink", size = "meta", className = "", children, ...rest }: React.ComponentProps<"button"> & { tone?: "ink" | "muted" | "danger"; size?: "meta" | "inherit" }) {
+  const colour = tone === "muted" ? "text-ink-3 hover:text-ink" : tone === "danger" ? "text-ink-3 hover:text-danger" : "font-medium text-ink";
   return (
-    <Link className={buttonClass(variant, size, className)} {...rest}>
-      {icon}
+    <button type="button" className={`inline-flex items-center gap-1 hover:underline disabled:opacity-40 ${size === "meta" ? "text-meta" : ""} ${colour} ${className}`} {...rest}>
       {children}
+    </button>
+  );
+}
+
+const QUICK = "inline-flex h-9 items-center gap-2 rounded-full border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink";
+
+/** A quick action on a record (Call, Email, Note…): a small pill with its icon. A link with `href`, else a button. */
+export function QuickAction({ href, icon, children, ...rest }: React.ComponentProps<"button"> & { href?: string; icon?: React.ReactNode }) {
+  const inner = (
+    <>
+      {icon && (
+        <span className="text-ink-3" aria-hidden>
+          {icon}
+        </span>
+      )}
+      {children}
+    </>
+  );
+  return href ? (
+    <Link href={href} className={QUICK}>
+      {inner}
     </Link>
+  ) : (
+    <button type="button" className={QUICK} {...rest}>
+      {inner}
+    </button>
   );
 }

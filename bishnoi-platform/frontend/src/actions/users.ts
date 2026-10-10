@@ -35,6 +35,15 @@ export async function updateUser(id: string, patch: UserPatch): Promise<Result<{
   });
 }
 
+/** Gone from the platform, with their applications; suspending keeps the person. */
+export async function deleteUser(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/platform/users/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}
+
 /** A first (or new) password for someone's Bishnoi One account, made here and shown once. Their sign-ins end. */
 export async function makePassword(id: string): Promise<Result<string>> {
   return attempt(async () => {

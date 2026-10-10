@@ -1,7 +1,8 @@
 "use client";
 
+import { IconButton } from "./button";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Field, FormError, Input } from "../ui/field";
@@ -36,35 +37,9 @@ export function listDetail(items: { isActive: boolean }[]): string {
   return items.length === 0 ? "Empty" : off ? `${items.length - off} on · ${off} off` : plural(items.length, "choice");
 }
 
-export function IconButton({
-  label,
-  onClick,
-  disabled,
-  pressed,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  pressed?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] hover:bg-bench/60 hover:text-ink disabled:pointer-events-none disabled:opacity-30 ${
-        pressed ? "bg-hema-tint text-hema" : "text-ink-3"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+
+/** The shared icon button (src/platform/ui/button.tsx), for this kit's callers. */
+export { IconButton };
 
 export function moved<T>(rows: T[], from: number, by: number): T[] {
   const next = [...rows];
@@ -93,8 +68,8 @@ function IconRow({
           aria-label={label}
           title={label}
           onClick={() => onPick(name)}
-          className={`inline-flex size-7 items-center justify-center rounded-[3px] border ${
-            value === name ? "border-hema bg-hema-tint text-hema" : "border-rule text-ink-3 hover:border-control"
+          className={`inline-flex size-7 items-center justify-center rounded-[14px] border ${
+            value === name ? "border-hema bg-hema-tint text-ink" : "border-rule text-ink-3 hover:border-control"
           }`}
         >
           <Icon name={name} className="size-4" />

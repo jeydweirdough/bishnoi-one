@@ -119,7 +119,7 @@ def vehicle_out(v: Vehicle, today: date) -> dict:
     dues = vehicle_dues(v, today)
     nearest = dues[0] if dues else None
     return {
-        "id": v.id, "name": v.name, "plate": v.plate, "yearModel": v.year_model, "color": v.color, "ownerName": v.owner_name,
+        "id": v.id, "no": v.no, "name": v.name, "plate": v.plate, "yearModel": v.year_model, "color": v.color, "ownerName": v.owner_name,
         "registrationDue": _d(v.registration_due), "insuranceDue": _d(v.insurance_due), "pmsDue": _d(v.pms_due),
         "fleetCard": v.fleet_card, "notes": v.notes, "dues": dues,
         "nextDue": nearest["label"] if nearest else None,
@@ -131,7 +131,7 @@ def vehicle_out(v: Vehicle, today: date) -> dict:
 
 def fleet_card_out(c: FleetCard, today: date) -> dict:
     return {
-        "id": c.id, "requestedOn": _d(c.requested_on), "holderName": c.holder_name, "companyName": c.company_name,
+        "id": c.id, "no": c.no, "requestedOn": _d(c.requested_on), "holderName": c.holder_name, "companyName": c.company_name,
         "monthlyAllowance": c.monthly_allowance, "allowanceNote": c.allowance_note, "fuelType": c.fuel_type,
         "plate": c.plate, "conductionSticker": c.conduction_sticker, "vehicleUnit": c.vehicle_unit, "status": c.status, "cardState": c.card_state, "notes": c.notes,
         "updatedAt": c.updated_at.isoformat(),
@@ -141,7 +141,7 @@ def fleet_card_out(c: FleetCard, today: date) -> dict:
 def travel_out(t: TravelSponsorship, today: date) -> dict:
     ahead = t.starts_on if t.status != "cancelled" else None
     return {
-        "id": t.id, "requestedOn": _d(t.requested_on), "repName": t.rep_name, "doctorName": t.doctor_name, "doctorBirthdate": _d(t.doctor_birthdate), "kind": t.kind,
+        "id": t.id, "no": t.no, "requestedOn": _d(t.requested_on), "repName": t.rep_name, "doctorName": t.doctor_name, "doctorBirthdate": _d(t.doctor_birthdate), "kind": t.kind,
         "travelDates": t.travel_dates, "startsOn": _d(t.starts_on), "hotelOrFlight": t.hotel_or_flight, "status": t.status,
         "approvedOn": _d(t.approved_on), "nextStep": t.next_step, "notes": t.notes, **countdown(ahead, today), "updatedAt": t.updated_at.isoformat(),
     }
@@ -149,7 +149,7 @@ def travel_out(t: TravelSponsorship, today: date) -> dict:
 
 def device_out(d: DeviceIssue, today: date) -> dict:
     return {
-        "id": d.id, "issuedOn": _d(d.issued_on), "issuedTo": d.issued_to, "laptop": d.laptop, "phone": d.phone, "sim": d.sim,
+        "id": d.id, "no": d.no, "issuedOn": _d(d.issued_on), "issuedTo": d.issued_to, "laptop": d.laptop, "phone": d.phone, "sim": d.sim,
         "condition": d.condition, "signedBy": d.signed_by, "notes": d.notes, "updatedAt": d.updated_at.isoformat(),
     }
 

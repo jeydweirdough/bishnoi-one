@@ -8,6 +8,7 @@ Every sign-in, every wrong password and every sign-out is a security event in
 the audit log, with the address it came from.
 """
 
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -119,6 +120,37 @@ def logout(record: CurrentSession, db: DB, address: Address) -> Response:
 
 @router.get("/me")
 def me(user: CurrentUser, settings: SettingsDep) -> dict:
+    return me_out(user, settings)
+
+
+class MeIn(Api):
+    full_name: str | None = Field(None, min_length=1, max_length=120)
+    email: str | None = Field(None, max_length=254)
+    # A new email is what you sign in with from then on: your password says it's you.
+    current_password: str | None = Field(None, max_length=MAX_PASSWORD)
+
+
+@router.patch("/me")
+def change_me(body: MeIn, user: CurrentUser, db: DB, settings: SettingsDep, address: Address) -> dict:
+    """Your own name and email on the console. Your role is changed by another Platform Admin."""
+    fields: list[str] = []
+    if body.full_name is not None and body.full_name.strip() and body.full_name.strip() != user.full_name:
+        user.full_name = body.full_name.strip()
+        fields.append("fullName")
+    if body.email is not None and body.email.strip().lower() != user.email:
+        email = body.email.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "email"], "msg": "Enter an email address like name@company.com."}])
+        if not body.current_password or not verify_password(body.current_password, user.password_hash):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "currentPassword"], "msg": "Type your current password to change your email."}])
+        taken = db.scalar(select(User).where(func.lower(User.email) == email, User.id != user.id))
+        if taken is not None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "email"], "msg": "There's already a staff account with this email."}])
+        user.email = email
+        fields.append("email")
+    if fields:
+        audit(db, user, "staff.updated", category="security", target=user.email, target_type="staff", target_id=user.id, fields=fields, address=address)
+        db.commit()
     return me_out(user, settings)
 
 

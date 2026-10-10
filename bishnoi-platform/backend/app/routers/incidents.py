@@ -12,14 +12,14 @@ Anyone signed in here may declare, update and resolve one.
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from pydantic import Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api import Api, camel, changed, field_error, iso, not_found
 from app.audit import audit
-from app.deps import DB, CurrentUser
+from app.deps import DB, AdminUser, CurrentUser
 from app.models import Application, Company, Incident, IncidentCompany, IncidentUpdate, Ticket, User
 from app.numbers import insert_numbered
 
@@ -225,3 +225,13 @@ def post_update(incident_id: str, body: UpdateIn, db: DB, me: CurrentUser) -> di
               target_id=i.id, application_id=i.application_id, fields=["status"])
     db.commit()
     return get_incident(i.id, db, me)
+
+
+@router.delete("/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_incident(incident_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone, with its updates. Tickets linked to it stay, unlinked."""
+    i = _incident(db, incident_id)
+    audit(db, me, "incident.deleted", target=f"{getattr(i, 'number', '')} {i.title}".strip(), target_type="incident", target_id=i.id)
+    db.delete(i)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

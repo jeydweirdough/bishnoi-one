@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { load } from "@/src/platform/lib/api";
+import { DeleteRecord } from "@/src/components/delete-record";
 import { getStaff } from "@/src/components/gate";
 import { HealthMark, Tabs } from "@/src/components/marks";
 import { RegisterApplication } from "@/src/components/applications/application-forms";
@@ -37,7 +38,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       </PageHeader>
       <Tabs current={tab} tabs={TABS.map((t) => ({ ...t, href: t.key === "registry" ? "/applications" : `/applications?tab=${t.key}` }))} />
       {tab === "registry" && <Registry retired={retired} canAdminister={staff.canAdminister} />}
-      {tab === "deployments" && <Deployments />}
+      {tab === "deployments" && <Deployments canDelete={staff.canAdminister} />}
       {tab === "integrations" && <Integrations />}
     </>
   );
@@ -120,7 +121,7 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
   );
 }
 
-async function Deployments() {
+async function Deployments({ canDelete }: { canDelete: boolean }) {
   const { deployments } = await load<{ deployments: Deployment[] }>("/platform/deployments");
   return (
     <Sheet className="overflow-hidden">
@@ -142,11 +143,22 @@ async function Deployments() {
                 {d.notes && <p className="mt-0.5 text-sm whitespace-pre-line text-ink-2">{d.notes}</p>}
                 <p className="text-meta text-ink-3">Recorded by {d.recordedBy}</p>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <EnvironmentMark environment={d.environment} />
-                <time dateTime={d.deployedAt} title={when(d.deployedAt)} className="text-meta text-ink-3">
-                  {ago(d.deployedAt)}
-                </time>
+              <div className="flex shrink-0 items-start gap-2">
+                <div className="flex flex-col items-end gap-1">
+                  <EnvironmentMark environment={d.environment} />
+                  <time dateTime={d.deployedAt} title={when(d.deployedAt)} className="text-meta text-ink-3">
+                    {ago(d.deployedAt)}
+                  </time>
+                </div>
+                {canDelete && (
+                  <DeleteRecord
+                    kind="deployment"
+                    id={d.id}
+                    name={`${d.applicationName} ${d.version}`}
+                    done="Deployment record deleted"
+                    body="This record goes from the deployment history. Nothing that's online changes."
+                  />
+                )}
               </div>
             </li>
           ))}

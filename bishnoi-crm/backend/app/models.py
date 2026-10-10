@@ -9,7 +9,7 @@ Accounts here are the CRM's own: nobody signed in here exists in any other Bishn
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
+from sqlalchemy import JSON, CheckConstraint, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from app.db import Base
@@ -25,8 +25,12 @@ def new_id() -> str:
 
 class Team(Base):
     __tablename__ = "nbcm_teams"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbcm_teams_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(80), unique=True)
     description: Mapped[str | None] = mapped_column(String(300), default=None)
     # The offices the team works from: ["Makati", "Cebu"].
@@ -74,8 +78,12 @@ class RolePermission(Base):
 
 class User(Base):
     __tablename__ = "nbcm_users"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbcm_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     # The company's own ID for them (e.g. EMP-0012), kept in capitals. A
@@ -177,11 +185,15 @@ class CustomerType(Base):
 
 class Company(Owned, Base):
     __tablename__ = "nbcm_companies"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbcm_companies_no", "no", unique=True),)
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     # The customer's code (CRM-000001), given by the system when it's added
     # (number_new_customers, below) and never changed: what people quote.
     code: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, default=None)
@@ -213,11 +225,15 @@ class Company(Owned, Base):
 
 class Contact(Owned, Base):
     __tablename__ = "nbcm_contacts"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbcm_contacts_no", "no", unique=True),)
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), index=True, default=None)
     first_name: Mapped[str] = mapped_column(String(80))
     last_name: Mapped[str | None] = mapped_column(String(80), default=None)
@@ -309,11 +325,15 @@ class PriceType(Base):
 
 class Product(Base):
     __tablename__ = "nbcm_products"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbcm_products_no", "no", unique=True),)
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     code: Mapped[str] = mapped_column(String(40), unique=True)
     name: Mapped[str] = mapped_column(String(160))
     generic_name: Mapped[str | None] = mapped_column(String(160), default=None)
@@ -888,12 +908,16 @@ class Deal(Owned, Base):
     is who's working it."""
 
     __tablename__ = "nbcm_deals"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("forecast_category IN ('pipeline', 'best_case', 'commit', 'closed', 'omitted')", name="deal_forecast"),
         CheckConstraint("probability >= 0 AND probability <= 100", name="deal_probability"),
+        Index("nbcm_deals_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(160))
     company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
     contact_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_contacts.id", ondelete="SET NULL"), index=True, default=None)
@@ -1237,3 +1261,9 @@ class QuoteLink(Base):
     company: Mapped[Company | None] = relationship(lazy="joined")
     contact: Mapped[Contact | None] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="QuoteLink.owner_id", lazy="joined")
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Team, Company, Contact, Product, Deal)

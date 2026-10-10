@@ -104,7 +104,7 @@ export type CompanyLists = Record<ListKind, ListItem[]>;
 
 export type Me = {
   // `photoAt`: when their picture last changed, or null when they have none (initials are drawn instead).
-  user: { id: string; email: string; fullName: string; photoAt: string | null };
+  user: { id: string; no?: number | null; email: string; fullName: string; photoAt: string | null };
   // The company this session works in, and null for a Developer Admin who has
   // not opened one: they sign in to the platform, which is in no company.
   // Everything else here is within whichever company that is.

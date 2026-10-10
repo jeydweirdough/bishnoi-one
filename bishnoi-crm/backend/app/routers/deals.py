@@ -233,6 +233,7 @@ def deal_out(db: Session, deal: Deal, access: Access, *, full: bool = False) -> 
     state = state_of(deal)
     out = {
         "id": deal.id,
+        "no": deal.no,
         "name": deal.name,
         "company": {"id": deal.company.id, "name": deal.company.name},
         "contact": {"id": deal.contact.id, "name": deal.contact.full_name} if deal.contact else None,

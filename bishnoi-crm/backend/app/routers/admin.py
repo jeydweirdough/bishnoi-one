@@ -131,6 +131,7 @@ def iso(moment: datetime | None) -> str | None:
 def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
     return {
         "id": user.id,
+        "no": user.no,
         "email": user.email,
         "fullName": user.full_name,
         "employeeId": user.employee_id,
@@ -449,6 +450,7 @@ def team_out(team: Team, members: int = 0, db: DB | None = None) -> dict:
     manager = db.get(User, team.manager_id) if db is not None and team.manager_id else None
     return {
         "id": team.id,
+        "no": team.no,
         "name": team.name,
         "description": team.description,
         "headquarters": team.headquarters or [],

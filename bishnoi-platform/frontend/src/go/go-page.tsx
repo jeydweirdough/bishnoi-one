@@ -52,7 +52,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-start px-4 py-10 sm:justify-center">
-      <div className="w-full max-w-md rounded-[3px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
+      <div className="w-full max-w-md rounded-[18px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
         <div className="border-b-[3px] border-double border-ink pb-3">
           <p className="text-stamp text-ink-3 uppercase">{APP_NAME}</p>
           <p className="text-heading leading-tight">{name ? `Opening ${name}` : "Your Bishnoi One account"}</p>
@@ -68,7 +68,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
                 <li key={c.slug}>
                   <a
                     href={goLink(key, returnTo, c.slug)}
-                    className="flex items-center justify-between rounded-[3px] border border-rule-strong px-4 py-3 text-ink hover:border-hema"
+                    className="flex items-center justify-between rounded-[18px] border border-rule-strong px-4 py-3 text-ink hover:border-hema"
                   >
                     <span className="font-medium">{c.name}</span>
                     {c.current && <span className="text-meta text-ink-3">Last used</span>}
@@ -80,7 +80,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
         ) : refused ? (
           <>
             <h1 className="mt-6 text-title">Can't open {name}</h1>
-            <p role="alert" className="mt-2 rounded-[3px] bg-danger-tint px-3 py-2 text-sm text-danger">
+            <p role="alert" className="mt-2 rounded-[14px] bg-danger-tint px-3 py-2 text-sm text-danger">
               {refused}
             </p>
           </>

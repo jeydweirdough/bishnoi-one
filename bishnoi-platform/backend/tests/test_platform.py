@@ -291,3 +291,12 @@ def test_every_app_reads_the_addresses_from_here(client, ana):
     r = client.patch(f"/platform/applications/{crm['id']}", json={"appUrl": "https://crm.getmeds.ph/"}, headers=ana)
     assert r.status_code == 200, r.text
     assert client.get("/public/applications").json()["addresses"]["crm"] == "https://crm.getmeds.ph"
+
+
+def test_one_request_for_the_frame(client, ana):
+    """The frame of every page is one request: the same as its three parts."""
+    frame = client.get("/platform/frame", headers=ana).json()
+    assert frame["me"] == client.get("/auth/me", headers=ana).json()
+    assert frame["banner"] == client.get("/platform/banner", headers=ana).json()
+    assert frame["unset"] == client.get("/platform/unset", headers=ana).json()
+    assert client.get("/platform/frame").status_code == 401

@@ -7,7 +7,7 @@ a migration (migrations/versions)."""
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -56,8 +56,12 @@ class RolePermission(Base):
 
 class User(Base):
     __tablename__ = "nbad_users"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -129,8 +133,12 @@ class ComplianceRecord(Base):
     """Corporate and regulatory registrations, permits, and accreditations (BOC, SEC, BIR, LGU, FDA)."""
 
     __tablename__ = "nbad_compliance_records"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_compliance_records_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     title: Mapped[str] = mapped_column(String(160))
     category: Mapped[str] = mapped_column(String(40))  # boc, lgu, sec, bir, fda, sanitary_fire, other
     agency: Mapped[str] = mapped_column(String(100))  # e.g. Bureau of Customs (BOC), LGU Makati, SEC, BIR, FDA
@@ -150,8 +158,12 @@ class ImmigrationRecord(Base):
     """Expatriate, executive visas, Alien Certificate of Registration (ACR I-Card), DOLE AEP, and passports."""
 
     __tablename__ = "nbad_immigration_records"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_immigration_records_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     individual_name: Mapped[str] = mapped_column(String(120))
     designation: Mapped[str] = mapped_column(String(120))
     nationality: Mapped[str] = mapped_column(String(60))
@@ -172,8 +184,12 @@ class CorporateDocument(Base):
     """Commercial contracts, corporate insurance policies (D&O, CGL, property), and board resolutions."""
 
     __tablename__ = "nbad_corporate_documents"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_corporate_documents_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     title: Mapped[str] = mapped_column(String(160))
     category: Mapped[str] = mapped_column(String(40))  # insurance, contract, nda, board_resolution, sla, legal_retainer
     counterparty: Mapped[str] = mapped_column(String(140))
@@ -194,8 +210,12 @@ class PropertyRecord(Base):
     """Corporate facilities, office leases, pharma warehouses, depot facilities, and utilities."""
 
     __tablename__ = "nbad_properties"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_properties_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(140))
     property_type: Mapped[str] = mapped_column(String(40))  # office, warehouse, depot, parking, expat_housing
     address: Mapped[str] = mapped_column(String(250))
@@ -282,8 +302,12 @@ class Vehicle(Base):
     """A company car: its registration, insurance and maintenance falling due."""
 
     __tablename__ = "nbad_vehicles"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbad_vehicles_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(140))  # "Ford Ranger AT"
     plate: Mapped[str | None] = mapped_column(String(20), default=None, index=True)
     year_model: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -302,12 +326,16 @@ class FleetCard(Base):
     """A fuel card given to a salesperson: their allowance, the car it's for, and whether it works."""
 
     __tablename__ = "nbad_fleet_cards"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("status IN ('processing', 'handed_over', 'with_hr', 'returned')", name="nbad_fleet_card_status"),
         CheckConstraint("card_state IN ('active', 'blocked')", name="nbad_fleet_card_state"),
+        Index("nbad_fleet_cards_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     requested_on: Mapped[date | None] = mapped_column(Date, default=None)
     holder_name: Mapped[str] = mapped_column(String(140), index=True)
     company_name: Mapped[str | None] = mapped_column(String(140), default=None)
@@ -328,12 +356,16 @@ class TravelSponsorship(Base):
     """A doctor's hotel stay or flight the company pays for, asked for by a rep."""
 
     __tablename__ = "nbad_travel_sponsorships"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("kind IN ('hotel', 'flight')", name="nbad_travel_kind"),
         CheckConstraint("status IN ('for_approval', 'for_processing', 'approved', 'booked', 'cancelled')", name="nbad_travel_status"),
+        Index("nbad_travel_sponsorships_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     requested_on: Mapped[date | None] = mapped_column(Date, default=None)
     rep_name: Mapped[str] = mapped_column(String(140), index=True)  # the medical sales associate who asked
     doctor_name: Mapped[str] = mapped_column(String(140), index=True)
@@ -354,9 +386,12 @@ class DeviceIssue(Base):
     """A laptop, phone or SIM handed to someone, and who signed for it."""
 
     __tablename__ = "nbad_device_issues"
-    __table_args__ = (CheckConstraint("condition IN ('brand_new', 'repaired', 'used')", name="nbad_device_condition"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint("condition IN ('brand_new', 'repaired', 'used')", name="nbad_device_condition"), Index("nbad_device_issues_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     issued_on: Mapped[date | None] = mapped_column(Date, default=None)
     issued_to: Mapped[str] = mapped_column(String(200), index=True)
     laptop: Mapped[str | None] = mapped_column(String(140), default=None)
@@ -382,3 +417,9 @@ class RecordEvent(Base):
     text: Mapped[str] = mapped_column(String(500))
     by_name: Mapped[str | None] = mapped_column(String(140), default=None)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, ComplianceRecord, ImmigrationRecord, CorporateDocument, PropertyRecord, Vehicle, FleetCard, TravelSponsorship, DeviceIssue)

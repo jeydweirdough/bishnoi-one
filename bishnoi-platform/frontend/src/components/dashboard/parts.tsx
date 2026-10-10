@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HealthGauges } from "../health-gauges";
 import type { ReactNode } from "react";
 import { Flag } from "@/src/platform/ui/marks";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -124,6 +125,9 @@ export function SystemHealth({ health }: { health: Dashboard["health"] }) {
         <HealthMark status={health.overall} label={OVERALL[health.overall]} />
         <span className="text-meta text-ink-3">checked {ago(health.checkedAt)}</span>
       </p>
+      <div className="mt-4 mb-2">
+        <HealthGauges health={health} />
+      </div>
       <ul className="mt-1 divide-y divide-rule" role="list">
         <HealthRow
           name="Platform API"

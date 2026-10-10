@@ -52,6 +52,15 @@ export async function saveSettings<K extends keyof PlatformSettings>(section: K,
   });
 }
 
+/** Your own name and email on the console; a new email takes your current password. */
+export async function changeMe(change: { fullName: string; email: string; currentPassword?: string }): Promise<Result> {
+  return attempt(async () => {
+    await api.patch("/auth/me", change);
+    refresh();
+    return null;
+  });
+}
+
 export async function changePassword(currentPassword: string, newPassword: string): Promise<Result> {
   return attempt(async () => {
     await api.post("/auth/password", { currentPassword, newPassword });

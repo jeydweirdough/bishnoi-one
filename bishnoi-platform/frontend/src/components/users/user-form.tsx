@@ -134,7 +134,7 @@ export function UserForm({
           )}
         </Field>
         {moving && losing.length > 0 && (
-          <p role="status" className="rounded-[3px] bg-danger-tint px-3 py-2 text-meta text-danger sm:col-span-2">
+          <p role="status" className="rounded-[14px] bg-danger-tint px-3 py-2 text-meta text-danger sm:col-span-2">
             {companyName} doesn&apos;t have {losing.map((g) => g.name).join(", ")}. {user?.fullName} will lose {losing.length === 1 ? "it" : "them"} with the move.
           </p>
         )}
@@ -168,7 +168,7 @@ export function UserForm({
           ) : apps.length === 0 ? (
             <p className="text-meta text-ink-3">{companyName} has no applications yet. Give it some on its Applications tab, then come back.</p>
           ) : (
-            <ul className="divide-y divide-rule rounded-[3px] border border-rule" role="list">
+            <ul className="divide-y divide-rule rounded-[18px] border border-rule" role="list">
               {apps.map((a) => {
                 const p = pick(a.id);
                 return (

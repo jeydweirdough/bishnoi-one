@@ -6,7 +6,7 @@ const ENVIRONMENT: Record<Deployment["environment"], string> = { production: "Pr
 export function EnvironmentMark({ environment }: { environment: Deployment["environment"] }) {
   return (
     <span
-      className={`inline-flex h-5 items-center rounded-[2px] px-1.5 text-stamp whitespace-nowrap uppercase ${
+      className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp whitespace-nowrap uppercase ${
         environment === "production" ? "border border-ink bg-ink text-white" : "border border-rule-strong text-ink-3"
       }`}
     >

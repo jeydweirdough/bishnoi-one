@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
+import { DeleteRecord } from "@/src/components/delete-record";
 import { getStaff } from "@/src/components/gate";
 import { ActivityList } from "@/src/components/activity-list";
 import { HealthMark, IncidentSeverityMark, IncidentStatusMark, KindMark, SeverityMark, Tabs, TicketStatusMark } from "@/src/components/marks";
@@ -11,6 +12,7 @@ import { AddIntegration, EditIntegration, RecordDeployment, RemoveIntegration } 
 import { CheckStrip } from "@/src/components/applications/check-strip";
 import { EnvironmentMark } from "@/src/components/applications/marks";
 import { checkLine, uptimeText } from "@/src/components/applications/words";
+import { AnswerGauge, UptimeGauge } from "@/src/components/health-gauges";
 import type { ApplicationDetail, AuditEntry } from "@/src/lib/types";
 import { HEALTH, ago, plural, when } from "@/src/lib/words";
 
@@ -58,18 +60,27 @@ export default async function ApplicationPage({ params, searchParams }: { params
             <>
               <EditApplication app={app} />
               <RetireApplication app={app} />
+              <DeleteRecord
+                kind="application"
+                id={app.id}
+                name={app.name}
+                after="/applications"
+                done="Application deleted"
+                body={`${app.name} goes from the registry, with its deployments, integrations and links. Only once no company has it: the applications sign in through it. To keep its history, retire it instead.`}
+              />
             </>
           )
         }
         actions={admin && app.isActive && <DeclareStatus app={app} />}
       >
+        {app.no && <span className="text-meta tabular-nums">No. {app.no} · </span>}
         <span className="font-mono text-meta">{app.key}</span>
         {app.version && <span> · version {app.version}</span>}
         {!app.isActive && <span> · retired, so not checked</span>}
       </PageHeader>
 
       {app.statusOverride && (
-        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[3px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
+        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
           <p>
             <b className="font-semibold">Declared: {DECLARED[app.statusOverride]}.</b>{" "}
             {app.statusNote && <span className="text-ink-2">{app.statusNote} </span>}
@@ -138,6 +149,12 @@ function Overview({ app }: { app: ApplicationDetail }) {
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="monitoring">Health</SectionTitle>
         <div className="mt-3 space-y-4">
+          {monitored && app.isActive && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <UptimeGauge value={app.uptime} />
+              <AnswerGauge value={app.lastCheck?.ms ?? null} slowMs={app.slowMs ?? 1500} label="Last answer" />
+            </div>
+          )}
           <Particulars
             items={[
               ["Now", <HealthMark key="s" status={app.status} />],

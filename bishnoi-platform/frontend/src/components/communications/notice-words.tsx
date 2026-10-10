@@ -11,7 +11,7 @@ export function NoticeLevelMark({ level }: { level: NoticeLevel }) {
   if (level === "critical") return <Flag letter="!">{NOTICE_LEVELS.critical}</Flag>;
   return (
     <span
-      className={`inline-flex h-5 items-center rounded-[2px] px-1.5 text-stamp uppercase ${
+      className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp uppercase ${
         level === "warning" ? "border border-ink bg-ink text-white" : "border border-rule-strong text-ink-3"
       }`}
     >
@@ -31,7 +31,7 @@ const STATE_STYLE: Record<NoticeState, string> = {
 
 export function NoticeStateMark({ state }: { state: NoticeState }) {
   return (
-    <span className={`inline-flex h-5 items-center rounded-[2px] px-1.5 text-stamp whitespace-nowrap uppercase ${STATE_STYLE[state]}`}>
+    <span className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp whitespace-nowrap uppercase ${STATE_STYLE[state]}`}>
       {NOTICE_STATES[state]}
     </span>
   );

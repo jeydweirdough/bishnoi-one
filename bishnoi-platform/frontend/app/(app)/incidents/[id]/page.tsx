@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { IncidentSeverityMark, IncidentStatusMark, SeverityMark, TicketStatusMark } from "@/src/components/marks";
+import { DeleteRecord } from "@/src/components/delete-record";
+import { getStaff } from "@/src/components/gate";
 import { EditIncident, PostUpdate } from "@/src/components/incidents/incident-forms";
 import { reach, span } from "@/src/components/incidents/words";
 import type { IncidentDetail, IncidentStatus, Options } from "@/src/lib/types";
@@ -28,7 +30,7 @@ function Stepper({ status }: { status: IncidentStatus }) {
   const steps = Object.keys(INCIDENT_STATUSES) as IncidentStatus[];
   const at = steps.indexOf(status);
   return (
-    <ol aria-label="Where it is" className="grid gap-px overflow-hidden rounded-[3px] bg-rule sm:grid-cols-4">
+    <ol aria-label="Where it is" className="grid gap-px overflow-hidden rounded-[18px] bg-rule sm:grid-cols-4">
       {steps.map((s, n) => (
         <li
           key={s}
@@ -50,7 +52,7 @@ function Stepper({ status }: { status: IncidentStatus }) {
 
 export default async function IncidentPage({ params }: { params: Params }) {
   const { id } = await params;
-  const [incident, options] = await Promise.all([getIncident(id), load<Options>("/platform/options")]);
+  const [incident, options, staff] = await Promise.all([getIncident(id), load<Options>("/platform/options"), getStaff()]);
 
   return (
     <>
@@ -58,7 +60,21 @@ export default async function IncidentPage({ params }: { params: Params }) {
         crumbs={[{ href: incident.isActive ? "/incidents" : "/incidents?state=resolved", label: "Incidents" }]}
         title={`${incident.number} ${incident.title}`}
         // Changing what it says about itself acts on the incident, so it sits with its name.
-        tools={<EditIncident incident={incident} options={options} />}
+        tools={
+          <>
+            <EditIncident incident={incident} options={options} />
+            {staff.canAdminister && (
+              <DeleteRecord
+                kind="incident"
+                id={incident.id}
+                name={`${incident.number} ${incident.title}`}
+                after="/incidents"
+                done="Incident deleted"
+                body="It goes with its updates. Tickets linked to it stay, unlinked. It can't be undone; to keep it, resolve it instead."
+              />
+            )}
+          </>
+        }
         actions={<PostUpdate incident={incident} />}
       >
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

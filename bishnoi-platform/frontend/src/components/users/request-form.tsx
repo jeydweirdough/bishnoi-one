@@ -67,7 +67,7 @@ export function RequestAccess({
         e.preventDefault();
         submit();
       }}
-      className="space-y-4 rounded-[3px] bg-bench/40 px-4 py-4"
+      className="space-y-4 rounded-[18px] bg-bench/40 px-4 py-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
