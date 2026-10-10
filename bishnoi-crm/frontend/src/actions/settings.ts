@@ -68,7 +68,8 @@ export type Connections = {
 // --- Settings → Attention: when something is worth a prompt on the home page ---
 
 export type Rule = { team: { id: string; name: string } | null; quietDays: number; noticeDays: number; clidpDays: number; stuckDays: number };
-export type AttentionRules = { everyone: Rule; divisions: Rule[]; teams: { id: string; name: string }[] };
+/** canSetEveryone: false for a manager, who sets only their own divisions'. */
+export type AttentionRules = { everyone: Rule; divisions: Rule[]; teams: { id: string; name: string }[]; canSetEveryone?: boolean };
 
 export async function saveAttentionRule(rule: { teamId: string | null; quietDays: number; noticeDays: number; clidpDays: number; stuckDays: number }): Promise<Result<AttentionRules>> {
   return attempt(() => api.put<AttentionRules>("/admin/attention-rules", rule));
@@ -105,4 +106,15 @@ export async function saveTerms(terms: Terms): Promise<Result<TermsSettings>> {
     refresh();
     return saved;
   });
+}
+
+// --- Settings → Retention windows: when a department's customers are at risk, and lost ---
+
+export type Window = { atRiskDays: number; lostDays: number };
+/** own: the department keeps its own windows; else it uses the company's. */
+export type RetentionWindows = { company: Window; teams: { id: string; name: string; atRiskDays: number | null; lostDays: number | null; own: boolean }[] };
+
+/** A department's own windows, or (both null) back to the company's. */
+export async function saveRetentionWindows(teamId: string, w: { atRiskDays: number | null; lostDays: number | null }): Promise<Result<RetentionWindows>> {
+  return attempt(() => api.put<RetentionWindows>(`/retention/windows/${enc(teamId)}`, w));
 }

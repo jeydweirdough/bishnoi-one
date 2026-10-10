@@ -12,9 +12,20 @@ const RANGE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
 /**
  * The period results are for: a month or quarter from the list, or a range
  * of your own, by day (1 Jul to 15 Oct) or by month (July to October).
- * Kept in the address (?period=), so it can be shared and comes back.
+ * Kept in the address (?period=, or the name given), so it can be shared and comes back.
  */
-export function PeriodPicker({ value, presets }: { value: string; presets: { value: string; label: string }[] }) {
+export function PeriodPicker({
+  value,
+  presets,
+  name = "period",
+  bare = false,
+}: {
+  value: string;
+  presets: { value: string; label: string }[];
+  name?: string;
+  /** In a toolbar: no label over it, no space under it. */
+  bare?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -31,7 +42,7 @@ export function PeriodPicker({ value, presets }: { value: string; presets: { val
 
   function go(period: string) {
     const next = new URLSearchParams(params.toString());
-    next.set("period", period);
+    next.set(name, period);
     start(() => router.replace(`${pathname}?${next}`, { scroll: false }));
   }
 
@@ -42,9 +53,9 @@ export function PeriodPicker({ value, presets }: { value: string; presets: { val
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-3">
+    <div className={bare ? "flex flex-wrap items-center gap-3" : "mb-4 flex flex-wrap items-end gap-3"}>
       <label className="block">
-        <span className="mb-1.5 block text-sm text-ink">Period</span>
+        <span className={bare ? "sr-only" : "mb-1.5 block text-sm text-ink"}>Period</span>
         <Combobox
           className="w-48"
           value={custom ? CUSTOM : value}

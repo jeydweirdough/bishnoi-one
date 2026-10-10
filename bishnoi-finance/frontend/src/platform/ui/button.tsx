@@ -52,7 +52,7 @@ export function Button({
   ...rest
 }: ButtonProps) {
   return (
-    <button
+    <button suppressHydrationWarning
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}

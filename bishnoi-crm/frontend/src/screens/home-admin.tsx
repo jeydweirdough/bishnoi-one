@@ -133,7 +133,7 @@ export async function AdminDashboard({ me, params = {} }: { me: Me & { org: Org 
           empty={!trend ? "Sales reports aren't open to your role" : points.some((p) => p.wonCentavos > 0) ? undefined : "Nothing won yet"}
           emptyNote={trend ? "Revenue won each month shows here as deals are won." : "Ask an administrator for Reports → View."}
           art="steps"
-          action={<SmallLink href="/deals?view=results">Results</SmallLink>}
+          action={<SmallLink href="/deals">Results</SmallLink>}
         >
           <MonthBars
             label="Revenue won"

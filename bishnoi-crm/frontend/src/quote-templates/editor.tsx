@@ -12,7 +12,8 @@ import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { TemplateImage } from "./images";
 import type { QuoteTemplate, TemplateDesign, TemplateList } from "./types";
 
-type Props = { initial: QuoteTemplate; options: Pick<TemplateList, "issuers" | "teams" | "placeholders"> };
+/** anyTeam: false for a manager, whose templates are for one of their own departments. */
+type Props = { initial: QuoteTemplate; options: Pick<TemplateList, "issuers" | "teams" | "placeholders"> & { anyTeam?: boolean } };
 
 /** One quotation template: who it's for, its control numbers, and its form
  *  (an uploaded Excel sheet, or fields designed here), logo and e-signature. */
@@ -92,7 +93,7 @@ export function TemplateEditor({ initial, options }: Props) {
             <Field label="Team" hint="For example, a Getmeds team and a 2MG team with their own forms.">
               {(p) => (
                 <Select {...p} value={v.teamId} onChange={set("teamId")}>
-                  <option value="">Any team</option>
+                  {options.anyTeam !== false && <option value="">Any team</option>}
                   {options.teams.map((tm) => (
                     <option key={tm.id} value={tm.id}>
                       {tm.name}

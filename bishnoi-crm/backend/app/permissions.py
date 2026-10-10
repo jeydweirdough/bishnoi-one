@@ -58,6 +58,10 @@ AREAS: tuple[Area, ...] = (
     # goals; goals.import: uploading what doctors owe.
     Area("goals", "Targets and balances", "Field work", ("view", "manage", "import")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
+    # A manager's own department: its promos and bundles, quotation templates,
+    # attention rules, retention windows and people's targets. Only for the
+    # teams the role reaches; company-wide settings stay with admin.settings.
+    Area("department", "Department settings", "Administration", ("manage",)),
     Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )
 
@@ -133,9 +137,13 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
 STARTING_ROLES += (
     (
         MANAGER,
-        "Above the team leads: manages every team they're the manager of, and its people. Approves their quotes and sets their targets.",
+        "Above the team leads: manages every team they're the manager of, and its people. Approves their quotes, sets their targets, and runs their department's settings.",
         "managed",
-        frozenset(dict(((r[0], r[3]) for r in STARTING_ROLES))[TEAM_LEAD] | _grant("goals", actions=("view", "manage"))),
+        frozenset(
+            dict(((r[0], r[3]) for r in STARTING_ROLES))[TEAM_LEAD]
+            | _grant("goals", actions=("view", "manage"))
+            | _grant("department", actions=("manage",))
+        ),
     ),
     (
         FIELD_AGENT,

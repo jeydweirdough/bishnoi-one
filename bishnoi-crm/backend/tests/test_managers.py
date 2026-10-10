@@ -66,3 +66,78 @@ def test_roles_keep_their_permissions_through_every_migration(client, ben):
 def test_the_teams_page_offers_people_who_manage_teams(app, client, ana, crew):
     make_manager(app, client, ana, [])
     assert [m["name"] for m in client.get("/admin/teams/managers", headers=ana).json()] == ["Mia"]
+
+
+# --- a manager runs their department's settings (department.manage) ---------------------------
+
+
+def team_ids(app) -> dict[str, str]:
+    with app.state.sessions() as db:
+        return {t.name: t.id for t in db.scalars(select(Team))}
+
+
+def promo(team: str) -> dict:
+    return {"name": f"{team} half off", "kind": "percent", "percentBp": 5000, "teamIds": [team]}
+
+
+def test_a_manager_runs_their_own_departments_promos_only(app, client, ana, crew):
+    mia = make_manager(app, client, ana, ["North"])
+    ids = team_ids(app)
+    made = client.post("/promos", json=promo(ids["North"]), headers=mia)
+    assert made.status_code == 201, made.text
+    assert client.put(f"/promos/{made.json()['id']}", json={**promo(ids["North"]), "name": "North third off"}, headers=mia).status_code == 200
+    assert client.post("/promos", json=promo(ids["South"]), headers=mia).status_code == 422
+    assert client.get("/promos", headers=mia).json()["can"]["edit"] is True
+    # One shared with another department is the administrator's.
+    shared = client.post("/promos", json={**promo(ids["North"]), "teamIds": [ids["North"], ids["South"]]}, headers=ana).json()
+    assert client.delete(f"/promos/{shared['id']}", headers=mia).status_code == 403
+    # A team lead sets no promos.
+    assert client.post("/promos", json=promo(ids["North"]), headers=crew["lia"]).status_code == 403
+
+
+def test_a_manager_sets_up_their_own_departments_quotation_templates(app, client, ana, crew):
+    mia = make_manager(app, client, ana, ["North"])
+    ids = team_ids(app)
+    everyone = client.post("/admin/quote-templates", json={"name": "Any quote"}, headers=ana).json()
+    assert client.post("/admin/quote-templates", json={"name": "South letter", "teamId": ids["South"]}, headers=mia).status_code == 422
+    assert client.post("/admin/quote-templates", json={"name": "Any quote 2"}, headers=mia).status_code == 422
+    north = client.post("/admin/quote-templates", json={"name": "North letter", "teamId": ids["North"]}, headers=mia)
+    assert north.status_code == 201, north.text
+    assert [t["name"] for t in client.get("/admin/quote-templates", headers=mia).json()["items"]] == ["North letter"]
+    assert client.patch(f"/admin/quote-templates/{everyone['id']}", json={"name": "Mine now"}, headers=mia).status_code == 404
+    assert client.get("/admin/quote-templates", headers=crew["lia"]).status_code == 403
+
+
+def test_a_manager_sets_their_own_departments_attention_rules(app, client, ana, crew):
+    mia = make_manager(app, client, ana, ["North"])
+    ids = team_ids(app)
+    rule = {"quietDays": 30, "noticeDays": 7, "clidpDays": 30, "stuckDays": 2}
+    assert client.put("/admin/attention-rules", json={**rule, "teamId": ids["North"]}, headers=mia).status_code == 200
+    assert client.put("/admin/attention-rules", json={**rule, "teamId": ids["South"]}, headers=mia).status_code == 422
+    assert client.put("/admin/attention-rules", json=rule, headers=mia).status_code == 422
+    seen = client.get("/admin/attention-rules", headers=mia).json()
+    assert [d["team"]["name"] for d in seen["divisions"]] == ["North"] and seen["canSetEveryone"] is False
+
+
+def test_a_department_keeps_its_own_retention_windows(app, client, ana, crew):
+    mia = make_manager(app, client, ana, ["North"])
+    ids = team_ids(app)
+    assert client.put(f"/retention/windows/{ids['South']}", json={"atRiskDays": 10, "lostDays": 20}, headers=mia).status_code == 422
+    assert client.put(f"/retention/windows/{ids['North']}", json={"atRiskDays": 20, "lostDays": 10}, headers=mia).status_code == 422
+    got = client.put(f"/retention/windows/{ids['North']}", json={"atRiskDays": 10, "lostDays": 20}, headers=mia).json()
+    assert [(t["name"], t["atRiskDays"], t["lostDays"]) for t in got["teams"]] == [("North", 10, 20)]
+    company(client, crew["ria"], "North Clinic")
+    rules = client.get("/retention?view=team", headers=mia).json()["rules"]
+    assert {"atRiskDays": 10, "lostDays": 20, "division": ids["North"], "divisionName": "North"} in rules
+    # Back to the company's.
+    back = client.put(f"/retention/windows/{ids['North']}", json={"atRiskDays": None, "lostDays": None}, headers=mia).json()
+    assert back["teams"][0]["own"] is False
+
+
+def test_a_manager_sets_targets_for_their_own_departments_people_only(app, client, ana, crew):
+    mia = make_manager(app, client, ana, ["North"])
+    people = {p["person"]["name"] for p in client.get("/sales/targets", headers=mia).json()["people"]}
+    assert "Ria" in people and "Sam" not in people
+    with app.state.sessions() as db:
+        sam = db.scalar(select(User).where(User.full_name == "Sam")).id
+    assert client.put("/sales/targets", json={"targets": [{"userId": sam, "amountCentavos": 100}]}, headers=mia).status_code == 422

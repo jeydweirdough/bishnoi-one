@@ -8,7 +8,7 @@ import { TargetProgress } from "./target-progress";
 /** This month's won revenue against the target, for a home page: one's own, or the team's. */
 export async function MonthTarget({ view, fmt, today, mayTarget }: { view: "mine" | "team"; fmt: Format; today: string; mayTarget: boolean }) {
   const r = await load<SalesResults>(`/sales/results?view=${view}`);
-  const results = `/deals?view=results${view === "mine" ? "&who=me" : ""}`;
+  const results = `/deals${view === "mine" ? "?who=me" : ""}`;
   return (
     <Sheet className="mb-5 px-5 py-4">
       <TargetProgress

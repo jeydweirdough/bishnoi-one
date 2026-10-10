@@ -252,6 +252,8 @@ def people_for(db: Session, kpis: list[Kpi], month: str, extra: set[str] = froze
     ]
 
 
+# Whose targets: everyone's for a role that reaches every record, else the
+# people and teams of the departments they reach (access.runs).
 @router.get("/kpi-targets")
 def read_targets(access: SetGoals, me: CurrentUser, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
@@ -259,7 +261,7 @@ def read_targets(access: SetGoals, me: CurrentUser, db: DB, settings: SettingsDe
     ids = [k.id for k in kpis]
     targets = list(db.scalars(select(KpiTarget).where(KpiTarget.month == month, KpiTarget.kpi_id.in_(ids))))
     entries = list(db.scalars(select(KpiEntry).where(KpiEntry.month == month, KpiEntry.kpi_id.in_(ids))))
-    people = people_for(db, kpis, month, {t.user_id for t in targets if t.user_id})
+    people = [p for p in people_for(db, kpis, month, {t.user_id for t in targets if t.user_id}) if access.runs(p.team_id)]
     per_person: dict[str, dict] = {}
     per_team: dict[str, dict] = {}
     for t in targets:
@@ -283,7 +285,7 @@ def read_targets(access: SetGoals, me: CurrentUser, db: DB, settings: SettingsDe
             }
             for p in people
         ],
-        "teams": [{"team": team_out(t), "targets": per_team.get(t.id, {})} for t in db.scalars(select(Team).order_by(func.lower(Team.name)))],
+        "teams": [{"team": team_out(t), "targets": per_team.get(t.id, {})} for t in db.scalars(select(Team).order_by(func.lower(Team.name))) if access.runs(t.id)],
     }
 
 
@@ -303,7 +305,8 @@ class TargetsIn(Api):
 def set_targets(access: SetGoals, me: CurrentUser, db: DB, settings: SettingsDep, body: TargetsIn, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
     kpis = {k.id: k for k in db.scalars(select(Kpi))}
-    users, teams = set(db.scalars(select(User.id))), set(db.scalars(select(Team.id)))
+    users = {u.id for u in db.scalars(select(User)) if access.runs(u.team_id)}
+    teams = {t for t in db.scalars(select(Team.id)) if access.runs(t)}
     for n, t in enumerate(body.targets):
         if t.kpi_id not in kpis:
             raise field_error(f"targets.{n}.kpiId", "Pick a KPI from the list.")
@@ -346,7 +349,8 @@ def set_entries(access: SetGoals, me: CurrentUser, db: DB, settings: SettingsDep
         k = db.get(Kpi, e.kpi_id)
         if k is None or k.measure != "manual":
             raise field_error(f"entries.{n}.kpiId", "Only a KPI entered by hand takes results here.")
-        if db.get(User, e.user_id) is None:
+        person = db.get(User, e.user_id)
+        if person is None or not access.runs(person.team_id):
             raise field_error(f"entries.{n}.userId", "No such person.")
         found = db.scalar(select(KpiEntry).where(KpiEntry.kpi_id == k.id, KpiEntry.month == month, KpiEntry.user_id == e.user_id))
         if e.value is None:

@@ -1,5 +1,7 @@
 """The prompts on someone's home page (app/attention.py), putting one aside,
-and Settings → Attention: when something is worth a prompt, per division."""
+and Settings → Attention: when something is worth a prompt, per division.
+An administrator sets everyone's rule and any division's; a manager
+(department.manage) only their own divisions'."""
 
 from datetime import date, timedelta
 from typing import Annotated, Literal
@@ -9,7 +11,7 @@ from pydantic import Field
 from sqlalchemy import select
 
 from app import attention
-from app.access import Access, CurrentAccess, require
+from app.access import DEPARTMENT, Access, CurrentAccess, require
 from app.api import Api, field_error, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -17,7 +19,7 @@ from app.models import AttentionDismissal, AttentionRule, Team
 from app.pricing import today
 
 router = APIRouter(tags=["attention"])
-Manage = Annotated[Access, Depends(require("admin.settings"))]
+Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
 
 
 @router.get("/attention")
@@ -50,13 +52,15 @@ def rule_out(r: AttentionRule, team: Team | None) -> dict:
 
 
 @router.get("/admin/attention-rules")
-def read_rules(_: Manage, db: DB) -> dict:
-    """Everyone's rule, and the divisions that have their own."""
+def read_rules(access: Manage, db: DB) -> dict:
+    """Everyone's rule, and the divisions that have their own (a manager's: theirs)."""
     rules = {r.team_id: r for r in db.scalars(select(AttentionRule))}
     everyone = rules.get(None) or AttentionRule(quiet_days=45, notice_days=7, clidp_days=30, stuck_days=2)
-    teams = {t.id: t for t in db.scalars(select(Team).order_by(Team.name))}
+    teams = {t.id: t for t in db.scalars(select(Team).order_by(Team.name)) if access.runs(t.id)}
     return {
         "everyone": rule_out(everyone, None),
+        # Everyone's rule is the company's: a manager sees it, as what their divisions start from.
+        "canSetEveryone": access.runs(None),
         "divisions": [rule_out(r, teams.get(tid)) for tid, r in rules.items() if tid and tid in teams],
         "teams": [{"id": t.id, "name": t.name} for t in teams.values() if t.is_active],
     }
@@ -76,6 +80,8 @@ def save_rule(access: Manage, me: CurrentUser, db: DB, body: RuleIn) -> dict:
     team = db.get(Team, body.team_id) if body.team_id else None
     if body.team_id and team is None:
         raise field_error("teamId", "Pick a team from the list.")
+    if not access.runs(body.team_id):
+        raise field_error("teamId", "Pick one of your own teams.")
     rule = db.scalar(select(AttentionRule).where(AttentionRule.team_id == body.team_id if body.team_id else AttentionRule.team_id.is_(None))) or AttentionRule(team_id=body.team_id)
     rule.quiet_days, rule.notice_days, rule.clidp_days, rule.stuck_days = body.quiet_days, body.notice_days, body.clidp_days, body.stuck_days
     db.add(rule)
@@ -87,6 +93,8 @@ def save_rule(access: Manage, me: CurrentUser, db: DB, body: RuleIn) -> dict:
 @router.delete("/admin/attention-rules/{team_id}")
 def drop_rule(access: Manage, me: CurrentUser, db: DB, team_id: str) -> dict:
     """A division goes back to everyone's rule."""
+    if not access.runs(team_id):
+        raise field_error("teamId", "Pick one of your own teams.")
     rule = db.scalar(select(AttentionRule).where(AttentionRule.team_id == team_id))
     if rule is not None:
         team = db.get(Team, team_id)

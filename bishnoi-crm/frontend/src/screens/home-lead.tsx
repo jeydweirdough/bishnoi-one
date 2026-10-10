@@ -124,7 +124,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
   // The team's month, each figure once: the revenue target leads; the rest are tiles.
   const r = data.results;
   const lead: Figure = r
-    ? paceFigure({ value: fmt.peso(r.totals.wonCentavos), label: "Team revenue won", actual: r.totals.wonCentavos, target: r.totals.targetCentavos, start: r.start, end: r.end, today, show: fmt.peso, href: "/deals?view=results", noTarget: "No revenue target set for the team" })
+    ? paceFigure({ value: fmt.peso(r.totals.wonCentavos), label: "Team revenue won", actual: r.totals.wonCentavos, target: r.totals.targetCentavos, start: r.start, end: r.end, today, show: fmt.peso, href: "/deals", noTarget: "No revenue target set for the team" })
     : { value: fmt.peso(t.quotedThisMonthCentavos), label: "Quoted by the team", note: fmt.plural(t.quotesThisMonth, "quote"), href: "/quotes" };
   const tiles: Figure[] = [
     { value: String(t.overdue), label: "Overdue", note: t.overdue ? "in the team: chase it" : "Nothing overdue", alert: t.overdue > 0, href: "/activities?who=team" },

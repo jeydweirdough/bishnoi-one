@@ -553,7 +553,8 @@ def read_goals(access: Manage, db: DB, settings: SettingsDep, month: str | None 
     some that month), with the month's goals."""
     month = month_or_now(month, settings)
     goals = field_goals(db, month)
-    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if is_field_person(u) or u.id in goals]
+    # A manager's: their own departments' people (access.runs).
+    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if (is_field_person(u) or u.id in goals) and access.runs(u.team_id)]
     return {
         "month": month,
         "people": [{"person": person_out(p), "team": team_out(p.team), "goal": goals.get(p.id)} for p in people],
@@ -563,7 +564,7 @@ def read_goals(access: Manage, db: DB, settings: SettingsDep, month: str | None 
 @router.put("/field/goals")
 def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: GoalsIn, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
-    users = set(db.scalars(select(User.id).where(User.id.in_([g.user_id for g in body.goals]))))
+    users = {u.id for u in db.scalars(select(User).where(User.id.in_([g.user_id for g in body.goals]))) if access.runs(u.team_id)}
     if missing := [g.user_id for g in body.goals if g.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
     kpis = {key: by_code(db, code) for key, code in FIELD_KPIS.items()}

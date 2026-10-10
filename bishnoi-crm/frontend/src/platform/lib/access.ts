@@ -12,25 +12,37 @@ export const PEOPLE_PAGES = [
 
 export const peoplePagesFor = (me: Me) => PEOPLE_PAGES.filter((t) => can(me, t.permission));
 
+/** A manager's own department's settings (its templates, attention rules and
+ *  retention windows), beside an administrator's for every department. */
+const DEPARTMENT = ["admin.settings", "department.manage"];
+
 /** Everything an admin sets up for everyone, a sub-page each. The pricing two
- *  are gated on the catalogue, as their pages and the API are. */
+ *  are gated on the catalogue, as their pages and the API are; the department
+ *  ones also open to a manager, for their own departments. */
 export const SETTINGS_PAGES = [
   { href: "/admin/settings", label: "Forms", permission: "admin.settings" },
   { href: "/admin/settings/company", label: "Company and quotes", permission: "admin.settings" },
-  { href: "/admin/settings/quote-templates", label: "Quotation templates", permission: "admin.settings" },
+  { href: "/admin/settings/quote-templates", label: "Quotation templates", permission: DEPARTMENT },
   { href: "/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
   { href: "/admin/settings/terms", label: "Terms", permission: "admin.settings" },
   { href: "/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
   { href: "/admin/settings/performance", label: "Performance", permission: "admin.settings" },
   { href: "/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
+  { href: "/admin/settings/retention-windows", label: "Retention windows", permission: DEPARTMENT },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
   { href: "/admin/settings/associations", label: "Associations", permission: "admin.settings" },
   { href: "/admin/settings/emails", label: "Email templates", permission: "admin.settings" },
-  { href: "/admin/settings/attention", label: "Attention", permission: "admin.settings" },
+  { href: "/admin/settings/attention", label: "Attention", permission: DEPARTMENT },
   { href: "/admin/settings/connections", label: "Connections", permission: "admin.settings" },
-] as const;
+] as const satisfies readonly { href: string; label: string; permission: string | readonly string[] }[];
 
-export const settingsPagesFor = (me: Me) => SETTINGS_PAGES.filter((t) => can(me, t.permission));
+/** Any one of these permissions. */
+export const canAny = (me: Me, permission: string | readonly string[]): boolean =>
+  typeof permission === "string" ? can(me, permission) : permission.some((p) => can(me, p));
+
+/** A manager without the company's settings sees only their department's. */
+export const settingsPagesFor = (me: Me) =>
+  SETTINGS_PAGES.filter((t) => canAny(me, t.permission) && (can(me, "admin.settings") || can(me, "admin.types") || t.permission === DEPARTMENT));
 
 type SubPage = { href: string; label: string };
 type AdminPage = { href: string; label: string; icon: "people" | "settings" | "auditLog"; also: string[]; subpages?: SubPage[] };
@@ -47,6 +59,10 @@ export function adminPagesFor(me: Me): AdminPage[] {
   if (can(me, "admin.settings") || can(me, "admin.types")) {
     const settings = settingsPagesFor(me);
     pages.push({ href: settings[0].href, label: "Settings", icon: "settings", also: ["/admin/settings"], subpages: settings.map(sub) });
+  } else if (can(me, "department.manage")) {
+    // A manager: their department's settings only.
+    const settings = settingsPagesFor(me);
+    pages.push({ href: settings[0].href, label: "Department settings", icon: "settings", also: settings.map((t) => t.href), subpages: settings.map(sub) });
   }
   if (can(me, "admin.audit")) pages.push({ href: "/admin/audit", label: "Audit log", icon: "auditLog", also: [] });
   return pages;

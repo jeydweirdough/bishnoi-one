@@ -8,20 +8,22 @@ import { toast } from "sonner";
 import { createTemplate, deleteTemplate } from "@/src/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 
-/** Starts a template: a name and how it's made, then its page for the rest. */
-export function NewTemplate() {
+/** Starts a template: a name and how it's made, then its page for the rest.
+ *  `teams`: given to a manager, whose templates are for one of their own departments. */
+export function NewTemplate({ teams }: { teams?: { id: string; name: string }[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"form" | "excel">("excel");
+  const [teamId, setTeamId] = useState(teams?.length === 1 ? teams[0].id : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function make() {
     start(async () => {
-      const r = await createTemplate({ name: name.trim(), kind });
+      const r = await createTemplate({ name: name.trim(), kind, ...(teams ? { teamId: teamId || null } : {}) });
       if (!r.ok) return setError(r.error);
       setOpen(false);
       router.push(`/admin/settings/quote-templates/${r.data.id}`);
@@ -55,6 +57,20 @@ export function NewTemplate() {
           <Field label="Name" hint="For example: PCSO, Getmeds; or Office of the President, 2MG.">
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus required />}
           </Field>
+          {teams && (
+            <Field label="Department" hint="Your templates are for your own departments.">
+              {(p) => (
+                <Select {...p} value={teamId} onChange={(e) => setTeamId(e.target.value)} required>
+                  <option value="">Pick a department</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
           <fieldset className="space-y-2">
             <legend className="mb-1 text-meta font-medium text-ink-2">How it is made</legend>
             {option("excel", "Upload an Excel form", "Your own quotation sheet, as the issuer asks for it. The CRM fills it in for each quote.", <FileSpreadsheet className="size-5" aria-hidden />)}
@@ -65,7 +81,7 @@ export function NewTemplate() {
             <Button type="button" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" loading={pending} disabled={name.trim().length < 2}>
+            <Button type="submit" variant="primary" loading={pending} disabled={name.trim().length < 2 || (!!teams && !teamId)}>
               Continue
             </Button>
           </div>

@@ -54,7 +54,7 @@ export function IconButton({
   ...rest
 }: Omit<React.ComponentProps<"button">, "aria-label"> & { label: string; tone?: keyof typeof ICON_TONES; size?: "sm" | "md"; pressed?: boolean }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       aria-label={label}
       aria-pressed={pressed}
@@ -71,7 +71,7 @@ export function IconButton({
 export function TextButton({ tone = "ink", size = "meta", className = "", children, ...rest }: React.ComponentProps<"button"> & { tone?: "ink" | "muted" | "danger"; size?: "meta" | "inherit" }) {
   const colour = tone === "muted" ? "text-ink-3 hover:text-ink" : tone === "danger" ? "text-ink-3 hover:text-danger" : "font-medium text-ink";
   return (
-    <button type="button" className={`inline-flex items-center gap-1 hover:underline disabled:opacity-40 ${size === "meta" ? "text-meta" : ""} ${colour} ${className}`} {...rest}>
+    <button suppressHydrationWarning type="button" className={`inline-flex items-center gap-1 hover:underline disabled:opacity-40 ${size === "meta" ? "text-meta" : ""} ${colour} ${className}`} {...rest}>
       {children}
     </button>
   );
@@ -96,7 +96,7 @@ export function QuickAction({ href, icon, children, ...rest }: React.ComponentPr
       {inner}
     </Link>
   ) : (
-    <button type="button" className={QUICK} {...rest}>
+    <button suppressHydrationWarning type="button" className={QUICK} {...rest}>
       {inner}
     </button>
   );

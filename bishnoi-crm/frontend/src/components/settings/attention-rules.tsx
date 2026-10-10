@@ -15,7 +15,7 @@ const FIELDS: { key: keyof Omit<Rule, "team">; label: string; unit: string; min:
   { key: "clidpDays", label: "A CLIDP running out within", unit: "days (B2B and BID)", min: 1, max: 365 },
 ];
 
-function RuleRow({ rule, teamId, onSaved, onDrop }: { rule: Rule; teamId: string | null; onSaved: (r: AttentionRules) => void; onDrop?: () => void }) {
+function RuleRow({ rule, teamId, onSaved, onDrop, readOnly }: { rule: Rule; teamId: string | null; onSaved: (r: AttentionRules) => void; onDrop?: () => void; readOnly?: boolean }) {
   const [v, setV] = useState(rule);
   const [pending, start] = useTransition();
   const dirty = FIELDS.some((f) => v[f.key] !== rule[f.key]);
@@ -30,7 +30,10 @@ function RuleRow({ rule, teamId, onSaved, onDrop }: { rule: Rule; teamId: string
   return (
     <Sheet className="px-5 py-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-semibold text-ink">{rule.team ? rule.team.name : "Everyone"}</h2>
+        <h2 className="font-semibold text-ink">
+          {rule.team ? rule.team.name : "Everyone"}
+          {readOnly && <span className="ml-2 text-meta font-normal text-ink-3">The company&apos;s; an administrator changes it</span>}
+        </h2>
         {onDrop && (
           <Button size="sm" variant="quiet" onClick={onDrop} disabled={pending}>
             Use everyone&apos;s
@@ -42,17 +45,19 @@ function RuleRow({ rule, teamId, onSaved, onDrop }: { rule: Rule; teamId: string
           <label key={f.key} className="block">
             <span className="mb-1 block text-sm text-ink">{f.label}</span>
             <span className="flex items-center gap-2">
-              <InputNumber min={f.min} max={f.max} value={v[f.key]} onChange={(n) => setV({ ...v, [f.key]: n ?? rule[f.key] })} className="w-24" />
+              <InputNumber disabled={readOnly} min={f.min} max={f.max} value={v[f.key]} onChange={(n) => setV({ ...v, [f.key]: n ?? rule[f.key] })} className="w-24" />
               <span className="text-meta text-ink-3">{f.unit}</span>
             </span>
           </label>
         ))}
       </div>
-      <div className="mt-4">
-        <Button variant="primary" onClick={save} loading={pending} disabled={!dirty}>
-          Save
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="mt-4">
+          <Button variant="primary" onClick={save} loading={pending} disabled={!dirty}>
+            Save
+          </Button>
+        </div>
+      )}
     </Sheet>
   );
 }
@@ -65,7 +70,7 @@ export function AttentionRulesEditor({ initial }: { initial: AttentionRules }) {
   const free = rules.teams.filter((t) => !rules.divisions.some((d) => d.team?.id === t.id));
   return (
     <div className="max-w-3xl space-y-4">
-      <RuleRow key={JSON.stringify(rules.everyone)} rule={rules.everyone} teamId={null} onSaved={setRules} />
+      <RuleRow key={JSON.stringify(rules.everyone)} rule={rules.everyone} teamId={null} onSaved={setRules} readOnly={rules.canSetEveryone === false} />
       {rules.divisions.map((d) => (
         <RuleRow
           key={d.team!.id + JSON.stringify(d)}

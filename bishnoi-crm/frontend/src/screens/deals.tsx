@@ -21,11 +21,15 @@ import { shiftMonth } from "../components/field/words";
 export const metadata = { title: "Deals" };
 
 // Deals, as a sales team reads them:
-// - Open deals and Closed deals: the figures and three charts (by probability,
-//   stage and priority), then the deals as a table (sortable, filtered) or, for
-//   open ones, a board with a column per stage;
-// - Forecast: what each person expects to close in a month or quarter, by category;
-// - Results: what was won in a month or quarter, against the revenue targets.
+// - Open deals, the first thing seen, laid out as the dashboard is: four
+//   figures (won in the period, the weighted pipeline, quoted, win rate), then
+//   revenue against target and the pipeline by stage and priority, then the
+//   open deals as a table or a board, then who sold and what. The period
+//   (?results=, this month unless picked) sits beside the tabs. So a team with
+//   sales but nothing open never sees an empty page;
+// - Closed deals: the same figures and charts, and the table;
+// - Forecast: what each person expects to close in a month or quarter, by category.
+// Old addresses: ?view=results is the first tab, its ?period= the results period.
 const SIZE = 50;
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -40,16 +44,22 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
   const periods = periodsFrom(today);
   // Old addresses: ?view=board is open deals on the board; ?view=list, the table.
   const asked = one(params.view);
-  const view = (["closed", "forecast", "results"] as const).find((v) => v === asked) ?? "open";
+  const view = (["closed", "forecast"] as const).find((v) => v === asked) ?? "open";
   const layout = view === "open" && (asked === "board" || one(params.layout) === "board") ? "board" : "table";
   const teamWide = me.role?.scope !== "own";
   const who = teamWide && one(params.who) !== "me" ? "team" : "me";
+  const results = one(params.results) || (asked === "results" ? one(params.period) : "");
   const href = (v: string, w = who, l = layout) => {
-    const q = new URLSearchParams({ ...(v !== "open" && { view: v }), ...(v === "open" && l === "board" && { layout: l }), ...(w === "me" && teamWide && { who: w }) });
+    const q = new URLSearchParams({
+      ...(v !== "open" && { view: v }),
+      ...(v === "open" && l === "board" && { layout: l }),
+      ...(v === "open" && results && { results }),
+      ...(w === "me" && teamWide && { who: w }),
+    });
     return `/deals${q.size ? `?${q}` : ""}`;
   };
   const owner = who === "me" ? "me" : "";
-  const month = /^\d{4}-\d{2}$/.test(one(params.period)) ? one(params.period) : periods.thisMonth;
+  const month = /^\d{4}-\d{2}$/.test(results) ? results : periods.thisMonth;
 
   return (
     <>
@@ -57,7 +67,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
         title="Deals"
         actions={
           <>
-            {view === "results" && can(me, "goals.manage") && (
+            {view === "open" && can(me, "goals.manage") && (
               <LinkButton href={`/performance/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />}>
                 Set targets
               </LinkButton>
@@ -78,9 +88,9 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
             { value: "open", label: "Open deals", href: href("open") },
             { value: "closed", label: "Closed", href: href("closed") },
             { value: "forecast", label: "Forecast", href: href("forecast") },
-            { value: "results", label: "Results", href: href("results") },
           ]}
         />
+        {view === "open" && <PeriodPicker bare name="results" value={results || periods.thisMonth} presets={resultPeriods(periods)} />}
         {teamWide && (
           <span className="ml-auto">
             <ToggleLinks
@@ -94,45 +104,73 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
         )}
       </div>
 
-      {(view === "open" || view === "closed") && (
-        <>
-          <Summary state={view} owner={owner} fmt={fmt} />
-          {view === "open" && (
-            <div className="mb-3">
-              <ToggleLinks
-                current={layout}
-                options={[
-                  { value: "table", label: "Table", href: href("open", who, "table") },
-                  { value: "board", label: "Board", href: href("open", who, "board") },
-                ]}
-              />
-            </div>
-          )}
-          {layout === "board" ? (
-            <Board fmt={fmt} today={today} owner={owner} period={one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />
-          ) : (
-            <Table fmt={fmt} today={today} owner={owner} state={view} params={params} base={href(view)} mayAdd={can(me, "deals.create")} />
-          )}
-        </>
-      )}
-      {view === "results" && (
-        <Results
+      {view === "open" && (
+        <Overview
           fmt={fmt}
           today={today}
-          period={one(params.period) || periods.thisMonth}
-          periods={periods}
+          period={results || periods.thisMonth}
+          owner={owner}
           team={who === "team" && can(me, "reports.view")}
           mayTarget={can(me, "goals.manage")}
-        />
+          filtered={Boolean(one(params.q) || one(params.stage) || one(params.priority) || one(params.closing) || (asked !== "results" && one(params.period)))}
+        >
+          <div className="mb-3">
+            <ToggleLinks
+              current={layout}
+              options={[
+                { value: "table", label: "Table", href: href("open", who, "table") },
+                { value: "board", label: "Board", href: href("open", who, "board") },
+              ]}
+            />
+          </div>
+          {layout === "board" ? (
+            <Board fmt={fmt} today={today} owner={owner} period={asked === "results" ? "" : one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />
+          ) : (
+            <Table fmt={fmt} today={today} owner={owner} state="open" params={params} base={href("open")} mayAdd={can(me, "deals.create")} />
+          )}
+        </Overview>
+      )}
+      {view === "closed" && (
+        <>
+          <Summary state="closed" owner={owner} fmt={fmt} mayAdd={false} filtered={Boolean(one(params.q) || one(params.stage) || one(params.priority))}>
+            <Table fmt={fmt} today={today} owner={owner} state="closed" params={params} base={href("closed")} mayAdd={false} />
+          </Summary>
+        </>
       )}
       {view === "forecast" && <Forecast fmt={fmt} period={one(params.period) || periods.thisMonth} periods={periods} showPeople={who === "team"} />}
     </>
   );
 }
 
-/** The four cards above the deals: the figures, then the deals by probability, stage and priority. */
-async function Summary({ state, owner, fmt }: { state: "open" | "closed"; owner: string; fmt: Format }) {
+/**
+ * The four cards above the deals: the figures, then the deals by probability,
+ * stage and priority; then the deals (children). With none at all, and no
+ * filter set, just that and the next step.
+ */
+async function Summary({
+  state,
+  owner,
+  fmt,
+  mayAdd,
+  filtered,
+  children,
+}: {
+  state: "open" | "closed";
+  owner: string;
+  fmt: Format;
+  mayAdd: boolean;
+  filtered: boolean;
+  children: React.ReactNode;
+}) {
   const s = await load<DealSummary>(`/deals-summary?state=${state}${owner ? `&owner=${owner}` : ""}`);
+  if (s.count === 0 && !filtered)
+    return (
+      <Sheet className="px-5 py-2">
+        <Empty icon="trend" title={state === "open" ? "No open deals" : "No closed deals yet"} actions={mayAdd && <NewDealButton variant="default" />}>
+          {state === "open" ? "Add one from a customer's page, or here, to see the pipeline and what's likely to close." : "Deals won or lost show up here."}
+        </Empty>
+      </Sheet>
+    );
   const pct = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : null);
   const shown = (n: number | null) => (n === null ? "—" : `${n}%`);
   const closed = s.wonCount + s.lostCount;
@@ -190,6 +228,7 @@ async function Summary({ state, owner, fmt }: { state: "open" | "closed"; owner:
           <Donut title="Deals by priority" slices={priorities} />
         </Breakdown>
       </div>
+      {children}
     </>
   );
 }
@@ -533,24 +572,66 @@ function resultPeriods(periods: ReturnType<typeof periodsFrom>) {
   ];
 }
 
-async function Results({
+/**
+ * The open tab, as the dashboard reads: the four figures; revenue against
+ * target beside the pipeline by stage and priority; the deals (children);
+ * then who sold and what. With nothing open, one card says so in place of
+ * the charts, and the table is left out.
+ */
+async function Overview({
   fmt,
   today,
   period,
-  periods,
+  owner,
   team,
   mayTarget,
+  filtered,
+  children,
 }: {
   fmt: Format;
   today: string;
   period: string;
-  periods: ReturnType<typeof periodsFrom>;
+  owner: string;
   team: boolean;
   mayTarget: boolean;
+  filtered: boolean;
+  /** The open deals: the table or the board. */
+  children: React.ReactNode;
 }) {
   const view = team ? "team" : "mine";
-  const r = await load<SalesResults>(`/sales/results?view=${view}&period=${encodeURIComponent(period)}`);
+  const [r, s] = await Promise.all([
+    load<SalesResults>(`/sales/results?view=${view}&period=${encodeURIComponent(period)}`),
+    load<DealSummary>(`/deals-summary?state=open${owner ? `&owner=${owner}` : ""}`),
+  ]);
   const t = r.totals;
+  const pct = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : null);
+  const decided = t.wonCount + t.lostCount;
+  const targets = mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/performance/targets?month=${r.period}` : undefined;
+  const figures: Figure[] = [
+    {
+      value: fmt.peso(t.wonCentavos),
+      label: `Won in ${r.label}`,
+      note: t.targetCentavos ? `${t.attainment ?? 0}% of the ${fmt.peso(t.targetCentavos)} target` : `${fmt.plural(t.wonCount, "deal")}, no target set`,
+      ring: t.targetCentavos ? t.attainment : null,
+      href: "/deals?view=closed",
+    },
+    {
+      value: fmt.peso(s.weightedCentavos),
+      label: "Pipeline, weighted",
+      note: s.count ? `${fmt.peso(s.valueCentavos)} in ${fmt.plural(s.count, "open deal")}` : "No open deals",
+      ring: pct(s.weightedCentavos, s.valueCentavos),
+    },
+    { value: fmt.peso(t.quotedCentavos), label: `Quoted in ${r.label}`, note: fmt.plural(t.quoteCount, "quote"), href: "/quotes" },
+    {
+      value: t.winRate === null ? "—" : `${t.winRate}%`,
+      label: "Win rate",
+      note: decided ? `${fmt.plural(t.wonCount, "deal")} won, ${t.lostCount} lost` : "No deals decided yet",
+      ring: t.winRate,
+      href: "/deals?view=closed",
+    },
+  ];
+  const busiest = [...s.byStage].sort((a, b) => b.count - a.count)[0];
+  const urgent = s.byPriority.filter((b) => b.priority === "urgent" || b.priority === "high").reduce((n, b) => n + b.count, 0);
   const exportLink = (report: string) =>
     r.canExport && (
       <a href={`/deals/export?report=${report}&view=${view}&period=${encodeURIComponent(r.period)}`} download className={buttonClass("default", "sm")}>
@@ -558,84 +639,97 @@ async function Results({
         Download CSV
       </a>
     );
-  const tiles = [
-    { label: "Quoted", value: fmt.peso(t.quotedCentavos), note: fmt.plural(t.quoteCount, "quote") },
-    { label: "Deals won", value: String(t.wonCount), note: fmt.peso(t.wonCentavos) },
-    { label: "Deals lost", value: String(t.lostCount), note: fmt.peso(t.lostCentavos) },
-    { label: "Win rate", value: t.winRate === null ? "None decided" : `${t.winRate}%`, note: "of deals won or lost" },
-  ];
+  const sold = r.customers.length > 0 || r.products.length > 0;
 
   return (
     <>
-      <PeriodPicker value={period} presets={resultPeriods(periods)} />
-      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,2fr)]">
-        <Sheet className="px-5 py-4">
-          <TargetProgress
-            figures={t}
-            start={r.start}
-            end={r.end}
-            today={today}
-            fmt={fmt}
-            label={`Won in ${r.label}`}
-            href={mayTarget && /^\d{4}-\d{2}$/.test(r.period) ? `/performance/targets?month=${r.period}` : undefined}
-          />
-        </Sheet>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-          {tiles.map((x) => (
-            <Sheet key={x.label} className="px-4 py-3">
-              <p className="text-meta text-ink-3">{x.label}</p>
-              <p className="mt-1 text-figure text-ink">{x.value}</p>
-              <p className="text-meta text-ink-3">{x.note}</p>
-            </Sheet>
-          ))}
-        </div>
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {figures.map((f, n) => (
+          <FigureCard key={f.label} figure={f} first={n === 0} />
+        ))}
       </div>
 
-      {team && (
-        <Sheet className="mb-4 overflow-x-auto">
-          <div className="px-5 pt-4"><SectionTitle action={r.people.length > 0 && exportLink("people")}>By person</SectionTitle></div>
-          {r.people.length === 0 ? (
-            <div className="px-5 py-2">
-              <Empty icon="trend" title="No sellers yet">
-                People whose role can create deals or quotes show up here.
-              </Empty>
-            </div>
-          ) : (
-            <FiguresTable fmt={fmt} rows={r.people.map((p) => ({ key: p.person.id, name: p.person.name, sub: p.team?.name ?? "No team", f: p }))} />
-          )}
+      <div className="mb-5 grid gap-3 lg:grid-cols-3">
+        <Sheet className="px-5 py-4">
+          <p className="text-caps text-ink-3 uppercase">Revenue against target</p>
+          <div className="mt-2">
+            <TargetProgress figures={t} start={r.start} end={r.end} today={today} fmt={fmt} label={`Won in ${r.label}`} href={targets} withWinRate={false} />
+          </div>
+        </Sheet>
+        {s.count === 0 ? (
+          <div className="lg:col-span-2">
+            <Breakdown title="Pipeline" value="" label="" empty="No open deals" emptyNote="Add one from a customer's page, or with New deal, to see the pipeline by stage and priority." art="steps">
+              {null}
+            </Breakdown>
+          </div>
+        ) : (
+          <>
+            <Breakdown value={`${pct(busiest.count, s.count)}%`} label={`are at ${busiest.name}, the busiest stage`} title="Pipeline by stage" art="steps">
+              <Donut title="Open deals by stage" totalLabel="Deals" slices={s.byStage.map((st, i) => ({ label: st.name, value: st.count, color: SERIES[i % SERIES.length], note: fmt.peso(st.valueCentavos) }))} />
+            </Breakdown>
+            <Breakdown value={`${pct(urgent, s.count)}%`} label="are urgent or high priority" title="Pipeline by priority" art="flag">
+              <Donut
+                title="Open deals by priority"
+                totalLabel="Deals"
+                slices={s.byPriority.map((b) => {
+                  const p = PRIORITIES.find((x) => x.value === b.priority)!;
+                  return { label: p.label, value: b.count, color: p.color };
+                })}
+              />
+            </Breakdown>
+          </>
+        )}
+      </div>
+
+      {(s.count > 0 || filtered) && <div className="mb-5">{children}</div>}
+
+      {team && r.people.length > 0 && (
+        <Sheet className="mb-3 overflow-x-auto">
+          <div className="px-5 pt-4">
+            <SectionTitle action={exportLink("people")}>By person, {r.label}</SectionTitle>
+          </div>
+          <FiguresTable fmt={fmt} rows={r.people.map((p) => ({ key: p.person.id, name: p.person.name, sub: p.team?.name ?? "No team", f: p }))} />
           {r.teams.length > 1 && (
             <>
-              <div className="border-t border-rule px-5 pt-4"><SectionTitle action={exportLink("teams")}>By team</SectionTitle></div>
+              <div className="border-t border-rule px-5 pt-4">
+                <SectionTitle action={exportLink("teams")}>By team</SectionTitle>
+              </div>
               <FiguresTable fmt={fmt} rows={r.teams.map((x) => ({ key: x.team?.id ?? "none", name: x.team?.name ?? "No team", f: x }))} />
             </>
           )}
         </Sheet>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Sheet className="px-5 py-4">
-          <SectionTitle action={r.customers.length > 0 && exportLink("customers")}>Top customers</SectionTitle>
-          <Ranked
-            fmt={fmt}
-            empty="No deals won in this period."
-            rows={r.customers.map((c) => ({ key: c.customer.id, name: c.customer.name, href: `/companies/${c.customer.id}`, value: c.wonCentavos, note: fmt.plural(c.wonCount, "deal") }))}
-          />
-        </Sheet>
-        <Sheet className="px-5 py-4">
-          <SectionTitle action={r.products.length > 0 && exportLink("products")}>Top products</SectionTitle>
-          <Ranked
-            fmt={fmt}
-            empty="No deals won in this period."
-            rows={r.products.map((p) => ({ key: p.product.id ?? p.product.name, name: p.product.name, value: p.wonCentavos, note: p.quantity ? fmt.plural(p.quantity, "unit") : "" }))}
-          />
-        </Sheet>
-        {r.lostReasons.length > 0 && (
-          <Sheet className="px-5 py-4 lg:col-span-2">
-            <SectionTitle>Why deals were lost</SectionTitle>
-            <Ranked fmt={fmt} empty="" rows={r.lostReasons.map((x) => ({ key: x.reason, name: x.reason, value: x.lostCentavos, note: fmt.plural(x.count, "deal") }))} />
-          </Sheet>
-        )}
-      </div>
+      {(sold || r.lostReasons.length > 0) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {sold && (
+            <>
+              <Sheet className="px-5 py-4">
+                <SectionTitle action={r.customers.length > 0 && exportLink("customers")}>Top customers</SectionTitle>
+                <Ranked
+                  fmt={fmt}
+                  empty="No deals won in this period."
+                  rows={r.customers.map((c) => ({ key: c.customer.id, name: c.customer.name, href: `/companies/${c.customer.id}`, value: c.wonCentavos, note: fmt.plural(c.wonCount, "deal") }))}
+                />
+              </Sheet>
+              <Sheet className="px-5 py-4">
+                <SectionTitle action={r.products.length > 0 && exportLink("products")}>Top products</SectionTitle>
+                <Ranked
+                  fmt={fmt}
+                  empty="No deals won in this period."
+                  rows={r.products.map((p) => ({ key: p.product.id ?? p.product.name, name: p.product.name, value: p.wonCentavos, note: p.quantity ? fmt.plural(p.quantity, "unit") : "" }))}
+                />
+              </Sheet>
+            </>
+          )}
+          {r.lostReasons.length > 0 && (
+            <Sheet className="px-5 py-4 lg:col-span-2">
+              <SectionTitle>Why deals were lost</SectionTitle>
+              <Ranked fmt={fmt} empty="" rows={r.lostReasons.map((x) => ({ key: x.reason, name: x.reason, value: x.lostCentavos, note: fmt.plural(x.count, "deal") }))} />
+            </Sheet>
+          )}
+        </div>
+      )}
     </>
   );
 }

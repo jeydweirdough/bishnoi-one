@@ -31,7 +31,7 @@ export function TargetsForm({
   const [pending, start] = useTransition();
   const lastMonth = new Map(previous.people.filter((p) => p.targetCentavos).map((p) => [p.person.id, p.targetCentavos]));
   const noneYet = data.people.every((p) => !p.targetCentavos);
-  const done = `/deals?view=results&period=${data.month}`;
+  const done = `/deals?results=${data.month}`;
 
   const total = data.people.reduce((sum, p) => sum + (fmt.toCentavos(drafts[p.person.id] || "0") ?? 0), 0);
 

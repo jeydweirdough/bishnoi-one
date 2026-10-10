@@ -1,7 +1,8 @@
 // Applications: every app on the platform, whether it's working, what was
 // deployed and what each connects to.
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Pill } from "@/src/platform/ui/figures";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { load } from "@/src/platform/lib/api";
@@ -12,7 +13,7 @@ import { RegisterApplication } from "@/src/components/applications/application-f
 import { EnvironmentMark } from "@/src/components/applications/marks";
 import { checkLine, uptimeText } from "@/src/components/applications/words";
 import type { Application, Deployment, Integration } from "@/src/lib/types";
-import { HEALTH, ago, when } from "@/src/lib/words";
+import { HEALTH, ago, plural, when } from "@/src/lib/words";
 
 export const metadata = { title: "Applications" };
 
@@ -44,20 +45,90 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
   );
 }
 
-function Figure({ label, children }: { label: string; children: ReactNode }) {
+// What needs attention comes first and stands apart (the Von Restorff effect);
+// each row says only what answers "is it fine?" (Hick's law): its state, uptime
+// and answer time, with what it's used by on one small line and problems only
+// when there are some; things that belong together sit together (proximity);
+// and the whole row opens the application, a big target (Fitts's law).
+const NEEDS: Record<Application["status"], boolean> = { down: true, degraded: true, maintenance: true, unknown: true, operational: false, retired: false };
+const ORDER: Record<Application["status"], number> = { down: 0, degraded: 1, maintenance: 2, unknown: 3, operational: 4, retired: 5 };
+
+function uptimeTone(uptime: number | null | undefined): string {
+  if (uptime == null) return "text-ink-3";
+  return uptime >= 99 ? "text-sage-deep" : uptime >= 95 ? "text-due-today" : "text-danger";
+}
+
+function AppRow({ a }: { a: Application }) {
+  const attention = NEEDS[a.status] && a.isActive;
+  const problems = [
+    a.activeIncidents ? `${a.activeIncidents} incident${a.activeIncidents === 1 ? "" : "s"} now` : null,
+    a.openTickets ? `${a.openTickets} open ticket${a.openTickets === 1 ? "" : "s"}` : null,
+  ].filter(Boolean) as string[];
+  const ms = a.lastCheck?.ms;
   return (
-    <div className="min-w-0">
-      <dt className="text-ink-3">{label}</dt>
-      <dd className="font-semibold text-ink tabular-nums">{children}</dd>
-    </div>
+    <li>
+      <Link
+        href={`/applications/${a.id}`}
+        className={`group grid gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-mint focus-visible:bg-mint focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto] ${
+          attention ? "border-l-4 border-danger bg-danger-tint/40" : "border-l-4 border-transparent"
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-base font-semibold text-ink group-hover:underline">{a.name}</span>
+            <HealthMark status={a.status} />
+            {problems.map((p) => (
+              <Pill key={p} tone="bad">
+                {p}
+              </Pill>
+            ))}
+          </span>
+          <span className="mt-0.5 block truncate text-meta text-ink-2">
+            {a.statusNote && <span className="text-ink">{a.statusNote} · </span>}
+            {a.isActive ? checkLine(a.lastCheck, Boolean(a.healthUrl)) : "Retired: not checked."}
+          </span>
+          <span className="mt-1 block text-meta text-ink-3">
+            <span className="font-mono">{a.key}</span>
+            {a.no ? ` · No. ${a.no}` : ""} · {plural(a.companyCount ?? 0, "company", "companies")} · {plural(a.userCount ?? 0, "user")}
+            {a.version ? ` · version ${a.version}` : ""}
+          </span>
+        </span>
+        <span className="flex items-center gap-6 sm:justify-end">
+          <span className="text-right">
+            <span className={`block text-lg font-semibold tabular-nums ${uptimeTone(a.uptime)}`}>{uptimeText(a.uptime)}</span>
+            <span className="block text-meta text-ink-3">up, last 24 h</span>
+          </span>
+          <span className="w-20 text-right">
+            <span className="block text-lg font-semibold text-ink tabular-nums">{ms == null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`}</span>
+            <span className="block text-meta text-ink-3">last answer</span>
+          </span>
+          <ChevronRight className="hidden size-4 text-ink-3 group-hover:text-ink sm:block" aria-hidden />
+        </span>
+      </Link>
+    </li>
   );
 }
 
 async function Registry({ retired, canAdminister }: { retired: boolean; canAdminister: boolean }) {
   const { applications } = await load<{ applications: Application[] }>(`/platform/applications${retired ? "?retired=true" : ""}`);
+  const sorted = [...applications].sort((x, y) => ORDER[x.status] - ORDER[y.status] || x.name.localeCompare(y.name));
+  const attention = sorted.filter((a) => NEEDS[a.status] && a.isActive);
+  const running = sorted.filter((a) => !(NEEDS[a.status] && a.isActive));
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2" role="status">
+          {applications.length === 0 ? null : attention.length > 0 ? (
+            <>
+              <Pill tone="bad">{attention.length} need attention</Pill>
+              <span>
+                {running.length} running{retired ? ", or retired" : ""}
+              </span>
+            </>
+          ) : (
+            <Pill tone="good">All {applications.length} running</Pill>
+          )}
+        </p>
         <ToggleLinks
           current={retired ? "all" : "active"}
           options={[
@@ -66,57 +137,36 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
           ]}
         />
       </div>
-      <Sheet className="overflow-hidden">
-        {applications.length === 0 ? (
+      {applications.length === 0 ? (
+        <Sheet>
           <Empty icon="apps" title="No applications yet.">
             {canAdminister ? "Register one with its health address, and the platform starts checking it." : "A Platform Admin registers them."}
           </Empty>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {applications.map((a) => (
-              <li key={a.id} className="px-5 py-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <p className="min-w-0">
-                    <Link href={`/applications/${a.id}`} className="font-semibold text-hema hover:underline">
-                      {a.name}
-                    </Link>
-                    <span className="ml-2 font-mono text-meta text-ink-3">{a.key}</span>
-                  </p>
-                  <HealthMark status={a.status} />
-                </div>
-                <p className="mt-0.5 text-meta text-ink-2">
-                  {a.statusNote && <span className="text-ink">{a.statusNote} · </span>}
-                  {a.isActive ? checkLine(a.lastCheck, Boolean(a.healthUrl)) : "Retired: not checked."}
-                </p>
-                <dl className="mt-2 grid grid-cols-3 gap-x-5 gap-y-2 text-meta sm:grid-cols-6">
-                  <Figure label="Version">{a.version ?? "—"}</Figure>
-                  <Figure label="Up, last 24 h">{uptimeText(a.uptime)}</Figure>
-                  <Figure label="Companies">{a.companyCount ?? 0}</Figure>
-                  <Figure label="Users">{(a.userCount ?? 0).toLocaleString("en-PH")}</Figure>
-                  <Figure label="Open tickets">
-                    {a.openTickets ? (
-                      <Link href={`/support?application=${a.id}`} className="text-hema hover:underline">
-                        {a.openTickets}
-                      </Link>
-                    ) : (
-                      0
-                    )}
-                  </Figure>
-                  <Figure label="Incidents now">
-                    {a.activeIncidents ? (
-                      <Link href={`/applications/${a.id}?tab=issues`} className="text-danger hover:underline">
-                        {a.activeIncidents}
-                      </Link>
-                    ) : (
-                      0
-                    )}
-                  </Figure>
-                </dl>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Sheet>
+        </Sheet>
+      ) : (
+        <div className="space-y-6">
+          {attention.length > 0 && (
+            <section aria-labelledby="needs-attention">
+              <h2 id="needs-attention" className="mb-2 text-caps text-danger uppercase">
+                Needs attention
+              </h2>
+              <Sheet className="overflow-hidden">
+                <ul className="divide-y divide-rule">{attention.map((a) => <AppRow key={a.id} a={a} />)}</ul>
+              </Sheet>
+            </section>
+          )}
+          {running.length > 0 && (
+            <section aria-labelledby="running">
+              <h2 id="running" className="mb-2 text-caps text-ink-3 uppercase">
+                {retired ? "Running and retired" : "Running"}
+              </h2>
+              <Sheet className="overflow-hidden">
+                <ul className="divide-y divide-rule">{running.map((a) => <AppRow key={a.id} a={a} />)}</ul>
+              </Sheet>
+            </section>
+          )}
+        </div>
+      )}
     </>
   );
 }

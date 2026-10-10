@@ -52,7 +52,7 @@ export function Input({ ref, size: _size, ...rest }: Omit<ComponentProps<"input"
     return <DateInput {...field} type={type as "date" | "datetime-local" | "time"} onChange={onChange as unknown as (e: FieldChange) => void} />;
   }
   return (
-    <AntInput
+    <AntInput suppressHydrationWarning
       ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
       status={rest["aria-invalid"] ? "error" : undefined}
       {...(rest as ComponentProps<typeof AntInput>)}
@@ -63,7 +63,7 @@ export function Input({ ref, size: _size, ...rest }: Omit<ComponentProps<"input"
 /** A password: hidden as typed, with the eye to show it. */
 export function PasswordInput({ ref, size: _size, ...rest }: ComponentProps<"input"> & { status?: "error" | "warning" | "" | string }) {
   return (
-    <AntInput.Password
+    <AntInput.Password suppressHydrationWarning
       ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
       status={rest["aria-invalid"] ? "error" : undefined}
       {...(rest as ComponentProps<typeof AntInput.Password>)}
@@ -73,13 +73,13 @@ export function PasswordInput({ ref, size: _size, ...rest }: ComponentProps<"inp
 
 /** A search box: the magnifier, and `onSearch` on Enter or its button. */
 export function SearchInput(props: ComponentProps<typeof AntInput.Search>) {
-  return <AntInput.Search allowClear {...props} />;
+  return <AntInput.Search suppressHydrationWarning allowClear {...props} />;
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
 export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"input">, "type">) {
   return (
-    <input
+    <input suppressHydrationWarning
       type="file"
       className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[14px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
       {...rest}
@@ -94,7 +94,7 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
  */
 export function CellInput({ ref, size: _size, className = "", ...rest }: ComponentProps<"input">) {
   return (
-    <AntInput
+    <AntInput suppressHydrationWarning
       ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
       status={rest["aria-invalid"] ? "error" : undefined}
       className={`text-right tabular-nums ${className}`}
@@ -105,7 +105,7 @@ export function CellInput({ ref, size: _size, className = "", ...rest }: Compone
 
 export function Textarea({ ref, ...rest }: ComponentProps<"textarea">) {
   return (
-    <AntInput.TextArea
+    <AntInput.TextArea suppressHydrationWarning
       ref={(r: { resizableTextArea?: { textArea: HTMLTextAreaElement } } | null) => toElement(ref, r?.resizableTextArea?.textArea ?? null)}
       status={rest["aria-invalid"] ? "error" : undefined}
       {...(rest as ComponentProps<typeof AntInput.TextArea>)}

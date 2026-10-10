@@ -10,21 +10,30 @@ import type { DealPriority, Deal, DealLists, DealStage, ForecastCategory, Revenu
 // do; these carry the request and hand back what it said.
 
 export type DealInput = {
-  name: string;
+  /** Left out on a new deal: made from its products and customer. */
+  name?: string;
   companyId: string;
   contactId: string | null;
   stageCode: string | null;
   probability?: number | null;
   forecastCategory?: Exclude<ForecastCategory, "closed"> | null;
   valueCentavos: number | null;
-  expectedCloseOn: string;
-  leadSource: string | null;
+  /** Left out on a new deal: 30 days from today. */
+  expectedCloseOn?: string;
+  /** Left out: the customer's own. */
+  leadSource?: string | null;
   priority?: DealPriority | null;
   priceType: string | null;
   lines: { productId: string; quantity: number }[];
   notes: string | null;
   ownerId: string | null;
 };
+
+/** How likely a deal is at this stage for this owner: the stage's own, adjusted by their record (the API's app/likely.py). */
+export async function howLikely(stage: string, owner: string | null): Promise<{ probability: number; why: string } | null> {
+  const q = new URLSearchParams({ stage, ...(owner ? { owner } : {}) });
+  return api.get<{ probability: number; why: string }>(`/deals/likely?${q}`).catch(() => null);
+}
 
 export async function createDeal(input: DealInput): Promise<Result<Deal>> {
   return attempt(() => api.post<Deal>("/deals", input));

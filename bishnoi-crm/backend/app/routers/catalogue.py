@@ -5,6 +5,8 @@ rules for quotes.
 Reading any of it needs products.view. Adding products needs
 products.create, deleting them products.delete, and everything else here
 (changing products, prices, promos, bundles and the rules) products.edit.
+A manager's department.manage also adds, changes and deletes promos and
+bundles, for their own departments only (check_teams, reachable).
 The catalogue is the company's, so a role's scope doesn't narrow it, except
 for promos and bundles: those belong to divisions (teams). Someone who reaches
 every record sees them all; anyone else sees, and quotes, only their own
@@ -34,6 +36,8 @@ router = APIRouter(tags=["catalogue"])
 View = Annotated[Access, Depends(require("products.view"))]
 Create = Annotated[Access, Depends(require("products.create"))]
 Edit = Annotated[Access, Depends(require("products.edit"))]
+# Promos and bundles: the catalogue's editors, or a manager for their departments.
+EditOffers = Annotated[Access, Depends(require("products.edit", "department.manage"))]
 Delete = Annotated[Access, Depends(require("products.delete"))]
 
 CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]*")
@@ -443,6 +447,17 @@ def reachable(db: Session, model, record_id: str, what: str, access: Access):
     return record
 
 
+def changeable(record: Promo | Bundle, access: Access) -> None:
+    """A manager (department.manage, not products.edit) changes only what is
+    wholly their departments': one shared with another department is the
+    catalogue editors'."""
+    reach = reach_of(access)
+    if access.can("products.edit") or reach is None:
+        return
+    if not set(record.team_ids or []) <= reach:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This one is shared with another department, so an administrator changes it.")
+
+
 def team_names(db: Session) -> dict[str, str]:
     return dict(db.execute(select(Team.id, Team.name)).all())
 
@@ -543,11 +558,11 @@ def promo_values(db: Session, access: Access, body: PromoIn, current: list[str] 
 def list_promos(access: View, db: DB, settings: SettingsDep) -> dict:
     on, names = today(settings.org_timezone), team_names(db)
     promos = [p for p in db.scalars(select(Promo).order_by(Promo.created_at.desc())) if sees(p, access)]
-    return {"items": [promo_out(p, on, names) for p in promos], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
+    return {"items": [promo_out(p, on, names) for p in promos], "teams": team_options(db, access), "can": {"edit": access.can_any("products.edit", "department.manage")}}
 
 
 @router.post("/promos", status_code=status.HTTP_201_CREATED)
-def create_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: PromoIn) -> dict:
+def create_promo(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, body: PromoIn) -> dict:
     promo = Promo(**promo_values(db, access, body))
     db.add(promo)
     db.flush()
@@ -557,8 +572,9 @@ def create_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, b
 
 
 @router.put("/promos/{promo_id}")
-def replace_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, promo_id: str, body: PromoIn) -> dict:
+def replace_promo(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, promo_id: str, body: PromoIn) -> dict:
     promo = reachable(db, Promo, promo_id, "promo", access)
+    changeable(promo, access)
     values = promo_values(db, access, body, promo.team_ids)
     fields = [k for k, v in values.items() if getattr(promo, k) != v]
     for k in fields:
@@ -570,8 +586,9 @@ def replace_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, 
 
 
 @router.delete("/promos/{promo_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_promo(access: Edit, me: CurrentUser, db: DB, promo_id: str) -> Response:
+def delete_promo(access: EditOffers, me: CurrentUser, db: DB, promo_id: str) -> Response:
     promo = reachable(db, Promo, promo_id, "promo", access)
+    changeable(promo, access)
     audit(db, me, "promo.deleted", target=promo.name, target_type="promo", target_id=promo.id)
     db.delete(promo)
     db.commit()
@@ -646,11 +663,11 @@ def bundle_values(db: Session, access: Access, body: BundleIn, not_id: str | Non
 def list_bundles(access: View, db: DB, settings: SettingsDep) -> dict:
     on, names = today(settings.org_timezone), team_names(db)
     bundles = [b for b in db.scalars(select(Bundle).order_by(func.lower(Bundle.name))) if sees(b, access)]
-    return {"items": [bundle_out(b, on, names) for b in bundles], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
+    return {"items": [bundle_out(b, on, names) for b in bundles], "teams": team_options(db, access), "can": {"edit": access.can_any("products.edit", "department.manage")}}
 
 
 @router.post("/bundles", status_code=status.HTTP_201_CREATED)
-def create_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: BundleIn) -> dict:
+def create_bundle(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, body: BundleIn) -> dict:
     bundle = Bundle(**bundle_values(db, access, body))
     db.add(bundle)
     db.flush()
@@ -660,8 +677,9 @@ def create_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, 
 
 
 @router.put("/bundles/{bundle_id}")
-def replace_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, bundle_id: str, body: BundleIn) -> dict:
+def replace_bundle(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, bundle_id: str, body: BundleIn) -> dict:
     bundle = reachable(db, Bundle, bundle_id, "bundle", access)
+    changeable(bundle, access)
     values = bundle_values(db, access, body, bundle.id, bundle.team_ids)
     fields = [k for k, v in values.items() if getattr(bundle, k) != v]
     for k in fields:
@@ -673,8 +691,9 @@ def replace_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep,
 
 
 @router.delete("/bundles/{bundle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_bundle(access: Edit, me: CurrentUser, db: DB, bundle_id: str) -> Response:
+def delete_bundle(access: EditOffers, me: CurrentUser, db: DB, bundle_id: str) -> Response:
     bundle = reachable(db, Bundle, bundle_id, "bundle", access)
+    changeable(bundle, access)
     audit(db, me, "bundle.deleted", target=bundle.name, target_type="bundle", target_id=bundle.id)
     db.delete(bundle)
     db.commit()

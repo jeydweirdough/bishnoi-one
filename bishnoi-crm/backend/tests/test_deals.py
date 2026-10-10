@@ -259,3 +259,34 @@ def test_the_summary_for_the_charts(client, crew):
     closed = client.get("/deals-summary?state=closed&owner=me", headers=ria).json()
     assert (closed["count"], closed["wonCount"], closed["lostCount"]) == (1, 0, 1)
     assert [d["name"] for d in client.get("/deals?state=closed", headers=ria).json()["items"]] == ["C"]
+
+
+
+def test_a_deal_fills_in_what_the_rep_doesnt_decide(client, crew):
+    """Only the customer is needed: the name, close date, probability, forecast
+    and lead source come from the customer, the stage and today."""
+    from tests.test_customers import company
+
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    r = client.post("/deals", json={"companyId": acme["id"]}, headers=crew["ria"])
+    assert r.status_code == 201, r.text
+    deal = r.json()
+    assert deal["name"].startswith("Acme Pharmacy · ")
+    assert deal["expectedCloseOn"] > deal.get("createdAt", "")[:10]
+    stage = next(x for x in client.get("/deal-stages", headers=crew["ria"]).json() if x["code"] == deal["stage"]["code"])
+    assert deal["probability"] == stage["probability"]  # the stage's own
+
+
+
+def test_how_likely_is_worked_out_from_the_record(client, crew, monkeypatch):
+    """The stage's own with nothing to go by; higher for a rep who wins more than everyone."""
+    from app import likely as how
+
+    stages = client.get("/deal-stages", headers=crew["ria"]).json()
+    first = next(s for s in stages if s.get("outcome", "open") == "open")
+    r = client.get("/deals/likely", params={"stage": first["code"]}, headers=crew["ria"]).json()
+    assert r["probability"] == first["probability"] and "not enough" in r["why"]
+    # Ria wins 8 of 10 (80%); everyone 10 of 20 (50%): 1.6 times the stage's own, within 1 to 99.
+    monkeypatch.setattr(how, "_record", lambda db, owner_id, on: (8, 10) if owner_id else (10, 20))
+    r = client.get("/deals/likely", params={"stage": first["code"]}, headers=crew["ria"]).json()
+    assert r["probability"] == max(1, min(99, round(first["probability"] * 1.6))) and "8 of 10" in r["why"]

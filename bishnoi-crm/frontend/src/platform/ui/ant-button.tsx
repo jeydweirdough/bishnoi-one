@@ -26,7 +26,7 @@ type ButtonProps = Omit<ComponentProps<"button">, "type" | "color"> & {
 
 export function Button({ variant = "default", size = "md", loading = false, icon, type = "button", children, ...rest }: ButtonProps) {
   return (
-    <AntButton {...look(variant)} size={size === "sm" ? "small" : "middle"} htmlType={type} loading={loading} icon={icon} {...rest}>
+    <AntButton suppressHydrationWarning {...look(variant)} size={size === "sm" ? "small" : "middle"} htmlType={type} loading={loading} icon={icon} {...rest}>
       {children}
     </AntButton>
   );
@@ -54,7 +54,7 @@ export function LinkButton({ href, variant = "default", size = "md", icon, child
     router.push(href, { scroll: scroll ?? true });
   }
   return (
-    <AntButton
+    <AntButton suppressHydrationWarning
       {...look(variant)}
       size={size === "sm" ? "small" : "middle"}
       href={href}

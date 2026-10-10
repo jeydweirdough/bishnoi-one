@@ -43,6 +43,10 @@ class Team(Base):
     manager_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), index=True, default=None)
     # Its customers named to other divisions (look-alikes, customer fields): app/routers/sharing.py.
     share_customers: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # The department's own retention windows (app/routers/retention.py); None:
+    # the company's (SalesSettings). Set by its manager or an administrator.
+    at_risk_days: Mapped[int | None] = mapped_column(Integer, default=None)
+    lost_days: Mapped[int | None] = mapped_column(Integer, default=None)
 
 
 class Role(Base):

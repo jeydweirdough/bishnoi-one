@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FileSpreadsheet, PenLine } from "lucide-react";
 import { PageHeader, Sheet, Empty } from "@/src/platform/ui/sheet";
-import { can } from "@/src/platform/lib/access";
+import { can, canAny } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { NoAccess } from "../components/admin/words";
 import { DeleteTemplate, NewTemplate } from "../quote-templates/list-actions";
@@ -13,18 +13,21 @@ export const metadata = { title: "Quotation templates" };
  *  (PCSO, Office of the President, DSWD...) or for any quote. */
 export default async function QuoteTemplatesPage() {
   const me = await getCompanyMe();
-  if (!can(me, "admin.settings")) return <NoAccess what="settings" />;
+  if (!canAny(me, ["admin.settings", "department.manage"])) return <NoAccess what="settings" />;
   const list = await load<TemplateList>("/admin/quote-templates");
+  // A manager: their own departments' templates, each made for one of them.
+  const departmentOnly = !can(me, "admin.settings");
+  const newOne = <NewTemplate teams={departmentOnly ? list.teams : undefined} />;
   return (
     <>
-      <PageHeader title="Quotation templates" actions={<NewTemplate />}>
+      <PageHeader title="Quotation templates" actions={newOne}>
         The quotation forms reps print or download from a quote, with your logo and e-signature. Design one here, or upload the Excel form an issuer
         such as PCSO or the Office of the President asks for.
       </PageHeader>
       <Sheet>
         {list.items.length === 0 ? (
-          <Empty title="No quotation templates yet" icon="quotes" actions={<NewTemplate />}>
-            Until there is one, quotes print on the standard quotation.
+          <Empty title="No quotation templates yet" icon="quotes" actions={newOne}>
+            {departmentOnly ? "Until your department has one, its quotes print on the company's." : "Until there is one, quotes print on the standard quotation."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">

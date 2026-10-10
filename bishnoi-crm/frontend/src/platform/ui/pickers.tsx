@@ -28,7 +28,7 @@ function useFieldValue(value: unknown, defaultValue: unknown, name: string | und
     onChange?.({ target: field, currentTarget: { ...field, form: hidden.current?.form ?? null } });
   }
   // A form read with FormData finds the value under the field's name.
-  const formValue = name ? <input ref={hidden} type="hidden" name={name} value={current} /> : <input ref={hidden} type="hidden" value={current} />;
+  const formValue = name ? <input suppressHydrationWarning ref={hidden} type="hidden" name={name} value={current} /> : <input suppressHydrationWarning ref={hidden} type="hidden" value={current} />;
   return { current, emit, formValue };
 }
 

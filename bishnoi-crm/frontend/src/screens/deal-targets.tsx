@@ -20,7 +20,7 @@ export default async function DealTargetsPage({ searchParams }: { searchParams: 
   const name = `${fmt.monthLabel(data.month)} ${data.month.slice(0, 4)}`;
   return (
     <>
-      <PageHeader title={`Revenue targets for ${name}`} crumbs={[{ href: `/deals?view=results&period=${data.month}`, label: "Sales results" }]}>
+      <PageHeader title={`Revenue targets for ${name}`} crumbs={[{ href: `/deals?results=${data.month}`, label: "Sales results" }]}>
         What each seller aims to win this month, counted from the deals they win. A team&apos;s target is its people&apos;s added up.
       </PageHeader>
       <Sheet className="max-w-2xl px-5 pt-3 pb-5">

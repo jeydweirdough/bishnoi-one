@@ -29,6 +29,7 @@ from app.api import Api, camel, changed, field_error, iso, not_found, person_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
+from app.likely import likely
 from app.models import DEAL_PRIORITIES, Activity, Company, Contact, Deal, DealStage, Quote
 from app.pricing import price_lines, sales_settings, today
 from app.routers.quotes import book_for
@@ -372,9 +373,35 @@ class DealFields(Api):
 
 
 class DealIn(DealFields):
-    name: str = Field(min_length=1, max_length=160)
+    # Both filled in when left out: the name from the products and the customer,
+    # the close CLOSE_IN_DAYS from today. A rep says only what they decide.
+    name: str | None = Field(None, min_length=1, max_length=160)
     company_id: str = Field(min_length=1, max_length=36)
-    expected_close_on: date
+    expected_close_on: date | None = None
+
+
+CLOSE_IN_DAYS = 30  # a new deal's expected close, when none is given
+
+
+def deal_name(company: Company, lines: list[dict], on: str) -> str:
+    """What's being bought, for whom: "Amoxicillin and Cefalexin for Davao Care
+    Hospital", or with no products "Davao Care Hospital · November 2026"."""
+    names = [l["productName"] for l in lines if l.get("productName")]
+    if names:
+        what = names[0] if len(names) == 1 else f"{names[0]} and {names[1]}" if len(names) == 2 else f"{names[0]} and {len(names) - 1} more"
+        return f"{what} for {company.name}"[:160]
+    closing = date.fromisoformat(on)
+    return f"{company.name} · {closing.strftime('%B %Y')}"[:160]
+
+
+@router.get("/deals/likely")
+def how_likely(access: View, me: CurrentUser, db: DB, settings: SettingsDep, stage: str = Query(max_length=40), owner: str | None = Query(None, max_length=36)) -> dict:
+    """A deal's probability at this stage for this owner (app/likely.py), before it's saved."""
+    found = db.get(DealStage, stage)
+    if found is None:
+        raise not_found("stage")
+    value, why = likely(db, owner or me.id, found, date.fromisoformat(today(settings.org_timezone)))
+    return {"probability": value, "why": why}
 
 
 @router.get("/deals")
@@ -494,15 +521,16 @@ def create_deal(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, 
     stage = open_stage(db, body.stage_code)
     owner = owner_for(db, access, body.owner_id)
     lines, value = priced(db, settings, company, body.price_type, body.lines or [])
+    close_on = (body.expected_close_on or date.fromisoformat(today(settings.org_timezone)) + timedelta(days=CLOSE_IN_DAYS)).isoformat()
     deal = Deal(
-        name=body.name,
+        name=(body.name or "").strip() or deal_name(company, lines, close_on),
         company_id=company.id,
         contact_id=contact.id if contact else None,
         stage_code=stage.code,
-        probability=body.probability if body.probability is not None else stage.probability,
+        probability=body.probability if body.probability is not None else likely(db, owner.id, stage, date.fromisoformat(today(settings.org_timezone)))[0],
         forecast_category=body.forecast_category or stage.forecast_category,
         value_centavos=value if lines else (body.value_centavos or 0),
-        expected_close_on=body.expected_close_on.isoformat(),
+        expected_close_on=close_on,
         # Not given: the customer's own (how they first came to us).
         lead_source=check_source(db, body.lead_source) if "lead_source" in body.model_fields_set else company.lead_source,
         priority=body.priority,
@@ -539,7 +567,7 @@ def update_deal(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, de
         # A deal entering a stage takes its probability and forecast category,
         # unless they were given with the move.
         if stage.code != deal.stage_code:
-            wanted.setdefault("probability", stage.probability)
+            wanted.setdefault("probability", likely(db, deal.owner_id, stage, date.fromisoformat(today(settings.org_timezone)))[0])
             wanted.setdefault("forecast_category", stage.forecast_category)
     for key in ("probability", "forecast_category"):
         if key in wanted and wanted[key] is None:

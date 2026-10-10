@@ -60,7 +60,8 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
           )
         }
       >
-        A customer is kept when they get a quote. At risk after {rules.atRiskDays} days without one, lost after {rules.lostDays}. Showing {whose}.
+        A customer is kept when they get a quote. At risk after {rules.atRiskDays} days without one, lost after {rules.lostDays}
+        {rules.division === "" && data.rules.length > 1 ? `, except where a department has its own (${data.rules.slice(1).map((r) => r.divisionName).join(", ")})` : ""}. Showing {whose}.
       </PageHeader>
 
       <div className="mb-3 flex flex-wrap items-center gap-2 empty:hidden">

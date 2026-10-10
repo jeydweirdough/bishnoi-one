@@ -61,7 +61,7 @@ def read_targets(access: Manage, db: DB, settings: SettingsDep, month: str | Non
     """Everyone who sells (and anyone already given a target that month), with the month's targets."""
     month = month_or_now(month, settings)
     targets = person_targets(db, by_code(db, "revenue_won"), [month])
-    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if is_seller(u) or u.id in targets]
+    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if (is_seller(u) or u.id in targets) and access.runs(u.team_id)]
     return {
         "month": month,
         "people": [{"person": person_out(p), "team": team_out(p.team), "targetCentavos": targets.get(p.id)} for p in people],
@@ -81,7 +81,8 @@ class TargetsIn(Api):
 @router.put("/targets")
 def set_targets(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: TargetsIn, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
-    users = set(db.scalars(select(User.id).where(User.id.in_([t.user_id for t in body.targets]))))
+    # A manager sets their own departments' people's targets (access.runs).
+    users = {u.id for u in db.scalars(select(User).where(User.id.in_([t.user_id for t in body.targets]))) if access.runs(u.team_id)}
     if missing := [t.user_id for t in body.targets if t.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
     kpi = by_code(db, "revenue_won")
