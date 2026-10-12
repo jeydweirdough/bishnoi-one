@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeftRight, ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, LogOut, Mail, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Dropdown, Modal, type MenuProps } from "antd";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
-import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
 import { signOut } from "../actions/session";
 import { addressKnown, THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
@@ -23,6 +23,9 @@ import type { Me, ModuleAccess } from "../lib/types";
 // A department is different. Inventory's pages (stock, transfers, purchasing)
 // are nothing like Finance's (approvals, letters, payments), so a department
 // really is a section, and opens to show its own.
+
+/** Whether the desktop sidebar is collapsed to its icons. */
+const RailContext = createContext(false);
 
 type Page = {
   href: string;
@@ -98,9 +101,7 @@ const UNSET_SAYS: Record<string, (n: number) => string> = {
 };
 
 type Place = Page & {
-  /** Any of these, and the place is part of their work. */
-  does: string[];
-  /** Any of these, and they may at least look. */
+  /** Any of these, and they may open it. */
   sees: string[];
   /** The alerts that count as waiting on them here. */
   waiting?: string[];
@@ -108,121 +109,96 @@ type Place = Page & {
   unset?: string[];
 };
 
+type Section = { label: string; places: Place[] };
+
 /**
- * Inventory's sidebar, built from what the person does rather than from
- * everything they may see. Every role may look at nearly everything, and a
- * list of eleven places reads as eleven jobs. So:
- *
- * - Home first: what needs them today.
- * - "Your work": only the places where their role acts (writes, approves,
- *   receives, issues, counts...), each with how many things wait on them.
- * - "Look up": the places they may only view, folded away until wanted.
+ * Inventory's sidebar: every page is one row, grouped by what happens to the
+ * stock: bring it in, keep it, send it out, check it. Nothing is folded away,
+ * so nobody has to remember what's inside what. A role sees the rows it may
+ * open, and each row says how many things wait on them there.
  */
-function inventoryNav(me: Me): { home: Page | null; work: Place[]; lookUp: Place[]; admin: Page[] } {
+function inventoryNav(me: Me): { home: Page | null; sections: Section[] } {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
-  const any = (list: string[]) => list.some(may);
-  // Receiving without buying: the warehouse's side of purchase orders.
-  const receivesOnly = may("receiving.receive") && !any(["purchasing.create", "purchasing.edit", "purchasing.approve"]);
-  // Moving stock makes looking at it part of the job.
-  const movesStock = any(["receiving.receive", "transfers.dispatch", "transfers.receive", "adjustments.create", "counts.create", "orders.issue"]);
-  // Each place's own pages, only the ones this role opens.
-  const shown = (list: (SubPage & { show?: boolean })[]): SubPage[] =>
-    list.filter((t) => t.show !== false).map(({ href, label }) => ({ href, label }));
-  const buying = shown([
-    { href: "/purchase-orders", label: "Purchase orders", show: may("purchasing.view") },
-    { href: "/receipts", label: "Receiving", show: may("receiving.view") },
-    { href: "/backorders", label: "Backorders", show: may("purchasing.view") },
-  ]);
-  const places: Place[] = [
-    { href: "/orders", label: "Orders & issuance", icon: "issuance", also: ["/reservations"], does: ["orders.create", "orders.edit", "orders.approve", "orders.issue"], sees: ["orders.view"], waiting: ["issue"],
-      subpages: [
-        { href: "/orders", label: "Orders" },
-        { href: "/reservations", label: "Reservations" },
-        { href: "/orders?status=issued", label: "Issuance history" },
+  const sections: Section[] = [
+    {
+      label: "Procurement",
+      places: [
+        { href: "/purchase-orders", label: "Purchases", icon: "purchaseOrders", also: ["/backorders"], sees: ["purchasing.view"], waiting: may("purchasing.approve") ? ["drafts"] : [] },
+        { href: "/receipts", label: "Receiving", icon: "receiving", sees: ["receiving.view"], waiting: ["receiving"] },
+        { href: "/suppliers", label: "Suppliers", icon: "suppliers", sees: ["suppliers.view"] },
       ],
     },
-    receivesOnly
-      ? { href: "/purchase-orders?status=ordered,partial", label: "Receiving", icon: "receiving", also: ["/purchase-orders", "/receipts", "/backorders"], does: ["receiving.receive"], sees: ["receiving.view"], waiting: ["receiving"], subpages: buying }
-      : {
-          href: may("purchasing.view") ? "/purchase-orders" : "/receipts",
-          label: "Purchase orders",
-          icon: "purchaseOrders",
-          also: ["/purchase-orders", "/receipts", "/backorders"],
-          does: ["purchasing.create", "purchasing.edit", "purchasing.approve", "receiving.receive"],
-          sees: ["purchasing.view", "receiving.view"],
-          waiting: may("purchasing.approve") ? ["drafts", "receiving"] : ["receiving"],
-          subpages: buying,
-        },
-    { href: "/transfers", label: "Transfers", icon: "transfers", does: ["transfers.create", "transfers.approve", "transfers.dispatch", "transfers.receive"], sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
     {
-      href: may("adjustments.view") ? "/adjustments" : "/counts",
-      label: "Adjustments & counts",
-      icon: "adjustments",
-      also: ["/adjustments", "/counts"],
-      does: ["adjustments.create", "adjustments.approve", "counts.create", "counts.approve"],
-      sees: ["adjustments.view", "counts.view"],
-      waiting: ["adjustments", "counts"],
-      subpages: shown([
-        { href: "/adjustments", label: "Adjustments", show: may("adjustments.view") },
-        { href: "/counts", label: "Inventory counts", show: may("counts.view") },
-      ]),
-    },
-    {
-      href: "/stock",
       label: "Stock",
-      icon: "stock",
-      also: ["/movements", "/batches", "/serials"],
-      does: movesStock ? ["stock.view"] : [],
-      sees: ["stock.view"],
-      subpages: [
-        { href: "/stock", label: "Stock overview" },
-        { href: "/movements", label: "Movements" },
-        { href: "/batches", label: "Batches & expiry" },
-        { href: "/serials", label: "Serial numbers" },
+      places: [
+        { href: "/stock", label: "On hand", icon: "stock", sees: ["stock.view"] },
+        { href: "/batches", label: "Batches and expiry", icon: "batches", sees: ["stock.view"] },
+        { href: "/serials", label: "Serials", icon: "serials", sees: ["stock.view"] },
+        { href: "/movements", label: "Movements", icon: "history", sees: ["stock.view"] },
+        { href: "/products", label: "Products", icon: "products", sees: ["products.view"], unset: ["productPrices"] },
+        { href: "/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
       ],
     },
     {
-      href: "/products",
-      label: "Products",
-      icon: "products",
-      also: ["/catalog"],
-      does: ["products.create", "products.edit", "products.delete"],
-      sees: ["products.view"],
-      unset: ["productPrices"],
-      subpages: [
-        { href: "/products", label: "Products" },
-        { href: "/catalog/categories", label: "Categories" },
-        { href: "/catalog/brands", label: "Brands" },
-        { href: "/catalog/units", label: "Units of measure" },
+      label: "Fulfillment",
+      places: [
+        // One board for every kind of order (the kinds are its filter, each with its own form).
+        { href: "/orders", label: "Orders", icon: "issuance", also: ["/reservations"], sees: ["orders.view"], waiting: ["issue"] },
+        { href: "/transfers", label: "Transfers", icon: "transfers", sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
       ],
     },
-    { href: "/suppliers", label: "Suppliers", icon: "suppliers", does: ["suppliers.create", "suppliers.edit", "suppliers.delete"], sees: ["suppliers.view"] },
-    { href: "/warehouses", label: "Warehouses", icon: "warehouses", does: ["warehouses.manage"], sees: ["warehouses.view"] },
-    { href: "/reports", label: "Reports", icon: "report", does: ["reports.export"], sees: ["reports.view"] },
-  ];
-  const admin: Page[] = [
-    ...(may("admin.users") || may("admin.roles")
-      ? [
-          {
-            href: may("admin.users") ? "/admin/users" : "/admin/roles",
-            label: "Users & roles",
-            icon: "people" as const,
-            also: ["/admin/users", "/admin/roles"],
-            subpages: shown([
-              { href: "/admin/users", label: "Users", show: may("admin.users") },
-              { href: "/admin/roles", label: "Roles & permissions", show: may("admin.roles") },
-            ]),
-          },
-        ]
-      : []),
-    ...(may("admin.audit") ? [{ href: "/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
+    {
+      label: "Control",
+      places: [
+        { href: "/adjustments", label: "Adjustments", icon: "adjustments", sees: ["adjustments.view"], waiting: ["adjustments"] },
+        { href: "/counts", label: "Stock counts", icon: "counts", sees: ["counts.view"], waiting: ["counts"] },
+        { href: "/reports", label: "Reports", icon: "report", sees: ["reports.view"] },
+      ],
+    },
+    {
+      label: "Catalogs",
+      places: [
+        { href: "/catalog/categories", label: "Categories", icon: "categories", sees: ["products.view"] },
+        { href: "/catalog/brands", label: "Brands", icon: "brands", sees: ["products.view"] },
+        { href: "/catalog/units", label: "Units", icon: "units", sees: ["products.view"] },
+      ],
+    },
+    {
+      label: "Access",
+      places: [
+        { href: "/admin/users", label: "Users", icon: "people", sees: ["admin.users"] },
+        { href: "/admin/roles", label: "Roles and permissions", icon: "roles", sees: ["admin.roles"] },
+        { href: "/admin/audit", label: "Audit log", icon: "auditLog", sees: ["admin.audit"] },
+      ],
+    },
   ];
   return {
     home: may("dashboard.view") ? { href: "/", label: "Home", icon: "home" } : null,
-    work: places.filter((p) => any(p.does)),
-    lookUp: places.filter((p) => !any(p.does) && any(p.sees)),
-    admin,
+    sections: sections
+      .map((s) => ({ ...s, places: s.places.filter((p) => p.sees.some(may)) }))
+      .filter((s) => s.places.length > 0),
   };
+}
+
+/**
+ * The row you're on: the most specific one the address is in. A query counts,
+ * so Orders to issue (/orders?status=confirmed,picking) is on rather than
+ * Customer orders when the address asks for those; a record's own page
+ * (/orders/123) falls back to the row its path starts with.
+ */
+function currentPlace(places: Place[], pathname: string, search: URLSearchParams): Place | undefined {
+  let found: Place | undefined;
+  let best = -1;
+  for (const p of places) {
+    const [path, query] = p.href.split("?");
+    const asks = [...new URLSearchParams(query ?? "")];
+    let score = -1;
+    if (within(pathname, path) && asks.length > 0 && asks.every(([k, v]) => search.get(k) === v)) score = 2000 + p.href.length;
+    else if ((p.also ?? []).some((a) => within(pathname, a))) score = 1500;
+    else if (asks.length === 0 && within(pathname, path)) score = 1000 + path.length;
+    if (score > best) [found, best] = [p, score];
+  }
+  return found;
 }
 
 /**
@@ -242,162 +218,39 @@ function UnsetMark({ place, unset }: { place: Place; unset: Unset }) {
   );
 }
 
-/** How many wait on them in a place, as the row's trailing mark. */
-function WaitingMark({ count }: { count: number }) {
-  if (!count) return null;
-  return (
-    <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
-      {count}
-      <span className="sr-only"> waiting on you</span>
-    </span>
-  );
-}
-
-/** "Look up": the places they may only view, folded until wanted, and open
- *  while they are in one. Remembered in this browser. */
-function LookUp({ places, pathname }: { places: Place[]; pathname: string }) {
-  const inside = places.some((p) => isCurrent(p, pathname, false));
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    try {
-      setOpen(localStorage.getItem("nav.lookUp") === "open");
-    } catch {
-      // No storage (a private window): it starts folded.
-    }
-  }, []);
-  function toggle() {
-    const next = !open;
-    setOpen(next);
-    try {
-      localStorage.setItem("nav.lookUp", next ? "open" : "closed");
-    } catch {
-      // Remembering is a nicety; without it the toggle still works.
-    }
-  }
-  const shown = open || inside;
-  return (
-    <div className="mt-5">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={shown}
-        className="mb-1 flex w-full items-center justify-between rounded-[3px] px-3 py-1 text-caps text-ink-3 uppercase hover:text-ink"
-      >
-        <span>Look up</span>
-        <ChevronRight className={`size-3.5 transition-transform ${shown ? "rotate-90" : ""}`} aria-hidden />
-      </button>
-      {shown && (
-        <div className="space-y-0.5">
-          {places.map((p) => (
-            <Entry key={p.href} page={p} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The sub-pages a page opens to. One alone is the page itself, so it isn't repeated under it. */
-const subpagesOf = (page: Page): SubPage[] => ((page.subpages?.length ?? 0) > 1 ? page.subpages! : []);
-
-/**
- * The sub-page you're on: the most specific one the address is in. A query
- * counts, so Issuance history (/orders?status=issued) is on rather than
- * Orders (/orders) when the address asks for issued orders.
- */
-function currentSub(page: Page, pathname: string, search: URLSearchParams): SubPage | undefined {
-  let found: SubPage | undefined;
-  for (const sub of subpagesOf(page)) {
-    const [path, query] = sub.href.split("?");
-    const asks = [...new URLSearchParams(query ?? "")];
-    if (!within(pathname, path) || asks.some(([k, v]) => search.get(k) !== v)) continue;
-    if (!found || sub.href.length > found.href.length) found = sub;
-  }
-  return found;
-}
-
-/**
- * A place in the sidebar. One with sub-pages opens to them, indented under
- * it, only while you're on one of them: everywhere else it is one line.
- */
-function Entry({ page, mark }: { page: Page; mark?: ReactNode }) {
-  const pathname = usePathname();
-  const search = useSearchParams();
-  const subs = subpagesOf(page);
-  if (subs.length === 0) {
-    return (
-      <Row href={page.href} icon={page.icon} current={isCurrent(page, pathname, false)} trailing={mark}>
-        {page.label}
-      </Row>
-    );
-  }
-  const here = currentSub(page, pathname, search);
-  const open = here !== undefined || isCurrent(page, pathname, false);
-  return (
-    <div>
-      <Row
-        href={page.href}
-        icon={page.icon}
-        current={false}
-        open={open}
-        trailing={
-          <>
-            {mark}
-            <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
-          </>
-        }
-      >
-        {page.label}
-      </Row>
-      {open && (
-        // The same guide line as a section's pages: these are the row's own.
-        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2" role="group" aria-label={page.label}>
-          {subs.map((sub) => (
-            <Row key={sub.href} href={sub.href} nested current={sub === here}>
-              {sub.label}
-            </Row>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function InventoryLinks({ me, waiting, unset }: { me: Me; waiting: Waiting; unset: Unset }) {
   const pathname = usePathname();
-  const { home, work, lookUp, admin } = inventoryNav(me);
+  const search = useSearchParams();
+  const { home, sections } = inventoryNav(me);
+  const atHome = pathname === "/" || within(pathname, "/alerts");
+  const here = atHome ? undefined : currentPlace(sections.flatMap((s) => s.places), pathname, search);
   const count = (p: Place) => (p.waiting ?? []).reduce((n, key) => n + (waiting[key] ?? 0), 0);
   return (
     <nav aria-label="Main">
       {home && (
-        <Row href={home.href} icon={home.icon} current={pathname === "/" || within(pathname, "/alerts")}>
-          {home.label}
-        </Row>
+        <Group label="General" dense first>
+          <Row href={home.href} icon={home.icon} current={atHome} dense>
+            {home.label}
+          </Row>
+        </Group>
       )}
-      {work.length > 0 && (
-        <Group label="Your work">
-          {work.map((p) => (
-            <Entry
+      {sections.map((s) => (
+        <Group key={s.label} label={s.label} dense>
+          {s.places.map((p) => (
+            <Row
               key={p.href}
-              page={p}
-              mark={
-                <>
-                  <UnsetMark place={p} unset={unset} />
-                  <WaitingMark count={count(p)} />
-                </>
-              }
-            />
+              href={p.href}
+              icon={p.icon}
+              current={p === here}
+              dense
+              count={count(p)}
+              trailing={<UnsetMark place={p} unset={unset} />}
+            >
+              {p.label}
+            </Row>
           ))}
         </Group>
-      )}
-      {lookUp.length > 0 && <LookUp places={lookUp} pathname={pathname} />}
-      {admin.length > 0 && (
-        <Group label="Administration">
-          {admin.map((p) => (
-            <Entry key={p.href} page={p} />
-          ))}
-        </Group>
-      )}
+      ))}
     </nav>
   );
 }
@@ -505,7 +358,9 @@ function Row({
   current,
   open = false,
   nested = false,
+  dense = false,
   trailing,
+  count = 0,
   children,
 }: {
   href: string;
@@ -514,35 +369,49 @@ function Row({
   current: boolean;
   open?: boolean;
   nested?: boolean;
+  /** Set closer: a sidebar with many rows. */
+  dense?: boolean;
   trailing?: ReactNode;
+  /** How many wait on them here: a small red dot on the icon catches the eye; the number is for screen readers. */
+  count?: number;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-[3px] px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const rail = useContext(RailContext);
+  const className = `flex items-center gap-3 rounded-full px-3 text-sm group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0 ${nested || dense ? "h-8" : "h-9"} ${
     current
-      ? "bg-hema-tint font-semibold text-hema"
+      ? "bg-hema-tint font-semibold text-ink"
       : open
         ? "font-semibold text-ink hover:bg-sheet"
         : "text-ink-2 hover:bg-sheet hover:text-ink"
   }`;
   const inside = (
     <>
-      {icon && <Icon name={icon} className={`size-4 ${current ? "text-hema" : open ? "text-ink-2" : "text-ink-3"}`} />}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {icon && (
+        <span className="relative inline-flex shrink-0">
+          <Icon name={icon} className={`size-4 ${current ? "text-sage-deep" : open ? "text-ink-2" : "text-ink-3"}`} />
+          {count > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-danger ring-2 ring-bench">
+              <span className="sr-only">{count} waiting on you</span>
+            </span>
+          )}
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate group-data-[rail=true]/side:sr-only">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
-      {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
+      <span className="contents group-data-[rail=true]/side:hidden">{trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}</span>
     </>
   );
   // Another app is another origin, so there is nothing for Next to route to:
   // it is an ordinary link, and the sign-in it lands on is already held.
   if (isAway(href)) {
     return (
-      <a href={href} className={className}>
+      <a href={href} className={className} title={rail ? String(children) : undefined}>
         {inside}
       </a>
     );
   }
   return (
-    <Link href={href} aria-current={current ? "page" : undefined} className={className}>
+    <Link href={href} aria-current={current ? "page" : undefined} className={className} title={rail && typeof children === "string" ? children : undefined}>
       {inside}
     </Link>
   );
@@ -596,7 +465,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[3px] px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-full px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
     >
       <Icon name={icon} className="size-4 text-ink-3" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -700,7 +569,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[3px] px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-sm ${
           open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
         }`}
       >
@@ -716,7 +585,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[3px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-[22px] border border-rule bg-bench p-1 shadow-lg"
           >
             {items.map((e) => (
               <a
@@ -724,7 +593,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-[3px] px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-full px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -739,11 +608,12 @@ function AppSwitcher({ items }: { items: Away[] }) {
   );
 }
 
-function Group({ label, children }: { label: string; children: ReactNode }) {
+function Group({ label, children, dense = false, first = false }: { label: string; children: ReactNode; dense?: boolean; first?: boolean }) {
   return (
-    <div className="mt-5">
-      <p className="mb-1 px-3 text-caps text-ink-3 uppercase">{label}</p>
-      <div className="space-y-0.5">{children}</div>
+    <div className={`${first ? "" : dense ? "mt-3.5" : "mt-5"} group-data-[rail=true]/side:mt-2`}>
+      <p className={`px-3 text-ink-3 uppercase group-data-[rail=true]/side:sr-only ${dense ? "mb-0.5 text-[0.625rem] leading-4 font-semibold tracking-[0.08em]" : "mb-1 text-caps"}`}>{label}</p>
+      {!first && <hr className="mx-3 mb-2 hidden border-rule group-data-[rail=true]/side:block" aria-hidden />}
+      <div className={dense ? "space-y-px" : "space-y-0.5"}>{children}</div>
     </div>
   );
 }
@@ -935,13 +805,9 @@ function Links({ me }: { me: Me }) {
 /** Where you are, in words, for the phone's top bar (the sidebar shows it on wider screens). */
 function placeOf(pathname: string, search: URLSearchParams, me: Me): string | null {
   if (THIS_APP === "inventory") {
-    const { home, work, lookUp, admin } = inventoryNav(me);
+    const { home, sections } = inventoryNav(me);
     if (home && (pathname === "/" || within(pathname, "/alerts"))) return home.label;
-    const page = [...work, ...lookUp, ...admin].find((p) => isCurrent(p, pathname, false) || currentSub(p, pathname, search));
-    if (!page) return null;
-    // A sub-page under its place, "Stock · Movements"; not "Products · Products".
-    const sub = currentSub(page, pathname, search);
-    return sub && sub.label !== page.label ? `${page.label} · ${sub.label}` : page.label;
+    return currentPlace(sections.flatMap((x) => x.places), pathname, search)?.label ?? null;
   }
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));
@@ -966,50 +832,80 @@ function placeOf(pathname: string, search: URLSearchParams, me: Me): string | nu
 
 function Account({ me }: { me: Me }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const [pending, setPending] = useState(false);
+  const switchHref =
+    THIS_APP && THIS_APP !== "platform" && addressKnown("platform")
+      ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
+      : null;
+  // What's used now and then sits behind ⋯, so the sidebar's foot is only who you are.
+  const items: MenuProps["items"] = [
+    { key: "account", label: "Your account", icon: <UserRound className="size-4" aria-hidden /> },
+    // The CRM sends email from each person's own mailbox.
+    ...(process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? [{ key: "mailbox", label: "Mailbox", icon: <Mail className="size-4" aria-hidden /> }] : []),
+    // Each company has its own data here. Someone who works for more than one
+    // picks the other on Bishnoi One, which sends them back signed in there.
+    ...(switchHref ? [{ key: "switch", label: "Switch company", icon: <ArrowLeftRight className="size-4" aria-hidden /> }] : []),
+    { type: "divider" as const },
+    { key: "signout", label: "Sign out", icon: <LogOut className="size-4" aria-hidden /> },
+  ];
+  function pick({ key }: { key: string }) {
+    if (key === "account") router.push("/account");
+    else if (key === "mailbox") router.push("/account/mailbox");
+    else if (key === "switch" && switchHref) window.location.href = switchHref;
+    else if (key === "signout") setLeaving(true);
+  }
+  const here = pathname === "/account" || pathname.startsWith("/account/");
   return (
     <div className="border-t border-rule pt-4">
-      <Link
-        href="/account"
-        aria-current={pathname === "/account" ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
-      >
-        <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-        <span className="min-w-0">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-hema" : ""}`}>{me.user.fullName}</span>
-          <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
-        </span>
-      </Link>
-      {/* Each company has its own data here. Someone who works for more than
-          one picks the other on Bishnoi One, which sends them back signed in there. */}
-      {THIS_APP && THIS_APP !== "platform" && addressKnown("platform") && (
-        <a
-          href={`${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`}
-          className="mt-1 flex items-center gap-2 rounded-[3px] px-3 py-1.5 text-sm text-ink-2 hover:bg-sheet"
-        >
-          <ArrowLeftRight className="size-4" aria-hidden />
-          Switch company
-        </a>
-      )}
-      <ConfirmButton
-        label="Sign out"
-        icon={<LogOut className="size-4" aria-hidden />}
-        triggerVariant="quiet"
-        triggerSize="sm"
-        triggerClassName="mt-2 w-full !justify-start"
+      <div className={`flex items-center gap-1 rounded-full pr-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:pr-0 ${here ? "bg-hema-tint" : ""}`}>
+        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 group-data-[rail=true]/side:px-1.5 ${here ? "" : "hover:bg-sheet"}`} title={me.user.fullName}>
+          <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
+          <span className="min-w-0 group-data-[rail=true]/side:sr-only">
+            <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
+            <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
+          </span>
+        </Link>
+        <Dropdown menu={{ items, onClick: pick }} trigger={["click"]} placement="topRight">
+          <button
+            type="button"
+            aria-label="Account options"
+            title="Account options"
+            className="grid size-9 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
+          >
+            <MoreHorizontal className="size-5" aria-hidden />
+          </button>
+        </Dropdown>
+      </div>
+      <Modal
+        open={leaving}
         title="Sign out?"
-        body="You'll need your email and password to get back in."
-        confirmLabel="Sign out"
-        danger={false}
-        onConfirm={async () => {
+        okText="Sign out"
+        cancelText="Cancel"
+        confirmLoading={pending}
+        onCancel={() => !pending && setLeaving(false)}
+        onOk={async () => {
+          setPending(true);
           await signOut();
         }}
-      />
+        width={400}
+      >
+        You&apos;ll need your email and password to get back in.
+      </Modal>
     </div>
   );
 }
 
-export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waiting; unset?: Unset }) {
+export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean }) {
   const pathname = usePathname();
+  const [rail, setRail] = useState(railAtFirst);
+  function toggleRail() {
+    const next = !rail;
+    setRail(next);
+    // A cookie, so the next page is drawn the same way from the start.
+    document.cookie = `bishnoi_nav=${next ? "rail" : "full"}; path=/; max-age=31536000; samesite=lax`;
+  }
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
@@ -1017,18 +913,18 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
   const place = placeOf(pathname, search, me);
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2.5 border-b-[3px] border-double border-ink pb-2">
+    <Link href="/" className="flex items-center gap-2.5 border-b border-rule pb-4">
       <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 shrink-0" />
       <span className="min-w-0">
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
         {/* Which app this is, not only which product. Each one is its own site on
             its own address, so "Bishnoi One" alone leaves you working out from the port
             whether the screen in front of you is missing or simply elsewhere. */}
-        <span className="block truncate text-base leading-tight font-semibold text-ink">
+        <span className="block truncate text-sm leading-tight font-semibold text-ink">
           {thisAppLabel() ? `${APP_NAME} ${thisAppLabel()}` : APP_NAME}
         </span>
+        {/* No company on the platform: a Developer Admin has not opened one, and
+            saying a company name there would be saying something untrue. */}
+        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
       </span>
     </Link>
   );
@@ -1036,12 +932,25 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
   return (
     <>
       {/* Desktop: a fixed column on the bench. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
-        <div>
-          <div className="mb-6 px-3">{brand}</div>
-          {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} unset={unset} /> : <Links me={me} />}
-        </div>
-        <Account me={me} />
+      <aside data-rail={rail} className="group/side sticky top-0 hidden h-dvh w-[16.5rem] flex-col justify-between overflow-x-hidden overflow-y-auto px-4 py-6 transition-[width] duration-200 data-[rail=true]:w-[4.75rem] data-[rail=true]:px-2.5 lg:flex">
+        <RailContext.Provider value={rail}>
+          <div>
+            <div className={`${THIS_APP === "inventory" ? "mb-4" : "mb-6"} flex items-start gap-1 px-3 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:items-center group-data-[rail=true]/side:px-0`}>
+              <div className="min-w-0 flex-1 group-data-[rail=true]/side:[&_span]:sr-only group-data-[rail=true]/side:[&_a]:border-b-0 group-data-[rail=true]/side:[&_a]:pb-0">{brand}</div>
+              <button
+                type="button"
+                onClick={toggleRail}
+                aria-label={rail ? "Open the sidebar" : "Close the sidebar"}
+                title={rail ? "Open the sidebar" : "Close the sidebar"}
+                className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink group-data-[rail=true]/side:mt-3"
+              >
+                {rail ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+              </button>
+            </div>
+            {THIS_APP === "inventory" ? <InventoryLinks me={me} waiting={waiting} unset={unset} /> : <Links me={me} />}
+          </div>
+          <Account me={me} />
+        </RailContext.Provider>
       </aside>
 
       {/* Phone and tablet: a top bar with a menu, saying where you are. */}
@@ -1053,7 +962,7 @@ export function Nav({ me, waiting = {}, unset = {} }: { me: Me; waiting?: Waitin
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

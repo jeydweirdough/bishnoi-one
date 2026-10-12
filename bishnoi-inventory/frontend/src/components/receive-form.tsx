@@ -14,7 +14,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; orderLineId: string | null; quantity: string; cost: string; batchNo: string; manufacturedOn: string; expiresOn: string; serials: string; outstanding: number | null };
 
-const cell = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 rounded-full border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
 
 /**
  * Taking a delivery in. Against a purchase order, its outstanding lines are
@@ -126,7 +126,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[60rem] text-left text-sm">
             <thead>
-              <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+              <tr className="border-b border-rule text-left text-meta text-ink-3">
                 <th className="py-2 pr-3 font-semibold">Product</th>
                 <th className="w-24 px-2 py-2 text-right font-semibold">Received</th>
                 <th className="w-28 px-2 py-2 text-right font-semibold">Unit cost</th>
@@ -146,10 +146,10 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                       {r.orderLineId ? (
                         <span className="font-semibold">{p?.name}<span className="block text-meta font-normal text-ink-3">{p?.sku} · {r.outstanding} still owed</span></span>
                       ) : (
-                        <select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value })} className={`${cell} w-full`}>
+                        <Select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value })} className="w-full">
                           <option value="">Pick a product…</option>
                           {products.filter((x) => x.status !== "discontinued").map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
-                        </select>
+                        </Select>
                       )}
                       {p?.trackSerials && (
                         <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder={`${Number(r.quantity) || 0} serial numbers, one per unit`} value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
@@ -173,7 +173,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                           <X className="size-4" aria-hidden />
                         </button>
                       )}

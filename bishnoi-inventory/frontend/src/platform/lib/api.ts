@@ -169,7 +169,7 @@ export async function loadQuery<T extends Record<string, unknown>>(document: str
   return data;
 }
 
-type Frame = { me: Me; alerts: { key: string; count: number }[] | null; unset: Record<string, number> | null };
+type Frame = { me: Me; alerts: { key: string; count: number; tone: "critical" | "warning" | "info"; title: string; href: string; examples: string[] }[] | null; unset: Record<string, number> | null };
 
 /**
  * Every page's frame in one request: who is signed in (with what they can

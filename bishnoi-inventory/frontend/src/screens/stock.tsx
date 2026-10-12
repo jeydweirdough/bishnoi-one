@@ -1,3 +1,4 @@
+import { FirstStep } from "../components/setup";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -38,9 +39,7 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
       </Filters>
       <Sheet>
         {data.items.length === 0 ? (
-          <Empty icon="stock" title="Nothing here">
-            Stock shows up once it&apos;s received into a warehouse.
-          </Empty>
+          <FirstStep icon="stock" title="No stock yet" body="Stock shows up once it's received into a warehouse." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(f.q || f.warehouse || f.category || f.state)} clear="/stock" may={may} />
         ) : (
           <Table head={["Item", "Warehouse", " On hand", " Damaged", " Reserved", " Picking", " Available", " In transit", " Reorder at", "Stock"]} min="64rem">
             {data.items.map((r) => (
@@ -114,8 +113,8 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
       </Filters>
       {product && (
         <p className="mb-3 text-sm text-ink-2">
-          Only <Link href={`/products/${product.id}`} className="font-semibold text-hema hover:underline">{product.name}</Link>.{" "}
-          <Link href={`/movements${query({ ...f, product: "" })}`} className="text-meta text-hema hover:underline">Show every product</Link>
+          Only <Link href={`/products/${product.id}`} className="font-semibold text-ink hover:underline">{product.name}</Link>.{" "}
+          <Link href={`/movements${query({ ...f, product: "" })}`} className="text-meta text-ink hover:underline">Show every product</Link>
         </p>
       )}
       <Sheet>
@@ -129,7 +128,7 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
                 <tr key={m.id}>
                   <Td className="text-meta whitespace-nowrap text-ink-3 tabular-nums">{at(m.at)}</Td>
                   <Td>
-                    <Link href={`/products/${m.product.id}`} className="font-semibold hover:text-hema hover:underline">{m.product.name}</Link>
+                    <Link href={`/products/${m.product.id}`} className="font-semibold hover:text-ink hover:underline">{m.product.name}</Link>
                     <span className="block text-meta text-ink-3">
                       {m.product.sku}
                       {m.batch && <> · batch {m.batch.batchNo}</>}
@@ -141,9 +140,9 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
                     {m.note && <span className="block text-meta text-ink-3">{m.note}</span>}
                   </Td>
                   <Td>{m.warehouse.code}{m.location && <span className="text-meta text-ink-3"> · {m.location.code}</span>}</Td>
-                  <Td>{href ? <Link href={href} className="text-hema hover:underline">{m.reference}</Link> : (m.reference ?? "—")}</Td>
+                  <Td>{href ? <Link href={href} className="text-ink hover:underline">{m.reference}</Link> : (m.reference ?? "—")}</Td>
                   <Td className="text-ink-2">{m.user}</Td>
-                  <Td num className={`font-semibold ${m.quantity > 0 ? "text-hema" : ""}`}>{signed(m.quantity, fmt.count)}</Td>
+                  <Td num className={`font-semibold ${m.quantity > 0 ? "text-ink" : ""}`}>{signed(m.quantity, fmt.count)}</Td>
                   <Td num className="text-ink-3">{m.onHandAfter == null ? "—" : fmt.count(m.onHandAfter)}</Td>
                 </tr>
               );
@@ -237,7 +236,7 @@ export async function SerialsPage({ searchParams }: { searchParams: Search }) {
                   const href = referenceHref(m.referenceType, m.referenceId);
                   return (
                     <li key={m.id} className="flex flex-wrap justify-between gap-2 py-2">
-                      <span>{MOVEMENT_KINDS[m.kind]} · {m.warehouse.code} · {href ? <Link href={href} className="text-hema hover:underline">{m.reference}</Link> : m.reference}</span>
+                      <span>{MOVEMENT_KINDS[m.kind]} · {m.warehouse.code} · {href ? <Link href={href} className="text-ink hover:underline">{m.reference}</Link> : m.reference}</span>
                       <span className="text-meta text-ink-3">{at(m.at)} · {m.user}</span>
                     </li>
                   );

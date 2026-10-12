@@ -47,6 +47,11 @@ export async function updateDeal(id: string, change: Partial<Omit<DealInput, "co
   });
 }
 
+/** A deal moved to another stage on the board. */
+export async function moveDealStage(id: string, stageCode: string): Promise<Result<Deal>> {
+  return updateDeal(id, { stageCode });
+}
+
 export async function winDeal(id: string, quoteId: string | null): Promise<Result<Deal>> {
   return attempt(async () => {
     const deal = await api.post<Deal>(`/deals/${enc(id)}/win`, { quoteId });

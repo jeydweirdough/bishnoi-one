@@ -118,7 +118,7 @@ export async function AuditPage({ searchParams }: { searchParams: Search }) {
                   <div className="min-w-0">
                     <p className="text-sm">
                       <span className="font-semibold">{ACTIONS[e.action] ?? e.action.replaceAll(/[._]/g, " ")}</span>
-                      {e.target && <span className="text-ink-2"> · {href ? <Link href={href} className="hover:text-hema hover:underline">{e.target}</Link> : e.target}</span>}
+                      {e.target && <span className="text-ink-2"> · {href ? <Link href={href} className="hover:text-ink hover:underline">{e.target}</Link> : e.target}</span>}
                     </p>
                     <p className="text-meta text-ink-3">by {e.actor}{e.fields.length > 0 && <> · changed {e.fields.join(", ")}</>}</p>
                   </div>

@@ -114,11 +114,11 @@ export function CatalogList({ kind, items, canEdit, canDelete }: { kind: Kind; i
                     <Button size="sm" variant="quiet" onClick={() => run(async () => { const r = await saveCatalogItem(kind, item.key, { isActive: !item.isActive }); return r.ok ? { ok: true } : r; }, item.isActive ? `${item.name} switched off` : `${item.name} switched on`)}>
                       {item.isActive ? "Switch off" : "Switch on"}
                     </Button>
-                    <button type="button" title={`Rename ${item.name}`} onClick={() => open(item)} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-hema">
+                    <button type="button" title={`Rename ${item.name}`} onClick={() => open(item)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Pencil className="size-4" aria-hidden />
                     </button>
                     {canDelete && item.count === 0 && !item.childCount && (
-                      <button type="button" title={`Delete ${item.name}`} onClick={() => run(async () => { const r = await deleteCatalogItem(kind, item.key); return r.ok ? { ok: true } : r; }, `${item.name} deleted`)} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                      <button type="button" title={`Delete ${item.name}`} onClick={() => run(async () => { const r = await deleteCatalogItem(kind, item.key); return r.ok ? { ok: true } : r; }, `${item.name} deleted`)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                         <Trash2 className="size-4" aria-hidden />
                       </button>
                     )}

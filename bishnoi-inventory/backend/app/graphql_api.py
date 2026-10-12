@@ -241,6 +241,14 @@ class Query:
     def transfer(self, info: strawberry.Info, id: str) -> JSON | None:
         return route(transfers.read_transfer, info, transfer_id=id)
 
+    @strawberry.field
+    def transfers_map(self, info: strawberry.Info) -> JSON | None:
+        return route(transfers.transfers_map, info)
+
+    @strawberry.field
+    def setup(self, info: strawberry.Info) -> JSON | None:
+        return route(unset.setup, info)
+
     # --- purchasing ---
 
     @strawberry.field

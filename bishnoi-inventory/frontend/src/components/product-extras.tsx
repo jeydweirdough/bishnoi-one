@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { CellInput, FormError } from "@/src/platform/ui/field";
+import { CellInput, FormError, Select } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 import { deleteImage, removeSupplierPrice, setSupplierPrice, uploadImage } from "../actions/inventory";
@@ -31,7 +31,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
   return (
     <div className="flex flex-wrap gap-3">
       {images.map((id) => (
-        <figure key={id} className="group relative size-28 overflow-hidden rounded-[3px] border border-rule bg-bench">
+        <figure key={id} className="group relative size-28 overflow-hidden rounded-[14px] border border-rule bg-bench">
           {/* eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box */}
           <img src={`/products/${productId}/images/${id}`} alt="" className="size-full object-contain" />
           {canEdit && (
@@ -45,7 +45,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
                   else router.refresh();
                 })
               }
-              className="absolute top-1 right-1 rounded-[3px] bg-sheet/90 p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
+              className="absolute top-1 right-1 rounded-full bg-sheet/90 p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
             >
               <Trash2 className="size-4" aria-hidden />
               <span className="sr-only">Remove this picture</span>
@@ -102,7 +102,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
             <li key={sp.supplier.id} className="flex items-baseline justify-between gap-3 py-2 text-sm">
               <span className="min-w-0">
                 <span className="font-semibold">{sp.supplier.name}</span>
-                {sp.price === cheapest && product.supplierPrices.length > 1 && <span className="ml-2 text-meta text-hema">Lowest</span>}
+                {sp.price === cheapest && product.supplierPrices.length > 1 && <span className="ml-2 text-meta text-ink">Lowest</span>}
                 <span className="block text-meta text-ink-3">
                   {[sp.supplierSku && `Their code ${sp.supplierSku}`, sp.leadTimeDays != null && `${sp.leadTimeDays} days lead time`].filter(Boolean).join(" · ") || "—"}
                 </span>
@@ -113,7 +113,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
                   <button
                     type="button"
                     title={`Remove ${sp.supplier.name}'s price`}
-                    className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-danger"
+                    className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-danger"
                     onClick={() => start(async () => { const r = await removeSupplierPrice(product.id, sp.supplier.id); if (!r.ok) toast.error(r.error); else router.refresh(); })}
                   >
                     <Trash2 className="size-4" aria-hidden />
@@ -126,16 +126,16 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
       )}
       {canEdit && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
-          <select
+          <Select
             aria-label="Supplier"
             value={adding.supplierId}
             onChange={(e) => setAdding({ ...adding, supplierId: e.target.value })}
-            className="h-8 min-w-40 flex-1 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+            className="min-w-40 flex-1"
           >
             <option value="">Supplier…</option>
             {suppliers.filter((s) => s.isActive && !listed.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             {newSuppliers.filter((n) => !suppliers.some((s) => s.id === n.id)).map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
-          </select>
+          </Select>
           {canAddSupplier && (
             <QuickAdd kind="supplier" label="New" onAdded={(a) => { setNewSuppliers((l) => [...l, { id: a.value, name: a.label }]); setAdding((x) => ({ ...x, supplierId: a.value })); }} />
           )}

@@ -382,7 +382,16 @@ export type Dashboard = {
   recentMovements: Movement[];
   recentReceipts: ReceiptBrief[];
   recentIssues: OrderBrief[];
+  /** Orders confirmed or being picked: still to go out. */
+  openOrders: number;
+  /** The last twelve months, oldest first. */
+  trend: { month: string; received: number; issued: number; orders: number }[];
+  /** Open purchase orders, soonest expected first. */
+  upcoming: PurchaseHome[];
+  recentPurchases: PurchaseHome[];
 };
+
+export type PurchaseHome = POBrief & { firstItem: string | null; moreItems: number };
 
 export type ReportInfo = { key: string; title: string; group: string; about: string; dated: boolean; byWarehouse: boolean };
 export type ReportColumn = { key: string; label: string; kind: "text" | "number" | "money" | "date" | "datetime" | "percent" };
@@ -402,3 +411,18 @@ export type PermissionArea = { key: string; name: string; group: string; actions
 export type RoleRow = { id: string; name: string; description: string | null; isSystem: boolean; permissions: string[]; userCount: number };
 export type RolesData = { roles: RoleRow[]; catalogue: PermissionArea[] };
 export type AuditEntry = { id: number; at: string; actor: string; actorId: string | null; action: string; target: string; targetType: string | null; targetId: string | null; fields: string[] };
+
+/** A place on the map. */
+export type Pin = { latitude: number; longitude: number };
+
+/** A transfer as the map draws it: a route from one warehouse's pin to the other's. */
+export type TransferRoute = TransferBrief & {
+  approvedAt: string | null;
+  fromPin: Pin | null;
+  toPin: Pin | null;
+  fromAddress: string | null;
+  toAddress: string | null;
+  firstItem: string | null;
+};
+
+export type MapWarehouse = Ref & { address: string | null; pin: Pin | null };

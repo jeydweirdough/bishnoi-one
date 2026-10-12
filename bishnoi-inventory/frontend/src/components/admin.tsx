@@ -74,7 +74,7 @@ export function UsersEditor({ data, meId, when }: { data: AdminUsers; meId: stri
             <li key={u.id} className="grid gap-3 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-center">
               <span className="min-w-0 text-sm">
                 <span className={`font-semibold ${u.isActive ? "" : "text-ink-3 line-through"}`}>{u.fullName}</span>
-                {u.id === meId && <span className="ml-2 text-meta text-hema">You</span>}
+                {u.id === meId && <span className="ml-2 text-meta text-ink">You</span>}
                 <span className="block text-meta text-ink-3">{u.email} · {u.lastSignInAt ? `last signed in ${when[u.id]}` : "never signed in"}{!u.isActive && " · switched off"}</span>
               </span>
               <Select aria-label={`${u.fullName}'s role`} value={u.role.id} disabled={pending} onChange={(e) => change(u.id, { roleId: e.target.value }, `${u.fullName} is now ${data.roles.find((r) => r.id === e.target.value)?.name}`)}>
@@ -278,7 +278,7 @@ function Permissions({ catalogue, granted, locked, onChange }: { catalogue: Perm
                   {area.actions.map((a) => {
                     const on = has.has(a.permission);
                     return (
-                      <label key={a.permission} className={`relative inline-flex items-center rounded-full border px-3 py-1 text-meta has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${on ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong bg-sheet text-ink-2"} ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}>
+                      <label key={a.permission} className={`relative inline-flex items-center rounded-full border px-3 py-1 text-meta has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"} ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}>
                         <input type="checkbox" className="sr-only" checked={on} disabled={locked} onChange={(e) => toggle(area, a.permission, e.target.checked)} />
                         {a.label}
                       </label>

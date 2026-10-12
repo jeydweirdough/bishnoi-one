@@ -94,7 +94,10 @@ def reference_warehouses(db: Session) -> list[dict]:
 
 
 def reference_products(db: Session) -> list[dict]:
-    products = db.scalars(select(Product).where(Product.product_type != "service").order_by(func.lower(Product.name)))
+    """What a document's lines can be for: products that hold stock. One that only
+    groups its sizes (BD Syringe, with 1, 3 and 5 mL) holds none itself, so its
+    sizes are listed instead."""
+    products = db.scalars(select(Product).where(Product.product_type != "service", Product.variant_count == 0).order_by(func.lower(Product.name)))
     return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id} for p in products]
 
 

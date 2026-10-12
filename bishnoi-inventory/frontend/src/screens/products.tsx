@@ -1,3 +1,4 @@
+import { FirstStep } from "../components/setup";
 import { Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -71,9 +72,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </Filters>
       <Sheet>
         {products.length === 0 ? (
-          <Empty icon="products" title={f.q ? "No products match" : "No products here"}>
-            {may("products.create") ? "Add the items you keep, with their SKU, unit and reorder point." : "Try other filters."}
-          </Empty>
+          <FirstStep icon="products" title="No products yet" body="Add the items you keep, with their SKU, unit and reorder point." href="/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.status !== "active")} clear="/products" may={may} />
         ) : (
           <Table head={["Product", " On hand", " Available", " Reorder at", " Cost", " Selling", "Stock"]} min="52rem">
             {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}

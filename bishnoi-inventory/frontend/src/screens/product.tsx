@@ -1,16 +1,25 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
-import { Particulars, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { cache } from "react";
 import { loadQuery } from "@/src/platform/lib/api";
 import { deleteProduct } from "../actions/inventory";
 import { ProductImages, SupplierPrices } from "../components/product-extras";
 import { RecordTools } from "../components/record-tools";
-import { ExpiryMark, Figures, NoAccess, StateMark, Table, Td } from "../components/ui";
+import { ExpiryMark, NoAccess, Stamp, StateMark, Table, Td } from "../components/ui";
+import { Barcode, BarList, Card, DetailPanel, InfoCard, InfoSection, Pill, StatCards } from "../components/detail";
+import { Icon } from "@/src/platform/ui/icons";
 import { MOVEMENT_KINDS, PRODUCT_STATUSES, PRODUCT_TYPES, referenceHref, signed } from "../lib/labels";
 import { context, type Params } from "../lib/page";
 import type { Product, Reference } from "../lib/types";
+
+/** A variant's stock, as a pill. */
+function StockPill({ state }: { state: Product["state"] }) {
+  if (state === "out") return <Stamp tone="attention">Out</Stamp>;
+  if (state === "low") return <Stamp tone="attention">Low</Stamp>;
+  return state ? <Stamp tone="done">In stock</Stamp> : null;
+}
 
 // The page and its title share one request.
 const productPage = cache((id: string) =>
@@ -65,161 +74,222 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
           </>
         }
       >
-        <span className="font-mono text-meta">{p.sku}</span>
-        {p.category && <> · {p.category.path}</>}
-        {p.brand && <> · {p.brand.name}</>}
+        <span className="mr-2 inline-flex h-6 items-center rounded-full border border-rule-strong px-2.5 align-middle text-meta text-ink-2">
+          Code: <span className="ml-1 font-mono">{p.sku}</span>
+        </span>
+        {[p.category?.path, p.brand?.name].filter(Boolean).join(" · ")}
         {p.status !== "active" && <> · <strong>{PRODUCT_STATUSES[p.status]}</strong></>}
-        <span className="ml-2 align-middle">{p.status === "active" && <StateMark state={p.state} />}</span>
+        <span className="ml-2 align-middle">{p.status === "active" && !groups && <StateMark state={p.state} />}</span>
       </PageHeader>
 
-      {!groups && (
-        <Figures
-          items={[
-            { label: "On hand", value: `${fmt.count(lv.onHand)} ${p.unit}` },
-            { label: "Available", value: fmt.count(lv.available), flag: p.state === "out" || p.state === "low" },
-            { label: "Reserved / picking", value: `${fmt.count(lv.reserved)} / ${fmt.count(lv.allocated)}` },
-            { label: "Damaged", value: fmt.count(lv.damaged) },
-            { label: "In transit", value: fmt.count(lv.inTransit) },
-            { label: "Value at cost", value: fmt.peso(p.value) },
-          ]}
-        />
+      <DetailPanel
+        side={
+          <>
+            <Card className="p-4">
+              <div className="grid aspect-square place-items-center overflow-hidden rounded-[14px] bg-bench">
+                {p.images[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box
+                  <img src={`/products/${p.id}/images/${p.images[0]}`} alt={p.name} className="size-full object-contain" />
+                ) : (
+                  <span className="flex flex-col items-center gap-2 text-ink-3">
+                    <Icon name="picture" className="size-12" />
+                    <span className="text-meta">No picture yet</span>
+                  </span>
+                )}
+              </div>
+              <div className="mt-3">
+                <ProductImages productId={p.id} images={p.images} canEdit={may("products.edit")} />
+              </div>
+            </Card>
+            <Card className="px-5 py-4">
+              <h2 className="mb-3 text-center text-sm font-semibold text-ink">Barcode</h2>
+              {p.barcode ? (
+                <Barcode value={p.barcode} />
+              ) : (
+                <p className="text-center text-meta text-ink-3">
+                  No barcode yet.
+                  {may("products.edit") && (
+                    <>
+                      {" "}
+                      <Link href={`/products/${p.id}/edit`} className="text-ink hover:underline">Add one</Link>
+                    </>
+                  )}
+                </p>
+              )}
+            </Card>
+            <Card className="px-5 pt-4 pb-4">
+              <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
+              <div className="mt-2">
+                <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
+              </div>
+            </Card>
+          </>
+        }
+      >
+        {groups ? (
+          <StatCards
+            items={[
+              { label: "Variants", value: fmt.count(p.variants.length) },
+              { label: "On hand, all variants", value: `${fmt.count(p.variants.reduce((n, v) => n + v.level.onHand, 0))} ${p.unit}` },
+              { label: "Value at cost", value: fmt.peso(p.variants.reduce((n, v) => n + v.value, 0)) },
+            ]}
+          />
+        ) : (
+          <StatCards
+            items={[
+              { label: "On hand", value: `${fmt.count(lv.onHand)} ${p.unit}`, note: lv.inTransit ? `${fmt.count(lv.inTransit)} on the way` : undefined },
+              { label: "Available", value: fmt.count(lv.available), flag: p.state === "out" || p.state === "low", note: p.state === "out" || p.state === "low" ? `Reorder at ${fmt.count(p.reorderPoint)}` : undefined },
+              { label: "Held for orders", value: fmt.count(lv.reserved + lv.allocated), note: lv.allocated ? `${fmt.count(lv.allocated)} being picked` : undefined },
+            ]}
+          />
+        )}
+
+        <InfoCard>
+          <InfoSection
+            icon="info"
+            title="Basic information"
+            items={[
+              ["Product name", p.name],
+              ["Type", PRODUCT_TYPES[p.productType]],
+              ["SKU", <span key="sku" className="font-mono">{p.sku}</span>],
+              ["Barcode", p.barcode],
+              ["Category", p.category?.path],
+              ["Brand", p.brand?.name],
+              ["Usual supplier", p.supplier ? <Link key="supplier" href={`/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
+              ["Unit", `${p.unitName} (${p.unit})`],
+              ...(p.variantLabel ? [["Variant", p.variantLabel] as [string, string]] : []),
+              ...Object.entries(p.attributes),
+            ]}
+          >
+            {p.description && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{p.description}</p>}
+          </InfoSection>
+          <InfoSection
+            icon="pricing"
+            title="Sale information"
+            items={[
+              ["Selling price", fmt.peso(p.sellingPrice)],
+              ["Cost price", fmt.peso(p.costPrice)],
+              [
+                "Profit",
+                p.sellingPrice > 0 ? (
+                  <span key="profit">
+                    {fmt.peso(p.sellingPrice - p.costPrice)}
+                    <Pill>Margin {Math.round(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100)}%</Pill>
+                  </span>
+                ) : null,
+              ],
+              ["Tax", `${p.taxRateBp / 100}%${p.taxInclusive ? ", included" : ", added"}`],
+            ]}
+          />
+          {!groups && (
+            <InfoSection
+              icon="stock"
+              title="Inventory"
+              action={
+                may("stock.view") && (
+                  <Link href={`/movements?product=${p.id}`} className="inline-flex items-center gap-1.5 text-meta text-ink hover:underline">
+                    <Icon name="history" className="size-3.5" />
+                    Movement history
+                  </Link>
+                )
+              }
+              items={[
+                ["Quantity", `${fmt.count(lv.onHand)} ${p.unit}`],
+                ["Value at cost", fmt.peso(p.value)],
+                ["Damaged", fmt.count(lv.damaged)],
+                ["In transit", fmt.count(lv.inTransit)],
+                ["Min · reorder · max", `${fmt.count(p.minStock)} · ${fmt.count(p.reorderPoint)} · ${p.maxStock == null ? "—" : fmt.count(p.maxStock)}`],
+                ["Reorder quantity", fmt.count(p.reorderQty)],
+                ["Tracked by", [p.trackBatches && "batch", p.trackExpiry && "expiry", p.trackSerials && "serial number"].filter(Boolean).join(", ") || "quantity only"],
+                ["Last changed", fmt.whenLabel(p.updatedAt)],
+              ]}
+            />
+          )}
+        </InfoCard>
+
+        {groups ? (
+          <BarList
+            title="Variants"
+            icon="products"
+            action={may("products.create") && <Link href={`/products/new?parent=${p.id}`} className="text-meta text-ink hover:underline">Add variant</Link>}
+            rows={p.variants.map((v) => ({
+              key: v.id,
+              href: `/products/${v.id}`,
+              name: v.variantLabel ?? v.name,
+              sub: `${v.sku} · ${fmt.count(v.level.onHand)} on hand · sells at ${fmt.peso(v.sellingPrice)}`,
+              pill: <StockPill state={v.state} />,
+              share: v.level.onHand / Math.max(1, ...p.variants.map((x) => x.level.onHand)),
+            }))}
+            empty="No variants yet."
+          />
+        ) : (
+          <BarList
+            title="By warehouse"
+            icon="warehouses"
+            rows={p.warehouses.map((w) => ({
+              key: w.warehouse.id,
+              href: `/warehouses/${w.warehouse.id}`,
+              name: w.warehouse.name,
+              sub: [
+                `${fmt.count(w.onHand)} on hand`,
+                `${fmt.count(w.available)} available`,
+                w.reserved + w.allocated ? `${fmt.count(w.reserved + w.allocated)} held` : null,
+                w.damaged ? `${fmt.count(w.damaged)} damaged` : null,
+                w.inTransit ? `${fmt.count(w.inTransit)} on the way` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              pill: w.onHand > 0 ? <Stamp tone="done">In stock</Stamp> : w.inTransit > 0 ? <Stamp tone="active">Coming in</Stamp> : <Stamp tone="muted">Empty</Stamp>,
+              share: w.onHand / Math.max(1, lv.onHand),
+            }))}
+            empty="None anywhere yet."
+          />
+        )}
+      </DetailPanel>
+
+      {!groups && p.balances.length > 0 && (
+        <Sheet className="mt-5">
+          <div className="px-5 pt-4">
+            <SectionTitle icon="headquarters">Where it is{p.trackBatches ? ", by batch" : ""}</SectionTitle>
+            {p.trackExpiry && <p className="text-meta text-ink-3">Soonest to expire first: the order it goes out in.</p>}
+          </div>
+          <Table head={["Warehouse · location", ...(p.trackBatches ? ["Batch", "Expires"] : []), " On hand", " Damaged"]} min="32rem">
+            {p.balances.map((b, i) => (
+              <tr key={i}>
+                <Td>{b.warehouse.code} · {b.location.code} <span className="text-meta text-ink-3">{b.location.name}</span></Td>
+                {p.trackBatches && <Td>{b.batch?.batchNo ?? "—"}</Td>}
+                {p.trackBatches && <Td>{b.batch?.expiresOn ? <ExpiryMark expiry={b.batch.expiry} label={day(b.batch.expiresOn)} /> : "—"}</Td>}
+                <Td num>{fmt.count(b.onHand)}</Td>
+                <Td num>{b.damaged ? fmt.count(b.damaged) : "—"}</Td>
+              </tr>
+            ))}
+          </Table>
+        </Sheet>
       )}
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="min-w-0 space-y-5">
-          {groups && (
-            <Sheet>
-              <div className="px-5 pt-4">
-                <SectionTitle icon="products">Variants</SectionTitle>
-              </div>
-              <Table head={["Variant", " On hand", " Available", " Cost", " Selling", "Stock"]}>
-                {p.variants.map((v) => (
-                  <tr key={v.id} className="relative hover:bg-bench/40">
-                    <Td>
-                      <Link href={`/products/${v.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">{v.variantLabel ?? v.name}</Link>
-                      <span className="block text-meta text-ink-3">{v.sku}</span>
-                    </Td>
-                    <Td num>{fmt.count(v.level.onHand)}</Td>
-                    <Td num>{fmt.count(v.level.available)}</Td>
-                    <Td num>{fmt.peso(v.costPrice)}</Td>
-                    <Td num>{fmt.peso(v.sellingPrice)}</Td>
-                    <Td><StateMark state={v.state} /></Td>
-                  </tr>
-                ))}
-              </Table>
-            </Sheet>
-          )}
-
-          {!groups && (
-            <Sheet>
-              <div className="px-5 pt-4">
-                <SectionTitle icon="warehouses">By warehouse</SectionTitle>
-              </div>
-              {p.warehouses.length === 0 ? (
-                <p className="px-5 pb-4 text-meta text-ink-3">None anywhere yet.</p>
-              ) : (
-                <Table head={["Warehouse", " On hand", " Damaged", " Reserved", " Picking", " Available", " In transit"]} min="36rem">
-                  {p.warehouses.map((w) => (
-                    <tr key={w.warehouse.id}>
-                      <Td><Link href={`/warehouses/${w.warehouse.id}`} className="font-semibold hover:text-hema hover:underline">{w.warehouse.name}</Link></Td>
-                      <Td num>{fmt.count(w.onHand)}</Td>
-                      <Td num>{fmt.count(w.damaged)}</Td>
-                      <Td num>{fmt.count(w.reserved)}</Td>
-                      <Td num>{fmt.count(w.allocated)}</Td>
-                      <Td num className="font-semibold">{fmt.count(w.available)}</Td>
-                      <Td num>{fmt.count(w.inTransit)}</Td>
-                    </tr>
-                  ))}
-                </Table>
-              )}
-            </Sheet>
-          )}
-
-          {!groups && p.balances.length > 0 && (
-            <Sheet>
-              <div className="px-5 pt-4">
-                <SectionTitle icon="headquarters">Where it is{p.trackBatches ? ", by batch" : ""}</SectionTitle>
-                {p.trackExpiry && <p className="text-meta text-ink-3">Soonest to expire first: the order it goes out in.</p>}
-              </div>
-              <Table head={["Warehouse · location", ...(p.trackBatches ? ["Batch", "Expires"] : []), " On hand", " Damaged"]} min="32rem">
-                {p.balances.map((b, i) => (
-                  <tr key={i}>
-                    <Td>{b.warehouse.code} · {b.location.code} <span className="text-meta text-ink-3">{b.location.name}</span></Td>
-                    {p.trackBatches && <Td>{b.batch?.batchNo ?? "—"}</Td>}
-                    {p.trackBatches && <Td>{b.batch?.expiresOn ? <ExpiryMark expiry={b.batch.expiry} label={day(b.batch.expiresOn)} /> : "—"}</Td>}
-                    <Td num>{fmt.count(b.onHand)}</Td>
-                    <Td num>{b.damaged ? fmt.count(b.damaged) : "—"}</Td>
-                  </tr>
-                ))}
-              </Table>
-            </Sheet>
-          )}
-
-          {p.recentMovements.length > 0 && (
-            <Sheet>
-              <div className="px-5 pt-4">
-                <SectionTitle icon="history" action={<Link href={`/movements?product=${p.id}`} className="text-meta text-hema hover:underline">All of them</Link>}>
-                  Recent movements
-                </SectionTitle>
-              </div>
-              <Table head={["When", "Action", "Warehouse", "Reference", " Quantity"]} min="36rem">
-                {p.recentMovements.map((m) => {
-                  const href = referenceHref(m.referenceType, m.referenceId);
-                  return (
-                    <tr key={m.id}>
-                      <Td className="text-meta text-ink-3 whitespace-nowrap">{at(m.at)}</Td>
-                      <Td>{MOVEMENT_KINDS[m.kind]}{m.batchNo && <span className="text-meta text-ink-3"> · {m.batchNo}</span>}</Td>
-                      <Td>{m.warehouse.code}</Td>
-                      <Td>{href ? <Link href={href} className="hover:text-hema hover:underline">{m.reference}</Link> : (m.reference ?? "—")}<span className="block text-meta text-ink-3">{m.user}</span></Td>
-                      <Td num className="font-semibold">{signed(m.quantity, fmt.count)}</Td>
-                    </tr>
-                  );
-                })}
-              </Table>
-            </Sheet>
-          )}
-        </div>
-
-        <div className="min-w-0 space-y-5">
-          <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="particulars">Particulars</SectionTitle>
-            <div className="mt-3">
-              <Particulars
-                items={[
-                  ["Type", PRODUCT_TYPES[p.productType]],
-                  ["Unit", `${p.unitName} (${p.unit})`],
-                  ["Barcode", p.barcode],
-                  ["Cost price", fmt.peso(p.costPrice)],
-                  ["Selling price", fmt.peso(p.sellingPrice)],
-                  ["Tax", `${p.taxRateBp / 100}%${p.taxInclusive ? ", included" : ", added"}`],
-                  ["Usual supplier", p.supplier ? <Link href={`/suppliers/${p.supplier.id}`} className="hover:text-hema hover:underline">{p.supplier.name}</Link> : null],
-                  ["Min · reorder · max", `${fmt.count(p.minStock)} · ${fmt.count(p.reorderPoint)} · ${p.maxStock == null ? "—" : fmt.count(p.maxStock)}`],
-                  ["Reorder quantity", fmt.count(p.reorderQty)],
-                  ["Tracked by", [p.trackBatches && "batch", p.trackExpiry && "expiry", p.trackSerials && "serial number"].filter(Boolean).join(", ") || "quantity only"],
-                  ...(p.variantLabel ? [["Variant", p.variantLabel] as [string, string]] : []),
-                  ...Object.entries(p.attributes),
-                ]}
-              />
-            </div>
-            {p.description && <p className="mt-4 text-sm whitespace-pre-line text-ink-2">{p.description}</p>}
-            <p className="mt-4 text-meta text-ink-3">Last changed {fmt.whenLabel(p.updatedAt).toLowerCase()}.</p>
-          </Sheet>
-
-          <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="company">Pictures</SectionTitle>
-            <div className="mt-3">
-              <ProductImages productId={p.id} images={p.images} canEdit={may("products.edit")} />
-            </div>
-          </Sheet>
-
-          <Sheet className="px-5 pt-4 pb-4">
-            <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
-            <div className="mt-2">
-              <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
-            </div>
-          </Sheet>
-        </div>
-      </div>
+      {p.recentMovements.length > 0 && (
+        <Sheet className="mt-5">
+          <div className="px-5 pt-4">
+            <SectionTitle icon="history" action={<Link href={`/movements?product=${p.id}`} className="text-meta text-ink hover:underline">All of them</Link>}>
+              Recent movements
+            </SectionTitle>
+          </div>
+          <Table head={["When", "Action", "Warehouse", "Reference", " Quantity"]} min="36rem">
+            {p.recentMovements.map((m) => {
+              const href = referenceHref(m.referenceType, m.referenceId);
+              return (
+                <tr key={m.id}>
+                  <Td className="text-meta text-ink-3 whitespace-nowrap">{at(m.at)}</Td>
+                  <Td>{MOVEMENT_KINDS[m.kind]}{m.batchNo && <span className="text-meta text-ink-3"> · {m.batchNo}</span>}</Td>
+                  <Td>{m.warehouse.code}</Td>
+                  <Td>{href ? <Link href={href} className="hover:text-ink hover:underline">{m.reference}</Link> : (m.reference ?? "—")}<span className="block text-meta text-ink-3">{m.user}</span></Td>
+                  <Td num className="font-semibold">{signed(m.quantity, fmt.count)}</Td>
+                </tr>
+              );
+            })}
+          </Table>
+        </Sheet>
+      )}
     </>
   );
 }

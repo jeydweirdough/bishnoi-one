@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { Board as KanbanBoard, type BoardCard } from "@/src/platform/ui/board";
+import { moveDealStage } from "../actions/deals";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
@@ -279,54 +281,33 @@ async function Board({
           </Empty>
         </Sheet>
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-2">
-          <div className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3">
-            {board.columns.map((col) => (
-              <section key={col.stage.code} aria-label={col.stage.name} className="min-w-0 rounded-full bg-bench/60 p-2">
-                <header className="mb-2 px-1">
-                  <h2 className="flex items-baseline justify-between gap-2 text-sm font-semibold text-ink">
-                    {col.stage.name}
-                    <span className="text-meta font-normal text-ink-3">{col.stage.probability}%</span>
-                  </h2>
-                  <p className="text-meta text-ink-3">
-                    {fmt.plural(col.count, "deal")} · {fmt.pesoCompact(col.valueCentavos)}
-                  </p>
-                </header>
-                <ul className="space-y-2">
-                  {col.deals.map((d) => (
-                    <li key={d.id}>
-                      <DealCard deal={d} fmt={fmt} today={today} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </div>
+        <KanbanBoard
+          columns={board.columns.map((col) => ({ key: col.stage.code, label: col.stage.name, aside: `${col.stage.probability}%`, note: `${fmt.plural(col.count, "deal")} · ${fmt.pesoCompact(col.valueCentavos)}`, hint: "No deals at this stage" }))}
+          cards={board.columns.flatMap((col) => col.deals.map((d) => dealCard(d, fmt, today)))}
+          // Any open stage to any other; won and lost are decided on the deal's page, with the quote or the reason.
+          moves={[{ from: "*", to: "*", step: "{to}", label: "Move to {to}" }]}
+          run={moveDealStage}
+        />
       )}
     </>
   );
 }
 
-function DealCard({ deal, fmt, today }: { deal: DealRow; fmt: Format; today: string }) {
-  const overdue = deal.state === "open" && deal.expectedCloseOn < today;
-  return (
-    <Link href={`/deals/${deal.id}`} className="block rounded-[14px] border border-rule bg-sheet px-3 py-2.5 hover:border-hema">
-      <p className="flex items-start justify-between gap-2">
-        <span className="truncate text-sm font-medium text-ink">{deal.name}</span>
-        {deal.priority && <PriorityFlag priority={deal.priority} />}
-      </p>
-      <p className="truncate text-meta text-ink-3">{deal.company.name}</p>
-      <p className="mt-1.5 flex items-baseline justify-between gap-2 text-meta">
-        <span className="font-semibold text-ink">{fmt.peso(deal.valueCentavos)}</span>
-        <span className={overdue ? "font-semibold text-danger" : "text-ink-3"}>{closeLabel(deal, today, fmt.dateLabel)}</span>
-      </p>
-      <p className="mt-0.5 text-meta text-ink-3">
-        {CATEGORY_LABELS[deal.forecastCategory]}
-        {deal.owner ? ` · ${deal.owner.name}` : ""}
-      </p>
-    </Link>
-  );
+/** A deal as a board card: its name and priority, the customer, the value and when it closes, then its forecast and owner. */
+function dealCard(deal: DealRow, fmt: Format, today: string): BoardCard {
+  return {
+    id: deal.id,
+    column: deal.stage.code,
+    href: `/deals/${deal.id}`,
+    title: deal.name,
+    flag: deal.priority ? <PriorityFlag priority={deal.priority} /> : undefined,
+    sub: deal.company.name,
+    value: fmt.peso(deal.valueCentavos),
+    when: closeLabel(deal, today, fmt.dateLabel),
+    late: deal.state === "open" && deal.expectedCloseOn < today,
+    meta: `${CATEGORY_LABELS[deal.forecastCategory]}${deal.owner ? ` · ${deal.owner.name}` : ""}`,
+    movable: deal.can.edit,
+  };
 }
 
 const SORTS = ["name", "created", "value", "stage", "priority", "close"] as const;

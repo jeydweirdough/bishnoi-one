@@ -1,6 +1,7 @@
 import { ArrowRight, Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { loadQuery } from "@/src/platform/lib/api";
 import { deleteTransfer, transferStep } from "../actions/inventory";
 import { TransferForm } from "../components/document-forms";
@@ -11,15 +12,19 @@ import { TransferStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
+import { FirstStep, NeedsFirst } from "../components/setup";
+import { loadSetup } from "../lib/setup";
+import { TransfersBoard } from "./boards";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import { batchChoices, given, referenceOf } from "../lib/reference";
 import type { BatchRow, Reference, Transfer, TransferBrief } from "../lib/types";
 
 export async function TransfersPage({ searchParams }: { searchParams: Search }) {
-  const { fmt, may, at } = await context();
+  const { fmt, may, at, day } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
+  const board = param(s, "view") !== "list" && !f.status;
   const { transfers } = await loadQuery<{ transfers: TransferBrief[] }>(`query Transfers($q: String, $status: String) { transfers(q: $q, status: $status) }`, given(f), ["transfers"]);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/transfers${query({ q: f.q, status })}` });
   return (
@@ -30,11 +35,24 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
       >
         Moving stock between warehouses: requested, approved, dispatched, in transit, received.
       </PageHeader>
-      <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("requested", "Requested"), chip("approved", "Approved"), chip("in_transit", "In transit"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />
-      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status }} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <ToggleLinks
+          current={board ? "board" : "list"}
+          options={[
+            { value: "board", label: "Board", href: `/transfers${query({ ...f, status: "", view: "" })}` },
+            { value: "list", label: "List", href: `/transfers${query({ ...f, view: "list" })}` },
+            { value: "map", label: "Map", href: "/transfers/map" },
+          ]}
+        />
+      </div>
+      {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("requested", "Requested"), chip("approved", "Approved"), chip("in_transit", "In transit"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
+      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status, view: board ? "" : "list" }} />
+      {board && transfers.length > 0 ? (
+        <TransfersBoard transfers={transfers} fmt={fmt} day={day} may={may} />
+      ) : (
       <Sheet>
         {transfers.length === 0 ? (
-          <Empty icon="transfers" title="No transfers here" />
+          <FirstStep icon="transfers" title="No transfers yet" body="Move stock from one warehouse to another, approved and tracked on the road." needs={["twoWarehouses", "stock"]} href="/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/transfers" may={may} />
         ) : (
           <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units"]} min="52rem">
             {transfers.map((t) => (
@@ -51,6 +69,7 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
           </Table>
         )}
       </Sheet>
+      )}
     </>
   );
 }
@@ -127,14 +146,14 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       </Sheet>
 
       {t.status === "approved" && may("transfers.dispatch") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="dispatch">
           <SectionTitle icon="transfers">Dispatch</SectionTitle>
           <p className="mb-3 text-meta text-ink-3">It leaves {t.from.name} now and is in transit until {t.to.name} receives it.</p>
           <PickForm kind="transfer" documentId={t.id} lines={pickLines} label="Dispatch" />
         </Sheet>
       )}
       {t.status === "in_transit" && may("transfers.receive") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="receive">
           <SectionTitle icon="receiving">It arrived</SectionTitle>
           <p className="mb-3 text-meta text-ink-3">The same batches go into {t.to.name}.</p>
           <ReceiveTransfer transferId={t.id} locations={destination} />
@@ -151,6 +170,9 @@ type TransferFormData = { reference: Pick<Reference, "products" | "warehouses">;
 export async function NewTransferPage() {
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["twoWarehouses", "stock"], then: "/transfers/new", title: "New transfer", doing: "move stock between warehouses", crumbs: [{ href: "/transfers", label: "Transfers" }], may });
+  if (gate) return gate;
   const { reference: ref, availability: available } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>

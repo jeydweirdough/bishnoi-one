@@ -293,7 +293,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
             <div key={i} className="flex items-end gap-3">
               <Input aria-label={`Specification ${i + 1} name`} placeholder="Size" value={k} className="max-w-48" onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [e.target.value, a[1]] : a)) })} />
               <Input aria-label={`Specification ${i + 1} value`} placeholder="Medium" value={v} onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [a[0], e.target.value] : a)) })} />
-              <button type="button" title="Remove this specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+              <button type="button" title="Remove this specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                 <X className="size-4" aria-hidden />
               </button>
             </div>

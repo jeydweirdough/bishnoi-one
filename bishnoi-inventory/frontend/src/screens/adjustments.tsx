@@ -10,6 +10,8 @@ import { AdjustmentStamp, CountStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query, signed } from "../lib/labels";
+import { NeedsFirst } from "../components/setup";
+import { loadSetup } from "../lib/setup";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import { referenceOf } from "../lib/reference";
 import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, ReasonOption, Reference } from "../lib/types";
@@ -75,7 +77,7 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
         }
       >
         <AdjustmentStamp status={a.status} /> <span className="ml-1">{a.reasonLabel} · {a.warehouse.name}</span>
-        {a.countId && <> · from <Link href={`/counts/${a.countId}`} className="text-hema hover:underline">a count</Link></>}
+        {a.countId && <> · from <Link href={`/counts/${a.countId}`} className="text-ink hover:underline">a count</Link></>}
       </PageHeader>
       <Sheet className="px-5 py-4">
         <Trail steps={[
@@ -106,6 +108,9 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
 export async function NewAdjustmentPage({ searchParams }: { searchParams: Search }) {
   const { may } = await context();
   if (!may("adjustments.create")) return <NoAccess what="writing adjustments" />;
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/adjustments/new", title: "New adjustment", doing: "adjust stock", crumbs: [{ href: "/adjustments", label: "Adjustments" }], may });
+  if (gate) return gate;
   const s = await searchParams;
   const { reference: ref, reasons, batches } = await loadQuery<{ reference: Pick<Reference, "products" | "units" | "warehouses">; reasons: ReasonOption[]; batches: BatchRow[] }>(
     `query NewAdjustment { ${referenceOf("products", "units", "warehouses")} reasons: adjustmentReasons batches }`,
@@ -202,7 +207,7 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
       >
         <CountStamp status={c.status} />
         {c.category && <span className="ml-1">{c.category.name} only</span>}
-        {c.adjustmentId && <> · posted as <Link href={`/adjustments/${c.adjustmentId}`} className="text-hema hover:underline">an adjustment</Link></>}
+        {c.adjustmentId && <> · posted as <Link href={`/adjustments/${c.adjustmentId}`} className="text-ink hover:underline">an adjustment</Link></>}
       </PageHeader>
       <Figures
         items={[

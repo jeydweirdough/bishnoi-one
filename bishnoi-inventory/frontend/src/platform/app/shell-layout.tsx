@@ -4,6 +4,7 @@ import { NavProgress } from "../shell/nav-progress";
 import { Notices } from "./notices";
 import { ViewingBanner } from "../shell/viewing-banner";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getMe } from "../lib/api";
 import { loadAddresses } from "../lib/addresses";
 import { THIS_APP, canUseThisApp, platformHome, thisAppLabel } from "../lib/apps";
@@ -34,8 +35,9 @@ function NoCompany() {
 }
 
 /** `waiting`: how many things wait on this person, by kind, for the sidebar's counts.
- *  `unset`: how many things aren't set up yet, for its red counts. */
-export async function ShellLayout({ children, waiting, unset }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset }) {
+ *  `unset`: how many things aren't set up yet, for its red counts.
+ *  `bell`: the app's notifications button, at the top of every page. */
+export async function ShellLayout({ children, waiting, unset, bell }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; bell?: React.ReactNode }) {
   await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
@@ -46,6 +48,8 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
   // The shell serves the companies list itself, and the Platform app is that
   // list, so neither of them is stranded by having no company open.
   const stranded = me.org === null && Boolean(THIS_APP) && THIS_APP !== "platform";
+  // The sidebar as it was left: full, or collapsed to its icons.
+  const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}
@@ -54,10 +58,11 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
-      <div className="min-h-dvh lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">
-        <Nav me={me} waiting={waiting} unset={unset} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
-          <div className="mx-auto max-w-[70rem]">
+      <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
+        <Nav me={me} waiting={waiting} unset={unset} rail={rail} />
+        <main className={`min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 ${bell ? "lg:pt-4" : "lg:pt-8"}`}>
+          <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
+            {bell && <div className="-mb-2 flex justify-end">{bell}</div>}
             {/* Announcements from Bishnoi One Platform (kept in Discord), for this app and for everyone. */}
             <Notices timeZone={me.org?.timezone} />
             {stranded ? <NoCompany /> : children}

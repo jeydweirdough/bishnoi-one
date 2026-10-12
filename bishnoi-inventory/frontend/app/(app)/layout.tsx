@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
 import { getFrame } from "@/src/platform/lib/api";
+import { AlertsBell } from "@/src/components/alerts-bell";
 
 export default async function Layout({ children }: { children: ReactNode }) {
   // One request with who you are: the API only lists what this person's role
@@ -11,7 +12,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const { alerts, unset } = await getFrame();
   const waiting = Object.fromEntries((alerts ?? []).map((a) => [a.key, a.count]));
   return (
-    <ShellLayout waiting={waiting} unset={unset ?? {}}>
+    <ShellLayout waiting={waiting} unset={unset ?? {}} bell={<AlertsBell alerts={alerts ?? []} />}>
       {children}
     </ShellLayout>
   );

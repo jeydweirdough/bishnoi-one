@@ -9,7 +9,7 @@ on the road it is in transit: counted at neither end as on hand, and shown
 at the destination as coming.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, Response, status
 from pydantic import Field
@@ -139,6 +139,40 @@ def list_transfers(
     if q:
         query = query.where(func.lower(Transfer.number).like(f"%{q.lower()}%"))
     return [transfer_brief(t) for t in db.scalars(query)]
+
+
+def pin(w) -> dict | None:
+    return {"latitude": w.latitude, "longitude": w.longitude} if w and w.latitude is not None and w.longitude is not None else None
+
+
+@router.get("/transfers/map")
+def transfers_map(_: View, db: DB) -> dict:
+    """Transfers as routes between warehouses: everything still open, and what
+    arrived in the last 30 days. With every warehouse and its pin."""
+    since = datetime.now(UTC) - timedelta(days=30)
+    query = (
+        select(Transfer)
+        .where(or_(Transfer.status.in_(("draft", "requested", "approved", "in_transit")), (Transfer.status == "received") & (Transfer.received_at >= since)))
+        .order_by(Transfer.created_at.desc())
+        .limit(100)
+    )
+    transfers = []
+    for t in db.scalars(query):
+        first = t.lines[0].product.name if t.lines else None
+        transfers.append({
+            **transfer_brief(t),
+            "approvedAt": iso(t.approved_at),
+            "fromPin": pin(t.from_warehouse),
+            "toPin": pin(t.to_warehouse),
+            "fromAddress": t.from_warehouse.address,
+            "toAddress": t.to_warehouse.address,
+            "firstItem": first,
+        })
+    warehouses = [
+        {**warehouse_ref(w), "address": w.address, "pin": pin(w)}
+        for w in db.scalars(select(Warehouse).where(Warehouse.is_active).order_by(Warehouse.code))
+    ]
+    return {"transfers": transfers, "warehouses": warehouses}
 
 
 @router.post("/transfers", status_code=status.HTTP_201_CREATED)

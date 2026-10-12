@@ -71,7 +71,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
                 <Input aria-label="Role" placeholder="Role" value={c.role ?? ""} onChange={(e) => set({ role: e.target.value })} />
                 <Input aria-label="Email" placeholder="Email" value={c.email ?? ""} onChange={(e) => set({ email: e.target.value })} />
                 <Input aria-label="Phone" placeholder="Phone" value={c.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} />
-                <button type="button" title="Remove" onClick={() => setContacts(contacts.filter((_, j) => j !== i))} className="justify-self-end rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                <button type="button" title="Remove" onClick={() => setContacts(contacts.filter((_, j) => j !== i))} className="justify-self-end rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                   <X className="size-4" aria-hidden />
                 </button>
               </div>

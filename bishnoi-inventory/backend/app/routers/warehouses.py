@@ -5,6 +5,7 @@ when nobody says otherwise. A place that has held stock is switched off
 rather than deleted, so its history still reads.
 """
 
+import httpx
 from fastapi import APIRouter, Response, status
 from pydantic import Field
 from sqlalchemy import func, select
@@ -29,12 +30,16 @@ class WarehouseIn(Api):
     code: str = Field(min_length=1, max_length=20, pattern=CODE)
     name: str = Field(min_length=1, max_length=120)
     address: str | None = Field(None, max_length=300)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
 
 
 class WarehousePatch(Api):
     code: str | None = Field(None, min_length=1, max_length=20, pattern=CODE)
     name: str | None = Field(None, min_length=1, max_length=120)
     address: str | None = Field(None, max_length=300)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
     is_active: bool | None = None
 
 
@@ -68,6 +73,8 @@ def warehouse_out(w: Warehouse, total: dict | None, locations: int) -> dict:
     return {
         **warehouse_ref(w),
         "address": w.address,
+        "latitude": w.latitude,
+        "longitude": w.longitude,
         "isActive": w.is_active,
         "locationCount": locations,
         "units": (total or {}).get("units", 0),
@@ -165,6 +172,33 @@ def update_warehouse(_: Manage, me: CurrentUser, db: DB, warehouse_id: str, body
         audit(db, me, "warehouse.updated", target=w.name, target_type="warehouse", target_id=w.id, fields=fields)
         db.commit()
     return {"id": w.id}
+
+
+GEOCODER = "https://nominatim.openstreetmap.org/search"
+
+
+@router.post("/warehouses/{warehouse_id}/locate")
+def locate_warehouse(_: Manage, me: CurrentUser, db: DB, warehouse_id: str) -> dict:
+    """Finds the warehouse's pin from its address (OpenStreetMap's own search), once, and keeps it."""
+    w = found(db, Warehouse, warehouse_id, "warehouse")
+    if not (w.address or "").strip():
+        raise field_error("address", "Add the warehouse's address first, then find it on the map.")
+    try:
+        r = httpx.get(
+            GEOCODER,
+            params={"q": w.address, "format": "json", "limit": 1, "countrycodes": "ph"},
+            headers={"User-Agent": "Bishnoi One Inventory (warehouse pins)"},
+            timeout=10,
+        )
+        hits = r.json() if r.status_code == 200 else []
+    except (httpx.HTTPError, ValueError):
+        raise conflict("The map search isn't answering right now. Try again in a moment, or set the pin by hand.") from None
+    if not hits:
+        raise conflict(f"No place on the map matches \"{w.address}\". Make the address fuller, or set the pin by hand.")
+    w.latitude, w.longitude = float(hits[0]["lat"]), float(hits[0]["lon"])
+    audit(db, me, "warehouse.updated", target=w.name, target_type="warehouse", target_id=w.id, fields=["latitude", "longitude"])
+    db.commit()
+    return {"id": w.id, "latitude": w.latitude, "longitude": w.longitude}
 
 
 @router.delete("/warehouses/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT)

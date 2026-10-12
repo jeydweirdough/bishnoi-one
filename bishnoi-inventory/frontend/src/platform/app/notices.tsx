@@ -56,7 +56,7 @@ const TONE = {
 } as const;
 
 function Icon({ n }: { n: Notice }) {
-  const props = { className: `mt-0.5 size-4 shrink-0 ${n.level === "critical" ? "text-danger" : "text-hema"}`, "aria-hidden": true } as const;
+  const props = { className: `mt-0.5 size-4 shrink-0 ${n.level === "critical" ? "text-danger" : "text-ink"}`, "aria-hidden": true } as const;
   if (n.kind === "maintenance") return <Wrench {...props} />;
   if (n.level !== "info") return <TriangleAlert {...props} />;
   return n.kind === "announcement" ? <Megaphone {...props} /> : <Info {...props} />;
@@ -69,7 +69,7 @@ export async function Notices({ timeZone }: { timeZone?: string }) {
   return (
     <section aria-label="Announcements" className="mb-5 space-y-2">
       {notices.map((n) => (
-        <details key={n.id} className={`group rounded-[3px] border px-4 py-2.5 text-sm ${TONE[n.level]}`} open={n.level === "critical"}>
+        <details key={n.id} className={`group rounded-[14px] border px-4 py-2.5 text-sm ${TONE[n.level]}`} open={n.level === "critical"}>
           <summary className={`flex cursor-pointer list-none items-start gap-2.5 ${n.body ? "" : "pointer-events-none"}`}>
             <Icon n={n} />
             <span className="min-w-0 flex-1">
@@ -83,7 +83,7 @@ export async function Notices({ timeZone }: { timeZone?: string }) {
                 </span>
               )}
             </span>
-            {n.body && <span className="shrink-0 text-meta text-hema group-open:hidden">Read</span>}
+            {n.body && <span className="shrink-0 text-meta text-ink group-open:hidden">Read</span>}
           </summary>
           {n.body && <p className="mt-1.5 pl-[1.625rem] whitespace-pre-line text-ink-2">{n.body}</p>}
         </details>

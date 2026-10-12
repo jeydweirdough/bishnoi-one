@@ -59,6 +59,10 @@ export async function deleteCatalogItem(list: CatalogList, key: string): Promise
 export async function saveWarehouse(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("patch", `/inventory/warehouses/${enc(id)}`, input) : send<Id>("post", "/inventory/warehouses", input);
 }
+/** Finds a warehouse's pin on the map from its address, and keeps it. */
+export async function locateWarehouse(id: string): Promise<Result<Id & { latitude: number; longitude: number }>> {
+  return send("post", `/inventory/warehouses/${enc(id)}/locate`);
+}
 export async function deleteWarehouse(id: string): Promise<Result<null>> {
   return send<null>("del", `/inventory/warehouses/${enc(id)}`);
 }

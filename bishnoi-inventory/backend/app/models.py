@@ -24,7 +24,7 @@ How stock is kept:
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
 from sqlalchemy.orm import Mapped, aliased, column_property, mapped_column, relationship
 
 from app.db import Base
@@ -298,6 +298,9 @@ class Warehouse(Stamped, Base):
     code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     address: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Where it is on the map, for drawing transfers as routes. Empty until set or found.
+    latitude: Mapped[float | None] = mapped_column(Float, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 

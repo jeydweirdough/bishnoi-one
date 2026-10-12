@@ -39,11 +39,11 @@ export function WarehouseForm({ warehouse, onDone }: { warehouse?: Pick<Warehous
 }
 
 /** A button that opens the warehouse form in place. */
-export function AddWarehouse() {
-  const [open, setOpen] = useState(false);
+export function AddWarehouse({ startOpen = false }: { startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   if (!open) return <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>Add warehouse</Button>;
   return (
-    <div className="w-full rounded-[3px] bg-sheet px-5 py-4 shadow-sheet">
+    <div className="w-full rounded-[22px] border border-rule bg-sheet px-5 py-4 shadow-sheet">
       <WarehouseForm onDone={() => setOpen(false)} />
     </div>
   );
@@ -56,13 +56,13 @@ export function EditWarehouse({ warehouse }: { warehouse: Pick<Warehouse, "id" |
   const [pending, start] = useTransition();
   return (
     <>
-      <button type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-sheet hover:text-hema">
+      <button type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-full p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
         <Pencil className="size-4" aria-hidden />
         <span className="sr-only">Edit warehouse</span>
       </button>
       {open && (
         <div className="fixed inset-x-0 top-0 z-40 flex justify-center p-4 lg:absolute lg:top-full lg:right-auto lg:left-0 lg:p-0 lg:pt-2">
-          <div className="w-full max-w-3xl rounded-[3px] bg-sheet px-5 py-4 shadow-overlay">
+          <div className="w-full max-w-3xl rounded-[22px] border border-rule bg-sheet px-5 py-4 shadow-overlay">
             <WarehouseForm warehouse={warehouse} onDone={() => setOpen(false)} />
             <div className="mt-3 border-t border-rule pt-3">
               <Button
@@ -134,13 +134,13 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
               <span className="min-w-0 text-sm">
                 <span className={`font-mono font-semibold ${loc.isActive ? "" : "text-ink-3 line-through"}`}>{loc.code}</span>
                 <span className="text-ink-2"> · {loc.name}</span>
-                {loc.isDefault && <span className="ml-2 text-meta font-semibold text-hema">Default</span>}
+                {loc.isDefault && <span className="ml-2 text-meta font-semibold text-ink">Default</span>}
                 <span className="block text-meta text-ink-3">{loc.units} units · {loc.products} products{!loc.isActive && " · switched off"}</span>
               </span>
               {canManage && (
                 <span className="flex shrink-0 items-center gap-1">
                   {!loc.isDefault && loc.isActive && (
-                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} is the default now`)} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-hema">
+                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} is the default now`)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Star className="size-4" aria-hidden />
                     </button>
                   )}
@@ -149,11 +149,11 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
                       {loc.isActive ? "Switch off" : "Switch on"}
                     </Button>
                   )}
-                  <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-hema">
+                  <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                     <Pencil className="size-4" aria-hidden />
                   </button>
                   {!loc.isDefault && loc.units === 0 && (
-                    <button type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                    <button type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                       <Trash2 className="size-4" aria-hidden />
                     </button>
                   )}

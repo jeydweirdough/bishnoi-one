@@ -1,5 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Icon } from "@/src/platform/ui/icons";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { loadQuery } from "@/src/platform/lib/api";
@@ -11,6 +13,11 @@ import { OrderStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Stamp, Table, Td, Trail } from "../components/ui";
 import { ORDER_KINDS, param, query } from "../lib/labels";
+import { FirstStep, NeedsFirst } from "../components/setup";
+import { KINDS, kindBySlug, kindOf, listHref, newHref } from "../lib/order-kinds";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { OrdersBoard } from "./boards";
+import { loadSetup } from "../lib/setup";
 import { canAddFrom, context, type Params, type Search } from "../lib/page";
 import { batchChoices, given, referenceOf } from "../lib/reference";
 import type { BatchRow, Order, OrderBrief, Reference, Reservation } from "../lib/types";
@@ -20,39 +27,57 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   if (!may("orders.view")) return <NoAccess what="orders" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind") };
+  // A board unless asked for the list, or for one status (which is a column, read as a list).
+  const board = param(s, "view") !== "list" && !f.status;
   const { orders } = await loadQuery<{ orders: OrderBrief[] }>(`query Orders($q: String, $status: String, $kind: String) { orders(q: $q, status: $status, kind: $kind) }`, given(f), ["orders"]);
   const issued = f.status === "issued";
+  const info = kindOf(f.kind);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/orders${query({ ...f, status })}` });
   return (
     <>
       <PageHeader
-        title={issued ? "Issuance history" : "Orders"}
-        actions={may("orders.create") && <LinkButton href="/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New order</LinkButton>}
+        title={issued ? (info ? `${info.plural}: issued` : "Issuance history") : info ? info.plural : "All orders"}
+        actions={may("orders.create") && <LinkButton href={info ? newHref(info) : "/orders/new"} variant="primary" icon={<Plus className="size-4" aria-hidden />}>{info ? info.newLabel : "New order"}</LinkButton>}
       >
-        Stock going out: customer orders, and issues to departments and projects. Order → reserved → picked → issued.
+        {info ? `${info.intro} Reserved, picked, then issued.` : "Stock going out: customer orders, and issues to departments and projects. Order → reserved → picked → issued."}
       </PageHeader>
-      {!issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder="Order number or who it's for" keep={{ status: f.status }} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <ToggleLinks
+          current={board ? "board" : "list"}
+          options={[
+            { value: "board", label: "Board", href: `/orders${query({ ...f, status: "", view: "" })}` },
+            { value: "list", label: "List", href: `/orders${query({ ...f, view: "list" })}` },
+            { value: "reservations", label: "Reservations", href: "/reservations" },
+          ]}
+        />
+      </div>
+      <Chips label="Kind" current={f.kind} options={[{ value: "", label: "All kinds", href: `/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/orders${query({ ...f, kind: k.kind })}` }))]} />
+      {!board && !issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
+      <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or who it's for"} keep={{ status: f.status, kind: f.kind, view: board ? "" : "list" }} />
+      {board && orders.length > 0 ? (
+        <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
+      ) : (
       <Sheet>
         {orders.length === 0 ? (
-          <Empty icon="issuance" title="No orders here" />
+          <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()} yet` : "No orders yet"} body={info ? info.intro : "An order holds stock for a customer or a department until it's issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={info ? listHref(info) : "/orders"} may={may} />
         ) : (
-          <Table head={["Order", "For", "Kind", "From", "Status", issued ? "Issued" : "Needed by", " Units", " Value"]} min="56rem">
+          <Table head={["Order", info ? info.recipient.label : "For", ...(info ? [] : ["Kind"]), "From", "Status", issued ? "Issued" : "Needed by", " Units", ...(info && !info.priced ? [] : [" Value"])]} min="52rem">
             {orders.map((o) => (
               <tr key={o.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/orders/${o.id}`}>{o.number}</RowLink></Td>
                 <Td>{o.recipient}</Td>
-                <Td className="text-ink-2">{ORDER_KINDS[o.kind]}</Td>
+                {!info && <Td className="text-ink-2">{ORDER_KINDS[o.kind]}</Td>}
                 <Td>{o.warehouse.code}</Td>
                 <Td><OrderStamp status={o.status} /></Td>
                 <Td className="whitespace-nowrap">{issued ? at(o.issuedAt) : day(o.neededOn)}</Td>
                 <Td num>{fmt.count(o.units)}</Td>
-                <Td num>{o.total ? fmt.peso(o.total) : "—"}</Td>
+                {(!info || info.priced) && <Td num>{o.total ? fmt.peso(o.total) : "—"}</Td>}
               </tr>
             ))}
           </Table>
         )}
       </Sheet>
+      )}
     </>
   );
 }
@@ -77,7 +102,7 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/orders", label: "Orders" }]}
+        crumbs={[{ href: listHref(kindOf(o.kind)!), label: kindOf(o.kind)!.plural }]}
         title={o.number}
         tools={o.status === "draft" && (
           <RecordTools what="order" name={o.number} editHref={may("orders.edit") ? `/orders/${o.id}/edit` : undefined} remove={may("orders.edit") ? deleteOrder.bind(null, o.id) : undefined} after="/orders" />
@@ -132,14 +157,14 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
       )}
 
       {held && may("orders.issue") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="issue">
           <SectionTitle icon="issuance">Issue it</SectionTitle>
           <p className="mb-3 text-meta text-ink-3">Stock leaves {o.warehouse.name} now, and the reservation is let go.</p>
           <PickForm kind="order" documentId={o.id} lines={pickLines} label="Issue & ship" />
         </Sheet>
       )}
       {o.status === "issued" && may("stock.view") && (
-        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-hema hover:underline">See its movements</Link></p>
+        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-ink hover:underline">See its movements</Link></p>
       )}
     </>
   );
@@ -149,14 +174,48 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
 const ORDER_FORM = `${referenceOf("products", "units", "warehouses")} availability`;
 type OrderFormData = { reference: Pick<Reference, "products" | "units" | "warehouses">; availability: Record<string, number> };
 
-export async function NewOrderPage() {
+/** New order with no kind: which one, each with what it's for, as the CRM's Add customer asks the type first. */
+export async function NewOrderChooser() {
+  const { may } = await context();
+  if (!may("orders.create")) return <NoAccess what="writing orders" />;
+  return (
+    <>
+      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order">
+        What is it for? Each kind has its own form.
+      </PageHeader>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {KINDS.map((k) => (
+          <Link key={k.kind} href={newHref(k)} className="group flex gap-4 rounded-[22px] border border-rule bg-sheet px-5 py-4 transition-colors hover:border-ink">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-hema-tint text-sage-deep">
+              <Icon name={k.icon} className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink group-hover:underline">{k.newLabel}</span>
+              <span className="mt-0.5 block text-meta text-ink-3">{k.intro}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export async function NewOrderPage({ params }: { params: Params<{ kind: string }> }) {
+  const info = kindBySlug((await params).kind);
+  if (!info) notFound();
   const { me, may } = await context();
   if (!may("orders.create")) return <NoAccess what="writing orders" />;
+  const crumbs = [{ href: listHref(info), label: info.plural }];
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "stock"], then: newHref(info), title: info.newLabel, doing: `write a ${info.one}`, crumbs, may });
+  if (gate) return gate;
   const { reference: ref, availability: available } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order" />
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
+      <PageHeader crumbs={crumbs} title={info.newLabel}>
+        {info.intro}
+      </PageHeader>
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} kind={info.kind} />
     </>
   );
 }
@@ -172,8 +231,8 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
   );
   return (
     <>
-      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} />
+      <PageHeader crumbs={[{ href: listHref(kindOf(o.kind)!), label: kindOf(o.kind)!.plural }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} kind={o.kind} />
     </>
   );
 }
@@ -184,7 +243,7 @@ export async function ReservationsPage() {
   const { reservations: rows } = await loadQuery<{ reservations: Reservation[] }>("query Reservations { reservations }", {}, ["reservations"]);
   return (
     <>
-      <PageHeader title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>
+      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>
       <Sheet>
         {rows.length === 0 ? (
           <Empty icon="issuance" title="Nothing is held" />
@@ -192,7 +251,7 @@ export async function ReservationsPage() {
           <Table head={["Product", "Order", "For", "Warehouse", "Needed by", "State", " Quantity"]} min="52rem">
             {rows.map((r, i) => (
               <tr key={i} className="relative hover:bg-bench/40">
-                <Td><Link href={`/products/${r.product.id}`} className="font-semibold hover:text-hema hover:underline">{r.product.name}</Link></Td>
+                <Td><Link href={`/products/${r.product.id}`} className="font-semibold hover:text-ink hover:underline">{r.product.name}</Link></Td>
                 <Td><RowLink href={`/orders/${r.order.id}`}>{r.order.number}</RowLink></Td>
                 <Td>{r.order.recipient}</Td>
                 <Td>{r.warehouse.code}</Td>

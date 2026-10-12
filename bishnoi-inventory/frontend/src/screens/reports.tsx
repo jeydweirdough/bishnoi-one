@@ -27,7 +27,7 @@ export async function ReportsPage() {
             <ul className="mt-1 divide-y divide-rule">
               {reports.filter((r) => r.group === g).map((r) => (
                 <li key={r.key} className="relative py-2.5">
-                  <Link href={`/reports/${r.key}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">{r.title}</Link>
+                  <Link href={`/reports/${r.key}`} className="font-semibold text-ink after:absolute after:inset-0 hover:underline">{r.title}</Link>
                   <span className="block text-meta text-ink-3">{r.about}</span>
                 </li>
               ))}
@@ -103,7 +103,7 @@ export async function ReportPage({ params, searchParams }: { params: Params<{ ke
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm" style={{ minWidth: `${Math.max(40, r.columns.length * 8)}rem` }}>
               <thead>
-                <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+                <tr className="border-b border-rule text-left text-meta text-ink-3">
                   {r.columns.map((c) => <th key={c.key} scope="col" className={`px-3 py-3 font-semibold first:pl-5 last:pr-5 ${right(c.kind) ? "text-right" : ""}`}>{c.label}</th>)}
                 </tr>
               </thead>

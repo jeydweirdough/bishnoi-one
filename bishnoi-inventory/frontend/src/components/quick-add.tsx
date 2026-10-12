@@ -146,7 +146,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
 
   return (
     <>
-      <button type="button" onClick={open} className="inline-flex items-center gap-0.5 text-meta font-semibold text-hema hover:underline">
+      <button type="button" onClick={open} className="inline-flex items-center gap-0.5 text-meta font-semibold text-ink hover:underline">
         <Plus className="size-3.5" aria-hidden />
         {label ?? `New ${WHAT[kind]}`}
       </button>
@@ -156,7 +156,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
         aria-labelledby={titleId}
         onClose={() => setShowing(false)}
         onCancel={(e) => pending && e.preventDefault()}
-        className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay"
+        className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-[22px] border border-rule bg-sheet p-0 text-ink shadow-overlay"
       >
         {/* Its own form, so pressing Enter here saves this, not the form around it. */}
         <form

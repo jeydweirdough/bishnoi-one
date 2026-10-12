@@ -2,7 +2,8 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/src/platform/ui/button";
-import { Input } from "@/src/platform/ui/field";
+import { Select } from "@/src/platform/ui/field";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { Flag } from "@/src/platform/ui/marks";
 import type { Expiry, StockState } from "../lib/types";
 import { STOCK_STATES } from "../lib/labels";
@@ -12,18 +13,24 @@ import { STOCK_STATES } from "../lib/labels";
 
 export type Tone = "neutral" | "active" | "done" | "attention" | "muted";
 
+// The CRM's status pills: waiting is grey, under way is mint, finished is
+// sage, a problem is red, cancelled is faded. The words say it; the dot is for the eye.
 const TONES: Record<Tone, string> = {
-  // Waiting on someone: dashed, like a form not yet signed.
-  neutral: "border border-dashed border-ink-2 text-ink-2",
-  active: "border border-hema bg-hema-tint text-hema",
-  done: "border border-ink bg-ink text-white",
-  attention: "border border-eosin text-eosin",
-  muted: "border border-rule-strong text-ink-3",
+  neutral: "bg-[#f1f1ee] text-ink-2",
+  active: "bg-hema-tint text-ink",
+  done: "bg-[#e6f2e1] text-[#3f6f35]",
+  attention: "bg-danger-tint text-danger",
+  muted: "bg-bench text-ink-3",
 };
 
-/** A document's status, stamped. */
+/** A document's status, as a pill. */
 export function Stamp({ tone, children }: { tone: Tone; children: ReactNode }) {
-  return <span className={`inline-flex h-5 shrink-0 items-center rounded-[2px] px-1.5 text-stamp whitespace-nowrap uppercase ${TONES[tone]}`}>{children}</span>;
+  return (
+    <span className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium whitespace-nowrap ${TONES[tone]}`}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+      {children}
+    </span>
+  );
 }
 
 /** How much of a product there is, in a word. Only out and low draw the eye. */
@@ -46,9 +53,9 @@ export function Table({ head, children, min = "40rem" }: { head: ReactNode[]; ch
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm" style={{ minWidth: min }}>
         <thead>
-          <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+          <tr className="border-b border-rule text-left text-meta text-ink-3">
             {head.map((h, i) => (
-              <th key={i} scope="col" className={`px-3 py-3 font-semibold first:pl-5 last:pr-5 ${typeof h === "string" && h.startsWith(" ") ? "text-right" : ""}`}>
+              <th key={i} scope="col" className={`px-3 py-2.5 font-medium first:pl-5 last:pr-5 ${typeof h === "string" && h.startsWith(" ") ? "text-right" : ""}`}>
                 {typeof h === "string" ? h.trim() : h}
               </th>
             ))}
@@ -69,7 +76,7 @@ export function Td({ children, num, className = "" }: { children: ReactNode; num
 export function RowLink({ href, children, sub }: { href: string; children: ReactNode; sub?: ReactNode }) {
   return (
     <>
-      <Link href={href} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
+      <Link href={href} className="font-semibold text-ink after:absolute after:inset-0 hover:underline">
         {children}
       </Link>
       {sub && <span className="block text-meta text-ink-3">{sub}</span>}
@@ -83,12 +90,20 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
     <form role="search" className="mb-3 flex flex-wrap items-end gap-3">
       {Object.entries(keep).map(([k, v]) => v && <input key={k} type="hidden" name={k} value={v} />)}
       {q !== undefined && (
-        <div className="w-full max-w-xs">
-          <Input name="q" defaultValue={q} placeholder={placeholder} aria-label={placeholder} />
-        </div>
+        <label className="relative min-w-[14rem] flex-1">
+          <span className="sr-only">{placeholder}</span>
+          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder={placeholder}
+            className="block h-10 w-full rounded-full border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
+          />
+        </label>
       )}
       {children}
-      <Button type="submit" size="sm" icon={<Search className="size-4" aria-hidden />}>
+      <Button type="submit" icon={<Search className="size-4" aria-hidden />}>
         Show
       </Button>
     </form>
@@ -98,36 +113,24 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
 /** A plain select for a filter bar. */
 export function FilterSelect({ name, value, label, options }: { name: string; value: string; label: string; options: { value: string; label: string }[] }) {
   return (
-    <label className="block min-w-36">
+    <label className="block min-w-[10rem]">
       <span className="mb-1 block text-meta font-medium text-ink-2">{label}</span>
-      <select name={name} defaultValue={value} className="h-9 w-full border-0 border-b border-control bg-transparent text-sm text-ink focus:border-hema focus:outline-none">
+      <Select name={name} defaultValue={value}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }
 
-/** Chip links for a list's quick filters: the one in use is filled. */
+/** A list's quick filters: the CRM's segmented control, the one in use in ink. */
 export function Chips({ options, current, label }: { options: { href: string; label: string; value: string }[]; current: string; label: string }) {
   return (
-    <nav aria-label={label} className="mb-3 flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <Link
-          key={o.value}
-          href={o.href}
-          scroll={false}
-          aria-current={o.value === current ? "page" : undefined}
-          className={`rounded-full border px-3 py-1 text-meta ${
-            o.value === current ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-hema"
-          }`}
-        >
-          {o.label}
-        </Link>
-      ))}
+    <nav aria-label={label} className="mb-3 max-w-full overflow-x-auto">
+      <ToggleLinks options={options} current={current} />
     </nav>
   );
 }
@@ -135,13 +138,13 @@ export function Chips({ options, current, label }: { options: { href: string; la
 /** The few numbers at the top of a record or a list, side by side. */
 export function Figures({ items }: { items: { label: string; value: ReactNode; flag?: boolean; href?: string }[] }) {
   return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[3px] bg-rule shadow-sheet sm:grid-cols-3 lg:grid-cols-6">
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map((f) => (
-        <div key={f.label} className="bg-sheet px-4 py-3">
-          <dt className="text-meta text-ink-3">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
-          <dd className="mt-0.5 text-lg font-semibold text-ink tabular-nums">
+        <div key={f.label} className={`flex flex-col-reverse justify-end rounded-[22px] border bg-sheet px-5 py-4 ${f.flag ? "border-danger/40" : "border-rule"}`}>
+          <dt className="mt-1 text-sm font-medium text-ink">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
+          <dd className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
             {f.href ? (
-              <Link href={f.href} className="hover:text-hema">
+              <Link href={f.href} className="hover:text-ink">
                 {f.value}
               </Link>
             ) : (

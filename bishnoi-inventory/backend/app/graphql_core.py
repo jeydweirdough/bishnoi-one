@@ -32,6 +32,7 @@ from fastapi.params import Query as QueryParam
 from graphql import GraphQLError
 from graphql.validation import NoSchemaIntrospectionCustomRule
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from strawberry.extensions import AddValidationRules, MaskErrors, MaxAliasesLimiter, MaxTokensLimiter, QueryDepthLimiter
 
@@ -66,7 +67,18 @@ def route(fn, info: strawberry.Info, **given):
     dependencies filled from this request, its arguments validated against the
     route's own limits, and its HTTP errors turned into this field's error."""
     try:
-        return _call(fn, info, given)
+        try:
+            return _call(fn, info, given)
+        except OperationalError:
+            # The database dropped the connection (Neon closes idle ones). The
+            # session is rolled back so this request's other fields still run,
+            # and this one is tried once more on a fresh connection.
+            info.context["db"].rollback()
+            try:
+                return _call(fn, info, given)
+            except OperationalError:
+                info.context["db"].rollback()
+                raise GraphQLError("The database didn't answer. Try again in a moment.", extensions={"code": "UNAVAILABLE", "status": 503}) from None
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else "That couldn't be read."
         code = {401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND"}.get(e.status_code, "BAD_INPUT")
