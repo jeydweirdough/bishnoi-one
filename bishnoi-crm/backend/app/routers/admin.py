@@ -55,13 +55,7 @@ class UserIn(Api):
     full_name: str = Field(min_length=1, max_length=120)
     role_id: str = Field(max_length=36)
     team_id: str | None = Field(None, max_length=36)
-    employee_id: str | None = Field(None, max_length=20)
     password: str = Field(max_length=256)
-
-    @field_validator("employee_id")
-    @classmethod
-    def _employee_id(cls, value: str | None) -> str | None:
-        return employee_code(value)
 
     @field_validator("email")
     @classmethod
@@ -82,30 +76,12 @@ class UserPatch(Api):
     full_name: str | None = Field(None, min_length=1, max_length=120)
     role_id: str | None = Field(None, max_length=36)
     team_id: str | None = Field(None, max_length=36)
-    employee_id: str | None = Field(None, max_length=20)
     is_active: bool | None = None
-
-    @field_validator("employee_id")
-    @classmethod
-    def _employee_id(cls, value: str | None) -> str | None:
-        return employee_code(value)
 
     @field_validator("email")
     @classmethod
     def _email(cls, value: str | None) -> str | None:
         return email_address(value) if value else value
-
-
-def employee_code(value: str | None) -> str | None:
-    """An employee ID as kept: trimmed and in capitals, so "emp-12 " finds EMP-12. Blank is none."""
-    return (value.strip().upper() or None) if value is not None else None
-
-
-def employee_id_taken(db: DB, code: str, but: str | None = None) -> bool:
-    q = select(User.id).where(User.employee_id == code)
-    if but:
-        q = q.where(User.id != but)
-    return db.scalar(q) is not None
 
 
 class PasswordIn(Api):
@@ -200,14 +176,12 @@ def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
         raise field_error("email", "Someone here already has that email.")
     check_role(db, body.role_id)
     check_team(db, body.team_id)
-    if body.employee_id and employee_id_taken(db, body.employee_id):
-        raise field_error("employeeId", "Someone here already has that employee ID.")
+    # Their employee ID is given as they're saved (app/employee_ids.py).
     user = User(
         email=body.email,
         full_name=body.full_name,
         role_id=body.role_id,
         team_id=body.team_id,
-        employee_id=body.employee_id,
         password_hash=hash_password(body.password),
     )
     db.add(user)
@@ -235,8 +209,6 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
         raise HTTPException(status.HTTP_409_CONFLICT, "You can't switch yourself off. Ask another admin.")
     if "email" in wanted and email_taken(db, wanted["email"], but=user.id):
         raise field_error("email", "Someone here already has that email.")
-    if wanted.get("employee_id") and employee_id_taken(db, wanted["employee_id"], but=user.id):
-        raise field_error("employeeId", "Someone here already has that employee ID.")
     if "role_id" in wanted:
         check_role(db, wanted["role_id"])
     if "team_id" in wanted:

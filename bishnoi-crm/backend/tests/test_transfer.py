@@ -54,12 +54,20 @@ def test_the_employee_id_must_name_someone_who_can_take_it(app, client, crew, an
     assert client.post(url, json={"employeeId": "EMP-1"}, headers=crew["sam"]).status_code == 404
 
 
-def test_administrators_set_employee_ids_unique_and_in_capitals(client, ana, crew):
-    people = {u["email"]: u for u in client.get("/admin/users", headers=ana).json()}
-    ria, rex = people["ria@example.com"], people["rex@example.com"]
-    set_ria = client.patch(f"/admin/users/{ria['id']}", json={"employeeId": " emp-0012 "}, headers=ana).json()
-    assert set_ria["employeeId"] == "EMP-0012"
-    r = client.patch(f"/admin/users/{rex['id']}", json={"employeeId": "Emp-0012"}, headers=ana)
-    assert r.status_code == 422 and "already" in errors(r)["employeeId"]
-    cleared = client.patch(f"/admin/users/{ria['id']}", json={"employeeId": ""}, headers=ana).json()
-    assert cleared["employeeId"] is None
+def test_employee_ids_are_given_and_never_shared(client, ana, crew):
+    # Everyone has one, and no two people the same.
+    people = client.get("/admin/users", headers=ana).json()
+    codes = [u["employeeId"] for u in people]
+    assert all(codes) and len(set(codes)) == len(codes)
+    # Someone added gets the next free number, without anyone typing it.
+    highest = max(int(c.split("-")[1]) for c in codes if c.startswith("EMP-"))
+    role = next(r for r in client.get("/admin/roles", headers=ana).json()["roles"] if r["name"] == "Salesperson")
+    new = client.post("/admin/users", json={"email": "new@example.com", "fullName": "New Person", "roleId": role["id"], "password": "a long password 1"}, headers=ana).json()
+    assert new["employeeId"] == f"EMP-{highest + 1:04d}"
+    # Nobody can type one, on adding or on changing someone.
+    r = client.post("/admin/users", json={"email": "other@example.com", "fullName": "Other", "roleId": role["id"], "password": "a long password 1", "employeeId": "EMP-9999"}, headers=ana)
+    assert r.status_code == 422
+    rex = next(u for u in people if u["email"] == "rex@example.com")
+    r = client.patch(f"/admin/users/{rex['id']}", json={"employeeId": new["employeeId"]}, headers=ana)
+    assert r.status_code == 422
+    assert client.get(f"/admin/users/{rex['id']}", headers=ana).json()["employeeId"] == rex["employeeId"]

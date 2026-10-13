@@ -22,7 +22,6 @@ export function UserForm({ roles, teams, user }: Props) {
   const [pending, start] = useTransition();
   const [fullName, setFullName] = useState(user?.fullName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
   const [roleId, setRoleId] = useState(user?.role.id ?? roles.find((r) => r.name === "Salesperson")?.id ?? roles[0]?.id ?? "");
   const [teamId, setTeamId] = useState(user?.team?.id ?? "");
   const can = useCan();
@@ -42,7 +41,6 @@ export function UserForm({ roles, teams, user }: Props) {
         const change: UserChange = {};
         if (fullName.trim() !== user.fullName) change.fullName = fullName.trim();
         if (email.trim().toLowerCase() !== user.email) change.email = email.trim();
-        if ((employeeId.trim().toUpperCase() || null) !== user.employeeId) change.employeeId = employeeId.trim() || null;
         if (roleId !== user.role.id) change.roleId = roleId;
         if ((teamId || null) !== (user.team?.id ?? null)) change.teamId = teamId || null;
         if (Object.keys(change).length === 0) {
@@ -51,7 +49,7 @@ export function UserForm({ roles, teams, user }: Props) {
         }
         result = await updateUser(user.id, change);
       } else {
-        result = await createUser({ fullName: fullName.trim(), email: email.trim(), employeeId: employeeId.trim() || null, roleId, teamId: teamId || null, password });
+        result = await createUser({ fullName: fullName.trim(), email: email.trim(), roleId, teamId: teamId || null, password });
       }
       if (result.ok) {
         toast.success(user ? "Changes saved" : "Person added", { description: result.data.fullName });
@@ -82,8 +80,9 @@ export function UserForm({ roles, teams, user }: Props) {
         <Field label="Work email" error={fields.email} hint={user ? undefined : "They sign in with this."}>
           {(p) => <Input {...p} type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />}
         </Field>
-        <Field label="Employee ID" optional error={fields.employeeId} hint="The company's ID for them. Customers are transferred to a person by it.">
-          {(p) => <Input {...p} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} autoComplete="off" maxLength={20} placeholder="e.g. EMP-0012" />}
+        {/* Given, not typed: the next free number when they're added, and theirs alone. */}
+        <Field label="Employee ID" hint={user ? "Given automatically, and theirs alone. Customers are transferred to a person by it." : "Given automatically when you add them: the next free number."}>
+          {(p) => <Input {...p} value={user?.employeeId ?? "Given when added"} readOnly disabled={!user?.employeeId} aria-readonly className="font-mono" />}
         </Field>
         <Field label="Role" error={fields.roleId} hint={role ? `${role.description ?? ""} ${SCOPE_WORDS[role.scope]}`.trim() : undefined}>
           {(p) => (

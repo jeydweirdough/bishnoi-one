@@ -1271,3 +1271,8 @@ class QuoteLink(Base):
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
 numbered(User, Team, Company, Contact, Product, Deal)
+
+# Employee IDs, given as people are saved (EMP-0001 on); nobody types one.
+from app.employee_ids import given_employee_ids  # noqa: E402
+
+given_employee_ids(User)
