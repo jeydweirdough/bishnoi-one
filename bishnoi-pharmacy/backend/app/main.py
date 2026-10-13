@@ -16,6 +16,7 @@ from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
 from app.routers import admin, auth, batches, dispensing, integration, medicines, patients, prescriptions, reports, sales, stock, suppliers, unset
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -34,6 +35,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Pharmacy API", version="0.2.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Pharmacy")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # The audit log goes to Discord too, a thread a day (app/discord.py).

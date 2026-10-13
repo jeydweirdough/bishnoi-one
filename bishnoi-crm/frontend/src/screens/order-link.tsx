@@ -6,7 +6,7 @@ import type { Medicine } from "../components/quotes/medicine-search";
 
 export const metadata = { title: "Order medicines", robots: { index: false, follow: false } };
 
-type Link = { company: string; orgName: string; customer: string | null; contact: string | null; asksWho: boolean; rep: string; priceType: string; expiresAt: string; products: Medicine[] };
+type Link = { company: string; orgName: string; customer: string | null; contact: string | null; asksWho: boolean; rep: string; expiresAt: string; products: Omit<Medicine, "priceCentavos">[] };
 type Params = Promise<{ company: string; token: string }>;
 
 const until = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" });
@@ -45,7 +45,7 @@ export default async function OrderLinkPage({ params }: { params: Params }) {
                 {until.format(new Date(link.expiresAt))}, once.
               </p>
             </header>
-            <OrderLinkForm company={company} token={token} medicines={link.products} rep={link.rep} asksWho={link.asksWho} />
+            <OrderLinkForm company={company} orgName={link.orgName} token={token} medicines={link.products.map((m) => ({ ...m, priceCentavos: 0 }))} rep={link.rep} asksWho={link.asksWho} />
           </>
         )}
       </div>

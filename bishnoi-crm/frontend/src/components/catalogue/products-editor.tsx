@@ -185,6 +185,7 @@ function ProductForm({
     Object.fromEntries(listed.map((t) => [t.code, fmt.pesosText(product?.prices[t.code] ?? null)])),
   );
   const [isActive, setActive] = useState(product?.isActive ?? true);
+  const [needsPrescription, setNeedsPrescription] = useState(product?.needsPrescription ?? false);
   const [vatCategory, setVatCategory] = useState<NonNullable<ProductInput["vatCategory"]>>(product?.vatCategory ?? "standard");
   const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(custom, product?.extra));
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -216,6 +217,7 @@ function ProductForm({
       form: values.form.trim() || null,
       unit: values.unit.trim(),
       vatCategory,
+      needsPrescription,
       isActive,
       prices: amounts,
       extra: extraChanges(custom, extra, product?.extra),
@@ -275,6 +277,15 @@ function ProductForm({
         className="space-y-5"
       >
         <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
+
+        {/* Rx: an order of it needs the prescription (an order link asks for it), and a pharmacist checks it. */}
+        <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-rule px-4 py-3 has-[:checked]:border-danger/40 has-[:checked]:bg-danger-tint/40">
+          <input type="checkbox" checked={needsPrescription} onChange={(e) => setNeedsPrescription(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
+          <span>
+            <span className="block text-sm font-medium text-ink">Needs a prescription (Rx)</span>
+            <span className="block text-meta text-ink-3">Customers ordering it through an order link attach the prescription, and a pharmacist checks it.</span>
+          </span>
+        </label>
 
         <Field label="VAT" error={fields.vatCategory} hint="How Finance taxes it on quotes and invoices. Exempt: e.g. medicines on the FDA's VAT-exempt lists.">
           {(p) => (

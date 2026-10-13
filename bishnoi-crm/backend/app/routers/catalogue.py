@@ -214,6 +214,7 @@ def product_out(p: Product, access: Access) -> dict:
         "form": p.form,
         "unit": p.unit,
         "vatCategory": p.vat_category,
+        "needsPrescription": p.needs_prescription,
         "isActive": p.is_active,
         # Its code, name, unit, state and SRP are Inventory's, changed there.
         "fromInventory": p.inventory_id is not None,
@@ -305,6 +306,8 @@ class ProductFields(Api):
     unit: str | None = Field(None, min_length=1, max_length=30)
     # For VAT, as Finance's tax pack names it (the price rules' tax step).
     vat_category: Literal["standard", "zero_rated", "exempt"] | None = None
+    # Sold only on a prescription (Rx): ordering it needs the prescription attached.
+    needs_prescription: bool | None = None
     is_active: bool | None = None
     # price type code -> centavos; null clears that price.
     prices: dict[str, int | None] | None = None

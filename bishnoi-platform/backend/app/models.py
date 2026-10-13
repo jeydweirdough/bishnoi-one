@@ -246,6 +246,25 @@ class CompanyApp(Base):
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class CompanyPass(Base):
+    """A company pass the platform gave an application: asked for (every hour)
+    or sent to it when the company changed (app/company_push.py)."""
+
+    __tablename__ = "nbpl_company_passes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # None once the company is deleted; the slug says who it was.
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="SET NULL"), index=True, default=None)
+    company_slug: Mapped[str] = mapped_column(String(40))
+    application_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    granted: Mapped[bool] = mapped_column(default=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    how: Mapped[str] = mapped_column(String(10))  # asked | pushed
+    answer: Mapped[str | None] = mapped_column(String(80), default=None)  # pushed: taken, or what went wrong
+
+
 # ---- Platform users and their access -------------------------------------------
 
 IDENTITY_STATUSES = ("active", "suspended")

@@ -1,4 +1,5 @@
 import "server-only";
+import { sendToErrorPage } from "./fail";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
@@ -56,7 +57,7 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
       cache: "no-store",
     });
   } catch {
-    throw new ApiError(503, "Can't reach the CRM server. Check that the API is running.");
+    throw new ApiError(503, "Can't reach the server just now. Try again in a moment.");
   }
 }
 
@@ -125,8 +126,7 @@ export async function load<T>(path: string): Promise<T> {
   try {
     return await api.get<T>(path);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) redirect("/login?expired=1");
-    if (error instanceof ApiError && error.status === 404) notFound();
+    if (error instanceof ApiError) sendToErrorPage(error.status);
     throw error;
   }
 }
@@ -143,7 +143,7 @@ export async function query<T>(document: string, variables?: Record<string, unkn
   try {
     res = await api.post<{ data: T | null; errors?: GraphQLError[] }>("/graphql", { query: document, variables: variables ?? {} });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) redirect("/login?expired=1");
+    if (error instanceof ApiError) sendToErrorPage(error.status);
     throw error;
   }
   const errors = res.errors ?? [];
@@ -163,7 +163,7 @@ export async function loadQuery<T extends Record<string, unknown>>(document: str
   for (const key of needed) {
     if (data[key] != null) continue;
     const why = errors.find((e) => e.path?.[0] === key);
-    if (why?.extensions?.status === 404 || why?.extensions?.status === 403) notFound();
+    sendToErrorPage(why?.extensions?.status);
     throw new ApiError(why?.extensions?.status ?? 500, why?.message ?? `The page couldn't read ${key}.`);
   }
   return data;

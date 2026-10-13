@@ -424,6 +424,8 @@ export type Product = {
   unit: string;
   /** For VAT, as Finance's tax pack names it (the price rules' tax step). */
   vatCategory?: "standard" | "zero_rated" | "exempt";
+  /** Rx: sold only on a prescription. */
+  needsPrescription?: boolean;
   isActive: boolean;
   /** Its code, name, unit, state and SRP are Bishnoi One Inventory's, changed there. */
   fromInventory?: boolean;
@@ -560,6 +562,8 @@ export type Quote = {
   priceType: string;
   priceTypeName: string;
   rx: boolean;
+  /** Attached by the customer on an order link, for Rx medicines: opened at /quotes/{id}/prescriptions/{n}. */
+  prescriptions?: { n: number; name: string; contentType: string; size: number }[];
   payer: string;
   payerName: string | null;
   notes: string | null;

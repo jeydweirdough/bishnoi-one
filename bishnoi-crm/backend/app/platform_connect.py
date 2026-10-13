@@ -68,6 +68,20 @@ def save_key(settings: Settings, key: str | None) -> None:
     _cached[settings.database_url] = (key, time.monotonic())
 
 
+def read_value(settings: Settings, name: str) -> str | None:
+    """Something else the Platform gave, kept in the same table (app/company.py's passes)."""
+    with _engine(settings).connect() as c:
+        return c.execute(select(_table.c.value).where(_table.c.name == name)).scalar()
+
+
+def write_value(settings: Settings, name: str, value: str | None) -> None:
+    """Keeps it (or, with None, lets it go)."""
+    with _engine(settings).begin() as c:
+        c.execute(delete(_table).where(_table.c.name == name))
+        if value is not None:
+            c.execute(insert(_table).values(name=name, value=value))
+
+
 def connect_key(settings: Settings) -> str | None:
     """The key to ask the Platform with: PLATFORM_APP_KEY, or the one it delivered.
     None yet: the Platform is asked to deliver it (in the background)."""

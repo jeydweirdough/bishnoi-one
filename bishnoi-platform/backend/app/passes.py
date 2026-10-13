@@ -101,28 +101,37 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
 
 
 # A company pass: how an application knows its company is registered here.
-COMPANY_LIFETIME = 3600  # seconds; the application asks again after it
+# Kept by the application for its whole life, renewed by it every hour, and
+# sent to it fresh the moment the company changes (app/company_push.py).
+COMPANY_LIFETIME = 30 * 24 * 3600  # seconds
 
 
-def company_pass(settings: Settings, company: Company, app: Application, granted: bool) -> str:
+def company_pass(settings: Settings, company: Company | None, app: Application, granted: bool, gone: dict | None = None) -> str:
     """Signed: this company, its status, and whether it may use this application.
-    The application checks it with the platform's public key, as a sign-in pass."""
+    The application checks it with the platform's public key, as a sign-in pass.
+    `gone` ({"id", "slug", "name"}): the company has been deleted."""
     now = int(time.time())
     header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
+    who = {"company": gone["id"], "slug": gone["slug"], "companyName": gone["name"], "status": "deleted"} if gone else {
+        "company": company.id, "slug": company.slug, "companyName": company.name, "status": company.status}
     claims = {
         "iss": ISSUER,
         "aud": app.key,
         "kind": "company",
-        "company": company.id,
-        "slug": company.slug,
-        "companyName": company.name,
-        "status": company.status,
-        "granted": granted,
+        **who,
+        "granted": granted and not gone,
         "iat": now,
         "exp": now + COMPANY_LIFETIME,
+        "jti": secrets.token_urlsafe(12),
     }
     signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
     return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
+
+
+def claims_of(token: str) -> dict:
+    """What a pass made here says (to record it; not a check)."""
+    body = token.split(".")[1]
+    return json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
 
 
 # A connect pass: an application's connect key, delivered to the address

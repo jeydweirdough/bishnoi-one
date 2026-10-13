@@ -237,6 +237,22 @@ export async function QuoteView({
             )}
           </section>
 
+          {(quote.prescriptions?.length ?? 0) > 0 && (
+            <section className="py-3" aria-label="Prescription">
+              <h3 className="text-meta text-ink-3">Prescription, from the customer</h3>
+              <ul className="mt-1 space-y-1">
+                {quote.prescriptions!.map((f) => (
+                  <li key={f.n}>
+                    <a href={`/quotes/${quote.id}/prescriptions/${f.n}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink hover:underline">
+                      <FileText className="size-4" aria-hidden />
+                      {f.name} <span className="text-meta text-ink-3">({Math.ceil(f.size / 1024)} KB)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {letter && (
             <section className="py-3" aria-label="Guarantee letter">
               <h3 className="text-meta text-ink-3">{quote.payerName} guarantee letter</h3>

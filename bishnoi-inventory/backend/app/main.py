@@ -16,6 +16,7 @@ from app.first_admin import make_first_admin
 from app.tenants import HEADER, Tenants, clean
 from app import graphql_api
 from app.routers import adjustments, admin, auth, catalog, insight, integration, orders, purchasing, stock, transfers, unset, warehouses
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -32,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Inventory API", version="0.1.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Inventory")
     app.state.settings = settings
     # The audit log goes to Discord too, a thread a day (app/discord.py).
     app.state.logs = logs_for("INVENTORY", settings)
@@ -77,4 +80,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app import platform_connect
 
     app.include_router(platform_connect.router)
+    # The platform's word when a company changes there (hidden: app/company.py).
+    from app import company as company_check
+
+    app.include_router(company_check.router)
     return app

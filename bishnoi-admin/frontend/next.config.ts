@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     root: path.resolve(import.meta.dirname, ".."),
   },
   poweredByHeader: false,
+  // forbidden(): a page the person's role doesn't reach shows app/forbidden.tsx.
+  experimental: { authInterrupts: true },
   // Which app this is, for the sidebar and the sign-in cookie. Built in, so
   // no .env.local or host setting needs it; one there still wins.
   env: {

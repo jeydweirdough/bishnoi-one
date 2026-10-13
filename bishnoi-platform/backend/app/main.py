@@ -39,6 +39,7 @@ from app.routers import (
 from app.routers import services as services_router
 from app.routers import settings as settings_router
 from app.traffic import traffic
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -57,6 +58,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Platform API", version="0.1.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Platform")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     make_first_admin(app.state.sessions, settings)

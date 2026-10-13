@@ -24,6 +24,9 @@ def company_may_use(settings: Settings, slug: str) -> None:
     from app.company import standing  # here: app.company needs the settings module first
 
     found = standing(settings, slug)
+    if found.outage:
+        # The platform couldn't be asked: a wait, not a refusal (the screens show "not available right now").
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, found.message, headers={"Retry-After": "30"})
     if not found.ok:
         raise HTTPException(status.HTTP_403_FORBIDDEN, found.message)
 

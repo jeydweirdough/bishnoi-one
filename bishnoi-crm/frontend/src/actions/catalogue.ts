@@ -16,6 +16,7 @@ export type ProductInput = {
   form: string | null;
   unit: string;
   vatCategory?: "standard" | "zero_rated" | "exempt";
+  needsPrescription?: boolean;
   isActive: boolean;
   /** price type code -> centavos; null clears that price. */
   prices: Record<string, number | null>;

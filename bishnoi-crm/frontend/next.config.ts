@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
   // A receipt or a guarantee letter goes up through a server action, and the
   // default (1 MB) is less than a phone photo. Vercel takes up to 4.5 MB.
   experimental: {
+    // forbidden(): a page the person's role doesn't reach shows app/forbidden.tsx.
+    authInterrupts: true,
     serverActions: { bodySizeLimit: "4.5mb" },
   },
   // Which app this is, for the sidebar. Built into the screens, so it is set

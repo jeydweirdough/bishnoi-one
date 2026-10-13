@@ -347,6 +347,8 @@ class Product(Base):
     # For VAT, as Finance's tax pack names it: standard, zero_rated or exempt.
     vat_category: Mapped[str] = mapped_column(String(20), default="standard")
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Sold only on a doctor's prescription (Rx): an order of it needs the prescription attached.
+    needs_prescription: Mapped[bool] = mapped_column(default=False)
     # The product in Bishnoi One Inventory this one is, when the list comes from there:
     # then its code, name, unit, state and SRP are Inventory's.
     inventory_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
@@ -560,6 +562,8 @@ class Quote(Owned, Base):
     # asked; and why the last try failed, if it did. None: not sent.
     pharmacy_sent: Mapped[dict | None] = mapped_column(JSON, default=None)
     pharmacy_check: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # The prescriptions attached (an order link's, for its Rx medicines): [{ref, name, contentType, size}].
+    prescriptions: Mapped[list | None] = mapped_column(JSON, default=None)
     pharmacy_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     pharmacy_error: Mapped[str | None] = mapped_column(String(300), default=None)
 
@@ -1260,6 +1264,8 @@ class QuoteLink(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When the customer agreed to the privacy notice, ordering through it.
+    privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     quote_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_quotes.id", ondelete="SET NULL"), default=None)
 
     company: Mapped[Company | None] = relationship(lazy="joined")

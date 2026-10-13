@@ -1,13 +1,23 @@
 "use client";
 
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { Check, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { Button, IconButton, TextButton } from "@/src/platform/ui/button";
 import { Empty } from "@/src/platform/ui/sheet";
 import { FormError, Textarea } from "@/src/platform/ui/field";
 import type { OrderLine } from "../../actions/quote-links";
 
-export type Medicine = { id: string; code: string; name: string; genericName: string | null; strength: string | null; form: string | null; unit: string | null; priceCentavos: number };
+/** `rx`: sold only on a prescription (an order link asks for it). */
+export type Medicine = { id: string; code: string; name: string; genericName: string | null; strength: string | null; form: string | null; unit: string | null; priceCentavos: number; rx?: boolean };
+
+/** Beside a prescription medicine's name. */
+function RxMark() {
+  return (
+    <span title="Needs a prescription" className="ml-2 inline-flex h-5 items-center rounded-full bg-danger-tint px-2 align-middle text-[0.6875rem] font-semibold text-danger">
+      Rx
+    </span>
+  );
+}
 
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 const money = (centavos: number) => peso.format(centavos / 100);
@@ -25,6 +35,9 @@ export function MedicineSearch({
   before,
   missing = null,
   withAsk = false,
+  showPrices = true,
+  onPick,
+  extra,
   onSubmit,
 }: {
   medicines: Medicine[];
@@ -37,6 +50,12 @@ export function MedicineSearch({
   missing?: string | null;
   /** Each pick can ask for another price (a customer's order link): the rep decides. */
   withAsk?: boolean;
+  /** False on a customer's order link: the prices come in the quotation, not here. */
+  showPrices?: boolean;
+  /** Told which medicines are picked, as they change (the order link asks for a prescription for Rx ones). */
+  onPick?: (ids: string[]) => void;
+  /** More, under the picks and before the note (the prescription). */
+  extra?: ReactNode;
   onSubmit: (lines: OrderLine[], note: string | null) => Promise<string | null>;
 }) {
   const [q, setQ] = useState("");
@@ -49,10 +68,13 @@ export function MedicineSearch({
   const byId = useMemo(() => new Map(medicines.map((m) => [m.id, m])), [medicines]);
   const found = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return [];
+    // Nothing typed yet: the medicines themselves, so there's something to pick from at once.
+    if (!t) return medicines.slice(0, 30);
     return medicines.filter((m) => [m.name, m.genericName, m.code].some((x) => x?.toLowerCase().includes(t))).slice(0, 30);
   }, [q, medicines]);
   const chosen = Object.entries(picked).filter(([, n]) => n > 0);
+  const chosenIds = chosen.map(([id]) => id).join(",");
+  useEffect(() => onPick?.(chosenIds ? chosenIds.split(",") : []), [chosenIds, onPick]);
   const askedOf = (id: string): number | null => {
     const typed = asking[id];
     if (typed === undefined || !typed.trim()) return null;
@@ -87,9 +109,14 @@ export function MedicineSearch({
           <Search className="size-4 text-ink-3" aria-hidden />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type its name, generic name or code" aria-label="Find a medicine" autoFocus className="w-full bg-transparent text-sm outline-none" />
         </label>
-        {!q.trim() ? (
-          <Empty compact icon="products" title="Search the medicines">
-            {medicines.length} medicines, with their prices. Type a few letters of the one you need.
+        {!q.trim() && medicines.length > 0 && (
+          <p className="mt-3 text-meta text-ink-3">
+            {medicines.length <= 30 ? `All ${medicines.length} medicines${showPrices ? ", at this price" : ""}.` : `The first 30 of ${medicines.length} medicines. Type a few letters to find the one you need.`}
+          </p>
+        )}
+        {medicines.length === 0 ? (
+          <Empty compact icon="products" title="No medicines at this price">
+            None of the products has this price yet. Try another price above, or give them one in Products.
           </Empty>
         ) : found.length === 0 ? (
           <Empty compact icon="products" title={`Nothing called "${q.trim()}"`}>
@@ -100,15 +127,26 @@ export function MedicineSearch({
             {found.map((m) => (
               <li key={m.id} className="flex items-center gap-3 py-3">
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-ink">{m.name}</span>
+                  <span className="block font-medium text-ink">
+                    {m.name}
+                    {m.rx && <RxMark />}
+                  </span>
                   <span className="block truncate text-meta text-ink-3">{[words(m), m.code].filter(Boolean).join(" · ")}</span>
                 </span>
-                <span className="shrink-0 text-right">
-                  <span className="block text-sm font-semibold text-ink tabular-nums">{money(m.priceCentavos)}</span>
-                  <span className="block text-meta text-ink-3">per {m.unit ?? "unit"}</span>
-                </span>
+                {showPrices ? (
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-semibold text-ink tabular-nums">{money(m.priceCentavos)}</span>
+                    <span className="block text-meta text-ink-3">per {m.unit ?? "unit"}</span>
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-meta text-ink-3">by the {m.unit ?? "unit"}</span>
+                )}
                 {picked[m.id] ? (
-                  <Quantity value={picked[m.id]} onChange={(n) => set(m.id, n)} name={m.name} />
+                  // How many is set in one place only: Your order.
+                  <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-hema-tint px-3 text-meta font-medium text-sage-deep">
+                    <Check className="size-3.5" aria-hidden />
+                    Added
+                  </span>
                 ) : (
                   <Button size="sm" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => set(m.id, 1)}>
                     Add
@@ -135,9 +173,16 @@ export function MedicineSearch({
               return (
                 <li key={id} className="flex items-center gap-3 py-3">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">{m.name}</span>
+                    <span className="block truncate text-sm font-medium text-ink">
+                      {m.name}
+                      {m.rx && <RxMark />}
+                    </span>
                     <span className="block text-meta text-ink-3 tabular-nums">
-                      {askedOf(id) !== null ? (
+                      {!showPrices ? (
+                        <>
+                          Quantity {n} · by the {m.unit ?? "unit"}
+                        </>
+                      ) : askedOf(id) !== null ? (
                         <>
                           <s>{money(m.priceCentavos)}</s> {money(askedOf(id)!)} asked × {n} = {money(askedOf(id)! * n)}
                         </>
@@ -181,10 +226,19 @@ export function MedicineSearch({
           </ul>
         )}
         {anyAsked && <p className="mt-3 rounded-[14px] bg-mint px-3 py-2 text-meta text-ink-2">You asked for another price: your representative reviews it before the quotation is final. The total shows what you asked for.</p>}
-        <div className="mt-3 flex items-baseline justify-between border-t border-rule-strong pt-3">
-          <span className="text-sm font-medium text-ink">{anyAsked ? "Total, as asked" : "Total"}</span>
-          <span className="text-[1.5rem] font-semibold text-ink tabular-nums">{money(total)}</span>
-        </div>
+        {showPrices ? (
+          <div className="mt-3 flex items-baseline justify-between border-t border-rule-strong pt-3">
+            <span className="text-sm font-medium text-ink">{anyAsked ? "Total, as asked" : "Total"}</span>
+            <span className="text-[1.5rem] font-semibold text-ink tabular-nums">{money(total)}</span>
+          </div>
+        ) : (
+          chosen.length > 0 && (
+            <p className="mt-3 border-t border-rule-strong pt-3 text-meta text-ink-2">
+              {chosen.length} {chosen.length === 1 ? "medicine" : "medicines"}. The prices come in your quotation, after you send this.
+            </p>
+          )
+        )}
+        {extra}
         {withNote && (
           <label className="mt-4 block">
             <span className="mb-1.5 block text-sm font-medium text-ink">

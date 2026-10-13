@@ -243,6 +243,8 @@ def quote_out(db: Session, q: Quote, access: Access, approvers: bool = True) -> 
             else [],
         },
         "letter": letter,
+        # Attached by the customer on an order link: opened one by one (/quotes/{id}/prescriptions/{n}).
+        "prescriptions": [{"n": n, "name": f["name"], "contentType": f["contentType"], "size": f["size"]} for n, f in enumerate(q.prescriptions or [])],
         "payment": {"status": q.payment_status, "paidCentavos": q.paid_centavos, "payments": q.payments},
         "validUntil": q.valid_until,
         "terms": q.terms,
@@ -588,6 +590,21 @@ def read_letter_file(access: View, db: DB, quote_id: str) -> Response:
         stored.data,
         media_type=stored.content_type,
         headers={"Content-Disposition": f"inline; filename*=utf-8''{url_quote(name)}"},
+    )
+
+
+@router.get("/quotes/{quote_id}/prescriptions/{n}")
+def read_prescription(access: View, db: DB, quote_id: str, n: int) -> Response:
+    """One prescription attached to the quote, for whoever can see the quote."""
+    quote = get_quote(db, access, quote_id)
+    files = quote.prescriptions or []
+    stored = db.get(StoredFile, files[n]["ref"]) if 0 <= n < len(files) else None
+    if stored is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This quote has no such prescription.")
+    return Response(
+        stored.data,
+        media_type=stored.content_type,
+        headers={"Content-Disposition": f"inline; filename*=utf-8''{url_quote(files[n]['name'])}"},
     )
 
 

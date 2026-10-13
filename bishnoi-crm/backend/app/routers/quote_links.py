@@ -19,22 +19,25 @@ Nothing about other customers, other price types or the rep's own figures is
 ever shown through it.
 """
 
+import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import Field
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import Field, ValidationError
 from sqlalchemy import select
 
 from app.access import Access, CurrentAccess
-from app.api import Api, digits, iso, not_found
+from app.api import Api, digits, field_error, iso, not_found
 from app.audit import audit
 from app.connections import NoKey, seal, unseal
 from app.deps import DB, CurrentUser, SettingsDep, as_utc
 from app.extra import check_extra
-from app.models import Company, Contact, QuoteLink, User
+from app.models import Company, Contact, QuoteLink, StoredFile, User
 from app.pricing import price_book, price_lines, today
 from app.routers.customer_types import first_type
-from app.routers.quotes import Discount, LineIn, QuoteIn, book_for, save_quote, with_tax
+from app.routers.quotes import LETTER_KINDS, MAX_LETTER_BYTES, LineIn, QuoteIn, book_for, save_quote, with_tax
 from app.scope import reaches
 from app.security import new_token, token_hash
 from app.tenants import company_of
@@ -43,8 +46,6 @@ router = APIRouter(tags=["quotes"])
 
 # How long a link may live: an hour, up to a week.
 LIFETIMES = (1, 4, 24, 72, 168)
-def money(centavos: int) -> str:
-    return f"\u20b1{centavos / 100:,.2f}"
 
 
 GONE = "This link has expired or was already used. Ask your medical representative for a new one."
@@ -257,7 +258,8 @@ def open_link(db, token: str) -> QuoteLink:
 
 @router.get("/public/quote-links/{token}")
 def read_link(request: Request, db: DB, settings: SettingsDep, token: str) -> dict:
-    """What the customer sees: who it's for, until when, and the medicines at their price."""
+    """What the customer sees: who it's for, until when, and the medicines on offer.
+    Never their prices: those come in the quotation letter, once the order is in."""
     link = open_link(db, token[:100])
     book = book_of(db, link, link.owner, today(settings.org_timezone))
     kind = book.price_type(link.price_type)
@@ -266,7 +268,7 @@ def read_link(request: Request, db: DB, settings: SettingsDep, token: str) -> di
         price = book.prices.get(p.id, {}).get(link.price_type)
         if not price:
             continue
-        products.append({"id": p.id, "code": p.code, "name": p.name, "genericName": p.generic_name, "strength": p.strength, "form": p.form, "unit": p.unit, "priceCentavos": price})
+        products.append({"id": p.id, "code": p.code, "name": p.name, "genericName": p.generic_name, "strength": p.strength, "form": p.form, "unit": p.unit, "rx": p.needs_prescription})
     products.sort(key=lambda x: x["name"].lower())
     return {
         "company": company_of(request),
@@ -276,7 +278,6 @@ def read_link(request: Request, db: DB, settings: SettingsDep, token: str) -> di
         # Not a customer yet: the page asks who they are before they send.
         "asksWho": link.company is None,
         "rep": link.owner.full_name,
-        "priceType": kind.name if kind else link.price_type,
         "expiresAt": iso(link.expires_at),
         "products": products,
     }
@@ -285,8 +286,6 @@ def read_link(request: Request, db: DB, settings: SettingsDep, token: str) -> di
 class OrderLine(Api):
     product_id: str = Field(max_length=36)
     quantity: int = Field(ge=1, le=100_000)
-    # The price per unit the customer asks for instead of the link's: the quote waits for approval.
-    asked_price_centavos: int | None = Field(None, ge=1)
 
 
 class NewCustomer(Api):
@@ -296,13 +295,20 @@ class NewCustomer(Api):
     contact_name: str | None = Field(None, max_length=160)
     mobile: str | None = Field(None, max_length=40)
     email: str | None = Field(None, max_length=254)
+    # Where to deliver; the pin only if they chose to share their location.
+    address: str | None = Field(None, max_length=300)
     city: str | None = Field(None, max_length=80)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
 
 
 class OrderIn(Api):
     lines: list[OrderLine] = Field(min_length=1, max_length=50)
     note: str | None = Field(None, max_length=1000)
     customer: NewCustomer | None = None
+    # Agreed to the privacy notice on the page: a medicine order is health
+    # information, sensitive under the Data Privacy Act, so none is taken without it.
+    privacy_accepted: bool = False
 
 
 def customer_from(db, rep: User, who: NewCustomer) -> tuple[Company, Contact | None]:
@@ -318,7 +324,10 @@ def customer_from(db, rep: User, who: NewCustomer) -> tuple[Company, Contact | N
         status=first_type(db, team_id=rep.team_id),
         email=email,
         phone=(who.mobile or "").strip() or None,
+        address=(who.address or "").strip() or None,
         city=(who.city or "").strip() or None,
+        latitude=who.latitude if who.latitude is not None and who.longitude is not None else None,
+        longitude=who.longitude if who.latitude is not None and who.longitude is not None else None,
         notes="Added from an order link, when they ordered.",
         owner_id=rep.id,
         team_id=rep.team_id,
@@ -336,13 +345,41 @@ def customer_from(db, rep: User, who: NewCustomer) -> tuple[Company, Contact | N
     return company, contact
 
 
+# A prescription, as a guarantee letter is taken: a PDF or a photo, told by its first bytes.
+MAX_PRESCRIPTIONS = 3
+
+
+def read_prescriptions(uploads: list[UploadFile]) -> list[tuple[bytes, str, str, str]]:
+    """Each file's bytes, extension, content type and name; refused, in words, if one isn't a PDF or a photo, or is too big."""
+    if len(uploads) > MAX_PRESCRIPTIONS:
+        raise field_error("prescription", f"Attach up to {MAX_PRESCRIPTIONS} files.")
+    out = []
+    for upload in uploads:
+        data = upload.file.read(MAX_LETTER_BYTES + 1)
+        if len(data) > MAX_LETTER_BYTES:
+            raise field_error("prescription", "A file is over 8 MB. Take the photo again at a lower size.")
+        kind = next((v for magic, v in LETTER_KINDS.items() if data.startswith(magic)), None)
+        if kind is None:
+            raise field_error("prescription", "Attach the prescription as a photo (JPG or PNG) or a PDF.")
+        content_type, ext = kind
+        out.append((data, ext, content_type, (upload.filename or f"prescription{ext}")[:120]))
+    return out
+
+
 @router.post("/public/quote-links/{token}", status_code=status.HTTP_201_CREATED)
-def place_order(db: DB, settings: SettingsDep, token: str, body: OrderIn) -> dict:
-    """The customer's picks, made into a quote for them, the rep's. The link is used up."""
+def place_order(db: DB, settings: SettingsDep, token: str, order: Annotated[str, Form(max_length=20000)], prescription: Annotated[list[UploadFile], File()] = []) -> dict:  # noqa: B006 (FastAPI's way of saying "none sent")
+    """The customer's picks, made into a quote for them, the rep's. The link is used up.
+    Sent as a form: `order` (the order, as JSON) and `prescription` (the files, for Rx medicines)."""
+    try:
+        body = OrderIn.model_validate_json(order)
+    except ValidationError as e:
+        raise RequestValidationError([{**x, "loc": ("body", *x["loc"])} for x in e.errors(include_url=False)]) from None
     link = open_link(db, token[:100])
     company, contact, rep = link.company, link.contact, db.get(User, link.owner_id)
     if rep is None or not rep.is_active:
         raise HTTPException(status.HTTP_410_GONE, GONE)
+    if not body.privacy_accepted:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "privacyAccepted"], "msg": "Agree to the privacy notice to send your order."}])
     if company is None and body.customer is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "customer", "name"], "msg": "Say who's ordering: your name, or your business's."}])
     if company is None and not ((body.customer.mobile or "").strip() or (body.customer.email or "").strip()):
@@ -352,51 +389,79 @@ def place_order(db: DB, settings: SettingsDep, token: str, body: OrderIn) -> dic
     if kind is None:
         raise HTTPException(status.HTTP_410_GONE, GONE)
     seen: dict[str, int] = {}
-    asked: dict[str, int] = {}
     for line in body.lines:  # the same medicine twice is one line
         seen[line.product_id] = seen.get(line.product_id, 0) + line.quantity
-        if line.asked_price_centavos:
-            asked[line.product_id] = line.asked_price_centavos
     allowed = {pid for pid in book.products if book.prices.get(pid, {}).get(link.price_type)}
     if any(pid not in allowed for pid in seen):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "One of the medicines isn't offered on this link. Reload the page and pick again.")
-    # An asked price: lower than the link's, it's the line's discount (what's asked off each unit, times how many).
-    listed = {pid: book.prices[pid][link.price_type] for pid in seen}
-    asked = {pid: price for pid, price in asked.items() if price < listed[pid]}
-    words = [f"{book.products[pid].name}: asked {money(price)} a unit (the price was {money(listed[pid])})" for pid, price in asked.items()]
-    note = " ".join(x for x in ("Ordered by the customer through a link.", (body.note or "").strip(), ("The customer asked for another price. " + "; ".join(words) + ".") if words else "") if x)
-
-    def lines(with_asked: bool) -> list[LineIn]:
-        return [
-            LineIn(product_id=pid, quantity=qty, discount=Discount(kind="amount", value=(listed[pid] - asked[pid]) * qty) if with_asked and pid in asked else None)
-            for pid, qty in seen.items()
-        ]
-
-    quote = QuoteIn(price_type=kind.code, notes=note[:2000], lines=lines(True))
-    try:
-        priced = price_lines(book, quote.price_type, quote.rx, [l.model_dump(by_alias=True) for l in quote.lines])
-    except HTTPException:
-        if not asked:
-            raise
-        # Discounts are off in the price rules: the asked prices stay in the notes, for the approver.
-        quote = QuoteIn(price_type=kind.code, notes=note[:2000], lines=lines(False))
-        priced = price_lines(book, quote.price_type, quote.rx, [l.model_dump(by_alias=True) for l in quote.lines])
-    priced = with_tax(settings, book, priced)
-    if asked:
-        # Asked for: someone decides, however small the change.
-        priced["approvalReasons"] = sorted({*priced["approvalReasons"], "asked"})
+    # Rx medicines: the prescription comes with the order, and a pharmacist checks it.
+    rx = sorted(book.products[pid].name for pid in seen if book.products[pid].needs_prescription)
+    if rx and not prescription:
+        raise field_error("prescription", f"{', '.join(rx)} {'needs' if len(rx) == 1 else 'need'} a prescription: attach a photo of it.")
+    files = read_prescriptions(prescription) if rx else []
+    agreed = datetime.now(UTC)
+    note = " ".join(x for x in (
+        "Ordered by the customer through a link.",
+        (body.note or "").strip(),
+        f"Prescription attached ({len(files)} {'file' if len(files) == 1 else 'files'}) for {', '.join(rx)}." if files else "",
+        f"They agreed to the privacy notice on {agreed:%d %b %Y, %H:%M} UTC.",
+    ) if x)
+    quote = QuoteIn(price_type=kind.code, notes=note[:2000], lines=[LineIn(product_id=pid, quantity=qty) for pid, qty in seen.items()])
+    priced = with_tax(settings, book, price_lines(book, quote.price_type, quote.rx, [l.model_dump(by_alias=True) for l in quote.lines]))
     if company is None:
         # Now they're a customer: the rep's, priced as above.
         company, contact = customer_from(db, rep, body.customer)
         link.company_id, link.contact_id = company.id, contact.id if contact else None
     record = save_quote(db, settings, rep, company, contact, quote, priced, kind, None, None, check_extra(db, "quote", None), book.settings)
+    if files:
+        # Kept like a guarantee letter, in the database; the quote is Rx, so a pharmacist checks it before it's ordered.
+        kept = []
+        for data, ext, content_type, name in files:
+            ref = secrets.token_hex(16)
+            db.add(StoredFile(ref=ref, content_type=content_type, data=data))
+            kept.append({"ref": ref, "ext": ext, "name": name, "contentType": content_type, "size": len(data)})
+        record.prescriptions = kept
+        record.rx = True
     link.used_at = datetime.now(UTC)
+    link.privacy_accepted_at = agreed
     link.quote_id = record.id
     db.commit()
+    # What they ordered, without prices: those come in the quotation letter.
     return {
         "number": record.number,
-        "totalCentavos": record.total_centavos,
-        "lines": [{"name": l.get("productName"), "quantity": l.get("quantity"), "totalCentavos": l.get("totalCentavos")} for l in record.lines],
+        "lines": [{"name": l.get("productName"), "quantity": l.get("quantity")} for l in record.lines],
         "waitsForApproval": record.approval_status == "pending",
         "rep": rep.full_name,
     }
+
+
+class Spot(Api):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+@router.post("/public/quote-links/{token}/place")
+def place_of(db: DB, token: str, body: Spot) -> dict:
+    """The address at a shared location, to fill in the delivery address: only for
+    an open link (so it isn't a free lookup for anyone), in the Philippines. Nothing
+    is kept here; the person checks it and sends it with the order."""
+    open_link(db, token[:100])
+    import httpx
+
+    try:
+        r = httpx.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": body.latitude, "lon": body.longitude, "format": "jsonv2", "zoom": 18, "addressdetails": 1, "accept-language": "en"},
+            headers={"User-Agent": "BishnoiOne-CRM/1.0 (order links)"},
+            timeout=8,
+        )
+        found = r.json().get("address", {}) if r.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
+        found = {}
+    if found.get("country_code") not in (None, "ph"):
+        return {"address": None, "city": None}
+    street = " ".join(x for x in (found.get("house_number"), found.get("road")) if x)
+    barangay = found.get("quarter") or found.get("suburb") or found.get("neighbourhood") or found.get("village") or found.get("hamlet")
+    address = ", ".join(x for x in (street, f"Brgy. {barangay}" if barangay and not barangay.lower().startswith(("brgy", "barangay")) else barangay) if x) or None
+    city = found.get("city") or found.get("town") or found.get("municipality") or found.get("county")
+    return {"address": address, "city": city}

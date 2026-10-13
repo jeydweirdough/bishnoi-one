@@ -51,4 +51,10 @@ def company_pass(db: DB, settings: SettingsDep, app: str = Query(max_length=40),
     if found is None or application is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such company registered on the platform.")
     granted = db.get(CompanyApp, (found.id, application.id)) is not None
-    return {"pass": passes.company_pass(settings, found, application, granted)}
+    token = passes.company_pass(settings, found, application, granted)
+    from app.company_push import record_asked
+
+    # Anyone may ask (the pass is what the application checks), so it's
+    # recorded at most once an hour per company and application.
+    record_asked(db, found, application, passes.claims_of(token))
+    return {"pass": token}

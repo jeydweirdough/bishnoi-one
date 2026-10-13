@@ -44,7 +44,9 @@ def make_engine(url: str) -> Engine:
         # connection may be dead by the next one. Connect per request; the
         # database's pooler does the pooling on its side.
         return create_engine(url, poolclass=NullPool, connect_args=connect_args)
-    engine = create_engine(url, connect_args=connect_args)
+    # With every pooled connection busy, a request waits at most 10 seconds for one,
+    # then answers 503 (app/guard.py), rather than piling up behind the others.
+    engine = create_engine(url, connect_args=connect_args, pool_timeout=10)
     _ping_when_idle(engine)
     return engine
 

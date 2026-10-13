@@ -10,11 +10,12 @@ import type { Quote } from "@/src/platform/lib/types";
 
 export type LinkState = "open" | "used" | "expired" | "switched_off";
 export type QuoteLink = { id: string; state: LinkState; priceType: string; createdAt: string; expiresAt: string; usedAt: string | null; quoteId: string | null; customer: { id: string; name: string } | null; owner: { id: string; name: string } };
-export type NewCustomer = { name: string; contactName: string | null; mobile: string | null; email: string | null; city: string | null };
+export type NewCustomer = { name: string; contactName: string | null; mobile: string | null; email: string | null; address: string | null; city: string | null; latitude: number | null; longitude: number | null };
 export type QuoteLinks = { items: QuoteLink[]; priceTypes: { code: string; name: string }[]; lifetimes: number[] };
 /** `askedPriceCentavos`: the price per unit the customer asks for instead (an order link's); the quote then waits for approval. */
 export type OrderLine = { productId: string; quantity: number; askedPriceCentavos?: number };
-export type Placed = { number: string; totalCentavos: number; lines: { name: string; quantity: number; totalCentavos: number }[]; waitsForApproval: boolean; rep: string };
+/** No prices: on an order link they come in the quotation, not on the page. */
+export type Placed = { number: string; lines: { name: string; quantity: number }[]; waitsForApproval: boolean; rep: string };
 
 /** A customer's links; with no customer, the links this person made (Customers → Order links). */
 export async function quoteLinks(companyId: string | null): Promise<QuoteLinks> {
@@ -46,8 +47,18 @@ export async function deleteQuoteLink(id: string): Promise<Result> {
 }
 
 /** The customer's order, through the link: no account, the company named by the link's address. */
-export async function placeOrder(company: string, token: string, lines: OrderLine[], note: string | null, customer: NewCustomer | null = null): Promise<Result<Placed>> {
-  return attempt(() => api.post<Placed>(`/public/quote-links/${enc(token)}`, { lines, note, customer }, { [COMPANY_HEADER]: company }));
+/** `order`: the form the page made: "order" (the order, as JSON) and "prescription" (the files, for Rx medicines). */
+export async function placeOrder(company: string, token: string, order: FormData): Promise<Result<Placed>> {
+  return attempt(() => api.post<Placed>(`/public/quote-links/${enc(token)}`, order, { [COMPANY_HEADER]: company }));
+}
+
+/** The address at a shared location, to fill in the delivery address (checked by the person before sending). */
+export async function addressAt(company: string, token: string, latitude: number, longitude: number): Promise<{ address: string | null; city: string | null }> {
+  try {
+    return await api.post<{ address: string | null; city: string | null }>(`/public/quote-links/${enc(token)}/place`, { latitude, longitude }, { [COMPANY_HEADER]: company });
+  } catch {
+    return { address: null, city: null };
+  }
 }
 
 /** A rep's quote from the medicine search: the customer's list price, paid by the customer. */
