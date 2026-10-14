@@ -76,3 +76,15 @@ def test_a_registered_applications_pages_may_call_the_platform(client, ana):
     assert r.headers.get("access-control-allow-origin") == "https://crm.example.com"
     r = client.options("/public/applications", headers={"Origin": "https://not-ours.example.com", "Access-Control-Request-Method": "GET"})
     assert r.headers.get("access-control-allow-origin") is None
+
+
+def test_registered_origins_on_a_machine_just_started(client, ana, monkeypatch):
+    # CI machines are often under a minute old: the clock (time since start)
+    # then reads a few seconds, and the never-read cache must not look fresh.
+    import time
+
+    crm = app_id(client, ana, "crm")
+    client.patch(f"/platform/applications/{crm}", json={"appUrl": "https://crm.example.com"}, headers=ana)
+    monkeypatch.setattr(time, "monotonic", lambda: 5.0)
+    r = client.options("/public/applications", headers={"Origin": "https://crm.example.com", "Access-Control-Request-Method": "GET"})
+    assert r.headers.get("access-control-allow-origin") == "https://crm.example.com"

@@ -129,7 +129,10 @@ class RegisteredOrigins(CORSMiddleware):
     def __init__(self, app, sessions, **options) -> None:
         super().__init__(app, **options)
         self._sessions = sessions
-        self._known: tuple[float, set[str]] = (0.0, set())
+        # Never read yet: -inf, not 0.0. The clock is time since the machine
+        # started, so on a machine up for under a minute 0.0 would look fresh
+        # and the first minute would allow no registered origin at all.
+        self._known: tuple[float, set[str]] = (float("-inf"), set())
 
     def _registered(self) -> set[str]:
         import time
