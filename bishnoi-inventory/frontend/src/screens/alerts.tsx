@@ -16,8 +16,8 @@ export default async function AlertsPage() {
   return (
     <>
       <PageHeader title="Alerts">
-        Flagged by themselves, as stock moves: low and out of stock, batches expired or expiring within {warn} days, and documents
-        waiting on someone in your role.
+        Raised automatically as stock moves: low and out-of-stock items, batches expired or expiring within {warn} days, and documents
+        pending action by your role.
       </PageHeader>
       <Sheet className="px-5 pt-2 pb-3">
         <AlertList alerts={alerts} />

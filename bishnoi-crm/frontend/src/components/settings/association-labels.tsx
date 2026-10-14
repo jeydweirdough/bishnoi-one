@@ -36,7 +36,7 @@ function Row({ l, onSaved }: { l: AssociationLabel; onSaved: (list: AssociationL
       <span className="flex items-center gap-2">
         <span className="text-meta text-ink-3">{l.used} linked</span>
         <Button size="sm" variant="quiet" disabled={pending} onClick={() => save({ isActive: !l.isActive })}>
-          {l.isActive ? "Switch off" : "Switch on"}
+          {l.isActive ? "Deactivate" : "Activate"}
         </Button>
       </span>
     </li>

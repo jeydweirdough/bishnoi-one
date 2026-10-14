@@ -239,7 +239,7 @@ function People({ fmt, insights, results, params }: { fmt: Format; insights: Peo
       </div>
       {people.length === 0 ? (
         <div className="px-5 py-2">
-          <Empty icon="people" title="Nobody else yet" actions={<LinkButton href="/admin/users/new" variant="primary">Add a person</LinkButton>}>
+          <Empty icon="people" title="No other users" actions={<LinkButton href="/admin/users/new" variant="primary">Add a person</LinkButton>}>
             Add the people who use the CRM, and give each a role.
           </Empty>
         </div>

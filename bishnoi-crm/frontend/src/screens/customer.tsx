@@ -113,7 +113,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <div className="contents lg:block lg:space-y-5">
             {customer.can.log && (
               <Sheet className="order-2 px-5 pt-4 pb-5">
-                <SectionTitle icon="logActivity">Log what happened</SectionTitle>
+                <SectionTitle icon="logActivity">Log activity</SectionTitle>
                 <div className="mt-2">
                   <LogActivity
                                         customerId={id}

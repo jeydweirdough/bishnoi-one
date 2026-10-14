@@ -46,7 +46,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
     <div className="min-h-screen bg-bench print:bg-white">
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-rule bg-sheet px-6 py-3 print:hidden">
         <LinkButton href={`/quotes/${id}`} variant="quiet">
-          Back to the quote
+          Back to quote
         </LinkButton>
         {choices.length > 1 && (
           <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-lg border border-rule-strong bg-sheet p-0.5">

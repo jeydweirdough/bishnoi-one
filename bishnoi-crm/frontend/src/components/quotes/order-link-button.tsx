@@ -13,7 +13,7 @@ import { changeQuoteLink, deleteQuoteLink, makeQuoteLink, quoteLinks, quoteLinkT
 
 const LIFETIMES = [1, 4, 24, 72, 168];
 const LIFETIME_WORDS: Record<number, string> = { 1: "1 hour", 4: "4 hours", 24: "1 day", 72: "3 days", 168: "1 week" };
-const STATE = { open: { text: "Open", tone: "good" }, used: { text: "Used", tone: "plain" }, expired: { text: "Expired", tone: "plain" }, switched_off: { text: "Switched off", tone: "plain" } } as const;
+const STATE = { open: { text: "Open", tone: "good" }, used: { text: "Used", tone: "plain" }, expired: { text: "Expired", tone: "plain" }, switched_off: { text: "Inactive", tone: "plain" } } as const;
 const when = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
 type Choices = Pick<QuoteLinks, "priceTypes" | "lifetimes"> & Partial<Pick<QuoteLinks, "payers">>;
@@ -43,7 +43,7 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
   };
   return (
     <section className="rounded-xl border border-rule p-4">
-      <p className="text-sm font-semibold text-ink">What the customer sends</p>
+      <p className="text-sm font-semibold text-ink">Required documents</p>
       <p className="text-meta text-ink-3">They&apos;re asked for exactly these, and can&apos;t send the order without them. Rx medicines always need a prescription.</p>
       <label className="mt-3 flex cursor-pointer items-start gap-3">
         <input type="checkbox" checked={asks.prescriptionAlways} onChange={(e) => setAsks({ ...asks, prescriptionAlways: e.target.checked })} className="mt-0.5 size-4 accent-[#141414]" />
@@ -51,11 +51,11 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
       </label>
       {(choices?.payers?.length ?? 0) > 0 && (
         <label className="mt-3 block">
-          <span className="mb-1.5 block text-sm text-ink">Who pays</span>
+          <span className="mb-1.5 block text-sm text-ink">Payer</span>
           <Combobox
             value={asks.payer ?? ""}
             onChange={(v: string) => setAsks({ ...asks, payer: v || null })}
-            options={[{ value: "", label: "They pay themselves" }, ...choices!.payers!.map((p) => ({ value: p.code, label: `${p.name}: they attach the guarantee letter` }))]}
+            options={[{ value: "", label: "Customer (self-pay)" }, ...choices!.payers!.map((p) => ({ value: p.code, label: `${p.name}: they attach the guarantee letter` }))]}
           />
         </label>
       )}
@@ -99,7 +99,7 @@ const address = (slug: string, token: string) => `${window.location.origin}/orde
 
 async function copyText(text: string) {
   await navigator.clipboard.writeText(text).catch(() => null);
-  toast.success("Link copied", { description: "Send it: it works once." });
+  toast.success("Link copied", { description: "Single-use link." });
 }
 
 /** How long it works, and which price it shows: the same two fields to make a link and to change one. */
@@ -181,7 +181,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         </p>
 
         {made ? (
-          <DialogPanel title="Send this link" hint="You can copy it again from the list while it works.">
+          <DialogPanel title="Order link" hint="You can copy it again from the list while it works.">
             <div className="flex items-center gap-2">
               <input readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
               <Button variant="primary" icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} onClick={copy}>
@@ -197,7 +197,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
             <div className="dialog-actions">
               <Button onClick={() => setOpen(false)}>Cancel</Button>
               <Button variant="primary" loading={pending} disabled={!data?.priceTypes.length} onClick={make}>
-                Make the link
+                Create link
               </Button>
             </div>
           </div>
@@ -236,7 +236,7 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
     start(async () => {
       const r = await changeQuoteLink(l.id, { on });
       if (!r.ok) return void toast.error(r.error);
-      toast.success(on ? "Link switched on" : "Link switched off");
+      toast.success(on ? "Link activated" : "Link deactivated");
       onChanged();
     });
   }
@@ -287,9 +287,9 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
                 placement="bottomRight"
                 menu={{
                   items: [
-                    ...(l.state !== "used" ? [{ key: "change", label: l.state === "expired" ? "Give it more time" : "Change" }] : []),
-                    ...(l.state === "open" ? [{ key: "off", label: "Switch off" }] : []),
-                    ...(l.state === "switched_off" ? [{ key: "on", label: "Switch on" }] : []),
+                    ...(l.state !== "used" ? [{ key: "change", label: l.state === "expired" ? "Extend" : "Edit" }] : []),
+                    ...(l.state === "open" ? [{ key: "off", label: "Deactivate" }] : []),
+                    ...(l.state === "switched_off" ? [{ key: "on", label: "Activate" }] : []),
                     ...(l.state !== "used" ? [{ type: "divider" as const }] : []),
                     { key: "delete", label: "Delete", danger: true },
                   ],
@@ -301,7 +301,7 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
                   },
                 }}
               >
-                <IconButton label="Change, switch off or delete this link" disabled={pending}>
+                <IconButton label="Edit, deactivate or delete this link" disabled={pending}>
                   <MoreHorizontal className="size-4" aria-hidden />
                 </IconButton>
               </Dropdown>

@@ -15,8 +15,8 @@ export default async function CustomerTypesPage() {
   return (
     <>
       <PageHeader title="Settings">
-        Customer types: what kind of customer each one is. The first one switched on is what a new customer starts as. A type in use can be
-        switched off (the customers keep it) but not deleted.
+        Customer types: what kind of customer each one is. The first active one is what a new customer starts as. A type in use can be
+        deactivated (the customers keep it) but not deleted.
       </PageHeader>
       <CustomerTypesEditor types={types} teams={teams} />
     </>

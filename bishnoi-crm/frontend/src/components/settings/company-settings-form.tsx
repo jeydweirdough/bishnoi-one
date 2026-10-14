@@ -92,7 +92,7 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
       className={`grid gap-5 rounded-xl transition-all duration-300 lg:grid-cols-2 lg:items-start ${shakeClass} ${anticipateClass}`}
     >
       <Sheet className="px-5 pt-4 pb-5">
-        <SectionTitle icon="company">Your business</SectionTitle>
+        <SectionTitle icon="company">Business details</SectionTitle>
         <div className="mt-3 grid gap-5 sm:grid-cols-2">
           <Field label="Name" error={fields.orgName} className="sm:col-span-2" hint="Shown on screens and quotes.">
             {(p) => <Input {...p} value={v.orgName} onChange={set("orgName")} />}

@@ -23,7 +23,7 @@ from app.api import Api, as_utc, camel, changed, field_error, iso, not_found, pe
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Product, PLANNED_KINDS, Activity, ActivityLink, Company, Contact
+from app.models import Product, PLANNED_KINDS, Activity, ActivityLink, Company, Contact, Visit
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -277,6 +277,35 @@ def summary(
     for state in ("overdue", "today", "upcoming", "open"):
         counts[state] = db.scalar(select(func.count()).select_from(in_state(base, state, settings).subquery())) or 0
     return counts
+
+
+@router.get("/daily")
+def daily(
+    access: View,
+    db: DB,
+    settings: SettingsDep,
+    from_: date = Query(alias="from", description="from this day (the company's own)"),
+    to: date = Query(description="up to, not including, this day"),
+) -> dict:
+    """How much the person signed in got done each day, for their profile's
+    charts: activities done, and visits made, counted on the company's own days.
+    At most a year at a time."""
+    if to <= from_ or (to - from_).days > 366:
+        raise field_error("to", "Pick up to a year, ending after it starts.")
+    zone = ZoneInfo(settings.org_timezone)
+    start = datetime.combine(from_, time(), zone).astimezone(UTC)
+    end = datetime.combine(to, time(), zone).astimezone(UTC)
+    done = db.scalars(
+        select(Activity.done_at).where(Activity.owner_id == access.user_id, Activity.done_at >= start, Activity.done_at < end)
+    ).all()
+    visited = db.scalars(
+        select(Visit.visited_at).where(Visit.owner_id == access.user_id, Visit.visited_at >= start, Visit.visited_at < end)
+    ).all()
+    days: dict[str, int] = {}
+    for at in [*done, *visited]:
+        day = as_utc(at).astimezone(zone).date().isoformat()
+        days[day] = days.get(day, 0) + 1
+    return {"days": days}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

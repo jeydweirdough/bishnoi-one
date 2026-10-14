@@ -143,7 +143,7 @@ export function UserForm({ roles, teams, user }: Props) {
               {pickableTeams.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
-                  {t.isActive ? "" : " (switched off)"}
+                  {t.isActive ? "" : " (inactive)"}
                 </option>
               ))}
             </Select>

@@ -10,9 +10,9 @@ export function ActivityFilters({ category, actor, q, actors }: { category: stri
     <form action="/activity" method="get" role="search" className="mb-4 flex flex-wrap items-end gap-x-4 gap-y-3">
       {category && <input type="hidden" name="category" value={category} />}
       <label className="block w-full sm:w-56">
-        <span className="mb-1 block text-meta font-medium text-ink-2">Who</span>
+        <span className="mb-1 block text-meta font-medium text-ink-2">User</span>
         <Select name="actor" defaultValue={actor}>
-          <option value="">Anyone</option>
+          <option value="">All users</option>
           {people.map((a) => (
             <option key={a} value={a}>
               {a}
@@ -21,12 +21,12 @@ export function ActivityFilters({ category, actor, q, actors }: { category: stri
         </Select>
       </label>
       <label className="block w-full sm:w-72">
-        <span className="mb-1 block text-meta font-medium text-ink-2">Words</span>
-        <Input type="search" name="q" defaultValue={q} placeholder="A name, a company, an action" />
+        <span className="mb-1 block text-meta font-medium text-ink-2">Search</span>
+        <Input type="search" name="q" defaultValue={q} placeholder="Name, company or action" />
       </label>
       <div className="flex items-center gap-3">
         <Button type="submit" size="sm">
-          Show
+          Apply
         </Button>
         {(actor || q) && (
           <Link href={category ? `/activity?category=${category}` : "/activity"} className="text-meta text-ink-2 hover:text-hema hover:underline">

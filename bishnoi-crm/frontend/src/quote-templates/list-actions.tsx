@@ -61,7 +61,7 @@ export function NewTemplate({ teams }: { teams?: { id: string; name: string }[] 
             <Field label="Department" hint="Your templates are for your own departments.">
               {(p) => (
                 <Select {...p} value={teamId} onChange={(e) => setTeamId(e.target.value)} required>
-                  <option value="">Pick a department</option>
+                  <option value="">Select a department</option>
                   {teams.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -72,7 +72,7 @@ export function NewTemplate({ teams }: { teams?: { id: string; name: string }[] 
             </Field>
           )}
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-meta font-medium text-ink-2">How it is made</legend>
+            <legend className="mb-1 text-meta font-medium text-ink-2">Template type</legend>
             {option("excel", "Upload an Excel form", "Your own quotation sheet, as the issuer asks for it. The CRM fills it in for each quote.", <FileSpreadsheet className="size-5" aria-hidden />)}
             {option("form", "Design it here", "Letterhead, wording and signatory as fields. Printed from the quote.", <PenLine className="size-5" aria-hidden />)}
           </fieldset>

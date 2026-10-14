@@ -238,7 +238,7 @@ function ProductForm({
   /** A built-in field, drawn with the label and hints the admin gave it. */
   function standard(f: FormFieldDef) {
     if (locked(f.key)) {
-      const shown = f.key === "isActive" ? (isActive ? "On sale" : "Switched off") : values[f.key as Text];
+      const shown = f.key === "isActive" ? (isActive ? "On sale" : "Inactive") : values[f.key as Text];
       return (
         <Field label={f.label} hint="From Inventory: change it there.">
           {(p) => <Input {...p} value={shown} readOnly disabled />}

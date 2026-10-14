@@ -30,6 +30,10 @@ type Props = {
   /** Rows show the file but can't take it away (the upload happens as soon as it's picked). */
   keep?: boolean;
   disabled?: boolean;
+  /** Several files at once: each dropped or browsed one joins the list, each removable;
+   *  `onFiles` hears the whole list. (One file at a time otherwise.) */
+  multiple?: boolean;
+  onFiles?: (files: File[]) => void;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
 };
@@ -42,14 +46,37 @@ export function size(bytes: number): string {
 
 const typeOf = (name: string) => (name.includes(".") ? name.split(".").pop()!.slice(0, 4).toUpperCase() : "FILE");
 
-export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChange, busy = false, current = null, keep = false, disabled = false, ...aria }: Props) {
+export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChange, busy = false, current = null, keep = false, disabled = false, multiple = false, onFiles, ...aria }: Props) {
   const inner = useRef<HTMLInputElement | null>(null);
   const fallbackId = useId();
   const inputId = id ?? fallbackId;
   const [file, setFile] = useState<File | null>(null);
   const [over, setOver] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const [many, setMany] = useState<File[]>([]);
   const locked = disabled || busy;
+
+  /** Several files: the ones that will do join the list; why any won't is said. */
+  function takeMany(list: File[]) {
+    const ok: File[] = [];
+    const why: string[] = [];
+    for (const f of list) {
+      if (!accepts(f)) why.push(`${f.name} isn't a kind of file this takes.`);
+      else if (maxBytes && f.size > maxBytes) why.push(`${f.name} is ${size(f.size)}: the most is ${size(maxBytes)}.`);
+      else ok.push(f);
+    }
+    setRefused(why.length ? why.join(" ") : null);
+    if (!ok.length) return;
+    const next = [...many, ...ok];
+    setMany(next);
+    onFiles?.(next);
+  }
+
+  function removeAt(i: number) {
+    const next = many.filter((_, j) => j !== i);
+    setMany(next);
+    onFiles?.(next);
+  }
 
   function setInput(el: HTMLInputElement | null) {
     inner.current = el;
@@ -103,7 +130,9 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
-          if (!locked) take(e.dataTransfer.files?.[0] ?? null, true);
+          if (locked) return;
+          if (multiple) takeMany([...(e.dataTransfer.files ?? [])]);
+          else take(e.dataTransfer.files?.[0] ?? null, true);
         }}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed px-6 py-8 text-center transition-colors ${
           over ? "border-sage-deep bg-mint" : "border-rule-strong bg-bench hover:border-ink-3"
@@ -113,7 +142,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
           <Upload className="size-4.5" />
         </span>
         <span className="mt-3 text-sm text-ink">
-          Drop your file here or <span className="font-medium underline underline-offset-2">browse</span>
+          Drop {multiple ? "your files" : "your file"} here or <span className="font-medium underline underline-offset-2">browse</span>
         </span>
         {note && <span className="mt-1 text-meta text-ink-3">{note}</span>}
         <input
@@ -122,9 +151,15 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
           name={name}
           type="file"
           accept={accept}
+          multiple={multiple}
           disabled={locked}
           className="sr-only"
           onChange={(e) => {
+            if (multiple) {
+              takeMany([...(e.target.files ?? [])]);
+              e.target.value = "";
+              return;
+            }
             const f = e.target.files?.[0] ?? null;
             if (f && !accepts(f)) {
               e.target.value = "";
@@ -148,7 +183,33 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
         </p>
       )}
 
-      {shown && (
+      {multiple && many.length > 0 && (
+        <ul className="mt-3 space-y-2" aria-label="Files chosen">
+          {many.map((f, i) => (
+            <li key={`${f.name}-${i}`} className="flex items-center gap-3 rounded-lg border border-rule bg-sheet px-3 py-2">
+              <span className="grid size-9 shrink-0 place-items-center rounded-md border border-rule bg-bench text-[0.625rem] font-semibold text-ink-3" aria-hidden>
+                {typeOf(f.name)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-ink">{f.name}</span>
+                <span className="block text-meta text-ink-3">{size(f.size)}</span>
+              </span>
+              {!busy && (
+                <button type="button" onClick={() => removeAt(i)} className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-bench hover:text-ink" aria-label={`Remove ${f.name}`}>
+                  <Trash2 className="size-4" aria-hidden />
+                </button>
+              )}
+            </li>
+          ))}
+          {busy && (
+            <li className="h-1 overflow-hidden rounded-full bg-mint-2" role="progressbar" aria-label="Uploading">
+              <span className="block h-full w-1/3 animate-[file-drop_1.2s_ease-in-out_infinite] rounded-full bg-ink" />
+            </li>
+          )}
+        </ul>
+      )}
+
+      {!multiple && shown && (
         <div className="mt-4">
           <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Chosen") : "On file"}</p>
           <div className="rounded-lg border border-rule bg-sheet px-3 py-2.5">

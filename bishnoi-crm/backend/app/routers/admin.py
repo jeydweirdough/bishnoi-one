@@ -15,6 +15,7 @@ from pydantic.alias_generators import to_camel
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 
+from app.routers.profile import split_name
 from app.access import Access, keep_an_administrator, permissions_of, require
 from app.api import email_address
 from app.audit import audit
@@ -180,6 +181,8 @@ def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
     user = User(
         email=body.email,
         full_name=body.full_name,
+        first_name=split_name(body.full_name)[0] or None,
+        last_name=split_name(body.full_name)[1] or None,
         role_id=body.role_id,
         team_id=body.team_id,
         password_hash=hash_password(body.password),
@@ -217,6 +220,10 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
     fields = [k for k, v in wanted.items() if getattr(user, k) != v]
     for key in fields:
         setattr(user, key, wanted[key])
+    if "full_name" in fields:
+        # Typed in one piece here: its parts follow (the person can tidy them on their profile).
+        user.first_name, user.last_name = split_name(user.full_name)
+        user.middle_initial = user.suffix = None
     if not fields:
         return user_out(user)
     keep_an_administrator(db)

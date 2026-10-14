@@ -82,7 +82,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
       </div>
       <Sheet>
         {list.items.length === 0 ? (
-          <Empty title={q || status ? "No invoices match" : "No invoices yet"} icon="lists">
+          <Empty title={q || status ? "No matching invoices" : "No invoices yet"} icon="lists">
             {!q && !status && may(me, "invoices.create") ? "Make the first one with New invoice." : null}
           </Empty>
         ) : (
@@ -93,7 +93,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                   <th className="py-2 pr-3 pl-5 font-semibold">Number</th>
                   <th className="px-3 py-2 font-semibold">Customer</th>
                   <th className="px-3 py-2 font-semibold">Date</th>
-                  <th className="px-3 py-2 font-semibold">Due</th>
+                  <th className="px-3 py-2 font-semibold">Due date</th>
                   <th className="px-3 py-2 text-right font-semibold">Total</th>
                   <th className="py-2 pr-5 pl-3 font-semibold">Status</th>
                 </tr>
@@ -196,7 +196,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             ) : may(me, "invoices.issue") ? (
               <IssueInvoice id={inv.id} series={series} />
             ) : (
-              <p className="text-sm text-ink-2">Someone who may issue invoices issues it from here.</p>
+              <p className="text-sm text-ink-2">Only users with permission to issue invoices can issue this draft.</p>
             )}
           </Sheet>
         )}
@@ -230,7 +230,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             items={[
               ["Date", fmt.dateLabel(inv.date)],
               ["Terms", inv.termsDays ? `${inv.termsDays} days` : "Cash on delivery"],
-              ["Due", fmt.dateLabel(inv.dueDate)],
+              ["Due date", fmt.dateLabel(inv.dueDate)],
               ["Reference", inv.reference],
             ]}
           />
@@ -294,7 +294,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
           <SectionTitle icon="payments">
             Payments{" "}
             <span className="font-normal text-ink-3">
-              · {fmt.peso(inv.paidCentavos)} received, {fmt.peso(inv.balanceCentavos)} owed
+              · {fmt.peso(inv.paidCentavos)} received, {fmt.peso(inv.balanceCentavos)} outstanding
             </span>
           </SectionTitle>
           {inv.payments.length > 0 && (
@@ -309,7 +309,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
                     <span className="text-ink-3"> · {p.recordedBy}</span>
                   </span>
                   {p.removedAt ? (
-                    <span className="text-meta no-underline">Taken off by {p.removedBy}</span>
+                    <span className="text-meta no-underline">Reversed by {p.removedBy}</span>
                   ) : (
                     may(me, "invoices.void") && <RemovePayment id={inv.id} paymentId={p.id} />
                   )}
@@ -329,7 +329,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
           Issued by {inv.issuedBy}.{" "}
           {inv.entryId && (
             <Link href="/ledger?source=invoice" className="text-hema hover:underline">
-              See it in the journal
+              View journal entry
             </Link>
           )}
         </p>
@@ -364,14 +364,14 @@ export async function SeriesPage() {
               <li key={s.id} className="flex flex-wrap items-center gap-x-6 gap-y-1 px-5 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">
-                    {s.name} {!s.isActive && <span className="font-normal text-ink-3">· switched off</span>}
+                    {s.name} {!s.isActive && <span className="font-normal text-ink-3">· inactive</span>}
                   </p>
                   <p className="text-meta text-ink-2">
                     ATP No. {s.atpNumber}, issued {fmt.dateLabel(s.atpDate)} · {s.firstNumber} to {s.lastNumber}
                   </p>
                 </div>
                 <p className={`text-meta ${s.left === 0 ? "text-danger" : s.left < 50 ? "text-danger" : "text-ink-2"}`}>
-                  {s.left === 0 ? "Used up" : `${fmt.count(s.left)} left · next ${s.nextNumber}`}
+                  {s.left === 0 ? "Fully used" : `${fmt.count(s.left)} left · next ${s.nextNumber}`}
                 </p>
                 {series.canSetup && s.left > 0 && <SwitchSeries id={s.id} isActive={s.isActive} />}
               </li>
@@ -406,7 +406,7 @@ export async function ReceivablesPage() {
       </PageHeader>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Sheet className="px-4 py-3 lg:col-span-1">
-          <p className="text-meta text-ink-3">Owed</p>
+          <p className="text-meta text-ink-3">Total outstanding</p>
           <p className="text-figure tabular-nums">{fmt.peso(age.totalCentavos)}</p>
           <p className={`text-meta ${late ? "text-danger" : "text-ink-3"}`}>{late ? `${fmt.peso(late)} past due` : "Nothing past due"}</p>
         </Sheet>
@@ -427,7 +427,7 @@ export async function ReceivablesPage() {
       )}
       <Sheet>
         {age.customers.length === 0 ? (
-          <Empty title="Nothing owed" icon="payments">
+          <Empty title="No outstanding receivables" icon="payments">
             Every issued invoice is paid.
           </Empty>
         ) : (
@@ -441,7 +441,7 @@ export async function ReceivablesPage() {
                       {b.label.replace(" days late", "").replace("Not yet due", "Current")}
                     </th>
                   ))}
-                  <th className="py-2 pr-5 pl-3 text-right font-semibold">Owed</th>
+                  <th className="py-2 pr-5 pl-3 text-right font-semibold">Balance due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
@@ -456,7 +456,7 @@ export async function ReceivablesPage() {
                             <Link href={`/invoices/${i.id}`} className="font-mono text-hema hover:underline">
                               {i.number}
                             </Link>
-                            {i.daysLate > 0 && <span className="text-danger"> {i.daysLate}d late</span>}
+                            {i.daysLate > 0 && <span className="text-danger"> {i.daysLate}d overdue</span>}
                           </span>
                         ))}
                       </p>

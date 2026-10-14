@@ -6,7 +6,7 @@ import { enc, load } from "@/src/platform/lib/api";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import type { CompanyDetail, Options } from "@/src/lib/types";
 
-export const metadata = { title: "Add a user" };
+export const metadata = { title: "Add user" };
 
 export default async function NewUserPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const refused = await adminsOnly();
@@ -19,13 +19,13 @@ export default async function NewUserPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader
-        title="Add a user"
+        title="Add user"
         crumbs={preset && presetName ? [{ href: "/companies", label: "Companies" }, { href: `/companies/${preset}?tab=users`, label: presetName }] : [{ href: "/users", label: "Users" }]}
       >
         One account for the person, with the applications they may use. They still sign in to each application on its own.
       </PageHeader>
       {options.companies.length === 0 ? (
-        <Sheet className="max-w-3xl px-5 py-6 text-ink-2">Add a company first: everyone on the platform works for one.</Sheet>
+        <Sheet className="max-w-3xl px-5 py-6 text-ink-2">Add a company first: every user belongs to a company.</Sheet>
       ) : (
         <Sheet className="max-w-3xl px-5 py-5 sm:px-6">
           <UserForm companies={options.companies} companyId={preset} initialApps={apps} />

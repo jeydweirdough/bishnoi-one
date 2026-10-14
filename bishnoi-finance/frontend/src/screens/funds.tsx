@@ -26,7 +26,7 @@ const TASKS: Record<FundTask, { title: string; intro: string; empty: string }> =
   to_settle: {
     title: "For settlement",
     intro: "Reviewed liquidations with a balance: a refund due from the employee, or a reimbursement due to them.",
-    empty: "Nothing for settlement.",
+    empty: "No liquidations for settlement.",
   },
   to_liquidate: {
     title: "Outstanding",

@@ -75,7 +75,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
             </div>
 
             <p className="mt-10 text-center text-sm text-[#3b3b3b]">
-              New here? <span className="font-medium text-[#4f7f44]">Your administrator adds you.</span>
+              New user? <span className="font-medium text-[#4f7f44]">Contact your administrator for access.</span>
             </p>
           </div>
         </section>

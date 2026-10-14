@@ -95,7 +95,7 @@ export function EmailTemplates({ items, teams }: { items: EmailTemplate[]; teams
                   <p className="font-medium text-ink">{t.name}</p>
                   <p className="truncate text-meta text-ink-3">{t.subject}</p>
                 </div>
-                {!t.isCurrent && <Tag color="error">{t.isActive ? "Not current" : "Switched off"}</Tag>}
+                {!t.isCurrent && <Tag color="error">{t.isActive ? "Not current" : "Inactive"}</Tag>}
                 <Button size="sm" onClick={() => setEditing(t)}>
                   Change
                 </Button>
@@ -104,7 +104,7 @@ export function EmailTemplates({ items, teams }: { items: EmailTemplate[]; teams
                   variant="quiet"
                   onClick={() => start(async () => void (await saveTemplate(t.id, { name: t.name, subject: t.subject, body: t.body, onlyTeams: t.onlyTeams, approvedOn: t.approvedOn, expiresOn: t.expiresOn, isActive: !t.isActive })))}
                 >
-                  {t.isActive ? "Switch off" : "Switch on"}
+                  {t.isActive ? "Deactivate" : "Activate"}
                 </Button>
               </li>
             ))}

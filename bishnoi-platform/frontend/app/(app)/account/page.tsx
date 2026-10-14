@@ -6,14 +6,14 @@ import { getStaff } from "@/src/components/gate";
 import { DetailsForm } from "@/src/components/account/details-form";
 import { PasswordForm } from "@/src/components/account/password-form";
 
-export const metadata = { title: "Your account" };
+export const metadata = { title: "My account" };
 
 export default async function Page() {
   const [me, staff] = await Promise.all([getMe(), getStaff()]);
 
   return (
     <>
-      <PageHeader title="Your account">Your staff account on the platform console.</PageHeader>
+      <PageHeader title="My account">Your staff account on the platform console.</PageHeader>
 
       <div className="grid max-w-[52rem] gap-5 lg:grid-cols-2 lg:items-start">
         <Sheet className="px-5 pt-4 pb-5">
@@ -27,7 +27,7 @@ export default async function Page() {
         </Sheet>
 
         <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="password">Change your password</SectionTitle>
+          <SectionTitle icon="password">Change password</SectionTitle>
           <PasswordForm />
         </Sheet>
       </div>

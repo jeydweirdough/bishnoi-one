@@ -131,7 +131,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
           ? { sku: t("sku"), name: t("name"), unit: t("unitCode") || "pc", costPrice: fmt?.toCentavos(t("costPrice")) ?? 0, sellingPrice: fmt?.toCentavos(t("sellingPrice")) ?? 0, trackBatches: flags.batches, trackExpiry: flags.batches, trackSerials: flags.serials }
           : undefined;
       onAdded({ kind, value, label: shown, product });
-      toast.success(`${t("name") || t("code")} added`, { description: "It's picked for you." });
+      toast.success(`${t("name") || t("code")} added`, { description: "Selected in the form." });
       dialog.current?.close();
       // The lists everyone picks from now include it.
       router.refresh();
@@ -174,10 +174,10 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
           {kind === "category" && (
             <>
               {f("name", "Name", { autoFocus: true, placeholder: "Syringes" })}
-              <Field label="Inside" optional>
+              <Field label="Parent category" optional>
                 {(p) => (
                   <Select {...p} value={v.parentId ?? ""} onChange={set("parentId")}>
-                    <option value="">At the top</option>
+                    <option value="">None (top level)</option>
                     {context.categories?.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}
                   </Select>
                 )}
@@ -205,7 +205,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
               {f("paymentTerms", "Payment terms", {}, true, "Net 30, COD…")}
             </div>
           )}
-          {kind === "warehouse" && f("address", "Address", {}, true, "It starts with one location, Main area; add racks and bins on its page.")}
+          {kind === "warehouse" && f("address", "Address", {}, true, "Created with one location, Main area. Add racks and bins on the warehouse page.")}
           {kind === "product" && (
             <>
               <div className="grid grid-cols-[9rem_1fr] gap-4">
@@ -220,8 +220,8 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
                     </Select>
                   )}
                 </Field>
-                {f("costPrice", `Cost${fmt ? ` (${fmt.symbol})` : ""}`, { inputMode: "decimal" }, true)}
-                {f("sellingPrice", `Selling${fmt ? ` (${fmt.symbol})` : ""}`, { inputMode: "decimal" }, true)}
+                {f("costPrice", `Unit cost${fmt ? ` (${fmt.symbol})` : ""}`, { inputMode: "decimal" }, true)}
+                {f("sellingPrice", `Selling price${fmt ? ` (${fmt.symbol})` : ""}`, { inputMode: "decimal" }, true)}
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <label className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
                   Serial numbers
                 </label>
               </div>
-              <p className="text-meta text-ink-3">Reorder levels, brand, pictures and the rest can be filled in on the product&apos;s page later.</p>
+              <p className="text-meta text-ink-3">Reorder levels, brand, images and other details can be added later on the product page.</p>
             </>
           )}
           <FormError message={error} />

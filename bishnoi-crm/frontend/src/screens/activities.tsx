@@ -28,7 +28,7 @@ const SIZE = 50;
 const GROUPS: { bucket: Bucket; label: string }[] = [
   { bucket: "overdue", label: "Overdue" },
   { bucket: "today", label: "Today" },
-  { bucket: "upcoming", label: "Coming up" },
+  { bucket: "upcoming", label: "Upcoming" },
 ];
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -131,7 +131,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
       </div>
 
       {view === "history" && (
-        <Filters selects={[{ name: "kind", label: "Kind", options: [{ value: "", label: "Every kind" }, ...KINDS.map((k) => ({ value: k.kind, label: `${k.label}s` }))] }]} />
+        <Filters selects={[{ name: "kind", label: "Type", options: [{ value: "", label: "All types" }, ...KINDS.map((k) => ({ value: k.kind, label: `${k.label}s` }))] }]} />
       )}
 
       {view === "calendar" ? (
@@ -139,7 +139,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="text-heading text-ink">{monthName}</h2>
             <span className="ml-auto flex gap-1">
-              <a href={monthHref(shiftMonth(month, -1))} className={buttonClass("quiet", "sm")} aria-label="The month before">
+              <a href={monthHref(shiftMonth(month, -1))} className={buttonClass("quiet", "sm")} aria-label="Previous month">
                 ‹ Before
               </a>
               {month !== today.slice(0, 7) && (
@@ -147,7 +147,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
                   This month
                 </a>
               )}
-              <a href={monthHref(shiftMonth(month, 1))} className={buttonClass("quiet", "sm")} aria-label="The month after">
+              <a href={monthHref(shiftMonth(month, 1))} className={buttonClass("quiet", "sm")} aria-label="Next month">
                 After ›
               </a>
             </span>
@@ -167,7 +167,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
             </SelectAllBox>
           </div>
           {rows.length === 0 ? (
-            <Empty icon="followUps" title="Nothing to do" actions={can(me, "activities.create") && <LogActivityButton
+            <Empty icon="followUps" title="No open tasks" actions={can(me, "activities.create") && <LogActivityButton
                     label="Plan a meeting or task"
                     org={me.org}
                     now={new Date().toISOString()}

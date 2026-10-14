@@ -44,7 +44,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
       setDraft({});
       setFields({});
       setError(null);
-      toast.success(enabled === undefined ? "Saved" : enabled ? `${s.name} switched on` : `${s.name} switched off`);
+      toast.success(enabled === undefined ? "Saved" : enabled ? `${s.name} enabled` : `${s.name} disabled`);
     });
   }
 
@@ -54,7 +54,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
       if (!r.ok) return setError(r.error);
       setError(null);
       if (r.data.check?.ok) toast.success(r.data.check.message);
-      else toast.error("It didn't work", { description: r.data.check?.message });
+      else toast.error("Connection test failed", { description: r.data.check?.message });
     });
   }
 
@@ -67,22 +67,22 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
           <p className="mt-0.5 text-meta text-ink-3">Used by {usedBy}.</p>
         </div>
         <span className="flex flex-wrap items-center gap-1.5">
-          <Stamp tone={s.enabled ? "good" : "plain"}>{s.enabled ? "On" : "Off"}</Stamp>
+          <Stamp tone={s.enabled ? "good" : "plain"}>{s.enabled ? "Enabled" : "Disabled"}</Stamp>
           {s.unreadable ? (
-            <Stamp tone="bad">Type the secrets again</Stamp>
+            <Stamp tone="bad">Re-enter secrets</Stamp>
           ) : s.missing.length > 0 ? (
             <Stamp>Details needed</Stamp>
           ) : !s.check ? (
             <Stamp>Not tested</Stamp>
           ) : s.check.ok ? (
-            <Stamp tone="good">Working</Stamp>
+            <Stamp tone="good">Connected</Stamp>
           ) : (
-            <Stamp tone="bad">Not working</Stamp>
+            <Stamp tone="bad">Connection failed</Stamp>
           )}
         </span>
       </div>
       {s.unreadable && (
-        <p className="mt-2 text-meta text-danger">The platform&apos;s signing key changed since these were saved, so the secrets can&apos;t be read. Type them in again.</p>
+        <p className="mt-2 text-meta text-danger">The platform&apos;s signing key changed since these were saved, so the secrets can&apos;t be read. Enter them again.</p>
       )}
       {s.check && (
         <p className="mt-2 text-meta text-ink-3">
@@ -109,7 +109,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
                 <Field key={d.key} label={d.label} hint={d.hint} error={fields[d.key]} optional={!d.required}>
                   {(p) => (
                     <Select {...p} value={typed ?? d.value ?? ""} onChange={(e) => set(d.key, e.target.value)}>
-                      <option value="">Pick one</option>
+                      <option value="">Select</option>
                       {d.options.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
@@ -131,7 +131,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
                         value={typed ?? ""}
                         onChange={(e) => set(d.key, e.target.value)}
                         autoComplete="new-password"
-                        placeholder={removing ? "Removed when you save" : d.saved ? `Saved${d.ending ? `, ends in ${d.ending}` : ""}. Type to replace.` : "Not saved yet"}
+                        placeholder={removing ? "Removed on save" : d.saved ? `Saved${d.ending ? `, ends in ${d.ending}` : ""}. Type to replace.` : "Not saved yet"}
                       />
                       {canChange && d.saved && !removing && (
                         <button type="button" className="text-meta text-ink-3 hover:text-danger hover:underline" onClick={() => set(d.key, "")}>
@@ -165,7 +165,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
                 Test connection
               </Button>
               <Button size="sm" variant={s.enabled ? "default" : "quiet"} onClick={() => save(!s.enabled)} disabled={dirty || saving}>
-                {s.enabled ? "Switch off" : "Switch on"}
+                {s.enabled ? "Disable" : "Enable"}
               </Button>
               {dirty && (
                 <Button size="sm" variant="quiet" onClick={() => setDraft({})}>
@@ -176,7 +176,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
           )}
           {updatedWhen && s.updatedBy && (
             <span className="ml-auto text-meta text-ink-3">
-              Changed {updatedWhen} by {s.updatedBy.name}
+              Last updated {updatedWhen} by {s.updatedBy.name}
             </span>
           )}
         </div>

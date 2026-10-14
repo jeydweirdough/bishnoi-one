@@ -156,8 +156,13 @@ class Query:
         return route(activities.summary, info, owner=owner)
 
     @strawberry.field(name="fieldDoctors")
-    def field_doctors(self, info: strawberry.Info, limit: int | None = None) -> JSON | None:
-        return route(field.list_doctors, info, limit=limit)
+    def field_doctors(self, info: strawberry.Info, limit: int | None = None, sort: str | None = None) -> JSON | None:
+        return route(field.list_doctors, info, limit=limit, sort=sort)
+
+    @strawberry.field(name="fieldCoverage")
+    def field_coverage(self, info: strawberry.Info, month: str | None = None) -> JSON | None:
+        """How much of the list the month reached (GET /field/coverage)."""
+        return route(field.coverage, info, month=month)
 
     @strawberry.field
     def visits(self, info: strawberry.Info, company: str | None = None, limit: int | None = None) -> JSON | None:

@@ -31,7 +31,7 @@ function TeamTable({ people, fmt, today }: { people: PersonInsight[]; fmt: Forma
           <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
             <th scope="col" className="py-2 pr-3 font-semibold">Person</th>
             <th scope="col" className="px-3 py-2 font-semibold">To do</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Did this week</th>
+            <th scope="col" className="px-3 py-2 font-semibold">Completed this week</th>
             <th scope="col" className="px-3 py-2 text-right font-semibold">Customers</th>
             <th scope="col" className="px-3 py-2 text-right font-semibold">Quoted this month</th>
             <th scope="col" className="py-2 pl-3 text-right font-semibold">Last active</th>
@@ -52,7 +52,7 @@ function TeamTable({ people, fmt, today }: { people: PersonInsight[]; fmt: Forma
                 {p.dueToday > 0 && <span>{p.dueToday} today</span>}
                 {p.dueToday > 0 && p.upcoming > 0 && <span className="text-ink-3"> · </span>}
                 {p.upcoming > 0 && <span className="text-ink-2">{p.upcoming} coming up</span>}
-                {!p.overdue && !p.dueToday && !p.upcoming && <span className="text-ink-3">Nothing planned</span>}
+                {!p.overdue && !p.dueToday && !p.upcoming && <span className="text-ink-3">None planned</span>}
               </td>
               <td className={`px-3 py-2.5 ${p.doneThisWeek ? "" : "text-ink-3"}`}>{didWords(p)}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">
@@ -130,7 +130,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
     { value: String(t.overdue), label: "Overdue", note: t.overdue ? "in the team: chase it" : "Nothing overdue", alert: t.overdue > 0, href: "/activities?who=team" },
     ...(approver ? [{ value: String(toApprove.total), label: "To approve", note: toApprove.total ? "quotes waiting on you" : "Nothing waiting", alert: toApprove.total > 0, href: "/quotes?task=approvals" }] : [{ value: String(t.newCustomersThisMonth), label: "New customers", note: "this month", href: "/companies" }]),
     ...(r ? [{ value: fmt.peso(t.quotedThisMonthCentavos), label: "Quoted", note: fmt.plural(t.quotesThisMonth, "quote"), href: "/quotes" }] : []),
-    { value: String(t.doneThisWeek), label: "Done this week", note: `${t.activeThisWeek} of ${t.people} people logged work`, href: "/activities?view=history&who=team" },
+    { value: String(t.doneThisWeek), label: "Completed this week", note: `${t.activeThisWeek} of ${t.people} people logged work`, href: "/activities?view=history&who=team" },
   ];
 
   return (
@@ -208,7 +208,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
               Due in the team
             </SectionTitle>
             {due.length === 0 ? (
-              <Empty icon="followUps" title="Nothing due today">Overdue and today&apos;s meetings and tasks across the team show up here.</Empty>
+              <Empty icon="followUps" title="No items due today">Overdue and today&apos;s meetings and tasks across the team show up here.</Empty>
             ) : (
               <ul className="divide-y divide-rule">
                 {due.slice(0, 12).map((f) => (
@@ -220,9 +220,9 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
         </div>
         <div className="flex flex-col">
           <MonthCard
-            title="Your team's month"
-            subtitle={`${fmt.monthLabel(today.slice(0, 7))} so far · ${me.team?.name ?? "your team"}`}
-            action={can(me, "goals.view") ? { href: "/performance", label: "See performance" } : undefined}
+            title="Team performance this month"
+            subtitle={`${fmt.monthLabel(today.slice(0, 7))} to date · ${me.team?.name ?? "your team"}`}
+            action={can(me, "goals.view") ? { href: "/performance", label: "View performance" } : undefined}
             lead={lead}
             rest={tiles}
           />
@@ -231,8 +231,8 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
 
       {/* Then each person, and what the team did. */}
       <Sheet className="mb-5 px-5 pt-4 pb-2">
-        <SectionTitle icon="teams">Your team</SectionTitle>
-        <p className="text-meta text-ink-3">Who&apos;s behind comes first. Click a name for their to do.</p>
+        <SectionTitle icon="teams">Team</SectionTitle>
+        <p className="text-meta text-ink-3">Sorted by those furthest behind. Select a name to view their to do.</p>
         <TeamTable people={insights.people} fmt={fmt} today={today} />
       </Sheet>
 
@@ -245,10 +245,10 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
             </Link>
           }
         >
-          What the team did
+          Team activity
         </SectionTitle>
         {teamDone.items.length === 0 ? (
-          <Empty icon="activity" title="Nothing logged yet" actions={can(me, "activities.create") && <LogActivityButton
+          <Empty icon="activity" title="No activity yet" actions={can(me, "activities.create") && <LogActivityButton
                 label="Log activity"
                 org={me.org}
                 now={new Date().toISOString()}

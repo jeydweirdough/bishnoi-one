@@ -3,7 +3,7 @@ import { Particulars, PageHeader, SectionTitle, Sheet } from "../ui/sheet";
 import { removeMyPhoto, saveMyPhoto } from "../actions/account";
 import { getCompanyMe } from "../lib/api";
 
-export const metadata = { title: "Your account" };
+export const metadata = { title: "My account" };
 
 export default async function AccountPage() {
   const me = await getCompanyMe();
@@ -11,13 +11,13 @@ export default async function AccountPage() {
 
   return (
     <>
-      <PageHeader title="Your account">Your picture and what you can reach. Your admin sets your name, email and roles.</PageHeader>
+      <PageHeader title="My account">Your profile picture and access. An admin sets your name, email and roles.</PageHeader>
 
       <div className="grid max-w-[52rem] gap-5 lg:grid-cols-2 lg:items-start">
         <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="profile">Picture</SectionTitle>
+          <SectionTitle icon="profile">Profile picture</SectionTitle>
           <p className="mb-4 text-meta text-ink-3">
-            It appears wherever your name does, for the people you work with. Without one, your initials do.
+            Shown next to your name throughout the app. Without one, your initials are shown.
           </p>
           <PhotoPicker
             name={me.user.fullName}
@@ -40,7 +40,7 @@ export default async function AccountPage() {
             ]}
           />
           <p className="mt-4 text-meta text-ink-3">
-            Something wrong here? Ask an admin: they set names, emails and who reaches what.
+            To correct these details, contact an admin. Admins manage names, emails and access.
           </p>
         </Sheet>
       </div>

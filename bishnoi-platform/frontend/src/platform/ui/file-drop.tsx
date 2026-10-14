@@ -69,7 +69,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
   function take(f: File | null, fromDrop = false) {
     setRefused(null);
     if (f && !accepts(f)) return setRefused(`${f.name} isn't a kind of file this takes.`);
-    if (f && maxBytes && f.size > maxBytes) return setRefused(`${f.name} is ${size(f.size)}: the most is ${size(maxBytes)}.`);
+    if (f && maxBytes && f.size > maxBytes) return setRefused(`${f.name} is ${size(f.size)}: the maximum is ${size(maxBytes)}.`);
     setFile(f);
     const input = inner.current;
     if (fromDrop && input && f) {
@@ -132,7 +132,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
             }
             if (f && maxBytes && f.size > maxBytes) {
               e.target.value = "";
-              return setRefused(`${f.name} is ${size(f.size)}: the most is ${size(maxBytes)}.`);
+              return setRefused(`${f.name} is ${size(f.size)}: the maximum is ${size(maxBytes)}.`);
             }
             setRefused(null);
             setFile(f);
@@ -150,7 +150,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
 
       {shown && (
         <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Chosen") : "On file"}</p>
+          <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Selected") : "Current file"}</p>
           <div className="rounded-[14px] border border-rule bg-sheet px-3 py-2.5">
             <div className="flex items-center gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-[10px] border border-rule bg-bench text-[0.6875rem] font-semibold text-ink-3" aria-hidden>

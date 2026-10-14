@@ -142,7 +142,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th scope="col" className="py-2 pr-3 font-semibold">Our field</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">CRM field</th>
                   <th scope="col" className="px-3 py-2 font-semibold">Column in your file</th>
                   <th scope="col" className="py-2 pl-3 font-semibold">First row</th>
                 </tr>
@@ -193,7 +193,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
               </Field>
               <label className="flex items-center gap-2 self-center text-sm">
                 <input type="checkbox" checked={makeTeams} onChange={(e) => (setMakeTeams(e.target.checked), setCheck(null))} className="size-4 accent-hema" />
-                Make the teams that aren&apos;t here yet
+                Create missing teams
               </label>
             </div>
           )}
@@ -246,7 +246,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
               {check && !check.dryRun ? "Done" : "Cancel"}
             </LinkButton>
           </div>
-          {!ready && <p className="mt-2 text-meta text-danger">Pick a column for each field marked *.</p>}
+          {!ready && <p className="mt-2 text-meta text-danger">Select a column for each field marked *.</p>}
         </Sheet>
       )}
       {!file && <FormError message={error} />}

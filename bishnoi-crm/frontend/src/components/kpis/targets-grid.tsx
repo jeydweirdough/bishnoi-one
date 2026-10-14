@@ -173,7 +173,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
       <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
         <SectionTitle>People</SectionTitle>
         {rolePeople.length === 0 ? (
-          <Empty icon="goals" art="gauge" title="Nothing is measured for anyone yet" actions={<LinkButton href="/admin/settings/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
+          <Empty icon="goals" art="gauge" title="No measures set up" actions={<LinkButton href="/admin/settings/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
         ) : (
           <table className="w-full text-sm">
             <thead>{head}</thead>
@@ -198,7 +198,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
                           className="text-right tabular-nums"
                         />
                       ) : (
-                        <span className="block text-right text-ink-3" title={`${k.name} isn't for ${p.role}`}>
+                        <span className="block text-right text-ink-3" title={`${k.name} does not apply to ${p.role}`}>
                           —
                         </span>
                       )}
@@ -247,7 +247,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
 
       {shownManual.length > 0 && rolePeople.length > 0 && (
         <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
-          <SectionTitle>Results entered by hand</SectionTitle>
+          <SectionTitle>Manual results</SectionTitle>
           <p className="mb-2 text-meta text-ink-3">For measures the CRM can&apos;t count: type each person&apos;s result for {monthName}.</p>
           <table className="w-full text-sm">
             <thead>

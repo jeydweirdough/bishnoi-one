@@ -78,15 +78,15 @@ function Reporter({
   return (
     <fieldset className="min-w-0 space-y-3">
       <legend className="mb-1 text-meta font-medium text-ink-2">Reported by</legend>
-      <Field label="Find them on the platform" hint="By name or email. If they aren't on it, write their name or email below." error={errors.picked}>
+      <Field label="Find user" hint="Search by name or email. If not found, enter their name or email below." error={errors.picked}>
         {(p) => <Input {...p} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or email" autoComplete="off" />}
       </Field>
       {q.trim().length >= 2 && (
         <div aria-live="polite" className="text-meta">
           {looking && found.length === 0 ? (
-            <p className="text-ink-3">Looking…</p>
+            <p className="text-ink-3">Searching…</p>
           ) : found.length === 0 ? (
-            <p className="text-ink-3">Nobody on the platform matches. Write their name or email below.</p>
+            <p className="text-ink-3">No matching users. Enter their name or email below.</p>
           ) : (
             <ul className="divide-y divide-rule rounded-[18px] border border-rule">
               {found.map((u) => (
@@ -106,10 +106,10 @@ function Reporter({
         </div>
       )}
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Their name" optional error={errors.name}>
+        <Field label="Reporter name" optional error={errors.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => onName(e.target.value)} />}
         </Field>
-        <Field label="Their email" optional error={errors.email}>
+        <Field label="Reporter email" optional error={errors.email}>
           {(p) => <Input {...p} type="email" inputMode="email" value={email} onChange={(e) => onEmail(e.target.value)} />}
         </Field>
       </div>
@@ -177,13 +177,13 @@ function TicketForm({ options, onDone }: { options: Options; onDone: () => void 
       className="space-y-5"
     >
       <div>
-        <Choice name="ticket-kind" legend="Kind" value={kind} onChange={setKind} options={KIND_OPTIONS} />
+        <Choice name="ticket-kind" legend="Type" value={kind} onChange={setKind} options={KIND_OPTIONS} />
         <p className="mt-1.5 text-meta text-ink-3">{TICKET_KINDS[kind].what}</p>
       </div>
-      <Field label="Title" hint="What's wrong or wanted, in a line." error={fieldError(fields, "title")}>
+      <Field label="Title" hint="A one-line summary of the issue or request." error={fieldError(fields, "title")}>
         {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />}
       </Field>
-      <Field label="What they said" optional hint="Steps, what they expected, what happened." error={fieldError(fields, "description")}>
+      <Field label="Description" optional hint="Steps to reproduce, expected result and actual result." error={fieldError(fields, "description")}>
         {(p) => <Textarea {...p} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>
       <Choice name="ticket-severity" legend="Severity" value={severity} onChange={setSeverity} options={SEVERITY_OPTIONS} />
@@ -212,7 +212,7 @@ function TicketForm({ options, onDone }: { options: Options; onDone: () => void 
         <Field label="Application" optional error={fieldError(fields, "applicationId")}>
           {(p) => (
             <Select {...p} value={applicationId} onChange={(e) => setApplicationId(e.target.value)}>
-              <option value="">None in particular</option>
+              <option value="">None</option>
               {options.applications.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -221,13 +221,13 @@ function TicketForm({ options, onDone }: { options: Options; onDone: () => void 
             </Select>
           )}
         </Field>
-        <Field label="People affected" optional error={fieldError(fields, "affectedUsers")}>
+        <Field label="Affected users" optional error={fieldError(fields, "affectedUsers")}>
           {(p) => <Input {...p} type="number" inputMode="numeric" min={0} value={affected} onChange={(e) => setAffected(e.target.value)} />}
         </Field>
-        <Field label="Assign to" optional hint="Assigning it marks it Assigned." error={fieldError(fields, "assigneeId")}>
+        <Field label="Assign to" optional hint="Assigning it sets the status to Assigned." error={fieldError(fields, "assigneeId")}>
           {(p) => (
             <Select {...p} value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
-              <option value="">Nobody yet</option>
+              <option value="">Unassigned</option>
               {options.staff.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -238,14 +238,14 @@ function TicketForm({ options, onDone }: { options: Options; onDone: () => void 
         </Field>
       </div>
       <FormError message={error} />
-      <PanelActions pending={pending} save="Log it" onCancel={onDone} />
+      <PanelActions pending={pending} save="Log ticket" onCancel={onDone} />
     </form>
   );
 }
 
 export function LogTicket({ options }: { options: Options }) {
   return (
-    <PanelButton label="Log a ticket" title="Log a ticket" variant="primary" icon={<Plus className="size-4" aria-hidden />} wide>
+    <PanelButton label="Log ticket" title="Log a ticket" variant="primary" icon={<Plus className="size-4" aria-hidden />} wide>
       {(close) => <TicketForm options={options} onDone={close} />}
     </PanelButton>
   );
@@ -282,7 +282,7 @@ function WordsForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
       <Field label="Title" error={fieldError(fields, "title")}>
         {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />}
       </Field>
-      <Field label="What they said" optional error={fieldError(fields, "description")}>
+      <Field label="Description" optional error={fieldError(fields, "description")}>
         {(p) => <Textarea {...p} rows={6} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>
       <FormError message={error} />
@@ -293,7 +293,7 @@ function WordsForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
 
 export function EditTicketWords({ ticket }: { ticket: Ticket }) {
   return (
-    <PanelButton tool label={`Edit the title and description of ${ticket.number}`} title={`${ticket.number}: title and description`} icon={<Pencil className="size-4" aria-hidden />} wide>
+    <PanelButton tool label={`Edit the title and description of ${ticket.number}`} title={`Edit ${ticket.number}`} icon={<Pencil className="size-4" aria-hidden />} wide>
       {(close) => <WordsForm ticket={ticket} onDone={close} />}
     </PanelButton>
   );
@@ -308,7 +308,7 @@ export function AddNote({ ticketId }: { ticketId: string }) {
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (!body.trim()) return setError("Write the note first.");
+        if (!body.trim()) return setError("Enter a note first.");
         start(async () => {
           const result = await addTicketNote(ticketId, body.trim());
           if (!result.ok) return setError(result.error);
@@ -319,7 +319,7 @@ export function AddNote({ ticketId }: { ticketId: string }) {
       }}
       className="space-y-3 border-t border-rule pt-4"
     >
-      <Field label="Add a note" hint="Kept on the ticket for whoever picks it up next." error={error ?? undefined}>
+      <Field label="Add note" hint="Saved on the ticket for the next person working on it." error={error ?? undefined}>
         {(p) => <Textarea {...p} rows={3} value={body} onChange={(e) => setBody(e.target.value)} />}
       </Field>
       <Button type="submit" size="sm" loading={pending}>

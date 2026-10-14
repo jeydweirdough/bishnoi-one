@@ -80,7 +80,7 @@ const PICKERS = new Set(["Select", "Cascader", "TreeSelect", "AutoComplete", "Tr
 export function AntTheme({ children }: { children: ReactNode }) {
   return (
     <AntdRegistry>
-      <ConfigProvider theme={ANT_THEME} renderEmpty={(component) => <p className="px-1 py-3 text-center text-meta text-ink-3">{PICKERS.has(component ?? "") ? "Nothing to pick yet." : "Nothing here yet."}</p>}>
+      <ConfigProvider theme={ANT_THEME} renderEmpty={(component) => <p className="px-1 py-3 text-center text-meta text-ink-3">{PICKERS.has(component ?? "") ? "No options available." : "No data."}</p>}>
         {children}
       </ConfigProvider>
     </AntdRegistry>

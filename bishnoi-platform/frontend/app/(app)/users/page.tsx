@@ -32,23 +32,23 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
           staff.canAdminister &&
           tab === "users" && (
             <LinkButton href={one(params.company) ? `/users/new?company=${one(params.company)}` : "/users/new"} variant="primary" icon={<UserPlus className="size-4" aria-hidden />}>
-              Add a user
+              Add user
             </LinkButton>
           )
         }
       >
         {tab === "users"
-          ? "The people at the companies, and the applications each may use."
+          ? "Users at each company, and their assigned applications."
           : tab === "staff"
             ? "The staff who sign in to this console: Platform Admins and Support."
-            : "Who is signed in to this console."}
+            : "Active staff sessions on this console."}
       </PageHeader>
       <Tabs
         current={tab}
         tabs={[
           { key: "users", label: "All users", href: "/users" },
           { key: "staff", label: "Staff", href: "/users?tab=staff" },
-          { key: "sessions", label: "Staff sign-ins", href: "/users?tab=sessions" },
+          { key: "sessions", label: "Staff sessions", href: "/users?tab=sessions" },
         ]}
       />
       {tab === "users" && <AllUsers params={params} canAdd={staff.canAdminister} />}
@@ -84,22 +84,22 @@ async function AllUsers({ params, canAdd }: { params: Record<string, string | st
       <Filters
         search="Search by name or email"
         selects={[
-          { name: "company", label: "Company", options: [{ value: "", label: "Every company" }, ...options.companies.map((c) => ({ value: c.id, label: c.name }))] },
-          { name: "application", label: "Application", options: [{ value: "", label: "Any application" }, ...options.applications.map((a) => ({ value: a.id, label: a.name }))] },
+          { name: "company", label: "Company", options: [{ value: "", label: "All companies" }, ...options.companies.map((c) => ({ value: c.id, label: c.name }))] },
+          { name: "application", label: "Application", options: [{ value: "", label: "All applications" }, ...options.applications.map((a) => ({ value: a.id, label: a.name }))] },
           {
             name: "status",
             label: "Status",
             options: [
-              { value: "", label: "Any status" },
+              { value: "", label: "All statuses" },
               { value: "active", label: "Active" },
               { value: "suspended", label: "Suspended" },
             ],
           },
           {
             name: "admins",
-            label: "Who",
+            label: "Role",
             options: [
-              { value: "", label: "Everyone" },
+              { value: "", label: "All users" },
               { value: "true", label: "Company admins only" },
             ],
           },
@@ -107,29 +107,29 @@ async function AllUsers({ params, canAdd }: { params: Record<string, string | st
             name: "password",
             label: "Sign-in",
             options: [
-              { value: "", label: "Anyone" },
+              { value: "", label: "All" },
               { value: "none", label: "No password yet" },
             ],
           },
         ]}
       />
       <p className="mb-2 text-meta text-ink-3">
-        {filtered ? `${plural(users.length, "user")} match, of ${total.toLocaleString("en-PH")}.` : `${plural(total, "user")} on the platform.`}
+        {filtered ? `${plural(users.length, "user")} found, of ${total.toLocaleString("en-PH")}.` : `${plural(total, "user")} on the platform.`}
         {users.length === 500 && " Showing the first 500; narrow the search to see the rest."}
       </p>
       <Sheet>
         {users.length === 0 ? (
-          <Empty icon="people" title={filtered ? "Nobody matches" : "No users yet"}>
+          <Empty icon="people" title={filtered ? "No matching users" : "No users yet"}>
             {filtered
               ? "Try another search, or clear the filters."
               : canAdd
-                ? "Add the people at a company with “Add a user”, then give them its applications."
-                : "A Platform Admin adds the people at each company."}
+                ? "Add users with “Add user”, then grant them access to their company's applications."
+                : "A Platform Admin adds users for each company."}
           </Empty>
         ) : (
           <>
             <div className="hidden gap-4 border-b border-rule px-5 py-2 text-meta text-ink-3 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.3fr)]">
-              <span>Person</span>
+              <span>Name</span>
               <span>Company</span>
               <span>Applications</span>
             </div>
@@ -147,12 +147,12 @@ async function Sessions({ canEndOthers }: { canEndOthers: boolean }) {
     <>
       <p className="mb-3 max-w-2xl text-meta text-ink-3">
         These are the console&apos;s staff, signed in here. Each application keeps its own users&apos; sign-ins; those aren&apos;t on the platform.
-        {!canEndOthers && " You can end your own; a Platform Admin can end anyone's."}
+        {!canEndOthers && " You can end your own session; a Platform Admin can end any session."}
       </p>
       <Sheet>
         {sessions.length === 0 ? (
-          <Empty icon="password" title="Nobody is signed in">
-            A session shows here from sign-in until it ends or runs out.
+          <Empty icon="password" title="No active sessions">
+            A session is listed from sign-in until it is signed out or expires.
           </Empty>
         ) : (
           <ul className="divide-y divide-rule" role="list">
@@ -162,7 +162,7 @@ async function Sessions({ canEndOthers }: { canEndOthers: boolean }) {
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-ink">{s.staff.name}</span>
                     <span className="text-meta text-ink-3">{s.staff.roleName}</span>
-                    {s.isYours && <span className="rounded-full bg-hema-tint px-1.5 text-stamp text-hema uppercase">This is you</span>}
+                    {s.isYours && <span className="rounded-full bg-hema-tint px-1.5 text-stamp text-hema uppercase">You</span>}
                   </span>
                   <span className="block text-meta text-ink-3">
                     {s.staff.email}
@@ -170,7 +170,7 @@ async function Sessions({ canEndOthers }: { canEndOthers: boolean }) {
                     <time dateTime={s.startedAt} title={when(s.startedAt)}>
                       {ago(s.startedAt)}
                     </time>{" "}
-                    · ends {when(s.expiresAt)}
+                    · expires {when(s.expiresAt)}
                   </span>
                 </span>
                 {(s.isYours || canEndOthers) && <EndSession id={s.id} name={s.staff.name} yours={s.isYours} />}

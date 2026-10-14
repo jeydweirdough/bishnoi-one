@@ -164,7 +164,7 @@ function TypeRow({
         <Popover
           trigger="click"
           placement="bottomRight"
-          title={`Who gets ${type.name}`}
+          title={`Teams with access: ${type.name}`}
           content={
             <div className="w-72">
               <TeamsFor
@@ -182,8 +182,8 @@ function TypeRow({
           </Button>
         </Popover>
       )}
-      <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !type.isActive }, type.isActive ? `${type.name} switched off` : `${type.name} switched on`)}>
-        {type.isActive ? "Switch off" : "Switch on"}
+      <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !type.isActive }, type.isActive ? `${type.name} deactivated` : `${type.name} activated`)}>
+        {type.isActive ? "Deactivate" : "Activate"}
       </Button>
       {type.companies === 0 && (
         <ConfirmButton

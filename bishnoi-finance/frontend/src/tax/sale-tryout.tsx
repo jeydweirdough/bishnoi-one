@@ -131,7 +131,7 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
         </Button>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Buyer" error={fields.treatment}>
+          <Field label="Buyer type" error={fields.treatment}>
             {(f) => (
               <Select {...f} value={treatment} onChange={(e) => setTreatment(e.target.value)}>
                 {setup.pack.treatments.map((t) => (
@@ -142,12 +142,12 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
               </Select>
             )}
           </Field>
-          <Field label="Date of the sale" error={fields.on} hint="Rates are the ones in force that day.">
+          <Field label="Sale date" error={fields.on} hint="Uses the rates in effect on this date.">
             {(f) => <Input {...f} type="date" value={on} onChange={(e) => setOn(e.target.value)} />}
           </Field>
           {needsId && (
             <>
-              <Field label="Their name" optional>
+              <Field label="Buyer name" optional>
                 {(f) => <Input {...f} value={buyerName} onChange={(e) => setBuyerName(e.target.value)} />}
               </Field>
               <Field label="OSCA or PWD ID number" error={fields.idNumber}>
@@ -158,7 +158,7 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
         </div>
         <FormError message={error} />
         <Button type="submit" variant="primary" loading={pending} icon={<Calculator className="size-4" aria-hidden />}>
-          Work it out
+          Calculate
         </Button>
       </form>
 
@@ -171,7 +171,7 @@ function InvoiceSummary({ result, fmt }: { result: ComputedSale | null; fmt: Ret
   if (!result) {
     return (
       <div className="grid min-h-48 place-content-center rounded-[3px] border-2 border-dashed border-rule p-6 text-center text-meta text-ink-3">
-        The Sales Invoice summary shows here.
+        The sales invoice summary appears here.
       </div>
     );
   }

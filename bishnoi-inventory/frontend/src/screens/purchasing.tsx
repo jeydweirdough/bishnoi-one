@@ -36,12 +36,12 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
         title="Purchase orders"
         actions={
           <>
-            {may("receiving.receive") && <LinkButton href="/receipts/new">Receive without an order</LinkButton>}
+            {may("receiving.receive") && <LinkButton href="/receipts/new">Receive without purchase order</LinkButton>}
             {may("purchasing.create") && <LinkButton href="/purchase-orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}
           </>
         }
       >
-        Purchase order → supplier delivers → receiving → stock.
+        Purchase order → supplier delivery → goods receipt → stock.
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <ToggleLinks
@@ -49,18 +49,18 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
           options={[
             { value: "board", label: "Board", href: `/purchase-orders${query({ ...f, status: "", view: "" })}` },
             { value: "list", label: "List", href: `/purchase-orders${query({ ...f, view: "list" })}` },
-            { value: "backorders", label: "Still owed", href: "/backorders" },
+            { value: "backorders", label: "Backorders", href: "/backorders" },
           ]}
         />
       </div>
-      {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("ordered,partial", "Pending delivery"), chip("partial", "Partly received"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
+      {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("ordered,partial", "Pending delivery"), chip("partial", "Partially received"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
       <Filters q={f.q} placeholder="PO number or supplier" keep={{ status: f.status, view: board ? "" : "list" }} />
       {board && orders.length > 0 ? (
         <PurchaseOrdersBoard orders={orders} fmt={fmt} day={day} may={may} />
       ) : (
       <Sheet>
         {orders.length === 0 ? (
-          <FirstStep icon="purchaseOrders" title="No purchase orders yet" body="Order from a supplier; receiving fills the order." needs={["warehouse", "supplier", "product"]} href="/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/purchase-orders" may={may} />
+          <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/purchase-orders" may={may} />
         ) : (
           <Table head={["Order", "Supplier", "Deliver to", "Status", "Ordered", "Expected", " Received", " Total"]} min="56rem">
             {orders.map((po) => (
@@ -114,15 +114,15 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
         actions={
           <>
             {po.status === "draft" && may("purchasing.approve") && (
-              <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve & place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "It can't be changed once placed, only received against or cancelled.", danger: false }} />
+              <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve and place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "Once placed, it cannot be edited, only received or cancelled.", danger: false }} />
             )}
             {(po.status === "draft" || open) && may("purchasing.approve") && (
               <StepButton
                 run={purchaseOrderStep.bind(null, po.id, "cancel")}
-                label={po.status === "partial" ? "Close (stop waiting)" : "Cancel order"}
-                done={po.status === "partial" ? "Closed: the rest won't come" : "Cancelled"}
+                label={po.status === "partial" ? "Close order" : "Cancel order"}
+                done={po.status === "partial" ? "Order closed; balance cancelled" : "Cancelled"}
                 variant="quiet"
-                confirm={{ title: po.status === "partial" ? `Close ${po.number}?` : `Cancel ${po.number}?`, body: po.status === "partial" ? `${outstanding} units still owed won't be waited for. What came stays in stock.` : "Nothing will be received against it.", danger: true }}
+                confirm={{ title: po.status === "partial" ? `Close ${po.number}?` : `Cancel ${po.number}?`, body: po.status === "partial" ? `${outstanding} outstanding units will be cancelled. Received stock is unchanged.` : "No further receipts can be recorded against it.", danger: true }}
               />
             )}
           </>
@@ -133,15 +133,15 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
-          { label: "Written up", who: po.createdBy, when: at(po.createdAt) },
-          { label: "Approved & placed", who: po.orderedBy, when: po.orderedOn ? day(po.orderedOn) : null },
+          { label: "Created", who: po.createdBy, when: at(po.createdAt) },
+          { label: "Approved and placed", who: po.orderedBy, when: po.orderedOn ? day(po.orderedOn) : null },
           { label: "Expected", who: null, when: po.expectedOn ? day(po.expectedOn) : null },
         ]} />
         {po.notes && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{po.notes}</p>}
       </Sheet>
 
       <Sheet className="mt-5">
-        <Table head={["Product", " Ordered", " Received", " Still owed", " Unit cost", " Amount"]}>
+        <Table head={["Product", " Ordered", " Received", " Outstanding", " Unit cost", " Amount"]}>
           {po.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
@@ -165,14 +165,14 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
 
       {open && may("receiving.receive") && (
         <section className="mt-6 scroll-mt-6" id="receive">
-          <h2 className="mb-3 text-heading">Receive a delivery</h2>
+          <h2 className="mb-3 text-heading">Receive delivery</h2>
           <ReceiveForm org={me.org} reference={ref} order={po} canAdd={canAddFrom(may)} />
         </section>
       )}
 
       {po.receipts.length > 0 && (
         <Sheet className="mt-6">
-          <div className="px-5 pt-4"><SectionTitle icon="receiving">Deliveries received</SectionTitle></div>
+          <div className="px-5 pt-4"><SectionTitle icon="receiving">Goods receipts</SectionTitle></div>
           <ReceiptsTable receipts={po.receipts} at={at} count={fmt.count} peso={fmt.peso} />
         </Sheet>
       )}
@@ -182,7 +182,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
 
 function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]; at: (iso: string | null) => string; count: (n: number) => string; peso: (n: number) => string }) {
   return (
-    <Table head={["Receipt", "Received", "Supplier", "Into", "Order", " Units", " Value"]} min="52rem">
+    <Table head={["Receipt", "Received date", "Supplier", "Warehouse", "Order", " Units", " Value"]} min="52rem">
       {receipts.map((r) => (
         <tr key={r.id} className="relative hover:bg-bench/40">
           <Td><RowLink href={`/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink></Td>
@@ -200,9 +200,9 @@ function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]
 
 export async function NewPurchaseOrderPage({ searchParams }: { searchParams: Search }) {
   const { me, may } = await context();
-  if (!may("purchasing.create")) return <NoAccess what="writing purchase orders" />;
+  if (!may("purchasing.create")) return <NoAccess what="creating purchase orders" />;
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
-  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "supplier", "product"], then: "/purchase-orders/new", title: "New purchase order", doing: "write a purchase order", crumbs: [{ href: "/purchase-orders", label: "Purchase orders" }], may });
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "supplier", "product"], then: "/purchase-orders/new", title: "New purchase order", doing: "create a purchase order", crumbs: [{ href: "/purchase-orders", label: "Purchase orders" }], may });
   if (gate) return gate;
   const s = await searchParams;
   const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(`query NewPurchaseOrder { ${FORM_LISTS} }`, {}, ["reference"]);
@@ -217,7 +217,7 @@ export async function NewPurchaseOrderPage({ searchParams }: { searchParams: Sea
 export async function EditPurchaseOrderPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, may } = await context();
-  if (!may("purchasing.edit")) return <NoAccess what="changing purchase orders" />;
+  if (!may("purchasing.edit")) return <NoAccess what="editing purchase orders" />;
   const { po, reference: ref } = await loadQuery<{ po: PO; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(
     `query EditPurchaseOrder($id: String!) { po: purchaseOrder(id: $id) ${FORM_LISTS} }`,
     { id },
@@ -242,11 +242,11 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
         title="Receiving"
         actions={may("receiving.receive") && <LinkButton href="/receipts/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Receive stock</LinkButton>}
       >
-        Every delivery taken in. To receive against a purchase order, open the order.
+        All goods receipts. To receive against a purchase order, open the order.
       </PageHeader>
       <Filters q={q} placeholder="Receipt or delivery number" />
       <Sheet>
-        {receipts.length === 0 ? <FirstStep icon="receiving" title="Nothing received yet" body="Stock comes in through a receipt, from a purchase order or without one." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
+        {receipts.length === 0 ? <FirstStep icon="receiving" title="No goods receipts" body="Stock is received through a goods receipt, with or without a purchase order." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
       </Sheet>
     </>
   );
@@ -259,7 +259,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
   const { receipt: r } = await loadQuery<{ receipt: Receipt }>(`query Receipt($id: String!) { receipt(id: $id) }`, { id }, ["receipt"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title={r.number} actions={may("stock.view") && <LinkButton href={`/movements?q=${enc(r.number)}`}>Its movements</LinkButton>}>
+      <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title={r.number} actions={may("stock.view") && <LinkButton href={`/movements?q=${enc(r.number)}`}>View stock movements</LinkButton>}>
         Received {at(r.receivedAt)} by {r.receivedBy?.name ?? "—"} into {r.warehouse.name} · {r.location.code}
         {r.supplier && <> from {r.supplier.name}</>}
         {r.order && <> against <Link href={`/purchase-orders/${r.order.id}`} className="text-ink hover:underline">{r.order.number}</Link></>}
@@ -300,7 +300,7 @@ export async function NewReceiptPage() {
   return (
     <>
       <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title="Receive stock">
-        A delivery with no purchase order: a donation, a return, stock found. For an order, receive it from the order.
+        For deliveries without a purchase order, such as donations, returns or found stock. To receive against a purchase order, open the order.
       </PageHeader>
       <ReceiveForm org={me.org} reference={ref} canAdd={canAddFrom(may)} />
     </>
@@ -313,12 +313,12 @@ export async function BackordersPage() {
   const { backorders: rows } = await loadQuery<{ backorders: Backorder[] }>("query Backorders { backorders }", {}, ["backorders"]);
   return (
     <>
-      <PageHeader title="Backorders">Everything still owed on placed purchase orders, soonest expected first.</PageHeader>
+      <PageHeader title="Backorders">Outstanding quantities on placed purchase orders, earliest expected date first.</PageHeader>
       <Sheet>
         {rows.length === 0 ? (
-          <Empty icon="purchaseOrders" title="Nothing is owed" />
+          <Empty icon="purchaseOrders" title="No backorders" />
         ) : (
-          <Table head={["Product", "Order", "Supplier", "Expected", " Ordered", " Received", " Still owed", " Value"]} min="56rem">
+          <Table head={["Product", "Order", "Supplier", "Expected", " Ordered", " Received", " Outstanding", " Value"]} min="56rem">
             {rows.map((b, i) => (
               <tr key={i} className="relative hover:bg-bench/40">
                 <Td><Link href={`/products/${b.product.id}`} className="font-semibold hover:text-ink hover:underline">{b.product.name}</Link><span className="block text-meta text-ink-3">{b.product.sku}</span></Td>

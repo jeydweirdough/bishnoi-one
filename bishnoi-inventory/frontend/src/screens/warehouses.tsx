@@ -17,16 +17,16 @@ export async function WarehousesPage({ searchParams }: { searchParams: Search })
   const { warehouses } = await loadQuery<{ warehouses: WarehouseRow[] }>("query Warehouses { warehouses }", {}, ["warehouses"]);
   return (
     <>
-      <PageHeader title="Warehouses">Every place stock is kept. Each has its own stock, and locations (zones, racks, bins) inside it.</PageHeader>
+      <PageHeader title="Warehouses">All sites where stock is kept. Each warehouse has its own stock and locations (zones, racks and bins).</PageHeader>
       {may("warehouses.manage") && <div className="mb-5"><AddWarehouse startOpen={(await searchParams).add === "1" || warehouses.length === 0} /></div>}
       <Sheet>
         {warehouses.length === 0 ? (
-          <Empty icon="warehouses" title="No warehouses yet">Add one, then receive stock into it.</Empty>
+          <Empty icon="warehouses" title="No warehouses">Add a warehouse, then receive stock into it.</Empty>
         ) : (
           <Table head={["Warehouse", "Address", " Locations", " Products", " Units", " Value"]}>
             {warehouses.map((w) => (
               <tr key={w.id} className="relative hover:bg-bench/40">
-                <Td><RowLink href={`/warehouses/${w.id}`} sub={w.isActive ? w.code : `${w.code} · switched off`}>{w.name}</RowLink></Td>
+                <Td><RowLink href={`/warehouses/${w.id}`} sub={w.isActive ? w.code : `${w.code} · inactive`}>{w.name}</RowLink></Td>
                 <Td className="text-ink-2">{w.address ?? "—"}</Td>
                 <Td num>{w.locationCount}</Td>
                 <Td num>{fmt.count(w.products)}</Td>
@@ -58,28 +58,28 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
             manage && (
               <>
                 <EditWarehouse warehouse={w} />
-                <RecordTools what="warehouse" name={w.name} remove={deleteWarehouse.bind(null, w.id)} after="/warehouses" removeNote="Only a warehouse stock has never moved through can be deleted. Otherwise, switch it off." />
+                <RecordTools what="warehouse" name={w.name} remove={deleteWarehouse.bind(null, w.id)} after="/warehouses" removeNote="Only a warehouse with no stock movements can be deleted. Otherwise, deactivate it." />
               </>
             )
           }
           actions={
             <>
-              {may("stock.view") && <LinkButton href={`/stock?warehouse=${w.id}`}>Its stock</LinkButton>}
-              {may("counts.create") && <LinkButton href={`/counts?warehouse=${w.id}`}>Count it</LinkButton>}
+              {may("stock.view") && <LinkButton href={`/stock?warehouse=${w.id}`}>View stock</LinkButton>}
+              {may("counts.create") && <LinkButton href={`/counts?warehouse=${w.id}`}>Start count</LinkButton>}
             </>
           }
         >
           <span className="font-mono text-meta">{w.code}</span>
           {w.address && <> · {w.address}</>}
-          {!w.isActive && <> · <strong>Switched off</strong></>}
+          {!w.isActive && <> · <strong>Inactive</strong></>}
         </PageHeader>
       </div>
       <DetailPanel>
         <StatCards
           items={[
-            { label: "Units on hand", value: fmt.count(s.onHand), href: `/stock?warehouse=${w.id}`, note: s.inTransit ? `${fmt.count(s.inTransit)} coming in` : undefined },
-            { label: "Available", value: fmt.count(s.available), note: s.reserved + s.allocated ? `${fmt.count(s.reserved + s.allocated)} held for orders` : undefined },
-            { label: "Low or out here", value: fmt.count(w.lowCount), flag: w.lowCount > 0, href: `/stock?warehouse=${w.id}&state=low` },
+            { label: "Units on hand", value: fmt.count(s.onHand), href: `/stock?warehouse=${w.id}`, note: s.inTransit ? `${fmt.count(s.inTransit)} in transit` : undefined },
+            { label: "Available", value: fmt.count(s.available), note: s.reserved + s.allocated ? `${fmt.count(s.reserved + s.allocated)} reserved for orders` : undefined },
+            { label: "Low or out of stock", value: fmt.count(w.lowCount), flag: w.lowCount > 0, href: `/stock?warehouse=${w.id}&state=low` },
           ]}
         />
         <InfoCard>
@@ -90,7 +90,7 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
               ["Warehouse name", w.name],
               ["Code", <span key="code" className="font-mono">{w.code}</span>],
               ["Address", w.address],
-              ["Status", w.isActive ? "Active" : "Switched off"],
+              ["Status", w.isActive ? "Active" : "Inactive"],
               ["Default location", w.locations.find((l) => l.isDefault)?.name],
               ["Locations", fmt.count(w.locations.filter((l) => l.isActive).length)],
             ]}
@@ -103,31 +103,31 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
               ["On hand", fmt.count(s.onHand)],
               ["Value at cost", fmt.peso(w.value)],
               ["Reserved", fmt.count(s.reserved)],
-              ["Being picked", fmt.count(s.allocated)],
+              ["Allocated", fmt.count(s.allocated)],
               ["Damaged", fmt.count(s.damaged)],
-              ["Coming in", fmt.count(s.inTransit)],
+              ["In transit", fmt.count(s.inTransit)],
             ]}
           />
         </InfoCard>
         {!manage && (
         <BarList
-          title="Where it's kept"
+          title="Stock by location"
           icon="headquarters"
           rows={w.locations.map((l) => ({
             key: l.id,
             name: `${l.code} · ${l.name}`,
             sub: `${fmt.count(l.units)} units · ${fmt.count(l.products)} ${l.products === 1 ? "product" : "products"}`,
-            pill: !l.isActive ? <Stamp tone="muted">Switched off</Stamp> : l.isDefault ? <Stamp tone="active">Default</Stamp> : null,
+            pill: !l.isActive ? <Stamp tone="muted">Inactive</Stamp> : l.isDefault ? <Stamp tone="active">Default</Stamp> : null,
             share: l.units / Math.max(1, s.onHand),
           }))}
-          empty="No locations yet."
+          empty="No locations."
         />
         )}
         {manage && (
           <Card>
             <div className="px-5 pt-4 pb-2">
               <SectionTitle icon="headquarters">Locations</SectionTitle>
-              <p className="text-meta text-ink-3">Stock received or moved here goes to the default location unless someone picks another.</p>
+              <p className="text-meta text-ink-3">Stock received or transferred here goes to the default location unless another is selected.</p>
             </div>
             <LocationsEditor warehouseId={w.id} locations={w.locations} canManage={manage} />
           </Card>

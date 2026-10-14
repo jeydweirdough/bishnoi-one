@@ -1,4 +1,6 @@
 import { Download } from "lucide-react";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { LinkButton } from "@/src/platform/ui/button";
 import Link from "next/link";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
@@ -39,9 +41,11 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
   const query = `view=${view}${team ? `&team=${enc(team)}` : ""}`;
   const data = await load<ModuleRetention>(`/retention?${query}`);
   const rules = data.rules[0];
+  // The watch list in pages; ticking several picks from the page in front of you.
+  const shown = slicePage(data.watch, pageOf(search.page));
   const href = (v: string, t = "") => `/retention?view=${v}${t ? `&team=${t}` : ""}`;
   // Worth a call: the ones with no follow-up yet can be won back several at a time.
-  const winnable = data.watch.filter((row) => row.canWinBack && !row.followUp);
+  const winnable = shown.rows.filter((row) => row.canWinBack && !row.followUp);
   const bulk = winnable.length > 1;
   const teamName = data.teams.find((t) => t.id === team)?.name;
   const whose = view === "mine" ? "your customers" : teamName ?? (me.role?.scope === "team" ? "your team" : "everyone");
@@ -77,7 +81,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
         {view === "team" && data.teams.length > 1 && (
           <ToggleLinks
             current={team}
-            options={[{ value: "", label: "Every team", href: href("team") }, ...data.teams.map((t) => ({ value: t.id, label: t.name, href: href("team", t.id) }))]}
+            options={[{ value: "", label: "All teams", href: href("team") }, ...data.teams.map((t) => ({ value: t.id, label: t.name, href: href("team", t.id) }))]}
           />
         )}
       </div>
@@ -85,18 +89,18 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
       <RetentionFigures summary={data.summary} rules={rules} />
 
       {/* Who to call comes before how it's going: the page is for keeping customers. */}
-      <SelectionProvider key={query} items={bulk ? winnable.map((row) => ({ id: row.customerId, name: row.name })) : []}>
+      <SelectionProvider key={query + shown.page} items={bulk ? winnable.map((row) => ({ id: row.customerId, name: row.name })) : []}>
         <div id="worth-a-call" className="scroll-mt-6" />
         <Sheet className="mb-5 px-5 pt-4 pb-2">
-          <SectionTitle icon="worthACall">Worth a call</SectionTitle>
+          <SectionTitle icon="worthACall">At-risk and lost customers</SectionTitle>
           <p className="text-meta text-ink-3">At risk first, the ones closest to lost at the top; then those lost lately, while they&apos;re still winnable.</p>
           {data.watch.length === 0 ? (
             <Empty
               icon="retention"
-              title="Nobody slipping away"
+              title="No at-risk customers"
               actions={
                 <LinkButton href="/companies" variant="quiet">
-                  See your customers
+                  View customers
                 </LinkButton>
               }
             >
@@ -112,7 +116,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
                 </div>
               )}
               <ul className="mt-1 divide-y divide-rule">
-                {data.watch.map((row) => (
+                {shown.rows.map((row) => (
                   <SelectableRow key={row.customerId} id={row.customerId} as="li" className="-mx-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-3">
                     <div className="flex min-w-0 items-start gap-3">
                       {bulk && (
@@ -153,6 +157,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
               </ul>
             </>
           )}
+          <Pager total={data.watch.length} page={shown.page} base={`/retention?${query}`} />
         </Sheet>
         {bulk && <WinBackBulk org={me.org} />}
       </SelectionProvider>
@@ -166,7 +171,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
           {data.trend.some((p) => p.rate !== null) ? (
             <TrendChart points={data.trend} title={`Retention by month, ${whose}`} org={me.org} />
           ) : (
-            <Empty compact icon="trend" title="No month to show yet">
+            <Empty compact icon="trend" title="No monthly data yet">
               Each month fills in once there&apos;s a {rules.lostDays}-day window to compare it with.
             </Empty>
           )}

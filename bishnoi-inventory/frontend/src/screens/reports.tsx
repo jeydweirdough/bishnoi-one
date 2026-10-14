@@ -19,7 +19,7 @@ export async function ReportsPage() {
   const groups = [...new Set(reports.map((r) => r.group))];
   return (
     <>
-      <PageHeader title="Reports">Every one can be narrowed to a warehouse{may("reports.export") ? ", and exported to a spreadsheet" : ""}.</PageHeader>
+      <PageHeader title="Reports">Filter any report by warehouse{may("reports.export") ? ", and export it to a spreadsheet" : ""}.</PageHeader>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {groups.map((g) => (
           <Sheet key={g} className="px-5 pt-4 pb-3">
@@ -87,7 +87,7 @@ export async function ReportPage({ params, searchParams }: { params: Params<{ ke
       </PageHeader>
       {(r.byWarehouse || r.dated) && (
         <Filters>
-          {r.byWarehouse && <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={[{ value: "", label: "Every warehouse" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))]} />}
+          {r.byWarehouse && <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={[{ value: "", label: "All warehouses" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))]} />}
           {r.dated && (
             <>
               <label className="block"><span className="mb-1 block text-meta font-medium text-ink-2">From</span><input type="date" name="from" defaultValue={f.from || r.from} className="h-9 border-0 border-b border-control bg-transparent text-sm" /></label>
@@ -98,7 +98,7 @@ export async function ReportPage({ params, searchParams }: { params: Params<{ ke
       )}
       <Sheet>
         {r.rows.length === 0 ? (
-          <Empty icon="report" title="Nothing to report">Nothing matches for this {r.dated ? "period" : "report"}{f.warehouse ? " in this warehouse" : ""}.</Empty>
+          <Empty icon="report" title="No data">No records for this {r.dated ? "period" : "report"}{f.warehouse ? " in this warehouse" : ""}.</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm" style={{ minWidth: `${Math.max(40, r.columns.length * 8)}rem` }}>

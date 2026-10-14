@@ -5,7 +5,7 @@ import { Modal } from "antd";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/src/platform/ui/button";
 import type { Assignable, CustomerType } from "@/src/platform/lib/types";
 import { addCustomerChoices } from "../../actions/crm";
@@ -83,7 +83,7 @@ export function CustomerStart({
       )}
       {!fixedKind && (
         <label className="block">
-          <span className="mb-1.5 block text-sm text-ink">What kind of customer?</span>
+          <span className="mb-1.5 block text-sm text-ink">Customer type</span>
           <Combobox
             className="w-full"
             size="large"
@@ -141,5 +141,19 @@ export function NewCustomerButton({
         {choices && <CustomerStart choices={choices} kind={kind} onDone={() => setOpen(false)} />}
       </Modal>
     </>
+  );
+}
+
+/** The same dialog, opened by something else (a search that found nobody), with the name already typed. */
+export function AddCustomerDialog({ open, onClose, kind, initialName, title = "Add customer" }: { open: boolean; onClose: () => void; kind?: string; initialName: string; title?: string }) {
+  const [choices, setChoices] = useState<Choices | null>(null);
+  const [, start] = useTransition();
+  useEffect(() => {
+    if (open && !choices) start(async () => setChoices(await addCustomerChoices()));
+  }, [open, choices]);
+  return (
+    <Modal open={open && Boolean(choices)} title={title} onCancel={onClose} footer={null} width={480} destroyOnHidden>
+      {choices && <CustomerStart choices={choices} kind={kind} initialName={initialName} onDone={onClose} />}
+    </Modal>
   );
 }

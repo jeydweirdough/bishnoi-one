@@ -36,7 +36,7 @@ export function UsersEditor({ data, meId, when }: { data: AdminUsers; meId: stri
     <div className="space-y-5">
       {adding ? (
         <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="addRole">Add a person</SectionTitle>
+          <SectionTitle icon="addRole">Add user</SectionTitle>
           <form
             noValidate
             className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
@@ -54,18 +54,18 @@ export function UsersEditor({ data, meId, when }: { data: AdminUsers; meId: stri
             <Field label="Role" error={fields.roleId} hint={data.roles.find((r) => r.id === d.roleId)?.description ?? undefined}>
               {(p) => <Select {...p} value={d.roleId} onChange={(e) => setD({ ...d, roleId: e.target.value })}>{data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select>}
             </Field>
-            <Field label="First password" error={fields.password} hint="At least 8 characters. Give it to them yourself.">
+            <Field label="Initial password" error={fields.password} hint="At least 8 characters. Share it with the user directly.">
               {(p) => <Input {...p} type="password" autoComplete="new-password" value={d.password} onChange={(e) => setD({ ...d, password: e.target.value })} />}
             </Field>
             <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-              <Button type="submit" variant="primary" loading={saving}>Add person</Button>
+              <Button type="submit" variant="primary" loading={saving}>Add user</Button>
               <Button variant="quiet" onClick={() => setAdding(false)}>Cancel</Button>
             </div>
             {error && <div className="sm:col-span-2 lg:col-span-4"><FormError message={error} /></div>}
           </form>
         </Sheet>
       ) : (
-        <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)}>Add a person</Button>
+        <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)}>Add user</Button>
       )}
 
       <Sheet>
@@ -77,14 +77,14 @@ export function UsersEditor({ data, meId, when }: { data: AdminUsers; meId: stri
                 {u.id === meId && <span className="ml-2 text-meta text-ink">You</span>}
                 <span className="block text-meta text-ink-3">{u.email} · {u.lastSignInAt ? `last signed in ${when[u.id]}` : "never signed in"}{!u.isActive && " · switched off"}</span>
               </span>
-              <Select aria-label={`${u.fullName}'s role`} value={u.role.id} disabled={pending} onChange={(e) => change(u.id, { roleId: e.target.value }, `${u.fullName} is now ${data.roles.find((r) => r.id === e.target.value)?.name}`)}>
+              <Select aria-label={`${u.fullName}'s role`} value={u.role.id} disabled={pending} onChange={(e) => change(u.id, { roleId: e.target.value }, `${u.fullName}'s role changed to ${data.roles.find((r) => r.id === e.target.value)?.name}`)}>
                 {data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </Select>
               <span className="flex items-center gap-1 justify-self-end">
                 <NewPassword id={u.id} name={u.fullName} />
                 {u.id !== meId && (
-                  <Button size="sm" variant="quiet" disabled={pending} onClick={() => change(u.id, { isActive: !u.isActive }, u.isActive ? `${u.fullName} switched off` : `${u.fullName} switched back on`)}>
-                    {u.isActive ? "Switch off" : "Switch on"}
+                  <Button size="sm" variant="quiet" disabled={pending} onClick={() => change(u.id, { isActive: !u.isActive }, u.isActive ? `${u.fullName} deactivated` : `${u.fullName} activated`)}>
+                    {u.isActive ? "Deactivate" : "Activate"}
                   </Button>
                 )}
               </span>
@@ -104,11 +104,11 @@ function NewPassword({ id, name }: { id: string; name: string }) {
       icon={<KeyRound className="size-4" aria-hidden />}
       triggerVariant="quiet"
       triggerSize="sm"
-      triggerTitle={`Set a new password for ${name}`}
-      title={`A new password for ${name}`}
+      triggerTitle={`Reset password for ${name}`}
+      title={`Reset password for ${name}`}
       body={
         <div className="space-y-2">
-          <p>Their sessions end, and they sign in with this. Give it to them yourself.</p>
+          <p>The user is signed out of all sessions and signs in with this password. Share it with the user directly.</p>
           <Input type="password" autoComplete="new-password" aria-label="New password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
       }
@@ -167,14 +167,14 @@ export function RolesEditor({ data }: { data: RolesData }) {
       delete next[selected];
       setDrafts(next);
       setSelected(result.data.id);
-      toast.success(role ? `${input.name} saved` : `${input.name} added`, { description: role ? "People with this role get the change on their next click." : undefined });
+      toast.success(role ? `${input.name} saved` : `${input.name} added`, { description: role ? "Applies to users with this role on their next action." : undefined });
       router.refresh();
     });
   }
 
   const items = [
-    ...data.roles.map((r) => ({ key: r.id, label: r.name, detail: `${r.userCount} ${r.userCount === 1 ? "person" : "people"}`, unsaved: r.id in drafts && !same(drafts[r.id], { name: r.name, description: r.description, permissions: r.permissions }) })),
-    ...(NEW in drafts || selected === NEW ? [{ key: NEW, label: draft.name.trim() || "New role", detail: "Not saved yet", unsaved: true }] : []),
+    ...data.roles.map((r) => ({ key: r.id, label: r.name, detail: `${r.userCount} ${r.userCount === 1 ? "user" : "users"}`, unsaved: r.id in drafts && !same(drafts[r.id], { name: r.name, description: r.description, permissions: r.permissions }) })),
+    ...(NEW in drafts || selected === NEW ? [{ key: NEW, label: draft.name.trim() || "New role", detail: "Unsaved", unsaved: true }] : []),
   ];
 
   return (
@@ -196,7 +196,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
                 <ConfirmButton
                   label="Delete role"
                   title={`Delete ${role.name}?`}
-                  body="Nobody has this role, so nothing else changes."
+                  body="No users have this role."
                   confirmLabel="Delete role"
                   triggerSize="sm"
                   triggerVariant="quiet"
@@ -220,18 +220,18 @@ export function RolesEditor({ data }: { data: RolesData }) {
             {role ? role.name : "New role"}
           </SectionTitle>
           {locked ? (
-            <p className="mt-2 text-meta text-ink-2">The Administrator role always has every permission, including ones added later. It can&apos;t be changed or deleted, so there&apos;s always a way to fix access. To give someone less, make a new role.</p>
+            <p className="mt-2 text-meta text-ink-2">The Administrator role has all permissions, including those added later. It cannot be changed or deleted. To grant fewer permissions, create a new role.</p>
           ) : (
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
               <Field label="Name" error={errors.fields.name}>{(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}</Field>
-              <Field label="What it's for" optional error={errors.fields.description}>{(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}</Field>
+              <Field label="Description" optional error={errors.fields.description}>{(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}</Field>
             </div>
           )}
         </Sheet>
         <Permissions catalogue={data.catalogue} granted={draft.permissions} locked={locked} onChange={(permissions) => edit({ permissions })} />
         {!locked && dirty && (
           <SaveBar
-            what={role ? <>Unsaved changes to <strong>{role.name}</strong></> : "A new role, not saved yet"}
+            what={role ? <>Unsaved changes to <strong>{role.name}</strong></> : "New role (unsaved)"}
             saving={saving}
             onSave={save}
             onDiscard={discard}

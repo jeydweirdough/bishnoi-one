@@ -85,7 +85,7 @@ function AppRow({ a }: { a: Application }) {
           </span>
           <span className="mt-0.5 block truncate text-meta text-ink-2">
             {a.statusNote && <span className="text-ink">{a.statusNote} · </span>}
-            {a.isActive ? checkLine(a.lastCheck, Boolean(a.healthUrl)) : "Retired: not checked."}
+            {a.isActive ? checkLine(a.lastCheck, Boolean(a.healthUrl)) : "Retired: not monitored."}
           </span>
           <span className="mt-1 block text-meta text-ink-3">
             <span className="font-mono">{a.key}</span>
@@ -96,11 +96,11 @@ function AppRow({ a }: { a: Application }) {
         <span className="flex items-center gap-6 sm:justify-end">
           <span className="text-right">
             <span className={`block text-lg font-semibold tabular-nums ${uptimeTone(a.uptime)}`}>{uptimeText(a.uptime)}</span>
-            <span className="block text-meta text-ink-3">up, last 24 h</span>
+            <span className="block text-meta text-ink-3">uptime, 24 h</span>
           </span>
           <span className="w-20 text-right">
             <span className="block text-lg font-semibold text-ink tabular-nums">{ms == null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`}</span>
-            <span className="block text-meta text-ink-3">last answer</span>
+            <span className="block text-meta text-ink-3">last response</span>
           </span>
           <ChevronRight className="hidden size-4 text-ink-3 group-hover:text-ink sm:block" aria-hidden />
         </span>
@@ -132,8 +132,8 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
         <ToggleLinks
           current={retired ? "all" : "active"}
           options={[
-            { value: "active", label: "In use", href: "/applications" },
-            { value: "all", label: "With retired ones", href: "/applications?retired=1" },
+            { value: "active", label: "Active", href: "/applications" },
+            { value: "all", label: "Include retired", href: "/applications?retired=1" },
           ]}
         />
       </div>
@@ -158,7 +158,7 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
           {running.length > 0 && (
             <section aria-labelledby="running">
               <h2 id="running" className="mb-2 text-caps text-ink-3 uppercase">
-                {retired ? "Running and retired" : "Running"}
+                {retired ? "Active and retired" : "Active"}
               </h2>
               <Sheet className="overflow-hidden">
                 <ul className="divide-y divide-rule">{running.map((a) => <AppRow key={a.id} a={a} />)}</ul>
@@ -242,7 +242,7 @@ async function Integrations() {
                   </span>
                 </p>
                 <p className="text-meta text-ink-3">
-                  {[i.target, i.healthUrl ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set by hand"].filter(Boolean).join(" · ")}
+                  {[i.target, i.healthUrl ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set manually"].filter(Boolean).join(" · ")}
                 </p>
               </div>
               <HealthMark status={i.status} label={HEALTH[i.status]} />

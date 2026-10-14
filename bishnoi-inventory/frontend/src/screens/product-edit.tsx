@@ -29,8 +29,8 @@ export async function NewProductPage({ searchParams }: { searchParams: Search })
   const { ref, parents } = await formData();
   return (
     <>
-      <PageHeader crumbs={[{ href: "/products", label: "Products" }]} title="Add a product">
-        Its code and name, what it costs, when to reorder, and how it&apos;s tracked. Stock comes in by receiving it.
+      <PageHeader crumbs={[{ href: "/products", label: "Products" }]} title="Add product">
+        Product details, pricing, reorder levels and tracking. Stock is added through goods receipts.
       </PageHeader>
       <ProductForm org={me.org} reference={ref} parents={parents} locked={false} canAdd={canAddFrom(may)} preset={{ parentId: typeof parent === "string" ? parent : undefined }} />
     </>
@@ -40,7 +40,7 @@ export async function NewProductPage({ searchParams }: { searchParams: Search })
 export async function EditProductPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, may } = await context();
-  if (!may("products.edit")) return <NoAccess what="changing products" />;
+  if (!may("products.edit")) return <NoAccess what="editing products" />;
   const { ref, parents, product: found } = await formData(id);
   const product = found as Product;
   // Tracking and unit are fixed once stock has moved (the API says so too).

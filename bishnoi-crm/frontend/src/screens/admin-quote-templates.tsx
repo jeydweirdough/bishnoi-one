@@ -54,7 +54,7 @@ export default async function QuoteTemplatesPage() {
                       .join(" · ")}
                   </p>
                 </div>
-                {!t.isActive && <span className="text-meta text-ink-3">Switched off</span>}
+                {!t.isActive && <span className="text-meta text-ink-3">Inactive</span>}
                 {(!t.hasLogo || !t.hasSignature) && (
                   <span className="text-meta text-ink-3">{!t.hasLogo && !t.hasSignature ? "No logo or e-signature yet" : !t.hasLogo ? "No logo yet" : "No e-signature yet"}</span>
                 )}

@@ -88,7 +88,7 @@ export function AttentionRulesEditor({ initial }: { initial: AttentionRules }) {
       ))}
       {free.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <Combobox className="w-56" placeholder="A division with its own" value={adding} onChange={setAdding} options={free.map((t) => ({ value: t.id, label: t.name }))} />
+          <Combobox className="w-56" placeholder="Select a division" value={adding} onChange={setAdding} options={free.map((t) => ({ value: t.id, label: t.name }))} />
           <Button
             disabled={!adding}
             onClick={() =>
@@ -101,7 +101,7 @@ export function AttentionRulesEditor({ initial }: { initial: AttentionRules }) {
               })
             }
           >
-            Give it its own
+            Override for this division
           </Button>
         </div>
       )}

@@ -97,7 +97,7 @@ export function TeamPricesEditor({
 
   const picker = teams.length > 1 && (
     <PickList
-      title="Your teams"
+      title="Teams"
       icon="teams"
       items={teams.map((t) => ({ key: t.id, label: t.name, unsaved: dirtyIn(t.id) }))}
       selected={team}
@@ -110,7 +110,7 @@ export function TeamPricesEditor({
   if (sheet && sheet.priceTypes.length === 0) {
     return (
       <Sheet>
-        <Empty icon="pricing" title="There's no price list yet">
+        <Empty icon="pricing" title="No price list yet">
           An administrator sets up price types in Administration → Settings → Pricing and retention. Until then there is nothing for{" "}
           {teams.length > 1 ? "your teams" : teamName} to charge over.
         </Empty>
@@ -124,7 +124,7 @@ export function TeamPricesEditor({
       <div className="min-w-0" aria-busy={loading || undefined}>
         {!sheet || !draft || !saved ? (
           <Sheet>
-            <Empty icon="pricing" title="Fetching this team's prices…" />
+            <Empty icon="pricing" title="Loading team prices…" />
           </Sheet>
         ) : (
           <TeamSheet
@@ -238,7 +238,7 @@ function TeamSheet({
           Leave a price empty and it follows the standard price. Your team quotes at these; a salesperson asking for a lower one sends it to you for approval.
         </p>
         {columns.length === 0 ? (
-          <Empty icon="products" title="Nothing to set here">
+          <Empty icon="products" title="No price list">
             Every price {teamName} quotes with is typed on the quote itself, so there is no list to price from.
           </Empty>
         ) : sheet.products.length === 0 ? (

@@ -16,7 +16,7 @@ import type { Product, Reference } from "../lib/types";
 
 /** A variant's stock, as a pill. */
 function StockPill({ state }: { state: Product["state"] }) {
-  if (state === "out") return <Stamp tone="attention">Out</Stamp>;
+  if (state === "out") return <Stamp tone="attention">Out of stock</Stamp>;
   if (state === "low") return <Stamp tone="attention">Low</Stamp>;
   return state ? <Stamp tone="done">In stock</Stamp> : null;
 }
@@ -55,12 +55,12 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
             editHref={may("products.edit") ? `/products/${p.id}/edit` : undefined}
             remove={may("products.delete") ? deleteProduct.bind(null, p.id) : undefined}
             after="/products"
-            removeNote="Only a product nothing has happened to can be deleted. One with stock history is marked discontinued instead."
+            removeNote="Only a product with no transactions can be deleted. A product with stock history is marked discontinued instead."
           />
         }
         actions={
           <>
-            {may("stock.view") && <LinkButton href={`/movements?product=${p.id}`}>Movements</LinkButton>}
+            {may("stock.view") && <LinkButton href={`/movements?product=${p.id}`}>Stock movements</LinkButton>}
             {groups && may("products.create") && (
               <LinkButton href={`/products/new?parent=${p.id}`} icon={<Plus className="size-4" aria-hidden />}>
                 Add variant
@@ -93,7 +93,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
                 ) : (
                   <span className="flex flex-col items-center gap-2 text-ink-3">
                     <Icon name="picture" className="size-12" />
-                    <span className="text-meta">No picture yet</span>
+                    <span className="text-meta">No image</span>
                   </span>
                 )}
               </div>
@@ -107,11 +107,11 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
                 <Barcode value={p.barcode} />
               ) : (
                 <p className="text-center text-meta text-ink-3">
-                  No barcode yet.
+                  No barcode.
                   {may("products.edit") && (
                     <>
                       {" "}
-                      <Link href={`/products/${p.id}/edit`} className="text-ink hover:underline">Add one</Link>
+                      <Link href={`/products/${p.id}/edit`} className="text-ink hover:underline">Add barcode</Link>
                     </>
                   )}
                 </p>
@@ -137,9 +137,9 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         ) : (
           <StatCards
             items={[
-              { label: "On hand", value: `${fmt.count(lv.onHand)} ${p.unit}`, note: lv.inTransit ? `${fmt.count(lv.inTransit)} on the way` : undefined },
-              { label: "Available", value: fmt.count(lv.available), flag: p.state === "out" || p.state === "low", note: p.state === "out" || p.state === "low" ? `Reorder at ${fmt.count(p.reorderPoint)}` : undefined },
-              { label: "Held for orders", value: fmt.count(lv.reserved + lv.allocated), note: lv.allocated ? `${fmt.count(lv.allocated)} being picked` : undefined },
+              { label: "On hand", value: `${fmt.count(lv.onHand)} ${p.unit}`, note: lv.inTransit ? `${fmt.count(lv.inTransit)} in transit` : undefined },
+              { label: "Available", value: fmt.count(lv.available), flag: p.state === "out" || p.state === "low", note: p.state === "out" || p.state === "low" ? `Reorder level ${fmt.count(p.reorderPoint)}` : undefined },
+              { label: "Reserved for orders", value: fmt.count(lv.reserved + lv.allocated), note: lv.allocated ? `${fmt.count(lv.allocated)} allocated` : undefined },
             ]}
           />
         )}
@@ -155,7 +155,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
               ["Barcode", p.barcode],
               ["Category", p.category?.path],
               ["Brand", p.brand?.name],
-              ["Usual supplier", p.supplier ? <Link key="supplier" href={`/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
+              ["Preferred supplier", p.supplier ? <Link key="supplier" href={`/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
               ["Unit", `${p.unitName} (${p.unit})`],
               ...(p.variantLabel ? [["Variant", p.variantLabel] as [string, string]] : []),
               ...Object.entries(p.attributes),
@@ -165,7 +165,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
           </InfoSection>
           <InfoSection
             icon="pricing"
-            title="Sale information"
+            title="Sales information"
             items={[
               ["Selling price", fmt.peso(p.sellingPrice)],
               ["Cost price", fmt.peso(p.costPrice)],
@@ -194,14 +194,14 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
                 )
               }
               items={[
-                ["Quantity", `${fmt.count(lv.onHand)} ${p.unit}`],
+                ["On hand", `${fmt.count(lv.onHand)} ${p.unit}`],
                 ["Value at cost", fmt.peso(p.value)],
                 ["Damaged", fmt.count(lv.damaged)],
                 ["In transit", fmt.count(lv.inTransit)],
-                ["Min · reorder · max", `${fmt.count(p.minStock)} · ${fmt.count(p.reorderPoint)} · ${p.maxStock == null ? "—" : fmt.count(p.maxStock)}`],
+                ["Minimum · reorder level · maximum", `${fmt.count(p.minStock)} · ${fmt.count(p.reorderPoint)} · ${p.maxStock == null ? "—" : fmt.count(p.maxStock)}`],
                 ["Reorder quantity", fmt.count(p.reorderQty)],
-                ["Tracked by", [p.trackBatches && "batch", p.trackExpiry && "expiry", p.trackSerials && "serial number"].filter(Boolean).join(", ") || "quantity only"],
-                ["Last changed", fmt.whenLabel(p.updatedAt)],
+                ["Tracking", [p.trackBatches && "batch", p.trackExpiry && "expiry", p.trackSerials && "serial number"].filter(Boolean).join(", ") || "quantity only"],
+                ["Last updated", fmt.whenLabel(p.updatedAt)],
               ]}
             />
           )}
@@ -220,11 +220,11 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
               pill: <StockPill state={v.state} />,
               share: v.level.onHand / Math.max(1, ...p.variants.map((x) => x.level.onHand)),
             }))}
-            empty="No variants yet."
+            empty="No variants."
           />
         ) : (
           <BarList
-            title="By warehouse"
+            title="Stock by warehouse"
             icon="warehouses"
             rows={p.warehouses.map((w) => ({
               key: w.warehouse.id,
@@ -239,10 +239,10 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
               ]
                 .filter(Boolean)
                 .join(" · "),
-              pill: w.onHand > 0 ? <Stamp tone="done">In stock</Stamp> : w.inTransit > 0 ? <Stamp tone="active">Coming in</Stamp> : <Stamp tone="muted">Empty</Stamp>,
+              pill: w.onHand > 0 ? <Stamp tone="done">In stock</Stamp> : w.inTransit > 0 ? <Stamp tone="active">In transit</Stamp> : <Stamp tone="muted">Empty</Stamp>,
               share: w.onHand / Math.max(1, lv.onHand),
             }))}
-            empty="None anywhere yet."
+            empty="No stock in any warehouse."
           />
         )}
       </DetailPanel>
@@ -251,9 +251,9 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         <Sheet className="mt-5">
           <div className="px-5 pt-4">
             <SectionTitle icon="headquarters">Where it is{p.trackBatches ? ", by batch" : ""}</SectionTitle>
-            {p.trackExpiry && <p className="text-meta text-ink-3">Soonest to expire first: the order it goes out in.</p>}
+            {p.trackExpiry && <p className="text-meta text-ink-3">Sorted by expiry date, the order stock is issued in (first-expired, first-out).</p>}
           </div>
-          <Table head={["Warehouse · location", ...(p.trackBatches ? ["Batch", "Expires"] : []), " On hand", " Damaged"]} min="32rem">
+          <Table head={["Warehouse · location", ...(p.trackBatches ? ["Batch", "Expiry date"] : []), " On hand", " Damaged"]} min="32rem">
             {p.balances.map((b, i) => (
               <tr key={i}>
                 <Td>{b.warehouse.code} · {b.location.code} <span className="text-meta text-ink-3">{b.location.name}</span></Td>
@@ -270,11 +270,11 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
       {p.recentMovements.length > 0 && (
         <Sheet className="mt-5">
           <div className="px-5 pt-4">
-            <SectionTitle icon="history" action={<Link href={`/movements?product=${p.id}`} className="text-meta text-ink hover:underline">All of them</Link>}>
+            <SectionTitle icon="history" action={<Link href={`/movements?product=${p.id}`} className="text-meta text-ink hover:underline">View all</Link>}>
               Recent movements
             </SectionTitle>
           </div>
-          <Table head={["When", "Action", "Warehouse", "Reference", " Quantity"]} min="36rem">
+          <Table head={["Date and time", "Movement type", "Warehouse", "Reference", " Quantity"]} min="36rem">
             {p.recentMovements.map((m) => {
               const href = referenceHref(m.referenceType, m.referenceId);
               return (

@@ -74,7 +74,7 @@ export function CustomersBulk({
           const title = String(form.get("title") ?? "").trim();
           const dueOn = String(form.get("dueOn") ?? "");
           if (title.length < 2 || !dueOn) {
-            toast.error("Give the follow-up a title and a date.");
+            toast.error("Enter a title and a date.");
             return false;
           }
           await run({ doing: "Adding follow-ups", did: (n) => `Follow-up added for ${plural(n, ...NOUN)}` }, (ids) =>
@@ -129,13 +129,13 @@ export function CustomersBulk({
     ),
     owner: (
       <BulkStep
-        submitLabel={`Give ${many}`}
+        submitLabel={`Reassign ${many}`}
         onCancel={() => setStep(null)}
         onSubmit={async (form) => {
           const ownerId = String(form.get("ownerId") ?? "");
           if (!ownerId) return false;
           const name = people?.find((p) => p.id === ownerId)?.name ?? "them";
-          await run({ doing: "Changing owner", did: (n) => `${plural(n, ...NOUN)} now with ${name}` }, (ids) =>
+          await run({ doing: "Changing owner", did: (n) => `${plural(n, ...NOUN)} reassigned to ${name}` }, (ids) =>
             bulkCustomers(ids, { action: "owner", ownerId }),
           );
         }}
@@ -144,7 +144,7 @@ export function CustomersBulk({
           {(p) => (
             <Select {...p} name="ownerId" required disabled={!people} defaultValue="" autoFocus>
               <option value="" disabled>
-                {people ? "Pick someone" : "Loading people…"}
+                {people ? "Select a person" : "Loading people…"}
               </option>
               {people?.map((person) => (
                 <option key={person.id} value={person.id}>

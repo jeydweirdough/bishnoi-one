@@ -291,7 +291,7 @@ export function CompanyForm({
                 .map((g) => (
                   <option key={g.code} value={g.code}>
                     {g.name}
-                    {g.isActive ? "" : " (switched off)"}
+                    {g.isActive ? "" : " (inactive)"}
                   </option>
                 ))}
             </Select>

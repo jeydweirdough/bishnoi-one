@@ -339,7 +339,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                   action={
                     can(me, "quotes.create") && (
                       <LinkButton href={`/companies/${company.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                        Make a quote
+                        Create quote
                       </LinkButton>
                     )
                   }
@@ -352,7 +352,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             ) : (
               <EmptyArt
                 art="notes"
-                title="Nothing logged yet"
+                title="No activity yet"
                 action={mayLog && <LogActivityButton kind="note" label="Log activity" variant="primary" {...logProps} />}
               >
                 Calls, meetings, emails, notes and tasks about this customer show up here, newest first.
@@ -463,7 +463,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
 
           {owed && isDoctor && owed.balance && (
             <Sheet className="px-5 pt-4 pb-5">
-              <SectionTitle icon="money">Owes</SectionTitle>
+              <SectionTitle icon="money">Outstanding balance</SectionTitle>
               <p className="mt-2 text-figure text-ink">{fmt.peso(owed.balance.owedCentavos)}</p>
               <p className="mt-1 text-meta text-ink-3">
                 {fmt.peso(owed.balance.balanceCentavos)} as of {fmt.dateLabel(owed.balance.asOf)}

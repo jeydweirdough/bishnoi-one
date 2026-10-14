@@ -139,10 +139,10 @@ export function DealClose({
           )}
           {step === "lose" && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Why was it lost?" error={fields.reason}>
+              <Field label="Loss reason" error={fields.reason}>
                 {(p) => (
                   <Select {...p} value={reason} onChange={(e) => setReason(e.target.value)}>
-                    <option value="">Pick a reason</option>
+                    <option value="">Select a reason</option>
                     {lists.lostReasons.map((r) => (
                       <option key={r} value={r}>
                         {r}
@@ -151,14 +151,14 @@ export function DealClose({
                   </Select>
                 )}
               </Field>
-              <Field label="Competitor" optional error={fields.competitor} hint="Who it went to, if anyone.">
+              <Field label="Competitor" optional error={fields.competitor} hint="The competitor that won the deal, if known.">
                 {(p) => <Input {...p} value={competitor} onChange={(e) => setCompetitor(e.target.value)} maxLength={120} />}
               </Field>
             </div>
           )}
           {step === "reopen" && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Back to stage" error={fields.stageCode}>
+              <Field label="Reopen at stage" error={fields.stageCode}>
                 {(p) => (
                   <Select {...p} value={stageCode} onChange={(e) => setStageCode(e.target.value)}>
                     {open.map((s) => (

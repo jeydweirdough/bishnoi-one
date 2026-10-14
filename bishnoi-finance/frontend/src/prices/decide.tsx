@@ -19,7 +19,7 @@ function Decision({ decide, what, rejectHint }: { decide: Decide; what: string; 
   const [pending, start] = useTransition();
 
   function send(decision: "approve" | "reject") {
-    if (decision === "reject" && !reason.trim()) return setError("Say why it's rejected.");
+    if (decision === "reject" && !reason.trim()) return setError("Enter the reason for rejection.");
     setError(null);
     start(async () => {
       const result = await decide({ decision, reason: decision === "reject" ? reason.trim() : null });
@@ -31,7 +31,7 @@ function Decision({ decide, what, rejectHint }: { decide: Decide; what: string; 
   if (rejecting) {
     return (
       <div className="w-full space-y-2 sm:max-w-sm">
-        <Field label="Why it's rejected" hint={rejectHint}>
+        <Field label="Reason for rejection" hint={rejectHint}>
           {(p) => <Textarea {...p} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />}
         </Field>
         <FormError message={error} />
@@ -72,5 +72,5 @@ export function DecidePrice({ price }: { price: WaitingPrice }) {
 }
 
 export function DecideQuote({ id, number }: { id: string; number: string }) {
-  return <Decision decide={(d) => decideQuote(id, number, d)} what={number} rejectHint="The rep sees your reason on the quote." />;
+  return <Decision decide={(d) => decideQuote(id, number, d)} what={number} rejectHint="Visible to the rep on the quote." />;
 }

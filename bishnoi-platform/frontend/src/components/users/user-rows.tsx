@@ -4,7 +4,7 @@ import type { PlatformUser } from "../../lib/types";
 
 /** Can this person work right now? Their own status, and their company's. */
 export function workState(u: Pick<PlatformUser, "status" | "companyStatus">): string | null {
-  if (u.companyStatus === "suspended") return "Can't work: company suspended";
+  if (u.companyStatus === "suspended") return "Inactive: company suspended";
   if (u.status === "suspended") return "Suspended";
   return null;
 }

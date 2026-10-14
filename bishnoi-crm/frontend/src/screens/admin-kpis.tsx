@@ -20,7 +20,7 @@ export default async function KpiSettingsPage() {
       <PageHeader title="Settings">
         Performance: what each person&apos;s month is measured by. Pick what the CRM counts, or have it entered by hand; say who it&apos;s for, and from what share of
         the target it counts as on target or slightly behind. Targets are set each month under Targets. The built-in ones keep what they measure but can be renamed,
-        retuned or switched off.
+        retuned or deactivated.
       </PageHeader>
       <PerformanceTabs current="measures" />
       <KpiEditor catalogue={catalogue} products={products.items.map((p) => ({ id: p.id, name: p.name }))} />

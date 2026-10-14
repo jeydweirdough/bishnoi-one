@@ -17,13 +17,13 @@ const percent = (v: number) => `${v.toFixed(v >= 99.95 || v === 0 ? 0 : 1)}%`;
 const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`);
 
 export function UptimeGauge({ value, note }: { value: number | null; note?: string }) {
-  return <HealthGauge label="Up, last 24 hours" value={value} min={90} max={100} bands={UPTIME} format={percent} note={note ?? "Good from 99%"} empty="Not checked yet" />;
+  return <HealthGauge label="Uptime, last 24 hours" value={value} min={90} max={100} bands={UPTIME} format={percent} note={note ?? "Good from 99%"} empty="Not checked yet" />;
 }
 
 /** What counts as slow when the API doesn't say (its Settings > Monitoring default). */
 const SLOW_MS = 1500;
 
-export function AnswerGauge({ value, slowMs: given, label = "Average answer", note }: { value: number | null; slowMs?: number | null; label?: string; note?: string }) {
+export function AnswerGauge({ value, slowMs: given, label = "Average response time", note }: { value: number | null; slowMs?: number | null; label?: string; note?: string }) {
   const slowMs = given && given > 0 ? given : SLOW_MS;
   return (
     <HealthGauge label={label} value={value} max={slowMs * 2} bands={answerBands(slowMs)} format={ms} note={note ?? `Slow from ${ms(slowMs)}`} empty="No requests yet" />

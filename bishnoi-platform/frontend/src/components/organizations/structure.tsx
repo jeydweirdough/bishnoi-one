@@ -13,8 +13,8 @@ import type { Unit } from "../../lib/types";
 import { ICON_BUTTON, ICON_TRIGGER_DANGER } from "./record-tools";
 
 const WORDS = {
-  department: { one: "department", title: "Departments", empty: "No departments yet", place: "Where it sits" },
-  branch: { one: "branch", title: "Branches", empty: "No branches yet", place: "Where it is" },
+  department: { one: "department", title: "Departments", empty: "No departments yet", place: "Location" },
+  branch: { one: "branch", title: "Branches", empty: "No branches yet", place: "Location" },
 } as const;
 
 /** A company's departments and branches, each with its edit and delete beside its name. */
@@ -87,7 +87,7 @@ function UnitRow({ unit, companyId, canChange }: { unit: Unit; companyId: string
                 triggerSize="sm"
                 triggerClassName={ICON_TRIGGER_DANGER}
                 title={`Delete the ${w.one} ${unit.name}?`}
-                body={`It goes from the company's structure. Its people stay at the company.`}
+                body={`It is removed from the company's structure. Its users stay at the company.`}
                 confirmLabel={`Delete ${w.one}`}
                 onConfirm={async () => {
                   const result = await deleteUnit(companyId, unit.id);
@@ -143,7 +143,7 @@ function UnitForm({ kind, companyId, unit, onDone }: { kind: Unit["kind"]; compa
         className="space-y-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={`Name of the ${w.one}`} error={fields.name}>
+          <Field label={`${w.one === "branch" ? "Branch" : "Department"} name`} error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus required />}
           </Field>
           <Field label={w.place} optional error={fields.location}>

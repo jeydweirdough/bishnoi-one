@@ -2,7 +2,7 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useActionState, useId, useRef, useState } from "react";
-import { signIn, type SignInState } from "../actions/session";
+import { checkCompany, checkPassword, signIn, type SignInState } from "../actions/session";
 import { SignInProgress } from "../screens/sign-in-progress";
 
 /** `group` heads a run of accounts, so a long list stays scannable. */
@@ -43,7 +43,9 @@ export function LoginForm({
   const [forgot, setForgot] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   // Signing in, a step at a time, on a screen of its own; back here, with why, if a step fails.
-  const [signing, setSigning] = useState<{ company: string; email: string; password: string } | null>(null);
+  // Signed in (the credentials checked on the form): then the loading screen, a step at a time.
+  const [signing, setSigning] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const error = failed ?? state?.error;
 
@@ -58,10 +60,9 @@ export function LoginForm({
     <div className="w-full">
       {signing && (
         <SignInProgress
-          {...signing}
           next={next}
           onBack={(why) => {
-            setSigning(null);
+            setSigning(false);
             setFailed(why);
           }}
         />
@@ -75,7 +76,17 @@ export function LoginForm({
           e.preventDefault();
           setFailed(null);
           if (!emailValue.trim() || !passwordValue) return setFailed("Enter your email and password.");
-          setSigning({ company: companyValue.trim(), email: emailValue.trim(), password: passwordValue });
+          // The credentials are checked here, on the form: a wrong one is said
+          // beside the fields. The loading screen opens only once they're right.
+          setChecking(true);
+          (async () => {
+            const unanswered = "Bishnoi One didn't answer. Check your connection, and try again.";
+            const found = await checkCompany(companyValue.trim()).catch(() => ({ ok: false as const, error: unanswered }));
+            if (!found.ok) return setFailed(found.error);
+            const right = await checkPassword(companyValue.trim(), emailValue.trim(), passwordValue).catch(() => ({ ok: false as const, error: unanswered }));
+            if (!right.ok) return setFailed(right.error);
+            setSigning(true);
+          })().finally(() => setChecking(false));
         }}
       >
         <input type="hidden" name="next" value={next} />
@@ -171,10 +182,10 @@ export function LoginForm({
 
         <button
           type="submit"
-          disabled={pending || signing !== null}
+          disabled={pending || checking || signing}
           className="mt-2 flex h-12 w-full items-center justify-center rounded-lg bg-[#141414] text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-70"
         >
-          {pending || signing ? "Signing in…" : "Sign in"}
+          {pending || checking || signing ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
@@ -191,7 +202,7 @@ export function LoginForm({
               className="group flex items-center gap-3 rounded-lg bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 rounded-full bg-white p-0.5" />
-              Your Bishnoi One account
+              Sign in with Bishnoi One
             </a>
           </div>
         </div>

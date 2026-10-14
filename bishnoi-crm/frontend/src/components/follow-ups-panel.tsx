@@ -54,7 +54,7 @@ export function FollowUpsPanel({
       assigneeId: String(data.get("assigneeId") ?? "") || null,
     };
     if (input.title.length < 2) {
-      setFields({ title: "Say what to do (at least 2 characters)." });
+      setFields({ title: "Enter a task (at least 2 characters)." });
       return;
     }
     const assignee = people.find((p) => p.id === input.assigneeId) ?? { id: me.id ?? "", name: me.name ?? "" };

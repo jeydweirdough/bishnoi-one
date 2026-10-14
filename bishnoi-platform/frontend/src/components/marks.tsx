@@ -74,7 +74,7 @@ export function Lifecycle({ status }: { status: TicketStatus }) {
   const steps = Object.keys(TICKET_STATUSES) as TicketStatus[];
   const at = steps.indexOf(status);
   return (
-    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-meta" aria-label="Where it is">
+    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-meta" aria-label="Status progress">
       {steps.map((s, i) => (
         <li key={s} className="inline-flex items-center gap-1">
           {i > 0 && <span aria-hidden className={`h-px w-3 ${i <= at ? "bg-hema" : "bg-rule-strong"}`} />}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Pager, usePages } from "@/src/platform/ui/pager";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import type { QuoteLink, QuoteLinks } from "../../actions/quote-links";
 import { LinkList, OrderLinkButton } from "./order-link-button";
@@ -8,6 +9,7 @@ import { LinkList, OrderLinkButton } from "./order-link-button";
 /** Customers → Order links: every link this person made, a new one for someone not a customer yet. */
 export function OrderLinksBoard({ links, choices, slug, mayMake }: { links: QuoteLink[]; choices: Pick<QuoteLinks, "priceTypes" | "lifetimes">; slug: string; mayMake: boolean }) {
   const router = useRouter();
+  const { rows, pager } = usePages(links);
   const make = mayMake && <OrderLinkButton slug={slug} label="New order link" variant="primary" onMade={() => router.refresh()} />;
   return (
     <>
@@ -19,7 +21,10 @@ export function OrderLinksBoard({ links, choices, slug, mayMake }: { links: Quot
           </Empty>
         </Sheet>
       ) : (
-        <LinkList links={links} choices={choices} slug={slug} onChanged={() => router.refresh()} showCustomer />
+        <>
+          <LinkList links={rows} choices={choices} slug={slug} onChanged={() => router.refresh()} showCustomer />
+          <Pager {...pager} />
+        </>
       )}
     </>
   );

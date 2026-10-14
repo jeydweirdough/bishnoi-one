@@ -7,9 +7,9 @@ Accounts here are the CRM's own: nobody signed in here exists in any other Bishn
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from app.db import Base
@@ -90,6 +90,15 @@ class User(Base):
     no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # Their name in parts, as they keep it on their profile; full_name is made
+    # from these (app/routers/profile.py), and is what everything else reads.
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
     # The company's own ID for them (e.g. EMP-0012), kept in capitals. A
     # customer transfer asks for it, so a record can't go to the wrong person.
     employee_id: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, default=None)
@@ -190,7 +199,11 @@ class CustomerType(Base):
 class Company(Owned, Base):
     __tablename__ = "nbcm_companies"
     __mapper_args__ = {"eager_defaults": True}
-    __table_args__ = (Index("nbcm_companies_no", "no", unique=True),)
+    __table_args__ = (
+        Index("nbcm_companies_no", "no", unique=True),
+        CheckConstraint("field_tier IS NULL OR field_tier IN (1, 2, 3)", name="company_field_tier"),
+        CheckConstraint("field_zone IS NULL OR field_zone IN ('red', 'yellow', 'green')", name="company_field_zone"),
+    )
 
     # Values of the fields an admin added (Settings → Forms), by key.
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -222,6 +235,13 @@ class Company(Owned, Base):
     longitude: Mapped[float | None] = mapped_column(Float, default=None)
     pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     pinned_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    # Their place in a field agent's plan (app/routers/field.py): tier 1, 2 or 3
+    # (visited 4, 2 or 1 times a month), and this week's zone, red, yellow or green.
+    field_tier: Mapped[int | None] = mapped_column(Integer, default=None)
+    field_zone: Mapped[str | None] = mapped_column(String(8), default=None)
+    zone_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When they joined a Patient Care Group (set by the visit that enrolled them).
+    care_group_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     owner: Mapped[User] = relationship(foreign_keys="Company.owner_id", lazy="joined")
     team: Mapped[Team | None] = relationship(lazy="joined")
@@ -732,7 +752,7 @@ class Visit(Owned, Base):
 
     __tablename__ = "nbcm_visits"
     __table_args__ = (
-        CheckConstraint("outcome IN ('collected', 'promised', 'not_in', 'updated', 'other')", name="visit_outcome"),
+        CheckConstraint("outcome IN ('detailed', 'collected', 'promised', 'not_in', 'updated', 'other')", name="visit_outcome"),
         CheckConstraint("amount_centavos >= 0", name="visit_amount"),
     )
 
@@ -754,6 +774,9 @@ class Visit(Owned, Base):
     # next visit is for, shown when that visit is logged.
     detailing: Mapped[list] = mapped_column(JSON, default=list)
     next_objective: Mapped[str | None] = mapped_column(String(300), default=None)
+    # The doctor's Patient Care Group, this visit (Rx playbook): "enrolled" them
+    # in one, "followed_up" on theirs, or "not_now".
+    care_group: Mapped[str | None] = mapped_column(String(12), default=None)
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
@@ -1305,3 +1328,78 @@ numbered(User, Team, Company, Contact, Product, Deal)
 from app.employee_ids import given_employee_ids  # noqa: E402
 
 given_employee_ids(User)
+
+
+class PlanStop(Base):
+    """A doctor on a field agent's plan for a day (Rx playbook: red zone in
+    the morning, yellow midday, green in the afternoon; at least 8 a day)."""
+
+    __tablename__ = "nbcm_plan_stops"
+    __table_args__ = (
+        UniqueConstraint("user_id", "company_id", "day", name="plan_stop_once"),
+        CheckConstraint("slot IN ('morning', 'midday', 'afternoon')", name="plan_stop_slot"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD, the company's own
+    slot: Mapped[str] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    company: Mapped[Company] = relationship(lazy="joined")
+
+
+class WeekPlan(Base):
+    """A field agent's week as a whole: when they sent it to their coach, and
+    when the coach went over it (playbook: every Monday morning)."""
+
+    __tablename__ = "nbcm_week_plans"
+    __table_args__ = (UniqueConstraint("user_id", "week", name="week_plan_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    week: Mapped[str] = mapped_column(String(10), index=True)  # its Monday, YYYY-MM-DD
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    reviewed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    note: Mapped[str | None] = mapped_column(Text, default=None)
+
+    reviewed_by: Mapped[User | None] = relationship(lazy="joined", foreign_keys=[reviewed_by_id])
+
+
+ASSISTANCE_PROGRAMS = ("dswd", "pcso", "ovp", "yakap")
+ASSISTANCE_STATUSES = ("pending", "approved", "denied")
+
+
+class AssistanceApplication(Owned, Base):
+    """A government assistance application (PAP, Rx playbook) for a doctor's
+    patient on a GetMeds product: DSWD-AICS, PCSO-IMAP, the Office of the Vice
+    President, or YAKAP/DOH. Only what's tracked is kept: the program, the
+    patient's name, the doctor, the products, when it went in, what became of
+    it, and the confirmation receipt. The diagnosis stays on the paper form."""
+
+    __tablename__ = "nbcm_assistance"
+    __table_args__ = (
+        CheckConstraint("program IN ('dswd', 'pcso', 'ovp', 'yakap')", name="assistance_program"),
+        CheckConstraint("status IN ('pending', 'approved', 'denied')", name="assistance_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    program: Mapped[str] = mapped_column(String(8), index=True)
+    patient_name: Mapped[str] = mapped_column(String(120))
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), index=True)
+    # The GetMeds products it's for, named as they were then: [{"id", "name"}].
+    products: Mapped[list] = mapped_column(JSON, default=list)
+    submitted_on: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD
+    status: Mapped[str] = mapped_column(String(10), default="pending", index=True)
+    decided_on: Mapped[str | None] = mapped_column(String(10), index=True, default=None)
+    receipt_no: Mapped[str | None] = mapped_column(String(60), default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    # Its files, kept in the database (StoredFile): the patient's IDs ("id") and
+    # the other documents ("document"): [{kind, store, ref, name, contentType, size}].
+    attachments: Mapped[list | None] = mapped_column(JSON, default=None)
+
+    company: Mapped[Company] = relationship(lazy="joined")
+    owner: Mapped[User] = relationship(foreign_keys="AssistanceApplication.owner_id", lazy="joined")

@@ -270,7 +270,7 @@ function Quantity({ value, onChange, name }: { value: number; onChange: (n: numb
         value={value}
         onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
         inputMode="numeric"
-        aria-label={`How many ${name}`}
+        aria-label={`Quantity of ${name}`}
         className="w-10 bg-transparent text-center text-sm tabular-nums outline-none"
       />
       <IconButton label={`One more ${name}`} size="sm" onClick={() => onChange(value + 1)}>

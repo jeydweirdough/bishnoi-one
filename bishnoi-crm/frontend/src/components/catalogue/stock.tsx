@@ -59,7 +59,7 @@ export function SyncNow() {
             return;
           }
           const { added, updated, switchedOff } = result.data;
-          const said = [added && `${added} added`, updated && `${updated} changed`, switchedOff && `${switchedOff} switched off`].filter(Boolean).join(", ");
+          const said = [added && `${added} added`, updated && `${updated} changed`, switchedOff && `${switchedOff} deactivated`].filter(Boolean).join(", ");
           toast.success("Products are up to date with Inventory", { description: said || "Nothing had changed." });
         })
       }

@@ -60,7 +60,7 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
       <fieldset disabled={locked} className="space-y-6">
         <Choice
           name="regime"
-          legend="Registered for"
+          legend="Tax registration type"
           value={v.regime}
           onChange={(regime) => set({ regime })}
           options={setup.pack.regimes.map((r) => ({ value: r.key, label: r.name }))}
@@ -88,14 +88,14 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           value={v.pricesIncludeTax}
           onChange={(pricesIncludeTax) => set({ pricesIncludeTax })}
           options={[
-            { value: "yes", label: "Include VAT (shelf prices)" },
-            { value: "no", label: "Are before VAT" },
+            { value: "yes", label: "VAT-inclusive (shelf prices)" },
+            { value: "no", label: "VAT-exclusive" },
           ]}
         />
       </fieldset>
       <FormError message={error} />
       {locked ? (
-        <p className="text-meta text-ink-3">Only Finance&apos;s admins change the registration.</p>
+        <p className="text-meta text-ink-3">Only Finance administrators can change the registration.</p>
       ) : (
         <Button type="submit" variant="primary" loading={pending}>
           Save registration

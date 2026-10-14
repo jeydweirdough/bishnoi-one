@@ -11,7 +11,7 @@ const MARK: Record<Alert["tone"], string> = {
 /** What needs someone, worst first: a count, a few examples, and where to go. */
 export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compact?: boolean }) {
   if (alerts.length === 0) {
-    return <p className="py-4 text-sm text-ink-2">Nothing needs attention. Stock is above its reorder points, nothing is expiring soon, and nothing is waiting on anyone.</p>;
+    return <p className="py-4 text-sm text-ink-2">No alerts. Stock is above reorder levels, no batches are expiring soon, and no documents are pending.</p>;
   }
   const order = { critical: 0, warning: 1, info: 2 };
   return (

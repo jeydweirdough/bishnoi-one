@@ -45,7 +45,7 @@ export function CompanyApps({
     }
     setError(null);
     const { withdrawnFromPeople: n } = result.data;
-    toast.success("Applications saved", { description: n ? `Withdrawn from ${plural(n, "person", "people")} at ${company.name}.` : company.name });
+    toast.success("Applications saved", { description: n ? `Access removed for ${plural(n, "user")} at ${company.name}.` : company.name });
     return true;
   }
 
@@ -80,7 +80,7 @@ export function CompanyApps({
                   </Link>
                 </span>
               ) : (
-                <span className="text-meta text-ink-3">{on ? "Given when you save" : "Not given"}</span>
+                <span className="text-meta text-ink-3">{on ? "Assigned on save" : "Not assigned"}</span>
               )}
               {detail && !on && detail.userCount > 0 && (
                 <span className="w-full text-meta text-danger">Withdrawing it also takes it from its {plural(detail.userCount, "user")} here.</span>
@@ -100,15 +100,15 @@ export function CompanyApps({
               <ConfirmButton
                 label="Save applications"
                 triggerVariant="primary"
-                title={`Withdraw ${plural(removing.length, "application")} from ${company.name}?`}
+                title={`Remove ${plural(removing.length, "application")} from ${company.name}?`}
                 body={
                   <>
-                    {removing.map((id) => have.get(id)?.name).join(", ")} will be taken from {company.name}
-                    {losing > 0 ? <> and from the {plural(losing, "person", "people")} there who use {removing.length === 1 ? "it" : "them"}</> : null}. Their roles in{" "}
-                    {removing.length === 1 ? "it" : "them"} are forgotten.
+                    {removing.map((id) => have.get(id)?.name).join(", ")} will be removed from {company.name}
+                    {losing > 0 ? <> and from the {plural(losing, "user")} there who use {removing.length === 1 ? "it" : "them"}</> : null}. Their roles in{" "}
+                    {removing.length === 1 ? "it" : "them"} are deleted.
                   </>
                 }
-                confirmLabel="Withdraw and save"
+                confirmLabel="Remove and save"
                 onConfirm={save}
               />
             ) : (

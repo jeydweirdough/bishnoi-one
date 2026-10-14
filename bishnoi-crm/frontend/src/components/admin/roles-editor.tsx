@@ -147,13 +147,13 @@ export function RolesEditor({ data }: { data: RolesData }) {
               <Field label="Name" error={errors.fields.name}>
                 {(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}
               </Field>
-              <Field label="What it's for" optional error={errors.fields.description}>
+              <Field label="Description" optional error={errors.fields.description}>
                 {(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}
               </Field>
               <div className="sm:col-span-2">
                 <Choice<Scope>
                   name="scope"
-                  legend="Whose records it reaches"
+                  legend="Record access"
                   value={draft.scope}
                   onChange={(scope) => edit({ scope })}
                   options={data.scopes.map((s) => ({ value: s.key, label: s.label }))}

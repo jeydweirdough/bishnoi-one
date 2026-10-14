@@ -15,7 +15,7 @@ export default async function DealStagesPage() {
     <>
       <PageHeader title="Settings">
         Deal stages: the steps a deal goes through. A deal entering a stage takes its probability and forecast category; the rep can change them on the
-        deal. A stage in use can be switched off (its deals keep it) but not deleted.
+        deal. A stage in use can be deactivated (its deals keep it) but not deleted.
       </PageHeader>
       <div className="space-y-5">
         <DealStagesEditor stages={stages} />

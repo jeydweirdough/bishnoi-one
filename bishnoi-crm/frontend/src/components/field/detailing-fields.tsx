@@ -60,7 +60,7 @@ export function DetailingFields({
     <div className="space-y-3">
       {shownBrief?.lastObjective && (
         <p className="rounded-lg border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
-          <span className="font-semibold">Last visit&apos;s objective:</span> {shownBrief.lastObjective.text}
+          <span className="font-semibold">Previous visit objective:</span> {shownBrief.lastObjective.text}
         </p>
       )}
       <fieldset className="space-y-2">
@@ -75,7 +75,7 @@ export function DetailingFields({
                 <Field label="Product" error={errors[`detailing.${i}.productId`]}>
                   {(p) => (
                     <Select {...p} value={r.productId} onChange={(e) => set(r.key, { productId: e.target.value })}>
-                      <option value="">Pick a product</option>
+                      <option value="">Select a product</option>
                       {(shownBrief?.products ?? []).map((prod) => (
                         <option key={prod.id} value={prod.id} disabled={taken.has(prod.id) && prod.id !== r.productId}>
                           {prod.name}
@@ -85,10 +85,10 @@ export function DetailingFields({
                     </Select>
                   )}
                 </Field>
-                <Field label={`How the ${lower(terms.visited.one)} took it`} error={errors[`detailing.${i}.reaction`]}>
+                <Field label={`${terms.visited.one} response`} error={errors[`detailing.${i}.reaction`]}>
                   {(p) => (
                     <Select {...p} value={r.reaction} onChange={(e) => set(r.key, { reaction: e.target.value as Reaction })}>
-                      <option value="">Pick one</option>
+                      <option value="">Select</option>
                       {REACTIONS.map((x) => (
                         <option key={x.value} value={x.value}>
                           {x.label}
@@ -99,18 +99,18 @@ export function DetailingFields({
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Key message" optional error={errors[`detailing.${i}.message`]}>
-                    {(p) => <Input {...p} value={r.message} onChange={(e) => set(r.key, { message: e.target.value })} maxLength={300} placeholder="What you told them about it" />}
+                    {(p) => <Input {...p} value={r.message} onChange={(e) => set(r.key, { message: e.target.value })} maxLength={300} placeholder="Key message delivered" />}
                   </Field>
                 </div>
               </div>
               <div className="flex flex-col gap-0.5">
-                <IconButton onClick={() => move(i, -1)} disabled={i === 0} size="sm" label="Discussed earlier">
+                <IconButton onClick={() => move(i, -1)} disabled={i === 0} size="sm" label="Move up">
                   <ArrowUp className="size-3.5" aria-hidden />
                 </IconButton>
-                <IconButton onClick={() => move(i, 1)} disabled={i === rows.length - 1} size="sm" label="Discussed later">
+                <IconButton onClick={() => move(i, 1)} disabled={i === rows.length - 1} size="sm" label="Move down">
                   <ArrowDown className="size-3.5" aria-hidden />
                 </IconButton>
-                <IconButton onClick={() => onRows(rows.filter((x) => x.key !== r.key))} tone="danger" size="sm" label="Take this product off">
+                <IconButton onClick={() => onRows(rows.filter((x) => x.key !== r.key))} tone="danger" size="sm" label="Remove product">
                   <X className="size-3.5" aria-hidden />
                 </IconButton>
               </div>
@@ -118,12 +118,16 @@ export function DetailingFields({
           </div>
         ))}
         {rows.length < 10 && (
-          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onRows([...rows, newDetail()])} disabled={!companyId}>
-            {rows.length ? "Another product" : "Add a product discussed"}
-          </Button>
+          <span className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onRows([...rows, newDetail()])} disabled={!companyId}>
+              {rows.length ? "Add another product" : "Add product discussed"}
+            </Button>
+            {/* The products come with the doctor (and what was last set out to do with them): so the doctor first. */}
+            {!companyId && <span className="text-meta text-ink-3">Select a {lower(terms.visited.one)} first.</span>}
+          </span>
         )}
       </fieldset>
-      <Field label="Next visit's objective" optional hint={`Shown when the next visit to this ${lower(terms.visited.one)} is logged.`} error={errors.nextObjective}>
+      <Field label="Next visit objective" optional hint={`Shown when the next visit to this ${lower(terms.visited.one)} is logged.`} error={errors.nextObjective}>
         {(p) => <Input {...p} value={objective} onChange={(e) => onObjective(e.target.value)} maxLength={300} placeholder="e.g. Bring the dosing study" />}
       </Field>
     </div>

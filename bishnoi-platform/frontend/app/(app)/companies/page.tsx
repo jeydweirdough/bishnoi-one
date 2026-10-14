@@ -36,7 +36,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         actions={
           staff.canAdminister && (
             <LinkButton href="/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add a company
+              Add company
             </LinkButton>
           )
         }
@@ -47,7 +47,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
 
       <div className="flex flex-wrap items-end gap-x-4">
         <div className="min-w-0 flex-1">
-          <Filters search="Search by name or address" />
+          <Filters search="Search by name or company code" />
         </div>
         <div className="mb-4">
           <ToggleLinks
@@ -63,11 +63,11 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
 
       <Sheet>
         {companies.length === 0 ? (
-          <Empty icon="companies" title={filtered ? "No companies match" : "No companies yet"}>
+          <Empty icon="companies" title={filtered ? "No matching companies" : "No companies yet"}>
             {filtered
-              ? "Try another search, or show all of them."
+              ? "Try another search, or show all companies."
               : staff.canAdminister
-                ? "Add the first company with “Add a company”, then give it applications and people."
+                ? "Add the first company with “Add company”, then assign its applications and users."
                 : "A Platform Admin adds companies."}
           </Empty>
         ) : (

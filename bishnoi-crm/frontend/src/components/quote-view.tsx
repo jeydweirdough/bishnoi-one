@@ -65,8 +65,8 @@ export async function QuoteView({
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                   <th scope="col" className="py-2 pr-3 font-semibold">Product</th>
                   <th scope="col" className="px-3 py-2 text-right font-semibold">Qty</th>
-                  <th scope="col" className="px-3 py-2 text-right font-semibold">Each</th>
-                  <th scope="col" className="px-3 py-2 font-semibold">Promo / discount</th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">Unit price</th>
+                  <th scope="col" className="px-3 py-2 font-semibold">Promo or discount</th>
                   <th scope="col" className="py-2 pl-3 text-right font-semibold">Total</th>
                 </tr>
               </thead>

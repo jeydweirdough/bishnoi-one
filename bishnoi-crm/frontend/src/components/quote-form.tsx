@@ -233,9 +233,9 @@ export function QuoteForm({
     if (priceType?.requiresNotes && !draft.notes.trim()) problems.notes = `${priceType.name} needs notes.`;
     if (Object.keys(problems).length) {
       setFields(problems);
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       triggerShake();
-      toast.error("Some fields need a look.");
+      toast.error("Some fields need attention.");
       return;
     }
 
@@ -377,7 +377,7 @@ export function QuoteForm({
                     }}
                     className={cell}
                     options={[
-                      { value: "", label: `Pick ${offeredBundles.length ? "a product or bundle" : "a product"}…`, promos: 0 },
+                      { value: "", label: `Select ${offeredBundles.length ? "a product or bundle" : "a product"}…`, promos: 0 },
                       ...productsFor(priceType?.code).map((p) => ({
                         value: p.id,
                         label: `${p.name} · ${p.unit}${!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}${levelOf(p.id)?.state === "out" ? " · out of stock" : ""}`,
@@ -619,7 +619,7 @@ export function QuoteForm({
             ))}
           </>
         ) : (
-          <p className="text-right text-meta text-ink-3">Pick products to see the total.</p>
+          <p className="text-right text-meta text-ink-3">Add products to see the total.</p>
         )}
       </div>
       {preview && preview.approvalReasons.length > 0 && (
@@ -641,7 +641,7 @@ export function QuoteForm({
       {/* Who pays */}
       {priceList.allowsGuaranteeLetters && (priceList.issuers.length > 0 || can("products.edit")) && (
         <div>
-        <Field label="Who pays" error={errorFor("payer")}>
+        <Field label="Payer" error={errorFor("payer")}>
           {(p) => (
             <Select {...p} value={draft.payer} onChange={(e) => update({ ...draft, payer: e.target.value })}>
               <option value="self">The customer</option>
@@ -654,7 +654,7 @@ export function QuoteForm({
           )}
         </Field>
         {can("products.edit") && (
-          <QuickAdd label="New issuer" title="Who issues guarantee letters">
+          <QuickAdd label="New issuer" title="New guarantee letter issuer">
             {(done) => <AddIssuer onAdded={(code) => update({ ...draft, payer: code })} done={done} />}
           </QuickAdd>
         )}

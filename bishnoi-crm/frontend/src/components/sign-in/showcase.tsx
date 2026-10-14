@@ -34,7 +34,7 @@ export function Showcase() {
   const slide = SLIDES[at];
   return (
     <aside
-      aria-label="What the CRM keeps track of"
+      aria-label="CRM features"
       className="hidden flex-col items-center justify-center rounded-xl bg-[#f1f7ee] px-10 py-12 lg:flex"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
@@ -53,7 +53,7 @@ export function Showcase() {
         </div>
       </div>
 
-      <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Pick one">
+      <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Slides">
         {SLIDES.map((s, i) => (
           <button
             key={s.title}

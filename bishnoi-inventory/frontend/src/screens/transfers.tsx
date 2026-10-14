@@ -52,7 +52,7 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
       ) : (
       <Sheet>
         {transfers.length === 0 ? (
-          <FirstStep icon="transfers" title="No transfers yet" body="Move stock from one warehouse to another, approved and tracked on the road." needs={["twoWarehouses", "stock"]} href="/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/transfers" may={may} />
+          <FirstStep icon="transfers" title="No transfers" body="Move stock between warehouses, with approval and in-transit tracking." needs={["twoWarehouses", "stock"]} href="/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/transfers" may={may} />
         ) : (
           <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units"]} min="52rem">
             {transfers.map((t) => (
@@ -105,7 +105,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
         )}
         actions={
           <>
-            {t.status === "draft" && may("transfers.create") && <StepButton run={transferStep.bind(null, t.id, "request")} label="Request it" done="Transfer requested" />}
+            {t.status === "draft" && may("transfers.create") && <StepButton run={transferStep.bind(null, t.id, "request")} label="Submit request" done="Transfer requested" />}
             {pending && may("transfers.approve") && <StepButton run={transferStep.bind(null, t.id, "approve")} label="Approve" done="Transfer approved" variant="primary" />}
             {(pending ? may("transfers.create") : t.status === "approved" && may("transfers.approve")) && (
               <StepButton run={transferStep.bind(null, t.id, "cancel")} label="Cancel transfer" done="Transfer cancelled" variant="quiet" confirm={{ title: `Cancel ${t.number}?`, danger: true }} />
@@ -127,7 +127,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       </Sheet>
 
       <Sheet className="mt-5">
-        <Table head={["Product", " Quantity", ...(pending || t.status === "approved" ? [` Free in ${t.from.code}`] : ["Batches sent"])]}>
+        <Table head={["Product", " Quantity", ...(pending || t.status === "approved" ? [` Available in ${t.from.code}`] : ["Batches dispatched"])]}>
           {t.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
@@ -148,14 +148,14 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       {t.status === "approved" && may("transfers.dispatch") && (
         <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="dispatch">
           <SectionTitle icon="transfers">Dispatch</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">It leaves {t.from.name} now and is in transit until {t.to.name} receives it.</p>
+          <p className="mb-3 text-meta text-ink-3">Stock leaves {t.from.name} and stays in transit until received at {t.to.name}.</p>
           <PickForm kind="transfer" documentId={t.id} lines={pickLines} label="Dispatch" />
         </Sheet>
       )}
       {t.status === "in_transit" && may("transfers.receive") && (
         <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="receive">
-          <SectionTitle icon="receiving">It arrived</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">The same batches go into {t.to.name}.</p>
+          <SectionTitle icon="receiving">Receive transfer</SectionTitle>
+          <p className="mb-3 text-meta text-ink-3">The dispatched batches are received into {t.to.name}.</p>
           <ReceiveTransfer transferId={t.id} locations={destination} />
         </Sheet>
       )}

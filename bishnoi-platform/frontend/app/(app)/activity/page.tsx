@@ -1,4 +1,4 @@
-// Activity & audit: everything done on the platform, newest first, filed four
+// Activity and audit: everything done on the platform, newest first, filed four
 // ways (administrative, security, support, system), and by who did it.
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -8,7 +8,7 @@ import { ActivityFilters } from "@/src/components/activity/filters";
 import { Tabs } from "@/src/components/marks";
 import type { AuditCategory, AuditEntry } from "@/src/lib/types";
 
-export const metadata = { title: "Activity & audit" };
+export const metadata = { title: "Activity and audit" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
@@ -60,7 +60,7 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
 
   return (
     <>
-      <PageHeader title="Activity & audit">
+      <PageHeader title="Activity and audit">
         Who did what on the platform, newest first. A change names the fields it touched, never what they were changed to.
       </PageHeader>
 
@@ -73,7 +73,7 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
           <p className="pt-2 text-meta text-ink-3">Each security event shows the address it came from.</p>
         )}
         {page.entries.length === 0 ? (
-          <Empty title={before ? "Nothing older" : filtered ? "Nothing matches these filters" : "Nothing recorded yet"} icon="auditLog">
+          <Empty title={before ? "No older entries" : filtered ? "No matching entries" : "No activity yet"} icon="auditLog">
             {filtered ? "Try someone else, or fewer words." : EMPTY[category]}
           </Empty>
         ) : (
@@ -85,7 +85,7 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
         <div className="mt-4 flex gap-2">
           {before && (
             <LinkButton href={here({ before: "" })} size="sm" variant="quiet">
-              Back to the newest
+              Back to newest
             </LinkButton>
           )}
           {page.more && last && (

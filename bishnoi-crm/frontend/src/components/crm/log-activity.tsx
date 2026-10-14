@@ -127,12 +127,12 @@ export function LogActivity({
     >
       <Choice<CrmKind>
         name="kind"
-        legend="What"
+        legend="Activity type"
         value={kind}
         onChange={pick}
         options={KINDS.map((k) => ({ value: k.kind, label: k.label, icon: <Icon name={k.icon} className="size-3.5" /> }))}
       />
-      <Field label={info.planned ? "What it's for" : "Subject"} error={fields.subject}>
+      <Field label={info.planned ? "Purpose" : "Subject"} error={fields.subject}>
         {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={PLACEHOLDERS[kind]} required />}
       </Field>
       <Field label="Details" optional error={fields.body}>
@@ -149,23 +149,23 @@ export function LogActivity({
         </Field>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={info.planned ? "When it's due" : "When"} error={fields.at}>
+        <Field label={info.planned ? "Due date" : "Date and time"} error={fields.at}>
           {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}
         </Field>
         {(kind === "call" || kind === "meeting") && (
-          <Field label="How long (minutes)" optional error={fields.durationMinutes}>
+          <Field label="Duration (minutes)" optional error={fields.durationMinutes}>
             {(p) => <Input {...p} type="number" min={0} max={1440} inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />}
           </Field>
         )}
         {(kind === "call" || kind === "email") && (
           <Choice<"out" | "in">
             name="direction"
-            legend="Which way"
+            legend="Direction"
             value={direction}
             onChange={setDirection}
             options={[
-              { value: "out", label: kind === "call" ? "We called" : "We sent it" },
-              { value: "in", label: kind === "call" ? "They called" : "They sent it" },
+              { value: "out", label: kind === "call" ? "Outbound" : "Sent" },
+              { value: "in", label: kind === "call" ? "Inbound" : "Received" },
             ]}
           />
         )}
@@ -191,10 +191,10 @@ export function LogActivity({
           </div>
         )}
         {contacts.length > 0 && !contactId && (
-          <Field label="With" optional error={fields.contactId}>
+          <Field label="Contact" optional error={fields.contactId}>
             {(p) => (
               <Select {...p} value={contact} onChange={(e) => setContact(e.target.value)}>
-                <option value="">Nobody in particular</option>
+                <option value="">None</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -206,7 +206,7 @@ export function LogActivity({
         )}
         <AlsoAbout value={alsoAbout} onChange={setAlsoAbout} except={company || undefined} />
         {info.planned && people.length > 1 && (
-          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label="Who's doing it" />
+          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label="Assigned to" />
         )}
       </div>
       <FormError message={error} />

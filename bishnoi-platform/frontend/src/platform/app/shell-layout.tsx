@@ -23,7 +23,7 @@ import { Sheet } from "../ui/sheet";
 function NoCompany() {
   return (
     <Sheet className="px-6 py-10 text-center">
-      <h1 className="text-heading">Open a company first</h1>
+      <h1 className="text-heading">Select a company</h1>
       <p className="mx-auto mt-1 max-w-md text-ink-2">
         You&apos;re signed in to the platform, which is in no company{thisAppLabel() ? `, and every ${thisAppLabel()} screen belongs to one` : ""}.
       </p>

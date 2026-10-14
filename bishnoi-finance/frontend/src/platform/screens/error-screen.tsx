@@ -13,31 +13,31 @@ export type ErrorKind = "notFound" | "forbidden" | "busy" | "unavailable" | "fai
 const SAY: Record<ErrorKind, { code: string; title: string; body: string; icon: ReactNode }> = {
   notFound: {
     code: "404",
-    title: "Nothing here",
+    title: "Page not found",
     body: "That page doesn't exist, or it belongs to a team you can't see. Check the address, or start again from home.",
     icon: <FileQuestion className="size-6" aria-hidden />,
   },
   forbidden: {
     code: "403",
-    title: "You don't have access to this",
+    title: "Access denied",
     body: "Your role, or your company's Bishnoi One plan, doesn't include this page. If you need it for your work, ask your administrator.",
     icon: <LockKeyhole className="size-6" aria-hidden />,
   },
   busy: {
     code: "429",
-    title: "That's a lot at once",
+    title: "Too many requests",
     body: "Too many requests came in a short time, so we paused them to keep things running for everyone. Wait a few seconds, then try again.",
     icon: <Clock className="size-6" aria-hidden />,
   },
   unavailable: {
     code: "503",
-    title: "Not available right now",
+    title: "Service unavailable",
     body: "The system isn't answering just now: it may be starting up or being updated. Nothing you did caused this. Try again in a minute.",
     icon: <CloudOff className="size-6" aria-hidden />,
   },
   failed: {
     code: "500",
-    title: "This page couldn't load",
+    title: "Page failed to load",
     body: "Something went wrong on our side. Try again; if it keeps happening, tell your administrator, with the reference below.",
     icon: <TriangleAlert className="size-6" aria-hidden />,
   },

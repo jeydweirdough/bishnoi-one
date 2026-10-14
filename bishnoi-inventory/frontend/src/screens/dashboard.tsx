@@ -57,7 +57,7 @@ function Change({ c }: { c: ReturnType<typeof change> }) {
 }
 
 function itemOf(po: PurchaseHome): string {
-  if (!po.firstItem) return "No lines yet";
+  if (!po.firstItem) return "No lines";
   return po.moreItems ? `${po.firstItem} and ${po.moreItems} more` : po.firstItem;
 }
 
@@ -81,7 +81,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           <h1 className="text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-ink">
             {fmt.greeting()}, {firstName}
           </h1>
-          <p className="mt-1 text-sm text-ink-2">Stock, orders and deliveries across {fmt.plural(d.warehouses.length, "warehouse")}, all in one place.</p>
+          <p className="mt-1 text-sm text-ink-2">Stock, orders and deliveries across {fmt.plural(d.warehouses.length, "warehouse")}.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {may("receiving.receive") && (
@@ -102,10 +102,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card
           icon="issuance"
-          label="Orders to fill"
+          label="Open orders"
           value={fmt.count(d.openOrders)}
           note={<Change c={change(now?.orders ?? 0, last?.orders ?? 0)} />}
-          trend={<TrendLine values={series.map((p) => p.orders)} label="Orders made each month, the last twelve" />}
+          trend={<TrendLine values={series.map((p) => p.orders)} label="Orders per month, last 12 months" />}
           href="/orders?status=confirmed"
         />
         <Card
@@ -113,7 +113,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           label="Received this month"
           value={`${fmt.count(now?.received ?? 0)} units`}
           note={<Change c={change(now?.received ?? 0, last?.received ?? 0)} />}
-          trend={<TrendLine values={series.map((p) => p.received)} label="Units received, the last twelve months" />}
+          trend={<TrendLine values={series.map((p) => p.received)} label="Units received per month, last 12 months" />}
           href="/receipts"
         />
         <Card
@@ -121,7 +121,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           label="Issued this month"
           value={`${fmt.count(now?.issued ?? 0)} units`}
           note={<Change c={change(now?.issued ?? 0, last?.issued ?? 0)} />}
-          trend={<TrendLine values={series.map((p) => p.issued)} label="Units issued, the last twelve months" />}
+          trend={<TrendLine values={series.map((p) => p.issued)} label="Units issued per month, last 12 months" />}
           href="/orders?status=issued"
         />
         <Card
@@ -146,7 +146,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-ink">Overview</h2>
-                <p className="mt-2 text-meta text-ink-3">Average a month, the last twelve</p>
+                <p className="mt-2 text-meta text-ink-3">Monthly average, last 12 months</p>
                 <p className="flex items-baseline gap-2">
                   <span className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{fmt.count(average)} units</span>
                   <span className="rounded-md bg-hema-tint px-2.5 py-0.5 text-meta font-semibold text-sage-deep">{fmt.count(yearTotal)} in all</span>
@@ -171,18 +171,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           {may("purchasing.view") && (
             <Sheet className="overflow-hidden">
               <div className="px-5 pt-4">
-                <SectionTitle icon="receiving" action={<Link href="/purchase-orders?status=ordered" className="text-meta text-ink hover:underline">All on order</Link>}>
+                <SectionTitle icon="receiving" action={<Link href="/purchase-orders?status=ordered" className="text-meta text-ink hover:underline">View all</Link>}>
                   Upcoming deliveries
                 </SectionTitle>
               </div>
               {d.upcoming.length === 0 ? (
                 <div className="px-5 pb-4">
-                  <Empty title="Nothing on order" icon="purchaseOrders" actions={may("purchasing.create") && <LinkButton href="/purchase-orders/new" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}>
+                  <Empty title="No open purchase orders" icon="purchaseOrders" actions={may("purchasing.create") && <LinkButton href="/purchase-orders/new" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}>
                     Purchase orders placed with suppliers show here until they&apos;re received.
                   </Empty>
                 </div>
               ) : (
-                <Table head={["Order", "Item", " Quantity", "Expected", "Status"]} min="36rem">
+                <Table head={["Order", "Product", " Quantity", "Expected", "Status"]} min="36rem">
                   {d.upcoming.map((po) => (
                     <tr key={po.id} className="hover:bg-bench/50">
                       <td className="px-3 py-3 pl-5">
@@ -211,11 +211,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         <div className="min-w-0 space-y-5">
           {may("purchasing.view") && (
             <Sheet className="px-5 pt-4 pb-3">
-              <SectionTitle icon="purchaseOrders" action={<Link href="/purchase-orders" className="text-meta text-ink hover:underline">All</Link>}>
+              <SectionTitle icon="purchaseOrders" action={<Link href="/purchase-orders" className="text-meta text-ink hover:underline">View all</Link>}>
                 Purchase history
               </SectionTitle>
               {d.recentPurchases.length === 0 ? (
-                <p className="py-3 text-meta text-ink-3">No purchase orders yet.</p>
+                <p className="py-3 text-meta text-ink-3">No purchase orders.</p>
               ) : (
                 <ul className="divide-y divide-rule">
                   {d.recentPurchases.map((po) => (

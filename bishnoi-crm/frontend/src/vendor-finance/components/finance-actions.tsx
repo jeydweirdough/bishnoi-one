@@ -33,7 +33,7 @@ function DecisionButtons({ quote, what, yes, decide, org }: { quote: Quote; what
   );
   const run = async (decision: Decision["decision"]) => {
     if (decision === "reject" && !note.trim()) {
-      toast.error("Say why, so the rep knows what to fix.");
+      toast.error("Enter a reason so the rep knows what to fix.");
       return false;
     }
     const result = await decide(quote.id, { decision, note: note.trim() || null });

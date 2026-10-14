@@ -86,7 +86,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
                       <button
                         type="button"
                         onClick={() => insert(f.field)}
-                        title={`Put ${f.field} where the cursor is`}
+                        title={`Insert ${f.field} at cursor`}
                         className="flex w-full items-baseline justify-between gap-2 rounded-lg px-2 py-1 text-left hover:bg-hema-tint focus-visible:ring-2 focus-visible:ring-hema focus-visible:outline-none"
                       >
                         <span className="truncate text-sm text-ink">{f.label}</span>

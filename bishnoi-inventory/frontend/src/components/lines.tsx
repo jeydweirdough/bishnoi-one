@@ -189,7 +189,7 @@ export function LinesEditor({
                       onChange={(e) => set(i, { productId: e.target.value })}
                       className="w-full"
                     >
-                      <option value="">Pick a product…</option>
+                      <option value="">Select a product…</option>
                       {offered.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name} · {o.sku}
@@ -251,9 +251,9 @@ export function LinesEditor({
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
         <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
-          Add a line
+          Add line
         </Button>
-        {addProduct && <QuickAdd kind="product" onAdded={added} context={{ org: addProduct.org, units: addProduct.units }} label="New product (not in the list)" />}
+        {addProduct && <QuickAdd kind="product" onAdded={added} context={{ org: addProduct.org, units: addProduct.units }} label="New product" />}
       </div>
     </div>
   );

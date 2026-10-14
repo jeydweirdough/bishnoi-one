@@ -93,7 +93,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
                 },
               ]),
           ...(me.role?.scope !== "own"
-            ? [{ name: "owner", label: "Whose", options: [{ value: "", label: "Everyone you can see" }, { value: "me", label: "Made by me" }] }]
+            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Created by me" }] }]
             : []),
         ]}
       />
@@ -112,7 +112,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
                 !task &&
                 picker && (
                   <>
-                    <NewQuoteButton customers={picker} label="Make the first quote" />
+                    <NewQuoteButton customers={picker} label="Create first quote" />
                     <LinkButton href="/companies" variant="quiet" icon={<Users className="size-4" aria-hidden />}>
                       Go to customers
                     </LinkButton>

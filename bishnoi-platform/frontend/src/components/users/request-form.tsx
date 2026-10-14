@@ -51,7 +51,7 @@ export function RequestAccess({
         setFields(result.fields ?? {});
         return;
       }
-      toast.success("Request logged", { description: "A Platform Admin decides it under Access." });
+      toast.success("Request logged", { description: "A Platform Admin reviews it under Access." });
       setOpen(false);
       setRole("");
       setReason("");
@@ -71,9 +71,9 @@ export function RequestAccess({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="What they want"
+          label="Application"
           error={fields.applicationId}
-          hint={appId && !companyApps.includes(appId) ? "Their company doesn't have this yet; it needs it before the request can be approved." : undefined}
+          hint={appId && !companyApps.includes(appId) ? "Not yet assigned to their company; it must be assigned before the request can be approved." : undefined}
         >
           {(p) => (
             <Select {...p} value={appId} onChange={(e) => setAppId(e.target.value)} autoFocus>
@@ -85,10 +85,10 @@ export function RequestAccess({
             </Select>
           )}
         </Field>
-        <Field label="Role they asked for" optional error={fields.role}>
+        <Field label="Requested role" optional error={fields.role}>
           {(p) => <Input {...p} value={role} onChange={(e) => setRole(e.target.value)} maxLength={60} />}
         </Field>
-        <Field label="Why" optional error={fields.reason} className="sm:col-span-2">
+        <Field label="Reason" optional error={fields.reason} className="sm:col-span-2">
           {(p) => <Textarea {...p} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
         </Field>
       </div>

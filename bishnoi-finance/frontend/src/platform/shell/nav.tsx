@@ -159,8 +159,8 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
   if (m.key === "inventory") {
     return [
       { href: root, label: "Overview", icon: "overview" },
-      { href: `${base}/products`, label: "Products & prices", icon: "products" },
-      { href: `${base}/promos`, label: "Promos & discounts", icon: "promos" },
+      { href: `${base}/products`, label: "Products and prices", icon: "products" },
+      { href: `${base}/promos`, label: "Promos and discounts", icon: "promos" },
       // Beside promos, because a person looks for both in the same place.
       { href: `${base}/bundles`, label: "Bundles", icon: "bundles" },
     ];
@@ -186,7 +186,7 @@ const SETTINGS: PageGroup[] = [
     label: "Access",
     pages: [
       { href: "/settings/people", label: "People", icon: "people", reach: recovers },
-      { href: "/settings/roles", label: "Roles & permissions", icon: "roles" },
+      { href: "/settings/roles", label: "Roles and permissions", icon: "roles" },
       { href: "/settings/teams", label: "Teams", icon: "teams" },
       { href: "/settings/audit", label: "Audit log", icon: "auditLog", reach: recovers },
     ],
@@ -196,7 +196,7 @@ const SETTINGS: PageGroup[] = [
     pages: [
       { href: "/settings/lists", label: "Lists", icon: "lists" },
       { href: "/settings/pricing", label: "Pricing", icon: "pricing" },
-      { href: "/settings/money", label: "Money & formats", icon: "money" },
+      { href: "/settings/money", label: "Money and formats", icon: "money" },
       { href: "/settings/orders", label: "Orders", icon: "orders" },
       { href: "/settings/retention", label: "Retention", icon: "retention" },
       { href: "/settings/goals", label: "Goals", icon: "goals" },
@@ -421,7 +421,7 @@ function WaitingMark({ count }: { count?: number }) {
   return (
     <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
       {count}
-      <span className="sr-only"> waiting on you</span>
+      <span className="sr-only"> pending</span>
     </span>
   );
 }
@@ -913,8 +913,8 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }:
               <button
                 type="button"
                 onClick={toggleRail}
-                aria-label={rail ? "Open the sidebar" : "Close the sidebar"}
-                title={rail ? "Open the sidebar" : "Close the sidebar"}
+                aria-label={rail ? "Expand sidebar" : "Collapse sidebar"}
+                title={rail ? "Expand sidebar" : "Collapse sidebar"}
                 className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink group-data-[rail=true]/side:mt-3"
               >
                 {rail ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}

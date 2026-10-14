@@ -19,9 +19,9 @@ export const metadata = { title: "Monitoring" };
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const HEADLINE: Record<HealthReport["overall"], { title: string; what: string }> = {
-  operational: { title: "Everything is working", what: "The Platform API, its database and every application checked answered normally." },
-  degraded: { title: "Something is slow or under maintenance", what: "People can work, but not everything is as it should be. See which below." },
-  down: { title: "Something is down", what: "At least one part isn't answering. See which below; an incident tells the people it reaches." },
+  operational: { title: "All systems operational", what: "The Platform API, its database and every monitored application responded normally." },
+  degraded: { title: "Degraded performance or maintenance", what: "Users can work, but some services are affected. See details below." },
+  down: { title: "Service outage", what: "At least one service is not responding. See details below; declare an incident to notify affected users." },
 };
 
 const PERIODS = [
@@ -106,14 +106,14 @@ async function HealthView() {
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-1">
-        <SectionTitle icon="monitoring">The platform</SectionTitle>
+        <SectionTitle icon="monitoring">Platform</SectionTitle>
         <ul className="divide-y divide-rule">
           <Row
             name="Platform API"
             status={report.platformApi.status}
             detail={
               report.platformApi.status === "operational"
-                ? "Answering; this page came through it."
+                ? "Responding normally."
                 : `${report.platformApi.failedPercent}% of its requests failed in the last 15 minutes.`
             }
             figures={[
@@ -125,7 +125,7 @@ async function HealthView() {
             name="Database"
             status={db.status}
             detail={db.checkedAt ? `${db.detail ? `${db.detail.replace(/\.$/, "")} · ` : ""}checked ${ago(db.checkedAt)}` : "Not checked yet."}
-            figures={[["Answered in", msText(db.ms)]]}
+            figures={[["Response time", msText(db.ms)]]}
           />
         </ul>
       </Sheet>
@@ -154,8 +154,8 @@ async function HealthView() {
                   </>
                 }
                 figures={[
-                  ["Answered in", msText(a.lastCheck?.ms)],
-                  ["Up, 24 h", uptimeText(a.uptime)],
+                  ["Response time", msText(a.lastCheck?.ms)],
+                  ["Uptime, 24 h", uptimeText(a.uptime)],
                 ]}
               />
             ))}
@@ -180,8 +180,8 @@ async function HealthView() {
                   </>
                 }
                 status={i.status}
-                detail={[i.target, i.monitored ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set by hand"].filter(Boolean).join(" · ")}
-                figures={i.monitored ? [["Answered in", msText(i.lastCheck?.ms)]] : undefined}
+                detail={[i.target, i.monitored ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set manually"].filter(Boolean).join(" · ")}
+                figures={i.monitored ? [["Response time", msText(i.lastCheck?.ms)]] : undefined}
               />
             ))}
           </ul>
@@ -222,13 +222,13 @@ async function TrafficView({ hours }: { hours: string }) {
 
       <Sheet className="overflow-hidden">
         <dl className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-4">
-          <Stat label="Requests a minute" value={s.requestsPerMinute.toLocaleString("en-PH")} note="over the last 5 minutes" />
+          <Stat label="Requests per minute" value={s.requestsPerMinute.toLocaleString("en-PH")} note="over the last 5 minutes" />
           <Stat label={`Requests, last ${period}`} value={s.requests.toLocaleString("en-PH")} />
-          <Stat label="Failed" value={`${s.failedPercent}%`} note={`${s.failed.toLocaleString("en-PH")} the API's own errors`} />
-          <Stat label="Refused" value={s.refused.toLocaleString("en-PH")} note="turned away: not signed in, not allowed, bad input" />
-          <Stat label="Average answer" value={msText(s.averageMs)} />
-          <Stat label="Slowest answer" value={msText(s.slowestMs)} />
-          <Stat label="Staff signed in" value={s.activeSessions.toLocaleString("en-PH")} note="sessions not yet ended" />
+          <Stat label="Failed" value={`${s.failedPercent}%`} note={`${s.failed.toLocaleString("en-PH")} server errors`} />
+          <Stat label="Rejected" value={s.refused.toLocaleString("en-PH")} note="not signed in, not permitted or invalid input" />
+          <Stat label="Average response time" value={msText(s.averageMs)} />
+          <Stat label="Slowest response time" value={msText(s.slowestMs)} />
+          <Stat label="Active staff sessions" value={s.activeSessions.toLocaleString("en-PH")} note="sessions not yet signed out" />
           <div aria-hidden className="bg-sheet max-sm:hidden" />
         </dl>
       </Sheet>
@@ -237,8 +237,8 @@ async function TrafficView({ hours }: { hours: string }) {
         <SectionTitle icon="trend">Requests over the last {period}</SectionTitle>
         <div className="mt-4">
           {traffic.series.length === 0 ? (
-            <Empty icon="trend" title="No requests in this time.">
-              The API counts its requests as they come; try a longer stretch.
+            <Empty icon="trend" title="No requests in this period.">
+              Try a longer period.
             </Empty>
           ) : (
             <TrafficChart traffic={traffic} now={Date.now()} />
@@ -248,7 +248,7 @@ async function TrafficView({ hours }: { hours: string }) {
 
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="apps">Response time by application</SectionTitle>
-        <p className="mt-1 text-meta text-ink-3">How long each took to answer its latest health check.</p>
+        <p className="mt-1 text-meta text-ink-3">Response time of each application's latest health check.</p>
         {traffic.applicationResponse.length === 0 ? (
           <Empty icon="apps" title="No applications to show.">
             Register them in Applications with a health address.
@@ -264,7 +264,7 @@ async function TrafficView({ hours }: { hours: string }) {
                       {a.name}
                     </Link>
                     <HealthMark status={a.status} />
-                    <span className="text-ink-3">no answer time</span>
+                    <span className="text-ink-3">no response time</span>
                   </li>
                 ))}
               </ul>

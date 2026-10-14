@@ -101,7 +101,7 @@ export function BarList({ title, icon, action, rows, empty }: {
         {action}
       </div>
       {rows.length === 0 ? (
-        <p className="px-5 pb-4 text-meta text-ink-3">{empty ?? "Nothing yet."}</p>
+        <p className="px-5 pb-4 text-meta text-ink-3">{empty ?? "No records."}</p>
       ) : (
         <ul className="divide-y divide-rule">
           {rows.map((r) => (

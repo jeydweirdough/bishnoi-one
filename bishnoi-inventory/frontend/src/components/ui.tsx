@@ -161,8 +161,8 @@ export function Figures({ items }: { items: { label: string; value: ReactNode; f
 export function NoAccess({ what }: { what: string }) {
   return (
     <div className="px-5 py-16 text-center">
-      <p className="font-semibold text-ink-2">Your role doesn&apos;t include {what}.</p>
-      <p className="mt-1 text-meta text-ink-3">Ask an administrator if you need it.</p>
+      <p className="font-semibold text-ink-2">Your role does not have access to {what}.</p>
+      <p className="mt-1 text-meta text-ink-3">Contact an administrator to request access.</p>
     </div>
   );
 }

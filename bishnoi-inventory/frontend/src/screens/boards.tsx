@@ -43,10 +43,10 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
   const shown = orders.filter((o) => o.status !== "cancelled" && (o.status !== "issued" || keep.has(o.id)));
   const units = (status: string) => shown.filter((o) => o.status === status).reduce((n, o) => n + o.units, 0);
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: `${fmt.count(units("draft"))} units`, hint: "Written up, nothing held yet" },
-    { key: "confirmed", label: "Reserved", dot: DOT.under, note: `${fmt.count(units("confirmed"))} units held`, hint: "Confirmed: its stock is held" },
-    { key: "picking", label: "Picking", dot: DOT.moving, note: `${fmt.count(units("picking"))} units`, hint: "Being picked from the shelves" },
-    { key: "issued", label: "Issued", dot: DOT.done, note: "Lately", hint: "Stock has gone out" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, note: `${fmt.count(units("draft"))} units`, hint: "Created; no stock reserved" },
+    { key: "confirmed", label: "Reserved", dot: DOT.under, note: `${fmt.count(units("confirmed"))} units held`, hint: "Confirmed; stock reserved" },
+    { key: "picking", label: "Picking", dot: DOT.moving, note: `${fmt.count(units("picking"))} units`, hint: "Being picked" },
+    { key: "issued", label: "Issued", dot: DOT.done, note: "Recent", hint: "Stock issued" },
   ];
   const cards: BoardCard[] = shown.map((o) => {
     const open = o.status !== "issued";
@@ -60,7 +60,7 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
       flag: kind ? undefined : <Tag>{info?.plural.replace(/ orders$| requests$/, "") ?? o.kind}</Tag>,
       sub: o.recipient,
       value: info?.priced && o.total ? fmt.peso(o.total) : `${fmt.count(o.units)} units`,
-      when: open ? (o.neededOn ? (o.neededOn === today ? "Needed today" : `Needed ${short(day(o.neededOn))}`) : undefined) : o.issuedAt ? `Issued ${short(day(o.issuedAt.slice(0, 10)))}` : undefined,
+      when: open ? (o.neededOn ? (o.neededOn === today ? "Required today" : `Required ${short(day(o.neededOn))}`) : undefined) : o.issuedAt ? `Issued ${short(day(o.issuedAt.slice(0, 10)))}` : undefined,
       late,
       meta: `${lines(o.lineCount)} · from ${o.warehouse.code}`,
     };
@@ -79,7 +79,7 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
       moves={moves}
       run={orderStep as Run}
       newHref={may("orders.create") ? (kindOf(kind) ? `/orders/new/${kindOf(kind)!.slug}` : "/orders/new") : undefined}
-      more={{ issued: { href: `/orders?view=list&status=issued${k}`, label: hidden ? `All issued (${fmt.count(hidden + KEEP_DONE)})` : "Issued, as a list" } }}
+      more={{ issued: { href: `/orders?view=list&status=issued${k}`, label: hidden ? `All issued (${fmt.count(hidden + KEEP_DONE)})` : "Issued (list view)" } }}
     />
   );
 }
@@ -89,10 +89,10 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
   const shown = orders.filter((o) => o.status !== "cancelled" && (o.status !== "received" || keep.has(o.id)));
   const worth = (status: string) => fmt.peso(shown.filter((o) => o.status === status).reduce((n, o) => n + o.total, 0));
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: worth("draft"), hint: "Not sent to the supplier yet" },
-    { key: "ordered", label: "Ordered", dot: DOT.under, note: worth("ordered"), hint: "Placed, waiting for delivery" },
-    { key: "partial", label: "Partly received", dot: DOT.moving, note: worth("partial"), hint: "Some came; the rest is owed" },
-    { key: "received", label: "Received", dot: DOT.done, note: "Lately", hint: "All in stock" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, note: worth("draft"), hint: "Not yet placed with the supplier" },
+    { key: "ordered", label: "Ordered", dot: DOT.under, note: worth("ordered"), hint: "Placed; awaiting delivery" },
+    { key: "partial", label: "Partially received", dot: DOT.moving, note: worth("partial"), hint: "Balance outstanding" },
+    { key: "received", label: "Received", dot: DOT.done, note: "Recent", hint: "Fully received" },
   ];
   const cards: BoardCard[] = shown.map((o) => ({
     id: o.id,
@@ -107,10 +107,10 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
   }));
   const receive = may("receiving.receive");
   const moves = allowed([
-    { from: "draft", to: "ordered", step: "place", label: "Place order", confirm: "Place this order with the supplier? It can't be changed once placed, only received against or cancelled.", may: may("purchasing.approve") },
+    { from: "draft", to: "ordered", step: "place", label: "Place order", confirm: "Place this order with the supplier? Once placed, it cannot be edited, only received or cancelled.", may: may("purchasing.approve") },
     { from: "ordered", to: "partial", open: "/purchase-orders/{id}#receive", label: "Receive", may: receive },
     { from: "ordered", to: "received", open: "/purchase-orders/{id}#receive", label: "Receive", may: receive },
-    { from: "partial", to: "received", open: "/purchase-orders/{id}#receive", label: "Receive the rest", may: receive },
+    { from: "partial", to: "received", open: "/purchase-orders/{id}#receive", label: "Receive remaining", may: receive },
   ]);
   return (
     <Board
@@ -119,7 +119,7 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
       moves={moves}
       run={purchaseOrderStep as Run}
       newHref={may("purchasing.create") ? "/purchase-orders/new" : undefined}
-      more={{ received: { href: "/purchase-orders?view=list&status=received", label: hidden ? `All received (${fmt.count(hidden + KEEP_DONE)})` : "Received, as a list" } }}
+      more={{ received: { href: "/purchase-orders?view=list&status=received", label: hidden ? `All received (${fmt.count(hidden + KEEP_DONE)})` : "Received (list view)" } }}
     />
   );
 }
@@ -129,11 +129,11 @@ export function TransfersBoard({ transfers, fmt, day, may }: { transfers: Transf
   const shown = transfers.filter((t) => t.status !== "cancelled" && (t.status !== "received" || keep.has(t.id)));
   const units = (status: string) => `${fmt.count(shown.filter((t) => t.status === status).reduce((n, t) => n + t.units, 0))} units`;
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: units("draft"), hint: "Not asked for yet" },
-    { key: "requested", label: "Requested", dot: DOT.waiting, note: units("requested"), hint: "Waiting for approval" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, note: units("draft"), hint: "Not yet requested" },
+    { key: "requested", label: "Requested", dot: DOT.waiting, note: units("requested"), hint: "Pending approval" },
     { key: "approved", label: "Approved", dot: DOT.under, note: units("approved"), hint: "Ready to dispatch" },
-    { key: "in_transit", label: "In transit", dot: DOT.moving, note: units("in_transit"), hint: "On the road" },
-    { key: "received", label: "Received", dot: DOT.done, note: "Lately", hint: "In stock where it went" },
+    { key: "in_transit", label: "In transit", dot: DOT.moving, note: units("in_transit"), hint: "Dispatched" },
+    { key: "received", label: "Received", dot: DOT.done, note: "Recent", hint: "Received at destination" },
   ];
   const dateOf = (iso: string | null) => short(day(iso ? iso.slice(0, 10) : null));
   const cards: BoardCard[] = shown.map((t) => ({
@@ -143,11 +143,11 @@ export function TransfersBoard({ transfers, fmt, day, may }: { transfers: Transf
     title: t.number,
     sub: `${t.from.name} → ${t.to.name}`,
     value: `${fmt.count(t.units)} units`,
-    when: t.status === "received" ? `Arrived ${dateOf(t.receivedAt)}` : t.status === "in_transit" ? `Left ${dateOf(t.dispatchedAt)}` : t.requestedAt ? `Asked ${dateOf(t.requestedAt)}` : undefined,
+    when: t.status === "received" ? `Received ${dateOf(t.receivedAt)}` : t.status === "in_transit" ? `Dispatched ${dateOf(t.dispatchedAt)}` : t.requestedAt ? `Requested ${dateOf(t.requestedAt)}` : undefined,
     meta: lines(t.lineCount),
   }));
   const moves = allowed([
-    { from: "draft", to: "requested", step: "request", label: "Request it", may: may("transfers.create") },
+    { from: "draft", to: "requested", step: "request", label: "Submit request", may: may("transfers.create") },
     { from: "requested", to: "approved", step: "approve", label: "Approve", may: may("transfers.approve") },
     { from: "approved", to: "in_transit", open: "/transfers/{id}#dispatch", label: "Dispatch", may: may("transfers.dispatch") },
     { from: "in_transit", to: "received", open: "/transfers/{id}#receive", label: "Receive", may: may("transfers.receive") },
@@ -159,7 +159,7 @@ export function TransfersBoard({ transfers, fmt, day, may }: { transfers: Transf
       moves={moves}
       run={transferStep as Run}
       newHref={may("transfers.create") ? "/transfers/new" : undefined}
-      more={{ received: { href: "/transfers?view=list&status=received", label: hidden ? `All received (${fmt.count(hidden + KEEP_DONE)})` : "Received, as a list" } }}
+      more={{ received: { href: "/transfers?view=list&status=received", label: hidden ? `All received (${fmt.count(hidden + KEEP_DONE)})` : "Received (list view)" } }}
     />
   );
 }

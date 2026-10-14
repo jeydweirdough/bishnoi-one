@@ -28,7 +28,7 @@ export function Timeline({
   const fmt = makeFormat(org);
   const activities = feed?.activities ?? given;
   if (activities.length === 0) {
-    return <Empty compact icon="activity" title="Nothing logged yet">Everything your team records against this customer shows up here.</Empty>;
+    return <Empty compact icon="activity" title="No activity yet">Everything your team records against this customer shows up here.</Empty>;
   }
   return (
     <ol className="divide-y divide-rule">

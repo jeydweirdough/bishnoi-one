@@ -106,24 +106,24 @@ export function PlatformForm({ initial, readOnly }: { initial: PlatformSettings[
     <SectionSheet
       title="Platform"
       icon="company"
-      intro="What the platform calls itself, where people write for help, and the time zone its times are shown in."
+      intro="The platform name, support contact and time zone."
       readOnly={readOnly}
       pending={pending}
       error={error}
       onSave={() =>
         save(
           { name: v.name.trim(), supportEmail: v.supportEmail.trim() || null, timezone: v.timezone.trim() },
-          "Every screen uses them from now on.",
+          "Applied to every screen.",
         )
       }
     >
-      <Field label="Name" error={fields.name} hint="Shown on the console and in what the platform sends.">
+      <Field label="Name" error={fields.name} hint="Shown on the console and in platform emails.">
         {(p) => <Input {...p} value={v.name} onChange={set("name")} maxLength={60} />}
       </Field>
-      <Field label="Support email" optional error={fields.supportEmail} hint="Where people write when something is wrong.">
+      <Field label="Support email" optional error={fields.supportEmail} hint="Where users send support requests.">
         {(p) => <Input {...p} type="email" value={v.supportEmail} onChange={set("supportEmail")} maxLength={254} />}
       </Field>
-      <Field label="Time zone" error={fields.timezone} className="sm:col-span-2" hint="What counts as today, and how times are written.">
+      <Field label="Time zone" error={fields.timezone} className="sm:col-span-2" hint="Used for dates and times across the platform.">
         {(p) => (
           <>
             <Input {...p} value={v.timezone} onChange={set("timezone")} list="settings-zones" />
@@ -164,22 +164,22 @@ export function MonitoringForm({ initial, readOnly }: { initial: PlatformSetting
     <SectionSheet
       title="Monitoring"
       icon="monitoring"
-      intro="How the platform checks that each application answers, and what counts as slow or down."
+      intro="Health check settings and the thresholds for degraded and down."
       readOnly={readOnly}
       pending={pending}
       error={error}
       onSave={submit}
     >
-      <Field label="Check again after (seconds)" error={fields.staleSeconds} hint="A check older than this is out of date, and the next look runs a new one. 15 to 3,600.">
+      <Field label="Check interval (seconds)" error={fields.staleSeconds} hint="A check older than this is stale and a new one runs. 15 to 3,600.">
         {(p) => <Input {...p} inputMode="numeric" value={v.staleSeconds} onChange={set("staleSeconds")} />}
       </Field>
-      <Field label="Wait for an answer (seconds)" error={fields.timeoutSeconds} hint="An application that takes longer counts as down. 1 to 15.">
+      <Field label="Timeout (seconds)" error={fields.timeoutSeconds} hint="An application that takes longer is marked down. 1 to 15.">
         {(p) => <Input {...p} inputMode="numeric" value={v.timeoutSeconds} onChange={set("timeoutSeconds")} />}
       </Field>
-      <Field label="Slow after (ms)" error={fields.slowMs} hint="An application that answers slower than this is marked degraded. 100 to 15,000.">
+      <Field label="Slow response threshold (ms)" error={fields.slowMs} hint="An application that responds slower than this is marked degraded. 100 to 15,000.">
         {(p) => <Input {...p} inputMode="numeric" value={v.slowMs} onChange={set("slowMs")} />}
       </Field>
-      <Field label="Keep history for (days)" error={fields.keepDays} hint="Health checks and traffic older than this are cleared away. 1 to 365.">
+      <Field label="History retention (days)" error={fields.keepDays} hint="Health checks and traffic older than this are deleted. 1 to 365.">
         {(p) => <Input {...p} inputMode="numeric" value={v.keepDays} onChange={set("keepDays")} />}
       </Field>
     </SectionSheet>
@@ -189,7 +189,7 @@ export function MonitoringForm({ initial, readOnly }: { initial: PlatformSetting
 const BANNER: { value: IncidentSeverity; label: string }[] = [
   { value: "critical", label: "Critical only" },
   { value: "major", label: "Major and critical" },
-  { value: "minor", label: "Every active incident" },
+  { value: "minor", label: "All active incidents" },
 ];
 
 export function NotificationsForm({ initial, readOnly }: { initial: PlatformSettings["notifications"]; readOnly: boolean }) {
@@ -203,14 +203,14 @@ export function NotificationsForm({ initial, readOnly }: { initial: PlatformSett
   function submit() {
     const found: Record<string, string> = {};
     const responseHours = Object.fromEntries(levels.map((s) => [s, whole(hours[s], 1, 720, found, s)])) as Record<Severity, number>;
-    save({ responseHours, bannerSeverity: banner }, "Overdue tickets and the banner follow them now.", found);
+    save({ responseHours, bannerSeverity: banner }, "Overdue tickets and the banner now use these settings.", found);
   }
 
   return (
     <SectionSheet
       title="Notifications"
       icon="support"
-      intro="How fast each ticket should be answered, and which incidents are announced at the top of every screen."
+      intro="Ticket response targets, and which incidents appear in the banner on every screen."
       readOnly={readOnly}
       pending={pending}
       error={error}
@@ -226,9 +226,9 @@ export function NotificationsForm({ initial, readOnly }: { initial: PlatformSett
         ))}
       </fieldset>
       <div className="sm:col-span-2">
-        <Choice name="bannerSeverity" legend="Incidents shown on every screen" value={banner} onChange={setBanner} options={BANNER} />
+        <Choice name="bannerSeverity" legend="Incident banner" value={banner} onChange={setBanner} options={BANNER} />
         <p className={`mt-1 text-meta ${fields.bannerSeverity ? "text-danger" : "text-ink-3"}`}>
-          {fields.bannerSeverity ?? "While one is active, every staff member sees it above whatever they're doing."}
+          {fields.bannerSeverity ?? "While one is active, it is shown at the top of every staff screen."}
         </p>
       </div>
     </SectionSheet>
@@ -258,24 +258,24 @@ export function SecurityForm({ initial, readOnly }: { initial: PlatformSettings[
     <SectionSheet
       title="Security"
       icon="roles"
-      intro="How long a sign-in lasts, and how many wrong passwords it takes before someone has to wait."
+      intro="Session length and sign-in lockout."
       readOnly={readOnly}
       pending={pending}
       error={error}
       onSave={submit}
     >
       <Field
-        label="A sign-in lasts (hours)"
+        label="Session length (hours)"
         error={fields.sessionHours}
         className="sm:col-span-2"
-        hint="1 to 168. A new length applies to sign-ins from now on; anyone already signed in keeps theirs."
+        hint="1 to 168. Applies to new sign-ins; current sessions are not affected."
       >
         {(p) => <Input {...p} inputMode="numeric" value={v.sessionHours} onChange={set("sessionHours")} />}
       </Field>
-      <Field label="Wrong passwords before a wait" error={fields.loginAttempts} hint="3 to 20, for one email.">
+      <Field label="Failed sign-ins before lockout" error={fields.loginAttempts} hint="3 to 20, per email.">
         {(p) => <Input {...p} inputMode="numeric" value={v.loginAttempts} onChange={set("loginAttempts")} />}
       </Field>
-      <Field label="Wait (minutes)" error={fields.lockoutMinutes} hint="How long before they can try again. 1 to 240.">
+      <Field label="Lockout duration (minutes)" error={fields.lockoutMinutes} hint="How long before the user can try again. 1 to 240.">
         {(p) => <Input {...p} inputMode="numeric" value={v.lockoutMinutes} onChange={set("lockoutMinutes")} />}
       </Field>
     </SectionSheet>

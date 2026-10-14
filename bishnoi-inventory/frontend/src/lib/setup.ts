@@ -29,10 +29,10 @@ export type Step = {
 
 export const STEPS: Step[] = [
   { key: "warehouse", title: "Add a warehouse", why: "Where stock is kept. Every receipt, transfer and order belongs to one.", icon: "warehouses", href: "/warehouses?add=1", action: "Add warehouse", permission: "warehouses.manage", done: (s) => s.warehouses > 0 },
-  { key: "supplier", title: "Add your suppliers", why: "Who you buy from, so purchase orders and receipts can name them.", icon: "suppliers", href: "/suppliers/new", action: "Add supplier", permission: "suppliers.create", done: (s) => s.suppliers > 0, optional: true },
-  { key: "product", title: "Add your products", why: "What you keep: its unit, batches and expiry, and when to reorder.", icon: "products", href: "/products/new", action: "Add product", permission: "products.create", done: (s) => s.products > 0 },
-  { key: "prices", title: "Price your products", why: "A product with no cost is valued at nothing; with no selling price it sells for nothing.", icon: "money", href: "/products", action: "See products", permission: "products.edit", done: (s) => s.products > 0 && s.unpriced === 0, after: ["product"] },
-  { key: "stock", title: "Receive your first stock", why: "Stock comes in through a receipt, from a purchase order or without one.", icon: "receiving", href: "/receipts/new", action: "Receive stock", permission: "receiving.receive", done: (s) => s.receipts > 0, after: ["warehouse", "product"] },
+  { key: "supplier", title: "Add suppliers", why: "Vendors you buy from, referenced on purchase orders and receipts.", icon: "suppliers", href: "/suppliers/new", action: "Add supplier", permission: "suppliers.create", done: (s) => s.suppliers > 0, optional: true },
+  { key: "product", title: "Add products", why: "Items you stock, with their unit, batch and expiry tracking, and reorder levels.", icon: "products", href: "/products/new", action: "Add product", permission: "products.create", done: (s) => s.products > 0 },
+  { key: "prices", title: "Set product prices", why: "Products without a cost have no stock value, and products without a selling price are sold at zero.", icon: "money", href: "/products", action: "View products", permission: "products.edit", done: (s) => s.products > 0 && s.unpriced === 0, after: ["product"] },
+  { key: "stock", title: "Receive first stock", why: "Stock is received through a goods receipt, with or without a purchase order.", icon: "receiving", href: "/receipts/new", action: "Receive stock", permission: "receiving.receive", done: (s) => s.receipts > 0, after: ["warehouse", "product"] },
 ];
 
 /** What each need means, and the step that meets it. */

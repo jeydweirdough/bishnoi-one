@@ -39,7 +39,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
         title={issued ? (info ? `${info.plural}: issued` : "Issuance history") : info ? info.plural : "All orders"}
         actions={may("orders.create") && <LinkButton href={info ? newHref(info) : "/orders/new"} variant="primary" icon={<Plus className="size-4" aria-hidden />}>{info ? info.newLabel : "New order"}</LinkButton>}
       >
-        {info ? `${info.intro} Reserved, picked, then issued.` : "Stock going out: customer orders, and issues to departments and projects. Order → reserved → picked → issued."}
+        {info ? `${info.intro} Reserved, picked, then issued.` : "Outbound stock: customer orders and issues to departments and projects. Order → reserved → picked → issued."}
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <ToggleLinks
@@ -51,17 +51,17 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
           ]}
         />
       </div>
-      <Chips label="Kind" current={f.kind} options={[{ value: "", label: "All kinds", href: `/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/orders${query({ ...f, kind: k.kind })}` }))]} />
+      <Chips label="Type" current={f.kind} options={[{ value: "", label: "All types", href: `/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/orders${query({ ...f, kind: k.kind })}` }))]} />
       {!board && !issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or who it's for"} keep={{ status: f.status, kind: f.kind, view: board ? "" : "list" }} />
+      <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: board ? "" : "list" }} />
       {board && orders.length > 0 ? (
         <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
       ) : (
       <Sheet>
         {orders.length === 0 ? (
-          <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()} yet` : "No orders yet"} body={info ? info.intro : "An order holds stock for a customer or a department until it's issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={info ? listHref(info) : "/orders"} may={may} />
+          <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={info ? listHref(info) : "/orders"} may={may} />
         ) : (
-          <Table head={["Order", info ? info.recipient.label : "For", ...(info ? [] : ["Kind"]), "From", "Status", issued ? "Issued" : "Needed by", " Units", ...(info && !info.priced ? [] : [" Value"])]} min="52rem">
+          <Table head={["Order", info ? info.recipient.label : "Recipient", ...(info ? [] : ["Type"]), "Warehouse", "Status", issued ? "Issued" : "Required date", " Units", ...(info && !info.priced ? [] : [" Value"])]} min="52rem">
             {orders.map((o) => (
               <tr key={o.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/orders/${o.id}`}>{o.number}</RowLink></Td>
@@ -110,31 +110,31 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
         actions={
           <>
             {o.status === "draft" && may("orders.approve") && (
-              <StepButton run={orderStep.bind(null, o.id, "confirm")} label="Confirm & reserve stock" done="Stock reserved for this order" variant="primary" />
+              <StepButton run={orderStep.bind(null, o.id, "confirm")} label="Confirm and reserve stock" done="Stock reserved for this order" variant="primary" />
             )}
             {o.status === "confirmed" && (may("orders.issue") || may("orders.approve")) && (
-              <StepButton run={orderStep.bind(null, o.id, "pick")} label="Start picking" done="Picking: the stock is allocated" />
+              <StepButton run={orderStep.bind(null, o.id, "pick")} label="Start picking" done="Picking started; stock allocated" />
             )}
             {(o.status === "draft" ? may("orders.edit") : held && may("orders.approve")) && (
-              <StepButton run={orderStep.bind(null, o.id, "cancel")} label="Cancel order" done="Order cancelled" variant="quiet" confirm={{ title: `Cancel ${o.number}?`, body: held ? "The stock it holds is let go for others." : undefined, danger: true }} />
+              <StepButton run={orderStep.bind(null, o.id, "cancel")} label="Cancel order" done="Order cancelled" variant="quiet" confirm={{ title: `Cancel ${o.number}?`, body: held ? "Its reserved stock is released." : undefined, danger: true }} />
             )}
           </>
         }
       >
-        <OrderStamp status={o.status} /> <span className="ml-1">{ORDER_KINDS[o.kind]} for <strong>{o.recipient}</strong>, from {o.warehouse.name}{o.neededOn && <>, needed by {day(o.neededOn)}</>}</span>
+        <OrderStamp status={o.status} /> <span className="ml-1">{ORDER_KINDS[o.kind]} for <strong>{o.recipient}</strong>, from {o.warehouse.name}{o.neededOn && <>, required by {day(o.neededOn)}</>}</span>
       </PageHeader>
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
-          { label: "Written up", who: o.createdBy, when: at(o.createdAt) },
-          { label: "Confirmed & reserved", who: o.confirmedBy, when: o.confirmedAt ? at(o.confirmedAt) : null },
+          { label: "Created", who: o.createdBy, when: at(o.createdAt) },
+          { label: "Confirmed and reserved", who: o.confirmedBy, when: o.confirmedAt ? at(o.confirmedAt) : null },
           { label: "Issued", who: o.issuedBy, when: o.issuedAt ? at(o.issuedAt) : null },
         ]} />
         {o.notes && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{o.notes}</p>}
       </Sheet>
 
       <Sheet className="mt-5">
-        <Table head={["Product", " Quantity", ...(o.status === "draft" ? [" Available now"] : []), ...(o.status === "issued" ? ["Taken from"] : []), " Unit price", " Amount"]}>
+        <Table head={["Product", " Quantity", ...(o.status === "draft" ? [" Available now"] : []), ...(o.status === "issued" ? ["Picked from"] : []), " Unit price", " Amount"]}>
           {o.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
@@ -153,18 +153,18 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
         </Table>
       </Sheet>
       {o.status === "draft" && short.length > 0 && (
-        <p className="mt-3 text-meta text-eosin">Not enough is available for {short.map((l) => l.product.name).join(", ")}: it can&apos;t be confirmed until there is.</p>
+        <p className="mt-3 text-meta text-eosin">Insufficient stock available for {short.map((l) => l.product.name).join(", ")}. The order cannot be confirmed until stock is available.</p>
       )}
 
       {held && may("orders.issue") && (
         <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="issue">
-          <SectionTitle icon="issuance">Issue it</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">Stock leaves {o.warehouse.name} now, and the reservation is let go.</p>
-          <PickForm kind="order" documentId={o.id} lines={pickLines} label="Issue & ship" />
+          <SectionTitle icon="issuance">Issue stock</SectionTitle>
+          <p className="mb-3 text-meta text-ink-3">Stock is issued from {o.warehouse.name} and the reservation is released.</p>
+          <PickForm kind="order" documentId={o.id} lines={pickLines} label="Issue and ship" />
         </Sheet>
       )}
       {o.status === "issued" && may("stock.view") && (
-        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-ink hover:underline">See its movements</Link></p>
+        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-ink hover:underline">View stock movements</Link></p>
       )}
     </>
   );
@@ -177,11 +177,11 @@ type OrderFormData = { reference: Pick<Reference, "products" | "units" | "wareho
 /** New order with no kind: which one, each with what it's for, as the CRM's Add customer asks the type first. */
 export async function NewOrderChooser() {
   const { may } = await context();
-  if (!may("orders.create")) return <NoAccess what="writing orders" />;
+  if (!may("orders.create")) return <NoAccess what="creating orders" />;
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order">
-        What is it for? Each kind has its own form.
+        Select the order type.
       </PageHeader>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {KINDS.map((k) => (
@@ -204,10 +204,10 @@ export async function NewOrderPage({ params }: { params: Params<{ kind: string }
   const info = kindBySlug((await params).kind);
   if (!info) notFound();
   const { me, may } = await context();
-  if (!may("orders.create")) return <NoAccess what="writing orders" />;
+  if (!may("orders.create")) return <NoAccess what="creating orders" />;
   const crumbs = [{ href: listHref(info), label: info.plural }];
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
-  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "stock"], then: newHref(info), title: info.newLabel, doing: `write a ${info.one}`, crumbs, may });
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "stock"], then: newHref(info), title: info.newLabel, doing: `create a ${info.one}`, crumbs, may });
   if (gate) return gate;
   const { reference: ref, availability: available } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability"]);
   return (
@@ -223,7 +223,7 @@ export async function NewOrderPage({ params }: { params: Params<{ kind: string }
 export async function EditOrderPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, may } = await context();
-  if (!may("orders.edit")) return <NoAccess what="changing orders" />;
+  if (!may("orders.edit")) return <NoAccess what="editing orders" />;
   const { order: o, reference: ref, availability: available } = await loadQuery<OrderFormData & { order: Order }>(
     `query EditOrder($id: String!) { order(id: $id) ${ORDER_FORM} }`,
     { id },
@@ -243,12 +243,12 @@ export async function ReservationsPage() {
   const { reservations: rows } = await loadQuery<{ reservations: Reservation[] }>("query Reservations { reservations }", {}, ["reservations"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>
+      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="Reservations">Stock reserved for open orders: reserved on confirmation and allocated during picking. Reserved stock is not available to other orders.</PageHeader>
       <Sheet>
         {rows.length === 0 ? (
-          <Empty icon="issuance" title="Nothing is held" />
+          <Empty icon="issuance" title="No reservations" />
         ) : (
-          <Table head={["Product", "Order", "For", "Warehouse", "Needed by", "State", " Quantity"]} min="52rem">
+          <Table head={["Product", "Order", "Recipient", "Warehouse", "Required date", "Status", " Quantity"]} min="52rem">
             {rows.map((r, i) => (
               <tr key={i} className="relative hover:bg-bench/40">
                 <Td><Link href={`/products/${r.product.id}`} className="font-semibold hover:text-ink hover:underline">{r.product.name}</Link></Td>

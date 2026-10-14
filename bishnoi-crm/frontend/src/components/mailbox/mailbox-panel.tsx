@@ -123,7 +123,7 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
               }}
             >
               <div className="min-w-[16rem] flex-1">
-                <Field label="Your email" error={error ?? undefined}>
+                <Field label="Email address" error={error ?? undefined}>
                   {(p) => <Input {...p} type="email" inputMode="email" autoComplete="email" placeholder="you@yourcompany.com" value={address} onChange={(e) => setAddress(e.target.value)} />}
                 </Field>
               </div>

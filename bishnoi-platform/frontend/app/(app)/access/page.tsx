@@ -36,7 +36,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Searc
           { key: "requests", label: "Requests", href: "/access", count: pending },
           { key: "organizations", label: "Organization access", href: "/access?tab=organizations" },
           { key: "applications", label: "Application access", href: "/access?tab=applications" },
-          { key: "roles", label: "Roles & permissions", href: "/access?tab=roles" },
+          { key: "roles", label: "Roles and permissions", href: "/access?tab=roles" },
         ]}
       />
       {tab === "requests" && <Requests status={typeof params.status === "string" ? params.status : "pending"} canDecide={staff.canAdminister} />}
@@ -48,7 +48,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Searc
 }
 
 const REQUEST_STATES: { value: RequestStatus | "all"; label: string }[] = [
-  { value: "pending", label: "Waiting" },
+  { value: "pending", label: "Pending" },
   { value: "approved", label: "Approved" },
   { value: "declined", label: "Declined" },
   { value: "all", label: "All" },
@@ -71,7 +71,7 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
       </div>
       <Sheet>
         {sorted.length === 0 ? (
-          <Empty icon="approvals" title={status === "pending" ? "Nobody is waiting" : "No requests here"}>
+          <Empty icon="approvals" title={status === "pending" ? "No pending requests" : "No requests here"}>
             {status === "pending"
               ? "When somebody asks for an application, log it from their page under Users and it waits here for a Platform Admin."
               : "Try another filter."}
@@ -94,7 +94,7 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
                   </p>
                   {r.reason && <p className="mt-0.5 text-sm whitespace-pre-line text-ink-2">“{r.reason}”</p>}
                   <p className="mt-0.5 text-meta text-ink-3">
-                    Asked{" "}
+                    Requested{" "}
                     <time dateTime={r.createdAt} title={when(r.createdAt)}>
                       {ago(r.createdAt)}
                     </time>
@@ -111,7 +111,7 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
                     <p className="mt-1.5 text-meta text-ink-2">
                       {r.company.name} doesn&apos;t have {r.application.name}, so this can&apos;t be approved yet.{" "}
                       <Link href={`/companies/${r.company.id}?tab=applications`} className="font-semibold text-hema hover:underline">
-                        Give {r.application.name} to {r.company.name} first
+                        Assign {r.application.name} to {r.company.name} first
                       </Link>
                       , then come back.
                     </p>
@@ -202,11 +202,11 @@ async function Organizations() {
                     <td key={cell.applicationId} className="px-3 py-2.5 text-center">
                       {cell.enabled ? (
                         <span className="inline-flex items-center gap-1 text-hema" title={`${c.name} has ${app?.name}: ${plural(cell.userCount, "user")}`}>
-                          <Check className="size-4" aria-label="Has it" />
+                          <Check className="size-4" aria-label="Assigned" />
                           <span className="text-meta text-ink-2 tabular-nums">{cell.userCount}</span>
                         </span>
                       ) : (
-                        <Minus className="mx-auto size-4 text-rule-strong" aria-label="Doesn't have it" />
+                        <Minus className="mx-auto size-4 text-rule-strong" aria-label="Not assigned" />
                       )}
                     </td>
                   );
@@ -240,7 +240,7 @@ async function Applications() {
               {a.name}
               <Count n={a.userCount} />
             </SectionTitle>
-            <p className="text-meta text-ink-3">{a.userCount === 0 ? "Nobody uses it yet." : `${plural(a.userCount, "person", "people")} may use it.`}</p>
+            <p className="text-meta text-ink-3">{a.userCount === 0 ? "No users yet." : `${plural(a.userCount, "person", "people")} may use it.`}</p>
           </div>
           {a.roles.length > 0 && (
             <ul className="divide-y divide-rule border-t border-rule" role="list">
@@ -317,7 +317,7 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Sheet className="self-start overflow-x-auto">
           <div className="px-5 pt-4 pb-2">
-            <SectionTitle icon="roles">What each role may do here</SectionTitle>
+            <SectionTitle icon="roles">Role permissions</SectionTitle>
           </div>
           <table className="w-full text-sm">
             <thead>

@@ -17,7 +17,7 @@ import { ProgressRing } from "../components/progress-ring";
 export const metadata = { title: "Performance" };
 
 /** "Salesperson" → "Salespeople", "Field agent" → "Field agents": a role's tab. */
-const plural = (role: string) => (/person$/i.test(role) ? role.replace(/person$/i, "people") : /s$/i.test(role) ? role : `${role}s`);
+export const plural = (role: string) => (/person$/i.test(role) ? role.replace(/person$/i, "people") : /s$/i.test(role) ? role : `${role}s`);
 const TONE = { green: "good", amber: "warn", red: "bad", none: "none", waiting: "none" } as const;
 // The status bars' colours: the checked palette, not the status tokens (a chart needs hex).
 const STATUS_COLOR: Record<"green" | "amber" | "red" | "none", string> = { green: "#1a8a52", amber: "#eda100", red: "#e34948", none: "#d5d9df" };
@@ -135,21 +135,21 @@ function NothingMeasured({ title, me }: { title: string; me: Me }) {
 }
 
 /** One's own breakdown: the statuses, then each measure with where it should be by today and the two months before. */
-function Mine({ card, history, fmt, me }: { card: KpiScorecard; history: (KpiScorecard | undefined)[]; fmt: Format; me: Me & { org: Org } }) {
+export function Mine({ card, history, fmt, me, figures = true }: { card: KpiScorecard; history: (KpiScorecard | undefined)[]; fmt: Format; me: Me & { org: Org }; figures?: boolean }) {
   const results = card.people[0]?.results ?? {};
   const mine = card.kpis.filter((k) => results[k.id]);
-  if (!mine.length) return <NothingMeasured title="Nothing is measured for your role yet" me={me} />;
+  if (!mine.length) return <NothingMeasured title="No measures set for your role" me={me} />;
   const past = history.filter((h): h is KpiScorecard => !!h);
   return (
     <>
-      <StatusFigures results={mine.map((k) => results[k.id])} />
+      {figures && <StatusFigures results={mine.map((k) => results[k.id])} />}
       <Sheet className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-rule text-left text-meta text-ink-3">
               <th className="px-5 py-2 font-medium">Measured by</th>
               <th className="px-3 py-2 text-right font-medium">{fmt.monthLabel(card.month)}</th>
-              <th className="px-3 py-2 text-right font-medium">By today</th>
+              <th className="px-3 py-2 text-right font-medium">Expected to date</th>
               {past.map((h) => (
                 <th key={h.month} className="px-3 py-2 text-right font-medium">
                   {fmt.monthLabel(h.month)}
@@ -232,17 +232,25 @@ function Overview({ kpi, total, results, fmt }: { kpi: KpiDef; total: KpiResult 
 }
 
 /** How far each person is towards their targets: one bar each, best first, with where they should be by today. */
-function ByPerson({ card, fmt }: { card: KpiScorecard; fmt: Format }) {
-  const rows = card.people
-    .map((p) => {
-      const targeted = card.kpis.map((k) => p.results[k.id]).filter((r): r is KpiResult => !!r && r.target !== null && r.attainment !== null);
-      const pct = targeted.length ? Math.round(targeted.reduce((s, r) => s + r.attainment!, 0) / targeted.length) : null;
-      const paces = targeted.filter((r) => r.expected !== null && r.target).map((r) => (100 * r.expected!) / r.target!);
-      const pace = paces.length ? paces.reduce((a, b) => a + b, 0) / paces.length : null;
-      const worst = (["red", "amber", "green"] as const).find((s) => targeted.some((r) => r.status === s)) ?? null;
-      return { p, pct, pace, worst, count: targeted.length };
-    })
+/** Where one person stands on their measures with a target: the average % of target, where they should be by today, the worst status. */
+export function standing(card: KpiScorecard, results: Record<string, KpiResult>) {
+  const targeted = card.kpis.map((k) => results[k.id]).filter((r): r is KpiResult => !!r && r.target !== null && r.attainment !== null);
+  const pct = targeted.length ? Math.round(targeted.reduce((s, r) => s + r.attainment!, 0) / targeted.length) : null;
+  const paces = targeted.filter((r) => r.expected !== null && r.target).map((r) => (100 * r.expected!) / r.target!);
+  const pace = paces.length ? paces.reduce((a, b) => a + b, 0) / paces.length : null;
+  const worst = (["red", "amber", "green"] as const).find((s) => targeted.some((r) => r.status === s)) ?? null;
+  return { pct, pace, worst, count: targeted.length };
+}
+
+/** Everyone in the card, best first: the leaderboard's order, and the bars'. */
+export function ranked(card: KpiScorecard) {
+  return card.people
+    .map((p) => ({ p, ...standing(card, p.results) }))
     .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.p.person.name.localeCompare(b.p.person.name));
+}
+
+function ByPerson({ card, fmt }: { card: KpiScorecard; fmt: Format }) {
+  const rows = ranked(card);
   const several = card.kpis.length > 1;
   return (
     <Sheet className="px-5 py-4">
@@ -275,11 +283,11 @@ function ByPerson({ card, fmt }: { card: KpiScorecard; fmt: Format }) {
   );
 }
 
-function Team({ card, fmt, show, href, targets }: { card: KpiScorecard; fmt: Format; show: "people" | "teams"; href: (show: string) => string; targets: string }) {
+export function Team({ card, fmt, show, href, targets }: { card: KpiScorecard; fmt: Format; show: "people" | "teams"; href: (show: string) => string; targets: string }) {
   if (!card.people.length)
     return (
       <Sheet className="px-5 py-2">
-        <Empty icon="goals" art="gauge" title="Nothing is measured for anyone in reach yet">
+        <Empty icon="goals" art="gauge" title="No measures set up">
           An administrator chooses what each role is measured by under Settings → Performance.
         </Empty>
       </Sheet>

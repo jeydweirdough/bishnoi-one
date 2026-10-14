@@ -1,4 +1,5 @@
 import { Nav, type Unset, type Waiting } from "../shell/nav";
+import { TopActions, type Notification } from "../shell/topbar";
 import { Suspense } from "react";
 import { NavProgress } from "../shell/nav-progress";
 import { Notices } from "./notices";
@@ -35,8 +36,9 @@ function NoCompany() {
 }
 
 /** `waiting`: how many things wait on this person, by kind, for the sidebar's counts.
- *  `unset`: how many things aren't set up yet, for its red counts. */
-export async function ShellLayout({ children, waiting, unset }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset }) {
+ *  `unset`: how many things aren't set up yet, for its red counts.
+ *  `notifications`: the app's own, for the bell (left out: no bell), and `allHref` where they're all listed. */
+export async function ShellLayout({ children, waiting, unset, notifications, allHref }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; notifications?: Promise<Notification[]>; allHref?: string }) {
   await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
@@ -49,6 +51,8 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
   const stranded = me.org === null && Boolean(THIS_APP) && THIS_APP !== "platform";
   // The sidebar as it was left: full, or collapsed to its icons.
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
+  // The bell, then who you are: the top right of every page.
+  const actions = <TopActions me={me} notifications={stranded ? undefined : notifications} allHref={allHref} />;
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}
@@ -58,8 +62,10 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
         <NavProgress />
       </Suspense>
       <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-        <Nav me={me} waiting={waiting} unset={unset} rail={rail} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
+        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} />
+        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
+          {/* Wider screens: the bell and the profile at the top right (on a phone they're in the top bar). */}
+          <header className="mb-4 hidden justify-end lg:flex">{actions}</header>
           <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             {/* Announcements from Bishnoi One Platform (kept in Discord), for this app and for everyone. */}
             <Notices timeZone={me.org?.timezone} />

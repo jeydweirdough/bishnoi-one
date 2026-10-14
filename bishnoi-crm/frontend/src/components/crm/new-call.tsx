@@ -46,7 +46,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
   }
 
   function save() {
-    if (!companyId || !when || !objective.trim()) return setError("Pick who it's with and when, and say what it's for.");
+    if (!companyId || !when || !objective.trim()) return setError("Customer, date and time, and objective are required.");
     start(async () => {
       const r = await createActivity({
         kind: "meeting",
@@ -63,7 +63,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
         ownerId: null,
       });
       if (!r.ok) return setError(r.error);
-      toast.success("Call planned", { description: `${when.format("ddd D MMM, h:mm A")}: ${objective.trim()}` });
+      toast.success("Call scheduled", { description: `${when.format("ddd D MMM, h:mm A")}: ${objective.trim()}` });
       setOpen(false);
       setObjective("");
       setLink("");
@@ -77,12 +77,12 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
       <Button variant={variant} icon={<PhoneCall className="size-4" aria-hidden />} onClick={show}>
         New call
       </Button>
-      <Modal open={open} title="New call" onCancel={() => setOpen(false)} onOk={save} okText="Plan the call" confirmLoading={pending} width={600} destroyOnHidden>
+      <Modal open={open} title="New call" onCancel={() => setOpen(false)} onOk={save} okText="Schedule call" confirmLoading={pending} width={600} destroyOnHidden>
         <div className="space-y-4">
           {/* Who and when, side by side; then what it's for. */}
           <FieldRow>
           <label className="block">
-            <span className="mb-1.5 block text-sm text-ink">Who it&apos;s with</span>
+            <span className="mb-1.5 block text-sm text-ink">Customer</span>
             <Combobox
               className="w-full"
               value={companyId || undefined}
@@ -104,7 +104,7 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm text-ink">When</span>
+            <span className="mb-1.5 block text-sm text-ink">Date and time</span>
             <DateTimeField value={when ? when.format("YYYY-MM-DDTHH:mm") : ""} onChange={(v) => setWhen(v ? dayjs(v) : null)} />
           </label>
           </FieldRow>
@@ -166,7 +166,7 @@ export function CallOutcome({
   return (
     <Modal
       open={open}
-      title="How did it go?"
+      title="Call outcome"
       onCancel={onCancel}
       onOk={() => onSave(outcome.trim(), discussed)}
       okText="Mark done"
@@ -179,7 +179,7 @@ export function CallOutcome({
     >
       <div className="space-y-4 pt-1">
         <label className="block">
-          <span className="mb-1.5 block text-sm text-ink">What came of it</span>
+          <span className="mb-1.5 block text-sm text-ink">Outcome</span>
           <Textarea rows={3} value={outcome} onChange={(e) => setOutcome(e.target.value)} maxLength={5000} placeholder="e.g. Interested; wants samples next week" />
         </label>
         <label className="block">

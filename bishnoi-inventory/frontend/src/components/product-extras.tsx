@@ -37,7 +37,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
           {canEdit && (
             <button
               type="button"
-              title="Remove this picture"
+              title="Remove image"
               onClick={() =>
                 start(async () => {
                   const result = await deleteImage(productId, id);
@@ -48,7 +48,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
               className="absolute top-1 right-1 rounded-md bg-sheet/90 p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
             >
               <Trash2 className="size-4" aria-hidden />
-              <span className="sr-only">Remove this picture</span>
+              <span className="sr-only">Remove image</span>
             </button>
           )}
         </figure>
@@ -57,11 +57,11 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
         <>
           <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => e.target.files?.[0] && add(e.target.files[0])} />
           <Button className="!h-28 !w-28 flex-col" icon={<ImagePlus className="size-5" aria-hidden />} loading={pending} onClick={() => input.current?.click()}>
-            Add picture
+            Add image
           </Button>
         </>
       )}
-      {images.length === 0 && !canEdit && <p className="text-meta text-ink-3">No pictures.</p>}
+      {images.length === 0 && !canEdit && <p className="text-meta text-ink-3">No images.</p>}
     </div>
   );
 }
@@ -81,7 +81,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
     start(async () => {
       const price = fmt.toCentavos(adding.price);
       if (!adding.supplierId || price === null) {
-        setError("Pick a supplier and give their price.");
+        setError("Select a supplier and enter the price.");
         return;
       }
       const result = await setSupplierPrice(product.id, adding.supplierId, { price, supplierSku: adding.sku || null, leadTimeDays: adding.lead ? Number(adding.lead) : null });
@@ -95,7 +95,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
   return (
     <div>
       {product.supplierPrices.length === 0 ? (
-        <p className="py-2 text-meta text-ink-3">No supplier prices yet. They&apos;re set here, or when a purchase order is placed.</p>
+        <p className="py-2 text-meta text-ink-3">No supplier prices. Add one here, or one is recorded when a purchase order is placed.</p>
       ) : (
         <ul className="divide-y divide-rule">
           {product.supplierPrices.map((sp) => (
@@ -139,8 +139,8 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
           {canAddSupplier && (
             <QuickAdd kind="supplier" label="New" onAdded={(a) => { setNewSuppliers((l) => [...l, { id: a.value, name: a.label }]); setAdding((x) => ({ ...x, supplierId: a.value })); }} />
           )}
-          <CellInput aria-label="Their price" placeholder="Price" inputMode="decimal" value={adding.price} onChange={(e) => setAdding({ ...adding, price: e.target.value })} className="w-24" />
-          <CellInput aria-label="Their code" placeholder="Their code" value={adding.sku} onChange={(e) => setAdding({ ...adding, sku: e.target.value })} className="w-28 !text-left" />
+          <CellInput aria-label="Supplier price" placeholder="Price" inputMode="decimal" value={adding.price} onChange={(e) => setAdding({ ...adding, price: e.target.value })} className="w-24" />
+          <CellInput aria-label="Supplier code" placeholder="Supplier code" value={adding.sku} onChange={(e) => setAdding({ ...adding, sku: e.target.value })} className="w-28 !text-left" />
           <CellInput aria-label="Lead time in days" placeholder="Days" inputMode="numeric" value={adding.lead} onChange={(e) => setAdding({ ...adding, lead: e.target.value.replace(/\D/g, "") })} className="w-16" />
           <Button size="sm" loading={pending} onClick={add}>
             Add price

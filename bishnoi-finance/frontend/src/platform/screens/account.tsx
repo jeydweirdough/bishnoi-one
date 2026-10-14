@@ -4,7 +4,7 @@ import { removeMyPhoto, saveMyPhoto } from "../actions/account";
 import { getCompanyMe, load } from "../lib/api";
 import { makeFormat } from "../lib/format";
 
-export const metadata = { title: "Your account" };
+export const metadata = { title: "Account" };
 
 /** What this app's /auth/account says about the person signed in. */
 type Account = {
@@ -35,12 +35,12 @@ export default async function AccountPage() {
 
   return (
     <>
-      <PageHeader title="Your account">Your picture and what you can reach. Your admin sets your name, email, role and team.</PageHeader>
+      <PageHeader title="Account">Your profile photo and access. An administrator sets your name, email, role and team.</PageHeader>
 
       <div className="grid max-w-[64rem] gap-5 lg:grid-cols-2 lg:items-start">
         <div className="space-y-5">
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="profile">Picture</SectionTitle>
+            <SectionTitle icon="profile">Profile photo</SectionTitle>
             <p className="mb-4 text-meta text-ink-3">
               It appears wherever your name does, for the people you work with. Without one, your initials do.
             </p>
@@ -83,30 +83,30 @@ export default async function AccountPage() {
                     null
                   ),
                 ],
-                ...(account ? ([["Reaches", REACH[account.role.scope]]] as [string, string][]) : []),
+                ...(account ? ([["Data access", REACH[account.role.scope]]] as [string, string][]) : []),
                 ...(account
                   ? ([
                       ["Member since", fmt.whenLabel(account.memberSince)],
-                      ["Password set", fmt.whenLabel(account.passwordChangedAt)],
-                      ["Signed in", fmt.whenLabel(account.signedInAt)],
-                      ["Before that", account.previousSignIn ? fmt.whenLabel(account.previousSignIn) : "This is your first sign-in"],
+                      ["Password last changed", fmt.whenLabel(account.passwordChangedAt)],
+                      ["Current sign-in", fmt.whenLabel(account.signedInAt)],
+                      ["Previous sign-in", account.previousSignIn ? fmt.whenLabel(account.previousSignIn) : "None"],
                     ] as [string, string][])
                   : []),
               ]}
             />
-            <p className="mt-4 text-meta text-ink-3">Something wrong here? Ask an admin: they set names, emails, roles and teams.</p>
+            <p className="mt-4 text-meta text-ink-3">To correct these details, contact an administrator.</p>
           </Sheet>
         </div>
 
         {account && (
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="roles">What you can do</SectionTitle>
+            <SectionTitle icon="roles">Permissions</SectionTitle>
             <p className="mb-4 text-meta text-ink-3">
               From your role, {account.role.name}, on {REACH_IN[account.role.scope]}
               {account.role.scope === "team" && team ? ` (${team})` : ""}.
             </p>
             {groups.length === 0 ? (
-              <p className="text-sm text-ink-3">Your role doesn&apos;t allow anything yet. Ask an admin.</p>
+              <p className="text-sm text-ink-3">Your role has no permissions yet. Contact an administrator.</p>
             ) : (
               // One grid for every group, so the actions line up down the page.
               <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5 text-sm">

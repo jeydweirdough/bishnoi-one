@@ -38,7 +38,7 @@ function usePrompts(prompts: Prompt[]) {
           next.delete(p.key);
           return next;
         });
-      } else toast.success(how === "snooze" ? "Back in a week" : "Won't show again", { description: p.title });
+      } else toast.success(how === "snooze" ? "Snoozed for 7 days" : "Dismissed", { description: p.title });
     });
   }
   return { left, aside };
@@ -60,13 +60,13 @@ function PromptRow({ p, aside }: { p: Prompt; aside: (p: Prompt, how: "snooze" |
         trigger={["click"]}
         menu={{
           items: [
-            { key: "snooze", label: "Remind me in a week" },
-            { key: "dismiss", label: "Don't show this again" },
+            { key: "snooze", label: "Snooze for 7 days" },
+            { key: "dismiss", label: "Dismiss" },
           ],
           onClick: ({ key }) => aside(p, key as "snooze" | "dismiss"),
         }}
       >
-        <IconButton tone="soft" className="self-center" label={`Put aside: ${p.title}`}>
+        <IconButton tone="soft" className="self-center" label={`Options: ${p.title}`}>
           <MoreHorizontal className="size-4" aria-hidden />
         </IconButton>
       </Dropdown>
@@ -107,7 +107,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
           <Link href="/attention" className="text-meta font-medium text-ink hover:underline">
             See all
           </Link>
-          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border-[1.5px] border-ink bg-sheet px-2 text-meta font-semibold text-ink" aria-label={left.length === 1 ? "1 thing" : `${left.length} things`}>
+          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border-[1.5px] border-ink bg-sheet px-2 text-meta font-semibold text-ink" aria-label={left.length === 1 ? "1 item" : `${left.length} items`}>
             {left.length}
           </span>
         </span>
@@ -135,7 +135,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
 
       {pages.length > 1 ? (
         <div className="flex items-center justify-center gap-3 px-6 pt-1 pb-4">
-          <IconButton onClick={() => go(Math.max(0, page - 1))} disabled={page === 0} tone="soft" size="sm" label="The ones before">
+          <IconButton onClick={() => go(Math.max(0, page - 1))} disabled={page === 0} tone="soft" size="sm" label="Previous">
             <ChevronLeft className="size-4" aria-hidden />
           </IconButton>
           <span className="flex items-center gap-1.5">
@@ -150,7 +150,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
               />
             ))}
           </span>
-          <IconButton onClick={() => go(Math.min(pages.length - 1, page + 1))} disabled={page === pages.length - 1} tone="soft" size="sm" label="The next ones">
+          <IconButton onClick={() => go(Math.min(pages.length - 1, page + 1))} disabled={page === pages.length - 1} tone="soft" size="sm" label="Next">
             <ChevronRight className="size-4" aria-hidden />
           </IconButton>
         </div>
@@ -166,8 +166,8 @@ export function AttentionList({ prompts }: { prompts: Prompt[] }) {
   const { left, aside } = usePrompts(prompts);
   if (left.length === 0) {
     return (
-      <Empty icon="inbox" title="Nothing needs you right now">
-        Overdue follow-ups, quotes waiting, quiet customers and thin profiles show up here as they come.
+      <Empty icon="inbox" title="No pending items">
+        Overdue follow-ups, quotes waiting, inactive customers and incomplete profiles appear here.
       </Empty>
     );
   }

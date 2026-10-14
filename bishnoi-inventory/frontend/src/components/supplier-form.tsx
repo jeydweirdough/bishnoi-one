@@ -45,23 +45,23 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <SectionTitle icon="suppliers">The supplier</SectionTitle>
+        <SectionTitle icon="suppliers">Supplier details</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-3">
           <Field label="Code" error={fields.code}>{(p) => <Input {...p} {...text("code")} placeholder="ABC" autoFocus={!supplier} />}</Field>
           <Field label="Name" error={fields.name} className="sm:col-span-2">{(p) => <Input {...p} {...text("name")} placeholder="ABC Medical Supply" />}</Field>
-          <Field label="Main contact" optional error={fields.contactPerson}>{(p) => <Input {...p} {...text("contactPerson")} />}</Field>
+          <Field label="Contact person" optional error={fields.contactPerson}>{(p) => <Input {...p} {...text("contactPerson")} />}</Field>
           <Field label="Email" optional error={fields.email}>{(p) => <Input {...p} type="email" {...text("email")} />}</Field>
           <Field label="Phone" optional error={fields.phone}>{(p) => <Input {...p} type="tel" {...text("phone")} />}</Field>
           <Field label="Address" optional error={fields.address} className="sm:col-span-3">{(p) => <Input {...p} {...text("address")} />}</Field>
           <Field label="Payment terms" optional error={fields.paymentTerms} hint="Net 30, COD…">{(p) => <Input {...p} {...text("paymentTerms")} />}</Field>
-          <Field label="Lead time (days)" optional error={fields.leadTimeDays} hint="From order to delivery, as promised.">
+          <Field label="Lead time (days)" optional error={fields.leadTimeDays} hint="Days from order to delivery.">
             {(p) => <Input {...p} inputMode="numeric" value={d.leadTimeDays} onChange={(e) => setD({ ...d, leadTimeDays: e.target.value.replace(/\D/g, "") })} />}
           </Field>
           <Field label="Notes" optional error={fields.notes} className="sm:col-span-3">{(p) => <Textarea {...p} rows={2} {...text("notes")} />}</Field>
         </div>
       </Sheet>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <SectionTitle icon="people">Other people to talk to</SectionTitle>
+        <SectionTitle icon="people">Other contacts</SectionTitle>
         <div className="mt-3 space-y-2">
           {contacts.map((c, i) => {
             const set = (change: Partial<Contact>) => setContacts(contacts.map((x, j) => (j === i ? { ...x, ...change } : x)));
@@ -80,7 +80,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
         </div>
         {Object.entries(fields).filter(([k]) => k.startsWith("contacts")).map(([k, v]) => <p key={k} className="mt-1 text-meta text-danger">{v}</p>)}
         <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => setContacts([...contacts, { name: "", role: null, email: null, phone: null }])}>
-          Add a person
+          Add contact
         </Button>
       </Sheet>
       <FormError message={error} />

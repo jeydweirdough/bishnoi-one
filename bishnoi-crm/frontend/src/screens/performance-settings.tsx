@@ -16,7 +16,7 @@ export function PerformanceTabs({ current }: { current: "measures" | "targets" |
       <ToggleLinks
         current={current}
         options={[
-          { value: "measures", label: "What is measured", href: BASE },
+          { value: "measures", label: "Measures", href: BASE },
           { value: "targets", label: "Targets", href: `${BASE}/targets` },
           { value: "results", label: "Results", href: `${BASE}/results` },
         ]}
@@ -35,11 +35,17 @@ export function SettingsTargets({ searchParams }: { searchParams: Search }) {
   return <KpiTargetsPage searchParams={searchParams} place={inSettings("targets")} />;
 }
 
-/** The menu's pages, for everyone but an administrator, whose are in Settings. */
+/** The old Performance page: an administrator's results are in Settings; everyone
+ *  else's are on their profile now (a lead's team on its "My team" tab). Kept as an
+ *  address so the links to it, and anyone's bookmark, still land in the right place. */
 export async function MenuResults({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
   if (me.isOwner) redirect(`${BASE}/results${await query(searchParams)}`);
-  return <PerformancePage searchParams={searchParams} place={IN_MENU} />;
+  const params = await searchParams;
+  const month = typeof params.month === "string" && /^\d{4}-\d{2}$/.test(params.month) ? params.month : null;
+  const team = me.role?.scope !== "own" && params.who !== "me";
+  const q = new URLSearchParams({ ...(team && { tab: "team" }), ...(month && { month }), ...(team && typeof params.role === "string" && { role: params.role }), ...(team && params.show === "teams" && { show: "teams" }) });
+  redirect(`/account${q.size ? `?${q}` : ""}`);
 }
 
 export async function MenuTargets({ searchParams }: { searchParams: Search }) {

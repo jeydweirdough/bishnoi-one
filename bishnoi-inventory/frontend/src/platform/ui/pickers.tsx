@@ -83,7 +83,7 @@ export function Select({ children, value, defaultValue, onChange, name, id, disa
         onChange={(v: string | undefined) => emit(v === undefined || v === EMPTY ? "" : v)}
         options={options}
         disabled={disabled}
-        placeholder={placeholder ?? "Pick one"}
+        placeholder={placeholder ?? "Select"}
         showSearch={{ optionFilterProp: "label" }}
         status={rest["aria-invalid"] ? "error" : undefined}
         aria-invalid={rest["aria-invalid"]}
@@ -115,7 +115,7 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
       value={(hasEmpty && value === "" ? EMPTY : value) as V}
       onChange={(v, o) => onChange?.((hasEmpty && (v as unknown) === EMPTY ? "" : v) as V, o)}
       showSearch={showSearch ?? { optionFilterProp: "label" }}
-      placeholder={placeholder ?? (single ? "Pick one" : "Pick any")}
+      placeholder={placeholder ?? "Select"}
       popupMatchSelectWidth
       {...rest}
     />
@@ -192,7 +192,7 @@ export function DateInput({ type, value, defaultValue, onChange, name, id, disab
           needConfirm={false}
           disabled={disabled || !day}
           status={status}
-          placeholder={day ? "Time" : "Pick the date first"}
+          placeholder={day ? "Time" : "Select a date first"}
           aria-label="Time"
         />
       </div>

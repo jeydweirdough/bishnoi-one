@@ -81,7 +81,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
         serials: r.serials.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean),
       }));
     const input = { orderId: order?.id ?? null, supplierId: order ? null : supplierId || null, warehouseId, locationId: locationId || null, deliveryRef: deliveryRef.trim() || null, notes: notes.trim() || null, lines };
-    save(() => receiveDelivery(input), (out) => ({ message: `${out.number} received${out.orderStatus === "partial" ? ": part of the order is still to come" : ""}`, go: `/receipts/${out.id}` }));
+    save(() => receiveDelivery(input), (out) => ({ message: `${out.number} received${out.orderStatus === "partial" ? "; the remaining quantity is on backorder" : ""}`, go: `/receipts/${out.id}` }));
   }
 
   return (
@@ -101,7 +101,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
             </WithAdd>
           )}
           <WithAdd can={canAdd.warehouse && !order} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); setLocationId(""); }} />}>
-            <Field label="Into warehouse" error={fields.warehouseId}>
+            <Field label="Warehouse" error={fields.warehouseId}>
               {(p) => (
                 <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLocationId(""); }}>
                   {warehouses.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
@@ -118,7 +118,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
             )}
           </Field>
           </WithAdd>
-          <Field label="Delivery receipt / invoice no." optional error={fields.deliveryRef}>{(p) => <Input {...p} value={deliveryRef} onChange={(e) => setDeliveryRef(e.target.value)} />}</Field>
+          <Field label="Delivery receipt or invoice number" optional error={fields.deliveryRef}>{(p) => <Input {...p} value={deliveryRef} onChange={(e) => setDeliveryRef(e.target.value)} />}</Field>
         </div>
       </Sheet>
 
@@ -128,11 +128,11 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
             <thead>
               <tr className="border-b border-rule text-left text-meta text-ink-3">
                 <th className="py-2 pr-3 font-semibold">Product</th>
-                <th className="w-24 px-2 py-2 text-right font-semibold">Received</th>
+                <th className="w-24 px-2 py-2 text-right font-semibold">Quantity received</th>
                 <th className="w-28 px-2 py-2 text-right font-semibold">Unit cost</th>
-                <th className="px-2 py-2 font-semibold">Batch / lot</th>
-                <th className="px-2 py-2 font-semibold">Made</th>
-                <th className="px-2 py-2 font-semibold">Expires</th>
+                <th className="px-2 py-2 font-semibold">Batch number</th>
+                <th className="px-2 py-2 font-semibold">Manufacture date</th>
+                <th className="px-2 py-2 font-semibold">Expiry date</th>
                 <th className="w-8" />
               </tr>
             </thead>
@@ -144,10 +144,10 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                   <tr key={i}>
                     <td className="py-2 pr-3 align-top">
                       {r.orderLineId ? (
-                        <span className="font-semibold">{p?.name}<span className="block text-meta font-normal text-ink-3">{p?.sku} · {r.outstanding} still owed</span></span>
+                        <span className="font-semibold">{p?.name}<span className="block text-meta font-normal text-ink-3">{p?.sku} · {r.outstanding} outstanding</span></span>
                       ) : (
                         <Select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value })} className="w-full">
-                          <option value="">Pick a product…</option>
+                          <option value="">Select a product…</option>
                           {products.filter((x) => x.status !== "discontinued").map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
                         </Select>
                       )}
@@ -166,10 +166,10 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                       {p?.trackBatches ? <input aria-label={`Line ${i + 1} batch`} value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} w-32 font-mono`} /> : <span className="text-meta text-ink-3">—</span>}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      {p?.trackBatches ? <input type="date" aria-label={`Line ${i + 1} made on`} value={r.manufacturedOn} onChange={(e) => set(i, { manufacturedOn: e.target.value })} className={cell} /> : null}
+                      {p?.trackBatches ? <input type="date" aria-label={`Line ${i + 1} manufacture date`} value={r.manufacturedOn} onChange={(e) => set(i, { manufacturedOn: e.target.value })} className={cell} /> : null}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      {p?.trackExpiry ? <input type="date" aria-label={`Line ${i + 1} expires on`} value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} /> : null}
+                      {p?.trackExpiry ? <input type="date" aria-label={`Line ${i + 1} expiry date`} value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} /> : null}
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
@@ -187,17 +187,17 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
         {!order && (
           <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
             <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>
-              Add a line
+              Add line
             </Button>
-            {canAdd.product && <QuickAdd kind="product" label="New product (not in the list)" context={{ org, units: reference.units.filter((u) => u.isActive) }} onAdded={productAdded} />}
+            {canAdd.product && <QuickAdd kind="product" label="New product" context={{ org, units: reference.units.filter((u) => u.isActive) }} onAdded={productAdded} />}
           </div>
         )}
-        {order && <p className="mt-2 text-meta text-ink-3">Received less than what&apos;s owed? Put what came: the rest stays on backorder.</p>}
+        {order && <p className="mt-2 text-meta text-ink-3">For a partial delivery, enter the quantity received. The remaining quantity stays on backorder.</p>}
       </Sheet>
       <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
       <FormError message={error ?? fields.lines} />
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>Receive into stock</Button>
+        <Button type="submit" variant="primary" loading={pending}>Receive stock</Button>
         <LinkButton href={order ? `/purchase-orders/${order.id}` : "/receipts"} variant="quiet">Cancel</LinkButton>
       </div>
     </form>

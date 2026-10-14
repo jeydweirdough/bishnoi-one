@@ -22,14 +22,14 @@ async function page(kind: "categories" | "brands" | "units", title: string, blur
 }
 
 export const CategoriesPage = () =>
-  page("categories", "Categories", "How the catalog is grouped.", (raw) =>
+  page("categories", "Categories", "Product groupings in the catalog.", (raw) =>
     (raw as CategoryRow[]).map((c) => ({ key: c.id, name: c.name, path: c.path, parentId: c.parentId, isActive: c.isActive, count: c.productCount, childCount: c.childCount })),
   );
 
 export const BrandsPage = () =>
-  page("brands", "Brands", "Who makes what you keep.", (raw) => (raw as BrandRow[]).map((b) => ({ key: b.id, name: b.name, isActive: b.isActive, count: b.productCount })));
+  page("brands", "Brands", "Manufacturers and brands of stocked products.", (raw) => (raw as BrandRow[]).map((b) => ({ key: b.id, name: b.name, isActive: b.isActive, count: b.productCount })));
 
 export const UnitsPage = () =>
-  page("units", "Units of measure", "What a product is counted in.", (raw) =>
+  page("units", "Units of measure", "Units used to count products.", (raw) =>
     (raw as UnitRow[]).map((u) => ({ key: u.code, code: u.code, name: u.name, isActive: u.isActive, count: u.productCount })),
   );

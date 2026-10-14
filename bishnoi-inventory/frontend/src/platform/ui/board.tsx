@@ -234,7 +234,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                     );
                   })}
                 </ul>
-                {list.length === 0 && !target && <p className="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">{col.hint ?? "Nothing here"}</p>}
+                {list.length === 0 && !target && <p className="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">{col.hint ?? "No records"}</p>}
                 {more?.[col.key] && (
                   <Link href={more[col.key].href} className="mt-2 px-1.5 text-meta text-ink-2 hover:text-ink hover:underline">
                     {more[col.key].label}

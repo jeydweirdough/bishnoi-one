@@ -9,7 +9,7 @@ import { context, type Search } from "../lib/page";
 import { given, referenceOf } from "../lib/reference";
 import type { BatchRow, Movement, Page, Reference, SerialRow, StockOverview } from "../lib/types";
 
-const warehouseOptions = (ref: Pick<Reference, "warehouses">) => [{ value: "", label: "Every warehouse" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
+const warehouseOptions = (ref: Pick<Reference, "warehouses">) => [{ value: "", label: "All warehouses" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
 
 export async function StockPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may } = await context();
@@ -27,21 +27,21 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
   return (
     <>
       <PageHeader
-        title="Stock"
+        title="Stock on hand"
         actions={may("counts.create") && <LinkButton href="/counts">Count stock</LinkButton>}
       >
-        How much you have, where. Available is what&apos;s on hand, less damaged stock and what orders hold.
+        Stock on hand by warehouse. Available is on hand less damaged and reserved stock.
       </PageHeader>
-      <Chips label="Stock" current={f.state} options={[chip("", "Everything"), chip("low", "Low"), chip("out", "Out of stock"), chip("over", "Over maximum")]} />
+      <Chips label="Stock" current={f.state} options={[chip("", "All"), chip("low", "Low"), chip("out", "Out of stock"), chip("over", "Over maximum")]} />
       <Filters q={f.q} placeholder="Product, SKU or barcode" keep={{ state: f.state }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
-        <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "Every category" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
+        <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "All categories" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
       </Filters>
       <Sheet>
         {data.items.length === 0 ? (
-          <FirstStep icon="stock" title="No stock yet" body="Stock shows up once it's received into a warehouse." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(f.q || f.warehouse || f.category || f.state)} clear="/stock" may={may} />
+          <FirstStep icon="stock" title="No stock" body="Stock appears once it is received into a warehouse." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(f.q || f.warehouse || f.category || f.state)} clear="/stock" may={may} />
         ) : (
-          <Table head={["Item", "Warehouse", " On hand", " Damaged", " Reserved", " Picking", " Available", " In transit", " Reorder at", "Stock"]} min="64rem">
+          <Table head={["Product", "Warehouse", " On hand", " Damaged", " Reserved", " Allocated", " Available", " In transit", " Reorder level", "Stock status"]} min="64rem">
             {data.items.map((r) => (
               <tr key={`${r.product.id}-${r.warehouse.id}`} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/products/${r.product.id}`} sub={r.product.sku}>{r.product.name}</RowLink></Td>
@@ -71,14 +71,14 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
           </Table>
         )}
       </Sheet>
-      <p className="mt-3 text-meta text-ink-3">Low is judged on a product as a whole, against its reorder point; a row is out when nothing is free in that warehouse.</p>
+      <p className="mt-3 text-meta text-ink-3">Low stock is based on the product&apos;s total available quantity against its reorder level. A row shows out of stock when nothing is available in that warehouse.</p>
     </>
   );
 }
 
 export async function MovementsPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, at } = await context();
-  if (!may("stock.view")) return <NoAccess what="the movement trail" />;
+  if (!may("stock.view")) return <NoAccess what="stock movements" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), product: param(s, "product"), warehouse: param(s, "warehouse"), kind: param(s, "kind"), from: param(s, "from"), to: param(s, "to") };
   const before = param(s, "before");
@@ -97,9 +97,9 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
   return (
     <>
       <PageHeader title="Stock movements">
-        The trail: every change to stock, who made it, and the document behind it. Newest first.
+        All stock changes, with the user and source document. Newest first.
       </PageHeader>
-      <Chips label="Kind" current={f.kind} options={MOVEMENT_FILTERS.map((k) => ({ value: k.key, label: k.label, href: `/movements${query({ ...f, kind: k.key })}` }))} />
+      <Chips label="Movement type" current={f.kind} options={MOVEMENT_FILTERS.map((k) => ({ value: k.key, label: k.label, href: `/movements${query({ ...f, kind: k.key })}` }))} />
       <Filters q={f.q} placeholder="Product, SKU or reference" keep={{ kind: f.kind, product: f.product }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
         <label className="block">
@@ -113,15 +113,15 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
       </Filters>
       {product && (
         <p className="mb-3 text-sm text-ink-2">
-          Only <Link href={`/products/${product.id}`} className="font-semibold text-ink hover:underline">{product.name}</Link>.{" "}
-          <Link href={`/movements${query({ ...f, product: "" })}`} className="text-meta text-ink hover:underline">Show every product</Link>
+          Filtered to <Link href={`/products/${product.id}`} className="font-semibold text-ink hover:underline">{product.name}</Link>.{" "}
+          <Link href={`/movements${query({ ...f, product: "" })}`} className="text-meta text-ink hover:underline">Show all products</Link>
         </p>
       )}
       <Sheet>
         {page.items.length === 0 ? (
-          <Empty icon="history" title={before ? "Nothing older" : "No movements match"} />
+          <Empty icon="history" title={before ? "No older records" : "No matching movements"} />
         ) : (
-          <Table head={["When", "Item", "Action", "Warehouse", "Reference", "By", " Quantity", " On hand after"]} min="60rem">
+          <Table head={["Date and time", "Product", "Movement type", "Warehouse", "Reference", "User", " Quantity", " Balance after"]} min="60rem">
             {page.items.map((m) => {
               const href = referenceHref(m.referenceType, m.referenceId);
               return (
@@ -175,26 +175,26 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
   return (
     <>
       <PageHeader
-        title="Batches & expiry"
+        title="Batches and expiry"
         actions={may("adjustments.create") && <LinkButton href="/adjustments/new?reason=expired">Write off expired stock</LinkButton>}
       >
-        Every lot on hand, soonest to expire first: the order stock goes out in (first expired, first out).
+        All batches on hand, sorted by expiry date in issue order (first-expired, first-out).
       </PageHeader>
-      <Chips label="Expiry" current={f.expiry} options={[chip("", "Everything"), chip("expired", "Expired"), chip("expiring", "Expiring soon"), chip("ok", "Good")]} />
+      <Chips label="Expiry" current={f.expiry} options={[chip("", "All"), chip("expired", "Expired"), chip("expiring", "Expiring soon"), chip("ok", "Not expiring")]} />
       <Filters q={f.q} placeholder="Batch number or product" keep={{ expiry: f.expiry }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
-        <FilterSelect name="empty" label="Show" value={f.empty} options={[{ value: "", label: "Batches with stock" }, { value: "true", label: "Used-up batches too" }]} />
+        <FilterSelect name="empty" label="Show" value={f.empty} options={[{ value: "", label: "Batches with stock" }, { value: "true", label: "Include depleted batches" }]} />
       </Filters>
       <Sheet>
         {batches.length === 0 ? (
-          <Empty icon="calendar" title="No batches match">Batches are recorded as stock of batch-tracked products is received.</Empty>
+          <Empty icon="calendar" title="No matching batches">Batches are recorded when batch-tracked products are received.</Empty>
         ) : (
-          <Table head={["Batch", "Item", "Expires", " Days left", "Where", " On hand", " Value"]} min="52rem">
+          <Table head={["Batch", "Product", "Expiry date", " Days left", "Warehouse", " On hand", " Value"]} min="52rem">
             {batches.map((b) => (
               <tr key={b.id} className="relative hover:bg-bench/40">
                 <Td><span className="font-mono font-semibold">{b.batchNo}</span>{b.manufacturedOn && <span className="block text-meta text-ink-3">Made {day(b.manufacturedOn)}</span>}</Td>
                 <Td><RowLink href={`/products/${b.product.id}`} sub={b.product.sku}>{b.product.name}</RowLink></Td>
-                <Td>{b.expiresOn ? <ExpiryMark expiry={b.expiry} label={day(b.expiresOn)} /> : <span className="text-ink-3">Doesn&apos;t expire</span>}</Td>
+                <Td>{b.expiresOn ? <ExpiryMark expiry={b.expiry} label={day(b.expiresOn)} /> : <span className="text-ink-3">No expiry</span>}</Td>
                 <Td num className={b.daysLeft != null && b.daysLeft < 0 ? "font-semibold text-eosin" : "text-ink-2"}>{b.daysLeft == null ? "—" : fmt.count(b.daysLeft)}</Td>
                 <Td className="text-meta text-ink-2">{b.warehouses.map((w) => `${w.code} ${fmt.count(w.onHand)}`).join(" · ") || "—"}</Td>
                 <Td num className="font-semibold">{fmt.count(b.onHand)}{b.damaged > 0 && <span className="block text-meta font-normal text-ink-3">{fmt.count(b.damaged)} damaged</span>}</Td>
@@ -217,12 +217,12 @@ export async function SerialsPage({ searchParams }: { searchParams: Search }) {
   const units = q ? (await loadQuery<{ serials: SerialRow[] }>(`query Serials($q: String!) { serials(q: $q) }`, { q }, ["serials"])).serials : [];
   return (
     <>
-      <PageHeader title="Serial numbers">Find a serial-numbered unit: where it is now, and everywhere it has been.</PageHeader>
-      <Filters q={q} placeholder="Serial number, or part of one" />
+      <PageHeader title="Serial numbers">Look up a serialized unit&apos;s current location and movement history.</PageHeader>
+      <Filters q={q} placeholder="Full or partial serial number" />
       {!q ? (
-        <Sheet><Empty icon="stock" title="Type a serial number to find it" /></Sheet>
+        <Sheet><Empty icon="stock" title="Enter a serial number to search" /></Sheet>
       ) : units.length === 0 ? (
-        <Sheet><Empty icon="stock" title="No unit has that serial number" /></Sheet>
+        <Sheet><Empty icon="stock" title="No matching serial number" /></Sheet>
       ) : (
         <div className="space-y-4">
           {units.map((u) => (

@@ -65,7 +65,7 @@ export function ProgressRing({
           strokeWidth="3"
           strokeLinecap="butt"
         >
-          <title>Where it should be by today</title>
+          <title>Expected by today</title>
         </line>
       )}
       <text x="50" y="50" textAnchor="middle" dominantBaseline="central" className={`fill-ink font-semibold ${size === "xs" ? "text-[1.6rem]" : size === "sm" ? "text-[1.15rem]" : "text-[1.3rem]"}`}>

@@ -139,7 +139,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
   return (
     <Modal
       open={open}
-      title={own ? "Send it from your own email" : "New email"}
+      title={own ? "Send from your own email" : "New email"}
       onCancel={() => {
         setOwn(null);
         onClose();
@@ -204,7 +204,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
               onFocus={() => !customer && customers.length === 0 && searchCustomers("")}
               showSearch={{ filterOption: false, onSearch: searchCustomers }}
               notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">No customer by that name. You can still type an email address in To below.</p>}
-              placeholder="Who it's about: it's kept on their page"
+              placeholder="Related customer (saved to their record)"
             />
           </label>
           <label className="block">
@@ -233,7 +233,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
               className="w-full"
               value={template || OWN}
               onChange={(v) => setTemplate(v === OWN ? "" : v)}
-              options={[{ value: OWN, label: "No template: write my own" }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+              options={[{ value: OWN, label: "No template" }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
             />
             {templates.length > 0 && <span className="mt-1 block text-meta text-ink-3">A template is sent as it&apos;s written; you can add a personal note to it.</span>}
           </label>
@@ -268,7 +268,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
             <p className="text-sm text-ink-2">
               It didn&apos;t go through your mailbox.{" "}
               <button type="button" onClick={ownApp} className="font-semibold text-ink underline">
-                Send it from your own email instead
+                Send from your own email instead
               </button>
             </p>
           )}

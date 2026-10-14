@@ -53,7 +53,7 @@ function DepartmentRow({ team, company, onSaved }: { team: Team; company: Retent
       </div>
       <div className="mt-4">
         <Button variant="primary" onClick={() => save({ atRiskDays: atRisk, lostDays: lost }, "Saved")} loading={pending} disabled={!dirty}>
-          {team.own ? "Save" : "Give it its own"}
+          {team.own ? "Save" : "Override for this team"}
         </Button>
       </div>
     </Sheet>

@@ -141,7 +141,7 @@ export function ListEditor({
     setErrors(found);
     if (Object.keys(found).length) return;
     if (required && !rows.some((r) => r.isActive)) {
-      return setError(`Leave at least one ${label.toLowerCase().replace(/s$/, "")} switched on: records can't be made without one.`);
+      return setError(`Leave at least one ${label.toLowerCase().replace(/s$/, "")} active: records can't be created without one.`);
     }
     start(async () => {
       const result = await onSave(rows.map((r) => ({ code: r.code, name: r.name.trim(), icon: r.icon, isActive: r.isActive })));
@@ -163,7 +163,7 @@ export function ListEditor({
         {hint} {note}
       </p>
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-ink-2">Nothing here yet. Add the first choice below.</p>
+        <p className="mt-4 text-sm text-ink-2">No options yet. Add the first option below.</p>
       ) : (
         <ol className="mt-3 divide-y divide-rule border-y border-rule">
           {rows.map((row, i) => {

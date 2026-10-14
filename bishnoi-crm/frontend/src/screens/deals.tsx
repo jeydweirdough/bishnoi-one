@@ -370,7 +370,7 @@ async function Table({
       <Filters
         search="Deal or customer"
         selects={[
-          { name: "stage", label: "Stage", options: [{ value: "", label: "Every stage" }, ...shownStages.map((s) => ({ value: s.code, label: s.name }))] },
+          { name: "stage", label: "Stage", options: [{ value: "", label: "All stages" }, ...shownStages.map((s) => ({ value: s.code, label: s.name }))] },
           { name: "priority", label: "Priority", options: [{ value: "", label: "Any priority" }, ...PRIORITIES.map((p) => ({ value: p.value ?? "none", label: p.label }))] },
           ...(state === "open"
             ? [
@@ -476,7 +476,7 @@ async function Table({
 }
 
 function Person({ who }: { who: { id: string; name: string } | null }) {
-  if (!who) return <span className="text-meta text-ink-3">No one</span>;
+  if (!who) return <span className="text-meta text-ink-3">Unassigned</span>;
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2">
       <Avatar name={who.name} id={who.id} size="sm" />
@@ -518,7 +518,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
           are left out.
         </p>
         {t.deals === 0 ? (
-          <Empty icon="trend" title="Nothing expected to close">
+          <Empty icon="trend" title="No deals expected to close">
             Deals with an expected close date in {forecast.label} show up here.
           </Empty>
         ) : (
@@ -705,7 +705,7 @@ async function Overview({
           )}
           {r.lostReasons.length > 0 && (
             <Sheet className="px-5 py-4 lg:col-span-2">
-              <SectionTitle>Why deals were lost</SectionTitle>
+              <SectionTitle>Loss reasons</SectionTitle>
               <Ranked fmt={fmt} empty="" rows={r.lostReasons.map((x) => ({ key: x.reason, name: x.reason, value: x.lostCentavos, note: fmt.plural(x.count, "deal") }))} />
             </Sheet>
           )}
@@ -723,7 +723,7 @@ function FiguresTable({ fmt, rows }: { fmt: Format; rows: { key: string; name: s
           <th className="px-5 py-2 font-medium">Name</th>
           <th className="px-3 py-2 text-right font-medium">Target</th>
           <th className="px-3 py-2 text-right font-medium">Won</th>
-          <th className="px-3 py-2 text-right font-medium">Of target</th>
+          <th className="px-3 py-2 text-right font-medium">Attainment</th>
           <th className="px-3 py-2 text-right font-medium">Win rate</th>
           <th className="px-5 py-2 text-right font-medium">Quoted</th>
         </tr>

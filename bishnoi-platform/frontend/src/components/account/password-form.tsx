@@ -17,9 +17,9 @@ export function PasswordForm() {
 
   function save() {
     const found: Record<string, string> = {};
-    if (!v.current) found.currentPassword = "Type the password you use now.";
+    if (!v.current) found.currentPassword = "Enter your current password.";
     if (v.next.length < 8) found.newPassword = "Use at least 8 characters.";
-    else if (v.next === v.current) found.newPassword = "That's the one you have. Pick a new one.";
+    else if (v.next === v.current) found.newPassword = "The new password must be different from the current one.";
     if (!found.newPassword && v.repeat !== v.next) found.repeat = "This doesn't match the new password.";
     if (Object.keys(found).length) {
       setError(null);
@@ -35,7 +35,7 @@ export function PasswordForm() {
       setError(null);
       setFields({});
       setV({ current: "", next: "", repeat: "" });
-      toast.success("Password changed", { description: "Your other sign-ins have ended. This one carries on." });
+      toast.success("Password changed", { description: "Your other sessions have been signed out." });
     });
   }
 
@@ -48,14 +48,14 @@ export function PasswordForm() {
       }}
       className="mt-2 grid gap-5"
     >
-      <p className="text-meta text-ink-3">Changing it ends your other sign-ins, on any other computer or browser. This one carries on.</p>
+      <p className="text-meta text-ink-3">Changing it signs out your sessions on other computers and browsers. This session stays signed in.</p>
       <Field label="Current password" error={fields.currentPassword}>
         {(p) => <PasswordInput {...p} autoComplete="current-password" value={v.current} onChange={set("current")} />}
       </Field>
       <Field label="New password" error={fields.newPassword} hint="At least 8 characters.">
         {(p) => <PasswordInput {...p} autoComplete="new-password" value={v.next} onChange={set("next")} />}
       </Field>
-      <Field label="New password again" error={fields.repeat}>
+      <Field label="Confirm new password" error={fields.repeat}>
         {(p) => <PasswordInput {...p} autoComplete="new-password" value={v.repeat} onChange={set("repeat")} />}
       </Field>
       <div>

@@ -109,10 +109,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             name: "active",
             label: "Showing",
             options: [
-              { value: "", label: "Every product" },
+              { value: "", label: "All products" },
               { value: "true", label: "On sale" },
-              { value: "false", label: "Switched off" },
-              { value: "missing", label: "Missing a price" },
+              { value: "false", label: "Inactive" },
+              { value: "missing", label: "Price missing" },
             ],
           },
         ]}

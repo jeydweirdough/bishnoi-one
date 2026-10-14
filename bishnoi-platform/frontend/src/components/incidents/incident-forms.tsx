@@ -26,10 +26,10 @@ function CompanyTicks({ options, value, onChange, appName, error }: { options: O
   return (
     <fieldset className="min-w-0">
       <legend className="mb-1 text-meta font-medium text-ink-2">
-        Companies it reaches <span className="font-normal text-ink-3">(optional)</span>
+        Affected companies <span className="font-normal text-ink-3">(optional)</span>
       </legend>
       <p className="mb-2 text-meta text-ink-3">
-        {value.length === 0 ? `None ticked: it reaches ${appName ? `everyone on ${appName}` : "everyone on the platform"}.` : `${value.length} ticked.`}
+        {value.length === 0 ? `None selected: affects ${appName ? `all users of ${appName}` : "all users on the platform"}.` : `${value.length} selected.`}
       </p>
       {options.length > 8 && (
         <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a company" aria-label="Find a company" className="mb-2" />
@@ -127,16 +127,16 @@ function IncidentForm({ options, incident, onDone }: { options: Options; inciden
       }}
       className="space-y-5"
     >
-      <Field label="What's wrong" hint="Said plainly, as the people it reaches would put it." error={fieldError(fields, "title")}>
+      <Field label="Title" hint="A short description in plain language, as affected users would describe it." error={fieldError(fields, "title")}>
         {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Orders can't be saved in the CRM" autoFocus />}
       </Field>
-      <Choice name="incident-kind" legend="Kind" value={kind} onChange={setKind} options={KINDS} />
-      <Choice name="incident-severity" legend="How bad" value={severity} onChange={setSeverity} options={SEVERITIES} />
+      <Choice name="incident-kind" legend="Type" value={kind} onChange={setKind} options={KINDS} />
+      <Choice name="incident-severity" legend="Severity" value={severity} onChange={setSeverity} options={SEVERITIES} />
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Application" optional error={fieldError(fields, "applicationId")}>
           {(p) => (
             <Select {...p} value={applicationId} onChange={(e) => setApplicationId(e.target.value)}>
-              <option value="">The whole platform</option>
+              <option value="">Entire platform</option>
               {apps.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -145,10 +145,10 @@ function IncidentForm({ options, incident, onDone }: { options: Options; inciden
             </Select>
           )}
         </Field>
-        <Field label="Lead" optional hint="Who is running it." error={fieldError(fields, "leadId")}>
+        <Field label="Lead" optional hint="The person managing the incident." error={fieldError(fields, "leadId")}>
           {(p) => (
             <Select {...p} value={leadId} onChange={(e) => setLeadId(e.target.value)}>
-              <option value="">Nobody yet</option>
+              <option value="">Not assigned</option>
               {options.staff.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -159,23 +159,23 @@ function IncidentForm({ options, incident, onDone }: { options: Options; inciden
         </Field>
       </div>
       <CompanyTicks options={options.companies} value={companyIds} onChange={setCompanyIds} appName={appName} error={fieldError(fields, "companyIds")} />
-      <Field label="Summary" optional hint="What's known, for staff." error={fieldError(fields, "summary")}>
+      <Field label="Summary" optional hint="Known details, for staff only." error={fieldError(fields, "summary")}>
         {(p) => <Textarea {...p} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />}
       </Field>
       {!incident && (
-        <Field label="First update" optional hint="What the people it reaches are told. Left empty, the summary is used, or “We're looking into it.”" error={fieldError(fields, "update")}>
+        <Field label="First update" optional hint="The message shown to affected users. If blank, the summary is used, or “We're looking into it.”" error={fieldError(fields, "update")}>
           {(p) => <Textarea {...p} rows={3} value={update} onChange={(e) => setUpdate(e.target.value)} />}
         </Field>
       )}
       <FormError message={error} />
-      <PanelActions pending={pending} save={incident ? "Save changes" : "Declare it"} onCancel={onDone} />
+      <PanelActions pending={pending} save={incident ? "Save changes" : "Declare incident"} onCancel={onDone} />
     </form>
   );
 }
 
 export function DeclareIncident({ options }: { options: Options }) {
   return (
-    <PanelButton label="Declare an incident" title="Declare an incident" variant="primary" icon={<Siren className="size-4" aria-hidden />} wide>
+    <PanelButton label="Declare incident" title="Declare an incident" variant="primary" icon={<Siren className="size-4" aria-hidden />} wide>
       {(close) => <IncidentForm options={options} onDone={close} />}
     </PanelButton>
   );
@@ -183,7 +183,7 @@ export function DeclareIncident({ options }: { options: Options }) {
 
 export function EditIncident({ incident, options }: { incident: Incident; options: Options }) {
   return (
-    <PanelButton tool label={`Edit ${incident.number}`} title={`${incident.number}: what it says`} icon={<Pencil className="size-4" aria-hidden />} wide>
+    <PanelButton tool label={`Edit ${incident.number}`} title={`Edit ${incident.number}`} icon={<Pencil className="size-4" aria-hidden />} wide>
       {(close) => <IncidentForm options={options} incident={incident} onDone={close} />}
     </PanelButton>
   );
@@ -218,25 +218,25 @@ function UpdateForm({ incident, onDone }: { incident: Incident; onDone: () => vo
       className="space-y-5"
     >
       <div>
-        <Choice name="update-status" legend="Where it is now" value={status} onChange={setStatus} options={STATUSES} />
+        <Choice name="update-status" legend="Status" value={status} onChange={setStatus} options={STATUSES} />
         <p className="mt-1.5 text-meta text-ink-3">
           {INCIDENT_STATUSES[status].what}
           {status === "resolved" && incident.status !== "resolved" && " Resolving it stamps when it ended."}
           {reopening && " This reopens it."}
         </p>
       </div>
-      <Field label="What to tell people" hint="Posted on the incident's timeline, as the latest word on it." error={fieldError(fields, "body")}>
+      <Field label="Update message" hint="Posted on the incident's timeline as the latest update." error={fieldError(fields, "body")}>
         {(p) => <Textarea {...p} rows={4} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />}
       </Field>
       <FormError message={error} />
-      <PanelActions pending={pending} save="Post the update" onCancel={onDone} />
+      <PanelActions pending={pending} save="Post update" onCancel={onDone} />
     </form>
   );
 }
 
 export function PostUpdate({ incident }: { incident: Incident }) {
   return (
-    <PanelButton label="Post an update" title={`Post an update on ${incident.number}`} variant="primary" icon={<Megaphone className="size-4" aria-hidden />}>
+    <PanelButton label="Post update" title={`Post an update on ${incident.number}`} variant="primary" icon={<Megaphone className="size-4" aria-hidden />}>
       {(close) => <UpdateForm incident={incident} onDone={close} />}
     </PanelButton>
   );

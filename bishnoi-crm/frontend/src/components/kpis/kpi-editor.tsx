@@ -57,7 +57,7 @@ export function KpiEditor({ catalogue, products }: { catalogue: KpiCatalogue; pr
                     <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
                       <span className={`font-semibold ${k.isActive ? "text-ink" : "text-ink-3 line-through"}`}>{k.name}</span>
                       {k.builtIn && <span className="text-meta text-ink-3">Built in</span>}
-                      {!k.isActive && <span className="text-meta text-ink-3">Switched off</span>}
+                      {!k.isActive && <span className="text-meta text-ink-3">Inactive</span>}
                     </p>
                     <p className="text-meta text-ink-2">
                       {k.measureLabel}
@@ -152,10 +152,10 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
         <Field label="Name" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="e.g. Calls made" />}
         </Field>
-        <Field label="What it means" optional error={fields.description}>
+        <Field label="Description" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} placeholder="Shown next to it" />}
         </Field>
-        <Field label="What it measures" error={fields.measure} hint={fixed ? "A built-in measure keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
+        <Field label="Measure" error={fields.measure} hint={fixed ? "A built-in measure keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
           {(p) => (
             <Select
               {...p}
@@ -213,12 +213,12 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
       <div className="grid gap-4 sm:grid-cols-[auto_12rem_12rem]">
         <Choice<"higher" | "lower">
           name={`better-${kpi?.id ?? "new"}`}
-          legend="Better when it's"
+          legend="Target direction"
           value={better}
           onChange={setBetter}
           options={[
-            { value: "higher", label: "Higher" },
-            { value: "lower", label: "Lower" },
+            { value: "higher", label: "Higher is better" },
+            { value: "lower", label: "Lower is better" },
           ]}
         />
         <Field label="On target from (% of target)" error={fields.greenAt}>
@@ -243,7 +243,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
       {kpi && (
         <label className="inline-flex items-center gap-1.5 text-sm">
           <input type="checkbox" className="accent-hema" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          In use (switched off, it&apos;s kept but not shown or targeted)
+          Active (when inactive, it is kept but not shown or targeted)
         </label>
       )}
       <FormError message={error} />

@@ -4,7 +4,8 @@
 // marker in the corner saying so.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
-import { getFrame } from "@/src/platform/lib/api";
+import { getFrame, load } from "@/src/platform/lib/api";
+import type { Prompt } from "@/src/actions/attention";
 import { FieldTracker } from "@/src/components/field/tracker";
 import { CanProvider } from "@/src/components/quick-add/can";
 import { isFieldAgent } from "@/src/components/field/words";
@@ -16,8 +17,10 @@ export default async function Layout({ children }: { children: ReactNode }) {
   // one request, shared with the page below (lib/api.ts getFrame).
   const { me, unset: counts } = await getFrame();
   const unset = counts ?? undefined;
+  // The bell's notifications are the attention prompts; not awaited, so no page waits for them.
+  const notifications = load<Prompt[]>("/attention").catch(() => [] as Prompt[]);
   return (
-    <ShellLayout unset={unset}>
+    <ShellLayout unset={unset} notifications={notifications} allHref="/attention">
       <TermsProvider terms={termsOf(me)}>
         <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
       </TermsProvider>

@@ -5,6 +5,7 @@ import { Segmented } from "antd";
 import { PenSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
+import { Pager } from "@/src/platform/ui/pager";
 import { Button } from "@/src/platform/ui/button";
 import { Sheet, Empty } from "@/src/platform/ui/sheet";
 import type { ActivityItem } from "@/src/platform/lib/types";
@@ -22,6 +23,9 @@ function parts(a: ActivityItem) {
  * Email: write to customers from the CRM, through the provider of the mailbox
  * you pick (Zoho Mail, Gmail, Outlook, SMTP), and see what's been sent.
  */
+/** How many sent emails a page holds: what the API sends at a time (actions/mailbox.ts). */
+const SENT_PAGE = 50;
+
 export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; initial: { items: ActivityItem[]; total: number }; teamWide: boolean; when: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const [who, setWho] = useState<"me" | "all">("me");
@@ -29,9 +33,18 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
   const [list, setList] = useState(initial);
   const [shown, setShown] = useState<string | null>(null);
   const [, start] = useTransition();
+  // Sent emails come 50 at a time from the API; a new search or a new "whose" starts at the first page.
+  const [page, setPage] = useState(1);
+  const turn = (n: number) => start(async () => {
+    setList(await sentEmails(who, q, (n - 1) * SENT_PAGE));
+    setPage(n);
+  });
 
   useEffect(() => {
-    const t = setTimeout(() => start(async () => setList(await sentEmails(who, q, 0))), q ? 300 : 0);
+    const t = setTimeout(() => start(async () => {
+      setList(await sentEmails(who, q, 0));
+      setPage(1);
+    }), q ? 300 : 0);
     return () => clearTimeout(t);
   }, [who, q, open]);
 
@@ -47,7 +60,7 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
             onChange={setWho}
             options={[
               { value: "me", label: "Mine" },
-              { value: "all", label: "Everyone's" },
+              { value: "all", label: "All" },
             ]}
           />
         )}
@@ -78,7 +91,7 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
           ) : (
             <Empty
               icon="email"
-              title="Nothing sent yet"
+              title="No emails sent"
               actions={
                 <Button variant="primary" icon={<PenSquare className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
                   Write the first email
@@ -125,8 +138,8 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
             })}
           </ul>
         )}
-        {list.total > list.items.length && <p className="border-t border-rule px-5 py-2.5 text-meta text-ink-3">The latest {list.items.length} of {list.total}. Search to find older ones.</p>}
       </Sheet>
+      <Pager total={list.total} page={page} size={SENT_PAGE} onPage={turn} />
       <Composer open={open} onClose={() => setOpen(false)} />
     </>
   );

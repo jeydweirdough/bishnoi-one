@@ -64,7 +64,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
         search="Search by name, email or customer"
         selects={
           me.role?.scope !== "own"
-            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "Everyone you can see" }, { value: "me", label: "Mine" }] }]
+            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Mine" }] }]
             : []
         }
       />

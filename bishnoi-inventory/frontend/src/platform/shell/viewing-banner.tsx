@@ -20,7 +20,7 @@ export function ViewingBanner({ who, company }: { who: string; company: string }
         <Eye className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0">
           You&apos;re seeing Bishnoi One as <b className="font-semibold">{who}</b> in {company}.
-          <span className="text-sheet/70"> Looking only — nothing here can be changed.</span>
+          <span className="text-sheet/70"> Read-only view. Changes are disabled.</span>
         </span>
       </p>
       <button

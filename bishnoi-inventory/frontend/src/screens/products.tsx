@@ -59,22 +59,22 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           )
         }
       >
-        The catalog: every item you keep, what it costs and sells for, and when to order more.
+        Product catalog with costs, selling prices and reorder levels.
       </PageHeader>
       <Filters q={f.q} placeholder="Name, SKU or barcode">
-        <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "Every category" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
-        <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "Every brand" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />
-        <FilterSelect name="supplier" label="Supplier" value={f.supplier} options={[{ value: "", label: "Every supplier" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
+        <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "All categories" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
+        <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "All brands" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />
+        <FilterSelect name="supplier" label="Supplier" value={f.supplier} options={[{ value: "", label: "All suppliers" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
         <FilterSelect name="stock" label="Stock" value={f.stock} options={[{ value: "", label: "Any" }, { value: "low", label: "Low" }, { value: "out", label: "Out of stock" }, { value: "over", label: "Over maximum" }]} />
         {/* The same list as the sidebar's red count on Products. */}
-        <FilterSelect name="missing" label="Prices" value={f.missing} options={[{ value: "", label: "Any" }, { value: "true", label: "Missing a price" }]} />
+        <FilterSelect name="missing" label="Prices" value={f.missing} options={[{ value: "", label: "Any" }, { value: "true", label: "Missing price" }]} />
         <FilterSelect name="status" label="Status" value={f.status} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "discontinued", label: "Discontinued" }, { value: "all", label: "All" }]} />
       </Filters>
       <Sheet>
         {products.length === 0 ? (
-          <FirstStep icon="products" title="No products yet" body="Add the items you keep, with their SKU, unit and reorder point." href="/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.status !== "active")} clear="/products" may={may} />
+          <FirstStep icon="products" title="No products" body="Add stocked items with their SKU, unit and reorder level." href="/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.status !== "active")} clear="/products" may={may} />
         ) : (
-          <Table head={["Product", " On hand", " Available", " Reorder at", " Cost", " Selling", "Stock"]} min="52rem">
+          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock"]} min="52rem">
             {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}
           </Table>
         )}

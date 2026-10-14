@@ -59,7 +59,7 @@ export function QuantityInput({
       return onChange(String(Math.max(0, max)));
     }
     if (min !== undefined && n < min) {
-      warn(`Only ${Math.abs(min).toLocaleString()}${unit ? ` ${unit}` : ""} on hand to take; set to ${min.toLocaleString()}`);
+      warn(`Only ${Math.abs(min).toLocaleString()}${unit ? ` ${unit}` : ""} on hand; set to ${min.toLocaleString()}`);
       return onChange(String(min));
     }
     onChange(clean);

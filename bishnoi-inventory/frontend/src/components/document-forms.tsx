@@ -52,7 +52,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
 
   function submit() {
     const input = { supplierId, warehouseId, expectedOn: expectedOn || null, notes: notes.trim() || null, lines: linesOut(lines, fmt, "unitCost") };
-    save(() => savePurchaseOrder(order?.id ?? null, input), (out) => ({ message: order ? "Purchase order saved" : "Purchase order drafted", go: `/purchase-orders/${order?.id ?? out.id}` }));
+    save(() => savePurchaseOrder(order?.id ?? null, input), (out) => ({ message: order ? "Purchase order saved" : "Purchase order saved as draft", go: `/purchase-orders/${order?.id ?? out.id}` }));
   }
 
   return (
@@ -63,7 +63,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
             <Field label="Supplier" error={fields.supplierId}>
               {(p) => (
                 <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                  <option value="">Pick a supplier…</option>
+                  <option value="">Select a supplier…</option>
                   {options(supplierOptions)}
                 </Select>
               )}
@@ -78,7 +78,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
               )}
             </Field>
           </WithAdd>
-          <Field label="Expected on" optional error={fields.expectedOn}>
+          <Field label="Expected delivery date" optional error={fields.expectedOn}>
             {(p) => <Input {...p} type="date" value={expectedOn} onChange={(e) => setExpectedOn(e.target.value)} />}
           </Field>
         </div>
@@ -92,7 +92,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
         <Button type="submit" variant="primary" loading={pending}>{order ? "Save draft" : "Save as draft"}</Button>
         <LinkButton href={order ? `/purchase-orders/${order.id}` : "/purchase-orders"} variant="quiet">Cancel</LinkButton>
       </div>
-      <p className="text-meta text-ink-3">A draft is placed with the supplier by someone who may approve purchase orders. Until then it can still change.</p>
+      <p className="text-meta text-ink-3">A draft can be edited until an approver places the order with the supplier.</p>
     </form>
   );
 }
@@ -122,7 +122,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
 
   function submit() {
     const input = { kind, recipient: recipient.trim(), warehouseId, neededOn: neededOn || null, notes: notes.trim() || null, lines: linesOut(lines, fmt, "unitPrice") };
-    save(() => saveOrder(order?.id ?? null, input), (out) => ({ message: order ? `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} saved` : `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} written up`, go: `/orders/${order?.id ?? out.id}` }));
+    save(() => saveOrder(order?.id ?? null, input), (out) => ({ message: order ? `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} saved` : `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} created`, go: `/orders/${order?.id ?? out.id}` }));
   }
 
   return (
@@ -141,7 +141,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
               )}
             </Field>
           </WithAdd>
-          <Field label="Needed by" optional error={fields.neededOn}>{(p) => <Input {...p} type="date" value={neededOn} onChange={(e) => setNeededOn(e.target.value)} />}</Field>
+          <Field label="Required date" optional error={fields.neededOn}>{(p) => <Input {...p} type="date" value={neededOn} onChange={(e) => setNeededOn(e.target.value)} />}</Field>
         </div>
       </Sheet>
       <Sheet className="px-5 pt-4 pb-4 sm:px-6">
@@ -163,7 +163,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
         <Button type="submit" variant="primary" loading={pending}>{order ? "Save" : "Save as draft"}</Button>
         <LinkButton href={order ? `/orders/${order.id}` : "/orders"} variant="quiet">Cancel</LinkButton>
       </div>
-      <p className="text-meta text-ink-3">Confirming the order reserves its stock, so nothing else can take it. Then it&apos;s picked and issued.</p>
+      <p className="text-meta text-ink-3">Confirming the order reserves its stock. The order is then picked and issued.</p>
     </form>
   );
 }
@@ -180,18 +180,18 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
 
   function submit(request: boolean) {
     const input = { fromWarehouseId: from, toWarehouseId: to, notes: notes.trim() || null, lines: linesOut(lines, fmt), request };
-    save(() => saveTransfer(transfer?.id ?? null, input), (out) => ({ message: transfer ? "Transfer saved" : request ? "Transfer requested" : "Transfer drafted", go: `/transfers/${transfer?.id ?? out.id}` }));
+    save(() => saveTransfer(transfer?.id ?? null, input), (out) => ({ message: transfer ? "Transfer saved" : request ? "Transfer requested" : "Transfer saved as draft", go: `/transfers/${transfer?.id ?? out.id}` }));
   }
 
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(!transfer); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="From" error={fields.fromWarehouseId}>
+          <Field label="Source warehouse" error={fields.fromWarehouseId}>
             {(p) => <Select {...p} value={from} onChange={(e) => { const next = e.target.value; setFrom(next); /* From and To can't be one warehouse: To moves to the next one. */ if (next === to) setTo(warehouses.find((w) => w.value !== next)?.value ?? ""); }}>{options(warehouses)}</Select>}
           </Field>
           <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setTo(a.value); }} />}>
-            <Field label="To" error={fields.toWarehouseId}>
+            <Field label="Destination warehouse" error={fields.toWarehouseId}>
               {(p) => <Select {...p} value={to} onChange={(e) => setTo(e.target.value)}>{warehouses.map((w) => <option key={w.value} value={w.value} disabled={w.value === from}>{w.label}</option>)}</Select>}
             </Field>
           </WithAdd>

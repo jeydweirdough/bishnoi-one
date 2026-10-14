@@ -8,7 +8,7 @@ import { NoAccess } from "../components/ui";
 import { context } from "../lib/page";
 import type { MapWarehouse, TransferRoute } from "../lib/types";
 
-export const metadata = { title: "Transfers on the map" };
+export const metadata = { title: "Transfer map" };
 
 /** A stretch of time, short: "3 d 4 h", "2 h 5 m", "12 m". */
 function span(ms: number): string {
@@ -31,11 +31,11 @@ export default async function TransfersMapPage() {
   const shown: Shown[] = m.transfers.map((t) => {
     const ago = (iso: string | null) => (iso ? now - new Date(iso).getTime() : 0);
     const step = (iso: string | null, words: string, lateAfter: number, when: string) => ({ ...t, since: span(ago(iso)), sinceLong: `${span(ago(iso))} ${words}`, late: ago(iso) > lateAfter, when });
-    if (t.status === "in_transit") return step(t.dispatchedAt, "on the road", ROAD_LATE, `Dispatched ${at(t.dispatchedAt)}`);
-    if (t.status === "approved") return step(t.approvedAt, "waiting to be dispatched", WAIT_LATE, `Approved ${at(t.approvedAt)}`);
-    if (t.status === "requested") return step(t.requestedAt, "waiting for approval", WAIT_LATE, `Requested ${at(t.requestedAt)}`);
-    if (t.status === "received") return { ...t, since: "Arrived", sinceLong: "arrived", late: false, when: `Received ${at(t.receivedAt)}` };
-    return { ...t, since: "Draft", sinceLong: "not requested yet", late: false, when: `Made ${at(t.createdAt)}` };
+    if (t.status === "in_transit") return step(t.dispatchedAt, "in transit", ROAD_LATE, `Dispatched ${at(t.dispatchedAt)}`);
+    if (t.status === "approved") return step(t.approvedAt, "awaiting dispatch", WAIT_LATE, `Approved ${at(t.approvedAt)}`);
+    if (t.status === "requested") return step(t.requestedAt, "pending approval", WAIT_LATE, `Requested ${at(t.requestedAt)}`);
+    if (t.status === "received") return { ...t, since: "Received", sinceLong: "received", late: false, when: `Received ${at(t.receivedAt)}` };
+    return { ...t, since: "Draft", sinceLong: "not yet requested", late: false, when: `Created ${at(t.createdAt)}` };
   });
 
   return (
@@ -44,7 +44,7 @@ export default async function TransfersMapPage() {
         title="Stock transfers"
         actions={may("transfers.create") && <LinkButton href="/transfers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New transfer</LinkButton>}
       >
-        Every transfer still open, and what arrived in the last 30 days, as routes between warehouses.
+        Open transfers and transfers received in the last 30 days, shown as routes between warehouses.
       </PageHeader>
       <div className="mb-4">
         <ToggleLinks

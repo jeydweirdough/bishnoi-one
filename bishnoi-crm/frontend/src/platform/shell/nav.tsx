@@ -1,14 +1,11 @@
 "use client";
 
-import { ArrowLeftRight, ChevronRight, LogOut, Mail, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
+import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Dropdown, Modal, type MenuProps } from "antd";
+import { usePathname } from "next/navigation";
 import { useContext, createContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Avatar } from "../ui/avatar";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
-import { signOut } from "../actions/session";
-import { addressKnown, THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
+import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
 import type { Me, ModuleAccess } from "../lib/types";
@@ -130,28 +127,15 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         ...only((selling || admin) && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
         ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
         ...only(!admin && may("activities.view"), { href: "/calendar", label: "Calendar", icon: "calendar" }),
-        ...only(!admin && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
+        // A field agent's calls are their visits (Field work), one log, not two.
+        ...only(!admin && !agent && may("activities.view"), { href: "/activities", label: "Activities", icon: "activity", also: ["/follow-ups"] }),
         // Writing to customers through one's own mailbox (Zoho Mail, Gmail, Outlook, SMTP).
-        ...only(!admin && may("activities.create"), { href: "/email", label: "Email", icon: "email" }),
+        // Not a field agent's: their doctors are reached in person and through Patient Care Groups.
+        ...only(!admin && !agent && may("activities.create"), { href: "/email", label: "Email", icon: "email" }),
         // Approved materials: everyone shows them; an administrator keeps them.
         ...only(may("customers.view") || may("admin.settings"), { href: "/media", label: "Media", icon: "letters" }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
-        // Performance: results against targets. A salesperson's is on their
-        // dashboard (with its breakdown a click away), an administrator's in
-        // Settings; whoever leads people has it here, and sets the targets.
-        ...only(!admin && !(selling && me.role?.scope === "own"), {
-          href: "/performance",
-          label: "Performance",
-          icon: "goals" as const,
-          ...(may("goals.manage")
-            ? {
-                subpages: [
-                  { href: "/performance", label: "Results", exact: true },
-                  { href: "/performance/targets", label: "Targets" },
-                ],
-              }
-            : {}),
-        }),
+        // Performance is on each person's profile now (the bell and picture, top right).
       ],
     },
     {
@@ -161,6 +145,8 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         ...only(may("visits.view"), { href: "/field/doctors", label: termsOf(me).visited.many, icon: "customers", also: agent ? ["/companies", "/contacts"] : [] }),
         ...only(may("visits.view"), { href: "/visits", label: "Visits", icon: "visit" }),
         ...only(may("goals.view") || agent, { href: "/field/routes", label: agent ? "My route" : "Routes", icon: "trend" }),
+        // Government assistance for doctors' patients (the Rx playbook's PAP).
+        ...only(may("visits.view"), { href: "/field/assistance", label: "Patient assistance", icon: "approvals" }),
       ],
     },
     {
@@ -179,6 +165,13 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
     // The CRM's own Administration: its users, roles, teams and audit log.
     { label: "Administration", pages: THIS_APP === "crm" ? adminPagesFor(me) : [] },
   ];
+  // A field agent's day is their doctors, visits and route: those come first,
+  // under Home, and the rest of the CRM after them.
+  if (agent) {
+    const [crm, field, ...rest] = groups;
+    const [home, ...others] = crm.pages;
+    return [{ ...field, pages: [home, ...field.pages] }, { ...crm, pages: others }, ...rest].filter((g) => g.pages.length > 0);
+  }
   return groups.filter((g) => g.pages.length > 0);
 }
 
@@ -312,6 +305,18 @@ function isCurrent(page: Page, pathname: string, overview: boolean): boolean {
   return within(pathname, page.href) || (page.also ?? []).some((a) => within(pathname, a));
 }
 
+/**
+ * Whether a row with pages is open: on its own while you're on one of them,
+ * and opened or closed by a click in between. The click holds until the page
+ * changes, so a closed row opens again when you go into one of its pages.
+ */
+function useOpen(onIt: boolean): [boolean, () => void] {
+  const pathname = usePathname();
+  const [picked, setPicked] = useState<{ on: string; open: boolean } | null>(null);
+  const open = picked?.on === pathname ? picked.open : onIt;
+  return [open, () => setPicked({ on: pathname, open: !open })];
+}
+
 function Row({
   href,
   icon,
@@ -320,6 +325,7 @@ function Row({
   nested = false,
   trailing,
   alert = false,
+  onToggle,
   children,
 }: {
   href: string;
@@ -331,6 +337,9 @@ function Row({
   trailing?: ReactNode;
   /** Something waits here: collapsed to icons, the counts are hidden, so a dot on the icon says so. */
   alert?: boolean;
+  /** A row that opens to its pages: opening shows them at once, without loading a page.
+   *  Collapsed to icons the pages can't show, so there it stays a link to the first. */
+  onToggle?: () => void;
   children: ReactNode;
 }) {
   const rail = useContext(RailContext);
@@ -354,6 +363,13 @@ function Row({
       <span className="contents group-data-[rail=true]/side:hidden">{trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}</span>
     </>
   );
+  if (onToggle && !rail) {
+    return (
+      <button type="button" onClick={onToggle} aria-expanded={open} className={`w-full text-left ${className}`}>
+        {inside}
+      </button>
+    );
+  }
   // Another app is another origin, so there is nothing for Next to route to:
   // it is an ordinary link, and the sign-in it lands on is already held.
   if (isAway(href)) {
@@ -380,7 +396,7 @@ function Parent({ href, base, icon, label, groups, overviewHref }: {
   overviewHref?: string;
 }) {
   const pathname = usePathname();
-  const open = within(pathname, base);
+  const [open, toggle] = useOpen(within(pathname, base));
   return (
     <div>
       <Row
@@ -388,6 +404,7 @@ function Parent({ href, base, icon, label, groups, overviewHref }: {
         icon={icon}
         current={false}
         open={open}
+        onToggle={toggle}
         trailing={<ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />}
       >
         {label}
@@ -466,7 +483,7 @@ function CrmEntry({ page, unset }: { page: CrmPage; unset: Unset }) {
   }
   const missing = unsetOn(unset, subs.map((s) => s.href));
   const here = currentSub(page, pathname);
-  const open = here !== undefined || crmCurrent(page, pathname);
+  const [open, toggle] = useOpen(here !== undefined || crmCurrent(page, pathname));
   return (
     <div>
       <Row
@@ -474,6 +491,7 @@ function CrmEntry({ page, unset }: { page: CrmPage; unset: Unset }) {
         icon={page.icon}
         current={false}
         open={open}
+        onToggle={toggle}
         alert={Boolean(page.count || missing.count)}
         trailing={
           <>
@@ -862,7 +880,8 @@ function placeOf(pathname: string, me: Me): string | null {
       const namedForOne = g.label !== "CRM" && subpagesOf(page).some((s) => s.label === page.label);
       const where = namedForOne ? g.label : page.label;
       if (sub) return sub.label === where ? where : `${where} · ${sub.label}`;
-      return g.label === "CRM" ? page.label : `${g.label} · ${page.label}`;
+      // Home is Home, whichever group it heads.
+      return g.label === "CRM" || page.href === "/" ? page.label : `${g.label} · ${page.label}`;
     }
     if (within(pathname, "/admin")) return "Administration";
   }
@@ -883,74 +902,8 @@ function placeOf(pathname: string, me: Me): string | null {
   return crmGroups(me).flatMap((g) => g.pages).find((p) => crmCurrent(p, pathname))?.label ?? null;
 }
 
-function Account({ me }: { me: Me }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [leaving, setLeaving] = useState(false);
-  const [pending, setPending] = useState(false);
-  const switchHref =
-    THIS_APP && THIS_APP !== "platform" && addressKnown("platform")
-      ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
-      : null;
-  // What's used now and then sits behind ⋯, so the sidebar's foot is only who you are.
-  const items: MenuProps["items"] = [
-    { key: "account", label: "Your account", icon: <UserRound className="size-4" aria-hidden /> },
-    // The CRM sends email from each person's own mailbox.
-    ...(process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? [{ key: "mailbox", label: "Mailbox", icon: <Mail className="size-4" aria-hidden /> }] : []),
-    // Each company has its own data here. Someone who works for more than one
-    // picks the other on Bishnoi One, which sends them back signed in there.
-    ...(switchHref ? [{ key: "switch", label: "Switch company", icon: <ArrowLeftRight className="size-4" aria-hidden /> }] : []),
-    { type: "divider" as const },
-    { key: "signout", label: "Sign out", icon: <LogOut className="size-4" aria-hidden /> },
-  ];
-  function pick({ key }: { key: string }) {
-    if (key === "account") router.push("/account");
-    else if (key === "mailbox") router.push("/account/mailbox");
-    else if (key === "switch" && switchHref) window.location.href = switchHref;
-    else if (key === "signout") setLeaving(true);
-  }
-  const here = pathname === "/account" || pathname.startsWith("/account/");
-  return (
-    <div className="border-t border-rule pt-4">
-      <div className={`flex items-center gap-1 rounded-lg pr-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:pr-0 ${here ? "bg-hema-tint" : ""}`}>
-        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 group-data-[rail=true]/side:px-1.5 ${here ? "" : "hover:bg-sheet"}`} title={me.user.fullName}>
-          <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-          <span className="min-w-0 group-data-[rail=true]/side:sr-only">
-            <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
-            <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
-          </span>
-        </Link>
-        <Dropdown menu={{ items, onClick: pick }} trigger={["click"]} placement="topRight">
-          <button
-            type="button"
-            aria-label="Account options"
-            title="Account options"
-            className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
-          >
-            <MoreHorizontal className="size-5" aria-hidden />
-          </button>
-        </Dropdown>
-      </div>
-      <Modal
-        open={leaving}
-        title="Sign out?"
-        okText="Sign out"
-        cancelText="Cancel"
-        confirmLoading={pending}
-        onCancel={() => !pending && setLeaving(false)}
-        onOk={async () => {
-          setPending(true);
-          await signOut();
-        }}
-        width={400}
-      >
-        You&apos;ll need your email and password to get back in.
-      </Modal>
-    </div>
-  );
-}
-
-export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean }) {
+/** `actions`: the bell and the profile, which sit at the top right; on a phone, beside the menu button. */
+export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, actions }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean; actions?: ReactNode }) {
   const pathname = usePathname();
   const [rail, setRail] = useState(railAtFirst);
   function toggleRail() {
@@ -1001,7 +954,6 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }:
             </div>
             <Links me={me} waiting={waiting} unset={unset} />
           </div>
-          <Account me={me} />
         </RailContext.Provider>
       </aside>
 
@@ -1009,24 +961,24 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }:
       <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-36 shrink-0">{brand}</div>
-          <button
-            type="button"
-            onClick={() => setOpenOn(open ? null : pathname)}
-            aria-expanded={open}
-            aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-lg pr-2 pl-3 text-ink hover:bg-sheet"
-          >
-            {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
-            {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}
-            <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
-          </button>
+          <div className="flex min-w-0 items-center gap-1">
+            {actions}
+            <button
+              type="button"
+              onClick={() => setOpenOn(open ? null : pathname)}
+              aria-expanded={open}
+              aria-controls="phone-menu"
+              className="inline-flex h-10 min-w-0 items-center gap-2 rounded-lg pr-2 pl-3 text-ink hover:bg-sheet"
+            >
+              {place && <span className="hidden min-w-0 truncate text-meta font-semibold text-ink-2 sm:inline">{place}</span>}
+              {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}
+              <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
+            </button>
+          </div>
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
             <Links me={me} waiting={waiting} unset={unset} />
-            <div className="mt-5">
-              <Account me={me} />
-            </div>
           </div>
         )}
       </div>

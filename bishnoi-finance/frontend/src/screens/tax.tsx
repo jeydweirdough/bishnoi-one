@@ -10,10 +10,10 @@ import type { TaxSetup } from "../tax/types";
 
 export const metadata = { title: "Tax" };
 
-const TABS = { registration: "Registration", rates: "Rates", try: "Try a sale" } as const;
+const TABS = { registration: "Registration", rates: "Rates", try: "Tax calculator" } as const;
 type Tab = keyof typeof TABS;
 
-const BUCKETS = { taxable: "On the invoice as VAT", zero_rated: "Zero-rated", exempt: "VAT-exempt", non_taxable: "No VAT on the invoice" };
+const BUCKETS = { taxable: "VATable", zero_rated: "Zero-rated", exempt: "VAT-exempt", non_taxable: "Non-VAT" };
 
 /**
  * Tax: the company's registration, the dated rates, and a place to see what a
@@ -68,7 +68,7 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
           {pack.codes.map((c) => (
             <Sheet key={c.code} className="px-5 py-4">
               <SectionTitle
-                action={<span className="text-sm font-semibold tabular-nums">{c.rated ? (c.rateTodayBp === null ? "No rate today" : `${percent(c.rateTodayBp)} today`) : "No rate"}</span>}
+                action={<span className="text-sm font-semibold tabular-nums">{c.rated ? (c.rateTodayBp === null ? "No current rate" : `${percent(c.rateTodayBp)} today`) : "No rate"}</span>}
               >
                 {c.name}
               </SectionTitle>

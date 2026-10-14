@@ -30,18 +30,18 @@ type Answer = { applications: App[]; links: LinkRow[]; offered: { from: Ref; to:
 
 // A link's state, drawn with the health marks every screen uses.
 const STATE: Record<LinkRow["state"], { mark: Health; label: string }> = {
-  working: { mark: "operational", label: "Working" },
-  waiting: { mark: "degraded", label: "Waiting" },
-  problem: { mark: "down", label: "Not working" },
-  off: { mark: "retired", label: "Off" },
+  working: { mark: "operational", label: "Connected" },
+  waiting: { mark: "degraded", label: "Pending" },
+  problem: { mark: "down", label: "Failed" },
+  off: { mark: "retired", label: "Disabled" },
 };
 
 /** Whether an application is connected, in a line. */
 function connection(a: App): { mark: Health; text: string } {
-  if (!a.connected) return { mark: "unknown", text: "Not connected yet: it asks when it first starts, or make its connect key here." };
-  if (!a.connectedAt) return { mark: "degraded", text: "Key made, but it hasn't connected yet: check its API address under Applications, and that it's running." };
+  if (!a.connected) return { mark: "unknown", text: "Not connected yet: it requests a key when it first starts, or create its connect key here." };
+  if (!a.connectedAt) return { mark: "degraded", text: "Key created, but it hasn't connected yet: check its API URL under Applications, and that it is running." };
   const quiet = Date.now() - Date.parse(a.connectedAt) > 60 * 60 * 1000;
-  return quiet ? { mark: "degraded", text: `Last connected ${ago(a.connectedAt)}. Is it running?` } : { mark: "operational", text: `Connected · asked ${ago(a.connectedAt)}` };
+  return quiet ? { mark: "degraded", text: `Last connected ${ago(a.connectedAt)}. Check that it is running.` } : { mark: "operational", text: `Connected · last contact ${ago(a.connectedAt)}` };
 }
 
 export default async function ConnectionsPage() {
@@ -60,13 +60,13 @@ export default async function ConnectionsPage() {
       <div className="space-y-5">
         <Sheet className="px-5 pt-4 pb-2">
           <SectionTitle icon="teams">
-            Links
+            Application links
             <span className="ml-2 text-meta font-normal text-ink-3">
-              {working} of {data.links.length} working
+              {working} of {data.links.length} connected
             </span>
           </SectionTitle>
           {data.links.length === 0 && data.offered.length === 0 ? (
-            <Empty icon="teams" title="No links yet.">
+            <Empty icon="teams" title="No application links yet.">
               Links appear here once the applications that use each other are registered in Applications.
             </Empty>
           ) : (
@@ -117,7 +117,7 @@ export default async function ConnectionsPage() {
           <SectionTitle icon="apps">Applications</SectionTitle>
           <p className="text-meta text-ink-3">
             Each application needs only the platform&apos;s address on its server (<code className="font-mono">PLATFORM_API_URL</code>). Its connect key is sent to
-            the API address registered for it (Applications), signed, when it first asks, or when you make a new one here: nothing is copied onto its server.
+            the API address registered for it (Applications), signed, when it first asks, or when a new one is created here: nothing is copied onto its server.
           </p>
           <ul className="mt-2 divide-y divide-rule">
             {data.applications.map((a) => {
@@ -137,12 +137,12 @@ export default async function ConnectionsPage() {
                           API at <span className="font-mono">{a.apiUrl}</span>
                         </>
                       ) : (
-                        <>No API address, so nothing can use it: add it on its page.</>
+                        <>No API URL: add it on the application&apos;s page.</>
                       )}
                       {a.keyHint && (
                         <span title={a.keyMadeAt ? when(a.keyMadeAt) : undefined}>
                           {" "}
-                          · key ending <span className="font-mono">{a.keyHint}</span>, made {ago(a.keyMadeAt)}
+                          · key ending <span className="font-mono">{a.keyHint}</span>, created {ago(a.keyMadeAt)}
                         </span>
                       )}
                     </p>

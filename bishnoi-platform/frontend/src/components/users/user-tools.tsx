@@ -23,7 +23,7 @@ export function SuspendUser({ id, name, status }: { id: string; name: string; st
       body={
         suspended
           ? `${name} can work again, with the applications and roles they had.`
-          : `${name} can't work in any application while suspended. Their applications and roles are kept, and you can reactivate them any time.`
+          : `${name} can't work in any application while suspended. Their applications and roles are kept, and they can be reactivated at any time.`
       }
       confirmLabel={suspended ? "Reactivate" : "Suspend user"}
       onConfirm={async () => {
@@ -40,7 +40,7 @@ export function SuspendUser({ id, name, status }: { id: string; name: string; st
 
 /** A first password for their Bishnoi One account (or a new one), shown once to hand over. */
 export function MakePassword({ id, name, hasPassword }: { id: string; name: string; hasPassword: boolean }) {
-  const label = hasPassword ? `Reset the password of ${name}` : `Make a first password for ${name}`;
+  const label = hasPassword ? `Reset the password of ${name}` : `Set a first password for ${name}`;
   return (
     <ConfirmButton
       label={<span className="sr-only">{label}</span>}
@@ -50,13 +50,13 @@ export function MakePassword({ id, name, hasPassword }: { id: string; name: stri
       triggerSize="sm"
       triggerClassName={ICON_TRIGGER}
       danger={false}
-      title={hasPassword ? `Reset ${name}'s password?` : `Make a first password for ${name}?`}
+      title={hasPassword ? `Reset ${name}'s password?` : `Set a first password for ${name}?`}
       body={
         hasPassword
           ? `A new password is made and shown once. ${name} is signed out everywhere and signs in with it, then changes it.`
-          : `A password is made and shown once. Give it to ${name}: they sign in with their Bishnoi One account, then change it.`
+          : `A password is generated and shown once. Give it to ${name}: they sign in with their Bishnoi One account, then change it.`
       }
-      confirmLabel={hasPassword ? "Reset password" : "Make password"}
+      confirmLabel={hasPassword ? "Reset password" : "Set password"}
       onConfirm={async () => {
         const result = await makePassword(id);
         if (!result.ok) {
@@ -65,7 +65,7 @@ export function MakePassword({ id, name, hasPassword }: { id: string; name: stri
         }
         const password = result.data;
         toast.success(`Password for ${name}: ${password}`, {
-          description: "Shown only now. Give it to them in person or by another channel.",
+          description: "Shown only once. Share it in person or through another secure channel.",
           duration: Infinity,
           action: { label: "Copy", onClick: () => navigator.clipboard?.writeText(password).catch(() => undefined) },
         });
@@ -86,7 +86,7 @@ export function DeleteUser({ id, name }: { id: string; name: string }) {
       triggerSize="sm"
       triggerClassName={ICON_TRIGGER_DANGER}
       title={`Delete ${name}?`}
-      body={`${name} goes from the platform, with every application and role they had, and can't sign in with their Bishnoi One account any more. It can't be undone; to keep them, suspend them instead.`}
+      body={`${name} is removed from the platform, with all their applications and roles, and can't sign in with their Bishnoi One account any more. It can't be undone; to keep them, suspend them instead.`}
       confirmLabel="Delete user"
       onConfirm={async () => {
         const result = await deleteUser(id);

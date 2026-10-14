@@ -16,15 +16,15 @@ export const SCOPE_TAGS: Record<Scope, string> = { own: "Own records", team: "Te
 export function NoAccess({ what }: { what: string }) {
   return (
     <Sheet>
-      <Empty icon="roles" title={`Your role doesn't include ${what}`}>
-        Ask an administrator if you need it.
+      <Empty icon="roles" title={`No access to ${what}`}>
+        Contact an administrator to request access.
       </Empty>
     </Sheet>
   );
 }
 
-/** "Switched off", the same mark everywhere. */
-export function OffTag({ children = "Switched off" }: { children?: string }) {
+/** "Inactive", the same mark everywhere. */
+export function OffTag({ children = "Inactive" }: { children?: string }) {
   return (
     <span className="inline-flex h-6 items-center rounded-md bg-[#f0f0ee] px-2.5 text-meta font-medium whitespace-nowrap text-ink-3">
       {children}

@@ -114,7 +114,7 @@ export function ProcedureEditor({ rules }: { rules: PriceRules }) {
         </section>
         <section>
           <h3 className="text-sm font-semibold">2 · Then, in this order</h3>
-          <p className="mb-2 text-meta text-ink-3">Each on what the line comes to so far. One switched off isn&apos;t applied.</p>
+          <p className="mb-2 text-meta text-ink-3">Each on what the line comes to so far. Inactive steps are not applied.</p>
           <OrderList
             items={adjust}
             names={adjustNames}
@@ -143,7 +143,7 @@ export function ProcedureEditor({ rules }: { rules: PriceRules }) {
               onChange={setInclusive}
               options={[
                 { value: "yes", label: "Include VAT" },
-                { value: "no", label: "Are before VAT" },
+                { value: "no", label: "Exclude VAT" },
               ]}
             />
           </div>

@@ -28,7 +28,7 @@ export async function StaffAccounts({ canChange }: { canChange: boolean }) {
           </SectionTitle>
         </div>
         {r.holders.length === 0 ? (
-          <Empty title={`Nobody is ${r.name} yet`} icon="person">
+          <Empty title={`No ${r.name} accounts yet`} icon="person">
             {r.role === "admin" ? "Make a Support member a Platform Admin below, or add one with Add staff." : canChange ? "Add one with Add staff above." : "A Platform Admin adds staff."}
           </Empty>
         ) : (
@@ -41,7 +41,7 @@ export async function StaffAccounts({ canChange }: { canChange: boolean }) {
                     <span className="flex flex-wrap items-center gap-2">
                       <span className={`font-semibold ${s.isActive ? "text-ink" : "text-ink-3"}`}>{s.fullName}</span>
                       {self && <span className="rounded-full bg-hema-tint px-1.5 text-stamp text-hema uppercase">You</span>}
-                      {!s.isActive && <SuspendedTag label="Switched off" />}
+                      {!s.isActive && <SuspendedTag label="Inactive" />}
                     </span>
                     <span className="block truncate text-meta text-ink-3">
                       {s.no ? `No. ${s.no} · ` : ""}

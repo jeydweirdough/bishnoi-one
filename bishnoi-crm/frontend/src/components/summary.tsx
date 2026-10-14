@@ -30,7 +30,7 @@ export function RetentionFigures({ summary, rules }: { summary: RetentionSummary
         ) : (
           // Nothing to measure yet: the same drawing and words as every empty place.
           <div className="mt-3 rounded-xl bg-mint">
-            <Empty compact icon="trend" title="Nothing to compare yet">
+            <Empty compact icon="trend" title="Not enough data to compare">
               It shows once customers quoted in one {rules.lostDays}-day window can be compared with the next. Keep quoting, and it fills in.
             </Empty>
           </div>
@@ -42,7 +42,7 @@ export function RetentionFigures({ summary, rules }: { summary: RetentionSummary
         <Tile figure={{ value: String(summary.noQuotes), label: "No recent quotes", note: "never quoted lately" }} />
         <Tile figure={{ value: String(summary.retained), label: "Kept", note: "quoted again" }} />
         <Tile figure={{ value: String(summary.new), label: "New customers", note: "first quote" }} />
-        <Tile figure={{ value: String(summary.healthy), label: "Healthy now", note: `quoted in ${rules.atRiskDays} days` }} />
+        <Tile figure={{ value: String(summary.healthy), label: "Active customers", note: `quoted in ${rules.atRiskDays} days` }} />
       </div>
     </div>
   );

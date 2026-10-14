@@ -3,6 +3,7 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Pager, usePages } from "@/src/platform/ui/pager";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
@@ -34,6 +35,7 @@ export function PromosEditor({
 }) {
   const fmt = makeFormat(org);
   const [editing, setEditing] = useState<PromoRow | "new" | null>(null);
+  const { rows: page, pager } = usePages(promos);
   const name = (id: string) => products.find((p) => p.id === id)?.name ?? "a product no longer here";
 
   return (
@@ -54,7 +56,7 @@ export function PromosEditor({
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
-            {promos.map((p) => (
+            {page.map((p) => (
               <li key={p.id} className="flex items-start justify-between gap-4 px-5 py-3">
                 <div className="min-w-0">
                   <p className="font-medium">
@@ -82,6 +84,7 @@ export function PromosEditor({
           </ul>
         )}
       </Sheet>
+      <Pager {...pager} />
     </div>
   );
 }
@@ -140,7 +143,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
     if (teamIds.length === 0) problems.teamIds = "Pick the divisions it's for.";
     if (Object.keys(problems).length) {
       setFields(problems);
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       return;
     }
     start(async () => {
@@ -281,7 +284,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-            Switched on
+            Active
           </label>
         </div>
 

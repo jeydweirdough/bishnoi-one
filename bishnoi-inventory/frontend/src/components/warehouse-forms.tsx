@@ -74,14 +74,14 @@ export function EditWarehouse({ warehouse }: { warehouse: Pick<Warehouse, "id" |
                     const r = await saveWarehouse(warehouse.id, { isActive: !warehouse.isActive });
                     if (!r.ok) toast.error(r.error);
                     else {
-                      toast.success(warehouse.isActive ? "Warehouse switched off" : "Warehouse switched on");
+                      toast.success(warehouse.isActive ? "Warehouse deactivated" : "Warehouse activated");
                       setOpen(false);
                       router.refresh();
                     }
                   })
                 }
               >
-                {warehouse.isActive ? "Switch this warehouse off" : "Switch it back on"}
+                {warehouse.isActive ? "Deactivate warehouse" : "Activate warehouse"}
               </Button>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
       try {
         const r = await work();
         if (!r.ok) {
-          const err = Object.values(r.fields ?? {})[0] ?? r.error ?? "That didn't work.";
+          const err = Object.values(r.fields ?? {})[0] ?? r.error ?? "Something went wrong.";
           triggerShake();
           toast.error(err);
           return setError(err);
@@ -158,13 +158,13 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
               {canManage && (
                 <span className="flex shrink-0 items-center gap-1">
                   {!loc.isDefault && loc.isActive && (
-                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} is the default now`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
+                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} set as default`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Star className="size-4" aria-hidden />
                     </button>
                   )}
                   {!loc.isDefault && (
-                    <Button size="sm" variant="quiet" onClick={() => run(() => saveLocation(warehouseId, loc.id, { isActive: !loc.isActive }), loc.isActive ? `${loc.code} switched off` : `${loc.code} switched on`)}>
-                      {loc.isActive ? "Switch off" : "Switch on"}
+                    <Button size="sm" variant="quiet" onClick={() => run(() => saveLocation(warehouseId, loc.id, { isActive: !loc.isActive }), loc.isActive ? `${loc.code} deactivated` : `${loc.code} activated`)}>
+                      {loc.isActive ? "Deactivate" : "Activate"}
                     </Button>
                   )}
                   <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">

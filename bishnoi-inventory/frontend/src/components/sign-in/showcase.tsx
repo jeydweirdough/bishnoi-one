@@ -15,7 +15,7 @@ type Slide = { title: string; sub: string; value: number; chip: string; says: st
 
 const SLIDES: Slide[] = [
   { title: "Stock count", sub: "Main warehouse", value: 84, chip: "Counting", says: "Know what's on every shelf, batch by batch, in" },
-  { title: "Expiring soon", sub: "7 batches, 90 days", value: 35, chip: "Check first", says: "See expiring batches before they become a loss in" },
+  { title: "Expiring soon", sub: "7 batches, 90 days", value: 35, chip: "Action needed", says: "See expiring batches before they become a loss in" },
   { title: "Transfers", sub: "4 of 5 received", value: 80, chip: "In transit", says: "Move stock between warehouses and know where it is in" },
 ];
 
@@ -53,7 +53,7 @@ export function Showcase() {
         </div>
       </div>
 
-      <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Pick one">
+      <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Select a slide">
         {SLIDES.map((s, i) => (
           <button
             key={s.title}

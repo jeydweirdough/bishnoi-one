@@ -23,7 +23,7 @@ export function SetupGuide({ setup, may }: { setup: Setup; may: (permission: str
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-ink">Get started</h2>
-          <p className="text-meta text-ink-3">Set Inventory up in this order: each step needs the one before it.</p>
+          <p className="text-meta text-ink-3">Complete these steps in order. Each step depends on the one before it.</p>
         </div>
         <span className="flex items-center gap-3 text-meta text-ink-2">
           <span className="h-2 w-32 overflow-hidden rounded-full bg-mint-2">
@@ -60,7 +60,7 @@ export function SetupGuide({ setup, may }: { setup: Setup; may: (permission: str
                     After &ldquo;{waits.title.toLowerCase()}&rdquo;
                   </span>
                 ) : !may(s.permission) ? (
-                  <span className="text-meta text-ink-3">Your administrator does this</span>
+                  <span className="text-meta text-ink-3">Done by an administrator</span>
                 ) : (
                   <LinkButton href={s.href} size="sm" variant={isNext ? "primary" : "default"}>
                     {s.action}
@@ -109,9 +109,9 @@ export function NeedsFirst({
           <Icon name={missing[0].step.icon} className="size-5" />
         </span>
         <h2 className="mt-4 text-lg font-semibold text-ink">
-          To {doing}, you need {missing.map((m) => m.says).join(", and ")} first.
+          Complete setup to {doing}
         </h2>
-        <p className="mt-1 text-sm text-ink-2">Make {missing.length === 1 ? "it" : "them"} now, and you&apos;ll come straight back here.</p>
+        <p className="mt-1 text-sm text-ink-2">Required first: {missing.map((m) => m.says).join(", and ")}. You return to this page afterwards.</p>
         <ol className="mt-5 space-y-2.5">
           {missing.map((m, i) => (
             <li key={m.need} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule px-4 py-3">
@@ -127,13 +127,13 @@ export function NeedsFirst({
                   {m.action}
                 </LinkButton>
               ) : (
-                <span className="text-meta text-ink-3">Ask your administrator</span>
+                <span className="text-meta text-ink-3">Requires an administrator</span>
               )}
             </li>
           ))}
         </ol>
         <Link href="/" className="mt-5 inline-flex items-center gap-1 text-meta text-ink-3 hover:text-ink">
-          See every setup step on Home
+          View all setup steps on Home
           <ChevronRight className="size-3.5" aria-hidden />
         </Link>
       </Sheet>
@@ -173,8 +173,8 @@ export async function FirstStep({
 }) {
   if (filtered) {
     return (
-      <Empty icon={icon} title="Nothing matches" actions={<LinkButton href={clear}>Clear filters</LinkButton>}>
-        Try other filters, or clear them to see everything.
+      <Empty icon={icon} title="No matching records" actions={<LinkButton href={clear}>Clear filters</LinkButton>}>
+        Change or clear the filters to see more results.
       </Empty>
     );
   }
@@ -187,7 +187,7 @@ export async function FirstStep({
         title={`First, ${first.step.title.charAt(0).toLowerCase()}${first.step.title.slice(1)}`}
         actions={may(first.step.permission) ? <LinkButton href={first.href} variant="primary">{first.action}</LinkButton> : undefined}
       >
-        {title}: {body} It needs {missing.map((m) => m.says).join(", and ")}{may(first.step.permission) ? "; make it, and you'll come back to this." : ". Your administrator sets that up."}
+        {title}: {body} Requires {missing.map((m) => m.says).join(", and ")}{may(first.step.permission) ? ". You return to this page afterwards." : ". An administrator must set this up."}
       </Empty>
     );
   }

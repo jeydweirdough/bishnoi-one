@@ -62,7 +62,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
         serials: r.serials.split(/[\s,]+/).filter(Boolean),
       }));
     save(() => createAdjustment({ warehouseId, reason, notes: notes.trim() || null, lines }), (out) => ({
-      message: out.status === "posted" ? `${out.number} posted` : `${out.number} sent for approval`,
+      message: out.status === "posted" ? `${out.number} posted` : `${out.number} submitted for approval`,
       go: `/adjustments/${out.id}`,
     }));
   }
@@ -76,7 +76,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
               {(p) => <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setRows([blank()]); }}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}{fresh.filter((a) => a.kind === "warehouse").map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</Select>}
             </Field>
           </WithAdd>
-          <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Sets stock aside as damaged: still on hand, no longer available." : "Removes stock.") : "Either way: a minus removes, a plus adds."}>
+          <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Marks stock as damaged: still on hand, but no longer available." : "Removes stock.") : "A negative quantity removes stock; a positive one adds it."}>
             {(p) => <Select {...p} value={reason} onChange={(e) => setReason(e.target.value as AdjustmentReason)}>{reasons.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</Select>}
           </Field>
         </div>
@@ -105,11 +105,11 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                   <tr key={i}>
                     <td className="py-2 pr-2 align-top">
                       <Select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value, batchId: "", batchNo: "" })}>
-                        <option value="">Pick a product…</option>
+                        <option value="">Select a product…</option>
                         {products.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
                       </Select>
                       {p?.trackSerials && (
-                        <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder="Their serial numbers, one per unit" value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
+                        <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder="Serial numbers, one per unit" value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
                       )}
                       {err && <p className="mt-1 text-meta text-danger">{err}</p>}
                     </td>
@@ -122,13 +122,13 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                       {p?.trackBatches ? (
                         <>
                           <Select aria-label={`Line ${i + 1} batch`} value={r.batchId} onChange={(e) => set(i, { batchId: e.target.value })}>
-                            <option value="">{adds || direction === "either" ? "A new batch…" : "Pick a batch…"}</option>
+                            <option value="">{adds || direction === "either" ? "New batch…" : "Select a batch…"}</option>
                             {own.map((b) => <option key={b.id} value={b.id}>{b.batchNo} ({b.onHand}){b.expiresOn ? ` · ${b.expiresOn}` : ""}</option>)}
                           </Select>
                           {!r.batchId && (adds || direction === "either") && (
                             <div className="mt-1.5 flex gap-1.5">
-                              <input aria-label="New batch number" placeholder="Batch no." value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
-                              {p.trackExpiry && <input aria-label="Expires on" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
+                              <input aria-label="New batch number" placeholder="Batch number" value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
+                              {p.trackExpiry && <input aria-label="Expiry date" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
                             </div>
                           )}
                         </>
@@ -159,11 +159,11 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
           </table>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
-          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add a line</Button>
+          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add line</Button>
           {canAdd.product && adds && (
             <QuickAdd
               kind="product"
-              label="New product (not in the list)"
+              label="New product"
               context={{ units: reference.units.filter((u) => u.isActive) }}
               onAdded={(a) => {
                 setFresh((list) => [...list, a]);
@@ -174,12 +174,12 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
           )}
         </div>
       </Sheet>
-      <Field label="Notes" optional error={fields.notes} hint="What happened. It goes on the movement trail.">
+      <Field label="Notes" optional error={fields.notes} hint="Recorded in the stock movement history.">
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </Field>
       <FormError message={error ?? fields.lines} />
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{approves ? "Post adjustment" : "Send for approval"}</Button>
+        <Button type="submit" variant="primary" loading={pending}>{approves ? "Post adjustment" : "Submit for approval"}</Button>
         <LinkButton href="/adjustments" variant="quiet">Cancel</LinkButton>
       </div>
     </form>
@@ -202,11 +202,11 @@ export function StartCount({ reference, warehouseId, canAdd = {} }: { reference:
           </Field>
         </WithAdd>
       </div>
-      <Field label="Only" optional className="min-w-56">
-        {(p) => <Select {...p} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Everything in it</option>{reference.categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}</Select>}
+      <Field label="Category" optional className="min-w-56">
+        {(p) => <Select {...p} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>{reference.categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}</Select>}
       </Field>
       <Button variant="primary" loading={pending} onClick={() => save(() => startCount({ warehouseId: w, categoryId: category || null }), (out) => ({ message: `${out.number} started`, go: `/counts/${out.id}` }))}>
-        Start a count
+        Start count
       </Button>
       {error && <div className="w-full"><FormError message={error} /></div>}
     </div>
@@ -247,7 +247,7 @@ export function CountSheet({ count, reference, canCount, day }: { count: Count; 
           const r = await then();
           if (!r.ok) {
             triggerShake();
-            const err = r.error ?? "That didn't work.";
+            const err = r.error ?? "Something went wrong.";
             toast.error(err);
             return setError(err);
           }
@@ -270,11 +270,11 @@ export function CountSheet({ count, reference, canCount, day }: { count: Count; 
         <table className="w-full min-w-[44rem] text-left text-sm">
           <thead>
             <tr className="border-b border-rule text-left text-meta text-ink-3">
-              <th className="py-3 pr-3 pl-5 font-semibold">Item</th>
+              <th className="py-3 pr-3 pl-5 font-semibold">Product</th>
               <th className="px-3 py-3 font-semibold">Location · batch</th>
               <th className="px-3 py-3 text-right font-semibold">Expected</th>
               <th className="px-3 py-3 text-right font-semibold">Counted</th>
-              <th className="py-3 pr-5 pl-3 text-right font-semibold">Difference</th>
+              <th className="py-3 pr-5 pl-3 text-right font-semibold">Variance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
@@ -303,14 +303,14 @@ export function CountSheet({ count, reference, canCount, day }: { count: Count; 
       {open && (
         <div className="space-y-3 border-t border-rule px-5 py-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-meta text-ink-2">Found something not on the list?</span>
-            <Select aria-label="Product found" value={extra.productId} onChange={(e) => setExtra({ ...extra, productId: e.target.value })} className="min-w-56">
+            <span className="text-meta text-ink-2">Add an item not on the count sheet</span>
+            <Select aria-label="Product" value={extra.productId} onChange={(e) => setExtra({ ...extra, productId: e.target.value })} className="min-w-56">
               <option value="">Product…</option>
               {reference.products.filter((p) => !p.trackBatches).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
-            <CellInput aria-label="How many" placeholder="0" value={extra.counted} onChange={(e) => setExtra({ ...extra, counted: e.target.value.replace(/\D/g, "") })} className="w-20" />
+            <CellInput aria-label="Counted quantity" placeholder="0" value={extra.counted} onChange={(e) => setExtra({ ...extra, counted: e.target.value.replace(/\D/g, "") })} className="w-20" />
             <Button size="sm" disabled={!extra.productId} loading={pending} onClick={() => persist(async () => { const r = await addCountLine(count.id, { productId: extra.productId, counted: Number(extra.counted) || 0 }); if (r.ok) setExtra({ productId: "", counted: "" }); return r; }, "Line added")}>
-              Add it
+              Add line
             </Button>
           </div>
           <FormError message={error} />

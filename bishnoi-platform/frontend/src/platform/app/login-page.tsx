@@ -61,7 +61,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
             </div>
 
             <div className="mt-8 space-y-2">
-              {expired && <Notice>Your session ended. Sign in again to pick up where you left off.</Notice>}
+              {expired && <Notice>Your session expired. Sign in again to continue.</Notice>}
               {denied && <Notice>The account you&apos;re signed in with doesn&apos;t work in {app ?? "this app"}. Sign in with one that does.</Notice>}
               {refused && <Notice tone="danger">{refused}</Notice>}
             </div>
@@ -71,7 +71,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
             </div>
 
             <p className="mt-10 text-center text-sm text-[#3b3b3b]">
-              New here? <span className="font-medium text-[#4f7f44]">Your administrator adds you.</span>
+              No account? <span className="font-medium text-[#4f7f44]">Contact your administrator.</span>
             </p>
           </div>
         </section>

@@ -78,7 +78,7 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
         Associations
       </SectionTitle>
       {data.groups.length === 0 ? (
-        <Empty compact icon="customers" title="Nothing linked yet">Link where they work, the group it&apos;s part of, or who decides on a deal.</Empty>
+        <Empty compact icon="customers" title="No associations">Link where they work, the group it&apos;s part of, or who decides on a deal.</Empty>
       ) : (
         <div className="mt-1 space-y-3">
           {data.groups.map((g) => (
@@ -119,7 +119,7 @@ export function AssociationsCard({ kind, id, data }: { kind: AssocKind; id: stri
       <Modal open={adding !== null} title="Link a record" onCancel={() => setAdding(null)} onOk={save} okText="Link" confirmLoading={pending} destroyOnHidden>
         <div className="space-y-4 pt-1">
           <label className="block">
-            <span className="mb-1.5 block text-sm text-ink">How they&apos;re linked</span>
+            <span className="mb-1.5 block text-sm text-ink">Relationship</span>
             <Combobox className="w-full" value={adding ?? undefined} onChange={(k) => open(k)} options={data.labels.map((l) => ({ value: `${l.label}:${l.side}`, label: l.name }))} />
           </label>
           {picked && (

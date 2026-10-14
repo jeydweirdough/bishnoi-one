@@ -1066,7 +1066,7 @@ function PreviewField({ field, sample, terms }: { field: FormFieldDef; sample: b
               </span>
             ))
           ) : (
-            <span className="text-xs text-ink-3 px-1.5">Pick options...</span>
+            <span className="text-xs text-ink-3 px-1.5">Select options...</span>
           )}
         </div>
       ) : (

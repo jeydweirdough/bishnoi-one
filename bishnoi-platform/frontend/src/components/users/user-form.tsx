@@ -73,7 +73,7 @@ export function UserForm({
         const result = await updateUser(user.id, change);
         if (result.ok) {
           const n = result.data.withdrawnApplications;
-          toast.success("Changes saved", { description: n ? `${plural(n, "application")} withdrawn with the move.` : values.fullName.trim() });
+          toast.success("Changes saved", { description: n ? `${plural(n, "application")} removed with the company change.` : values.fullName.trim() });
           router.push(`/users/${user.id}`);
           return;
         }
@@ -118,12 +118,12 @@ export function UserForm({
         <Field
           label="Company"
           error={fields.companyId}
-          hint={user ? "Moving them keeps only the applications the new company has." : "The company they work for."}
+          hint={user ? "Changing company keeps only the applications assigned to the new company." : "The company the user belongs to."}
           className="sm:col-span-2"
         >
           {(p) => (
             <Select {...p} value={companyId} onChange={(e) => chooseCompany(e.target.value)} required>
-              {!companyId && <option value="">Pick a company</option>}
+              {!companyId && <option value="">Select a company</option>}
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -144,14 +144,14 @@ export function UserForm({
         <Field label="Email" error={fields.email}>
           {(p) => <Input {...p} type="email" inputMode="email" autoCapitalize="none" value={values.email} onChange={set("email")} required />}
         </Field>
-        <Field label="Title" optional error={fields.title} hint="What they do there, like Pharmacist.">
+        <Field label="Title" optional error={fields.title} hint="Job title, e.g. Pharmacist.">
           {(p) => <Input {...p} value={values.title} onChange={set("title")} />}
         </Field>
         <label className="flex cursor-pointer items-start gap-2.5 self-end pb-1 text-sm text-ink">
           <input type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isCompanyAdmin} onChange={(e) => setCompanyAdmin(e.target.checked)} />
           <span>
             Company admin
-            <span className="block text-meta text-ink-3">Runs their company&apos;s people and access.</span>
+            <span className="block text-meta text-ink-3">Manages the company&apos;s users and access.</span>
           </span>
         </label>
       </div>
@@ -162,7 +162,7 @@ export function UserForm({
             <Subheading>Applications</Subheading>
           </legend>
           {!companyId ? (
-            <p className="text-meta text-ink-3">Pick the company first: they can only be given what it has.</p>
+            <p className="text-meta text-ink-3">Select the company first: users can only be given its assigned applications.</p>
           ) : loadingApps || apps === null ? (
             <p className="text-meta text-ink-3">Looking up {companyName}&apos;s applications…</p>
           ) : apps.length === 0 ? (
@@ -201,7 +201,7 @@ export function UserForm({
       <FormError message={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending} disabled={moving && loadingApps}>
-          {user ? (moving && losing.length > 0 ? "Move and save" : "Save changes") : "Add user"}
+          {user ? (moving && losing.length > 0 ? "Change company and save" : "Save changes") : "Add user"}
         </Button>
         <LinkButton href={user ? `/users/${user.id}` : initialCompany ? `/companies/${initialCompany}?tab=users` : "/users"} variant="quiet">
           Cancel

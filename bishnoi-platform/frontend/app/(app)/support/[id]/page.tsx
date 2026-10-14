@@ -36,11 +36,11 @@ function Note({ note }: { note: TicketNote }) {
           {moved ? (
             note.from ? (
               <span className="text-ink-2">
-                moved it <TicketStatusMark status={note.from} /> → <TicketStatusMark status={note.to!} />
+                changed status <TicketStatusMark status={note.from} /> → <TicketStatusMark status={note.to!} />
               </span>
             ) : (
               <span className="text-ink-2">
-                logged it as <TicketStatusMark status={note.to!} />
+                logged it with status <TicketStatusMark status={note.to!} />
               </span>
             )
           ) : (
@@ -77,7 +77,7 @@ export default async function TicketPage({ params }: { params: Params }) {
                 name={`${ticket.number} ${ticket.title}`}
                 after="/support"
                 done="Ticket deleted"
-                body="It goes with its notes: for a ticket raised by mistake, or a test. It can't be undone; to keep it, close it instead."
+                body="It is deleted with its notes. Use this for tickets logged by mistake or for testing. This can't be undone; to keep it, close it instead."
               />
             )}
           </>
@@ -100,14 +100,14 @@ export default async function TicketPage({ params }: { params: Params }) {
         <p className="mt-2 text-meta text-ink-3">
           {ticket.isOpen
             ? `${TICKET_STATUSES[ticket.status]} now. Change the status beside it under Details; steps can be skipped.`
-            : `${TICKET_STATUSES[ticket.status]} ${ago(ticket.closedAt ?? ticket.resolvedAt)}. Moving it back to an earlier step reopens it.`}
+            : `${TICKET_STATUSES[ticket.status]} ${ago(ticket.closedAt ?? ticket.resolvedAt)}. Changing it back to an earlier status reopens it.`}
         </p>
       </Sheet>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="message">What they said</SectionTitle>
+            <SectionTitle icon="message">Description</SectionTitle>
             {ticket.description ? (
               <p className="mt-2 text-sm whitespace-pre-line text-ink">{ticket.description}</p>
             ) : (
@@ -116,9 +116,9 @@ export default async function TicketPage({ params }: { params: Params }) {
           </Sheet>
 
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="history">Notes and moves</SectionTitle>
+            <SectionTitle icon="history">Notes and status history</SectionTitle>
             {newestFirst.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">Nothing yet. Add a note below as you work it.</p>
+              <p className="py-2 text-meta text-ink-3">No notes yet. Add a note below as work progresses.</p>
             ) : (
               <ol className="mt-1 divide-y divide-rule">
                 {newestFirst.map((n) => (

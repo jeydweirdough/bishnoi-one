@@ -42,7 +42,7 @@ export function AlertsBell({ alerts }: { alerts: Alert[] }) {
     >
       <button
         type="button"
-        aria-label={any ? `Needs attention: ${alerts.length}` : "Needs attention: nothing"}
+        aria-label={any ? `Needs attention: ${alerts.length}` : "Needs attention: none"}
         className="relative inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-sheet hover:text-ink"
       >
         <Bell className="size-5" aria-hidden />

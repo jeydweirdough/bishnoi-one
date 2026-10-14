@@ -2,6 +2,8 @@ import { ArrowDown, ArrowUp, Plus, Upload } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton } from "@/src/platform/ui/button";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
@@ -18,11 +20,11 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "
 const WEEK = 7 * 86_400_000;
 /** Where someone stands: switched off, never signed in, signed in this week, or not lately. */
 function standing(p: AdminUserRow, now: number) {
-  if (!p.isActive) return { key: "off", label: "Switched off", color: "#8f98a3" };
+  if (!p.isActive) return { key: "off", label: "Inactive", color: "#8f98a3" };
   if (!p.lastSignInAt) return { key: "never", label: "Never signed in", color: "#d5d9df" };
   return now - Date.parse(p.lastSignInAt) < WEEK
-    ? { key: "week", label: "In this week", color: "#2a78d6" }
-    : { key: "earlier", label: "Not this week", color: "#eda100" };
+    ? { key: "week", label: "Signed in this week", color: "#2a78d6" }
+    : { key: "earlier", label: "Not signed in this week", color: "#eda100" };
 }
 
 const SORTS = {
@@ -52,12 +54,17 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
     .filter((p) => (!team || p.team?.id === team) && (!role || p.role.id === role) && (!status || standing(p, now).key === status))
     .filter((p) => !search || p.fullName.toLowerCase().includes(search) || p.email.toLowerCase().includes(search) || (p.employeeId ?? "").toLowerCase().includes(search))
     .sort((a, b) => (reverse ? -1 : 1) * SORTS[sort](a, b));
+  const shown = slicePage(people, pageOf(params.page));
   const active = everyone.filter((p) => p.isActive);
   const count = (key: string) => everyone.filter((p) => standing(p, now).key === key).length;
   const roles = [...new Map(everyone.map((p) => [p.role.id, p.role.name])).entries()];
   const teams = [...new Map(everyone.filter((p) => p.team).map((p) => [p.team!.id, p.team!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const when = new Intl.DateTimeFormat(me.org.locale, { dateStyle: "medium", timeZone: me.org.timezone });
   const keep = new URLSearchParams(Object.entries({ team, role, status, q: one(params.q) }).filter(([, v]) => v) as [string, string][]);
+  // The page links keep the search, the filters and the order.
+  const keepAll = new URLSearchParams(keep);
+  if (sort !== "name") keepAll.set("sort", sort);
+  if (reverse) keepAll.set("desc", "1");
   const sortHref = (k: SortKey) => {
     const q = new URLSearchParams(keep);
     if (k !== "name") q.set("sort", k);
@@ -95,23 +102,23 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <FigureCard first figure={{ value: String(active.length), label: "Active", note: `${count("week")} signed in this week`, href: "/admin/users" }} />
         <FigureCard figure={{ value: String(count("never")), label: "Never signed in", note: count("never") ? "Send them their sign-in again" : "Everyone has signed in", alert: count("never") > 0, href: "/admin/users?status=never" }} />
-        <FigureCard figure={{ value: String(count("off")), label: "Switched off", note: "Can't sign in; their records stay", href: "/admin/users?status=off" }} />
+        <FigureCard figure={{ value: String(count("off")), label: "Inactive", note: "Can't sign in; their records stay", href: "/admin/users?status=off" }} />
       </div>
 
       <Filters
         search="Name, email or employee ID"
         selects={[
-          { name: "role", label: "Role", options: [{ value: "", label: "Every role" }, ...roles.map(([id, name]) => ({ value: id, label: name }))] },
-          { name: "team", label: "Team", options: [{ value: "", label: "Every team" }, ...teams.map(([id, name]) => ({ value: id, label: name }))] },
+          { name: "role", label: "Role", options: [{ value: "", label: "All roles" }, ...roles.map(([id, name]) => ({ value: id, label: name }))] },
+          { name: "team", label: "Team", options: [{ value: "", label: "All teams" }, ...teams.map(([id, name]) => ({ value: id, label: name }))] },
           {
             name: "status",
             label: "Status",
             options: [
-              { value: "", label: "Anyone" },
+              { value: "", label: "All" },
               { value: "week", label: "Signed in this week" },
-              { value: "earlier", label: "Not this week" },
+              { value: "earlier", label: "Not signed in this week" },
               { value: "never", label: "Never signed in" },
-              { value: "off", label: "Switched off" },
+              { value: "off", label: "Inactive" },
             ],
           },
         ]}
@@ -149,7 +156,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
-              {people.map((p) => {
+              {shown.rows.map((p) => {
                 const s = standing(p, now);
                 return (
                   <tr key={p.id} className="hover:bg-bench/40">
@@ -186,6 +193,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
           </table>
         )}
       </Sheet>
+      <Pager total={people.length} page={shown.page} base={`/admin/users${keepAll.size ? `?${keepAll}` : ""}`} />
     </>
   );
 }

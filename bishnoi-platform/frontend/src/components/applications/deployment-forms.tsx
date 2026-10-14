@@ -49,25 +49,25 @@ function DeploymentForm({ appId, appName, onDone }: { appId: string; appName: st
         {(p) => <Input {...p} value={version} onChange={(e) => setVersion(e.target.value)} placeholder="2.4.0" autoFocus className="max-w-[12rem]" />}
       </Field>
       <div>
-        <Choice name="environment" legend="Where it went" value={environment} onChange={setEnvironment} options={ENVIRONMENTS} />
+        <Choice name="environment" legend="Environment" value={environment} onChange={setEnvironment} options={ENVIRONMENTS} />
         <p className="mt-1.5 text-meta text-ink-3">
           {environment === "production"
-            ? `Production makes this the version of ${appName} people are on.`
-            : "Kept in the list; the live version stays as it is."}
+            ? `Sets the current version of ${appName}.`
+            : "Recorded only; the current version does not change."}
         </p>
       </div>
-      <Field label="What changed" optional error={fieldError(fields, "notes")}>
+      <Field label="Release notes" optional error={fieldError(fields, "notes")}>
         {(p) => <Textarea {...p} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </Field>
       <FormError message={error} />
-      <PanelActions pending={pending} save="Record it" onCancel={onDone} />
+      <PanelActions pending={pending} save="Record deployment" onCancel={onDone} />
     </form>
   );
 }
 
 export function RecordDeployment({ appId, appName }: { appId: string; appName: string }) {
   return (
-    <PanelButton label="Record a deployment" title={`Record a deployment of ${appName}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
+    <PanelButton label="Record deployment" title={`Record a deployment of ${appName}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
       {(close) => <DeploymentForm appId={appId} appName={appName} onDone={close} />}
     </PanelButton>
   );
@@ -127,31 +127,31 @@ function IntegrationForm({ appId, link, onDone }: { appId: string; link?: Integr
         <Field label="Name" error={fieldError(fields, "name")}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder="Payments" autoFocus />}
         </Field>
-        <Field label="What it connects to" optional hint="A service, a host or a partner." error={fieldError(fields, "target")}>
+        <Field label="Target" optional hint="A service, host or partner." error={fieldError(fields, "target")}>
           {(p) => <Input {...p} value={target} onChange={(e) => setTarget(e.target.value)} />}
         </Field>
       </div>
       <Field
-        label="Health address"
+        label="Health check URL"
         optional
-        hint="With one, the platform checks it along with the applications and its status is what the check says. Without one, you set the status by hand."
+        hint="With one, the platform monitors it and sets its status from the check. Without one, the status is set manually."
         error={fieldError(fields, "healthUrl")}
       >
         {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://" value={healthUrl} onChange={(e) => setHealthUrl(e.target.value)} />}
       </Field>
-      {!checked && <Choice name="link-status" legend="Status, as you know it" value={status} onChange={setStatus} options={LINK_STATUSES} />}
+      {!checked && <Choice name="link-status" legend="Status" value={status} onChange={setStatus} options={LINK_STATUSES} />}
       <Field label="Notes" optional error={fieldError(fields, "notes")}>
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </Field>
       <FormError message={error} />
-      <PanelActions pending={pending} save={link ? "Save changes" : "Add it"} onCancel={onDone} />
+      <PanelActions pending={pending} save={link ? "Save changes" : "Add integration"} onCancel={onDone} />
     </form>
   );
 }
 
 export function AddIntegration({ appId, appName }: { appId: string; appName: string }) {
   return (
-    <PanelButton label="Add an integration" title={`Add an integration to ${appName}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
+    <PanelButton label="Add integration" title={`Add an integration to ${appName}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
       {(close) => <IntegrationForm appId={appId} onDone={close} />}
     </PanelButton>
   );
@@ -175,8 +175,8 @@ export function RemoveIntegration({ link }: { link: Integration }) {
       triggerSize="sm"
       triggerClassName="!size-8 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
       title={`Remove the ${link.name} integration?`}
-      body="It leaves the application's record and monitoring. This can't be undone; add it again if you need it back."
-      confirmLabel="Remove it"
+      body="It is removed from the application's record and from monitoring. This can't be undone."
+      confirmLabel="Remove"
       onConfirm={async () => {
         const result = await deleteIntegration(link.id);
         if (!result.ok) {

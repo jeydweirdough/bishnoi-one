@@ -26,7 +26,7 @@ export function PickForm({ kind, documentId, lines, label }: { kind: "order" | "
         serials: (chosen[l.id]?.serials ?? "").split(/[\s,]+/).filter(Boolean),
       })),
     };
-    save(() => (kind === "order" ? issueOrder(documentId, input) : dispatchTransfer(documentId, input)), () => ({ message: kind === "order" ? "Issued: stock is out" : "Dispatched: it's in transit" }));
+    save(() => (kind === "order" ? issueOrder(documentId, input) : dispatchTransfer(documentId, input)), () => ({ message: kind === "order" ? "Stock issued" : "Dispatched; now in transit" }));
   }
 
   return (

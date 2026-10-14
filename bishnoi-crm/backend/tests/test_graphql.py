@@ -88,3 +88,9 @@ def test_performance_reads_as_the_scorecard(client, ana, crew):
     assert "errors" not in got, got
     assert got["data"]["performance"] == client.get("/kpi-scorecard?view=mine", headers=rep).json()
     assert got["data"]["before"]["month"] == "2026-01"
+
+
+def test_a_field_agents_home_in_one_request(client, ana):
+    # The field Home's query: the list by the plan, and the month's coverage of it.
+    data = gql(client, ana, '{ doctors: fieldDoctors(limit: 5, sort: "plan") coverage: fieldCoverage }')["data"]
+    assert {"items", "total"} <= set(data["doctors"]) and data["coverage"]["goalPct"] == 80

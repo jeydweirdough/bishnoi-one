@@ -156,9 +156,9 @@ export function DealForm({
     if (Object.keys(problems).length) {
       if (problems.name) setDetails(true);
       setFields(problems);
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       triggerShake();
-      toast.error("Some fields need a look.");
+      toast.error("Some fields need attention.");
       return;
     }
     const input: DealInput = {
@@ -289,7 +289,7 @@ export function DealForm({
                       value={l.productId}
                       onChange={(id) => setLine(l.key, { productId: id, promoId: startingPromo(promos, id) })}
                       options={[
-                        { value: "", label: "Pick a product", promos: 0 },
+                        { value: "", label: "Select a product", promos: 0 },
                         ...products.map((x) => ({ value: x.id, label: `${x.name} (${x.code})`, promos: promosFor(promos, x.id).length, bundles: bundlesWith(bundles, x.id).length })),
                       ]}
                       optionRender={(o) => withPromoFlag(o.data.label, Number(o.data.promos) || 0, Number(o.data.bundles) || 0)}
@@ -430,7 +430,7 @@ export function DealForm({
           <Field label="Contact" optional error={fields.contactId}>
             {(p) => (
               <Select {...p} value={contactId} onChange={(e) => setContactId(e.target.value)}>
-                <option value="">No one in particular</option>
+                <option value="">None</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}

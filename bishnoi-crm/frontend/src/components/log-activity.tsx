@@ -86,7 +86,7 @@ export function LogActivity({
     // Catch the obvious here, so nothing appears in the history only to vanish.
     if (input.summary.length < 2) {
       setFields({ summary: "Say what happened (at least 2 characters)." });
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       return;
     }
     const typed = { kind, outcome, withFollowUp, title };
@@ -137,7 +137,7 @@ export function LogActivity({
   return (
     <form ref={form} onSubmit={submit} noValidate className="space-y-4">
       <Choice
-        legend="What happened"
+        legend="Activity type"
         name="kind"
         value={kind}
         onChange={setKind}
@@ -165,7 +165,7 @@ export function LogActivity({
             required
             rows={3}
             maxLength={2000}
-            placeholder="What was discussed, what they asked for"
+            placeholder="Discussion points and requests"
           />
         )}
       </Field>

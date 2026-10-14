@@ -13,9 +13,9 @@ export type CatalogItem = { key: string; name: string; code?: string; parentId?:
 type Kind = "categories" | "brands" | "units";
 
 const WORDS: Record<Kind, { one: string; hint: string }> = {
-  categories: { one: "category", hint: "Put one inside another to make a tree: Medical Supplies › Syringes." },
-  brands: { one: "brand", hint: "Who makes it." },
-  units: { one: "unit", hint: "A short code (box) and its name (Box). Quantities are whole units of it." },
+  categories: { one: "category", hint: "Nest categories to build a hierarchy, for example Medical Supplies › Syringes." },
+  brands: { one: "brand", hint: "The manufacturer or brand name." },
+  units: { one: "unit", hint: "A short code (box) and a name (Box). Quantities are recorded in whole units." },
 };
 
 type Draft = { name: string; code: string; parentId: string };
@@ -68,12 +68,12 @@ export function CatalogList({ kind, items, canEdit, canDelete }: { kind: Kind; i
         </div>
       )}
       <div className="min-w-48 flex-1">
-        <Input aria-label="Name" placeholder={kind === "units" ? "Box" : `The ${w.one}'s name`} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus={kind !== "units" || editing !== "new"} />
+        <Input aria-label="Name" placeholder={kind === "units" ? "Box" : "Name"} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus={kind !== "units" || editing !== "new"} />
       </div>
       {kind === "categories" && (
         <div className="min-w-48">
-          <Select aria-label="Inside" value={draft.parentId} onChange={(e) => setDraft({ ...draft, parentId: e.target.value })}>
-            <option value="">At the top</option>
+          <Select aria-label="Parent category" value={draft.parentId} onChange={(e) => setDraft({ ...draft, parentId: e.target.value })}>
+            <option value="">None (top level)</option>
             {items.filter((c) => c.key !== editing).map((c) => <option key={c.key} value={c.key}>Inside {c.path}</option>)}
           </Select>
         </div>
@@ -92,7 +92,7 @@ export function CatalogList({ kind, items, canEdit, canDelete }: { kind: Kind; i
     <div>
       <p className="px-5 pt-4 pb-2 text-meta text-ink-3">{w.hint}</p>
       {items.length === 0 && editing !== "new" ? (
-        <Empty title={`No ${kind} yet`} icon="lists" />
+        <Empty title={`No ${kind}`} icon="lists" />
       ) : (
         <ul className="divide-y divide-rule border-t border-rule">
           {items.map((item) =>
@@ -111,8 +111,8 @@ export function CatalogList({ kind, items, canEdit, canDelete }: { kind: Kind; i
                 </span>
                 {canEdit && (
                   <span className="flex shrink-0 items-center gap-1">
-                    <Button size="sm" variant="quiet" onClick={() => run(async () => { const r = await saveCatalogItem(kind, item.key, { isActive: !item.isActive }); return r.ok ? { ok: true } : r; }, item.isActive ? `${item.name} switched off` : `${item.name} switched on`)}>
-                      {item.isActive ? "Switch off" : "Switch on"}
+                    <Button size="sm" variant="quiet" onClick={() => run(async () => { const r = await saveCatalogItem(kind, item.key, { isActive: !item.isActive }); return r.ok ? { ok: true } : r; }, item.isActive ? `${item.name} deactivated` : `${item.name} activated`)}>
+                      {item.isActive ? "Deactivate" : "Activate"}
                     </Button>
                     <button type="button" title={`Rename ${item.name}`} onClick={() => open(item)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Pencil className="size-4" aria-hidden />

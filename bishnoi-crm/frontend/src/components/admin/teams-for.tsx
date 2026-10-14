@@ -64,7 +64,7 @@ export function TeamsFor({
           className="w-full"
           value={picked}
           onChange={(ids) => set(mode, ids)}
-          placeholder={notes?.placeholder ?? "Pick teams"}
+          placeholder={notes?.placeholder ?? "Select teams"}
           options={teams.filter((t) => t.isActive || picked.includes(t.id)).map((t) => ({ value: t.id, label: t.name }))}
           showSearch={{ optionFilterProp: "label" }}
         />

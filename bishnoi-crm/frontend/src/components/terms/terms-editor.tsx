@@ -44,15 +44,15 @@ export function TermsEditor({ data }: { data: TermsSettings }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <Sheet className="px-5 pt-4 pb-5">
-        <SectionTitle icon="particulars">Your words</SectionTitle>
+        <SectionTitle icon="particulars">Terms</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <Field label="Who field agents visit, one" hint="On visits: Doctor, Account, Store." error={errors.fields?.["visited.one"]}>
+          <Field label="Visited account (singular)" hint="On visits: Doctor, Account, Store." error={errors.fields?.["visited.one"]}>
             {(p) => <Input {...p} value={draft.visited.one} maxLength={40} onChange={(e) => set({ visited: { ...draft.visited, one: e.target.value } })} />}
           </Field>
-          <Field label="Many" hint="In the menu: Field work → Doctors, Accounts, Stores." error={errors.fields?.["visited.many"]}>
+          <Field label="Visited account (plural)" hint="In the menu: Field work → Doctors, Accounts, Stores." error={errors.fields?.["visited.many"]}>
             {(p) => <Input {...p} value={draft.visited.many} maxLength={40} onChange={(e) => set({ visited: { ...draft.visited, many: e.target.value } })} />}
           </Field>
-          <Field label="Which customers they are" hint={`The customer type listed under ${many}. Any customer, if none is picked.`} error={errors.fields?.visitedType}>
+          <Field label="Customer type" hint={`The customer type listed under ${many}. Any customer, if none is picked.`} error={errors.fields?.visitedType}>
             {(p) => (
               <Select {...p} value={draft.visitedType ?? ""} onChange={(e) => set({ visitedType: e.target.value || null })}>
                 <option value="">Any customer</option>
@@ -64,18 +64,18 @@ export function TermsEditor({ data }: { data: TermsSettings }) {
               </Select>
             )}
           </Field>
-          <Field label="Where a visit happens" hint={`"Logged away from the ${site}", and the place's pin.`} error={errors.fields?.site}>
+          <Field label="Visit location" hint={`"Logged away from the ${site}", and the place's pin.`} error={errors.fields?.site}>
             {(p) => <Input {...p} value={draft.site} maxLength={40} onChange={(e) => set({ site: e.target.value })} />}
           </Field>
-          <Field label="Talking through products on a visit" hint="The heading over the products discussed on visits." error={errors.fields?.detailing}>
+          <Field label="Product detailing" hint="The heading over the products discussed on visits." error={errors.fields?.detailing}>
             {(p) => <Input {...p} value={draft.detailing} maxLength={60} onChange={(e) => set({ detailing: e.target.value })} />}
           </Field>
-          <Field label="A product's base name, shared by its brands" hint="The kind of form field that offers it." error={errors.fields?.genericName}>
+          <Field label="Generic name" hint="The kind of form field that offers it." error={errors.fields?.genericName}>
             {(p) => <Input {...p} value={draft.genericName} maxLength={40} onChange={(e) => set({ genericName: e.target.value })} />}
           </Field>
         </div>
         <p className="mt-5 rounded-lg bg-mint px-4 py-3 text-meta text-ink-2">
-          Reads as: “Pick how the {one} took it” · “{many} visited” · “At the {site}”
+          Reads as: “Select the {one} response” · “{many} visited” · “At the {site}”
         </p>
         <FormError message={errors.error} />
         <div className="mt-5 flex justify-end gap-2">

@@ -136,14 +136,14 @@ export async function SalespersonHome() {
                   </Link>
                 }
               >
-                Your to do
+                To do
               </SectionTitle>
               <p className="text-meta text-ink-3">
                 <span className={counts.overdue ? "font-semibold text-danger" : ""}>{counts.overdue} overdue</span> · {counts.today} today ·{" "}
                 {counts.upcoming} coming up
               </p>
               {due.length === 0 ? (
-                <Empty icon="followUps" title="Nothing due today" actions={can(me, "activities.create") && <LogActivityButton
+                <Empty icon="followUps" title="No items due today" actions={can(me, "activities.create") && <LogActivityButton
                       label="Plan a follow-up"
                       org={me.org}
                       now={new Date().toISOString()}
@@ -178,11 +178,11 @@ export async function SalespersonHome() {
                 icon="deals"
                 action={
                   <Link href="/deals?who=me" className="text-meta font-medium text-ink hover:underline">
-                    All your deals
+                    All my deals
                   </Link>
                 }
               >
-                Your deals closing next
+                Deals closing soon
               </SectionTitle>
               {closing.length === 0 ? (
                 <Empty compact icon="deals" art="steps" title="No open deals">
@@ -216,11 +216,11 @@ export async function SalespersonHome() {
                 icon="quotes"
                 action={
                   <Link href="/quotes?owner=me" className="text-meta font-medium text-ink hover:underline">
-                    All your quotes
+                    All my quotes
                   </Link>
                 }
               >
-                Your quotes
+                My quotes
               </SectionTitle>
               {approver && toApprove.total > 0 && (
                 <Link href="/quotes?task=approvals" className="mt-1 flex items-center justify-between rounded-lg bg-hema-tint px-3 py-2 text-sm font-medium text-ink hover:underline">

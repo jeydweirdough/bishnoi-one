@@ -71,7 +71,7 @@ export function ConnectKey({ appId, appName, appKey, has }: { appId: string; app
           })
         }
       >
-        Make its connect key
+        Create connect key
       </Button>
     );
   }
@@ -80,9 +80,9 @@ export function ConnectKey({ appId, appName, appKey, has }: { appId: string; app
       label="New key"
       icon={<KeyRound className="size-4" aria-hidden />}
       triggerSize="sm"
-      title={`Make a new connect key for ${appName}?`}
-      body={`The old key stops working at once: ${appName} can't reach its links until its server has the new one. Do this if the old key may have been seen by someone it shouldn't.`}
-      confirmLabel="Make a new key"
+      title={`Create a new connect key for ${appName}?`}
+      body={`The old key stops working at once: ${appName} can't reach its links until its server has the new one. Do this if the old key may have been exposed.`}
+      confirmLabel="Create new key"
       onConfirm={async () => {
         const r = await makeConnectKey(appId);
         if (!r.ok) {
@@ -106,7 +106,7 @@ export function Disconnect({ appId, appName }: { appId: string; appName: string 
       triggerClassName="!size-8 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
       title={`Disconnect ${appName}?`}
       body="Its connect key stops working, and within 5 minutes it drops every link: what it uses, and what uses it. Its own screens keep working."
-      confirmLabel="Disconnect it"
+      confirmLabel="Disconnect"
       danger
       onConfirm={async () => {
         const r = await disconnectApp(appId);
@@ -131,11 +131,11 @@ export function LinkThem({ fromId, toId, label }: { fromId: string; toId: string
         start(async () => {
           const r = await addLink(fromId, toId);
           if (!r.ok) return void toast.error(r.error);
-          toast.success("Linked", { description: `${label}. Both pick it up within 5 minutes.` });
+          toast.success("Link created", { description: `${label}. Both applications apply it within 5 minutes.` });
         })
       }
     >
-      Link them
+      Create link
     </Button>
   );
 }
@@ -152,11 +152,11 @@ export function LinkSwitch({ id, isOn, label }: { id: string; isOn: boolean; lab
         start(async () => {
           const r = await switchLink(id, !isOn);
           if (!r.ok) return void toast.error(r.error);
-          toast.success(isOn ? "Switched off" : "Switched on", { description: `${label}. Both pick it up within 5 minutes.` });
+          toast.success(isOn ? "Link disabled" : "Link enabled", { description: `${label}. Both applications apply it within 5 minutes.` });
         })
       }
     >
-      {isOn ? "Switch off" : "Switch on"}
+      {isOn ? "Disable" : "Enable"}
     </Button>
   );
 }
@@ -166,20 +166,20 @@ export function NewLinkKey({ id, label }: { id: string; label: string }) {
     <ConfirmButton
       label={<span className="sr-only">New key for {label}</span>}
       icon={<RefreshCw className="size-4" aria-hidden />}
-      triggerTitle="Make a new key between them"
+      triggerTitle="Create a new key for this link"
       triggerVariant="quiet"
       triggerSize="sm"
       triggerClassName="!size-8 !px-0 !text-ink-3"
-      title="Make a new key between them?"
+      title="Create a new key for this link?"
       body="Both applications pick the new key up within 5 minutes; until both have it, calls between them may be refused. Nothing needs changing on either server."
-      confirmLabel="Make a new key"
+      confirmLabel="Create new key"
       onConfirm={async () => {
         const r = await newLinkKey(id);
         if (!r.ok) {
           toast.error(r.error);
           return false;
         }
-        toast.success("New key made", { description: label });
+        toast.success("New key created", { description: label });
       }}
     />
   );
@@ -195,8 +195,8 @@ export function RemoveLink({ id, label }: { id: string; label: string }) {
       triggerSize="sm"
       triggerClassName="!size-8 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
       title={`Remove the link "${label}"?`}
-      body="Both applications drop it within 5 minutes. To pause it instead, switch it off: switching it back on keeps the same key."
-      confirmLabel="Remove it"
+      body="Both applications drop it within 5 minutes. To pause it instead, disable it: enabling it again keeps the same key."
+      confirmLabel="Remove link"
       danger
       onConfirm={async () => {
         const r = await removeLink(id);

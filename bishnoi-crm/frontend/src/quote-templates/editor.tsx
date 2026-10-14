@@ -106,7 +106,7 @@ export function TemplateEditor({ initial, options }: Props) {
             <div className="sm:col-span-2">
               <Choice
                 name="kind"
-                legend="How it is made"
+                legend="Template type"
                 value={v.kind}
                 onChange={(kind) => setV({ ...v, kind })}
                 options={[

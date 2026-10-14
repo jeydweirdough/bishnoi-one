@@ -71,30 +71,30 @@ export default async function SupportPage({ searchParams }: { searchParams: Sear
         ]}
       />
       <p className="-mt-2 mb-4 text-meta text-ink-3">
-        {kind ? TICKET_KINDS[kind].what : "Every kind of report. The numbers on the tabs are the open ones."}
+        {kind ? TICKET_KINDS[kind].what : "All ticket types. Tab counts show open tickets."}
       </p>
 
       <Filters
-        search="Number, title or who reported it"
+        search="Number, title or reporter"
         selects={[
           {
             name: "state",
-            label: "State",
+            label: "Status",
             options: [
               { value: "", label: "Open" },
-              { value: "done", label: "Done" },
+              { value: "done", label: "Closed" },
               { value: "all", label: "All" },
             ],
           },
           {
             name: "severity",
             label: "Severity",
-            options: [{ value: "", label: "Any severity" }, ...(Object.keys(SEVERITIES) as Severity[]).map((s) => ({ value: s, label: SEVERITIES[s] }))],
+            options: [{ value: "", label: "All severities" }, ...(Object.keys(SEVERITIES) as Severity[]).map((s) => ({ value: s, label: SEVERITIES[s] }))],
           },
           {
             name: "assignee",
             label: "Assigned to",
-            options: [{ value: "", label: "Anyone" }, { value: "none", label: "Nobody yet" }, ...options.staff.map((s) => ({ value: s.id, label: s.name }))],
+            options: [{ value: "", label: "Anyone" }, { value: "none", label: "Unassigned" }, ...options.staff.map((s) => ({ value: s.id, label: s.name }))],
           },
         ]}
       />
@@ -102,12 +102,12 @@ export default async function SupportPage({ searchParams }: { searchParams: Sear
       {(appName || companyName) && (
         <p className="mb-3 flex flex-wrap gap-2 text-meta">
           {appName && (
-            <Link href={without("application", "application_id")} className="inline-flex items-center gap-1 rounded-full border border-hema bg-hema-tint px-3 py-1 text-hema" aria-label={`Stop showing only ${appName}`}>
+            <Link href={without("application", "application_id")} className="inline-flex items-center gap-1 rounded-full border border-hema bg-hema-tint px-3 py-1 text-hema" aria-label={`Clear filter: ${appName}`}>
               Only {appName} <X className="size-3.5" aria-hidden />
             </Link>
           )}
           {companyName && (
-            <Link href={without("company", "company_id")} className="inline-flex items-center gap-1 rounded-full border border-hema bg-hema-tint px-3 py-1 text-hema" aria-label={`Stop showing only ${companyName}`}>
+            <Link href={without("company", "company_id")} className="inline-flex items-center gap-1 rounded-full border border-hema bg-hema-tint px-3 py-1 text-hema" aria-label={`Clear filter: ${companyName}`}>
               Only {companyName} <X className="size-3.5" aria-hidden />
             </Link>
           )}
@@ -116,8 +116,8 @@ export default async function SupportPage({ searchParams }: { searchParams: Sear
 
       <Sheet className="overflow-hidden">
         {list.tickets.length === 0 ? (
-          <Empty icon="support" title={filtered ? "No tickets match." : kind ? `No open ${TICKET_KINDS[kind].many.toLowerCase()}.` : "Nothing open."}>
-            {filtered ? "Try another state or fewer filters." : "When someone reports something, use Log a ticket so it's tracked until it's done."}
+          <Empty icon="support" title={filtered ? "No matching tickets." : kind ? `No open ${TICKET_KINDS[kind].many.toLowerCase()}.` : "No open tickets."}>
+            {filtered ? "Try another status or fewer filters." : "When an issue is reported, use Log ticket to track it until it is closed."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
@@ -153,7 +153,7 @@ export default async function SupportPage({ searchParams }: { searchParams: Sear
           </ul>
         )}
       </Sheet>
-      {list.tickets.length >= 300 && <p className="mt-3 text-meta text-ink-3">Showing the newest 300. Narrow it down with the filters to see older ones.</p>}
+      {list.tickets.length >= 300 && <p className="mt-3 text-meta text-ink-3">Showing the newest 300. Use the filters to see older tickets.</p>}
     </>
   );
 }

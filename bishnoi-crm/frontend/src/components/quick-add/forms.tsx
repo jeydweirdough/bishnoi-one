@@ -130,7 +130,7 @@ export function AddCustomer({ onAdded, done, initialName = "" }: { onAdded: (cus
         })
       }
     >
-      <Field label="Customer's name" hint="Just the name for now: their details can follow on their page." error={failed?.fields?.name}>
+      <Field label="Customer name" hint="Just the name for now: their details can follow on their page." error={failed?.fields?.name}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={160} autoFocus />}
       </Field>
     </Shell>
@@ -157,7 +157,7 @@ export function AddTeam({ onAdded, done }: { onAdded: (team: { id: string; name:
         })
       }
     >
-      <Field label="Team's name" hint="Its headquarters can be added later, in People and access → Teams." error={failed?.fields?.name}>
+      <Field label="Team name" hint="Its headquarters can be added later, in People and access → Teams." error={failed?.fields?.name}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />}
       </Field>
     </Shell>
@@ -195,7 +195,7 @@ export function AddIssuer({ onAdded, done }: { onAdded: (code: string) => void; 
         })
       }
     >
-      <Field label="Who issues the letters" error={failed?.fields?.name}>
+      <Field label="Issuer name" error={failed?.fields?.name}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus placeholder="e.g. Philippine Charity Sweepstakes Office" />}
       </Field>
       <Field label="Short code" hint="Letters and numbers, as it's shown on quotes." error={failed?.fields?.code}>

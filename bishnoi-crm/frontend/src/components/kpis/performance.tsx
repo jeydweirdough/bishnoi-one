@@ -37,9 +37,9 @@ export function StatusFigures({ results, targetsHref }: { results: KpiResult[]; 
   const targeted = results.length - t.none;
   const figures: Figure[] = [
     { value: String(t.green), label: "On target", note: targeted ? `of ${targeted} with a target` : "No targets set", ring: targeted ? Math.round((100 * t.green) / targeted) : null },
-    { value: String(t.amber), label: "Slightly behind", note: targeted ? "Close to where they should be by today" : "—" },
-    { value: String(t.red), label: "Behind", note: t.red ? "Short of where they should be by today" : "Nobody behind", alert: t.red > 0 },
-    { value: String(t.none), label: "Without a target", note: t.none ? (targetsHref ? "Set them under Targets" : "Your lead sets them") : "Every result has a target", href: t.none ? targetsHref : undefined },
+    { value: String(t.amber), label: "Slightly behind", note: targeted ? "Near expected pace" : "—" },
+    { value: String(t.red), label: "Behind", note: t.red ? "Below expected pace" : "None behind", alert: t.red > 0 },
+    { value: String(t.none), label: "Without a target", note: t.none ? (targetsHref ? "Set under Targets" : "Set by your team lead") : "All results have targets", href: t.none ? targetsHref : undefined },
   ];
   return (
     <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -63,9 +63,9 @@ export function YourMonth({ card, more, fmt, month }: { card: KpiScorecard | nul
   const [lead, ...rest] = figures;
   return (
     <MonthCard
-      title="Your month"
-      subtitle={`${fmt.monthLabel(card?.month ?? month)} so far`}
-      action={measured.length > 0 ? { href: "/performance", label: "See your performance" } : undefined}
+      title="Monthly performance"
+      subtitle={`${fmt.monthLabel(card?.month ?? month)} to date`}
+      action={measured.length > 0 ? { href: "/performance", label: "View performance" } : undefined}
       lead={lead}
       rest={rest}
     />

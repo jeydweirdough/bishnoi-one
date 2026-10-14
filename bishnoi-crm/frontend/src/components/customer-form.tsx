@@ -84,7 +84,7 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
       className="space-y-7"
     >
       <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">Where it belongs</legend>
+        <legend className="mb-3 text-sm font-semibold text-ink">Assignment</legend>
         {canChooseDivision && (
           <Field label="Division" error={fields.division}>
             {(p) => (
@@ -155,7 +155,7 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
       </fieldset>
 
       <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">Who</legend>
+        <legend className="mb-3 text-sm font-semibold text-ink">Details</legend>
         <Field label="Name" error={fields.name} className="sm:col-span-2" hint="Write it the way it should read in the list, title and all.">
           {(p) => <Input {...p} name="name" defaultValue={customer?.name} required maxLength={120} autoComplete="off" />}
         </Field>
@@ -183,7 +183,7 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
       </fieldset>
 
       <fieldset className="grid gap-5 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold text-ink">How to reach them</legend>
+        <legend className="mb-3 text-sm font-semibold text-ink">Contact information</legend>
         <Field label="Phone" optional error={fields.phone}>
           {(p) => <Input {...p} name="phone" type="tel" inputMode="tel" defaultValue={customer?.phone ?? ""} placeholder="0917 123 4567" />}
         </Field>

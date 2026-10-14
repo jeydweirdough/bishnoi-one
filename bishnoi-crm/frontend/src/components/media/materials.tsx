@@ -129,10 +129,10 @@ function MaterialForm({
         </div>
         <label className="block">
           <span className="mb-1.5 block text-sm text-ink">Products</span>
-          <Combobox mode="multiple" className="w-full" value={picked} onChange={setPicked} options={products} showSearch={{ optionFilterProp: "label" }} placeholder="The products it's about" />
+          <Combobox mode="multiple" className="w-full" value={picked} onChange={setPicked} options={products} showSearch={{ optionFilterProp: "label" }} placeholder="Related products" />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-sm text-ink">Who can show it</span>
+          <span className="mb-1.5 block text-sm text-ink">Visible to</span>
           {/* "Everyone" is a choice of its own: picking a division narrows it, picking Everyone opens it to all again. */}
           <Combobox
             mode="multiple"
@@ -142,7 +142,7 @@ function MaterialForm({
               const added = picked.find((v) => !onlyTeams.includes(v) && v !== EVERYONE);
               setOnlyTeams(picked.at(-1) === EVERYONE && !added ? [] : picked.filter((v) => v !== EVERYONE));
             }}
-            options={[{ value: EVERYONE, label: "Everyone, every division" }, ...teams]}
+            options={[{ value: EVERYONE, label: "All divisions" }, ...teams]}
             showSearch={{ optionFilterProp: "label" }}
           />
           <span className="mt-1 block text-meta text-ink-3">{onlyTeams.length ? "Only these divisions see it in Media." : "Every division sees it. Pick divisions to show it to them only."}</span>
@@ -208,7 +208,7 @@ export function Materials({
               Add the approved decks, PDFs and links reps show customers, with the products and divisions they&apos;re for.
             </Empty>
           ) : (
-            <Empty icon="letters" title="Nothing approved for your division yet">
+            <Empty icon="letters" title="No approved materials for your division">
               Approved presentations, PDFs and videos show up here once an administrator adds them. Ask them for what you need to show customers.
             </Empty>
           )}
@@ -234,7 +234,7 @@ export function Materials({
                     menu={{
                       items: [
                         { key: "change", label: "Change" },
-                        { key: "switch", label: m.isActive ? "Switch off" : "Switch on" },
+                        { key: "switch", label: m.isActive ? "Deactivate" : "Activate" },
                         { type: "divider" },
                         { key: "delete", label: "Delete", danger: true },
                       ],
@@ -255,7 +255,7 @@ export function Materials({
               {/* Where it stands, then what it's about. */}
               {(!m.isCurrent || m.onlyTeams.length > 0) && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {!m.isCurrent && <Tag color="error">{m.isActive ? "Not current" : "Switched off"}</Tag>}
+                  {!m.isCurrent && <Tag color="error">{m.isActive ? "Not current" : "Inactive"}</Tag>}
                   {m.onlyTeams.map((t) => (
                     <Tag key={t}>{teamName(t)}</Tag>
                   ))}

@@ -123,7 +123,7 @@ function inventoryNav(me: Me): { home: Page | null; sections: Section[] } {
     {
       label: "Procurement",
       places: [
-        { href: "/purchase-orders", label: "Purchases", icon: "purchaseOrders", also: ["/backorders"], sees: ["purchasing.view"], waiting: may("purchasing.approve") ? ["drafts"] : [] },
+        { href: "/purchase-orders", label: "Purchase orders", icon: "purchaseOrders", also: ["/backorders"], sees: ["purchasing.view"], waiting: may("purchasing.approve") ? ["drafts"] : [] },
         { href: "/receipts", label: "Receiving", icon: "receiving", sees: ["receiving.view"], waiting: ["receiving"] },
         { href: "/suppliers", label: "Suppliers", icon: "suppliers", sees: ["suppliers.view"] },
       ],
@@ -131,10 +131,10 @@ function inventoryNav(me: Me): { home: Page | null; sections: Section[] } {
     {
       label: "Stock",
       places: [
-        { href: "/stock", label: "On hand", icon: "stock", sees: ["stock.view"] },
+        { href: "/stock", label: "Stock on hand", icon: "stock", sees: ["stock.view"] },
         { href: "/batches", label: "Batches and expiry", icon: "batches", sees: ["stock.view"] },
-        { href: "/serials", label: "Serials", icon: "serials", sees: ["stock.view"] },
-        { href: "/movements", label: "Movements", icon: "history", sees: ["stock.view"] },
+        { href: "/serials", label: "Serial numbers", icon: "serials", sees: ["stock.view"] },
+        { href: "/movements", label: "Stock movements", icon: "history", sees: ["stock.view"] },
         { href: "/products", label: "Products", icon: "products", sees: ["products.view"], unset: ["productPrices"] },
         { href: "/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
       ],
@@ -213,7 +213,7 @@ function UnsetMark({ place, unset }: { place: Place; unset: Unset }) {
   return (
     <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
       {count}
-      <span className="sr-only"> not set yet: {says}</span>
+      <span className="sr-only"> not set up: {says}</span>
     </span>
   );
 }
@@ -288,7 +288,7 @@ const SETTINGS: PageGroup[] = [
     label: "Access",
     pages: [
       { href: "/settings/people", label: "People", icon: "people", reach: recovers },
-      { href: "/settings/roles", label: "Roles & permissions", icon: "roles" },
+      { href: "/settings/roles", label: "Roles and permissions", icon: "roles" },
       { href: "/settings/teams", label: "Teams", icon: "teams" },
       { href: "/settings/audit", label: "Audit log", icon: "auditLog", reach: recovers },
     ],
@@ -298,7 +298,7 @@ const SETTINGS: PageGroup[] = [
     pages: [
       { href: "/settings/lists", label: "Lists", icon: "lists" },
       { href: "/settings/pricing", label: "Pricing", icon: "pricing" },
-      { href: "/settings/money", label: "Money & formats", icon: "money" },
+      { href: "/settings/money", label: "Money and formats", icon: "money" },
       { href: "/settings/orders", label: "Orders", icon: "orders" },
       { href: "/settings/retention", label: "Retention", icon: "retention" },
       { href: "/settings/goals", label: "Goals", icon: "goals" },
@@ -841,7 +841,7 @@ function Account({ me }: { me: Me }) {
       : null;
   // What's used now and then sits behind ⋯, so the sidebar's foot is only who you are.
   const items: MenuProps["items"] = [
-    { key: "account", label: "Your account", icon: <UserRound className="size-4" aria-hidden /> },
+    { key: "account", label: "Account", icon: <UserRound className="size-4" aria-hidden /> },
     // The CRM sends email from each person's own mailbox.
     ...(process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? [{ key: "mailbox", label: "Mailbox", icon: <Mail className="size-4" aria-hidden /> }] : []),
     // Each company has its own data here. Someone who works for more than one
@@ -891,7 +891,7 @@ function Account({ me }: { me: Me }) {
         }}
         width={400}
       >
-        You&apos;ll need your email and password to get back in.
+        You will need your email and password to sign in again.
       </Modal>
     </div>
   );

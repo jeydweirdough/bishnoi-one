@@ -60,7 +60,7 @@ export function StaffForm({ person }: { person?: Staff }) {
         const r = await createStaff({ fullName, email, role, password: password || null });
         if (!r.ok) return setError(r.error);
         if (r.data) showPassword(fullName, r.data);
-        else toast.success("Staff account added", { description: `${fullName} signs in with the password you typed.` });
+        else toast.success("Staff account added", { description: `${fullName} signs in with the password entered.` });
       }
       dialog.current?.close();
     });
@@ -69,9 +69,9 @@ export function StaffForm({ person }: { person?: Staff }) {
   return (
     <>
       {editing ? (
-        <Button variant="quiet" size="sm" className={ICON_TRIGGER} title={`Change ${person!.fullName}'s name or email`} onClick={show} aria-haspopup="dialog">
+        <Button variant="quiet" size="sm" className={ICON_TRIGGER} title={`Edit ${person!.fullName}'s name or email`} onClick={show} aria-haspopup="dialog">
           <Pencil className="size-4" aria-hidden />
-          <span className="sr-only">Change {person!.fullName}&apos;s name or email</span>
+          <span className="sr-only">Edit {person!.fullName}&apos;s name or email</span>
         </Button>
       ) : (
         <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={show} aria-haspopup="dialog">
@@ -86,7 +86,7 @@ export function StaffForm({ person }: { person?: Staff }) {
       >
         <form onSubmit={save} className="space-y-4 p-5">
           <h2 id={titleId} className="text-heading">
-            {editing ? `Change ${person!.fullName}` : "Add a staff member"}
+            {editing ? `Edit ${person!.fullName}` : "Add staff member"}
           </h2>
           {!editing && <p className="text-sm text-ink-2">Someone who signs in to this console. Platform Admins change anything; Support sees it all and works tickets and incidents.</p>}
           <Field label="Full name">{(p) => <Input {...p} value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={120} autoFocus />}</Field>
@@ -94,7 +94,7 @@ export function StaffForm({ person }: { person?: Staff }) {
           {!editing && (
             <>
               <Choice name="role" legend="Role" value={role} options={ROLES} onChange={setRole} />
-              <Field label="Password" optional hint="Leave it empty and one is made, shown once. At least 8 characters.">
+              <Field label="Password" optional hint="Leave blank to generate one, shown once. At least 8 characters.">
                 {(p) => <PasswordInput {...p} value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={256} autoComplete="new-password" />}
               </Field>
             </>

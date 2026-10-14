@@ -47,5 +47,5 @@ export function audience(n: Pick<Notice, "company" | "application">): string {
 
 /** When it shows: "Sep 24, 2026, 10:00 AM – Sep 24, 2026, 12:00 PM", or open-ended. */
 export function noticeWindow(n: Pick<Notice, "startsAt" | "endsAt">, zone?: string): string {
-  return n.endsAt ? `${when(n.startsAt, zone)} – ${when(n.endsAt, zone)}` : `From ${when(n.startsAt, zone)}, until it's withdrawn`;
+  return n.endsAt ? `${when(n.startsAt, zone)} – ${when(n.endsAt, zone)}` : `From ${when(n.startsAt, zone)}, until withdrawn`;
 }

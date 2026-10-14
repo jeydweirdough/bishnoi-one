@@ -20,7 +20,7 @@ type Props = { params: Promise<{ id: string }> };
 
 const getUser = (id: string) => load<{ user: PlatformUserDetail }>(`/platform/users/${enc(id)}`).then((b) => b.user);
 
-const REQUEST_WORDS: Record<RequestStatus, string> = { pending: "Waiting", approved: "Approved", declined: "Declined" };
+const REQUEST_WORDS: Record<RequestStatus, string> = { pending: "Pending", approved: "Approved", declined: "Declined" };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -61,7 +61,7 @@ export default async function UserPage({ params }: Props) {
         <Link href={`/companies/${user.companyId}`} className="text-hema hover:underline">
           {user.companyName ?? "their company"}
         </Link>
-        {user.companyStatus === "suspended" && <span className="text-danger">, which is suspended: they can&apos;t work until it&apos;s reactivated</span>}.
+        {user.companyStatus === "suspended" && <span className="text-danger">, which is suspended: the user has no access until it is reactivated</span>}.
       </PageHeader>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
@@ -72,7 +72,7 @@ export default async function UserPage({ params }: Props) {
                 Applications
                 <Count n={user.applications.length} />
               </SectionTitle>
-              <p className="text-meta text-ink-3">They can only have what {user.companyName ?? "their company"} has. Each application still has its own sign-in.</p>
+              <p className="text-meta text-ink-3">Limited to the applications assigned to {user.companyName ?? "their company"}. Each application has its own sign-in.</p>
             </div>
             <div className="border-t border-rule">
               <Grants user={user} canChange={staff.canAdminister} />
@@ -87,8 +87,8 @@ export default async function UserPage({ params }: Props) {
               </SectionTitle>
             </div>
             {user.requests.length === 0 ? (
-              <Empty title="Nothing asked for" icon="approvals">
-                When {user.fullName.split(" ")[0]} asks for an application, log it here so a Platform Admin can decide.
+              <Empty title="No access requests" icon="approvals">
+                When {user.fullName.split(" ")[0]} requests an application, log it here for a Platform Admin to review.
               </Empty>
             ) : (
               <ul className="divide-y divide-rule border-t border-rule" role="list">
@@ -99,7 +99,7 @@ export default async function UserPage({ params }: Props) {
                       {r.role && <span className="text-ink-2"> as {r.role}</span>}
                     </span>
                     <span className="text-meta text-ink-3">
-                      <span className={r.status === "pending" ? "font-semibold text-ink" : ""}>{REQUEST_WORDS[r.status]}</span> · asked{" "}
+                      <span className={r.status === "pending" ? "font-semibold text-ink" : ""}>{REQUEST_WORDS[r.status]}</span> · requested{" "}
                       <time dateTime={r.createdAt} title={when(r.createdAt)}>
                         {ago(r.createdAt)}
                       </time>
@@ -112,13 +112,13 @@ export default async function UserPage({ params }: Props) {
               {askable.length > 0 ? (
                 <RequestAccess userId={user.id} name={user.fullName} applications={askable} companyApps={companyApps} />
               ) : (
-                <p className="text-meta text-ink-3">They have, or are waiting on, every application.</p>
+                <p className="text-meta text-ink-3">Every application is assigned or pending.</p>
               )}
             </div>
             {waiting.size > 0 && (
               <p className="border-t border-rule px-5 py-2.5 text-meta text-ink-3">
                 <Link href="/access" className="text-hema hover:underline">
-                  Decide waiting requests under Access
+                  Review pending requests under Access
                 </Link>
               </p>
             )}
@@ -127,12 +127,12 @@ export default async function UserPage({ params }: Props) {
           <Sheet>
             <div className="px-5 pt-4 pb-2">
               <SectionTitle icon="support">
-                Tickets they reported
+                Reported tickets
                 <Count n={user.tickets.length} />
               </SectionTitle>
             </div>
             {user.tickets.length === 0 ? (
-              <Empty title="Nothing reported" icon="support">
+              <Empty title="No tickets reported" icon="support">
                 Complaints, bugs and questions from {user.fullName.split(" ")[0]} show here.
               </Empty>
             ) : (
@@ -159,7 +159,7 @@ export default async function UserPage({ params }: Props) {
 
         <div className="space-y-5">
           <Sheet className="px-5 py-4">
-            <SectionTitle icon="particulars">Particulars</SectionTitle>
+            <SectionTitle icon="particulars">Details</SectionTitle>
             <div className="mt-3">
               <Particulars
                 items={[
@@ -171,18 +171,18 @@ export default async function UserPage({ params }: Props) {
                       {user.companyName ?? "—"}
                     </Link>,
                   ],
-                  ["Company admin", user.isCompanyAdmin ? "Yes, runs their company's people and access" : "No"],
+                  ["Company admin", user.isCompanyAdmin ? "Yes, manages the company's users and access" : "No"],
                   ["Status", blocked ?? "Active"],
-                  ["Last active", user.lastActiveAt ? when(user.lastActiveAt) : "Not yet"],
-                  ["On the platform since", when(user.createdAt)],
+                  ["Last active", user.lastActiveAt ? when(user.lastActiveAt) : "Never"],
+                  ["Created on", when(user.createdAt)],
                 ]}
               />
             </div>
           </Sheet>
           <Sheet className="px-5 py-4">
-            <SectionTitle icon="auditLog">What was done to this account</SectionTitle>
+            <SectionTitle icon="auditLog">Account activity</SectionTitle>
             <div className="mt-2">
-              <ActivityList entries={user.activity} empty="Nothing yet." />
+              <ActivityList entries={user.activity} empty="No activity yet." />
             </div>
           </Sheet>
         </div>

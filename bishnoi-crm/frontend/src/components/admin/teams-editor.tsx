@@ -84,7 +84,7 @@ function AddTeam() {
         <Field label="Name" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}
         </Field>
-        <Field label="What it does" optional error={fields.description}>
+        <Field label="Description" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
         </Field>
         <div className="sm:order-last sm:col-span-3">
@@ -136,7 +136,7 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
       toast.error(result.error);
       return false;
     }
-    toast.success(team.isActive ? "Team switched off" : "Team switched back on", { description: team.name });
+    toast.success(team.isActive ? "Team deactivated" : "Team reactivated", { description: team.name });
     router.refresh();
     return true;
   }
@@ -166,7 +166,7 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
           <Field label="Name" error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}
           </Field>
-          <Field label="What it does" optional error={fields.description}>
+          <Field label="Description" optional error={fields.description}>
             {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
           </Field>
           <div className="sm:col-span-3">
@@ -252,14 +252,14 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
           Edit
         </Button>
         <ConfirmButton
-          label={team.isActive ? "Switch off" : "Switch on"}
+          label={team.isActive ? "Deactivate" : "Activate"}
           title={team.isActive ? `Switch ${team.name} off?` : `Switch ${team.name} back on?`}
           body={
             team.isActive
               ? "People already in it stay, but nobody new can be put in it. Switch it back on any time."
               : "People can be put in it again."
           }
-          confirmLabel={team.isActive ? "Switch off" : "Switch on"}
+          confirmLabel={team.isActive ? "Deactivate" : "Activate"}
           danger={team.isActive}
           triggerSize="sm"
           triggerVariant="quiet"

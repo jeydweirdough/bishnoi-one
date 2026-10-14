@@ -48,7 +48,7 @@ export default async function FinanceHome() {
             {[
               ...money.map((a) => [a, "Cash and cash equivalents"] as const),
               ...(advances ? [[advances, "Cash advances not yet liquidated or refunded"] as const] : []),
-              ...(payable ? [[payable, "Reimbursements owed to employees"] as const] : []),
+              ...(payable ? [[payable, "Reimbursements payable to employees"] as const] : []),
             ].map(([a, hint]) => (
               <div key={a.id} className="flex items-baseline justify-between gap-4 border-b border-rule py-1.5">
                 <dt>

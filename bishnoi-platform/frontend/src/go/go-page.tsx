@@ -61,7 +61,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
           <p className="mt-6 text-ink-2">This sign-in link is incomplete. Go back to the application and choose Sign in with your Bishnoi One account again.</p>
         ) : choices.length > 0 ? (
           <>
-            <h1 className="mt-6 text-title">Which company?</h1>
+            <h1 className="mt-6 text-title">Select a company</h1>
             <p className="mt-1 text-ink-2">You work for more than one. Each has its own {name} data.</p>
             <ul className="mt-5 space-y-2">
               {choices.map((c) => (
@@ -79,7 +79,7 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
           </>
         ) : refused ? (
           <>
-            <h1 className="mt-6 text-title">Can't open {name}</h1>
+            <h1 className="mt-6 text-title">Unable to open {name}</h1>
             <p role="alert" className="mt-2 rounded-[14px] bg-danger-tint px-3 py-2 text-sm text-danger">
               {refused}
             </p>

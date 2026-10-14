@@ -66,7 +66,7 @@ export function FollowUpsBulk({
     ),
     assign: (
       <BulkStep
-        submitLabel={`Give ${many}`}
+        submitLabel={`Assign ${many}`}
         onCancel={() => setStep(null)}
         onSubmit={async (form) => {
           const assigneeId = String(form.get("assigneeId") ?? "");
@@ -77,11 +77,11 @@ export function FollowUpsBulk({
           );
         }}
       >
-        <Field label="Give to" className="w-52">
+        <Field label="Assign to" className="w-52">
           {(p) => (
             <Select {...p} name="assigneeId" required defaultValue="" autoFocus>
               <option value="" disabled>
-                Pick someone
+                Select a person
               </option>
               {people.map((person) => (
                 <option key={person.id} value={person.id}>

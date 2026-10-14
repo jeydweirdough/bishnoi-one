@@ -9,7 +9,7 @@ import type { Waiting, WaitingPrice, WaitingQuote } from "../prices/types";
 
 function Change({ p, fmt }: { p: WaitingPrice; fmt: Format }) {
   if (p.proposedAmountCentavos === 0) {
-    return <span className="text-sm font-semibold text-danger">Take this price away{p.currentAmountCentavos ? ` (now ${fmt.peso(p.currentAmountCentavos)})` : ""}</span>;
+    return <span className="text-sm font-semibold text-danger">Remove price{p.currentAmountCentavos ? ` (now ${fmt.peso(p.currentAmountCentavos)})` : ""}</span>;
   }
   const now = p.currentAmountCentavos;
   const to = p.proposedAmountCentavos ?? 0;
@@ -65,14 +65,14 @@ function QuoteRow({ q, fmt, canApprove }: { q: WaitingQuote; fmt: Format; canApp
           {q.grossCentavos > q.totalCentavos && <span className="block text-meta text-ink-3">list {fmt.peso(q.grossCentavos)}</span>}
         </p>
       </div>
-      {q.notes && <p className="rounded-md bg-bench px-3 py-2 text-meta text-ink-2">Why the rep asked: {q.notes}</p>}
+      {q.notes && <p className="rounded-md bg-bench px-3 py-2 text-meta text-ink-2">Rep&apos;s reason: {q.notes}</p>}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-rule text-left text-meta text-ink-3">
             <th scope="col" className="py-1.5 font-medium">Product</th>
             <th scope="col" className="py-1.5 text-right font-medium">Qty</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Requested each</th>
-            <th scope="col" className="hidden py-1.5 pl-4 font-medium sm:table-cell">Against SRP</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Requested unit price</th>
+            <th scope="col" className="hidden py-1.5 pl-4 font-medium sm:table-cell">Variance from SRP</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-rule">
@@ -118,7 +118,7 @@ export default async function PricesPage() {
       </PageHeader>
       {trouble || !waiting ? (
         <Sheet>
-          <Empty title="The CRM can't be read just now" icon="pricing">
+          <Empty title="CRM unavailable" icon="pricing">
             {trouble}
           </Empty>
         </Sheet>
@@ -129,7 +129,7 @@ export default async function PricesPage() {
               Prices set by managers <span className="font-normal text-ink-3">· {waiting.prices.length}</span>
             </h2>
             {waiting.prices.length === 0 ? (
-              <Empty title="No prices waiting" icon="pricing">
+              <Empty title="No prices for approval" icon="pricing">
                 A Doctor&apos;s, Patient&apos;s or Special price a manager sets in the CRM shows here until you decide it.
               </Empty>
             ) : (
@@ -145,7 +145,7 @@ export default async function PricesPage() {
                         </span>
                       </p>
                       <p className="truncate text-meta text-ink-3">
-                        {p.productCode} · {p.teamName} · asked by {p.submittedByName}
+                        {p.productCode} · {p.teamName} · submitted by {p.submittedByName}
                         {p.submittedAt && `, ${fmt.whenLabel(p.submittedAt)}`}
                       </p>
                     </div>
@@ -161,7 +161,7 @@ export default async function PricesPage() {
               Quotes at a requested price <span className="font-normal text-ink-3">· {waiting.quotes.length}</span>
             </h2>
             {waiting.quotes.length === 0 ? (
-              <Empty title="No quotes waiting" icon="quotes">
+              <Empty title="No quotes for approval" icon="quotes">
                 A quote where a rep asked for a price of their own waits here, oldest first, before it can go to the customer.
               </Empty>
             ) : (
@@ -172,7 +172,7 @@ export default async function PricesPage() {
               </ul>
             )}
           </Sheet>
-          {!waiting.canApprove && <p className="mt-3 text-meta text-ink-3">You can see these; deciding them needs the Approve permission for product prices.</p>}
+          {!waiting.canApprove && <p className="mt-3 text-meta text-ink-3">View only. Approving these requires the Approve permission for product prices.</p>}
         </>
       )}
     </>

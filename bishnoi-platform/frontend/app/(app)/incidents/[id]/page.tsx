@@ -30,7 +30,7 @@ function Stepper({ status }: { status: IncidentStatus }) {
   const steps = Object.keys(INCIDENT_STATUSES) as IncidentStatus[];
   const at = steps.indexOf(status);
   return (
-    <ol aria-label="Where it is" className="grid gap-px overflow-hidden rounded-[18px] bg-rule sm:grid-cols-4">
+    <ol aria-label="Status progress" className="grid gap-px overflow-hidden rounded-[18px] bg-rule sm:grid-cols-4">
       {steps.map((s, n) => (
         <li
           key={s}
@@ -70,7 +70,7 @@ export default async function IncidentPage({ params }: { params: Params }) {
                 name={`${incident.number} ${incident.title}`}
                 after="/incidents"
                 done="Incident deleted"
-                body="It goes with its updates. Tickets linked to it stay, unlinked. It can't be undone; to keep it, resolve it instead."
+                body="It is deleted with its updates. Linked tickets stay, unlinked. This can't be undone; to keep it, resolve it instead."
               />
             )}
           </>
@@ -82,14 +82,14 @@ export default async function IncidentPage({ params }: { params: Params }) {
           <IncidentStatusMark status={incident.status} />
           <span className="text-meta">
             {INCIDENT_KINDS[incident.kind]} ·{" "}
-            {incident.resolvedAt ? `lasted ${span(incident.startedAt, incident.resolvedAt)}` : `going on for ${span(incident.startedAt, null)}`}
+            {incident.resolvedAt ? `lasted ${span(incident.startedAt, incident.resolvedAt)}` : `ongoing for ${span(incident.startedAt, null)}`}
           </span>
         </span>
       </PageHeader>
 
       <div className="mb-5">
         <Stepper status={incident.status} />
-        <p className="mt-2 text-meta text-ink-3">It moves on when someone posts an update saying where it is now.</p>
+        <p className="mt-2 text-meta text-ink-3">The status changes when an update is posted with a new status.</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
@@ -132,11 +132,11 @@ export default async function IncidentPage({ params }: { params: Params }) {
                         {incident.application.name}
                       </Link>
                     ) : (
-                      "The whole platform"
+                      "Entire platform"
                     ),
                   ],
                   [
-                    "Reaches",
+                    "Affected companies",
                     incident.companies.length > 0 ? (
                       <span>
                         {incident.companies.map((c, n) => (
@@ -152,9 +152,9 @@ export default async function IncidentPage({ params }: { params: Params }) {
                       reach(incident)
                     ),
                   ],
-                  ["Lead", incident.lead?.name ?? "Nobody yet"],
+                  ["Lead", incident.lead?.name ?? "Not assigned"],
                   ["Started", when(incident.startedAt)],
-                  ["Resolved", incident.resolvedAt ? when(incident.resolvedAt) : "Not yet"],
+                  ["Resolved", incident.resolvedAt ? when(incident.resolvedAt) : "Not resolved"],
                   ["Declared by", incident.createdBy],
                 ]}
               />
@@ -165,7 +165,7 @@ export default async function IncidentPage({ params }: { params: Params }) {
           <Sheet className="px-5 pt-4 pb-3">
             <SectionTitle icon="support">Linked tickets</SectionTitle>
             {incident.tickets.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">None yet. Link a ticket to this incident from the ticket&apos;s page, beside Incident.</p>
+              <p className="py-2 text-meta text-ink-3">No linked tickets. Link a ticket to this incident from the ticket&apos;s page, beside Incident.</p>
             ) : (
               <ul className="mt-1 divide-y divide-rule">
                 {incident.tickets.map((t) => (

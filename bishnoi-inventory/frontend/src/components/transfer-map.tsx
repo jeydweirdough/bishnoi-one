@@ -191,7 +191,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {tab === "transfers" &&
             (shown.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-3">No transfers match.</p>
+              <p className="py-6 text-center text-sm text-ink-3">No matching transfers.</p>
             ) : (
               shown.map((t) => {
                 const on = t.id === picked;
@@ -214,7 +214,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                       </span>
                     </span>
                     <span className="mt-2 flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-ink">{t.firstItem ?? "No lines yet"}{t.lineCount > 1 ? ` and ${t.lineCount - 1} more` : ""}</span>
+                      <span className="truncate text-sm font-semibold text-ink">{t.firstItem ?? "No lines"}{t.lineCount > 1 ? ` and ${t.lineCount - 1} more` : ""}</span>
                       <span className="shrink-0 text-sm font-semibold text-ink tabular-nums">{t.units.toLocaleString()} units</span>
                     </span>
                     <span className="mt-2 grid grid-cols-[0.75rem_minmax(0,1fr)] gap-x-2 text-meta">
@@ -247,19 +247,19 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                   <span className="text-sm font-semibold text-ink">{w.name}</span>
                   <span className="text-meta font-semibold text-ink-3">{w.code}</span>
                 </p>
-                <p className="mt-0.5 text-meta text-ink-3">{w.address ?? "No address yet"}</p>
+                <p className="mt-0.5 text-meta text-ink-3">{w.address ?? "No address"}</p>
                 <p className="mt-2 flex items-center justify-between gap-2 text-meta">
                   {w.pin ? (
                     <span className="flex items-center gap-1 text-sage-deep">
                       <MapPin className="size-3.5" aria-hidden />
-                      On the map
+                      Mapped
                     </span>
                   ) : (
-                    <span className="text-ink-3">Not on the map yet</span>
+                    <span className="text-ink-3">Not mapped</span>
                   )}
                   {!w.pin && mayLocate && (
-                    <Button size="sm" disabled={!w.address || locating === w.id} onClick={() => locate(w)} title={w.address ? undefined : "Add its address first"}>
-                      {locating === w.id ? "Finding…" : "Find on map"}
+                    <Button size="sm" disabled={!w.address || locating === w.id} onClick={() => locate(w)} title={w.address ? undefined : "Add an address first"}>
+                      {locating === w.id ? "Locating…" : "Locate on map"}
                     </Button>
                   )}
                 </p>
@@ -283,7 +283,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
               <p className="mt-0.5 text-meta text-ink-3">
                 {chosen.units.toLocaleString()} units · {chosen.lineCount} line{chosen.lineCount === 1 ? "" : "s"} · {chosen.sinceLong}
               </p>
-              {(!chosen.fromPin || !chosen.toPin) && <p className="mt-2 text-meta text-danger">A warehouse here isn&apos;t on the map yet, so the route isn&apos;t drawn.</p>}
+              {(!chosen.fromPin || !chosen.toPin) && <p className="mt-2 text-meta text-danger">A warehouse on this transfer is not mapped, so the route cannot be shown.</p>}
               <Link href={`/transfers/${chosen.id}`} className="mt-3 flex h-9 items-center justify-center gap-1.5 rounded-lg border border-ink text-sm font-medium text-ink hover:bg-hema-tint">
                 Open transfer
                 <ChevronRight className="size-4" aria-hidden />
@@ -303,9 +303,9 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
         </div>
         {unpinned.length > 0 && (
           <div className="absolute bottom-4 left-4 z-[500] max-w-sm rounded-lg border border-rule bg-sheet px-4 py-2.5 text-meta text-ink-2 shadow-overlay">
-            {unpinned.map((w) => w.name).join(", ")} {unpinned.length === 1 ? "isn't" : "aren't"} on the map yet.{" "}
+            {unpinned.map((w) => w.name).join(", ")} {unpinned.length === 1 ? "is" : "are"} not mapped.{" "}
             <button type="button" onClick={() => setTab("warehouses")} className="font-semibold text-ink underline">
-              Place {unpinned.length === 1 ? "it" : "them"}
+              Locate on map
             </button>
           </div>
         )}

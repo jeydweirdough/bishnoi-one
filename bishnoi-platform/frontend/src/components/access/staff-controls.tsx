@@ -40,7 +40,7 @@ export function StaffControls({ person }: { person: Staff }) {
         triggerClassName={ICON_TRIGGER}
         danger={false}
         title={`Reset ${person.fullName}'s password?`}
-        body={`A new password is made and shown once. ${first} is signed out everywhere, signs in with it, then changes it under Account.`}
+        body={`A new password is generated and shown once. ${first} is signed out everywhere, signs in with it, then changes it under Account.`}
         confirmLabel="Reset password"
         onConfirm={async () => {
           const result = await resetStaffPassword(person.id);
@@ -52,32 +52,32 @@ export function StaffControls({ person }: { person: Staff }) {
         }}
       />
       <ConfirmButton
-        label={admin ? "Make Support" : "Make Platform Admin"}
+        label={admin ? "Change role to Support" : "Change role to Platform Admin"}
         triggerSize="sm"
-        triggerTitle={admin ? `Make ${person.fullName} Support` : `Make ${person.fullName} a Platform Admin`}
+        triggerTitle={admin ? `Change ${person.fullName}'s role to Support` : `Change ${person.fullName}'s role to Platform Admin`}
         danger={admin}
-        title={admin ? `Make ${person.fullName} Support?` : `Make ${person.fullName} a Platform Admin?`}
+        title={admin ? `Change ${person.fullName}'s role to Support?` : `Change ${person.fullName}'s role to Platform Admin?`}
         body={
           admin
             ? `${first} keeps seeing everything and working tickets and incidents, but can no longer change companies, users, applications, settings or staff.`
             : `${first} can change anything on the platform: companies, users and their access, applications, settings, and other staff.`
         }
-        confirmLabel={admin ? "Make Support" : "Make Platform Admin"}
+        confirmLabel="Change role"
         onConfirm={() => change({ role: admin ? "member" : "admin" }, "Role changed")}
       />
       <ConfirmButton
-        label={person.isActive ? "Switch off" : "Switch on"}
+        label={person.isActive ? "Deactivate" : "Activate"}
         triggerSize="sm"
-        triggerTitle={person.isActive ? `Switch off ${person.fullName}'s account` : `Switch on ${person.fullName}'s account`}
+        triggerTitle={person.isActive ? `Deactivate ${person.fullName}'s account` : `Activate ${person.fullName}'s account`}
         danger={person.isActive}
-        title={person.isActive ? `Switch off ${person.fullName}'s account?` : `Switch ${person.fullName}'s account back on?`}
+        title={person.isActive ? `Deactivate ${person.fullName}'s account?` : `Reactivate ${person.fullName}'s account?`}
         body={
           person.isActive
-            ? `${first} can't sign in to the console until it's switched back on${person.activeSessions ? ", and they're signed out wherever they are signed in" : ""}. Nothing they did is lost.`
+            ? `${first} can't sign in to the console until it's reactivated${person.activeSessions ? ", and they're signed out wherever they are signed in" : ""}. Nothing they did is lost.`
             : `${first} can sign in to the console again, as ${person.roleName}.`
         }
-        confirmLabel={person.isActive ? "Switch off" : "Switch on"}
-        onConfirm={() => change({ isActive: !person.isActive }, person.isActive ? "Account switched off" : "Account switched on")}
+        confirmLabel={person.isActive ? "Deactivate" : "Activate"}
+        onConfirm={() => change({ isActive: !person.isActive }, person.isActive ? "Account deactivated" : "Account activated")}
       />
       <ConfirmButton
         label={<span className="sr-only">Delete {person.fullName}&apos;s account</span>}
@@ -87,7 +87,7 @@ export function StaffControls({ person }: { person: Staff }) {
         triggerSize="sm"
         triggerClassName={ICON_TRIGGER_DANGER}
         title={`Delete ${person.fullName}'s account?`}
-        body={`${first} can't sign in any more, and the account can't be brought back. Tickets and incidents they had stay, with nobody on them. To keep the account, switch it off instead.`}
+        body={`${first} can't sign in any more, and the account can't be restored. Their tickets and incidents stay, unassigned. To keep the account, deactivate it instead.`}
         confirmLabel="Delete account"
         onConfirm={async () => {
           const result = await deleteStaff(person.id);

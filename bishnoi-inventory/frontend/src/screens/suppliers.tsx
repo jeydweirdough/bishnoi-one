@@ -30,15 +30,15 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
         title="Suppliers"
         actions={may("suppliers.create") && <LinkButton href="/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add supplier</LinkButton>}
       >
-        Who you buy from: how to reach them, their terms, and how well they deliver.
+        Vendors you buy from, with contact details, payment terms and delivery performance.
       </PageHeader>
-      <Chips label="Show" current={f.state} options={[{ value: "active", label: "Active", href: `/suppliers${query({ q: f.q })}` }, { value: "off", label: "Switched off", href: `/suppliers${query({ q: f.q, state: "off" })}` }, { value: "all", label: "All", href: `/suppliers${query({ q: f.q, state: "all" })}` }]} />
+      <Chips label="Status" current={f.state} options={[{ value: "active", label: "Active", href: `/suppliers${query({ q: f.q })}` }, { value: "off", label: "Inactive", href: `/suppliers${query({ q: f.q, state: "off" })}` }, { value: "all", label: "All", href: `/suppliers${query({ q: f.q, state: "all" })}` }]} />
       <Filters q={f.q} placeholder="Name, code or contact" keep={{ state: f.state }} />
       <Sheet>
         {suppliers.length === 0 ? (
-          <FirstStep icon="suppliers" title="No suppliers yet" body="Who you buy from, with their terms and lead time." href="/suppliers/new" action="Add supplier" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/suppliers" may={may} />
+          <FirstStep icon="suppliers" title="No suppliers" body="Vendors you buy from, with their payment terms and lead times." href="/suppliers/new" action="Add supplier" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/suppliers" may={may} />
         ) : (
-          <Table head={["Supplier", "Contact", "Terms", " Lead time", " Orders", " Fill rate", " On time", " Received"]} min="56rem">
+          <Table head={["Supplier", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received"]} min="56rem">
             {suppliers.map((x) => (
               <tr key={x.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/suppliers/${x.id}`} sub={x.code}>{x.name}</RowLink></Td>
@@ -76,20 +76,20 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
             editHref={may("suppliers.edit") ? `/suppliers/${x.id}/edit` : undefined}
             remove={may("suppliers.delete") ? deleteSupplier.bind(null, x.id) : undefined}
             after="/suppliers"
-            removeNote="A supplier with purchase orders can't be deleted; switch it off instead, at the foot of its Edit page."
+            removeNote="A supplier with purchase orders cannot be deleted. Deactivate it instead from its Edit page."
           />
         }
         actions={may("purchasing.create") && x.isActive && <LinkButton href={`/purchase-orders/new?supplier=${x.id}`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}
       >
         <span className="font-mono text-meta">{x.code}</span>
-        {!x.isActive && <> · <strong>Switched off</strong></>}
+        {!x.isActive && <> · <strong>Inactive</strong></>}
       </PageHeader>
       <DetailPanel>
         <StatCards
           items={[
             { label: "Purchase orders", value: fmt.count(perf?.orders ?? 0), note: `${fmt.peso(perf?.spend ?? 0)} received` },
             { label: "Fill rate", value: rate(perf?.fillRate), note: `${fmt.count(perf?.received ?? 0)} of ${fmt.count(perf?.ordered ?? 0)} units` },
-            { label: "Delivered on time", value: rate(perf?.onTimeRate), flag: perf?.onTimeRate != null && perf.onTimeRate < 0.8, note: perf?.late ? `${fmt.count(perf.late)} late` : undefined },
+            { label: "On-time delivery", value: rate(perf?.onTimeRate), flag: perf?.onTimeRate != null && perf.onTimeRate < 0.8, note: perf?.late ? `${fmt.count(perf.late)} late` : undefined },
           ]}
         />
         <InfoCard>
@@ -115,8 +115,8 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
               ["Lead time", x.leadTimeDays == null ? null : `${x.leadTimeDays} days`],
               ["Average lead time", perf?.averageLeadDays == null ? null : `${perf.averageLeadDays} days`],
               ["Received value", fmt.peso(perf?.spend ?? 0)],
-              ["Status", x.isActive ? "Active" : "Switched off"],
-              ["Since", fmt.whenLabel(x.createdAt)],
+              ["Status", x.isActive ? "Active" : "Inactive"],
+              ["Created", fmt.whenLabel(x.createdAt)],
             ]}
           />
           {x.contacts.length > 0 && (
@@ -124,24 +124,24 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
           )}
         </InfoCard>
         <BarList
-          title="What they supply"
+          title="Products supplied"
           icon="products"
           rows={x.prices.map((p) => ({
             key: p.product.id,
             href: `/products/${p.product.id}`,
             name: p.product.name,
-            sub: [p.product.sku, p.supplierSku && `their code ${p.supplierSku}`, p.leadTimeDays != null && `${p.leadTimeDays} days`].filter(Boolean).join(" · "),
+            sub: [p.product.sku, p.supplierSku && `supplier code ${p.supplierSku}`, p.leadTimeDays != null && `${p.leadTimeDays} days`].filter(Boolean).join(" · "),
             pill: <span className="text-sm font-semibold text-ink tabular-nums">{fmt.peso(p.price)}</span>,
             share: p.price / Math.max(1, ...x.prices.map((q) => q.price)),
           }))}
-          empty="No prices yet. They're recorded when an order is placed, or on a product's page."
+          empty="No supplier prices. Prices are recorded when an order is placed, or on the product page."
         />
       </DetailPanel>
 
       <Sheet className="mt-5">
         <div className="px-5 pt-4"><SectionTitle icon="purchaseOrders">Purchase history</SectionTitle></div>
         {x.orders.length === 0 ? (
-          <p className="px-5 pb-4 text-meta text-ink-3">No purchase orders yet.</p>
+          <p className="px-5 pb-4 text-meta text-ink-3">No purchase orders.</p>
         ) : (
           <Table head={["Order", "Status", "Ordered", "Expected", " Received", " Total"]}>
             {x.orders.map((po) => (
@@ -166,7 +166,7 @@ export async function NewSupplierPage() {
   if (!may("suppliers.create")) return <NoAccess what="adding suppliers" />;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/suppliers", label: "Suppliers" }]} title="Add a supplier" />
+      <PageHeader crumbs={[{ href: "/suppliers", label: "Suppliers" }]} title="Add supplier" />
       <SupplierForm />
     </>
   );
@@ -175,7 +175,7 @@ export async function NewSupplierPage() {
 export async function EditSupplierPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { may } = await context();
-  if (!may("suppliers.edit")) return <NoAccess what="changing suppliers" />;
+  if (!may("suppliers.edit")) return <NoAccess what="editing suppliers" />;
   const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   return (
     <>
@@ -192,8 +192,8 @@ function SupplierActive({ supplier }: { supplier: Supplier }) {
     <div className="mt-8 border-t border-rule pt-4">
       <StepButton
         run={saveSupplier.bind(null, supplier.id, { isActive: !supplier.isActive })}
-        label={supplier.isActive ? "Switch this supplier off" : "Switch this supplier back on"}
-        done={supplier.isActive ? "Supplier switched off" : "Supplier switched on"}
+        label={supplier.isActive ? "Deactivate supplier" : "Activate supplier"}
+        done={supplier.isActive ? "Supplier deactivated" : "Supplier activated"}
         variant="quiet"
       />
     </div>

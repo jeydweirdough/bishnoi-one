@@ -22,19 +22,19 @@ export const MOVEMENT_KINDS: Record<MovementKind, string> = {
 
 /** The kinds people filter the trail by, grouped the way they think of them. */
 export const MOVEMENT_FILTERS: { key: string; label: string }[] = [
-  { key: "", label: "Everything" },
+  { key: "", label: "All" },
   { key: "receive,return_in", label: "Stock in" },
   { key: "issue,return_out", label: "Stock out" },
   { key: "transfer_out,transfer_in", label: "Transfers" },
   { key: "adjust", label: "Adjustments" },
-  { key: "damage,write_off,expired,lost", label: "Damage, expiry & loss" },
+  { key: "damage,write_off,expired,lost", label: "Damage, expiry and loss" },
   { key: "reserve,release", label: "Reservations" },
 ];
 
 export const PO_STATUSES: Record<POStatus, string> = {
   draft: "Draft",
   ordered: "Ordered",
-  partial: "Partly received",
+  partial: "Partially received",
   received: "Received",
   cancelled: "Cancelled",
 };
@@ -65,14 +65,14 @@ export const TRANSFER_STATUSES: Record<TransferStatus, string> = {
 };
 
 export const ADJUSTMENT_STATUSES: Record<AdjustmentBrief["status"], string> = {
-  pending: "Waiting for approval",
+  pending: "Pending approval",
   posted: "Posted",
   rejected: "Rejected",
 };
 
 export const COUNT_STATUSES: Record<CountStatus, string> = {
   open: "Counting",
-  submitted: "Waiting for approval",
+  submitted: "Pending approval",
   approved: "Approved",
   cancelled: "Cancelled",
 };
@@ -80,8 +80,8 @@ export const COUNT_STATUSES: Record<CountStatus, string> = {
 export const PRODUCT_TYPES: Record<ProductType, string> = {
   stock: "Stock item",
   consumable: "Consumable",
-  asset: "Asset / equipment",
-  service: "Service (no stock)",
+  asset: "Asset or equipment",
+  service: "Service (non-stock)",
 };
 
 export const PRODUCT_STATUSES: Record<ProductStatus, string> = {

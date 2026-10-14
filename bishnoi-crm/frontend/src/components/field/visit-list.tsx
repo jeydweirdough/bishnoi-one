@@ -3,7 +3,9 @@ import type { Format } from "@/src/platform/lib/format";
 import { DeleteVisit } from "./delete-visit";
 import type { Visit } from "./types";
 import { distanceText, mapLink } from "./where";
-import { outcomeOf, reactionOf } from "./words";
+import { CARE_GROUP, outcomeOf, reactionOf } from "./words";
+
+const careGroupOf = (value: string) => CARE_GROUP.find((c) => c.value === value)?.past ?? "";
 
 /** Where the visit was logged, against the place's pin (`site`: the company's word, e.g. clinic): said plainly, with a map to check. */
 function Place({ v, site }: { v: Visit; site: string }) {
@@ -28,6 +30,7 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
             <div className="min-w-0 flex-1">
               <p className="text-sm">
                 <span className="font-semibold">{outcome.past}</span>
+                {v.careGroup && v.careGroup !== "not_now" && <span className="text-ink-2"> · {careGroupOf(v.careGroup)}</span>}
                 {showDoctor && (
                   <>
                     {" · "}
@@ -62,7 +65,7 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
               {v.notes && <p className="mt-1 text-sm text-ink-2">{v.notes}</p>}
               {v.nextObjective && (
                 <p className="mt-1 text-meta text-ink-3">
-                  <span className="font-semibold text-ink-2">Next time:</span> {v.nextObjective}
+                  <span className="font-semibold text-ink-2">Next visit objective:</span> {v.nextObjective}
                 </p>
               )}
             </div>

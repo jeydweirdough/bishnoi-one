@@ -33,7 +33,7 @@ export function DetailsForm({ id, no, fullName, email, role }: { id: string; no:
       setFields({});
       setError(null);
       setV((x) => ({ ...x, password: "" }));
-      toast.success("Your details are saved", { description: newEmail ? "Sign in with your new email from now on." : undefined });
+      toast.success("Details saved", { description: newEmail ? "Sign in with your new email from now on." : undefined });
     });
   }
 
@@ -47,11 +47,11 @@ export function DetailsForm({ id, no, fullName, email, role }: { id: string; no:
       <Field label="Name" error={fields.fullName}>
         {(p) => <Input {...p} value={v.fullName} onChange={(e) => setV({ ...v, fullName: e.target.value })} maxLength={120} autoComplete="name" />}
       </Field>
-      <Field label="Email" error={fields.email} hint="What you sign in with.">
+      <Field label="Email" error={fields.email} hint="Used to sign in.">
         {(p) => <Input {...p} type="email" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} maxLength={254} autoComplete="email" />}
       </Field>
       {newEmail && (
-        <Field label="Your current password" error={fields.currentPassword} hint="To change the email you sign in with.">
+        <Field label="Current password" error={fields.currentPassword} hint="Required to change the sign-in email.">
           {(p) => <PasswordInput {...p} value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} autoComplete="current-password" />}
         </Field>
       )}
@@ -67,7 +67,7 @@ export function DetailsForm({ id, no, fullName, email, role }: { id: string; no:
         <span className="text-ink-3">Account ID</span>
         <span className="flex min-w-0 items-center gap-2">
           <code className="truncate text-meta text-ink-2">{id}</code>
-          <button type="button" onClick={copy} className="shrink-0 text-ink-3 hover:text-hema" title="Copy your account ID" aria-label="Copy your account ID">
+          <button type="button" onClick={copy} className="shrink-0 text-ink-3 hover:text-hema" title="Copy account ID" aria-label="Copy account ID">
             {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
           </button>
         </span>

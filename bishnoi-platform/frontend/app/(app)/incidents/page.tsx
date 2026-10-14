@@ -47,15 +47,15 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
         selects={[
           {
             name: "kind",
-            label: "Kind",
-            options: [{ value: "", label: "Every kind" }, ...(Object.keys(INCIDENT_KINDS) as IncidentKind[]).map((k) => ({ value: k, label: INCIDENT_KINDS[k] }))],
+            label: "Type",
+            options: [{ value: "", label: "All types" }, ...(Object.keys(INCIDENT_KINDS) as IncidentKind[]).map((k) => ({ value: k, label: INCIDENT_KINDS[k] }))],
           },
         ]}
       />
       <Sheet className="overflow-hidden">
         {list.incidents.length === 0 ? (
-          <Empty icon="incidents" title={resolved ? "No resolved incidents." : kind ? `No ${INCIDENT_KINDS[kind].toLowerCase()} incidents going on.` : "Nothing going on."}>
-            {resolved ? "Incidents come here once an update marks them Resolved." : "When something breaks for many people at once, declare an incident so everyone works from the same page."}
+          <Empty icon="incidents" title={resolved ? "No resolved incidents." : kind ? `No active ${INCIDENT_KINDS[kind].toLowerCase()} incidents.` : "No active incidents."}>
+            {resolved ? "Incidents appear here once an update marks them Resolved." : "When something breaks for many people at once, declare an incident so everyone works from the same page."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
@@ -82,7 +82,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
                     {howLong(i)}
                   </time>
                   {" · "}
-                  {i.lead ? `Led by ${i.lead.name}` : "No lead yet"}
+                  {i.lead ? `Led by ${i.lead.name}` : "No lead assigned"}
                   {i.ticketCount ? ` · ${plural(i.ticketCount, "linked ticket")}` : ""}
                 </p>
               </li>

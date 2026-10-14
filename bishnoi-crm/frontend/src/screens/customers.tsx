@@ -4,6 +4,7 @@ import { CustomersBulk } from "../components/customers-bulk";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import { CustomerFilters } from "../components/customer-filters";
 import { LinkButton } from "@/src/platform/ui/button";
+import { Pager } from "@/src/platform/ui/pager";
 import { StatusMark } from "@/src/platform/ui/marks";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
@@ -38,7 +39,6 @@ export default async function CustomersPage({ searchParams }: { params: Promise<
   const showDivision = ws.manyDivisions;
   const showTeam = ws.teams.length > 1;
   const today = fmt.todayKey();
-  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const can = {
     create: teamsFor(ws, "create").length > 0,
     edit: teamsFor(ws, "edit").length > 0,
@@ -158,27 +158,7 @@ export default async function CustomersPage({ searchParams }: { params: Promise<
         {bulk && <CustomersBulk teams={ws.teams} can={can} filters={filters} total={total} org={org} />}
       </SelectionProvider>
 
-      {total > 0 && (
-        <nav aria-label="Pages" className="mt-3 flex items-center justify-between text-meta text-ink-3">
-          <span>
-            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
-          </span>
-          {lastPage > 1 && (
-            <span className="flex gap-2">
-              {page > 1 && (
-                <LinkButton href={pageHref(page - 1)} size="sm">
-                  Previous
-                </LinkButton>
-              )}
-              {page < lastPage && (
-                <LinkButton href={pageHref(page + 1)} size="sm">
-                  Next
-                </LinkButton>
-              )}
-            </span>
-          )}
-        </nav>
-      )}
+      <Pager total={total} page={page} size={PAGE_SIZE} base={pageHref(1)} />
     </>
   );
 }

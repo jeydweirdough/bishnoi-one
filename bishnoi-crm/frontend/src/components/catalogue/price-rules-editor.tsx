@@ -284,7 +284,7 @@ function RuleForm({
           <Field label="Product" optional={kind !== "group_price"} error={fields.productId}>
             {(p) => (
               <Select {...p} value={productId} onChange={(e) => setProductId(e.target.value)}>
-                <option value="">{kind === "group_price" ? "Pick a product" : "Every product"}</option>
+                <option value="">{kind === "group_price" ? "Select a product" : "All products"}</option>
                 {products.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name} · {x.code}
@@ -296,7 +296,7 @@ function RuleForm({
           <Field label="Price group" optional={kind !== "group_price"} error={fields.priceGroupCode}>
             {(p) => (
               <Select {...p} value={group} onChange={(e) => setGroup(e.target.value)}>
-                <option value="">{kind === "group_price" ? "Pick a group" : "Every customer"}</option>
+                <option value="">{kind === "group_price" ? "Select a group" : "All customers"}</option>
                 {rules.groups
                   .filter((g) => g.isActive || g.code === rule?.priceGroup?.code)
                   .map((g) => (
@@ -377,7 +377,7 @@ function RuleForm({
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-            Switched on
+            Active
           </label>
         </div>
         <FormError message={error} />

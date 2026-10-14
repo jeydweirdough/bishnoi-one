@@ -187,8 +187,8 @@ function StageRow({
       )}
       <span className="w-20 text-meta text-ink-3">{stage.deals === 1 ? "1 deal" : `${stage.deals} deals`}</span>
       {isOpen && (
-        <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !stage.isActive }, stage.isActive ? `${stage.name} switched off` : `${stage.name} switched on`)}>
-          {stage.isActive ? "Switch off" : "Switch on"}
+        <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !stage.isActive }, stage.isActive ? `${stage.name} deactivated` : `${stage.name} activated`)}>
+          {stage.isActive ? "Deactivate" : "Activate"}
         </Button>
       )}
       {isOpen && stage.deals === 0 && (

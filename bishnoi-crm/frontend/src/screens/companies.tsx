@@ -99,7 +99,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         selects={[
           { name: "status", label: "Type", options: [{ value: "", label: "Any type" }, ...typeOptions(types)] },
           ...(me.role?.scope !== "own"
-            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "Everyone you can see" }, { value: "me", label: "Mine" }] }]
+            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Mine" }] }]
             : []),
         ]}
       />

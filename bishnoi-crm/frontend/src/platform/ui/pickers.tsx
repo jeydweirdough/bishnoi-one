@@ -66,11 +66,17 @@ function optionsOf(children: ReactNode): (Option | Group)[] {
   return out;
 }
 
-type SelectProps = Omit<ComponentProps<"select">, "onChange" | "size"> & { onChange?: (e: FieldChange) => void; placeholder?: string };
+type SelectProps = Omit<ComponentProps<"select">, "onChange" | "size"> & {
+  onChange?: (e: FieldChange) => void;
+  placeholder?: string;
+  /** What the list says when nothing matches what was typed (or there is nothing at all): a way forward, not a dead end. */
+  notFound?: (typed: string) => ReactNode;
+};
 
 /** A dropdown, typed into to find an option. Written like a plain <select>, with <option>s. */
-export function Select({ children, value, defaultValue, onChange, name, id, disabled, className = "", placeholder, required: _required, ...rest }: SelectProps) {
+export function Select({ children, value, defaultValue, onChange, name, id, disabled, className = "", placeholder, notFound, required: _required, ...rest }: SelectProps) {
   const { current, emit, formValue } = useFieldValue(value, defaultValue, name, onChange);
+  const [typed, setTyped] = useState("");
   const options = optionsOf(children);
   const flat = options.flatMap((o) => ("options" in o ? o.options : [o]));
   const shown = current === "" ? (flat.some((o) => o.value === EMPTY) ? EMPTY : undefined) : current;
@@ -83,8 +89,9 @@ export function Select({ children, value, defaultValue, onChange, name, id, disa
         onChange={(v: string | undefined) => emit(v === undefined || v === EMPTY ? "" : v)}
         options={options}
         disabled={disabled}
-        placeholder={placeholder ?? "Pick one"}
-        showSearch={{ optionFilterProp: "label" }}
+        placeholder={placeholder ?? "Select"}
+        showSearch={{ optionFilterProp: "label", onSearch: notFound ? setTyped : undefined }}
+        notFoundContent={notFound ? notFound(typed.trim()) : undefined}
         status={rest["aria-invalid"] ? "error" : undefined}
         aria-invalid={rest["aria-invalid"]}
         aria-describedby={rest["aria-describedby"]}
@@ -115,7 +122,7 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
       value={(hasEmpty && value === "" ? EMPTY : value) as V}
       onChange={(v, o) => onChange?.((hasEmpty && (v as unknown) === EMPTY ? "" : v) as V, o)}
       showSearch={showSearch ?? { optionFilterProp: "label" }}
-      placeholder={placeholder ?? (single ? "Pick one" : "Pick any")}
+      placeholder={placeholder ?? "Select"}
       popupMatchSelectWidth
       {...rest}
     />
@@ -192,7 +199,7 @@ export function DateInput({ type, value, defaultValue, onChange, name, id, disab
           needConfirm={false}
           disabled={disabled || !day}
           status={status}
-          placeholder={day ? "Time" : "Pick the date first"}
+          placeholder={day ? "Time" : "Select a date first"}
           aria-label="Time"
         />
       </div>

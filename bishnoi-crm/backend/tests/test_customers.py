@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo
 """Companies, contacts and activities, and whose of them each role reaches."""
 
 from datetime import UTC, datetime, timedelta
@@ -189,6 +190,22 @@ def test_whats_due(client, crew):
     assert (tasks_only["upcoming"], tasks_only["open"]) == (1, 2)
     overdue = client.get("/activities", params={"state": "overdue"}, headers=crew["ria"]).json()["items"]
     assert [a["subject"] for a in overdue] == ["late"] and overdue[0]["isOverdue"]
+
+
+def test_what_got_done_each_day(client, crew):
+    # The profile's charts: one's own done activities by the company's day; what's still planned isn't counted.
+    now = datetime.now(UTC)
+    activity(client, crew["ria"], kind="call", direction="out")
+    activity(client, crew["ria"], kind="note", subject="Prefers email")
+    activity(client, crew["ria"], kind="task", subject="later", at=(now + timedelta(days=2)).isoformat())
+    today = datetime.now(ZoneInfo("Asia/Manila")).date()
+    window = {"from": (today - timedelta(days=7)).isoformat(), "to": (today + timedelta(days=1)).isoformat()}
+    days = client.get("/activities/daily", params=window, headers=crew["ria"]).json()["days"]
+    assert days == {today.isoformat(): 2}
+    # Someone else's are theirs.
+    assert client.get("/activities/daily", params=window, headers=crew["lia"]).json()["days"] == {}
+    bad = client.get("/activities/daily", params={"from": window["to"], "to": window["from"]}, headers=crew["ria"])
+    assert bad.status_code == 422
 
 
 def test_a_time_without_a_zone_is_the_companys_own(client, crew):

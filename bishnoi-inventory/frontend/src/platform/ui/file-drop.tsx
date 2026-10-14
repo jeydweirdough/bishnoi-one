@@ -150,7 +150,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
 
       {shown && (
         <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Chosen") : "On file"}</p>
+          <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Selected") : "Current file"}</p>
           <div className="rounded-lg border border-rule bg-sheet px-3 py-2.5">
             <div className="flex items-center gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-md border border-rule bg-bench text-[0.6875rem] font-semibold text-ink-3" aria-hidden>

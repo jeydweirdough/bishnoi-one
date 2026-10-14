@@ -10,7 +10,7 @@ export function QuickQuoteForm({ companyId, priceType, medicines }: { companyId:
   return (
     <MedicineSearch
       medicines={medicines}
-      submitLabel="Make the quote"
+      submitLabel="Create quote"
       onSubmit={async (lines) => {
         const r = await quickQuote(companyId, priceType, lines);
         if (!r.ok) return r.error;

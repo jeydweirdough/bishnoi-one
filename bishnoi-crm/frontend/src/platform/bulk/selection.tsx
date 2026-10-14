@@ -355,7 +355,7 @@ export function useBulkRun() {
         );
         if (queued) router.refresh();
         if (!job) {
-          toast.info("Still working on it in the background", {
+          toast.info("Processing in the background", {
             id: toastId,
             description: "Reload in a minute to see the changes.",
           });

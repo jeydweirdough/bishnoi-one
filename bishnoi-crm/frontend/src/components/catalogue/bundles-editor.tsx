@@ -3,6 +3,7 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Pager, usePages } from "@/src/platform/ui/pager";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
@@ -36,6 +37,7 @@ export function BundlesEditor({
 }) {
   const fmt = makeFormat(org);
   const [editing, setEditing] = useState<BundleRow | "new" | null>(null);
+  const { rows: page, pager } = usePages(bundles);
   const product = (id: string) => products.find((p) => p.id === id);
 
   return (
@@ -64,7 +66,7 @@ export function BundlesEditor({
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
-            {bundles.map((b) => (
+            {page.map((b) => (
               <li key={b.id} className="flex items-start justify-between gap-4 px-5 py-3">
                 <div className="min-w-0">
                   <p className="font-medium">
@@ -91,6 +93,7 @@ export function BundlesEditor({
           </ul>
         )}
       </Sheet>
+      <Pager {...pager} />
     </div>
   );
 }
@@ -151,7 +154,7 @@ function BundleForm({
     if (input.items.length === 0 || input.items.some((i) => i.qty < 1)) problems.items = "Pick at least one product, each with a whole-number quantity.";
     if (Object.keys(problems).length) {
       setFields(problems);
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       return;
     }
     start(async () => {
@@ -197,7 +200,7 @@ function BundleForm({
         <DivisionPicker what="bundle" options={teams} value={teamIds} onChange={setTeamIds} error={fields.teamIds} />
 
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold">What&apos;s in it</legend>
+          <legend className="mb-2 text-sm font-semibold">Contents</legend>
           <ul className="space-y-2">
             {items.map((item, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -207,7 +210,7 @@ function BundleForm({
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, productId: e.target.value } : x)))}
                   className="min-w-0 flex-1"
                 >
-                  <option value="">Pick a product…</option>
+                  <option value="">Select a product…</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} · {p.unit}
@@ -249,7 +252,7 @@ function BundleForm({
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-            Switched on
+            Active
           </label>
         </div>
 

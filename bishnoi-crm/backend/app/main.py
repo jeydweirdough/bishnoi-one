@@ -18,7 +18,7 @@ from app.tenants import HEADER, Tenants, clean
 from app import graphql_api
 from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, exports, field, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, integration_prices, connections, attention, media, associations, mailbox
 from app.routers import settings as settings_router
-from app.routers import quote_links, sharing
+from app.routers import assistance, field_plan, profile, quote_links, sharing
 from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -93,6 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(company_check.router)
     app.include_router(auth.router)
+    app.include_router(profile.router)
     app.include_router(admin.router)
     # Before the record routers, so /companies/bulk isn't read as a company's id.
     app.include_router(bulk.router)
@@ -116,6 +117,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(quote_templates.router)
     app.include_router(retention.router)
     app.include_router(field.router)
+    app.include_router(field_plan.router)
+    app.include_router(assistance.router)
     app.include_router(settings_router.router)
     app.include_router(connections.router)
     app.include_router(attention.router)
