@@ -34,7 +34,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
   preset?: { supplierId?: string; productId?: string; quantity?: string };
 }) {
   const fmt = makeFormat(org);
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const [supplierId, setSupplierId] = useState(order?.supplier.id ?? preset?.supplierId ?? "");
   const [warehouseId, setWarehouseId] = useState(order?.warehouse.id ?? reference.warehouses.find((w) => w.isActive)?.id ?? "");
   const [expectedOn, setExpectedOn] = useState(order?.expectedOn ?? "");
@@ -56,7 +56,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-3">
           <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
@@ -108,7 +108,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
   available: Record<string, number>;
 }) {
   const fmt = makeFormat(org);
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const kind = order?.kind ?? given;
   const info = kindOf(kind)!;
   const [recipient, setRecipient] = useState(order?.recipient ?? "");
@@ -126,7 +126,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-3">
           <Field label={info.recipient.label} hint={info.recipient.hint} error={fields.recipient}>
@@ -170,7 +170,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
 
 export function TransferForm({ org, reference, transfer, available, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "warehouses">; transfer?: Transfer; available: Record<string, number>; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const { added, remember } = useAdded();
   const warehouses = withAdded(active(reference.warehouses).map((w) => ({ value: w.id, label: w.name })), added, "warehouse", asOption);
   const [from, setFrom] = useState(transfer?.from.id ?? warehouses[0]?.value ?? "");
@@ -184,7 +184,7 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(!transfer); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(!transfer); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="From" error={fields.fromWarehouseId}>

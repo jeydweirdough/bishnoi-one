@@ -50,7 +50,7 @@ AREAS: tuple[Area, ...] = (
     Area("customers", "Customers & contacts", "CRM", CRUD),
     Area("deals", "Deals", "CRM", CRUD),
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "CRM", CRUD),
-    Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices")),
+    Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices", "approve")),
     Area("quotes", "Quotes", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("visits", "Visits & collections", "Field work", CRUD),
@@ -143,6 +143,18 @@ STARTING_ROLES += (
             dict(((r[0], r[3]) for r in STARTING_ROLES))[TEAM_LEAD]
             | _grant("goals", actions=("view", "manage"))
             | _grant("department", actions=("manage",))
+        ),
+    ),
+    (
+        "Finance",
+        "Curates baseline product prices and SRP, approves doctor's price, patient's price, and special price proposals from managers.",
+        "all",
+        frozenset(
+            _grant("products", actions=("view", "edit", "prices", "approve"))
+            | _grant("quotes", actions=("view", "approve"))
+            | _grant("orders", actions=("view", "approve"))
+            | _grant("reports", actions=("view", "export"))
+            | _grant("dashboard", actions=("view",))
         ),
     ),
     (

@@ -51,7 +51,7 @@ def call(settings: Settings, path: str, params: dict | None = None) -> dict:
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise Unreachable("Inventory refused the CRM's key: check INVENTORY_API_KEY here and INTEGRATION_KEYS there.") from e
+            raise Unreachable("Unable to sync with Inventory: connection could not be verified. Please contact your system administrator.") from e
         raise Unreachable(f"Inventory answered with an error ({e.code}).") from e
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
         raise Unreachable("Inventory can't be reached right now.") from e
@@ -124,10 +124,11 @@ def sync(db: Session, settings: Settings) -> dict:
         srp = item.get("sellingPrice") or 0
         there = next((pp for pp in product.prices if pp.price_type_code == SRP), None)
         if srp > 0 and there is None:
-            product.prices.append(ProductPrice(price_type_code=SRP, amount_centavos=srp))
+            product.prices.append(ProductPrice(price_type_code=SRP, amount_centavos=srp, approval_status="approved"))
             changed = True
         elif srp > 0 and there.amount_centavos != srp:
             there.amount_centavos = srp
+            there.approval_status = "approved"
             changed = True
         elif srp <= 0 and there is not None:
             product.prices.remove(there)

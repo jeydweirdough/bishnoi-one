@@ -119,7 +119,10 @@ export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
 
 export function approvalReason(reason: ApprovalReason, quote: Pick<Quote, "priceTypeName">): string {
   if (reason === "asked") return "The customer asked for another price (see the notes)";
-  return reason === "price" ? `${quote.priceTypeName} needs approval` : "An extra discount is over the limit";
+  if (reason === "margin") return "Gross margin is below the 48% target floor (requires GM approval)";
+  if (reason === "s2_license") return "Contains S-2 narcotic / controlled substance (requires PDEA license verification)";
+  // Prices are Finance's: a price asked for on a quote waits for Finance, in Bishnoi One Finance.
+  return reason === "price" ? `${quote.priceTypeName} needs Finance's approval` : "An extra discount is over the limit";
 }
 
 /** "10% off", "10.00 off each" in the company's money, "Buy 10, get 1 free", "5% from 20 · 8% from 50". */

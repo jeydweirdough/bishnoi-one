@@ -12,12 +12,12 @@ import { useSave } from "./lines";
 
 /** Adding a warehouse, or changing one's code, name and address. */
 export function WarehouseForm({ warehouse, onDone }: { warehouse?: Pick<Warehouse, "id" | "code" | "name" | "address">; onDone?: () => void }) {
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const [d, setD] = useState({ code: warehouse?.code ?? "", name: warehouse?.name ?? "", address: warehouse?.address ?? "" });
   return (
     <form
       noValidate
-      className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end"
+      className={`grid gap-4 rounded-xl transition-all duration-300 sm:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end ${shakeClass} ${anticipateClass}`}
       onSubmit={(e) => {
         e.preventDefault();
         save(() => saveWarehouse(warehouse?.id ?? null, { code: d.code.trim(), name: d.name.trim(), address: d.address.trim() || null }), (out) => {
@@ -43,7 +43,7 @@ export function AddWarehouse({ startOpen = false }: { startOpen?: boolean }) {
   const [open, setOpen] = useState(startOpen);
   if (!open) return <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>Add warehouse</Button>;
   return (
-    <div className="w-full rounded-[22px] border border-rule bg-sheet px-5 py-4 shadow-sheet">
+    <div className="w-full rounded-xl border border-rule bg-sheet px-5 py-4 shadow-sheet">
       <WarehouseForm onDone={() => setOpen(false)} />
     </div>
   );
@@ -56,13 +56,13 @@ export function EditWarehouse({ warehouse }: { warehouse: Pick<Warehouse, "id" |
   const [pending, start] = useTransition();
   return (
     <>
-      <button type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-full p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
+      <button type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-md p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
         <Pencil className="size-4" aria-hidden />
         <span className="sr-only">Edit warehouse</span>
       </button>
       {open && (
         <div className="fixed inset-x-0 top-0 z-40 flex justify-center p-4 lg:absolute lg:top-full lg:right-auto lg:left-0 lg:p-0 lg:pt-2">
-          <div className="w-full max-w-3xl rounded-[22px] border border-rule bg-sheet px-5 py-4 shadow-overlay">
+          <div className="w-full max-w-3xl rounded-xl border border-rule bg-sheet px-5 py-4 shadow-overlay">
             <WarehouseForm warehouse={warehouse} onDone={() => setOpen(false)} />
             <div className="mt-3 border-t border-rule pt-3">
               <Button
@@ -97,18 +97,36 @@ type Loc = Warehouse["locations"][number];
 export function LocationsEditor({ warehouseId, locations, canManage }: { warehouseId: string; locations: Loc[]; canManage: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [shaking, setShaking] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [d, setD] = useState({ code: "", name: "" });
   const [error, setError] = useState<string | null>(null);
 
+  function triggerShake() {
+    setShaking(true);
+    setTimeout(() => setShaking(false), 480);
+  }
+
   function run(work: () => Promise<{ ok: boolean; error?: string; fields?: Record<string, string> }>, done: string) {
     start(async () => {
-      const r = await work();
-      if (!r.ok) return setError(Object.values(r.fields ?? {})[0] ?? r.error ?? "That didn't work.");
-      toast.success(done);
-      setEditing(null);
-      setError(null);
-      router.refresh();
+      try {
+        const r = await work();
+        if (!r.ok) {
+          const err = Object.values(r.fields ?? {})[0] ?? r.error ?? "That didn't work.";
+          triggerShake();
+          toast.error(err);
+          return setError(err);
+        }
+        toast.success(done);
+        setEditing(null);
+        setError(null);
+        router.refresh();
+      } catch (err) {
+        const errText = err instanceof Error ? err.message : "Connection failed. Please try again.";
+        triggerShake();
+        toast.error(errText);
+        setError(errText);
+      }
     });
   }
 
@@ -124,7 +142,7 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
   );
 
   return (
-    <div>
+    <div className={`rounded-xl transition-all duration-300 ${shaking ? "animate-shake ring-2 ring-danger/40 ring-offset-2" : ""} ${pending ? "animate-anticipate pointer-events-none opacity-90" : ""}`}>
       <ul className="divide-y divide-rule border-t border-rule">
         {locations.map((loc) =>
           editing === loc.id ? (
@@ -140,7 +158,7 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
               {canManage && (
                 <span className="flex shrink-0 items-center gap-1">
                   {!loc.isDefault && loc.isActive && (
-                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} is the default now`)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
+                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} is the default now`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Star className="size-4" aria-hidden />
                     </button>
                   )}
@@ -149,11 +167,11 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
                       {loc.isActive ? "Switch off" : "Switch on"}
                     </Button>
                   )}
-                  <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
+                  <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                     <Pencil className="size-4" aria-hidden />
                   </button>
                   {!loc.isDefault && loc.units === 0 && (
-                    <button type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                    <button type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                       <Trash2 className="size-4" aria-hidden />
                     </button>
                   )}

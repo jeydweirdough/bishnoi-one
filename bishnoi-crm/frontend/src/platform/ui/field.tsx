@@ -7,7 +7,7 @@ import { DateInput, type FieldChange } from "./pickers";
 // Fields are Ant Design's: boxed, Ant's border, blue on focus, red when
 // invalid. The label always sits above, never inside.
 const control =
-  "block w-full min-w-0 rounded-[20px] border border-control bg-sheet px-4 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:outline-none focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
+  "block w-full min-w-0 rounded-lg border border-control bg-sheet px-4 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:outline-none focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
 
 /** Hands the caller the real <input> (or <textarea>), as before, not Ant's wrapper. */
 function toElement<E extends HTMLElement>(ref: Ref<E> | undefined, el: E | null) {
@@ -81,7 +81,7 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
   return (
     <input suppressHydrationWarning
       type="file"
-      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-[14px] file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
+      className={`py-1.5 ${control} file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-rule-strong file:bg-sheet file:px-3 file:py-1 file:text-meta file:font-semibold file:text-ink hover:file:border-control ${className}`}
       {...rest}
     />
   );

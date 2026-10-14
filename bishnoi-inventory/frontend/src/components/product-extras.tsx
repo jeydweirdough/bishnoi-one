@@ -31,7 +31,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
   return (
     <div className="flex flex-wrap gap-3">
       {images.map((id) => (
-        <figure key={id} className="group relative size-28 overflow-hidden rounded-[14px] border border-rule bg-bench">
+        <figure key={id} className="group relative size-28 overflow-hidden rounded-lg border border-rule bg-bench">
           {/* eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box */}
           <img src={`/products/${productId}/images/${id}`} alt="" className="size-full object-contain" />
           {canEdit && (
@@ -45,7 +45,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
                   else router.refresh();
                 })
               }
-              className="absolute top-1 right-1 rounded-full bg-sheet/90 p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
+              className="absolute top-1 right-1 rounded-md bg-sheet/90 p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
             >
               <Trash2 className="size-4" aria-hidden />
               <span className="sr-only">Remove this picture</span>
@@ -113,7 +113,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
                   <button
                     type="button"
                     title={`Remove ${sp.supplier.name}'s price`}
-                    className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-danger"
+                    className="rounded-md p-1 text-ink-3 hover:bg-bench hover:text-danger"
                     onClick={() => start(async () => { const r = await removeSupplierPrice(product.id, sp.supplier.id); if (!r.ok) toast.error(r.error); else router.refresh(); })}
                   >
                     <Trash2 className="size-4" aria-hidden />

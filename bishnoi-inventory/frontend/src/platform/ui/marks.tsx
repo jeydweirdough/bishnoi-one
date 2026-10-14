@@ -12,7 +12,7 @@ const statusStyle: Record<CustomerStatus, string> = {
 export function StatusMark({ status }: { status: CustomerStatus }) {
   return (
     <span
-      className={`inline-flex h-6 items-center rounded-full px-2.5 text-meta font-medium whitespace-nowrap ${statusStyle[status]}`}
+      className={`inline-flex h-6 items-center rounded-md px-2.5 text-meta font-medium whitespace-nowrap ${statusStyle[status]}`}
     >
       {CUSTOMER_STATUSES[status]}
     </span>
@@ -25,10 +25,10 @@ export function StatusMark({ status }: { status: CustomerStatus }) {
 export function QuoteStateMark({ state }: { state: Quote["state"] }) {
   if (state === "rejected") return <Flag letter="!">{QUOTE_STATES.rejected}</Flag>;
   if (state === "ready") {
-    return <span className="inline-flex h-6 items-center rounded-full bg-[#e6f2e1] px-2.5 text-meta font-medium whitespace-nowrap text-[#3f6f35]">{QUOTE_STATES.ready}</span>;
+    return <span className="inline-flex h-6 items-center rounded-md bg-[#e6f2e1] px-2.5 text-meta font-medium whitespace-nowrap text-[#3f6f35]">{QUOTE_STATES.ready}</span>;
   }
   return (
-    <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-dashed border-ink-2 px-2.5 text-meta font-medium whitespace-nowrap text-ink-2">
+    <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-dashed border-ink-2 px-2.5 text-meta font-medium whitespace-nowrap text-ink-2">
       {QUOTE_STATES.waiting}
     </span>
   );

@@ -216,7 +216,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
                     inputMode="numeric"
                     value={t.minQty}
                     onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)))}
-                    className="h-9 w-20 rounded-[14px] border border-control px-2 text-right"
+                    className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                   />
                   units,
                   <input
@@ -224,7 +224,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
                     inputMode="decimal"
                     value={t.percent}
                     onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)))}
-                    className="h-9 w-20 rounded-[14px] border border-control px-2 text-right"
+                    className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                   />
                   % off
                   {tiers.length > 1 && (
@@ -253,7 +253,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
             Every product
           </label>
           {!every && (
-            <ul className="mt-2 grid max-h-64 gap-1 overflow-y-auto rounded-[14px] border border-rule p-2 sm:grid-cols-2">
+            <ul className="mt-2 grid max-h-64 gap-1 overflow-y-auto rounded-lg border border-rule p-2 sm:grid-cols-2">
               {products.map((p) => (
                 <li key={p.id}>
                   <label className="flex items-center gap-2 text-sm">

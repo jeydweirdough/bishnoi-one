@@ -48,12 +48,12 @@ function usePrompts(prompts: Prompt[]) {
 function PromptRow({ p, aside }: { p: Prompt; aside: (p: Prompt, how: "snooze" | "dismiss") => void }) {
   return (
     <li className="flex items-start gap-3.5 py-3.5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-full border-[1.5px] border-ink bg-sheet text-ink">{ICONS[p.kind] ?? <CircleAlert className="size-4" aria-hidden />}</span>
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg border-[1.5px] border-ink bg-sheet text-ink">{ICONS[p.kind] ?? <CircleAlert className="size-4" aria-hidden />}</span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-ink">{p.title}</p>
         <p className="text-meta text-ink-3">{p.reason}</p>
       </div>
-      <Link href={p.href} className="shrink-0 self-center rounded-full border border-ink bg-sheet px-3.5 py-1 text-sm font-medium text-ink hover:bg-sage/40">
+      <Link href={p.href} className="shrink-0 self-center rounded-lg border border-ink bg-sheet px-3.5 py-1 text-sm font-medium text-ink hover:bg-sage/40">
         {p.action}
       </Link>
       <Dropdown
@@ -98,7 +98,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
   }
 
   return (
-    <section aria-labelledby="attention" className="mb-5 rounded-[28px] bg-mint">
+    <section aria-labelledby="attention" className="mb-5 rounded-xl bg-mint">
       <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-1">
         <h2 id="attention" className="text-heading text-ink">
           Needs your attention
@@ -107,7 +107,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
           <Link href="/attention" className="text-meta font-medium text-ink hover:underline">
             See all
           </Link>
-          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border-[1.5px] border-ink bg-sheet px-2 text-meta font-semibold text-ink" aria-label={left.length === 1 ? "1 thing" : `${left.length} things`}>
+          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border-[1.5px] border-ink bg-sheet px-2 text-meta font-semibold text-ink" aria-label={left.length === 1 ? "1 thing" : `${left.length} things`}>
             {left.length}
           </span>
         </span>

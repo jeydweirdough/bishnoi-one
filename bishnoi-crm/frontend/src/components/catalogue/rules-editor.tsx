@@ -51,7 +51,7 @@ export function RulesEditor({ rules }: { rules: SalesRules }) {
               <div className="min-w-0">
                 <p className="font-medium">
                   {t.name} <span className="text-meta text-ink-3">{t.code}</span>
-                  {!t.isActive && <span className="ml-2 rounded-full bg-bench px-2 py-0.5 text-meta">Off</span>}
+                  {!t.isActive && <span className="ml-2 rounded-md bg-bench px-2 py-0.5 text-meta">Off</span>}
                 </p>
                 <p className="text-meta text-ink-3">{describe(t)}</p>
               </div>
@@ -115,7 +115,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
         e.preventDefault();
         submit();
       }}
-      className="mt-3 space-y-4 rounded-[14px] bg-bench px-4 py-4"
+      className="mt-3 space-y-4 rounded-xl bg-bench px-4 py-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {!kind && (

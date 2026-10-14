@@ -81,7 +81,7 @@ export function QuantityInput({
         {said}
       </span>
       {said && (
-        <span className="absolute top-full right-0 z-10 mt-1 w-max max-w-56 rounded-[10px] bg-ink px-2.5 py-1 text-[0.6875rem] leading-snug text-white shadow-overlay" aria-hidden>
+        <span className="absolute top-full right-0 z-10 mt-1 w-max max-w-56 rounded-md bg-ink px-2.5 py-1 text-[0.6875rem] leading-snug text-white shadow-overlay" aria-hidden>
           {said}
         </span>
       )}

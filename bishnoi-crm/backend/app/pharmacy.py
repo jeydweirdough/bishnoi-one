@@ -49,7 +49,7 @@ class PharmacyRefused(Exception):
 def call(settings: Settings, method: str, path: str, body: dict | None = None) -> dict:
     """One call to Pharmacy's /integration/checks. Returns its JSON answer."""
     if not settings.pharmacy_linked:
-        raise PharmacyUnavailable("The CRM isn't linked to Pharmacy yet (PHARMACY_API_URL, PHARMACY_API_KEY), so an Rx quote can't be checked.")
+        raise PharmacyUnavailable("The CRM is not connected to Pharmacy yet, so an Rx quote cannot be checked. Please contact your system administrator.")
     url = f"{settings.pharmacy_api_url}/integration/checks" + (f"/{urllib.parse.quote(path)}" if path else "")
     headers = {"X-Bishnoi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)}
     data = None
@@ -62,9 +62,9 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None) -
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise PharmacyUnavailable("Pharmacy refused the CRM's key: check PHARMACY_API_KEY here and INTEGRATION_KEYS there.") from e
+            raise PharmacyUnavailable("Pharmacy connection could not be verified. Please contact your system administrator.") from e
         if 300 <= e.code < 400:
-            raise PharmacyUnavailable("PHARMACY_API_URL isn't Pharmacy's API: use the API's own address (locally, http://127.0.0.1:8307).") from e
+            raise PharmacyUnavailable("Pharmacy service address could not be reached. Please contact your system administrator.") from e
         detail = ""
         try:
             detail = json.loads(e.read()).get("detail", "")

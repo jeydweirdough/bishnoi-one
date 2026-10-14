@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from app.models import StoredFile
 from app.tools.users import make_demo_catalogue
+from tests.conftest import bearer, sign_in
 from tests.test_customers import company, contact, crew  # noqa: F401 (crew is a fixture)
 
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
@@ -54,9 +55,9 @@ def test_price_list_offers_the_catalogue(client, crew, ids):
     r = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"])
     assert r.status_code == 200, r.text
     got = r.json()
-    assert [t["code"] for t in got["priceTypes"]] == ["PATIENT", "TRADE", "DOCTOR", "SPECIAL"]
+    assert [t["code"] for t in got["priceTypes"]] == ["PATIENT", "TRADE", "DOCTOR", "SPECIAL", "SRP"]
     amox = next(p for p in got["products"] if p["code"] == "AMX-500")
-    assert amox["prices"] == {"PATIENT": 145000, "TRADE": 118000, "DOCTOR": 130000}
+    assert amox["prices"] == {"PATIENT": 145000, "TRADE": 118000, "DOCTOR": 130000, "SRP": 145000}
     assert {i["code"] for i in got["issuers"]} == {"DSWD", "PCSO", "MAYOR", "OP"}
     assert len(got["promos"]) == 3 and len(got["bundles"]) == 2
 
@@ -144,17 +145,17 @@ def test_a_contacts_quote_shows_on_its_company_too(client, crew, ids):
     assert client.get(f"/quotes?company={acme['id']}", headers=crew["ria"]).json()["total"] == 1
 
 
-def test_special_prices_need_notes_and_approval(client, crew, ids):
+def test_special_prices_need_notes_and_finances_approval(client, crew, ids):
     acme = company(client, crew["ria"])
     r = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, unitPriceCentavos=100000)], price_type="SPECIAL")
     assert "notes" in errors(r)
     q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, unitPriceCentavos=100000)], price_type="SPECIAL", notes="Hospital tender").json()
     assert (q["state"], q["approval"]["status"], q["can"]["approve"]) == ("waiting", "pending", False)
     assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["ria"]).status_code == 403
-    assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "reject"}, headers=crew["max"]).status_code == 422  # needs a reason
+    # A price the rep asked for is Finance's to approve (tests/test_price_approvals.py): not even a director's.
+    assert client.get(f"/quotes/{q['id']}", headers=crew["max"]).json()["can"]["approve"] is False
     r = client.post(f"/quotes/{q['id']}/approval", json={"decision": "reject", "note": "Too low"}, headers=crew["max"])
-    assert (r.json()["state"], r.json()["approval"]["note"], r.json()["approval"]["by"]["name"]) == ("rejected", "Too low", "Max")
-    assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["max"]).status_code == 409
+    assert r.status_code == 409 and "Finance" in r.text
 
 
 def test_a_guarantee_letter_is_checked_then_paid(client, crew, ids):
@@ -202,9 +203,10 @@ def test_deleting_a_quote_removes_its_letter(app, client, crew, ids):
 
 def test_approver_lists(client, crew, ids):
     acme = company(client, crew["ria"])
-    save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, unitPriceCentavos=1000)], price_type="SPECIAL", notes="Why")
+    over = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, discount={"kind": "percent", "value": 3000})]).json()  # 30% off: the lead's to approve
+    save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, unitPriceCentavos=1000)], price_type="SPECIAL", notes="Why")  # a requested price: Finance's
     save(client, crew["ria"], acme, [line(ids["AMX-500"])])
-    assert client.get("/quotes?task=approvals", headers=crew["max"]).json()["total"] == 1
+    assert [q["id"] for q in client.get("/quotes?task=approvals", headers=crew["max"]).json()["items"]] == [over["id"]]
     assert client.get("/quotes?state=ready", headers=crew["max"]).json()["total"] == 1
 
 
@@ -224,7 +226,13 @@ def test_a_team_lead_sets_their_teams_prices(client, crew, ids):
     r = client.put(f"/prices?team={north}", json={"items": [{"productId": ids["AMX-500"], "priceTypeCode": "PATIENT", "amountCentavos": 140000}]}, headers=crew["lia"])
     assert r.status_code == 200, r.text
     cell = next(p for p in r.json()["products"] if p["code"] == "AMX-500")["prices"]["PATIENT"]
-    assert cell == {"company": 145000, "team": 140000}
+    assert (cell["company"], cell["teamStatus"], cell["teamProposed"]) == (145000, "pending", 140000)
+    # Prices are Finance's: the lead's price waits, and her reps quote the company's until it's approved.
+    assert preview(client, crew["ria"], ria_co, [line(ids["AMX-500"])]).json()["totalCentavos"] == 145000
+    finance = bearer(sign_in(client))  # an Administrator decides as Finance does
+    decide = {"kind": "team", "productId": ids["AMX-500"], "priceTypeCode": "PATIENT", "teamId": north, "decision": "approve"}
+    assert client.post("/prices/approvals/decide", json=decide, headers=crew["lia"]).status_code == 403
+    assert client.post("/prices/approvals/decide", json=decide, headers=finance).status_code == 200
     assert preview(client, crew["ria"], ria_co, [line(ids["AMX-500"])]).json()["totalCentavos"] == 140000
     assert preview(client, crew["sam"], sam_co, [line(ids["AMX-500"])]).json()["totalCentavos"] == 145000
 
@@ -232,8 +240,9 @@ def test_a_team_lead_sets_their_teams_prices(client, crew, ids):
     assert sheet["usesAllTypes"] is False
     offered = client.get(f"/companies/{ria_co['id']}/price-list", headers=crew["ria"]).json()["priceTypes"]
     assert [t["code"] for t in offered] == ["TRADE"]
-    # Cleared: back to the company's price.
+    # Cleared, and Finance agreeing: back to the company's price.
     client.put(f"/prices?team={north}", json={"items": [{"productId": ids["AMX-500"], "priceTypeCode": "PATIENT", "amountCentavos": None}]}, headers=crew["lia"])
+    assert client.post("/prices/approvals/decide", json=decide, headers=finance).status_code == 200
     assert client.put(f"/prices/types?team={north}", json={"codes": []}, headers=crew["lia"]).json()["usesAllTypes"] is True
     assert preview(client, crew["ria"], ria_co, [line(ids["AMX-500"])]).json()["totalCentavos"] == 145000
 
@@ -322,8 +331,9 @@ def test_the_rules_can_be_changed(client, ana, crew, catalogue):
     assert client.patch("/pricing/settings", json={"lostDays": 200}, headers=crew["lia"]).status_code == 403
 
 
-def test_a_requested_price_goes_to_the_salespersons_team_lead(app, client, crew, ids):
-    """A salesperson asks for a lower price for a client; their own lead approves it."""
+def test_a_requested_price_goes_to_finance_not_the_team_lead(app, client, crew, ids):
+    """A salesperson asks for a lower price for a client: Finance approves it
+    (tests/test_price_approvals.py), so it isn't in any team lead's approvals."""
     from app.models import Team, User
     from app.security import hash_password
     from tests.conftest import PASSWORD, bearer, role_id, sign_in
@@ -336,8 +346,8 @@ def test_a_requested_price_goes_to_the_salespersons_team_lead(app, client, crew,
     acme = company(client, crew["ria"])
     q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 10, unitPriceCentavos=120000)], price_type="SPECIAL", notes="Client asked for a lower price").json()
     assert (q["state"], q["approval"]["reasons"]) == ("waiting", ["price"])
-    assert client.get("/quotes?task=approvals", headers=crew["lia"]).json()["total"] == 1  # Ria's lead sees it
-    assert client.get("/quotes?task=approvals", headers=lou).json()["total"] == 0  # another team's lead doesn't
-    assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=lou).status_code == 404
-    done = client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["lia"]).json()
-    assert (done["state"], done["approval"]["by"]["name"]) == ("ready", "Lia")
+    assert client.get("/quotes?task=approvals", headers=crew["lia"]).json()["total"] == 0  # not Ria's lead's to decide
+    assert client.get("/quotes?task=approvals", headers=lou).json()["total"] == 0
+    assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=lou).status_code == 404  # still out of another team's reach
+    r = client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["lia"])
+    assert r.status_code == 409 and "Finance" in r.text

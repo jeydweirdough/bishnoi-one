@@ -105,11 +105,11 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
           setOver(false);
           if (!locked) take(e.dataTransfer.files?.[0] ?? null, true);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-[18px] border-[1.5px] border-dashed px-6 py-8 text-center transition-colors ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed px-6 py-8 text-center transition-colors ${
           over ? "border-sage-deep bg-mint" : "border-rule-strong bg-bench hover:border-ink-3"
         } ${locked ? "pointer-events-none opacity-60" : ""}`}
       >
-        <span className="grid size-10 place-items-center rounded-[12px] border border-rule bg-sheet text-ink shadow-sm" aria-hidden>
+        <span className="grid size-10 place-items-center rounded-lg border border-rule bg-sheet text-ink shadow-sm" aria-hidden>
           <Upload className="size-4.5" />
         </span>
         <span className="mt-3 text-sm text-ink">
@@ -151,9 +151,9 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
       {shown && (
         <div className="mt-4">
           <p className="mb-2 text-sm font-medium text-ink">{file ? (busy ? "Uploading" : "Chosen") : "On file"}</p>
-          <div className="rounded-[14px] border border-rule bg-sheet px-3 py-2.5">
+          <div className="rounded-lg border border-rule bg-sheet px-3 py-2.5">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-[10px] border border-rule bg-bench text-[0.6875rem] font-semibold text-ink-3" aria-hidden>
+              <span className="grid size-11 shrink-0 place-items-center rounded-md border border-rule bg-bench text-[0.6875rem] font-semibold text-ink-3" aria-hidden>
                 {typeOf(shown.name)}
               </span>
               <span className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
                   type="button"
                   onClick={remove}
                   disabled={busy}
-                  className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-bench hover:text-ink disabled:opacity-40"
+                  className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-bench hover:text-ink disabled:opacity-40"
                   aria-label={busy ? `Stop ${shown.name}` : `Remove ${shown.name}`}
                 >
                   {busy ? <X className="size-4" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}

@@ -15,7 +15,7 @@ function FilterSelect({ label, value, onChange, children }: { label: string; val
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 min-w-0 appearance-none rounded-[14px] border border-rule-strong bg-sheet pr-8 pl-2.5 text-sm text-ink hover:border-control focus:border-hema focus:outline-none"
+        className="h-9 min-w-0 appearance-none rounded-lg border border-rule-strong bg-sheet pr-8 pl-2.5 text-sm text-ink hover:border-control focus:border-hema focus:outline-none"
       >
         {children}
       </Select>
@@ -76,7 +76,7 @@ export function CustomerFilters({
           value={q}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Name, city, specialty or phone"
-          className="h-9 w-full rounded-[14px] border border-rule-strong bg-sheet pr-3 pl-8 text-sm placeholder:text-ink-3/80 hover:border-control focus:border-hema focus:outline-none"
+          className="h-9 w-full rounded-lg border border-rule-strong bg-sheet pr-3 pl-8 text-sm placeholder:text-ink-3/80 hover:border-control focus:border-hema focus:outline-none"
         />
       </label>
       {divisions.length > 1 && (

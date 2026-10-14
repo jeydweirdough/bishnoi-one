@@ -2,17 +2,21 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
+import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button, LinkButton, IconButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { BundleTag, PromoTags, bundlesWith, promosFor, startingPromo, withPromoFlag } from "../catalogue/promo-tag";
 import type { DealPriority, Assignable, Deal, DealLists, DealStage, ForecastCategory, Org, PriceList } from "@/src/platform/lib/types";
 import { createDeal, howLikely, updateDeal, type DealInput } from "../../actions/deals";
 import { OwnerField } from "../crm/owner-field";
 import { PRIORITIES } from "./words";
 
-type LineDraft = { key: number; productId: string; quantity: string };
+/** promoId: the promo the product is sold under ("" none); it goes on to the deal's quote. */
+type LineDraft = { key: number; productId: string; quantity: string; promoId: string };
 
 /** A new deal's close, until changed: as the API does it (CLOSE_IN_DAYS). */
 const CLOSE_IN_DAYS = 30;
@@ -72,7 +76,28 @@ export function DealForm({
 }) {
   const fmt = makeFormat(org);
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const {
+    pending,
+    shakeClass,
+    anticipateClass,
+    execute,
+    triggerShake,
+    error,
+    fieldErrors: fields,
+    setError,
+    setFieldErrors: setFields,
+  } = useAnticipation<{
+    name: string;
+    contactId: string;
+    stageCode: string;
+    closeOn: string;
+    value: string;
+    priority: DealPriority | "";
+    notes: string;
+    ownerId: string;
+    priceType: string;
+    lines: LineDraft[];
+  }>();
   const open = stages.filter((s) => s.outcome === "open" && (s.isActive || s.code === deal?.stage.code));
   const priceTypes = priceList?.usesPriceList ? priceList.priceTypes.filter((t) => t.entry !== "entered" && t.rule === "always") : [];
   const [name, setName] = useState(deal?.name ?? "");
@@ -89,13 +114,16 @@ export function DealForm({
   const [notes, setNotes] = useState(deal?.notes ?? "");
   const [ownerId, setOwnerId] = useState(deal?.owner?.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
   const [priceType, setPriceType] = useState(deal?.priceType ?? priceTypes[0]?.code ?? "");
-  const [lines, setLines] = useState<LineDraft[]>(() => (deal?.lines ?? []).map((l, i) => ({ key: i, productId: l.productId, quantity: String(l.quantity) })));
-  const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
+  const [lines, setLines] = useState<LineDraft[]>(() => (deal?.lines ?? []).map((l, i) => ({ key: i, productId: l.productId, quantity: String(l.quantity), promoId: l.promoId ?? "" })));
   const stage = stages.find((s) => s.code === stageCode);
   const products = priceList?.products.filter((p) => p.prices[priceType] != null) ?? [];
   const withProducts = lines.some((l) => l.productId);
   // Each line's value at the chosen price, before promos: the saved deal shows the priced figure.
+  const promos = priceList?.promos ?? [];
+  // Sets whose every product can be valued at this price.
+  const bundles = (priceList?.bundles ?? []).filter((b) => b.items.every((i) => products.some((p) => p.id === i.productId)));
+  const nameOf = (id: string) => priceList?.products.find((p) => p.id === id)?.name ?? "a product";
+  const withPromos = lines.some((l) => l.productId && l.promoId);
   const estimate = lines.reduce((sum, l) => sum + (products.find((p) => p.id === l.productId)?.prices[priceType] ?? 0) * (Number(l.quantity) || 0), 0);
   const isOpen = !deal || deal.state === "open";
   const productNames = lines.map((l) => products.find((p) => p.id === l.productId)?.name).filter(Boolean) as string[];
@@ -129,6 +157,8 @@ export function DealForm({
       if (problems.name) setDetails(true);
       setFields(problems);
       setError("Some fields need a look.");
+      triggerShake();
+      toast.error("Some fields need a look.");
       return;
     }
     const input: DealInput = {
@@ -141,45 +171,71 @@ export function DealForm({
       expectedCloseOn: closeOn,
       priority: priority || null,
       priceType: withProducts ? priceType : null,
-      lines: lines.filter((l) => l.productId).map((l) => ({ productId: l.productId, quantity: Number(l.quantity) || 0 })),
+      lines: lines.filter((l) => l.productId).map((l) => ({ productId: l.productId, quantity: Number(l.quantity) || 0, promoId: l.promoId || null })),
       notes: notes.trim() || null,
       ownerId: ownerId || null,
     };
-    start(async () => {
-      let result;
-      if (deal) {
-        const change: Partial<DealInput> = {};
-        if (input.name !== deal.name) change.name = input.name;
-        if (input.contactId !== (deal.contact?.id ?? null)) change.contactId = input.contactId;
-        if (isOpen && input.stageCode !== deal.stage.code) change.stageCode = input.stageCode;
-        if (input.expectedCloseOn !== deal.expectedCloseOn) change.expectedCloseOn = input.expectedCloseOn;
-        if ((input.priority ?? null) !== (deal.priority ?? null)) change.priority = input.priority;
-        if (input.notes !== deal.notes) change.notes = input.notes;
-        if (input.ownerId && input.ownerId !== deal.owner?.id) change.ownerId = input.ownerId;
-        const before = JSON.stringify(deal.lines.map((l) => [l.productId, l.quantity]));
-        const after = JSON.stringify(input.lines.map((l) => [l.productId, l.quantity]));
-        if (before !== after || (withProducts && priceType !== deal.priceType)) {
-          change.lines = input.lines;
-          change.priceType = input.priceType;
+
+    execute({
+      anticipate: () => ({
+        name,
+        contactId,
+        stageCode,
+        closeOn,
+        value,
+        priority,
+        notes,
+        ownerId,
+        priceType,
+        lines: [...lines],
+      }),
+      rollback: (prev) => {
+        setName(prev.name);
+        setContactId(prev.contactId);
+        setStageCode(prev.stageCode);
+        setCloseOn(prev.closeOn);
+        setValue(prev.value);
+        setPriority(prev.priority);
+        setNotes(prev.notes);
+        setOwnerId(prev.ownerId);
+        setPriceType(prev.priceType);
+        setLines(prev.lines);
+      },
+      request: async () => {
+        if (deal) {
+          const change: Partial<DealInput> = {};
+          if (input.name !== deal.name) change.name = input.name;
+          if (input.contactId !== (deal.contact?.id ?? null)) change.contactId = input.contactId;
+          if (isOpen && input.stageCode !== deal.stage.code) change.stageCode = input.stageCode;
+          if (input.expectedCloseOn !== deal.expectedCloseOn) change.expectedCloseOn = input.expectedCloseOn;
+          if ((input.priority ?? null) !== (deal.priority ?? null)) change.priority = input.priority;
+          if (input.notes !== deal.notes) change.notes = input.notes;
+          if (input.ownerId && input.ownerId !== deal.owner?.id) change.ownerId = input.ownerId;
+          const before = JSON.stringify(deal.lines.map((l) => [l.productId, l.quantity, l.promoId ?? null]));
+          const after = JSON.stringify(input.lines.map((l) => [l.productId, l.quantity, l.promoId ?? null]));
+          if (before !== after || (withProducts && priceType !== deal.priceType)) {
+            change.lines = input.lines;
+            change.priceType = input.priceType;
+          }
+          // A typed value counts once there are no products (any more) to value it.
+          if (!withProducts && input.valueCentavos !== deal.valueCentavos) change.valueCentavos = input.valueCentavos;
+          if (Object.keys(change).length === 0) {
+            router.push(`/deals/${deal.id}`);
+            return { ok: true, data: deal };
+          }
+          return await updateDeal(deal.id, change);
+        } else {
+          return await createDeal(input);
         }
-        // A typed value counts once there are no products (any more) to value it.
-        if (!withProducts && input.valueCentavos !== deal.valueCentavos) change.valueCentavos = input.valueCentavos;
-        if (Object.keys(change).length === 0) {
-          router.push(`/deals/${deal.id}`);
-          return;
-        }
-        result = await updateDeal(deal.id, change);
-      } else {
-        result = await createDeal(input);
-      }
-      if (!result.ok) {
-        setError(result.error);
-        setFields(result.fields ?? {});
-        return;
-      }
-      toast.success(deal ? "Changes saved" : "Deal added", { description: result.data.name });
-      router.push(`/deals/${result.data.id}`);
-      router.refresh();
+      },
+      successMessage: (data) => ({
+        title: deal ? "Changes saved" : "Deal added",
+        description: data.name,
+      }),
+      onSuccess: (data) => {
+        router.push(`/deals/${data.id}`);
+        router.refresh();
+      },
     });
   }
 
@@ -225,14 +281,19 @@ export function DealForm({
               <li key={l.key} className="grid items-end gap-3 py-2 sm:grid-cols-[minmax(0,1fr)_6rem_2.25rem]">
                 <Field label={`Product ${i + 1}`} error={fields[`lines.${i}.productId`]}>
                   {(p) => (
-                    <Select {...p} value={l.productId} onChange={(e) => setLine(l.key, { productId: e.target.value })}>
-                      <option value="">Pick a product</option>
-                      {products.map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name} ({x.code})
-                        </option>
-                      ))}
-                    </Select>
+                    // A product on promo says so in the list, before it's picked.
+                    <Combobox<string>
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
+                      status={p["aria-invalid"] ? "error" : undefined}
+                      value={l.productId}
+                      onChange={(id) => setLine(l.key, { productId: id, promoId: startingPromo(promos, id) })}
+                      options={[
+                        { value: "", label: "Pick a product", promos: 0 },
+                        ...products.map((x) => ({ value: x.id, label: `${x.name} (${x.code})`, promos: promosFor(promos, x.id).length, bundles: bundlesWith(bundles, x.id).length })),
+                      ]}
+                      optionRender={(o) => withPromoFlag(o.data.label, Number(o.data.promos) || 0, Number(o.data.bundles) || 0)}
+                    />
                   )}
                 </Field>
                 <Field label="Quantity" error={fields[`lines.${i}.quantity`]}>
@@ -241,20 +302,29 @@ export function DealForm({
                 <IconButton onClick={() => setLines(lines.filter((x) => x.key !== l.key))} tone="danger" className="h-9" label={`Remove product ${i + 1}`}>
                   <Trash2 className="size-4" aria-hidden />
                 </IconButton>
+                {(promosFor(promos, l.productId).length > 0 || bundlesWith(bundles, l.productId).length > 0 || fields[`lines.${i}.promoId`]) && (
+                  <div className="flex flex-wrap gap-2 sm:col-span-full">
+                    <PromoTags promos={promosFor(promos, l.productId)} fmt={fmt} appliedId={l.promoId} onPick={(id) => setLine(l.key, { promoId: id })} label={`Product ${i + 1}`} />
+                    {bundlesWith(bundles, l.productId).map((b) => (
+                      <BundleTag key={b.id} bundle={b} nameOf={nameOf} fmt={fmt} />
+                    ))}
+                    {fields[`lines.${i}.promoId`] && <p className="mt-1 text-meta text-danger">{fields[`lines.${i}.promoId`]}</p>}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap items-center gap-4">
-            <Button type="button" size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => setLines([...lines, { key: Date.now(), productId: "", quantity: "1" }])}>
+            <Button type="button" size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => setLines([...lines, { key: Date.now(), productId: "", quantity: "1", promoId: "" }])}>
               Add a product
             </Button>
-            {withProducts && <span className="text-meta text-ink-2">About {fmt.peso(estimate)} at list price</span>}
+            {withProducts && <span className="text-meta text-ink-2">About {fmt.peso(estimate)} at list price{withPromos ? ", before promos" : ""}</span>}
           </div>
         </>
       ) : (
         <div className="flex flex-wrap items-end gap-4">
           {priceTypes.length > 0 && (
-            <Button type="button" variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setLines([{ key: Date.now(), productId: "", quantity: "1" }])}>
+            <Button type="button" variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setLines([{ key: Date.now(), productId: "", quantity: "1", promoId: "" }])}>
               Add a product
             </Button>
           )}
@@ -267,7 +337,7 @@ export function DealForm({
   );
 
   return (
-    <form noValidate onSubmit={submit} className="space-y-6">
+    <form noValidate onSubmit={submit} className={`space-y-6 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <FormError message={error} />
 
       <div role="radiogroup" aria-label="Priority" className="flex flex-wrap items-center gap-2">
@@ -281,7 +351,7 @@ export function DealForm({
               role="radio"
               aria-checked={on}
               onClick={() => setPriority((x.value ?? "") as DealPriority | "")}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors ${
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors ${
                 on ? "border-ink bg-ink text-white" : "border-rule-strong bg-sheet text-ink-2 hover:border-ink hover:text-ink"
               }`}
             >
@@ -325,7 +395,7 @@ export function DealForm({
       </div>
 
       {!deal && !details && (
-        <section aria-labelledby="filled-in" className="rounded-[18px] bg-mint px-5 py-4">
+        <section aria-labelledby="filled-in" className="rounded-xl bg-mint px-5 py-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="filled-in" className="text-sm font-semibold text-ink">
               Filled in for you

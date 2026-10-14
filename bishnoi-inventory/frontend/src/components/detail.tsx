@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/src/platform/ui/icons";
 /** The panel: the record's left column beside its facts. Without `side`, the facts take the width. */
 export function DetailPanel({ side, children }: { side?: ReactNode; children: ReactNode }) {
   return (
-    <div className={`mt-5 grid gap-4 rounded-[26px] border border-rule bg-[#f4f4f1] p-3 sm:p-4 ${side ? "lg:grid-cols-[19rem_minmax(0,1fr)]" : ""}`}>
+    <div className={`mt-5 grid gap-4 rounded-xl border border-rule bg-[#f4f4f1] p-3 sm:p-4 ${side ? "lg:grid-cols-[19rem_minmax(0,1fr)]" : ""}`}>
       {side && <div className="min-w-0 space-y-4">{side}</div>}
       <div className="min-w-0 space-y-4">{children}</div>
     </div>
@@ -19,7 +19,7 @@ export function DetailPanel({ side, children }: { side?: ReactNode; children: Re
 
 /** A white card inside the panel. */
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-[20px] border border-rule bg-sheet ${className}`}>{children}</div>;
+  return <div className={`rounded-lg border border-rule bg-sheet ${className}`}>{children}</div>;
 }
 
 /** The record's headline numbers: a label, then the number under it. */
@@ -27,7 +27,7 @@ export function StatCards({ items }: { items: { label: string; value: ReactNode;
   return (
     <dl className={`grid gap-3 ${items.length >= 4 ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
       {items.map((s) => (
-        <div key={s.label} className={`rounded-[20px] border bg-sheet px-5 py-4 ${s.flag ? "border-danger/40" : "border-rule"}`}>
+        <div key={s.label} className={`rounded-lg border bg-sheet px-5 py-4 ${s.flag ? "border-danger/40" : "border-rule"}`}>
           <dt className={`text-sm ${s.flag ? "text-danger" : "text-ink-2"}`}>{s.label}</dt>
           <dd className="mt-1 text-[1.5rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
             {s.href ? (
@@ -76,7 +76,7 @@ export function InfoCard({ children }: { children: ReactNode }) {
 
 /** A small pill beside a value: "Margin 53%". */
 export function Pill({ children }: { children: ReactNode }) {
-  return <span className="ml-2 inline-flex h-5 items-center rounded-full border border-rule-strong px-2 text-[0.6875rem] font-medium text-ink-2">{children}</span>;
+  return <span className="ml-2 inline-flex h-5 items-center rounded-md border border-rule-strong px-2 text-[0.6875rem] font-medium text-ink-2">{children}</span>;
 }
 
 /**

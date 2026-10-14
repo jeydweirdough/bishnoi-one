@@ -26,7 +26,7 @@ const TONES: Record<Tone, string> = {
 /** A document's status, as a pill. */
 export function Stamp({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium whitespace-nowrap ${TONES[tone]}`}>
+    <span className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium whitespace-nowrap ${TONES[tone]}`}>
       <span className="size-1.5 rounded-full bg-current" aria-hidden />
       {children}
     </span>
@@ -98,7 +98,7 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
             name="q"
             defaultValue={q}
             placeholder={placeholder}
-            className="block h-10 w-full rounded-full border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
+            className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
           />
         </label>
       )}
@@ -140,7 +140,7 @@ export function Figures({ items }: { items: { label: string; value: ReactNode; f
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map((f) => (
-        <div key={f.label} className={`flex flex-col-reverse justify-end rounded-[22px] border bg-sheet px-5 py-4 ${f.flag ? "border-danger/40" : "border-rule"}`}>
+        <div key={f.label} className={`flex flex-col-reverse justify-end rounded-xl border bg-sheet px-5 py-4 ${f.flag ? "border-danger/40" : "border-rule"}`}>
           <dt className="mt-1 text-sm font-medium text-ink">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
           <dd className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
             {f.href ? (

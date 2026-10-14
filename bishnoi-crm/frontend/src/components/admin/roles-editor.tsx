@@ -248,7 +248,7 @@ function Permissions({
                         return (
                           <label
                             key={a.permission}
-                            className={`relative inline-flex items-center rounded-full border px-3 py-1 text-meta transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${
+                            className={`relative inline-flex items-center rounded-md border px-3 py-1 text-meta transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${
                               on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"
                             } ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}
                           >

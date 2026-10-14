@@ -365,7 +365,16 @@ class ProductPrice(Base):
 
     product_id: Mapped[str] = mapped_column(ForeignKey("nbcm_products.id", ondelete="CASCADE"), primary_key=True)
     price_type_code: Mapped[str] = mapped_column(ForeignKey("nbcm_price_types.code", ondelete="CASCADE"), primary_key=True)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
+    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    approval_status: Mapped[str] = mapped_column(String(20), default="approved")  # approved, pending, rejected
+    proposed_amount_centavos: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), nullable=True, default=None)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), nullable=True, default=None)
+    # Who in Finance decided, by name: Finance approves in its own app, where its people aren't CRM users.
+    approved_by_name: Mapped[str | None] = mapped_column(String(120), nullable=True, default=None)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
 
 
 class TeamPriceType(Base):
@@ -385,7 +394,16 @@ class TeamPrice(Base):
     team_id: Mapped[str] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="CASCADE"), primary_key=True)
     product_id: Mapped[str] = mapped_column(ForeignKey("nbcm_products.id", ondelete="CASCADE"), primary_key=True)
     price_type_code: Mapped[str] = mapped_column(ForeignKey("nbcm_price_types.code", ondelete="CASCADE"), primary_key=True)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
+    amount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    approval_status: Mapped[str] = mapped_column(String(20), default="approved")  # approved, pending, rejected
+    proposed_amount_centavos: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), nullable=True, default=None)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), nullable=True, default=None)
+    # Who in Finance decided, by name: Finance approves in its own app, where its people aren't CRM users.
+    approved_by_name: Mapped[str | None] = mapped_column(String(120), nullable=True, default=None)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
 
 
 PROMO_KINDS = ("percent", "amount", "free_goods", "tiered")
@@ -562,8 +580,10 @@ class Quote(Owned, Base):
     # asked; and why the last try failed, if it did. None: not sent.
     pharmacy_sent: Mapped[dict | None] = mapped_column(JSON, default=None)
     pharmacy_check: Mapped[dict | None] = mapped_column(JSON, default=None)
-    # The prescriptions attached (an order link's, for its Rx medicines): [{ref, name, contentType, size}].
+    # The prescriptions attached (an order link's, for its Rx medicines): [{store, key or ref, name, contentType, size}].
     prescriptions: Mapped[list | None] = mapped_column(JSON, default=None)
+    # Other documents the link asked for (a valid ID...): [{label, store, key or ref, name, contentType, size}].
+    documents: Mapped[list | None] = mapped_column(JSON, default=None)
     pharmacy_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     pharmacy_error: Mapped[str | None] = mapped_column(String(300), default=None)
 
@@ -833,7 +853,7 @@ class QuoteTemplate(Base):
     (an issuer's code, "self" for the customer, None for any) and its team."""
 
     __tablename__ = "nbcm_quote_templates"
-    __table_args__ = (CheckConstraint("kind IN ('form', 'excel')", name="quote_template_kind"),)
+    __table_args__ = (CheckConstraint("kind IN ('form', 'excel', 'code')", name="quote_template_kind"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(120))
@@ -1266,6 +1286,9 @@ class QuoteLink(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # When the customer agreed to the privacy notice, ordering through it.
     privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # What the customer must send with the order, set by the rep making the link:
+    # {"prescription": "rx" | "always", "payer": issuer code or None, "payerName", "documents": [labels]}.
+    asks: Mapped[dict | None] = mapped_column(JSON, default=None)
     quote_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_quotes.id", ondelete="SET NULL"), default=None)
 
     company: Mapped[Company | None] = relationship(lazy="joined")

@@ -219,7 +219,7 @@ function BundleForm({
                   inputMode="numeric"
                   value={item.qty}
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))}
-                  className="h-9 w-20 rounded-[14px] border border-control px-2 text-right"
+                  className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                 />
                 {items.length > 1 && (
                   <Button size="sm" variant="quiet" onClick={() => setItems(items.filter((_, j) => j !== i))} aria-label={`Remove item ${i + 1}`}>

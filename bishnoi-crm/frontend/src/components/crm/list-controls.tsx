@@ -49,7 +49,7 @@ export function Filters({ search, selects }: { search?: string; selects: { name:
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={search}
-          className="block h-10 w-full rounded-full border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
+          className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
         />
       </label>
       )}
@@ -98,7 +98,7 @@ export function Pager({ total, page, size, base }: { total: number; page: number
 
 /** Deleting a company or a contact, from its own page. */
 /** What a record page's name can do to the record itself, as icons beside the name. */
-const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[14px] text-ink-3 transition-colors";
+const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-3 transition-colors";
 
 export function EditRecord({ href, what }: { href: string; what: string }) {
   return (

@@ -57,7 +57,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
               key={p.id}
               href={link(route.day, p.id)}
               aria-current={p.id === route.person.id ? "page" : undefined}
-              className={`rounded-[14px] border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:border-control"}`}
+              className={`rounded-md border px-3 py-1.5 text-meta ${p.id === route.person.id ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:border-control"}`}
             >
               {p.name}
             </Link>
@@ -66,12 +66,12 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
       )}
 
       <nav aria-label="Day" className="mb-4 flex items-center gap-2">
-        <Link href={link(shiftDay(route.day, -1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
+        <Link href={link(shiftDay(route.day, -1))} className="rounded-md p-1.5 text-ink-2 hover:bg-bench" aria-label="The day before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-44 text-center text-heading">{route.day === route.today ? "Today" : fmt.dateLabel(route.day)}</span>
         {route.day < route.today ? (
-          <Link href={link(shiftDay(route.day, 1))} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
+          <Link href={link(shiftDay(route.day, 1))} className="rounded-md p-1.5 text-ink-2 hover:bg-bench" aria-label="The day after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (

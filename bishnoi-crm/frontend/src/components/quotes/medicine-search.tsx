@@ -13,7 +13,7 @@ export type Medicine = { id: string; code: string; name: string; genericName: st
 /** Beside a prescription medicine's name. */
 function RxMark() {
   return (
-    <span title="Needs a prescription" className="ml-2 inline-flex h-5 items-center rounded-full bg-danger-tint px-2 align-middle text-[0.6875rem] font-semibold text-danger">
+    <span title="Needs a prescription" className="ml-2 inline-flex h-5 items-center rounded-md bg-danger-tint px-2 align-middle text-[0.6875rem] font-semibold text-danger">
       Rx
     </span>
   );
@@ -105,7 +105,7 @@ export function MedicineSearch({
         <h2 id="find" className="text-heading text-ink">
           Find a medicine
         </h2>
-        <label className="mt-3 flex h-12 items-center gap-3 rounded-full border border-control bg-sheet px-5 focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)]">
+        <label className="mt-3 flex h-12 items-center gap-3 rounded-lg border border-control bg-sheet px-5 focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)]">
           <Search className="size-4 text-ink-3" aria-hidden />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type its name, generic name or code" aria-label="Find a medicine" autoFocus className="w-full bg-transparent text-sm outline-none" />
         </label>
@@ -143,7 +143,7 @@ export function MedicineSearch({
                 )}
                 {picked[m.id] ? (
                   // How many is set in one place only: Your order.
-                  <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-hema-tint px-3 text-meta font-medium text-sage-deep">
+                  <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-hema-tint px-3 text-meta font-medium text-sage-deep">
                     <Check className="size-3.5" aria-hidden />
                     Added
                   </span>
@@ -197,7 +197,7 @@ export function MedicineSearch({
                         <TextButton onClick={() => setAsking((a) => ({ ...a, [id]: "" }))}>Ask for another price</TextButton>
                       ) : (
                         <span className="mt-1.5 flex items-center gap-2">
-                          <span className="inline-flex h-8 items-center gap-1 rounded-full border border-control px-3 focus-within:border-ink">
+                          <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-control px-3 focus-within:border-ink">
                             <span className="text-meta text-ink-3">₱</span>
                             <input
                               value={asking[id]}
@@ -225,7 +225,7 @@ export function MedicineSearch({
             })}
           </ul>
         )}
-        {anyAsked && <p className="mt-3 rounded-[14px] bg-mint px-3 py-2 text-meta text-ink-2">You asked for another price: your representative reviews it before the quotation is final. The total shows what you asked for.</p>}
+        {anyAsked && <p className="mt-3 rounded-lg bg-mint px-3 py-2 text-meta text-ink-2">You asked for another price: your representative reviews it before the quotation is final. The total shows what you asked for.</p>}
         {showPrices ? (
           <div className="mt-3 flex items-baseline justify-between border-t border-rule-strong pt-3">
             <span className="text-sm font-medium text-ink">{anyAsked ? "Total, as asked" : "Total"}</span>
@@ -262,7 +262,7 @@ export function MedicineSearch({
 /** How many: − the number +, the number typed in too. */
 function Quantity({ value, onChange, name }: { value: number; onChange: (n: number) => void; name: string }) {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full border border-rule-strong">
+    <span className="inline-flex shrink-0 items-center rounded-lg border border-rule-strong">
       <IconButton label={`One less ${name}`} size="sm" onClick={() => onChange(value - 1)}>
         <Minus className="size-3.5" aria-hidden />
       </IconButton>

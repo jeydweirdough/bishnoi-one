@@ -15,12 +15,14 @@ export type TemplateDesign = {
   signatoryName: string;
   signatoryTitle: string;
   signatoryContact: string;
+  /** A template written as code: its HTML, with %fields%. */
+  html?: string;
 };
 
 export type QuoteTemplate = {
   id: string;
   name: string;
-  kind: "form" | "excel";
+  kind: "form" | "excel" | "code";
   payer: string | null;
   payerName: string | null;
   teamId: string | null;
@@ -82,4 +84,9 @@ export type QuoteDocument = {
   notes: string;
   terms: string;
   design: TemplateDesign;
+  /** Written as code: the page itself, filled in and cleaned. */
+  html?: string;
 };
+
+/** What a template written as code can use. */
+export type CodeFields = { groups: { name: string; fields: { field: string; label: string }[] }[]; loop: [string, string]; starter: string };

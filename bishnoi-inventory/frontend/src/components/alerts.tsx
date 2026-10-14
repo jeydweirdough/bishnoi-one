@@ -21,7 +21,7 @@ export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compac
         .map((a) => (
           <li key={a.key} className="relative py-2.5">
             <Link href={a.href} className="flex items-start gap-3 after:absolute after:inset-0 hover:[&_span.title]:text-ink">
-              <span className={`mt-0.5 inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-full border px-1.5 text-meta font-semibold tabular-nums ${MARK[a.tone]}`}>
+              <span className={`mt-0.5 inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-md border px-1.5 text-meta font-semibold tabular-nums ${MARK[a.tone]}`}>
                 {a.count}
               </span>
               <span className="min-w-0 flex-1">

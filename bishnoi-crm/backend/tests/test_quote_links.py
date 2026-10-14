@@ -188,7 +188,7 @@ def test_rx_medicines_need_the_prescription_and_a_pharmacist_sees_it(app, client
     # On the quote: Rx (so a pharmacist checks it before it's ordered), the file there to open.
     quote = client.get(f"/quotes?company={acme['id']}", headers=crew["ria"]).json()["items"][0]
     full = client.get(f"/quotes/{quote['id']}", headers=crew["ria"]).json()
-    assert full["rx"] is True and [p["name"] for p in full["prescriptions"]] == ["rx.png"] and "Prescription attached" in full["notes"]
+    assert full["rx"] is True and [p["name"] for p in full["prescriptions"]] == ["rx.png"] and "Attached: prescription" in full["notes"]
     got = client.get(f"/quotes/{quote['id']}/prescriptions/0", headers=crew["ria"])
     assert got.status_code == 200 and got.content == PNG and got.headers["content-type"] == "image/png"
     # Someone who can't see the quote can't open it.
@@ -211,3 +211,87 @@ def test_a_shared_location_gives_the_address(client, crew, ids, monkeypatch):
     assert r.json() == {"address": "12 Rizal Street, Brgy. Poblacion", "city": "Makati"}
     # Only for an open link: not a free lookup for anyone.
     assert client.post("/public/quote-links/not-a-link/place", json={"latitude": 14.55, "longitude": 121.02}, headers=PUBLIC).status_code == 404
+
+
+PDF = b"%PDF-1.7\n" + b"\0" * 64
+
+
+def test_the_rep_sets_what_the_customer_sends(app, client, crew, ids):
+    """A guarantee letter for a payer, named documents, a prescription with any order: asked, and checked."""
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    choices = client.get(f"/companies/{acme['id']}/quote-links", headers=crew["ria"]).json()
+    payer = choices["payers"][0]
+    # A payer not on the list is refused.
+    bad = client.post(f"/companies/{acme['id']}/quote-links", json={"hours": 24, "asks": {"payer": "NOBODY"}}, headers=crew["ria"])
+    assert bad.status_code == 422
+    link = make_link(client, crew["ria"], acme, priceType="PATIENT", asks={"prescriptionAlways": True, "payer": payer["code"], "documents": ["Valid ID", " valid id ", "Senior citizen card"]})
+    assert link["asks"] == {"prescriptionAlways": True, "payer": {"code": payer["code"], "name": payer["name"]}, "documents": ["Valid ID", "Senior citizen card"]}
+    page = client.get(f"/public/quote-links/{link['token']}", headers=PUBLIC).json()
+    assert page["asks"]["documents"] == ["Valid ID", "Senior citizen card"] and page["uploads"] == "with-order"
+
+    order = {"lines": [{"productId": ids["AMX-500"], "quantity": 1}], "privacyAccepted": True, "letter": {"number": "GL-2026-001", "issuedOn": "2026-10-01", "amountCentavos": 145000}}
+    rx = ("rx.png", PNG, "image/png")
+    letter = ("gl.pdf", PDF, "application/pdf")
+    send_form = lambda files: client.post(f"/public/quote-links/{link['token']}", data={"order": json.dumps(order)}, files=files, headers=PUBLIC)  # noqa: E731
+    # Each thing asked for is needed: the prescription, the letter, every document.
+    assert "prescription" in send_form([]).text
+    assert "guarantee letter" in send_form([("prescription", rx)]).text
+    r = send_form([("prescription", rx), ("letter_file", letter), ("document", ("id.png", PNG, "image/png"))])
+    assert r.status_code == 422 and "Senior citizen card" in r.text
+    r = send_form([("prescription", rx), ("letter_file", letter), ("document", ("id.png", PNG, "image/png")), ("document", ("senior.jpg", b"\xff\xd8\xff" + b"0" * 32, "image/jpeg"))])
+    assert r.status_code == 201, r.text
+
+    quote = client.get(f"/quotes?company={acme['id']}", headers=crew["ria"]).json()["items"][0]
+    full = client.get(f"/quotes/{quote['id']}", headers=crew["ria"]).json()
+    assert full["rx"] is True and full["payer"] == payer["code"]
+    assert (full["letter"]["number"], full["letter"]["status"], full["letter"]["file"]["name"]) == ("GL-2026-001", "pending", "gl.pdf")
+    assert [(d["label"], d["name"]) for d in full["documents"]] == [("Valid ID", "id.png"), ("Senior citizen card", "senior.jpg")]
+    assert client.get(f"/quotes/{quote['id']}/documents/1", headers=crew["ria"]).content.startswith(b"\xff\xd8\xff")
+    assert client.get(f"/quotes/{quote['id']}/letter", headers=crew["ria"]).content == PDF
+    assert client.get(f"/quotes/{quote['id']}/documents/0", headers=crew["sam"]).status_code == 404  # not theirs
+    # Deleted, its files go with it.
+    assert client.delete(f"/quotes/{quote['id']}", headers=crew["ana"] if "ana" in crew else crew["ria"]).status_code in (204, 403)
+
+
+def test_files_go_straight_to_storage_when_it_is_set_up(app, client, crew, ids, monkeypatch):
+    """With storage: a signed form per file, only for what the link asks for, and the file checked before the order is taken."""
+    from app import storage
+
+    held: dict[str, tuple[str, int]] = {}
+    monkeypatch.setattr(storage, "configured", lambda settings: True)
+    monkeypatch.setattr(storage, "presign_upload", lambda settings, key, content_type, max_bytes=storage.MAX_BYTES: {"url": "https://bucket.test", "fields": {"key": key}, "key": key})
+
+    def check(settings, key):
+        if key not in held:
+            raise ValueError("missing")
+        return held[key]
+
+    monkeypatch.setattr(storage, "check", check)
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    link = make_link(client, crew["ria"], acme, priceType="PATIENT", asks={"documents": ["Valid ID"]})
+    assert client.get(f"/public/quote-links/{link['token']}", headers=PUBLIC).json()["uploads"] == "direct"
+    up = lambda **b: client.post(f"/public/quote-links/{link['token']}/uploads", json=b, headers=PUBLIC)  # noqa: E731
+    # Only for what it asks for: no letter (no payer), no second document.
+    assert up(kind="letter", contentType="application/pdf").status_code == 422
+    assert up(kind="document", index=1, contentType="image/png").status_code == 422
+    form = up(kind="document", index=0, contentType="image/png").json()
+    assert form["key"].startswith(f"links/{link['id']}/document-0-")
+    order = {"lines": [{"productId": ids["AMX-500"], "quantity": 1}], "privacyAccepted": True, "files": [{"kind": "document", "index": 0, "key": form["key"], "name": "id.png"}]}
+    # Not finished uploading: refused, in words.
+    r = send(client, link["token"], order)
+    assert r.status_code == 422 and "didn't finish uploading" in r.text
+    # Someone else's file can't be named.
+    other = {**order, "files": [{"kind": "document", "index": 0, "key": "links/another/document-0-abc.png", "name": "x.png"}]}
+    assert "isn't this order's" in send(client, link["token"], other).text
+    held[form["key"]] = ("image/png", 2048)
+    r = send(client, link["token"], order)
+    assert r.status_code == 201, r.text
+    full = client.get(f"/quotes/{client.get(f'/quotes?company={acme[chr(105) + chr(100)]}', headers=crew['ria']).json()['items'][0]['id']}", headers=crew["ria"]).json()
+    assert [(d["label"], d["name"], d["size"]) for d in full["documents"]] == [("Valid ID", "id.png", 2048)]
+
+
+def test_without_storage_uploads_go_with_the_order(client, crew, ids):
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    link = make_link(client, crew["ria"], acme)
+    r = client.post(f"/public/quote-links/{link['token']}/uploads", json={"kind": "prescription", "contentType": "image/png"}, headers=PUBLIC)
+    assert r.status_code == 409

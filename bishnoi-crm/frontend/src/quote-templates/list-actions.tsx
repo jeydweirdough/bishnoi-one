@@ -31,7 +31,7 @@ export function NewTemplate({ teams }: { teams?: { id: string; name: string }[] 
   }
 
   const option = (value: "form" | "excel", title: string, body: string, icon: React.ReactNode) => (
-    <label className="flex cursor-pointer gap-3 rounded-[14px] border border-rule-strong p-3 has-checked:border-hema has-checked:bg-hema-tint">
+    <label className="flex cursor-pointer gap-3 rounded-lg border border-rule-strong p-3 has-checked:border-hema has-checked:bg-hema-tint">
       <input type="radio" name="kind" value={value} checked={kind === value} onChange={() => setKind(value)} className="mt-1 accent-hema" />
       <span className="text-ink-3">{icon}</span>
       <span>

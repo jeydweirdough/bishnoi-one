@@ -47,7 +47,7 @@ export function TemplateImage({
 
   return (
     <div className="space-y-3">
-      <div className={`flex items-center justify-center rounded-[14px] border border-dashed border-rule-strong bg-white ${which === "logo" ? "h-28" : "h-24"}`}>
+      <div className={`flex items-center justify-center rounded-lg border border-dashed border-rule-strong bg-white ${which === "logo" ? "h-28" : "h-24"}`}>
         {has ? (
           // eslint-disable-next-line @next/next/no-img-element -- a stored file, sized by its own proportions
           <img src={`/quote-templates/${template.id}/images/${which}?v=${version}`} alt={`The ${noun}`} className="max-h-full max-w-full object-contain p-2" />
@@ -132,7 +132,7 @@ function SignaturePad({ busy, onDone, onCancel }: { busy: boolean; onDone: (blob
         width={900}
         height={260}
         aria-label="Signature pad: draw your signature"
-        className="h-32 w-full touch-none rounded-[14px] border border-control bg-white"
+        className="h-32 w-full touch-none rounded-lg border border-control bg-white"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           last.current = point(e);

@@ -1,22 +1,99 @@
 "use client";
 
 import { Dropdown, Modal } from "antd";
-import { Check, Copy, Link2, MoreHorizontal } from "lucide-react";
+import { Check, Copy, Link2, MoreHorizontal, Plus, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, IconButton } from "@/src/platform/ui/button";
 import { DialogPanel, FieldRow } from "@/src/platform/ui/dialog";
-import { FormError } from "@/src/platform/ui/field";
+import { FormError, Input } from "@/src/platform/ui/field";
 import { Pill } from "@/src/platform/ui/figures";
 import { Combobox } from "@/src/platform/ui/pickers";
-import { changeQuoteLink, deleteQuoteLink, makeQuoteLink, quoteLinks, quoteLinkToken, type QuoteLink, type QuoteLinks } from "../../actions/quote-links";
+import { changeQuoteLink, deleteQuoteLink, makeQuoteLink, quoteLinks, quoteLinkToken, type AsksInput, type LinkAsks, type QuoteLink, type QuoteLinks } from "../../actions/quote-links";
 
 const LIFETIMES = [1, 4, 24, 72, 168];
 const LIFETIME_WORDS: Record<number, string> = { 1: "1 hour", 4: "4 hours", 24: "1 day", 72: "3 days", 168: "1 week" };
 const STATE = { open: { text: "Open", tone: "good" }, used: { text: "Used", tone: "plain" }, expired: { text: "Expired", tone: "plain" }, switched_off: { text: "Switched off", tone: "plain" } } as const;
 const when = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
-type Choices = Pick<QuoteLinks, "priceTypes" | "lifetimes">;
+type Choices = Pick<QuoteLinks, "priceTypes" | "lifetimes"> & Partial<Pick<QuoteLinks, "payers">>;
+
+// The documents a rep asks for most, one tap each.
+const COMMON_DOCUMENTS = ["Valid ID", "Senior citizen card", "PWD ID", "Medical abstract", "Doctor's request"];
+const NO_ASKS: AsksInput = { prescriptionAlways: false, payer: null, documents: [] };
+
+/** What the link asks for, in a line: "Prescription, DSWD guarantee letter, Valid ID". */
+export function asksWords(asks: LinkAsks | undefined): string {
+  if (!asks) return "";
+  return [asks.prescriptionAlways ? "a prescription" : "", asks.payer ? `${asks.payer.name} guarantee letter` : "", ...asks.documents].filter(Boolean).join(", ");
+}
+
+/**
+ * What the customer sends with the order: a prescription (always asked for Rx
+ * medicines; here, for any order), a guarantee letter when someone else pays,
+ * and documents the rep names. The customer is asked for exactly these.
+ */
+function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks: AsksInput; setAsks: (a: AsksInput) => void }) {
+  const [typed, setTyped] = useState("");
+  const add = (label: string) => {
+    const clean = label.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!clean || asks.documents.length >= 5 || asks.documents.some((d) => d.toLowerCase() === clean.toLowerCase())) return;
+    setAsks({ ...asks, documents: [...asks.documents, clean] });
+    setTyped("");
+  };
+  return (
+    <section className="rounded-xl border border-rule p-4">
+      <p className="text-sm font-semibold text-ink">What the customer sends</p>
+      <p className="text-meta text-ink-3">They&apos;re asked for exactly these, and can&apos;t send the order without them. Rx medicines always need a prescription.</p>
+      <label className="mt-3 flex cursor-pointer items-start gap-3">
+        <input type="checkbox" checked={asks.prescriptionAlways} onChange={(e) => setAsks({ ...asks, prescriptionAlways: e.target.checked })} className="mt-0.5 size-4 accent-[#141414]" />
+        <span className="text-sm text-ink">Ask for a prescription with every order, Rx or not</span>
+      </label>
+      {(choices?.payers?.length ?? 0) > 0 && (
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-sm text-ink">Who pays</span>
+          <Combobox
+            value={asks.payer ?? ""}
+            onChange={(v: string) => setAsks({ ...asks, payer: v || null })}
+            options={[{ value: "", label: "They pay themselves" }, ...choices!.payers!.map((p) => ({ value: p.code, label: `${p.name}: they attach the guarantee letter` }))]}
+          />
+        </label>
+      )}
+      <div className="mt-3">
+        <span className="mb-1.5 block text-sm text-ink">Documents to attach <span className="text-ink-3">(up to 5)</span></span>
+        {asks.documents.length > 0 && (
+          <ul className="mb-2 flex flex-wrap gap-1.5">
+            {asks.documents.map((d) => (
+              <li key={d} className="inline-flex h-7 items-center gap-1 rounded-md bg-hema-tint pr-1 pl-3 text-meta text-ink">
+                {d}
+                <button type="button" aria-label={`Don't ask for ${d}`} onClick={() => setAsks({ ...asks, documents: asks.documents.filter((x) => x !== d) })} className="grid size-5 place-items-center rounded-md hover:bg-sheet">
+                  <X className="size-3" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {asks.documents.length < 5 && (
+          <>
+            <div className="flex gap-2">
+              <Input value={typed} onChange={(e) => setTyped(e.target.value)} onPressEnter={() => add(typed)} placeholder="e.g. Valid ID" maxLength={60} aria-label="A document to ask for" />
+              <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => add(typed)} disabled={!typed.trim()}>
+                Add
+              </Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {COMMON_DOCUMENTS.filter((d) => !asks.documents.includes(d)).map((d) => (
+                <button key={d} type="button" onClick={() => add(d)} className="h-7 rounded-md border border-dashed border-rule-strong px-3 text-meta text-ink-2 hover:border-ink hover:text-ink">
+                  + {d}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
 
 const address = (slug: string, token: string) => `${window.location.origin}/order/${slug}/${token}`;
 
@@ -56,6 +133,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
   const [data, setData] = useState<QuoteLinks | null>(null);
   const [hours, setHours] = useState(24);
   const [priceType, setPriceType] = useState<string | null>(null);
+  const [asks, setAsks] = useState<AsksInput>(NO_ASKS);
   const [made, setMade] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +144,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
   function show() {
     setOpen(true);
     setMade(null);
+    setAsks(NO_ASKS);
     setError(null);
     reload();
   }
@@ -73,7 +152,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
   function make() {
     setError(null);
     start(async () => {
-      const r = await makeQuoteLink(companyId, hours, priceType);
+      const r = await makeQuoteLink(companyId, hours, priceType, asks);
       if (!r.ok) return setError(r.error);
       setMade(address(slug, r.data.token));
       setCopied(false);
@@ -104,7 +183,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         {made ? (
           <DialogPanel title="Send this link" hint="You can copy it again from the list while it works.">
             <div className="flex items-center gap-2">
-              <input readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-full border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
+              <input readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
               <Button variant="primary" icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} onClick={copy}>
                 {copied ? "Copied" : "Copy"}
               </Button>
@@ -113,6 +192,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         ) : (
           <div className="mt-5 space-y-4">
             <LinkFields choices={data} hours={hours} setHours={setHours} priceType={priceType} setPriceType={setPriceType} />
+            <AsksFields choices={data} asks={asks} setAsks={setAsks} />
             <FormError message={error} />
             <div className="dialog-actions">
               <Button onClick={() => setOpen(false)}>Cancel</Button>
@@ -163,7 +243,7 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
 
   return (
     <>
-      <ul className="divide-y divide-rule rounded-[18px] border border-rule bg-sheet">
+      <ul className="divide-y divide-rule rounded-xl border border-rule bg-sheet">
         {links.map((l) => (
           <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
             <span className="min-w-0">
@@ -193,6 +273,7 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
                   </>
                 )}
               </span>
+              {asksWords(l.asks) && <span className="block text-meta text-ink-3">Asks for {asksWords(l.asks)}</span>}
             </span>
             <span className="flex shrink-0 items-center gap-2">
               <Pill tone={STATE[l.state].tone}>{STATE[l.state].text}</Pill>

@@ -15,7 +15,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; locationId: string; batchId: string; batchNo: string; expiresOn: string; quantity: string; serials: string };
 const blank = (): Row => ({ productId: "", locationId: "", batchId: "", batchNo: "", expiresOn: "", quantity: "", serials: "" });
-const cell = "h-8 w-full rounded-full border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
 
 /**
  * Writing up an adjustment: where, why, and what changes. Someone who may
@@ -30,7 +30,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
   approves: boolean;
   preset?: { reason?: string; warehouseId?: string };
 }) {
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const warehouses = reference.warehouses.filter((w) => w.isActive);
   const [warehouseId, setWarehouseId] = useState(preset?.warehouseId || warehouses[0]?.id || "");
   const [reason, setReason] = useState<AdjustmentReason>((reasons.find((r) => r.key === preset?.reason)?.key ?? "count") as AdjustmentReason);
@@ -68,7 +68,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setFresh((l) => [...l, a]); setWarehouseId(a.value); setRows([blank()]); }} />}>
@@ -149,7 +149,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
+                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
                       )}
                     </td>
                   </tr>
@@ -220,30 +220,52 @@ export function StartCount({ reference, warehouseId, canAdd = {} }: { reference:
 export function CountSheet({ count, reference, canCount, day }: { count: Count; reference: Pick<Reference, "products">; canCount: boolean; day: Record<string, string> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [shaking, setShaking] = useState(false);
   const open = count.status === "open" && canCount;
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(count.lines.map((l) => [l.id, l.counted == null ? "" : String(l.counted)])));
   const [error, setError] = useState<string | null>(null);
   const [extra, setExtra] = useState({ productId: "", counted: "" });
   const dirty = count.lines.some((l) => (values[l.id] ?? "") !== (l.counted == null ? "" : String(l.counted)));
 
+  function triggerShake() {
+    setShaking(true);
+    setTimeout(() => setShaking(false), 480);
+  }
+
   function persist(then?: () => Promise<{ ok: boolean; error?: string }>, message = "Counts saved") {
     start(async () => {
-      if (dirty) {
-        const r = await recordCounts(count.id, count.lines.map((l) => ({ lineId: l.id, counted: values[l.id] === "" ? null : Number(values[l.id]) })));
-        if (!r.ok) return setError(r.error);
+      try {
+        if (dirty) {
+          const r = await recordCounts(count.id, count.lines.map((l) => ({ lineId: l.id, counted: values[l.id] === "" ? null : Number(values[l.id]) })));
+          if (!r.ok) {
+            triggerShake();
+            toast.error(r.error || "Could not save counts.");
+            return setError(r.error);
+          }
+        }
+        if (then) {
+          const r = await then();
+          if (!r.ok) {
+            triggerShake();
+            const err = r.error ?? "That didn't work.";
+            toast.error(err);
+            return setError(err);
+          }
+        }
+        setError(null);
+        toast.success(message);
+        router.refresh();
+      } catch (err) {
+        triggerShake();
+        const errText = err instanceof Error ? err.message : "Network error. Please try again.";
+        setError(errText);
+        toast.error(errText);
       }
-      if (then) {
-        const r = await then();
-        if (!r.ok) return setError(r.error ?? "That didn't work.");
-      }
-      setError(null);
-      toast.success(message);
-      router.refresh();
     });
   }
 
   return (
-    <div>
+    <div className={`rounded-xl transition-all duration-300 ${shaking ? "animate-shake ring-2 ring-danger/40 ring-offset-2" : ""} ${pending ? "animate-anticipate pointer-events-none opacity-90" : ""}`}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] text-left text-sm">
           <thead>

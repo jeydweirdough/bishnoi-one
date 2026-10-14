@@ -185,8 +185,8 @@ export async function NewOrderChooser() {
       </PageHeader>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {KINDS.map((k) => (
-          <Link key={k.kind} href={newHref(k)} className="group flex gap-4 rounded-[22px] border border-rule bg-sheet px-5 py-4 transition-colors hover:border-ink">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-hema-tint text-sage-deep">
+          <Link key={k.kind} href={newHref(k)} className="group flex gap-4 rounded-xl border border-rule bg-sheet px-5 py-4 transition-colors hover:border-ink">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-hema-tint text-sage-deep">
               <Icon name={k.icon} className="size-5" />
             </span>
             <span className="min-w-0">

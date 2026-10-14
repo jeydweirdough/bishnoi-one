@@ -77,8 +77,13 @@
      reads the same as eosin to red-green colour-blind people. */
   --color-due-today: #d48806;
   --color-due-later: #2f54eb;
+  /* Promos: the sale-tag yellow, so a product on promo stands out wherever it's picked.
+     The ink on it is a deep brown (5.4:1 on the yellow, 8.4:1 on the tint). */
+  --color-promo: #f7c21a;
+  --color-promo-tint: #fff7da;
+  --color-promo-ink: #6b3f00;
 
-  --radius-sheet: 22px;
+  --radius-sheet: 12px;
   /* Sheets are outlined (border-rule), so their shadow is only a breath. */
   --shadow-sheet: 0 1px 2px 0 rgb(20 20 20 / 0.03);
   --shadow-overlay: 0 6px 16px 0 rgb(0 0 0 / 0.08), 0 3px 6px -4px rgb(0 0 0 / 0.12), 0 9px 28px 8px rgb(0 0 0 / 0.05);
@@ -210,4 +215,32 @@ table > thead > tr {
 @keyframes card-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Anticipation & Shake for Optimistic UI */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 45%, 75% { transform: translateX(-6px); }
+  30%, 60%, 85% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes anticipate-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.995); opacity: 0.92; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-anticipate {
+  animation: anticipate-pulse 0.35s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .animate-anticipate {
+    animation: none !important;
+  }
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
@@ -22,7 +23,6 @@ const ZONES = ["Asia/Manila", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Jakarta"
 /** The company as every screen shows it, and how quotes are numbered and worded. */
 export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
   const [v, setV] = useState({
     orgName: initial.orgName,
     currency: initial.currency,
@@ -35,36 +35,50 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
     companyTin: initial.companyTin ?? "",
     companyContact: initial.companyContact ?? "",
   });
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const {
+    pending,
+    shakeClass,
+    anticipateClass,
+    execute,
+    triggerShake,
+    error,
+    fieldErrors: fields,
+    setFieldErrors: setFields,
+  } = useAnticipation<typeof v>();
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   const example = `${v.quotePrefix || "Q"}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-0001`;
 
   function save() {
     const days = Number(v.quoteValidDays);
-    if (!Number.isInteger(days) || days < 1) return setFields({ quoteValidDays: "A whole number of days, 1 or more." });
-    start(async () => {
-      const r = await saveCompanySettings({
-        orgName: v.orgName.trim(),
-        currency: v.currency,
-        locale: v.locale,
-        timezone: v.timezone.trim(),
-        quotePrefix: v.quotePrefix.trim().toUpperCase(),
-        quoteValidDays: days,
-        quoteTerms: v.quoteTerms.trim() || null,
-        companyAddress: v.companyAddress.trim() || null,
-        companyTin: v.companyTin.trim() || null,
-        companyContact: v.companyContact.trim() || null,
-      });
-      if (!r.ok) {
-        setError(r.fields ? null : r.error);
-        setFields(r.fields ?? {});
-        return;
-      }
-      setError(null);
-      setFields({});
-      toast.success("Settings saved", { description: "Every screen uses them from now on." });
-      router.refresh();
+    if (!Number.isInteger(days) || days < 1) {
+      setFields({ quoteValidDays: "A whole number of days, 1 or more." });
+      triggerShake();
+      toast.error("A whole number of days, 1 or more.");
+      return;
+    }
+    execute({
+      anticipate: () => ({ ...v }),
+      rollback: (prev) => setV(prev),
+      request: () =>
+        saveCompanySettings({
+          orgName: v.orgName.trim(),
+          currency: v.currency,
+          locale: v.locale,
+          timezone: v.timezone.trim(),
+          quotePrefix: v.quotePrefix.trim().toUpperCase(),
+          quoteValidDays: days,
+          quoteTerms: v.quoteTerms.trim() || null,
+          companyAddress: v.companyAddress.trim() || null,
+          companyTin: v.companyTin.trim() || null,
+          companyContact: v.companyContact.trim() || null,
+        }),
+      successMessage: () => ({
+        title: "Settings saved",
+        description: "Every screen uses them from now on.",
+      }),
+      onSuccess: () => {
+        router.refresh();
+      },
     });
   }
 
@@ -75,7 +89,7 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
         e.preventDefault();
         save();
       }}
-      className="grid gap-5 lg:grid-cols-2 lg:items-start"
+      className={`grid gap-5 rounded-xl transition-all duration-300 lg:grid-cols-2 lg:items-start ${shakeClass} ${anticipateClass}`}
     >
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="company">Your business</SectionTitle>

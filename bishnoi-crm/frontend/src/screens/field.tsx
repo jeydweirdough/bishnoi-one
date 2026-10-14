@@ -105,14 +105,14 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
       </PageHeader>
 
       <nav aria-label="Month" className="mb-4 flex items-center gap-2">
-        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
+        <Link href={`/field?month=${shiftMonth(month, -1)}`} className="rounded-md p-1.5 text-ink-2 hover:bg-bench" aria-label="The month before">
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
         <span className="min-w-36 text-center text-heading">
           {fmt.monthLabel(month)} {month.slice(0, 4)}
         </span>
         {month < data.thisMonth ? (
-          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-[14px] p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
+          <Link href={`/field?month=${shiftMonth(month, 1)}`} className="rounded-md p-1.5 text-ink-2 hover:bg-bench" aria-label="The month after">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         ) : (

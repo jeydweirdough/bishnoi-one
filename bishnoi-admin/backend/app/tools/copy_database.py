@@ -25,7 +25,7 @@ from sqlalchemy.engine import Engine
 
 from app.config import API_DIR, DATA_DIR, get_settings
 from app.db import make_engine
-from app.migrate import upgrade
+from app.migrate import VERSION_TABLE, upgrade
 
 KEEP_BACKUPS = 30
 CHUNK = 1000
@@ -33,9 +33,10 @@ CHUNK = 1000
 
 def prefix_of(engine: Engine) -> str:
     """This app's table prefix (nbad_), read from its version table."""
-    for name in inspect(engine).get_table_names():
-        if name.endswith("_alembic_version"):
-            return name.removesuffix("alembic_version")
+    # This app's own: a database can hold several apps' tables (Admin and
+    # Platform share one), so the first version table found may be another's.
+    if VERSION_TABLE in inspect(engine).get_table_names():
+        return VERSION_TABLE.removesuffix("alembic_version")
     raise SystemExit("That database has no version table: it isn't one of this app's.")
 
 

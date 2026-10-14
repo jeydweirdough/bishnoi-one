@@ -211,7 +211,7 @@ function UnsetMark({ place, unset }: { place: Place; unset: Unset }) {
   if (!count) return null;
   const says = found.map((key) => UNSET_SAYS[key]?.(unset[key]) ?? "").filter(Boolean).join(". ");
   return (
-    <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+    <span title={says} className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-danger px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
       {count}
       <span className="sr-only"> not set yet: {says}</span>
     </span>
@@ -377,7 +377,7 @@ function Row({
   children: ReactNode;
 }) {
   const rail = useContext(RailContext);
-  const className = `flex items-center gap-3 rounded-full px-3 text-sm group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0 ${nested || dense ? "h-8" : "h-9"} ${
+  const className = `flex items-center gap-3 rounded-lg px-3 text-sm group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0 ${nested || dense ? "h-8" : "h-9"} ${
     current
       ? "bg-hema-tint font-semibold text-ink"
       : open
@@ -465,7 +465,7 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-full px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+      className="flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
     >
       <Icon name={icon} className="size-4 text-ink-3" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -569,7 +569,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-sm ${
+        className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-sm ${
           open ? "bg-sheet font-semibold text-ink" : "text-ink-2 hover:bg-sheet hover:text-ink"
         }`}
       >
@@ -585,7 +585,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
             role="menu"
             aria-label="Other apps"
             style={{ top: at.top, left: at.left, width: PANEL_W, maxHeight: `calc(100dvh - ${at.top + EDGE}px)` }}
-            className="animate-reshape fixed z-50 overflow-y-auto rounded-[22px] border border-rule bg-bench p-1 shadow-lg"
+            className="animate-reshape fixed z-50 overflow-y-auto rounded-lg border border-rule bg-bench p-1 shadow-lg"
           >
             {items.map((e) => (
               <a
@@ -593,7 +593,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
                 role="menuitem"
                 href={e.href}
                 {...(e.blank ? { target: "_blank", rel: "noopener" } : {})}
-                className="flex h-9 items-center gap-2.5 rounded-full px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
+                className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm text-ink-2 hover:bg-sheet hover:text-ink"
               >
                 <Icon name={e.icon} className="size-4 shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
@@ -859,8 +859,8 @@ function Account({ me }: { me: Me }) {
   const here = pathname === "/account" || pathname.startsWith("/account/");
   return (
     <div className="border-t border-rule pt-4">
-      <div className={`flex items-center gap-1 rounded-full pr-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:pr-0 ${here ? "bg-hema-tint" : ""}`}>
-        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 group-data-[rail=true]/side:px-1.5 ${here ? "" : "hover:bg-sheet"}`} title={me.user.fullName}>
+      <div className={`flex items-center gap-1 rounded-lg pr-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:pr-0 ${here ? "bg-hema-tint" : ""}`}>
+        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 group-data-[rail=true]/side:px-1.5 ${here ? "" : "hover:bg-sheet"}`} title={me.user.fullName}>
           <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
           <span className="min-w-0 group-data-[rail=true]/side:sr-only">
             <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
@@ -872,7 +872,7 @@ function Account({ me }: { me: Me }) {
             type="button"
             aria-label="Account options"
             title="Account options"
-            className="grid size-9 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-sheet hover:text-ink focus-visible:text-ink"
           >
             <MoreHorizontal className="size-5" aria-hidden />
           </button>
@@ -942,7 +942,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }:
                 onClick={toggleRail}
                 aria-label={rail ? "Open the sidebar" : "Close the sidebar"}
                 title={rail ? "Open the sidebar" : "Close the sidebar"}
-                className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink group-data-[rail=true]/side:mt-3"
+                className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-sheet hover:text-ink group-data-[rail=true]/side:mt-3"
               >
                 {rail ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
               </button>
@@ -962,7 +962,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false }:
             onClick={() => setOpenOn(open ? null : pathname)}
             aria-expanded={open}
             aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-ink hover:bg-sheet"
+            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-lg pr-2 pl-3 text-ink hover:bg-sheet"
           >
             {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
             {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}

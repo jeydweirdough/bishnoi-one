@@ -172,8 +172,8 @@ def lines_of(db: Session, quote: Quote) -> list[dict]:
     return out
 
 
-def document(db: Session, quote: Quote, template: QuoteTemplate, settings: Settings) -> dict:
-    """Everything a template shows for a quote."""
+def document(db: Session, quote: Quote, template: QuoteTemplate, settings: Settings, preview: bool = False) -> dict:
+    """Everything a template shows for a quote. A preview gives it no control number (one is kept for good once given)."""
     contact = db.get(Contact, quote.contact_id) if quote.contact_id else None
     company = db.get(Company, quote.company_id) if quote.company_id else (contact.company if contact else None)
     owner = db.get(User, quote.owner_id) if quote.owner_id else None
@@ -192,7 +192,7 @@ def document(db: Session, quote: Quote, template: QuoteTemplate, settings: Setti
     address = extra_by(db, quote, "address") or (", ".join(p for p in (company.address, company.city) if p) if company and not contact else None)
     total = (quote.tax or {}).get("totalDueCentavos") or quote.total_centavos
     return {
-        "controlNumber": control_number(db, template, quote),
+        "controlNumber": "PREVIEW" if preview else control_number(db, template, quote),
         "quoteNumber": quote.number,
         "date": (quote.created_at.date() if quote.created_at else date.today()).isoformat(),
         "validUntil": quote.valid_until,

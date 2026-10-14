@@ -34,7 +34,7 @@ function recentDone<T extends { id: string }>(all: T[], done: (x: T) => boolean)
 
 /** A small word beside a card's title: what kind of order it is. */
 function Tag({ children }: { children: string }) {
-  return <span className="rounded-full bg-bench px-2 py-0.5 text-[0.6875rem] text-ink-2">{children}</span>;
+  return <span className="rounded-md bg-bench px-2 py-0.5 text-[0.6875rem] text-ink-2">{children}</span>;
 }
 
 export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrief[]; fmt: Fmt; day: Day; may: May; kind?: string }) {

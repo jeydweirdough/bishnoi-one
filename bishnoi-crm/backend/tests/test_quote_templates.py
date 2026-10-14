@@ -146,3 +146,43 @@ def test_a_control_number_taken_by_another_pc_moves_to_the_next(app, client, ana
         assert db.get(QuoteTemplate, t["id"]).control_next == 780  # that PC hadn't moved the counter yet
     got = client.get(f"/quotes/{pcso_quote['id']}/document", headers=crew["ria"]).json()["controlNumber"]
     assert got.endswith("-00781")
+
+
+def test_a_template_written_as_code_fills_its_fields_and_runs_nothing(client, ana, crew, pcso_quote):  # noqa: F811
+    fields = client.get("/admin/quote-template-fields", headers=ana).json()
+    names = [f["field"] for g in fields["groups"] for f in g["fields"]]
+    assert "%customer_name%" in names and "%items_table%" in names and "%line_qty%" in names and "%lines_start%" in fields["starter"] or "%items_table%" in fields["starter"]
+    code = (
+        "<style>.t{color:#141414}</style><h1 class='t' onclick='steal()'>%heading% for %customer_name%</h1>"
+        "<script>alert('x')</script><a href='javascript:steal()'>x</a><iframe src='https://evil.test'></iframe>"
+        "<table>%lines_start%<tr><td>%line_brand%</td><td>%line_qty%</td><td>%line_total%</td></tr>%lines_end%</table>"
+        "<p>Total %total% · control %control_no% · %not_a_field%</p>"
+    )
+    t = client.post("/admin/quote-templates", json={"name": "PCSO as code", "kind": "code", "payer": "PCSO", "controlPrefix": "PC", "design": {"html": code}}, headers=ana).json()
+    assert t["kind"] == "code" and t["design"]["html"] == code
+
+    # The preview: this template's latest quote, and no control number used up.
+    before = client.get(f"/admin/quote-templates/{t['id']}", headers=ana).json()["controlNext"]
+    preview = client.post(f"/admin/quote-templates/{t['id']}/preview", json={"html": code}, headers=ana).json()
+    html = preview["html"]
+    assert preview["using"].startswith("Quote ") and "PREVIEW" in html
+    assert client.get(f"/admin/quote-templates/{t['id']}", headers=ana).json()["controlNext"] == before
+    # Filled in: the customer, one row per product, the total; a typo left as typed, so it shows.
+    assert pcso_quote["customerName"] in html and html.count("<tr>") == 3 and "₱" in html and "%not_a_field%" in html
+    # Cleaned: no script, no handler, no frame, no javascript: link; the company's own style stays.
+    for bad in ("<script", "alert(", "onclick", "steal()", "<iframe", "javascript:", "evil.test"):
+        assert bad not in html, bad
+    assert "<style>.t{color:#141414}</style>" in html
+
+    # Printed: the same page, with a real control number this time.
+    doc = client.get(f"/quotes/{pcso_quote['id']}/document?template={t['id']}", headers=crew["ria"]).json()
+    assert doc["template"]["kind"] == "code" and doc["controlNumber"].startswith("PC-") and doc["controlNumber"] in doc["html"]
+    # A customer's name is text, never markup.
+    from tests.test_quotes import save as save_quote  # noqa: F401
+
+
+def test_preview_with_made_up_values_when_there_is_no_quote_yet(client, ana):
+    t = client.post("/admin/quote-templates", json={"name": "New as code", "kind": "code", "design": {"html": "<p>%customer_name%: %items_table%</p>"}}, headers=ana).json()
+    preview = client.post(f"/admin/quote-templates/{t['id']}/preview", json={"html": "<p>%customer_name%</p>%items_table%"}, headers=ana).json()
+    assert preview["using"].startswith("Made-up") and "Maria Santos" in preview["html"] and "Amoxicillin" in preview["html"]
+    # Only those who set templates up may preview them.

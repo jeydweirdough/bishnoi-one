@@ -3,6 +3,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useActionState, useId, useRef, useState } from "react";
 import { signIn, type SignInState } from "../actions/session";
+import { SignInProgress } from "../screens/sign-in-progress";
 
 /** `group` heads a run of accounts, so a long list stays scannable. */
 export type Demo = { email: string; who: string; role: string; group: string };
@@ -10,7 +11,7 @@ export type Demo = { email: string; who: string; role: string; group: string };
 // The sign-in form's own look (src/components/sign-in/showcase.tsx has the
 // picture beside it): rounded fields with a grey outline, a black button.
 const FIELD =
-  "block h-12 w-full rounded-full border border-[#8a8a8a] bg-white px-6 text-sm text-[#141414] placeholder:text-[#7a7a7a] transition-colors focus:border-[#141414] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a8d69b] aria-[invalid=true]:border-danger";
+  "block h-12 w-full rounded-lg border border-[#8a8a8a] bg-white px-4 text-sm text-[#141414] placeholder:text-[#7a7a7a] transition-colors focus:border-[#141414] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a8d69b] aria-[invalid=true]:border-danger";
 
 /**
  * Company, work email and password, then Sign in. The company is filled in
@@ -41,6 +42,10 @@ export function LoginForm({
   const [shown, setShown] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
+  // Signing in, a step at a time, on a screen of its own; back here, with why, if a step fails.
+  const [signing, setSigning] = useState<{ company: string; email: string; password: string } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const error = failed ?? state?.error;
 
   function fillDemo(address: string) {
     setPicked(address);
@@ -51,7 +56,28 @@ export function LoginForm({
 
   return (
     <div className="w-full">
-      <form action={action} className="space-y-3" noValidate>
+      {signing && (
+        <SignInProgress
+          {...signing}
+          next={next}
+          onBack={(why) => {
+            setSigning(null);
+            setFailed(why);
+          }}
+        />
+      )}
+      {/* Without scripts, the form posts as before (signIn); with them, the steps are shown. */}
+      <form
+        action={action}
+        className="space-y-3"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setFailed(null);
+          if (!emailValue.trim() || !passwordValue) return setFailed("Enter your email and password.");
+          setSigning({ company: companyValue.trim(), email: emailValue.trim(), password: passwordValue });
+        }}
+      >
         <input type="hidden" name="next" value={next} />
         <div>
           <label htmlFor={ids.company} className="sr-only">
@@ -114,7 +140,7 @@ export function LoginForm({
             onClick={() => setShown((s) => !s)}
             aria-label={shown ? "Hide password" : "Show password"}
             aria-pressed={shown}
-            className="absolute top-1/2 right-4 -translate-y-1/2 rounded-full p-1.5 text-[#6a6a6a] hover:text-[#141414] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:outline-none"
+            className="absolute top-1/2 right-4 -translate-y-1/2 rounded-md p-1.5 text-[#6a6a6a] hover:text-[#141414] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:outline-none"
           >
             {shown ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
           </button>
@@ -132,23 +158,23 @@ export function LoginForm({
           </button>
         </div>
         {forgot && (
-          <p id={ids.forgot} className="rounded-2xl bg-[#f1f7ee] px-5 py-2.5 text-meta text-[#3b3b3b]">
+          <p id={ids.forgot} className="rounded-lg bg-[#f1f7ee] px-5 py-2.5 text-meta text-[#3b3b3b]">
             Passwords are reset by your administrator. Ask them for a new one, then change it from your account page.
           </p>
         )}
 
-        {state?.error && (
-          <p role="alert" className="rounded-2xl bg-danger-tint px-5 py-2.5 text-sm text-danger">
-            {state.error}
+        {error && (
+          <p role="alert" className="rounded-lg bg-danger-tint px-5 py-2.5 text-sm text-danger">
+            {error}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={pending}
-          className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-[#141414] text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-70"
+          disabled={pending || signing !== null}
+          className="mt-2 flex h-12 w-full items-center justify-center rounded-lg bg-[#141414] text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-70"
         >
-          {pending ? "Signing in…" : "Sign in"}
+          {pending || signing ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
@@ -162,7 +188,7 @@ export function LoginForm({
           <div className="mt-5 flex justify-center">
             <a
               href={bishnoiAccount}
-              className="group flex items-center gap-3 rounded-full bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="group flex items-center gap-3 rounded-lg bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 rounded-full bg-white p-0.5" />
               Your Bishnoi One account
@@ -172,7 +198,7 @@ export function LoginForm({
       )}
 
       {demo.length > 0 && (
-        <details className="mt-8 rounded-2xl border border-[#e2e2e2] px-5 py-3 text-meta">
+        <details className="mt-8 rounded-xl border border-[#e2e2e2] px-5 py-3 text-meta">
           <summary className="cursor-pointer font-medium text-[#3b3b3b]">
             Demo accounts (this computer only){demoPassword ? ` · password ${demoPassword}` : ""}
           </summary>
@@ -188,7 +214,7 @@ export function LoginForm({
                         onClick={() => fillDemo(d.email)}
                         title={`${d.role} — ${d.email}`}
                         aria-pressed={picked === d.email}
-                        className={`rounded-full border px-3 py-1 transition-colors ${
+                        className={`rounded-md border px-3 py-1 transition-colors ${
                           picked === d.email ? "border-[#5e8f52] bg-[#f1f7ee] text-[#141414]" : "border-[#cfcfcf] bg-white text-[#141414] hover:border-[#5e8f52]"
                         }`}
                       >

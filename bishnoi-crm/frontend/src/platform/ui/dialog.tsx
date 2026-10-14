@@ -15,7 +15,7 @@ export function DialogPanel({ title, hint, children }: { title?: string; hint?: 
   return (
     <section>
       {title && <p className="mb-1.5 text-sm font-medium text-ink">{title}</p>}
-      <div className="space-y-3 rounded-[18px] border border-rule p-4">
+      <div className="space-y-3 rounded-xl border border-rule p-4">
         {children}
         {hint && <p className="text-meta text-ink-3">{hint}</p>}
       </div>

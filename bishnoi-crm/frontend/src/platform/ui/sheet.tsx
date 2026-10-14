@@ -8,7 +8,7 @@ export type Crumb = { href: string; label: string };
 
 /** A white sheet on the bench. The only thing that lifts. */
 export function Sheet({ children, className = "", as: Tag = "section" }: { children: ReactNode; className?: string; as?: "section" | "div" | "article" }) {
-  return <Tag className={`rounded-[22px] border border-rule bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
+  return <Tag className={`rounded-xl border border-rule bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
 }
 
 /** A sheet's heading. Every sheet gets one, in the same style, so sections are found at a glance. */

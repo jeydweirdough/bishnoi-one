@@ -23,7 +23,7 @@ export function JoinLink({ link, size = "md" }: { link: string; size?: "sm" | "m
       href={link}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink font-medium text-white hover:bg-hema-hover ${size === "sm" ? "px-2.5 py-0.5 text-meta" : "px-3 py-1 text-sm"}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-md bg-ink font-medium text-white hover:bg-hema-hover ${size === "sm" ? "px-2.5 py-0.5 text-meta" : "px-3 py-1 text-sm"}`}
       title={link}
     >
       <Video className="size-3.5" aria-hidden />

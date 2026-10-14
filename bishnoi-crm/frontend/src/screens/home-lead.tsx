@@ -187,7 +187,7 @@ export async function LeadHome({ me }: { me: Me & { org: Org } }) {
                     </span>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className="text-sm tabular-nums">{fmt.peso(q.totalCentavos)}</span>
-                      <Link href={`/quotes/${q.id}`} className="rounded-full border border-ink px-3 py-1 text-meta font-medium text-ink hover:bg-mint">
+                      <Link href={`/quotes/${q.id}`} className="rounded-md border border-ink px-3 py-1 text-meta font-medium text-ink hover:bg-mint">
                         Review
                       </Link>
                     </span>

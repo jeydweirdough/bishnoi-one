@@ -17,7 +17,7 @@ export function RetentionFigures({ summary, rules }: { summary: RetentionSummary
       <Sheet className="px-5 py-4">
         <p className="text-caps text-ink-3 uppercase">Retention, last {rules.lostDays} days</p>
         {measured ? (
-          <div className="mt-3 flex items-start justify-between gap-3 rounded-[18px] bg-mint px-4 py-4">
+          <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-mint px-4 py-4">
             <div className="min-w-0">
               <p className="text-[2.25rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{rateLabel(summary.rate)}</p>
               <p className="mt-1 text-sm font-medium text-ink">of customers kept</p>
@@ -29,7 +29,7 @@ export function RetentionFigures({ summary, rules }: { summary: RetentionSummary
           </div>
         ) : (
           // Nothing to measure yet: the same drawing and words as every empty place.
-          <div className="mt-3 rounded-[18px] bg-mint">
+          <div className="mt-3 rounded-xl bg-mint">
             <Empty compact icon="trend" title="Nothing to compare yet">
               It shows once customers quoted in one {rules.lostDays}-day window can be compared with the next. Keep quoting, and it fills in.
             </Empty>

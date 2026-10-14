@@ -81,13 +81,13 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
   const mailto = `mailto:${ready.to.map(encodeURIComponent).join(",")}?subject=${encodeURIComponent(ready.subject)}&body=${encodeURIComponent(ready.body.slice(0, 1500))}`;
 
   const Part = ({ name, value, long = false }: { name: string; value: string; long?: boolean }) => (
-    <div className="rounded-[14px] border border-rule bg-sheet px-3.5 py-2.5">
+    <div className="rounded-lg border border-rule bg-sheet px-3.5 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <span className="text-meta font-medium text-ink-3">{name}</span>
         <button
           type="button"
           onClick={() => copy(name, value)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint"
+          className="inline-flex items-center gap-1.5 rounded-md border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint"
         >
           {copied === name ? <Check className="size-3.5 text-sage-deep" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
           {copied === name ? "Copied" : "Copy"}
@@ -110,13 +110,13 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
           <Part name="Message" value={ready.body} long />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <a href="https://mail.zoho.com/zm/" target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-full border border-ink bg-sheet px-3 text-sm font-medium text-ink hover:bg-mint">
+          <a href="https://mail.zoho.com/zm/" target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink bg-sheet px-3 text-sm font-medium text-ink hover:bg-mint">
             Open Zoho Mail <ExternalLink className="size-3.5" aria-hidden />
           </a>
-          <a href={gmail} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-full border border-ink bg-sheet px-3 text-sm font-medium text-ink hover:bg-mint">
+          <a href={gmail} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink bg-sheet px-3 text-sm font-medium text-ink hover:bg-mint">
             Open in Gmail <ExternalLink className="size-3.5" aria-hidden />
           </a>
-          <a href={mailto} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rule-strong bg-sheet px-3 text-sm text-ink-2 hover:border-ink hover:text-ink">
+          <a href={mailto} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rule-strong bg-sheet px-3 text-sm text-ink-2 hover:border-ink hover:text-ink">
             My computer&apos;s mail app
           </a>
         </div>
@@ -130,7 +130,7 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
         </h3>
         <p className="mt-1 text-meta text-ink-3">Open the email in your Sent folder and take a screenshot (Windows: Win+Shift+S), then paste it here with Ctrl+V or pick the file. It&apos;s kept on the customer as proof it went.</p>
         {preview ? (
-          <div className="relative mt-3 overflow-hidden rounded-[14px] border border-rule">
+          <div className="relative mt-3 overflow-hidden rounded-lg border border-rule">
             {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the picked file */}
             <img src={preview} alt="The screenshot to attach" className="max-h-56 w-full object-contain bg-bench" />
             <IconButton onClick={() => setShot(null)} label="Remove the screenshot" tone="solid" className="absolute top-2 right-2">

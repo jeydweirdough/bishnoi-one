@@ -173,12 +173,14 @@ def make_demo_catalogue(db: Session) -> None:
         if db.get(Issuer, code) is None:
             db.add(Issuer(code=code, name=name))
     db.flush()
-    listed = [t[0] for t in DEMO_PRICE_TYPES if t[2] == "list"]
+    # The demo's prices are PATIENT, TRADE, DOCTOR; each product's SRP, as Finance sets it, is its Patient price.
+    listed = [t[0] for t in DEMO_PRICE_TYPES if t[2] == "list" and t[0] != "SRP"]
     products: dict[str, Product] = {}
     for code, name, generic, strength, form, unit, pesos in DEMO_PRODUCTS:
         products[code] = Product(
             code=code, name=name, generic_name=generic, strength=strength or None, form=form, unit=unit,
-            prices=[ProductPrice(price_type_code=t, amount_centavos=p * 100) for t, p in zip(listed, pesos, strict=True)],
+            prices=[ProductPrice(price_type_code=t, amount_centavos=p * 100) for t, p in zip(listed, pesos, strict=True)]
+            + [ProductPrice(price_type_code="SRP", amount_centavos=pesos[0] * 100)],
         )
     db.add_all(products.values())
     db.flush()

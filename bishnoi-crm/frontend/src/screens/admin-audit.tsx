@@ -39,7 +39,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Sea
             key={f.key}
             href={f.key ? `/admin/audit?action=${enc(f.key)}` : "/admin/audit"}
             aria-current={f.key === filter ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 text-meta ${
+            className={`rounded-md border px-3 py-1 text-meta ${
               f.key === filter ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-ink"
             }`}
           >

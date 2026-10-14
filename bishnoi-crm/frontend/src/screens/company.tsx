@@ -198,7 +198,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
       </nav>
 
       {/* Who they are, where things stand, and what to do: one card, as on the components page. */}
-      <section aria-labelledby="customer-name" className="mb-5 rounded-[22px] border-[1.5px] border-ink bg-sheet px-5 pt-5 pb-4 sm:px-6">
+      <section aria-labelledby="customer-name" className="mb-5 rounded-xl border-[1.5px] border-ink bg-sheet px-5 pt-5 pb-4 sm:px-6">
         <div className="flex flex-wrap items-start gap-x-5 gap-y-4">
           <span className="grid size-14 shrink-0 place-items-center rounded-full border-[1.5px] border-ink bg-sage text-lg font-semibold text-ink" aria-hidden>
             {initials || "?"}
@@ -208,7 +208,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
               <h1 id="customer-name" className="text-title text-ink">
                 {company.name}
               </h1>
-              {company.code && <span className="rounded-[8px] bg-[#f3f3f1] px-2 py-0.5 text-meta font-medium tracking-wide text-ink-2">{company.code}</span>}
+              {company.code && <span className="rounded-md bg-[#f3f3f1] px-2 py-0.5 text-meta font-medium tracking-wide text-ink-2">{company.code}</span>}
               {/* Edit and delete act on the customer itself, so they sit with its name. */}
               {company.can.edit && <EditRecord href={`/companies/${company.id}/edit`} what="customer" />}
               {company.can.delete && (
@@ -228,7 +228,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <StatusTag status={company.status} types={types} />
               {company.leadSource && (
-                <span className="inline-flex h-6 items-center rounded-full bg-[#f0f0ee] px-2.5 text-meta font-medium text-ink-2">From {lower(company.leadSource)}</span>
+                <span className="inline-flex h-6 items-center rounded-md bg-[#f0f0ee] px-2.5 text-meta font-medium text-ink-2">From {lower(company.leadSource)}</span>
               )}
             </div>
           </div>

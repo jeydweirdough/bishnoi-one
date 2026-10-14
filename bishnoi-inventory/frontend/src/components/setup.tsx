@@ -40,7 +40,7 @@ export function SetupGuide({ setup, may }: { setup: Setup; may: (permission: str
           return (
             <li
               key={s.key}
-              className={`flex flex-col rounded-[18px] border px-4 py-3.5 ${isNext ? "border-ink bg-sheet shadow-[0_0_0_1px_var(--color-ink)]" : isDone ? "border-rule bg-hema-tint" : "border-rule bg-sheet"}`}
+              className={`flex flex-col rounded-lg border px-4 py-3.5 ${isNext ? "border-ink bg-sheet shadow-[0_0_0_1px_var(--color-ink)]" : isDone ? "border-rule bg-hema-tint" : "border-rule bg-sheet"}`}
             >
               <span className="flex items-center gap-2.5">
                 <span
@@ -105,7 +105,7 @@ export function NeedsFirst({
     <>
       <PageHeader title={title} crumbs={crumbs} />
       <Sheet className="max-w-2xl px-6 py-6">
-        <span className="grid size-11 place-items-center rounded-full bg-hema-tint text-sage-deep">
+        <span className="grid size-11 place-items-center rounded-lg bg-hema-tint text-sage-deep">
           <Icon name={missing[0].step.icon} className="size-5" />
         </span>
         <h2 className="mt-4 text-lg font-semibold text-ink">
@@ -114,7 +114,7 @@ export function NeedsFirst({
         <p className="mt-1 text-sm text-ink-2">Make {missing.length === 1 ? "it" : "them"} now, and you&apos;ll come straight back here.</p>
         <ol className="mt-5 space-y-2.5">
           {missing.map((m, i) => (
-            <li key={m.need} className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-rule px-4 py-3">
+            <li key={m.need} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule px-4 py-3">
               <span className="flex items-center gap-3">
                 <span className={`grid size-7 place-items-center rounded-full text-meta font-semibold ${i === 0 ? "bg-ink text-white" : "border border-rule-strong text-ink-3"}`}>{i + 1}</span>
                 <span>

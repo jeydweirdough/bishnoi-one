@@ -67,6 +67,26 @@ def test_products_on_a_deal_are_priced_by_the_price_rules(client, crew, ids):
     assert r.status_code == 422 and "priceType" in errors(r)
 
 
+def test_a_deal_keeps_the_promo_its_products_are_sold_under(client, crew, ids):
+    acme = company(client, crew["ria"])
+    promo = ids["Flu season 10% off"]
+    d = deal(client, crew["ria"], acme, priceType="PATIENT", lines=[line(ids["CTZ-10"], 2, promoId=promo), line(ids["AMX-500"], 1)])
+    first, second = d["lines"]
+    assert (first["promoId"], first["promoName"]) == (promo, "Flu season 10% off")
+    assert (first["grossCentavos"], first["promoDiscountCentavos"], first["totalCentavos"]) == (196000, 19600, 176400)
+    assert second["promoId"] is None and second["promoDiscountCentavos"] == 0
+    assert d["valueCentavos"] == 176400 + 145000  # after the promo
+    # A promo that isn't for the product is refused, as on a quote.
+    r = client.patch(f"/deals/{d['id']}", json={"lines": [line(ids["ALP-5"], 1, promoId=promo)]}, headers=crew["ria"])
+    assert r.status_code == 422 and "lines.0.promoId" in errors(r)
+
+
+def test_the_price_list_says_when_each_promo_ends(client, crew, ids):
+    acme = company(client, crew["ria"])
+    offered = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()["promos"]
+    assert offered and all("endsOn" in p for p in offered)
+
+
 def test_losing_needs_a_reason_from_the_list(client, ben):
     d = deal(client, ben, company(client, ben))
     r = client.post(f"/deals/{d['id']}/lose", json={"reason": "Bad vibes"}, headers=ben)

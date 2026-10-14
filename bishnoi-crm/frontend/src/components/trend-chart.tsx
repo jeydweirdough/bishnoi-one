@@ -146,7 +146,7 @@ export function TrendChart({ points, title, org }: { points: TrendPoint[]; title
         {shown && (
           <div
             role="status"
-            className="pointer-events-none absolute top-0 z-10 w-max max-w-48 rounded-[14px] bg-sheet px-2.5 py-1.5 text-meta shadow-overlay"
+            className="pointer-events-none absolute top-0 z-10 w-max max-w-48 rounded-md bg-sheet px-2.5 py-1.5 text-meta shadow-overlay"
             style={{
               left: `${x(active!, n)}%`,
               transform: `translateX(${x(active!, n) > 60 ? "calc(-100% - 10px)" : "10px"})`,

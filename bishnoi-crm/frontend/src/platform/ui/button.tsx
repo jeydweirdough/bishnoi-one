@@ -7,7 +7,7 @@ import type * as React from "react";
 import type { Size, Variant } from "./ant-button";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
 
 const variants: Record<Variant, string> = {
   primary: "bg-hema text-white hover:bg-hema-hover",
@@ -59,7 +59,7 @@ export function IconButton({
       aria-label={label}
       aria-pressed={pressed}
       title={label}
-      className={`grid shrink-0 place-items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${size === "sm" ? "size-7" : "size-8"} ${pressed ? "bg-hema-tint text-ink" : ICON_TONES[tone]} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${size === "sm" ? "size-7" : "size-8"} ${pressed ? "bg-hema-tint text-ink" : ICON_TONES[tone]} ${className}`}
       {...rest}
     >
       {children}
@@ -77,7 +77,7 @@ export function TextButton({ tone = "ink", size = "meta", className = "", childr
   );
 }
 
-const QUICK = "inline-flex h-9 items-center gap-2 rounded-full border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink";
+const QUICK = "inline-flex h-9 items-center gap-2 rounded-lg border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink";
 
 /** A quick action on a record (Call, Email, Note…): a small pill with its icon. A link with `href`, else a button. */
 export function QuickAction({ href, icon, children, ...rest }: React.ComponentProps<"button"> & { href?: string; icon?: React.ReactNode }) {

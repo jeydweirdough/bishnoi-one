@@ -29,9 +29,9 @@ function change(now: number, before: number): { text: string; tone: "up" | "down
 
 function Card({ icon, label, value, note, trend, href }: { icon: IconName; label: string; value: string; note: ReactNode; trend?: ReactNode; href: string }) {
   return (
-    <Link href={href} className="group block rounded-[22px] border border-rule bg-sheet px-5 py-4 transition-colors hover:border-rule-strong">
+    <Link href={href} className="group block rounded-xl border border-rule bg-sheet px-5 py-4 transition-colors hover:border-rule-strong">
       <p className="flex items-center gap-2.5 border-b border-dashed border-rule pb-3 text-sm font-medium text-ink">
-        <span className="grid size-8 place-items-center rounded-full border border-rule text-ink-2">
+        <span className="grid size-8 place-items-center rounded-lg border border-rule text-ink-2">
           <Icon name={icon} className="size-4" />
         </span>
         {label}
@@ -149,7 +149,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 <p className="mt-2 text-meta text-ink-3">Average a month, the last twelve</p>
                 <p className="flex items-baseline gap-2">
                   <span className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{fmt.count(average)} units</span>
-                  <span className="rounded-full bg-hema-tint px-2.5 py-0.5 text-meta font-semibold text-sage-deep">{fmt.count(yearTotal)} in all</span>
+                  <span className="rounded-md bg-hema-tint px-2.5 py-0.5 text-meta font-semibold text-sage-deep">{fmt.count(yearTotal)} in all</span>
                 </p>
               </div>
               <ToggleLinks
@@ -221,7 +221,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                   {d.recentPurchases.map((po) => (
                     <li key={po.id}>
                       <Link href={`/purchase-orders/${po.id}`} className="flex gap-3 py-3 hover:opacity-80">
-                        <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-hema-tint text-sage-deep">
+                        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-hema-tint text-sage-deep">
                           <Icon name="purchaseOrders" className="size-5" />
                         </span>
                         <span className="min-w-0 flex-1">

@@ -69,7 +69,7 @@ export async function Notices({ timeZone }: { timeZone?: string }) {
   return (
     <section aria-label="Announcements" className="mb-5 space-y-2">
       {notices.map((n) => (
-        <details key={n.id} className={`group rounded-[14px] border px-4 py-2.5 text-sm ${TONE[n.level]}`} open={n.level === "critical"}>
+        <details key={n.id} className={`group rounded-lg border px-4 py-2.5 text-sm ${TONE[n.level]}`} open={n.level === "critical"}>
           <summary className={`flex cursor-pointer list-none items-start gap-2.5 ${n.body ? "" : "pointer-events-none"}`}>
             <Icon n={n} />
             <span className="min-w-0 flex-1">

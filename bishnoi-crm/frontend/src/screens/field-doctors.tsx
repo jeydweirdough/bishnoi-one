@@ -46,13 +46,13 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
           defaultValue={search}
           placeholder="Search by name"
           aria-label={`Search ${lower(terms.visited.many)} by name`}
-          className="h-9 w-64 rounded-[14px] border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
+          className="h-9 w-64 rounded-lg border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
         />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />
           Only those who owe
         </label>
-        <button type="submit" className="h-9 rounded-[14px] border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
+        <button type="submit" className="h-9 rounded-lg border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
           Show
         </button>
       </form>

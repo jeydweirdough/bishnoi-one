@@ -35,13 +35,13 @@ export function Showcase() {
   return (
     <aside
       aria-label="What Inventory keeps track of"
-      className="hidden flex-col items-center justify-center rounded-[28px] bg-[#f1f7ee] px-10 py-12 lg:flex"
+      className="hidden flex-col items-center justify-center rounded-xl bg-[#f1f7ee] px-10 py-12 lg:flex"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
     >
       <div className="relative w-full max-w-[34rem]">
         <Art />
-        <div key={at} className="absolute bottom-[1%] left-[-3%] w-[14rem] rounded-[22px] border-[1.5px] border-[#141414] bg-white px-5 pt-4 pb-4 motion-safe:animate-[card-in_500ms_ease-out_both]">
+        <div key={at} className="absolute bottom-[1%] left-[-3%] w-[14rem] rounded-xl border-[1.5px] border-[#141414] bg-white px-5 pt-4 pb-4 motion-safe:animate-[card-in_500ms_ease-out_both]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-[#141414]">{slide.title}</p>
@@ -49,7 +49,7 @@ export function Showcase() {
             </div>
             <Ring value={slide.value} />
           </div>
-          <span className="mt-3 inline-flex rounded-full border border-[#141414] px-3 py-0.5 text-meta font-medium text-[#141414]">{slide.chip}</span>
+          <span className="mt-3 inline-flex rounded-md border border-[#141414] px-3 py-0.5 text-meta font-medium text-[#141414]">{slide.chip}</span>
         </div>
       </div>
 

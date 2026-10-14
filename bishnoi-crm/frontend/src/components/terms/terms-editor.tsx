@@ -74,7 +74,7 @@ export function TermsEditor({ data }: { data: TermsSettings }) {
             {(p) => <Input {...p} value={draft.genericName} maxLength={40} onChange={(e) => set({ genericName: e.target.value })} />}
           </Field>
         </div>
-        <p className="mt-5 rounded-[14px] bg-mint px-4 py-3 text-meta text-ink-2">
+        <p className="mt-5 rounded-lg bg-mint px-4 py-3 text-meta text-ink-2">
           Reads as: “Pick how the {one} took it” · “{many} visited” · “At the {site}”
         </p>
         <FormError message={errors.error} />

@@ -3,7 +3,8 @@
 import type { Then } from "./new-customer";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
@@ -53,7 +54,22 @@ export function CompanyForm({
   then?: Then;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const {
+    pending,
+    shakeClass,
+    anticipateClass,
+    execute,
+    error,
+    fieldErrors: fields,
+    setError,
+    setFieldErrors: setFields,
+  } = useAnticipation<{
+    values: Record<Text, string>;
+    status: CompanyStatus;
+    priceGroup: string;
+    ownerId: string;
+    extra: ExtraDraft;
+  }>();
   const [ownerId, setOwnerId] = useState(
     () =>
       company?.owner.id ??
@@ -89,8 +105,6 @@ export function CompanyForm({
   );
   const can = useCan();
   const [priceGroup, setPriceGroup] = useState(company?.priceGroupCode ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [dupMessage, setDupMessage] = useState("");
   const [extra, setExtra] = useState<ExtraDraft>(() => toDraft(everyTeamsLayout.sections.flatMap((s) => s.fields), company?.extra));
@@ -114,38 +128,58 @@ export function CompanyForm({
       ownerId: ownerId || null,
       extra: extraChanges(allFields, extra),
     };
-    start(async () => {
-      let result;
-      if (company) {
-        const change: Partial<CompanyInput> = {};
-        for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
-        if (status !== company.status) change.status = status;
-        if (priceGroups.length && (priceGroup || null) !== (company.priceGroupCode ?? null)) change.priceGroupCode = priceGroup || null;
-        if (ownerId !== company.owner.id) change.ownerId = ownerId;
-        const extraChange = extraChanges(allFields, extra, company.extra);
-        if (extraChange) change.extra = extraChange;
-        if (Object.keys(change).length === 0) {
-          router.push(`/companies/${company.id}`);
-          return;
+
+    execute({
+      anticipate: () => ({
+        values: { ...values },
+        status,
+        priceGroup,
+        ownerId,
+        extra: { ...extra },
+      }),
+      rollback: (prev) => {
+        setValues(prev.values);
+        setStatus(prev.status);
+        setPriceGroup(prev.priceGroup);
+        setOwnerId(prev.ownerId);
+        setExtra(prev.extra);
+      },
+      request: async () => {
+        if (company) {
+          const change: Partial<CompanyInput> = {};
+          for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
+          if (status !== company.status) change.status = status;
+          if (priceGroups.length && (priceGroup || null) !== (company.priceGroupCode ?? null)) change.priceGroupCode = priceGroup || null;
+          if (ownerId !== company.owner.id) change.ownerId = ownerId;
+          const extraChange = extraChanges(allFields, extra, company.extra);
+          if (extraChange) change.extra = extraChange;
+          if (Object.keys(change).length === 0) {
+            router.push(`/companies/${company.id}`);
+            return { ok: true, data: company };
+          }
+          return await updateCompany(company.id, change);
+        } else {
+          return await createCompany({ ...input, allowDuplicate });
         }
-        result = await updateCompany(company.id, change);
-      } else {
-        result = await createCompany({ ...input, allowDuplicate });
-      }
-      if (result.ok) {
-        toast.success(company ? "Changes saved" : "Customer added", { description: then ? `Now their ${then}: ${result.data.name}` : result.data.name });
+      },
+      successMessage: (data) => ({
+        title: company ? "Changes saved" : "Customer added",
+        description: then ? `Now their ${then}: ${data.name}` : data.name,
+      }),
+      onSuccess: (data) => {
         router.push(
-          company || !then ? `/companies/${result.data.id}` : then === "quote" ? `/companies/${result.data.id}/quotes/new` : `/deals/new?company=${encodeURIComponent(result.data.id)}`,
+          company || !then ? `/companies/${data.id}` : then === "quote" ? `/companies/${data.id}/quotes/new` : `/deals/new?company=${encodeURIComponent(data.id)}`,
         );
         router.refresh();
-        return;
-      }
-      // "Looks like one already here" is a question, not an error: it gets its own panel.
-      const found = result.duplicates ?? [];
-      setDuplicates(found);
-      setDupMessage(found.length ? result.error : "");
-      setError(found.length ? null : result.error);
-      setFields(result.fields ?? {});
+      },
+      onError: (err, _errFields, dups) => {
+        const found = (dups as Duplicate[]) ?? [];
+        setDuplicates(found);
+        setDupMessage(found.length ? err : "");
+        if (found.length) {
+          setError(null);
+        }
+      },
     });
   }
 
@@ -236,7 +270,7 @@ export function CompanyForm({
         e.preventDefault();
         submit();
       }}
-      className="space-y-7"
+      className={`space-y-7 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}
     >
       <LayoutForm
         layout={layout}

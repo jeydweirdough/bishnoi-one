@@ -43,7 +43,7 @@ export function CustomerSharingButton() {
           Whether other divisions are told a customer is already here when they add the same one, and can pick it as a hospital or other linked customer. They only
           ever see its name and division, never its details.
         </p>
-        <div className="mt-5 rounded-[18px] border border-rule">
+        <div className="mt-5 rounded-xl border border-rule">
           {teams === null ? (
             <p className="px-4 py-4 text-meta text-ink-3">Getting your divisions…</p>
           ) : teams.length === 0 ? (

@@ -68,7 +68,7 @@ function IconRow({
           aria-label={label}
           title={label}
           onClick={() => onPick(name)}
-          className={`inline-flex size-7 items-center justify-center rounded-[14px] border ${
+          className={`inline-flex size-7 items-center justify-center rounded-md border ${
             value === name ? "border-hema bg-hema-tint text-ink" : "border-rule text-ink-3 hover:border-control"
           }`}
         >

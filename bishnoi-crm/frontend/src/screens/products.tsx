@@ -12,6 +12,14 @@ import { SyncNow } from "../components/catalogue/stock";
 import { Filters, Pager } from "../components/crm/list-controls";
 import { formLayout } from "../components/extra/load";
 
+function friendlyError(msg: string | null | undefined): string | null {
+  if (!msg) return null;
+  if (/INVENTORY_API_KEY|INTEGRATION_KEYS|refused the CRM's key/i.test(msg)) {
+    return "Unable to sync with Inventory: connection could not be verified. Please contact your system administrator.";
+  }
+  return msg;
+}
+
 export const metadata = { title: "Products" };
 
 const SIZE = 100;
@@ -41,6 +49,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const fmt = makeFormat(me.org);
   const here = new URLSearchParams(Object.entries({ q, active }).filter(([, v]) => v));
 
+  const linkErr = friendlyError(link.error);
+  const stockErr = friendlyError(stock?.error);
+
   return (
     <>
       <PageHeader
@@ -60,13 +71,20 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           <>
             The products come from Inventory, with their SRP: add and change them there. Here you set the other price types, and each team may set its own
             prices over these.
-            <span className={`mt-1 block ${link.error ? "text-danger" : "text-ink-3"}`}>
-              {link.error
-                ? `${link.error} The list below is from the last time it worked.`
-                : link.syncedAt
-                  ? `Last brought over: ${fmt.whenLabel(link.syncedAt)}. It's checked again every 15 minutes.`
-                  : "Not brought over from Inventory yet."}
-              {stock?.error && ` Stock: ${stock.error}`}
+            <span className={`mt-1 block ${linkErr ? "text-danger" : "text-ink-3"}`}>
+              {linkErr ? (
+                <>
+                  {linkErr} The list below is from the last time it worked.
+                  {stockErr && stockErr !== linkErr && <span> Stock: {stockErr}</span>}
+                </>
+              ) : (
+                <>
+                  {link.syncedAt
+                    ? `Last brought over: ${fmt.whenLabel(link.syncedAt)}. It's checked again every 15 minutes.`
+                    : "Not brought over from Inventory yet."}
+                  {stockErr && <span> Stock: {stockErr}</span>}
+                </>
+              )}
             </span>
           </>
         ) : (

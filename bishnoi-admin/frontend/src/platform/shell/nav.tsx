@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, MoreHorizontal, UserRound, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../ui/avatar";
 import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
@@ -22,6 +22,9 @@ import type { Me, ModuleAccess } from "../lib/types";
 // A department is different. Inventory's pages (products, promos, bundles) are
 // nothing like Finance's (approvals, letters, payments), so a department really
 // is a section, and opens to show its own.
+
+/** Whether the desktop sidebar is collapsed to its icons. */
+const RailContext = createContext(false);
 
 type Page = {
   href: string;
@@ -209,7 +212,8 @@ function Row({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-full px-3 text-sm ${nested ? "h-8" : "h-9"} ${
+  const rail = useContext(RailContext);
+  const className = `flex items-center gap-2.5 rounded-full px-3 text-sm group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0 ${nested ? "h-8" : "h-9"} ${
     current
       ? "bg-hema-tint font-semibold text-ink"
       : open
@@ -219,22 +223,22 @@ function Row({
   const inside = (
     <>
       <Icon name={icon} className={`size-4 ${current ? "text-sage-deep" : open ? "text-ink-2" : "text-ink-3"}`} />
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className="min-w-0 flex-1 truncate group-data-[rail=true]/side:sr-only">{children}</span>
       {/* A row that leaves says so, the same mark the outside apps carry. */}
-      {trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}
+      <span className="contents group-data-[rail=true]/side:hidden">{trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}</span>
     </>
   );
   // Another app is another origin, so there is nothing for Next to route to:
   // it is an ordinary link, and the sign-in it lands on is already held.
   if (isAway(href)) {
     return (
-      <a href={href} className={className}>
+      <a href={href} className={className} title={rail && typeof children === "string" ? children : undefined}>
         {inside}
       </a>
     );
   }
   return (
-    <Link href={href} aria-current={current ? "page" : undefined} className={className}>
+    <Link href={href} aria-current={current ? "page" : undefined} className={className} title={rail && typeof children === "string" ? children : undefined}>
       {inside}
     </Link>
   );
@@ -264,10 +268,10 @@ function Parent({ href, base, icon, label, groups, overviewHref }: {
       </Row>
       {open && (
         // The guide line sits under the parent's icon, so the pages read as its own.
-        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2">
+        <div className="mt-0.5 mb-1.5 ml-[1.1875rem] animate-reshape space-y-0.5 border-l border-rule pl-2 group-data-[rail=true]/side:hidden">
           {groups.map((group, i) => (
             <div key={group.label ?? i} role={group.label ? "group" : undefined} aria-label={group.label}>
-              {group.label && <p className="px-3 pt-1.5 pb-0.5 text-meta text-ink-3">{group.label}</p>}
+              {group.label && <p className="px-3 pt-1.5 pb-0.5 text-meta text-ink-3 group-data-[rail=true]/side:sr-only">{group.label}</p>}
               {group.pages.map((page) => (
                 <Row key={page.href} href={page.href} icon={page.icon} nested current={isCurrent(page, pathname, page.href === overviewHref)}>
                   {page.label}
@@ -288,11 +292,12 @@ function AppLink({ href, icon, label }: { href: string; icon: IconName; label: s
       href={href}
       target="_blank"
       rel="noopener"
-      className="flex h-9 items-center gap-2.5 rounded-[12px] px-3 text-sm text-ink hover:bg-bench"
+      title={label}
+      className="flex h-9 items-center gap-2.5 rounded-[12px] px-3 text-sm text-ink hover:bg-bench group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0"
     >
-      <Icon name={icon} className="size-4 text-ink" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <Icon name="external" className="size-3.5 text-ink-3" />
+      <Icon name={icon} className="size-4 shrink-0 text-ink" />
+      <span className="min-w-0 flex-1 truncate group-data-[rail=true]/side:sr-only">{label}</span>
+      <Icon name="external" className="size-3.5 text-ink-3 group-data-[rail=true]/side:hidden" />
       <span className="sr-only">(opens in a new tab)</span>
     </a>
   );
@@ -312,7 +317,7 @@ function Flat({ groups, overviewHref }: { groups: PageGroup[]; overviewHref?: st
     <>
       {groups.map((group, i) => (
         <div key={group.label ?? i} role={group.label ? "group" : undefined} aria-label={group.label}>
-          {group.label && <p className="px-3 pt-1.5 pb-0.5 text-meta text-ink-3">{group.label}</p>}
+          {group.label && <p className="px-3 pt-1.5 pb-0.5 text-meta text-ink-3 group-data-[rail=true]/side:sr-only">{group.label}</p>}
           {group.pages.map((page) => (
             <Row
               key={page.href}
@@ -406,13 +411,14 @@ function AppSwitcher({ items }: { items: Away[] }) {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 w-full items-center gap-2.5 rounded-[12px] px-3 text-sm ${
+        title="Other apps"
+        className={`flex h-9 w-full items-center gap-2.5 rounded-[12px] px-3 text-sm group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-0 ${
           open ? "bg-bench font-semibold text-ink" : "text-ink hover:bg-bench"
         }`}
       >
-        <Icon name="apps" className="size-4 text-ink" />
-        <span className="min-w-0 flex-1 truncate text-left">Other apps</span>
-        <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
+        <Icon name="apps" className="size-4 shrink-0 text-ink" />
+        <span className="min-w-0 flex-1 truncate text-left group-data-[rail=true]/side:sr-only">Other apps</span>
+        <ChevronRight aria-hidden className={`size-3.5 shrink-0 text-ink-3 transition-transform group-data-[rail=true]/side:hidden ${open ? "rotate-90" : ""}`} />
       </button>
       {at && (
         <>
@@ -447,8 +453,9 @@ function AppSwitcher({ items }: { items: Away[] }) {
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="mt-5">
-      <p className="mb-1 px-3 text-caps text-ink-3 uppercase">{label}</p>
+    <div className="mt-5 group-data-[rail=true]/side:mt-2">
+      <p className="mb-1 px-3 text-caps text-ink-3 uppercase group-data-[rail=true]/side:sr-only">{label}</p>
+      <hr className="mx-3 mb-2 hidden border-rule group-data-[rail=true]/side:block" aria-hidden />
       <div className="space-y-0.5">{children}</div>
     </div>
   );
@@ -714,10 +721,10 @@ function Account({ me }: { me: Me }) {
   // The CRM's foot (without Ant Design): who you are, and the rest behind ⋯.
   return (
     <div className="border-t border-rule pt-4">
-      <div ref={menu} className={`relative flex items-center gap-1 rounded-full pr-1 ${here ? "bg-hema-tint" : ""}`}>
-        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 ${here ? "" : "hover:bg-sheet"}`}>
+      <div ref={menu} className={`relative flex items-center gap-1 rounded-full pr-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:pr-0 ${here ? "bg-hema-tint" : ""}`}>
+        <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-1.5 group-data-[rail=true]/side:px-1.5 ${here ? "" : "hover:bg-sheet"}`} title={me.user.fullName}>
           <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-          <span className="min-w-0">
+          <span className="min-w-0 group-data-[rail=true]/side:sr-only">
             <span className="block truncate text-sm font-semibold text-ink">{me.user.fullName}</span>
             <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
           </span>
@@ -734,7 +741,7 @@ function Account({ me }: { me: Me }) {
           <MoreHorizontal className="size-5" aria-hidden />
         </button>
         {open && (
-          <div role="menu" className="absolute right-0 bottom-full z-40 mb-2 w-52 rounded-[16px] border border-rule bg-sheet p-1.5 shadow-overlay">
+          <div role="menu" className="absolute right-0 bottom-full z-40 mb-2 w-52 group-data-[rail=true]/side:right-auto group-data-[rail=true]/side:left-0 rounded-[16px] border border-rule bg-sheet p-1.5 shadow-overlay">
             <Link role="menuitem" href="/account" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-sm text-ink hover:bg-mint">
               <UserRound className="size-4" aria-hidden />
               Your account
@@ -761,8 +768,15 @@ function Account({ me }: { me: Me }) {
   );
 }
 
-export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
+export function Nav({ me, unset = {}, rail: railAtFirst = false }: { me: Me; unset?: Unset; rail?: boolean }) {
   const pathname = usePathname();
+  const [rail, setRail] = useState(railAtFirst);
+  function toggleRail() {
+    const next = !rail;
+    setRail(next);
+    // A cookie, so the next page is drawn the same way from the start; every app reads the same one.
+    document.cookie = `bishnoi_nav=${next ? "rail" : "full"}; path=/; max-age=31536000; samesite=lax`;
+  }
   // The phone menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
@@ -788,12 +802,25 @@ export function Nav({ me, unset = {} }: { me: Me; unset?: Unset }) {
   return (
     <>
       {/* Desktop: a light grey column beside the page, a rule between them. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between overflow-y-auto px-4 py-6 lg:flex">
-        <div>
-          <div className="mb-6 px-3">{brand}</div>
-          <Links me={me} unset={unset} />
-        </div>
-        <Account me={me} />
+      <aside data-rail={rail} className="group/side sticky top-0 hidden h-dvh w-[16.5rem] flex-col justify-between overflow-x-hidden overflow-y-auto px-4 py-6 transition-[width] duration-200 data-[rail=true]:w-[4.75rem] data-[rail=true]:px-2.5 lg:flex">
+        <RailContext.Provider value={rail}>
+          <div>
+            <div className="mb-6 flex items-start gap-1 px-3 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:items-center group-data-[rail=true]/side:px-0">
+              <div className="min-w-0 flex-1 group-data-[rail=true]/side:[&_span]:sr-only group-data-[rail=true]/side:[&_a]:border-b-0 group-data-[rail=true]/side:[&_a]:pb-0">{brand}</div>
+              <button
+                type="button"
+                onClick={toggleRail}
+                aria-label={rail ? "Open the sidebar" : "Close the sidebar"}
+                title={rail ? "Open the sidebar" : "Close the sidebar"}
+                className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink group-data-[rail=true]/side:mt-3"
+              >
+                {rail ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+              </button>
+            </div>
+            <Links me={me} unset={unset} />
+          </div>
+          <Account me={me} />
+        </RailContext.Provider>
       </aside>
 
       {/* Phone and tablet: a top bar with a menu, saying where you are. */}

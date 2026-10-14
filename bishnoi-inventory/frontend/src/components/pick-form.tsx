@@ -14,7 +14,7 @@ export type PickLine = { id: string; product: ProductRef; quantity: number; batc
  * unless someone picks one; serial-numbered units need their numbers.
  */
 export function PickForm({ kind, documentId, lines, label }: { kind: "order" | "transfer"; documentId: string; lines: PickLine[]; label: string }) {
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const [chosen, setChosen] = useState<Record<string, { batchId: string; serials: string }>>({});
   const needsChoice = lines.some((l) => l.product.trackBatches || l.product.trackSerials);
 
@@ -30,7 +30,7 @@ export function PickForm({ kind, documentId, lines, label }: { kind: "order" | "
   }
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       {needsChoice && (
         <ul className="divide-y divide-rule">
           {lines.filter((l) => l.product.trackBatches || l.product.trackSerials).map((l) => {

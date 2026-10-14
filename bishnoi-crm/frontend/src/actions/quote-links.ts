@@ -9,9 +9,12 @@ import type { Quote } from "@/src/platform/lib/types";
 // Order links (the API's app/routers/quote_links.py) and quick quotes from the medicine search.
 
 export type LinkState = "open" | "used" | "expired" | "switched_off";
-export type QuoteLink = { id: string; state: LinkState; priceType: string; createdAt: string; expiresAt: string; usedAt: string | null; quoteId: string | null; customer: { id: string; name: string } | null; owner: { id: string; name: string } };
+/** What the customer sends with the order: set by the rep making the link (a prescription is always asked for Rx medicines). */
+export type LinkAsks = { prescriptionAlways: boolean; payer: { code: string; name: string } | null; documents: string[] };
+export type AsksInput = { prescriptionAlways: boolean; payer: string | null; documents: string[] };
+export type QuoteLink = { id: string; state: LinkState; priceType: string; createdAt: string; expiresAt: string; usedAt: string | null; quoteId: string | null; customer: { id: string; name: string } | null; owner: { id: string; name: string }; asks: LinkAsks };
 export type NewCustomer = { name: string; contactName: string | null; mobile: string | null; email: string | null; address: string | null; city: string | null; latitude: number | null; longitude: number | null };
-export type QuoteLinks = { items: QuoteLink[]; priceTypes: { code: string; name: string }[]; lifetimes: number[] };
+export type QuoteLinks = { items: QuoteLink[]; priceTypes: { code: string; name: string }[]; lifetimes: number[]; payers: { code: string; name: string }[] };
 /** `askedPriceCentavos`: the price per unit the customer asks for instead (an order link's); the quote then waits for approval. */
 export type OrderLine = { productId: string; quantity: number; askedPriceCentavos?: number };
 /** No prices: on an order link they come in the quotation, not on the page. */
@@ -24,8 +27,8 @@ export async function quoteLinks(companyId: string | null): Promise<QuoteLinks> 
 
 /** A new link: its token comes back this once, to copy and send. */
 /** With no customer: for someone not one yet, who becomes the rep's customer when they order. */
-export async function makeQuoteLink(companyId: string | null, hours: number, priceType: string | null): Promise<Result<QuoteLink & { token: string }>> {
-  return attempt(() => api.post<QuoteLink & { token: string }>(companyId ? `/companies/${enc(companyId)}/quote-links` : "/quote-links", { hours, priceType }));
+export async function makeQuoteLink(companyId: string | null, hours: number, priceType: string | null, asks: AsksInput): Promise<Result<QuoteLink & { token: string }>> {
+  return attempt(() => api.post<QuoteLink & { token: string }>(companyId ? `/companies/${enc(companyId)}/quote-links` : "/quote-links", { hours, priceType, asks }));
 }
 
 /** A link's maker changes it while it hasn't been used: how long from now it works, its price, on or off. */
@@ -70,4 +73,11 @@ export async function quickQuote(companyId: string, priceType: string, lines: Or
     refresh();
     return { id: quote.id, ready: quote.approval.status !== "pending" };
   });
+}
+
+export type UploadForm = { url: string; fields: Record<string, string>; key: string };
+
+/** A signed form to upload one file the link asks for straight to storage (the browser posts it there). */
+export async function uploadForm(company: string, token: string, kind: "prescription" | "letter" | "document", index: number, contentType: string): Promise<Result<UploadForm>> {
+  return attempt(() => api.post<UploadForm>(`/public/quote-links/${enc(token)}/uploads`, { kind, index, contentType }, { [COMPANY_HEADER]: company }));
 }

@@ -50,7 +50,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
         key={key || "all"}
         href={tab(key)}
         aria-current={current ? "page" : undefined}
-        className={`rounded-full border px-3 py-1 text-meta ${
+        className={`rounded-md border px-3 py-1 text-meta ${
           current ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-ink"
         }`}
       >

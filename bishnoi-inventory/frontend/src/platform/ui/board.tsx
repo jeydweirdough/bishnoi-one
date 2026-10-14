@@ -92,6 +92,13 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
           });
   const moveTo = (c: BoardCard, to: string) => movesOf(c).find((m) => m.to === to);
 
+  const [shakingCard, setShakingCard] = useState<string | null>(null);
+
+  function triggerShakeCard(id: string) {
+    setShakingCard(id);
+    setTimeout(() => setShakingCard(null), 500);
+  }
+
   function take(card: BoardCard, move: BoardMove, asked = false) {
     if (move.open) {
       router.push(move.open.replace("{id}", card.id));
@@ -108,6 +115,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
       const result = await run(card.id, (move.step ?? "").replace("{to}", move.to));
       if (!result.ok) {
         setMoved((m) => ({ ...m, [card.id]: from }));
+        triggerShakeCard(card.id);
         toast.error(result.error);
         return;
       }
@@ -149,7 +157,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                 }}
                 onDragLeave={() => setOver((o) => (o === col.key ? null : o))}
                 onDrop={(e) => drop(e, col.key)}
-                className={`flex min-h-[24rem] min-w-0 flex-col rounded-[20px] border p-2 transition-colors ${
+                className={`flex min-h-[24rem] min-w-0 flex-col rounded-xl border p-2 transition-colors ${
                   over === col.key && target ? "border-sage bg-hema-tint" : target ? "border-dashed border-sage bg-[#f4f4f1]" : "border-transparent bg-[#f4f4f1]"
                 }`}
               >
@@ -161,7 +169,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                     <span className="ml-auto flex items-center gap-1 text-meta font-normal text-ink-3">
                       {col.aside}
                       {newHref && col.key === columns[0].key && (
-                        <Link href={newHref} className="grid size-6 place-items-center rounded-full hover:bg-sheet hover:text-ink" title="New" aria-label="New">
+                        <Link href={newHref} className="grid size-6 place-items-center rounded-md hover:bg-sheet hover:text-ink" title="New" aria-label="New">
                           <Plus className="size-4" aria-hidden />
                         </Link>
                       )}
@@ -169,7 +177,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                   </h2>
                   {col.note && <p className="text-meta text-ink-3">{col.note}</p>}
                 </header>
-                {target && <p className="mb-2 rounded-[12px] bg-sheet px-3 py-1.5 text-meta text-ink-2">Drop to {target.label.replace("{to}", col.label).toLowerCase()}</p>}
+                {target && <p className="mb-2 rounded-md bg-sheet px-3 py-1.5 text-meta text-ink-2">Drop to {target.label.replace("{to}", col.label).toLowerCase()}</p>}
                 <ul className="flex-1 space-y-2">
                   {list.map((c) => {
                     const next = movesOf(c);
@@ -186,9 +194,9 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                           setDragging(null);
                           setOver(null);
                         }}
-                        className={`group relative rounded-[14px] border border-rule bg-sheet px-3 py-2.5 transition hover:border-hema ${c.late ? "border-t-2 border-t-danger" : ""} ${
+                        className={`group relative rounded-lg border border-rule bg-sheet px-3 py-2.5 transition hover:border-hema ${c.late ? "border-t-2 border-t-danger" : ""} ${
                           next.length ? "cursor-grab active:cursor-grabbing" : ""
-                        } ${dragging?.id === c.id ? "opacity-50" : ""}`}
+                        } ${dragging?.id === c.id ? "opacity-50" : ""} ${shakingCard === c.id ? "animate-shake ring-2 ring-danger/50" : ""}`}
                       >
                         <p className="flex items-start justify-between gap-2">
                           <Link href={c.href} draggable={false} className="min-w-0 truncate text-sm font-medium text-ink after:absolute after:inset-0">
@@ -216,7 +224,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                             <button
                               type="button"
                               aria-label={`Move ${c.title}`}
-                              className="absolute right-1.5 bottom-1.5 z-10 grid size-6 place-items-center rounded-full bg-sheet text-ink-3 opacity-0 group-hover:opacity-100 hover:bg-bench hover:text-ink focus-visible:opacity-100 max-lg:opacity-100"
+                              className="absolute right-1.5 bottom-1.5 z-10 grid size-6 place-items-center rounded-md bg-sheet text-ink-3 opacity-0 group-hover:opacity-100 hover:bg-bench hover:text-ink focus-visible:opacity-100 max-lg:opacity-100"
                             >
                               <MoreHorizontal className="size-4" aria-hidden />
                             </button>
@@ -226,7 +234,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                     );
                   })}
                 </ul>
-                {list.length === 0 && !target && <p className="rounded-[14px] border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">{col.hint ?? "Nothing here"}</p>}
+                {list.length === 0 && !target && <p className="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">{col.hint ?? "Nothing here"}</p>}
                 {more?.[col.key] && (
                   <Link href={more[col.key].href} className="mt-2 px-1.5 text-meta text-ink-2 hover:text-ink hover:underline">
                     {more[col.key].label}

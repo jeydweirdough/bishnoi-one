@@ -75,7 +75,7 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           aria-busy={pending || undefined}
           aria-label={done ? `Reopen: ${row.title}` : `Mark done: ${row.title}`}
           // 24px to look at, 40px to hit: marking done is the most repeated tap in the app.
-          className={`relative mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full border before:absolute before:-inset-2 ${
+          className={`relative mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md border before:absolute before:-inset-2 ${
             done ? "border-ink bg-ink text-white" : "border-control text-transparent hover:border-hema hover:text-ink"
           }`}
         >

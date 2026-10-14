@@ -88,7 +88,7 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
 
 function Notice({ children, tone }: { children: React.ReactNode; tone?: "danger" }) {
   return (
-    <p role={tone ? "alert" : undefined} className={`rounded-2xl px-5 py-2.5 text-sm ${tone ? "bg-danger-tint text-danger" : "bg-[#f1f7ee] text-[#3b3b3b]"}`}>
+    <p role={tone ? "alert" : undefined} className={`rounded-lg px-5 py-2.5 text-sm ${tone ? "bg-danger-tint text-danger" : "bg-[#f1f7ee] text-[#3b3b3b]"}`}>
       {children}
     </p>
   );

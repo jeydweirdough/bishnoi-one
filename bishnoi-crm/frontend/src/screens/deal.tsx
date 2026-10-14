@@ -10,6 +10,7 @@ import { NoAccess } from "../components/admin/words";
 import { AssociationsPanel } from "../components/crm/associations-panel";
 import { EditRecord } from "../components/crm/list-controls";
 import { DealClose } from "../components/deals/deal-close";
+import { AppliedPromo } from "../components/catalogue/promo-tag";
 import { PriorityFlag, CATEGORY_LABELS, StageTag, closeLabel } from "../components/deals/words";
 
 type Params = Promise<{ id: string }>;
@@ -137,6 +138,12 @@ export default async function DealPage({ params }: { params: Params }) {
                     <tr key={l.productId}>
                       <td className="py-2">
                         {l.productName} <span className="text-meta text-ink-3">{l.productCode}</span>
+                        {/* Sold under a promo: it goes on to the deal's quote with the product. */}
+                        {l.promoName && (
+                          <span className="mt-1 block">
+                            <AppliedPromo name={l.promoName} discountCentavos={l.promoDiscountCentavos} freeQuantity={l.freeQuantity} fmt={fmt} />
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 text-right">
                         {fmt.count(l.quantity)} {l.unit}

@@ -145,12 +145,13 @@ def quote_waiting(db: Session, settings: Settings, quote: Quote, maker: User) ->
     )
 
 
-def quote_decided(db: Session, settings: Settings, quote: Quote, decider: User) -> None:
+def quote_decided(db: Session, settings: Settings, quote: Quote, decider_name: str, decider_id: str | None = None) -> None:
+    """decider_id: None when Finance decided, in its own app."""
     owner = db.get(User, quote.owner_id)
-    if owner is None or owner.id == decider.id or not owner.is_active:
+    if owner is None or owner.id == decider_id or not owner.is_active:
         return
     approved = quote.approval_status == "approved"
-    lines = [f"{decider.full_name} {'approved' if approved else 'rejected'} your quote for {quote_for(quote)}."]
+    lines = [f"{decider_name} {'approved' if approved else 'rejected'} your quote for {quote_for(quote)}."]
     if quote.approval_note:
         lines.append(f"{'Their note' if approved else 'Why'}: {quote.approval_note}")
     send(

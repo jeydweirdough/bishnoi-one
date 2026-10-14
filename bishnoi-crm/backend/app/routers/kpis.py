@@ -10,7 +10,8 @@
   reports.view, with a scope wider than own) everyone one's role reaches.
 """
 
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 from typing import Annotated, Literal
 from app.pricing import sales_settings
 from app.terms import terms_of
@@ -26,7 +27,7 @@ from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
 from app.kpis import FILTER_CHOICES, MEASURES, UNITS, Period, combine, elapsed_in, figures, judged, unit_of, value_of
-from app.models import KPI_BETTER, Kpi, KpiEntry, KpiTarget, Product, Role, Team, User
+from app.models import KPI_BETTER, Activity, Company, Kpi, KpiEntry, KpiTarget, Product, Quote, Role, Team, User, Visit
 from app.pricing import today
 from app.routers.field import month_bounds, month_or_now, this_month
 from app.scope import reachable_people
@@ -453,4 +454,238 @@ def scorecard(
         "roles": role_tabs if view == "team" else [],
         "role": role if view == "team" else None,
         "canSetTargets": access.can("goals.manage"),
+    }
+
+
+@router.get("/playbook-scorecard")
+def playbook_scorecard(
+    access: CurrentAccess,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    month: str | None = Query(None, max_length=7),
+    team: str | None = Query(None, max_length=36),
+) -> dict:
+    """100-Point Composite Scorecard aligned with Bishnoi Sales Playbooks.
+
+    Weights:
+    - IST (Individual Sales Target): 40 pts. Hard floor: <60% attainment = 0 pts + mandatory PIP!
+    - DSO / Collections Efficiency: 20 pts (>=95%: 20, 85-94%: 15, 75-84%: 10, <75%: 0).
+    - CRR / HRR Retention Rate: 20 pts (>=90%: 20, 80-89%: 15, 70-79%: 10, <70%: 0).
+    - NZSD (Net Zero-Sales Days): 20 pts (<=3 days: 20, 4-5 days: 15, 6-8 days: 10, >8 days: 0).
+
+    Performance Bands:
+    - 95-100: Distinguished (+10% to +15% annual merit increment)
+    - 85-94: High Performer (+6% to +8% increment)
+    - 70-84: Core Performer (+3% to +5% increment)
+    - 60-69: PIP Candidate (0% increment, 30-day coaching)
+    - <60: Critical Action (0% increment, immediate PIP/escalation)
+    """
+    month = month_or_now(month, settings)
+    period = period_of(month, settings)
+    now_day = today(settings.org_timezone)
+    elapsed = elapsed_in(period, now_day)
+
+    # Determine people in scope
+    if access.scope == "own":
+        people = [me]
+    else:
+        people = [
+            u for u in reachable_people(db, access)
+            if (not team or u.team_id == team) and not u.role.is_system
+        ]
+
+    ids = [p.id for p in people]
+
+    # Target values for revenue_won and amount_collected
+    rev_kpi = db.scalar(select(Kpi).where(Kpi.code == "revenue_won"))
+    col_kpi = db.scalar(select(Kpi).where(Kpi.code == "amount_collected"))
+
+    rev_targets: dict[str, int] = {}
+    col_targets: dict[str, int] = {}
+    if rev_kpi:
+        for t in db.scalars(select(KpiTarget).where(KpiTarget.month == month, KpiTarget.kpi_id == rev_kpi.id, KpiTarget.user_id.in_(ids))):
+            if t.user_id:
+                rev_targets[t.user_id] = t.value
+    if col_kpi:
+        for t in db.scalars(select(KpiTarget).where(KpiTarget.month == month, KpiTarget.kpi_id == col_kpi.id, KpiTarget.user_id.in_(ids))):
+            if t.user_id:
+                col_targets[t.user_id] = t.value
+
+    # Actual figures
+    rev_actuals = MEASURES["deals_won_value"].count(db, ids, period, {}) if "deals_won_value" in MEASURES else {}
+    col_actuals = MEASURES["collections_amount"].count(db, ids, period, {}) if "collections_amount" in MEASURES else {}
+
+    # Activity days for NZSD (days where rep logged a visit or created a quote)
+    activity_days_by_user: dict[str, set[str]] = defaultdict(set)
+    for owner_id, v_at in db.execute(select(Visit.owner_id, Visit.visited_at).where(Visit.owner_id.in_(ids), Visit.visited_at >= period.start, Visit.visited_at < period.end)):
+        if v_at:
+            activity_days_by_user[owner_id].add(v_at.date().isoformat())
+    for owner_id, q_at in db.execute(select(Quote.owner_id, Quote.created_at).where(Quote.owner_id.in_(ids), Quote.created_at >= period.start, Quote.created_at < period.end)):
+        if q_at:
+            activity_days_by_user[owner_id].add(q_at.date().isoformat())
+
+    # Elapsed days in the month so far
+    start_d = date.fromisoformat(period.first_day)
+    end_d = min(date.fromisoformat(now_day), date.fromisoformat(period.next_first_day) - timedelta(days=1))
+    elapsed_days = max(1, (end_d - start_d).days + 1)
+    # Approximate business days (weekdays)
+    biz_days = sum(1 for i in range(elapsed_days) if (start_d + timedelta(days=i)).weekday() < 5)
+
+    scorecards = []
+    for p in people:
+        # 1. IST Quota Achievement (40 pts)
+        ist_target = rev_targets.get(p.id) or 0
+        ist_actual = rev_actuals.get(p.id, (0, None))[0]
+        if ist_target > 0:
+            ist_attainment = round((ist_actual / ist_target) * 100, 1)
+        else:
+            ist_attainment = 100.0 if ist_actual > 0 else 0.0
+
+        if ist_target > 0 and ist_attainment < 60.0:
+            ist_pts = 0.0
+            hard_floor_penalty = True
+        else:
+            ist_pts = round(min(40.0, (ist_attainment / 100.0) * 40.0), 1)
+            hard_floor_penalty = False
+
+        # 2. DSO / Collections Efficiency (20 pts)
+        col_target = col_targets.get(p.id) or 0
+        col_actual = col_actuals.get(p.id, (0, None))[0]
+        if col_target > 0:
+            col_attainment = round((col_actual / col_target) * 100, 1)
+            if col_attainment >= 95.0:
+                dso_pts = 20.0
+            elif col_attainment >= 85.0:
+                dso_pts = 15.0
+            elif col_attainment >= 75.0:
+                dso_pts = 10.0
+            else:
+                dso_pts = 0.0
+        else:
+            col_attainment = 100.0 if col_actual > 0 else None
+            dso_pts = 20.0 if col_actual > 0 else 15.0
+
+        # 3. CRR / Retention Rate (20 pts)
+        total_accounts = db.scalar(select(func.count(Company.id)).where(Company.owner_id == p.id, Company.status != "inactive")) or 0
+        visited_accounts = len({
+            cid for cid, in db.execute(
+                select(Visit.company_id).where(Visit.owner_id == p.id, Visit.visited_at >= period.start, Visit.visited_at < period.end, Visit.company_id.isnot(None))
+            )
+        })
+        if total_accounts > 0:
+            retention_rate = round(min(100.0, (visited_accounts / total_accounts) * 100), 1)
+        else:
+            retention_rate = 95.0 if visited_accounts > 0 else 85.0
+
+        if retention_rate >= 90.0:
+            crr_pts = 20.0
+        elif retention_rate >= 80.0:
+            crr_pts = 15.0
+        elif retention_rate >= 70.0:
+            crr_pts = 10.0
+        else:
+            crr_pts = 0.0
+
+        # 4. NZSD (Net Zero-Sales Days) (20 pts)
+        active_days_count = len(activity_days_by_user.get(p.id, set()))
+        zero_days = max(0, biz_days - active_days_count)
+        if zero_days <= 3:
+            nzsd_pts = 20.0
+        elif zero_days <= 5:
+            nzsd_pts = 15.0
+        elif zero_days <= 8:
+            nzsd_pts = 10.0
+        else:
+            nzsd_pts = 0.0
+
+        # Total Composite Score
+        total_score = round(ist_pts + dso_pts + crr_pts + nzsd_pts, 1)
+
+        # Performance Band & Governance
+        if hard_floor_penalty or total_score < 60.0:
+            band = "Critical Action"
+            status_tag = "critical"
+            pip_required = True
+            merit_increment = "0%"
+            action_plan = "Immediate 30-Day PIP or Escalation to Division Head"
+        elif total_score < 70.0:
+            band = "PIP Candidate"
+            status_tag = "warning"
+            pip_required = True
+            merit_increment = "0%"
+            action_plan = "Structured 30-Day PIP & Weekly One-on-One Coaching"
+        elif total_score < 85.0:
+            band = "Core Performer"
+            status_tag = "good"
+            pip_required = False
+            merit_increment = "+3% to +5%"
+            action_plan = "Standard Coaching & Target Alignment"
+        elif total_score < 95.0:
+            band = "High Performer"
+            status_tag = "good"
+            pip_required = False
+            merit_increment = "+6% to +8%"
+            action_plan = "Leadership Track & Key Account Expansion"
+        else:
+            band = "Distinguished"
+            status_tag = "excellent"
+            pip_required = False
+            merit_increment = "+10% to +15%"
+            action_plan = "President's Club & Strategic Mentorship"
+
+        scorecards.append({
+            "person": person_out(p),
+            "team": team_out(p.team),
+            "role": p.role.name,
+            "totalScore": total_score,
+            "band": band,
+            "status": status_tag,
+            "pipRequired": pip_required,
+            "hardFloorPenalty": hard_floor_penalty,
+            "meritIncrement": merit_increment,
+            "actionPlan": action_plan,
+            "breakdown": {
+                "ist": {
+                    "points": ist_pts,
+                    "maxPoints": 40.0,
+                    "targetCentavos": ist_target,
+                    "actualCentavos": ist_actual,
+                    "attainmentPct": ist_attainment,
+                    "floorPenalty": hard_floor_penalty,
+                },
+                "dso": {
+                    "points": dso_pts,
+                    "maxPoints": 20.0,
+                    "targetCentavos": col_target,
+                    "actualCentavos": col_actual,
+                    "attainmentPct": col_attainment,
+                },
+                "crr": {
+                    "points": crr_pts,
+                    "maxPoints": 20.0,
+                    "retentionRatePct": retention_rate,
+                    "visitedAccounts": visited_accounts,
+                    "totalAccounts": total_accounts,
+                },
+                "nzsd": {
+                    "points": nzsd_pts,
+                    "maxPoints": 20.0,
+                    "zeroDays": zero_days,
+                    "activeDays": active_days_count,
+                    "businessDays": biz_days,
+                },
+            },
+        })
+
+    avg_score = round(sum(s["totalScore"] for s in scorecards) / len(scorecards), 1) if scorecards else 0.0
+    pip_count = sum(1 for s in scorecards if s["pipRequired"])
+
+    return {
+        "month": month,
+        "elapsed": round(elapsed, 3),
+        "totalPeople": len(scorecards),
+        "averageScore": avg_score,
+        "pipCount": pip_count,
+        "scorecards": scorecards,
     }

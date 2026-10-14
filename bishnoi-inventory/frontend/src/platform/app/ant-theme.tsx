@@ -41,10 +41,10 @@ export const ANT_THEME = {
     controlItemBgActiveHover: "#e3eedf",
     controlItemBgHover: "#f4f4f2",
     controlOutline: "rgba(127, 176, 112, 0.35)",
-    borderRadius: 20,
-    borderRadiusLG: 22,
-    borderRadiusSM: 12,
-    borderRadiusXS: 8,
+    borderRadius: 8,
+    borderRadiusLG: 10,
+    borderRadiusSM: 6,
+    borderRadiusXS: 4,
     controlHeight: 36,
     controlHeightSM: 28,
     controlHeightLG: 44,
@@ -53,23 +53,23 @@ export const ANT_THEME = {
   },
   components: {
     Button: { primaryShadow: "none", defaultShadow: "none", dangerShadow: "none", defaultBorderColor: INK, defaultHoverBg: MINT, defaultHoverBorderColor: INK, defaultHoverColor: INK, fontWeight: 500 },
-    // Text sits clear of the rounded ends: more room at the sides than a square field needs.
-    Input: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, paddingInline: 16, paddingInlineLG: 18, paddingInlineSM: 12, paddingBlock: 6 },
+    // Text sits clear of the edges: room at the sides.
+    Input: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, paddingInline: 14, paddingInlineLG: 16, paddingInlineSM: 10, paddingBlock: 6 },
     InputNumber: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK },
     Select: { activeOutlineColor: "rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, optionSelectedBg: MINT, optionSelectedColor: INK, optionActiveBg: "#f4f4f2", optionSelectedFontWeight: 500 },
     DatePicker: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, cellActiveWithRangeBg: MINT },
     // The selected filter is ink, as on the components page.
-    Segmented: { itemSelectedBg: INK, itemSelectedColor: "#ffffff", trackBg: "#ffffff", trackPadding: 3, borderRadius: 999, borderRadiusSM: 999 },
+    Segmented: { itemSelectedBg: INK, itemSelectedColor: "#ffffff", trackBg: "#ffffff", trackPadding: 3, borderRadius: 8, borderRadiusSM: 6 },
     Tabs: { inkBarColor: INK, itemSelectedColor: INK, itemHoverColor: INK, itemActiveColor: INK },
     Table: { headerBg: "#fbfbfa", headerColor: "#6a6a6a", rowHoverBg: MINT, rowSelectedBg: MINT, rowSelectedHoverBg: "#e8f2e3", borderColor: "#ececea" },
-    Card: { borderRadiusLG: 22 },
-    // Dialogs: a large title, a round close button, room around the fields (the rest in app/globals.css).
-    Modal: { borderRadiusLG: 28, titleFontSize: 22, titleLineHeight: 1.3, modalCloseBtnSize: 36 },
-    Tag: { borderRadiusSM: 999, defaultBg: "#f0f0ee" },
-    Menu: { itemSelectedBg: MINT, itemSelectedColor: INK, itemBorderRadius: 999 },
+    Card: { borderRadiusLG: 10 },
+    // Dialogs: a large title, close button, room around the fields (the rest in app/globals.css).
+    Modal: { borderRadiusLG: 12, titleFontSize: 22, titleLineHeight: 1.3, modalCloseBtnSize: 36 },
+    Tag: { borderRadiusSM: 6, defaultBg: "#f0f0ee" },
+    Menu: { itemSelectedBg: MINT, itemSelectedColor: INK, itemBorderRadius: 6 },
     Progress: { defaultColor: SAGE, remainingColor: "#e3eedf" },
     Switch: { colorPrimary: INK, colorPrimaryHover: "#2b2b2b" },
-    Checkbox: { colorPrimary: INK, colorPrimaryHover: "#2b2b2b", borderRadiusSM: 6 },
+    Checkbox: { colorPrimary: INK, colorPrimaryHover: "#2b2b2b", borderRadiusSM: 4 },
     Radio: { colorPrimary: INK },
   },
 };

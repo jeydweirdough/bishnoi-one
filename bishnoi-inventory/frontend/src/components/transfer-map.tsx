@@ -142,7 +142,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
   }
 
   return (
-    <div className="grid h-[calc(100dvh-14rem)] min-h-[34rem] overflow-hidden rounded-[22px] border border-rule bg-sheet lg:grid-cols-[23rem_minmax(0,1fr)]">
+    <div className="grid h-[calc(100dvh-14rem)] min-h-[34rem] overflow-hidden rounded-xl border border-rule bg-sheet lg:grid-cols-[23rem_minmax(0,1fr)]">
       <aside className="flex min-h-0 flex-col border-b border-rule lg:border-r lg:border-b-0">
         <div className="px-5 pt-5">
           <h2 className="text-xl font-semibold text-ink">Map</h2>
@@ -175,7 +175,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search transfers"
-                  className="block h-9 w-full rounded-full border border-control bg-sheet pr-3 pl-10 text-sm text-ink placeholder:text-ink-3/80 hover:border-ink-3 focus:border-ink focus:outline-none"
+                  className="block h-9 w-full rounded-lg border border-control bg-sheet pr-3 pl-10 text-sm text-ink placeholder:text-ink-3/80 hover:border-ink-3 focus:border-ink focus:outline-none"
                 />
               </label>
               <Combobox
@@ -201,7 +201,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                     type="button"
                     onClick={() => setPicked(t.id)}
                     aria-pressed={on}
-                    className={`block w-full rounded-[18px] border bg-sheet px-4 py-3 text-left transition-colors ${on ? "border-sage-deep shadow-[0_0_0_1px_var(--color-sage-deep)]" : "border-rule hover:border-rule-strong"}`}
+                    className={`block w-full rounded-lg border bg-sheet px-4 py-3 text-left transition-colors ${on ? "border-sage-deep shadow-[0_0_0_1px_var(--color-sage-deep)]" : "border-rule hover:border-rule-strong"}`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2">
@@ -242,7 +242,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
 
           {tab === "warehouses" &&
             warehouses.map((w) => (
-              <div key={w.id} className="rounded-[18px] border border-rule px-4 py-3">
+              <div key={w.id} className="rounded-lg border border-rule px-4 py-3">
                 <p className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-ink">{w.name}</span>
                   <span className="text-meta font-semibold text-ink-3">{w.code}</span>
@@ -272,7 +272,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
         <div ref={box} className="absolute inset-0 bg-bench [&_.leaflet-tile-pane]:[filter:grayscale(1)_brightness(1.06)_contrast(0.92)]" role="img" aria-label="Transfers between warehouses on a map" />
         <div className="pointer-events-none absolute inset-x-4 top-4 z-[500] flex items-start justify-between gap-3">
           {chosen ? (
-            <div className="pointer-events-auto w-72 rounded-[18px] border border-rule bg-sheet p-4 shadow-overlay">
+            <div className="pointer-events-auto w-72 rounded-lg border border-rule bg-sheet p-4 shadow-overlay">
               <p className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-ink">{chosen.number}</span>
                 <TransferStamp status={chosen.status} />
@@ -284,7 +284,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                 {chosen.units.toLocaleString()} units · {chosen.lineCount} line{chosen.lineCount === 1 ? "" : "s"} · {chosen.sinceLong}
               </p>
               {(!chosen.fromPin || !chosen.toPin) && <p className="mt-2 text-meta text-danger">A warehouse here isn&apos;t on the map yet, so the route isn&apos;t drawn.</p>}
-              <Link href={`/transfers/${chosen.id}`} className="mt-3 flex h-9 items-center justify-center gap-1.5 rounded-full border border-ink text-sm font-medium text-ink hover:bg-hema-tint">
+              <Link href={`/transfers/${chosen.id}`} className="mt-3 flex h-9 items-center justify-center gap-1.5 rounded-lg border border-ink text-sm font-medium text-ink hover:bg-hema-tint">
                 Open transfer
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
@@ -295,14 +295,14 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
           <button
             type="button"
             onClick={() => startRefresh(() => router.refresh())}
-            className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-full border border-rule bg-sheet px-4 text-sm text-ink shadow-overlay hover:bg-hema-tint"
+            className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-lg border border-rule bg-sheet px-4 text-sm text-ink shadow-overlay hover:bg-hema-tint"
           >
             <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
             Refresh
           </button>
         </div>
         {unpinned.length > 0 && (
-          <div className="absolute bottom-4 left-4 z-[500] max-w-sm rounded-[14px] border border-rule bg-sheet px-4 py-2.5 text-meta text-ink-2 shadow-overlay">
+          <div className="absolute bottom-4 left-4 z-[500] max-w-sm rounded-lg border border-rule bg-sheet px-4 py-2.5 text-meta text-ink-2 shadow-overlay">
             {unpinned.map((w) => w.name).join(", ")} {unpinned.length === 1 ? "isn't" : "aren't"} on the map yet.{" "}
             <button type="button" onClick={() => setTab("warehouses")} className="font-semibold text-ink underline">
               Place {unpinned.length === 1 ? "it" : "them"}

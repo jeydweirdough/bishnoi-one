@@ -36,7 +36,7 @@ export function Timeline({
         const kind = listName(kinds, a.kind);
         return (
           <li key={a.id} className={`flex gap-3 py-3.5 ${isPending(a.id) ? "animate-reshape opacity-60" : ""}`}>
-            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-bench text-ink-2">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-bench text-ink-2">
               {/* A switched-off kind is no longer on the list, so its code stands in for the picture too. */}
               <Icon name={listIcon(kinds.find((k) => k.code === a.kind) ?? { code: a.kind, icon: null })} />
             </span>

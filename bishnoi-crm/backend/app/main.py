@@ -16,7 +16,7 @@ from app.first_admin import make_first_admin
 from app.inventory import srp_type
 from app.tenants import HEADER, Tenants, clean
 from app import graphql_api
-from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, exports, field, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, connections, attention, media, associations, mailbox
+from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, exports, field, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, integration_prices, connections, attention, media, associations, mailbox
 from app.routers import settings as settings_router
 from app.routers import quote_links, sharing
 from app.guard import install as install_guard
@@ -127,4 +127,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sharing.router)
     app.include_router(quote_links.router)
     app.include_router(integration.router)
+    app.include_router(integration_prices.router)
     return app

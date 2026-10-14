@@ -24,7 +24,7 @@ export type DealInput = {
   leadSource?: string | null;
   priority?: DealPriority | null;
   priceType: string | null;
-  lines: { productId: string; quantity: number }[];
+  lines: { productId: string; quantity: number; promoId?: string | null }[];
   notes: string | null;
   ownerId: string | null;
 };

@@ -306,16 +306,31 @@ def linked(db: Session, access: Access, company_id: str | None, contact_id: str 
 class LineIn(Api):
     product_id: str = Field(min_length=1, max_length=36)
     quantity: int = Field(ge=1, le=100_000)
+    # The promo it's sold under, from the customer's price list; it goes on to the quote.
+    promo_id: str | None = Field(None, max_length=36)
 
 
-def priced(db: Session, settings: Settings, company: Company, price_type: str | None, lines: list[LineIn]) -> tuple[list[dict], int]:
-    """The products on a deal, priced by the price rules for this customer (no tax)."""
+def priced(
+    db: Session, settings: Settings, company: Company, price_type: str | None, lines: list[LineIn], *, kept_promos: bool = False
+) -> tuple[list[dict], int]:
+    """The products on a deal, priced by the price rules for this customer (no tax).
+
+    kept_promos: the lines are the deal's own, re-priced (a new price type): a
+    promo that has ended since, or that the price rules no longer take, is
+    let go rather than stopping the change."""
     if not lines:
         return [], 0
     if not price_type:
         raise field_error("priceType", "Pick the price the products are valued at.")
     book = book_for(db, company, None, today(settings.org_timezone))
-    result = price_lines(book, price_type, False, [{"productId": l.product_id, "quantity": l.quantity} for l in lines])
+    takes = "promo" in book.procedure.get("adjust", [])
+
+    def promo_of(l: LineIn) -> str | None:
+        if not l.promo_id or (kept_promos and (not takes or l.promo_id not in book.promos)):
+            return None
+        return l.promo_id
+
+    result = price_lines(book, price_type, False, [{"productId": l.product_id, "quantity": l.quantity, "promoId": promo_of(l)} for l in lines])
     kept = [
         {
             "productId": l["productId"],
@@ -323,7 +338,12 @@ def priced(db: Session, settings: Settings, company: Company, price_type: str | 
             "productName": l["productName"],
             "unit": l["unit"],
             "quantity": l["quantity"],
+            "freeQuantity": l["freeQuantity"],
             "unitPriceCentavos": l["unitPriceCentavos"],
+            "grossCentavos": l["grossCentavos"],
+            "promoId": l["promoId"],
+            "promoName": l["promoName"],
+            "promoDiscountCentavos": l["promoDiscountCentavos"],
             "totalCentavos": l["totalCentavos"],
         }
         for l in result["lines"]
@@ -581,9 +601,10 @@ def update_deal(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, de
     if "lead_source" in wanted:
         check_source(db, wanted["lead_source"])
     if "lines" in wanted or "price_type" in wanted:
-        lines_in = body.lines if "lines" in wanted else [LineIn(product_id=l["productId"], quantity=l["quantity"]) for l in deal.lines]
+        kept = "lines" not in wanted
+        lines_in = body.lines if not kept else [LineIn(product_id=l["productId"], quantity=l["quantity"], promo_id=l.get("promoId")) for l in deal.lines]
         price_type = wanted.get("price_type", deal.price_type)
-        lines, value = priced(db, settings, deal.company, price_type, lines_in or [])
+        lines, value = priced(db, settings, deal.company, price_type, lines_in or [], kept_promos=kept)
         wanted["lines"], wanted["price_type"] = lines, (price_type if lines else None)
         if lines:
             wanted["value_centavos"] = value

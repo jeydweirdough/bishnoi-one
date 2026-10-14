@@ -37,7 +37,7 @@ def _post(settings: Settings, path: str, body: dict) -> dict:
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise TaxUnavailable("Finance refused the CRM's key: check FINANCE_API_KEY here and INTEGRATION_KEYS there.") from e
+            raise TaxUnavailable("Unable to calculate tax: Finance service connection could not be verified. Please contact your system administrator.") from e
         detail = ""
         try:
             detail = json.loads(e.read()).get("detail", "")

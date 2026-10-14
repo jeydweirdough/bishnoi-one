@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     backup_from: str | None = None
     # Where uploaded files (guarantee letters) are kept.
     files_dir: Path = DATA_DIR / "files"
+    # S3-compatible storage (Neon's) for uploaded files: an order link's
+    # prescriptions, guarantee letters and documents go straight there from
+    # the customer's browser (app/storage.py). Unset: they're kept in the database.
+    aws_endpoint_url_s3: str | None = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: SecretStr | None = None
+    aws_region: str = "ap-southeast-1"
+    s3_bucket: str = "assets"
+    # Where the screens run, allowed to upload into the bucket from the browser.
+    s3_browser_origins: list[str] = ["http://localhost:4302", "http://127.0.0.1:4302"]
     # The first administrator, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + a database it
     # can reach and you can't). Once they exist these are ignored; remove the

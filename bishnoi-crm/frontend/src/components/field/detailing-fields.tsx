@@ -59,7 +59,7 @@ export function DetailingFields({
   return (
     <div className="space-y-3">
       {shownBrief?.lastObjective && (
-        <p className="rounded-[14px] border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
+        <p className="rounded-lg border-l-4 border-hema bg-hema-tint px-3 py-2 text-sm">
           <span className="font-semibold">Last visit&apos;s objective:</span> {shownBrief.lastObjective.text}
         </p>
       )}
@@ -68,7 +68,7 @@ export function DetailingFields({
           Products discussed <span className="font-normal text-ink-3">(optional, in the order you discussed them)</span>
         </legend>
         {rows.map((r, i) => (
-          <div key={r.key} className="rounded-[14px] border border-rule p-2.5">
+          <div key={r.key} className="rounded-lg border border-rule p-2.5">
             <div className="flex items-start gap-2">
               <span className="pt-2 text-meta font-semibold text-ink-3 tabular-nums">{i + 1}.</span>
               <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">

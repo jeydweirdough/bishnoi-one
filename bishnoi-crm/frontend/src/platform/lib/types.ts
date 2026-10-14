@@ -404,11 +404,12 @@ export type PromoTerms = {
   freeQty: number | null;
   tiers: PromoTier[];
   productIds: string[] | null; // null: every product
+  /** Its last day (YYYY-MM-DD), for the tag's "3 days left". null: no end set. */
+  endsOn: string | null;
 };
 
 export type Promo = PromoTerms & {
   startsOn: string;
-  endsOn: string | null;
   divisionCodes: string[];
   isActive: boolean;
   state: "running" | "upcoming" | "ended" | "off";
@@ -485,10 +486,10 @@ export type PriceList = {
   products: Omit<Product, "isActive" | "updatedAt">[];
   promos: PromoTerms[];
   /** Picked instead of a product, not on top of one. */
-  bundles: Pick<Bundle, "id" | "code" | "name" | "priceCentavos" | "asOneLine" | "items">[];
+  bundles: Pick<Bundle, "id" | "code" | "name" | "priceCentavos" | "asOneLine" | "items" | "endsOn">[];
 };
 
-export type ApprovalReason = "price" | "discount" | "asked";
+export type ApprovalReason = "price" | "discount" | "asked" | "margin" | "s2_license";
 
 export type QuoteLine = {
   productId: string;
@@ -564,6 +565,8 @@ export type Quote = {
   rx: boolean;
   /** Attached by the customer on an order link, for Rx medicines: opened at /quotes/{id}/prescriptions/{n}. */
   prescriptions?: { n: number; name: string; contentType: string; size: number }[];
+  /** Other documents the order link asked for (a valid ID...): opened at /quotes/{id}/documents/{n}. */
+  documents?: { n: number; label: string | null; name: string; contentType: string; size: number }[];
   payer: string;
   payerName: string | null;
   notes: string | null;
@@ -1213,6 +1216,12 @@ export type DealLine = {
   quantity: number;
   unitPriceCentavos: number;
   totalCentavos: number;
+  /** The promo it's sold under, and what it takes off (since 14 October 2026; older lines have none). */
+  promoId?: string | null;
+  promoName?: string | null;
+  promoDiscountCentavos?: number;
+  freeQuantity?: number;
+  grossCentavos?: number;
 };
 
 export type DealRow = {

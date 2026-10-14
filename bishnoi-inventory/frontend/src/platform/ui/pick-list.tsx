@@ -71,7 +71,7 @@ export function PickList({
                         type="button"
                         onClick={() => onSelect(i.key)}
                         aria-pressed={on}
-                        className={`w-full rounded-[14px] px-3 py-2 text-left ${on ? "bg-hema-tint" : "hover:bg-bench/60"}`}
+                        className={`w-full rounded-lg px-3 py-2 text-left ${on ? "bg-hema-tint" : "hover:bg-bench/60"}`}
                       >
                         <span className={`block text-sm ${on ? "font-semibold text-ink" : "text-ink"}`}>
                           {i.label}
@@ -108,7 +108,7 @@ export function SaveBar({
   saveLabel?: string;
 }) {
   return (
-    <div className="sticky bottom-3 z-10 mt-4 animate-rise space-y-2 rounded-[14px] bg-sheet px-4 py-3 shadow-overlay">
+    <div className="sticky bottom-3 z-10 mt-4 animate-rise space-y-2 rounded-lg bg-sheet px-4 py-3 shadow-overlay">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm">{what}</span>
         <span className="flex gap-2">

@@ -58,12 +58,12 @@ export function ActivityCalendar({ items, month, today, timeZone, showOwner }: {
     return (
       <li key={a.id} title={label} className={a.meetingLink && !a.isDone ? "flex items-center gap-1" : undefined}>
         {a.meetingLink && !a.isDone && (
-          <a href={a.meetingLink} target="_blank" rel="noopener noreferrer" aria-label={`Join: ${a.subject}`} className="order-last shrink-0 rounded-full bg-ink px-1.5 py-0.5 text-[0.6875rem] font-medium text-white hover:bg-hema-hover">
+          <a href={a.meetingLink} target="_blank" rel="noopener noreferrer" aria-label={`Join: ${a.subject}`} className="order-last shrink-0 rounded-md bg-ink px-1.5 py-0.5 text-[0.6875rem] font-medium text-white hover:bg-hema-hover">
             Join
           </a>
         )}
         {customer.href ? (
-          <Link href={customer.href} aria-label={label} className={`flex items-center gap-1 rounded-full px-1 py-0.5 text-[0.75rem] leading-tight hover:bg-bench ${tone}`}>
+          <Link href={customer.href} aria-label={label} className={`flex items-center gap-1 rounded-md px-1 py-0.5 text-[0.75rem] leading-tight hover:bg-bench ${tone}`}>
             {body}
           </Link>
         ) : (

@@ -111,7 +111,7 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
         )}
         {/* Sent from their own email app: the screenshot it was logged with. */}
         {a.hasProof && (
-          <a href={`/activities/${a.id}/proof`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint">
+          <a href={`/activities/${a.id}/proof`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint">
             <Icon name="email" className="size-3.5" />
             See the screenshot
           </a>

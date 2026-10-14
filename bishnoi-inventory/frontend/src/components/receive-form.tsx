@@ -14,7 +14,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; orderLineId: string | null; quantity: string; cost: string; batchNo: string; manufacturedOn: string; expiresOn: string; serials: string; outstanding: number | null };
 
-const cell = "h-8 rounded-full border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
 
 /**
  * Taking a delivery in. Against a purchase order, its outstanding lines are
@@ -23,7 +23,7 @@ const cell = "h-8 rounded-full border border-rule-strong bg-sheet px-2 text-sm h
  */
 export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses">; order?: PO; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   // Added from here ("+ New …"), listed until the page's own lists have them.
   const [added, setAdded] = useState<Added[]>([]);
   const remember = (a: Added) => setAdded((list) => [...list, a]);
@@ -85,7 +85,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-4">
           {!order && (
@@ -173,7 +173,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                           <X className="size-4" aria-hidden />
                         </button>
                       )}

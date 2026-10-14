@@ -6,19 +6,27 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, TextButton } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
 import { FieldRow } from "@/src/platform/ui/dialog";
-import { FileDrop } from "@/src/platform/ui/file-drop";
-import { addressAt, placeOrder, type NewCustomer, type Placed } from "../../actions/quote-links";
+import { addressAt, placeOrder, type LinkAsks, type NewCustomer, type Placed } from "../../actions/quote-links";
 import { MedicineSearch, type Medicine } from "./medicine-search";
-
-// What a request may carry (Next's server actions, and Vercel): the prescription's pages together.
-const MAX_RX_BYTES = 4 * 1024 * 1024;
+import { WhatToSend, whatsMissing, type Letter, type Sent } from "./order-attachments";
 
 /**
  * The customer's side of an order link: first the privacy notice (what an
  * order shares, and why), then pick and send, then what happens next. No
  * prices here: they come in the quotation letter, after the order is sent.
  */
-export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho = false }: { company: string; orgName: string; token: string; medicines: Medicine[]; rep: string; asksWho?: boolean }) {
+export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho = false, asks, uploads }: {
+  company: string;
+  orgName: string;
+  token: string;
+  medicines: Medicine[];
+  rep: string;
+  asksWho?: boolean;
+  /** What the rep's link asks the customer to send. */
+  asks: LinkAsks;
+  /** Files straight to storage, or with the order (no storage on this server). */
+  uploads: "direct" | "with-order";
+}) {
   const [agreed, setAgreed] = useState(false);
   const [placed, setPlaced] = useState<Placed | null>(null);
   const [who, setWho] = useState<NewCustomer>({ name: "", contactName: null, mobile: null, email: null, address: null, city: null, latitude: null, longitude: null });
@@ -27,19 +35,14 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
   const [filledFrom, setFilledFrom] = useState<"location" | "nothing" | null>(null);
   const [pickedIds, setPickedIds] = useState<string[]>([]);
   const onPick = useCallback((ids: string[]) => setPickedIds(ids), []);
-  // The prescription, a page per file (up to 3): photos or a PDF, under 4 MB all together.
-  const [pages, setPages] = useState<(File | null)[]>([null]);
+  // What the link asks them to send: files by slot ("prescription-0", "letter-0", "document-1"), and the letter's details.
+  const [sent, setSent] = useState<Record<string, Sent>>({});
+  const [letter, setLetter] = useState<Letter>({ number: "", issuedOn: "", amount: "" });
   const rxNames = medicines.filter((m) => m.rx && pickedIds.includes(m.id)).map((m) => m.name);
-  const rxFiles = pages.filter((f): f is File => f !== null);
-  const rxBytes = rxFiles.reduce((n, f) => n + f.size, 0);
   const set = (k: keyof NewCustomer) => (e: { target: { value: string } }) => setWho((w) => ({ ...w, [k]: e.target.value || null }));
   const first = rep.split(" ")[0];
   // Someone not a customer yet: who they are, a way to reach them, and where to deliver.
-  const missing = rxNames.length > 0 && rxFiles.length === 0
-    ? `Attach the prescription for ${rxNames.join(", ")}.`
-    : rxBytes > MAX_RX_BYTES
-      ? "The prescription's files are over 4 MB together. Take the photos again at a lower size."
-      : !asksWho
+  const missing = whatsMissing(asks, rxNames, sent, letter, uploads) ?? (!asksWho
     ? null
     : who.name.trim().length < 2
       ? "Fill in your name, or your business's."
@@ -47,7 +50,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
         ? `Give a mobile number or an email, so ${first} can reach you.`
         : !(who.address?.trim() && who.city?.trim())
           ? "Give the delivery address and city."
-          : null;
+          : null);
 
   /** The browser asks the person first; nothing is taken unless they say yes. */
   function locate() {
@@ -93,7 +96,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
   return (
     <>
       {/* Floating over the order until they agree: what they'll fill in is in view, and out of reach. */}
-      <PrivacyNotice open={!agreed} orgName={orgName} rep={rep} asksWho={asksWho} onAgree={() => setAgreed(true)} />
+      <PrivacyNotice open={!agreed} orgName={orgName} rep={rep} asksWho={asksWho} asks={asks} onAgree={() => setAgreed(true)} />
       <div inert={!agreed} aria-hidden={!agreed} className={agreed ? "" : "pointer-events-none select-none"}>
         <MedicineSearch
           medicines={medicines}
@@ -102,35 +105,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
           showPrices={false}
           missing={missing}
           onPick={onPick}
-          extra={
-            rxNames.length > 0 && (
-              <section aria-labelledby="rx" className="mt-4 rounded-[14px] border border-danger/30 bg-danger-tint/40 p-3">
-                <h3 id="rx" className="text-sm font-semibold text-ink">
-                  Prescription
-                </h3>
-                <p className="mt-0.5 text-meta text-ink-2">
-                  {rxNames.join(", ")} {rxNames.length === 1 ? "needs" : "need"} a doctor&apos;s prescription. Attach a clear photo of it (each page), or a PDF. A pharmacist checks it before your order is prepared.
-                </p>
-                <div className="mt-2 space-y-2">
-                  {pages.map((_, i) => (
-                    <FileDrop
-                      key={i}
-                      accept="image/jpeg,image/png,application/pdf"
-                      note={pages.length > 1 ? `Page ${i + 1}: JPG, PNG or PDF` : "JPG, PNG or PDF, up to 4 MB in all"}
-                      maxBytes={MAX_RX_BYTES}
-                      onFile={(f) => setPages((all) => all.map((x, j) => (j === i ? f : x)))}
-                      aria-label={`Prescription, page ${i + 1}`}
-                    />
-                  ))}
-                </div>
-                {pages.length < 3 && pages[pages.length - 1] !== null && (
-                  <TextButton className="mt-2" onClick={() => setPages((all) => [...all, null])}>
-                    Add another page
-                  </TextButton>
-                )}
-              </section>
-            )
-          }
+          extra={<WhatToSend asks={asks} rxNames={rxNames} mode={uploads} company={company} token={token} sent={sent} setSent={setSent} letter={letter} setLetter={setLetter} />}
           before={
             asksWho && (
               <div>
@@ -158,7 +133,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
                     </label>
                   </FieldRow>
                   {/* Optional: a pin helps the delivery find the place, and fills in the address. Asked by the browser, never taken quietly. */}
-                  <div className="rounded-[14px] bg-bench px-3 py-2.5">
+                  <div className="rounded-lg bg-bench px-3 py-2.5">
                     {who.latitude !== null && locating !== "finding" ? (
                       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-2">
                         <LocateFixed className="size-4 text-sage-deep" aria-hidden />
@@ -194,9 +169,22 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
           }
           onSubmit={async (lines, note) => {
             if (!agreed) return "Agree to the privacy notice first.";
+            const files = Object.values(sent).sort((a, b) => a.kind.localeCompare(b.kind) || a.index - b.index);
             const form = new FormData();
-            form.set("order", JSON.stringify({ lines, note, customer: asksWho ? { ...who, name: who.name.trim() } : null, privacyAccepted: true }));
-            if (rxNames.length > 0) for (const f of rxFiles) form.append("prescription", f, f.name);
+            form.set(
+              "order",
+              JSON.stringify({
+                lines,
+                note,
+                customer: asksWho ? { ...who, name: who.name.trim() } : null,
+                privacyAccepted: true,
+                // Uploaded straight to storage: what each is, and where it went.
+                files: files.filter((f) => f.key).map((f) => ({ kind: f.kind, index: f.index, key: f.key, name: f.name })),
+                letter: asks.payer ? { number: letter.number.trim(), issuedOn: letter.issuedOn, amountCentavos: Math.round(Number(letter.amount) * 100) } : null,
+              }),
+            );
+            // No storage on this server: the files themselves, with the order.
+            for (const f of files.filter((x) => x.file)) form.append(f.kind === "letter" ? "letter_file" : f.kind, f.file!, f.name);
             const r = await placeOrder(company, token, form);
             if (!r.ok) return r.error;
             setPlaced(r.data);
@@ -214,7 +202,9 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
  * A medicine order is health information, sensitive personal information under
  * the Act, so it's asked for every order, and only with a yes.
  */
-function PrivacyNotice({ open, orgName, rep, asksWho, onAgree }: { open: boolean; orgName: string; rep: string; asksWho: boolean; onAgree: () => void }) {
+function PrivacyNotice({ open, orgName, rep, asksWho, asks, onAgree }: { open: boolean; orgName: string; rep: string; asksWho: boolean; asks: LinkAsks; onAgree: () => void }) {
+  // What this link asks for, said in the notice too: a prescription is health information, an ID is personal.
+  const papers = ["your prescription, if a medicine needs one" + (asks.prescriptionAlways ? " (asked with every order)" : ""), asks.payer ? `the ${asks.payer.name} guarantee letter` : "", ...asks.documents.map((d) => `your ${d}`)].filter(Boolean);
   const [ticked, setTicked] = useState(false);
   // Opened once the page is live in the browser: the dialog lives in a layer the server doesn't draw.
   const [live, setLive] = useState(false);
@@ -232,7 +222,7 @@ function PrivacyNotice({ open, orgName, rep, asksWho, onAgree }: { open: boolean
       aria-labelledby="privacy"
       styles={{ mask: { backdropFilter: "blur(3px)" }, body: { maxHeight: "min(70dvh, 46rem)", overflowY: "auto" } }}
     >
-      <span className="grid size-11 place-items-center rounded-full bg-hema-tint text-sage-deep">
+      <span className="grid size-11 place-items-center rounded-lg bg-hema-tint text-sage-deep">
         <ShieldCheck className="size-5" aria-hidden />
       </span>
       <h2 id="privacy" className="mt-4 text-heading text-ink">
@@ -245,7 +235,8 @@ function PrivacyNotice({ open, orgName, rep, asksWho, onAgree }: { open: boolean
         <div>
           <dt className="font-semibold text-ink">What we collect</dt>
           <dd className="text-ink-2">
-            The medicines and quantities you order{asksWho ? ", your name or your business's, a contact person, your mobile number or email, your delivery address and, only if you choose to share it, your location" : ""}.
+            The medicines and quantities you order, {papers.join(", ")}
+            {asksWho ? ", your name or your business's, a contact person, your mobile number or email, your delivery address and, only if you choose to share it, your location" : ""}. Files are kept privately and seen only by those below.
           </dd>
         </div>
         <div>
@@ -269,7 +260,7 @@ function PrivacyNotice({ open, orgName, rep, asksWho, onAgree }: { open: boolean
           </dd>
         </div>
       </dl>
-      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-[14px] border border-rule px-4 py-3 has-[:checked]:border-sage has-[:checked]:bg-mint">
+      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-lg border border-rule px-4 py-3 has-[:checked]:border-sage has-[:checked]:bg-mint">
         <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
         <span className="text-sm text-ink">I have read this, and I agree to {orgName} using my information for my order, as described.</span>
       </label>

@@ -150,7 +150,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
             made = json.loads(response.read() or b"{}")
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise OrdersUnavailable("Bishnoi One Order refused the CRM's key: check ORDERS_API_KEY.") from e
+            raise OrdersUnavailable("Order service connection could not be authenticated. Please contact your system administrator.") from e
         detail = ""
         try:
             detail = json.loads(e.read() or b"{}").get("detail") or ""

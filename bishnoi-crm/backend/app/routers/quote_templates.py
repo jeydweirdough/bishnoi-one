@@ -40,6 +40,7 @@ from app.quote_templates import (
     sheet_of,
     stored,
 )
+from app.quote_code import FIELDS, MAX_HTML, STARTER, render, sample_doc
 from app.routers.quotes import get_quote
 
 router = APIRouter(tags=["quote templates"])
@@ -128,11 +129,13 @@ class DesignIn(Api):
     signatory_name: str | None = Field(None, max_length=120)
     signatory_title: str | None = Field(None, max_length=120)
     signatory_contact: str | None = Field(None, max_length=120)
+    # A "code" template's own HTML, with %fields% (app/quote_code.py).
+    html: str | None = Field(None, max_length=MAX_HTML)
 
 
 class TemplateIn(Api):
     name: str | None = Field(None, min_length=2, max_length=120)
-    kind: Literal["form", "excel"] | None = None
+    kind: Literal["form", "excel", "code"] | None = None
     payer: str | None = Field(None, max_length=40)
     team_id: str | None = None
     is_active: bool | None = None
@@ -312,7 +315,7 @@ def fitting(db: Session, quote: Quote) -> list[QuoteTemplate]:
     """Active templates for this quote's payer and team, the most specific first."""
     rows = db.scalars(select(QuoteTemplate).where(QuoteTemplate.is_active)).all()
     fits = [t for t in rows if t.payer in (None, quote.payer) and t.team_id in (None, quote.team_id)]
-    fits = [t for t in fits if t.kind == "form" or t.excel_ref]
+    fits = [t for t in fits if t.kind == "form" or (t.kind == "excel" and t.excel_ref) or (t.kind == "code" and (t.design or {}).get("html"))]
     return sorted(fits, key=lambda t: (t.payer is None, t.team_id is None, t.name.lower()))
 
 
@@ -338,7 +341,45 @@ def chosen(db: Session, quote: Quote, template_id: str | None) -> QuoteTemplate:
 def quote_document(access: View, db: DB, settings: SettingsDep, quote_id: str, template: str | None = Query(None)) -> dict[str, Any]:
     quote = get_quote(db, access, quote_id)
     t = chosen(db, quote, template)
-    return {"template": template_out(db, t), **document(db, quote, t, settings)}
+    doc = document(db, quote, t, settings)
+    # Written as code: the page itself, filled in and cleaned, to print as it is.
+    return {"template": template_out(db, t), **doc, **({"html": code_html(db, t, doc)} if t.kind == "code" else {})}
+
+
+def code_html(db: Session, t: QuoteTemplate, doc: dict, source: str | None = None) -> str:
+    logo, sign = stored(db, t.logo_ref), stored(db, t.signature_ref)
+    return render(source if source is not None else (t.design or {}).get("html") or "", doc, logo.data if logo else None, logo.content_type if logo else None, sign.data if sign else None, sign.content_type if sign else None)
+
+
+@router.get("/admin/quote-template-fields")
+def code_fields(access: Manage) -> dict:
+    """The fields a template written as code can use, by group; and a layout to start from."""
+    groups: dict[str, list[dict]] = {}
+    for group, field, label in FIELDS:
+        groups.setdefault(group, []).append({"field": f"%{field}%", "label": label})
+    return {"groups": [{"name": g, "fields": f} for g, f in groups.items()], "loop": ["%lines_start%", "%lines_end%"], "starter": STARTER}
+
+
+class PreviewIn(Api):
+    html: str = Field(max_length=MAX_HTML)
+
+
+@router.post("/admin/quote-templates/{template_id}/preview")
+def preview_code(access: Manage, db: DB, settings: SettingsDep, template_id: str, body: PreviewIn) -> dict:
+    """The code as it would print, before it's saved: with this template's most recent
+    quote (no control number is used up), or made-up values when there's none yet."""
+    t = get_template(db, template_id, access)
+    query = select(Quote).order_by(Quote.created_at.desc()).limit(1)
+    if t.payer:
+        query = query.where(Quote.payer == t.payer)
+    if t.team_id:
+        query = query.where(Quote.team_id == t.team_id)
+    quote = db.scalar(query)
+    if quote is not None:
+        doc, using = document(db, quote, t, settings, preview=True), f"Quote {quote.number}, {quote.customer_name}"
+    else:
+        doc, using = sample_doc({**DESIGN_DEFAULTS, **(t.design or {})}, settings.org_name), "Made-up values: there's no quote for this template yet"
+    return {"html": code_html(db, t, doc, body.html), "using": using}
 
 
 @router.get("/quotes/{quote_id}/document.xlsx")

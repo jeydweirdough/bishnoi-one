@@ -278,7 +278,7 @@ function Permissions({ catalogue, granted, locked, onChange }: { catalogue: Perm
                   {area.actions.map((a) => {
                     const on = has.has(a.permission);
                     return (
-                      <label key={a.permission} className={`relative inline-flex items-center rounded-full border px-3 py-1 text-meta has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"} ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}>
+                      <label key={a.permission} className={`relative inline-flex items-center rounded-md border px-3 py-1 text-meta has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema ${on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"} ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}>
                         <input type="checkbox" className="sr-only" checked={on} disabled={locked} onChange={(e) => toggle(area, a.permission, e.target.checked)} />
                         {a.label}
                       </label>

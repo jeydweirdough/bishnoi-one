@@ -9,6 +9,7 @@ import { saveTemplate, uploadTemplateFile } from "@/src/actions/quote-templates"
 import { Button } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { CodeTemplate } from "./code-editor";
 import { TemplateImage } from "./images";
 import type { QuoteTemplate, TemplateDesign, TemplateList } from "./types";
 
@@ -111,6 +112,7 @@ export function TemplateEditor({ initial, options }: Props) {
                 options={[
                   { value: "excel", label: "Uploaded Excel form" },
                   { value: "form", label: "Designed here" },
+                  { value: "code", label: "Written as code" },
                 ]}
               />
             </div>
@@ -148,6 +150,7 @@ export function TemplateEditor({ initial, options }: Props) {
             <p className="text-meta text-ink-3">
               Left blank, the company name, address, TIN and contact come from Settings, Company and quotes. Write {"{issuer}"} where the issuer&apos;s
               name goes.
+              {v.kind === "code" ? " Your code shows these where it has their fields, for example %company_name% and %certification%." : ""}
             </p>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <Field label="Company name" optional>
@@ -222,6 +225,12 @@ export function TemplateEditor({ initial, options }: Props) {
           </div>
         </Sheet>
       </div>
+
+      {v.kind === "code" && (
+        <div className="lg:col-span-2">
+          <CodeTemplate templateId={t.id} html={d.html ?? ""} onChange={(html) => setD({ ...d, html })} />
+        </div>
+      )}
 
       <div className="lg:col-span-2">
         <FormError message={error} />

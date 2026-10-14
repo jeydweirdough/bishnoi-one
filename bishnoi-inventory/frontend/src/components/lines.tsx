@@ -2,7 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { CellInput, Select } from "@/src/platform/ui/field";
@@ -20,6 +20,7 @@ type Outcome<T> = { ok: true; data: T } | Failure;
 /**
  * Saving a form: runs the action, keeps the API's words for what's wrong
  * (overall and per field), and on success says so and moves on.
+ * Uses Anticipation Method with rollback and shake animations on error.
  */
 export function useSave() {
   const router = useRouter();
@@ -28,28 +29,66 @@ export function useSave() {
   const then = useSearchParams().get("then");
   const back = then && then.startsWith("/") && !then.startsWith("//") ? then : null;
   const [pending, start] = useTransition();
+  const [shaking, setShaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerShake = useCallback(() => {
+    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    setShaking(true);
+    shakeTimeoutRef.current = setTimeout(() => {
+      setShaking(false);
+    }, 480);
+  }, []);
+
+  function fail(message: string, fieldProblems?: Record<string, string>) {
+    setError(message);
+    if (fieldProblems) setFields(fieldProblems);
+    triggerShake();
+    toast.error(message);
+  }
 
   function save<T>(run: () => Promise<Outcome<T>>, done: (data: T) => { message: string; go?: string }) {
+    setError(null);
+    setFields({});
     start(async () => {
-      const result = await run();
-      if (!result.ok) {
-        setError(result.error);
-        setFields(result.fields ?? {});
-        return;
+      try {
+        const result = await run();
+        if (!result.ok) {
+          setError(result.error);
+          setFields(result.fields ?? {});
+          triggerShake();
+          toast.error(result.error || "Action could not be completed.");
+          return;
+        }
+        setError(null);
+        setFields({});
+        const next = done(result.data);
+        toast.success(next.message);
+        if (back) router.push(back);
+        else if (next.go) router.push(next.go);
+        else router.refresh();
+      } catch (err) {
+        const errText = err instanceof Error ? err.message : "Connection failed. Please try again.";
+        setError(errText);
+        triggerShake();
+        toast.error(errText);
       }
-      setError(null);
-      setFields({});
-      const next = done(result.data);
-      toast.success(next.message);
-      if (back) router.push(back);
-      else if (next.go) router.push(next.go);
-      else router.refresh();
     });
   }
 
-  return { pending, error, fields, save, fail: (message: string) => setError(message) };
+  return {
+    pending,
+    shaking,
+    error,
+    fields,
+    save,
+    fail,
+    triggerShake,
+    shakeClass: shaking ? "animate-shake ring-2 ring-danger/40 ring-offset-2 transition-all duration-300" : "",
+    anticipateClass: pending ? "animate-anticipate pointer-events-none opacity-90" : "",
+  };
 }
 
 /**
@@ -187,7 +226,7 @@ export function LinesEditor({
                   )}
                   <td className="py-2 text-right align-top">
                     {lines.length > 1 && (
-                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
+                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
                         <X className="size-4" aria-hidden />
                         <span className="sr-only">Remove line {i + 1}</span>
                       </button>

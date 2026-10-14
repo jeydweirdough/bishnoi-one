@@ -220,7 +220,7 @@ export function Materials({
             <li key={m.id} className={`flex flex-col rounded-sheet border border-rule bg-sheet p-5 shadow-sheet ${m.isCurrent ? "" : "opacity-75"}`}>
               {/* What it is, with the ways to manage it beside its name. */}
               <div className="flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-bench text-ink-2">
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-bench text-ink-2">
                   {m.kind === "link" ? <Link2 className="size-4" aria-hidden /> : <FileText className="size-4" aria-hidden />}
                 </span>
                 <div className="min-w-0 flex-1">

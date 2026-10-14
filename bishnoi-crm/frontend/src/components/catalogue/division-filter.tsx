@@ -13,7 +13,7 @@ export function DivisionFilter({ base, teams, current }: { base: string; teams: 
           href={t.id ? `${base}?division=${t.id}` : base}
           scroll={false}
           aria-current={t.id === current ? "true" : undefined}
-          className={`rounded-full border px-2.5 py-0.5 text-meta ${t.id === current ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:text-ink"}`}
+          className={`rounded-md border px-2.5 py-0.5 text-meta ${t.id === current ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong text-ink-2 hover:text-ink"}`}
         >
           {t.name}
         </Link>

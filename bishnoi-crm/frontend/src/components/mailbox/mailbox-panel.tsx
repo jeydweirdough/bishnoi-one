@@ -79,7 +79,7 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
                   </p>
                 </div>
                 <span
-                  className={`inline-flex h-6 items-center rounded-full px-2.5 text-meta font-medium ${
+                  className={`inline-flex h-6 items-center rounded-md px-2.5 text-meta font-medium ${
                     m.lastError ? "bg-danger-tint text-danger" : m.isDefault ? "border border-ink text-ink" : "bg-[#e6f2e1] text-[#3f6f35]"
                   }`}
                 >
@@ -151,7 +151,7 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
             ) : (
               <div className="mt-5 space-y-4">
                 {found.help && (
-                  <div className="rounded-[18px] bg-mint px-4 py-3">
+                  <div className="rounded-xl bg-mint px-4 py-3">
                     <p className="text-sm font-semibold text-ink">First, make an app password</p>
                     <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-ink-2">
                       {found.help.steps.map((step) => (
@@ -176,7 +176,7 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
                       </TextButton>
                     )}
                     {advanced && (
-                      <div className="mt-3 grid gap-3 rounded-[18px] border border-rule px-4 py-4 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-3 rounded-xl border border-rule px-4 py-4 sm:grid-cols-2">
                         {found.smtp.guessed && <p className="text-meta text-ink-3 sm:col-span-2">Our best guess; your provider&apos;s help pages or your IT give the right ones.</p>}
                         <Field label="Server">{(p) => <Input {...p} value={server.host} onChange={(e) => setServer({ ...server, host: e.target.value })} />}</Field>
                         <div className="grid grid-cols-2 gap-3">

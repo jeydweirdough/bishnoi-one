@@ -19,7 +19,7 @@ const TONES: Record<Tone, string> = {
 /** Where something stands, in words: "On pace", "Behind", "Waiting". The dot is for the eye; the words say it. */
 export function Pill({ tone = "plain", dot = true, className = "", children }: { tone?: Tone; dot?: boolean; className?: string; children: ReactNode }) {
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium whitespace-nowrap ${TONES[tone]} ${className}`}>
+    <span className={`inline-flex h-6 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium whitespace-nowrap ${TONES[tone]} ${className}`}>
       {dot && <span className="size-1.5 rounded-full bg-current" aria-hidden />}
       {children}
     </span>
@@ -64,7 +64,7 @@ function Linked({ href, className, children }: { href?: string; className: strin
 /** One figure in a card: the number large, then what it is, then how it compares. */
 export function FigureCard({ figure: f, first = false }: { figure: Figure; first?: boolean }) {
   return (
-    <Linked href={f.href} className={`block rounded-[22px] bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
+    <Linked href={f.href} className={`block rounded-xl bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{f.value}</p>
@@ -85,7 +85,7 @@ export function FigureCard({ figure: f, first = false }: { figure: Figure; first
 /** A smaller figure, as a tile among others (under a lead figure, in a grid of counts). */
 export function Tile({ figure: f }: { figure: Figure }) {
   return (
-    <Linked href={f.href} className={`block min-w-0 rounded-[18px] border bg-sheet px-4 py-3 ${f.alert ? "border-[#f0c9c6]" : "border-rule"}`}>
+    <Linked href={f.href} className={`block min-w-0 rounded-lg border bg-sheet px-4 py-3 ${f.alert ? "border-[#f0c9c6]" : "border-rule"}`}>
       <span className={`block truncate text-[1.375rem] leading-tight font-semibold tabular-nums ${f.alert ? "text-danger" : "text-ink"}`}>{f.value}</span>
       <span className="mt-1 block text-sm font-medium text-ink">{f.label}</span>
       <span className="mt-0.5 block text-meta text-ink-3">
@@ -99,7 +99,7 @@ export function Tile({ figure: f }: { figure: Figure }) {
 /** The figure a page leads with, in its own mint block: large, where it stands, its ring. */
 export function LeadFigure({ figure: f }: { figure: Figure }) {
   return (
-    <Linked href={f.href} className="flex items-start justify-between gap-3 rounded-[18px] bg-mint px-4 py-3.5 hover:bg-mint-2">
+    <Linked href={f.href} className="flex items-start justify-between gap-3 rounded-xl bg-mint px-4 py-3.5 hover:bg-mint-2">
       <span className="min-w-0">
         <span className="block text-[2.25rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{f.value}</span>
         <span className="mt-1 block text-sm font-medium text-ink">{f.label}</span>

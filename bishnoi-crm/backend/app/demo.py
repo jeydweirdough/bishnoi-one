@@ -112,6 +112,8 @@ DEMO_PRICE_TYPES: tuple[tuple[str, str, str, str, bool, bool], ...] = (
     ("TRADE", "Drugstore/Hospital Price", "list", "always", False, False),
     ("DOCTOR", "Doctor's Price", "list", "with_rx", False, False),
     ("SPECIAL", "Requested price", "entered", "always", True, True),
+    # Finance's own: a product with no approved SRP can't be quoted (app/pricing.py).
+    ("SRP", "SRP", "list", "always", False, False),
 )
 
 # code, name

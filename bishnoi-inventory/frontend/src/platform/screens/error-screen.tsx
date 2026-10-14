@@ -54,7 +54,7 @@ export function ErrorScreen({ kind, reference, actions, standalone = false }: { 
   const say = SAY[kind];
   return (
     <main className={`flex items-center justify-center px-4 ${standalone ? "min-h-dvh" : "min-h-[60dvh]"}`}>
-      <div className="w-full max-w-lg rounded-[22px] border border-rule bg-sheet px-6 py-10 text-center shadow-sheet sm:px-10">
+      <div className="w-full max-w-lg rounded-xl border border-rule bg-sheet px-6 py-10 text-center shadow-sheet sm:px-10">
         <span className="mx-auto grid size-12 place-items-center rounded-full bg-hema-tint text-sage-deep">{say.icon}</span>
         <p className="mt-4 text-meta font-semibold tracking-[0.08em] text-ink-3 uppercase">Error {say.code}</p>
         <h1 className="mt-1 text-heading text-ink">{say.title}</h1>
@@ -72,4 +72,4 @@ export function ErrorScreen({ kind, reference, actions, standalone = false }: { 
 
 /** A button-shaped link that needs no app frame around it (the crash page has none). */
 export const plainButton = (primary = false) =>
-  `inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors ${primary ? "bg-ink text-white hover:bg-[#2b2b2b]" : "border border-rule-strong bg-sheet text-ink hover:border-ink"}`;
+  `inline-flex h-10 items-center justify-center rounded-lg px-5 text-sm font-medium transition-colors ${primary ? "bg-ink text-white hover:bg-[#2b2b2b]" : "border border-rule-strong bg-sheet text-ink hover:border-ink"}`;

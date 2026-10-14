@@ -116,7 +116,7 @@ export function ProductsEditor({
                   <td className="px-5 py-2.5">
                     <p className="font-medium">
                       {p.name}
-                      {!p.isActive && <span className="ml-2 rounded-full bg-bench px-2 py-0.5 text-meta">Off</span>}
+                      {!p.isActive && <span className="ml-2 rounded-md bg-bench px-2 py-0.5 text-meta">Off</span>}
                     </p>
                     <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form].filter(Boolean).join(" · ")}</p>
                   </td>
@@ -279,7 +279,7 @@ function ProductForm({
         <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
 
         {/* Rx: an order of it needs the prescription (an order link asks for it), and a pharmacist checks it. */}
-        <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-rule px-4 py-3 has-[:checked]:border-danger/40 has-[:checked]:bg-danger-tint/40">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-rule px-4 py-3 has-[:checked]:border-danger/40 has-[:checked]:bg-danger-tint/40">
           <input type="checkbox" checked={needsPrescription} onChange={(e) => setNeedsPrescription(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
           <span>
             <span className="block text-sm font-medium text-ink">Needs a prescription (Rx)</span>

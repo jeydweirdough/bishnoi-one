@@ -122,10 +122,17 @@ def prompts(db: Session, access: Access, me: User, settings: Settings) -> list[P
     # Quotes waiting too long for approval: a sale stuck. Mine, and for an approver, the team's.
     stuck_before = now - timedelta(days=rule.stuck_days)
     waiting = select(Quote).where(Quote.approval_status == "pending", Quote.created_at < stuck_before)
+    # A quote at a requested price waits for Finance, not the team lead.
+    def finances(q: Quote) -> bool:
+        return "price" in (q.approval_reasons or [])
+
     for q in db.scalars(waiting.where(Quote.owner_id == me.id)).unique():
-        out.append(Prompt(f"stuck:{q.id}", "quote", f"Quote {q.number} is still waiting for approval", "Remind your team lead: the customer is waiting.", "Open the quote", f"/quotes/{q.id}", 70))
+        who = "Finance is reviewing the price you asked for" if finances(q) else "Remind your team lead"
+        out.append(Prompt(f"stuck:{q.id}", "quote", f"Quote {q.number} is still waiting for approval", f"{who}: the customer is waiting.", "Open the quote", f"/quotes/{q.id}", 70))
     if access.can("quotes.approve"):
         for q in db.scalars(within(waiting, Quote, access).where(Quote.owner_id != me.id)).unique():
+            if finances(q):
+                continue
             out.append(Prompt(f"approve:{q.id}", "quote", f"Quote {q.number} is waiting for your approval", f"{getattr(db.get(User, q.owner_id), 'full_name', 'A salesperson')}'s customer is waiting.", "Review it", f"/quotes/{q.id}", 82))
 
     # Behind on this month's revenue target, with the month running out.

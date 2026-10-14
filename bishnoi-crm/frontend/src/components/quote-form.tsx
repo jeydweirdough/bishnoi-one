@@ -2,16 +2,18 @@
 
 import { Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { FileDrop } from "@/src/platform/ui/file-drop";
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
-import { promoTerms } from "@/src/platform/lib/labels";
 import type { CustomField, Org, PriceList, QuotePreview, StockAnswer } from "@/src/platform/lib/types";
 import { Flag } from "@/src/platform/ui/marks";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { BundleTag, PromoTags, bundlesWith, promosFor, startingPromo, withPromoFlag } from "./catalogue/promo-tag";
 import { TaxSummary } from "./tax-summary";
 import { StockBadge } from "./catalogue/stock";
 import { ExtraFields, extraChanges, toDraft, type ExtraDraft } from "./extra/extra-fields";
@@ -54,7 +56,7 @@ const blankLine = (key: number): LineDraft => ({
 });
 
 // Desktop reads the lines as a table under one header row; phones stack each field with its own label.
-const LINE_GRID = "sm:grid-cols-[minmax(0,2.2fr)_4.5rem_minmax(0,1.6fr)_minmax(0,1.4fr)_7rem_2.25rem]";
+const LINE_GRID = "sm:grid-cols-[minmax(0,2.8fr)_4.5rem_minmax(0,1.6fr)_7rem_2.25rem]";
 const mobileLabel = "mb-0.5 block text-meta text-ink-3 sm:sr-only";
 
 const cell = "h-9 w-full min-w-0 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none aria-[invalid=true]:border-danger";
@@ -101,8 +103,8 @@ export function QuoteForm({
   deal = null,
 }: {
   to: QuoteFor;
-  /** The deal it's made for, when started from one. */
-  deal?: { id: string; name: string } | null;
+  /** The deal it's made for, when started from one: its products, at its price, under its promos, start the quote. */
+  deal?: { id: string; name: string; priceType?: string | null; lines?: { productId: string; quantity: number; promoId?: string | null }[] } | null;
   priceList: PriceList;
   org: Org;
   fields?: CustomField[];
@@ -114,18 +116,37 @@ export function QuoteForm({
   const can = useCan();
   const always = priceList.priceTypes.filter((t) => t.rule === "always");
   const withRx = priceList.priceTypes.filter((t) => t.rule === "with_rx");
-  const [draft, setDraft] = useState<Draft>({
-    priceType: always[0]?.code ?? "",
-    rx: false,
-    payer: "self",
-    notes: "",
-    lines: [blankLine(0)],
+  const [draft, setDraft] = useState<Draft>(() => {
+    // From a deal: its lines, keeping each promo that still applies to its product.
+    const known = (deal?.lines ?? []).filter((l) => priceList.products.some((p) => p.id === l.productId));
+    return {
+      priceType: always.find((t) => t.code === deal?.priceType)?.code ?? always[0]?.code ?? "",
+      rx: false,
+      payer: "self",
+      notes: "",
+      lines: known.length
+        ? known.map((l, i) => ({
+            ...blankLine(i),
+            productId: l.productId,
+            quantity: String(l.quantity),
+            promoId: promosFor(priceList.promos, l.productId).some((p) => p.id === l.promoId) ? (l.promoId ?? "") : "",
+          }))
+        : [blankLine(0)],
+    };
   });
   const [preview, setPreview] = useState<QuotePreview | null>(null);
   const [previewFields, setPreviewFields] = useState<Record<string, string>>({});
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [saving, startSave] = useTransition();
+  const {
+    pending: saving,
+    shakeClass,
+    anticipateClass,
+    execute,
+    triggerShake,
+    error,
+    fieldErrors: fields,
+    setError,
+    setFieldErrors: setFields,
+  } = useAnticipation<Draft>();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
   const letterFile = useRef<HTMLInputElement>(null);
@@ -175,6 +196,11 @@ export function QuoteForm({
     update({ ...draft, lines: draft.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) });
   }
 
+  // Started from a deal's products: priced at once, as if just picked.
+  useEffect(() => {
+    if (draft.lines.some((l) => l.productId)) update(draft);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -208,24 +234,27 @@ export function QuoteForm({
     if (Object.keys(problems).length) {
       setFields(problems);
       setError("Some fields need a look.");
+      triggerShake();
+      toast.error("Some fields need a look.");
       return;
     }
 
     const form = new FormData();
     form.set("quote", JSON.stringify({ ...toInput(fmt, draft, entered, letter), extra: extraChanges(custom, extra), dealId: deal?.id ?? null }));
     if (withLetter && file) form.set("letterFile", file);
-    startSave(async () => {
-      const result = await createQuote(to, form);
-      if (!result.ok) {
-        setError(result.error);
-        setFields(result.fields ?? {});
-        return;
-      }
-      toast.success("Quote saved", {
+
+    execute({
+      anticipate: () => ({ ...draft }),
+      rollback: (prev) => setDraft(prev),
+      request: () => createQuote(to, form),
+      successMessage: () => ({
+        title: "Quote saved",
         description: preview?.approvalReasons.length || withLetter ? "It's waiting for approval now." : undefined,
-      });
-      router.push(`/quotes/${result.data.id}`);
-      router.refresh();
+      }),
+      onSuccess: (data) => {
+        router.push(`/quotes/${data.id}`);
+        router.refresh();
+      },
     });
   }
 
@@ -239,7 +268,6 @@ export function QuoteForm({
 
   const productsFor = (code: string | undefined) =>
     entered ? priceList.products : priceList.products.filter((p) => code && p.prices[code] !== undefined);
-  const promosFor = (productId: string) => priceList.promos.filter((p) => p.productIds === null || p.productIds.includes(productId));
   const errorFor = (key: string) => fields[key] ?? previewFields[key];
   const previewLine = (l: LineDraft) =>
     l.bundleId
@@ -279,7 +307,7 @@ export function QuoteForm({
       : priceList.bundles.filter((b) => code && b.items.every((i) => priceList.products.find((p) => p.id === i.productId)?.prices[code] !== undefined));
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-6">
+    <form onSubmit={submit} noValidate className={`space-y-6 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-end">
         {withRx.length > 0 && (
           <label className="flex h-9 items-center gap-2 text-sm">
@@ -311,7 +339,6 @@ export function QuoteForm({
         <div aria-hidden className={`hidden gap-x-3 border-b border-rule pb-1.5 text-caps text-ink-3 uppercase sm:grid ${LINE_GRID}`}>
           <span>{priceList.bundles.length > 0 ? "Product or bundle" : "Product"}</span>
           <span className="text-right">Qty</span>
-          <span>Promo</span>
           <span>Extra discount</span>
           <span className="text-right">Total</span>
           <span />
@@ -321,51 +348,53 @@ export function QuoteForm({
             const at = `lines.${i}`;
             const product = priceList.products.find((p) => p.id === l.productId);
             const bundle = priceList.bundles.find((b) => b.id === l.bundleId);
-            const promos = l.productId ? promosFor(l.productId) : [];
+            const promos = l.bundleId ? [] : promosFor(priceList.promos, l.productId);
             const rows = previewLine(l);
             const total = lineTotal(rows);
             const offeredBundles = bundlesFor(priceType?.code);
+            // The sets this product is part of, that can be quoted at this price.
+            const inBundles = l.bundleId ? [] : bundlesWith(offeredBundles, l.productId);
             return (
               <li key={l.key} className={`grid gap-x-3 gap-y-3 py-3 sm:items-start ${LINE_GRID}`}>
                 <div className="min-w-0">
                   <span className={mobileLabel}>{priceList.bundles.length > 0 ? "Product or bundle" : "Product"}</span>
-                  <Select
+                  {/* A product on promo says so in the list, before it's picked. */}
+                  <Combobox<string>
                     aria-label={`Line ${i + 1}: ${offeredBundles.length ? "product or bundle" : "product"}`}
-                    aria-invalid={errorFor(`${at}.productId`) || errorFor(`${at}.bundleId`) ? true : undefined}
+                    status={errorFor(`${at}.productId`) || errorFor(`${at}.bundleId`) ? "error" : undefined}
                     value={l.bundleId ? `b:${l.bundleId}` : l.productId}
-                    onChange={(e) => {
-                      const picked = e.target.value;
+                    onChange={(picked) => {
                       const isBundle = picked.startsWith("b:");
                       setLine(l.key, {
                         productId: isBundle ? "" : picked,
                         bundleId: isBundle ? picked.slice(2) : "",
-                        // A bundle takes neither, and a changed product's promo no longer applies.
-                        promoId: "",
+                        // A bundle takes no promo; a product starts with its only promo, or none to choose between.
+                        promoId: isBundle ? "" : startingPromo(priceList.promos, picked),
                         discountKind: "",
                         discountValue: "",
                         unitPrice: "",
                       });
                     }}
                     className={cell}
-                  >
-                    <option value="">Pick {offeredBundles.length ? "a product or bundle" : "a product"}…</option>
-                    {productsFor(priceType?.code).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} · {p.unit}
-                        {!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}
-                        {levelOf(p.id)?.state === "out" ? " · out of stock" : ""}
-                      </option>
-                    ))}
-                    {offeredBundles.length > 0 && (
-                      <optgroup label="Bundles">
-                        {offeredBundles.map((b) => (
-                          <option key={b.id} value={`b:${b.id}`}>
-                            {b.name} · the set · {fmt.peso(b.priceCentavos)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </Select>
+                    options={[
+                      { value: "", label: `Pick ${offeredBundles.length ? "a product or bundle" : "a product"}…`, promos: 0 },
+                      ...productsFor(priceType?.code).map((p) => ({
+                        value: p.id,
+                        label: `${p.name} · ${p.unit}${!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}${levelOf(p.id)?.state === "out" ? " · out of stock" : ""}`,
+                        promos: promosFor(priceList.promos, p.id).length,
+                        bundles: bundlesWith(offeredBundles, p.id).length,
+                      })),
+                      ...(offeredBundles.length
+                        ? [
+                            {
+                              label: "Bundles",
+                              options: offeredBundles.map((b) => ({ value: `b:${b.id}`, label: `${b.name} · the set · ${fmt.peso(b.priceCentavos)}`, promos: 0 })),
+                            },
+                          ]
+                        : []),
+                    ]}
+                    optionRender={(o) => withPromoFlag(o.data.label, Number(o.data.promos) || 0, Number(o.data.bundles) || 0)}
+                  />
                   {product?.genericName && <p className="mt-0.5 text-meta text-ink-3">{product.genericName}</p>}
                   {product && stock?.linked && !stock.error && (
                     <p className="mt-1">
@@ -421,26 +450,6 @@ export function QuoteForm({
                     <p className="mt-0.5 text-meta text-ink-2 sm:text-right">+{rows.reduce((n, r) => n + r.freeQuantity, 0)} free</p>
                   )}
                   {errorFor(`${at}.quantity`) && <p className="mt-1 text-meta text-danger">{errorFor(`${at}.quantity`)}</p>}
-                </div>
-
-                <div className="min-w-0">
-                  <span className={mobileLabel}>Promo</span>
-                  {/* A picker only when there's something to pick. */}
-                  {l.bundleId ? (
-                    <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">The set price</p>
-                  ) : promos.length > 0 ? (
-                    <Select aria-label={`Line ${i + 1}: promo`} value={l.promoId} onChange={(e) => setLine(l.key, { promoId: e.target.value })} className={cell}>
-                      <option value="">No promo</option>
-                      {promos.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({promoTerms(fmt, p)})
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">{l.productId ? "None for this product" : "—"}</p>
-                  )}
-                  {errorFor(`${at}.promoId`) && <p className="mt-1 text-meta text-danger">{errorFor(`${at}.promoId`)}</p>}
                 </div>
 
                 <div className="min-w-0">
@@ -510,6 +519,23 @@ export function QuoteForm({
                     </Button>
                   )}
                 </div>
+
+                {(promos.length > 0 || inBundles.length > 0 || errorFor(`${at}.promoId`)) && (
+                  <div className="flex flex-wrap gap-2 sm:col-span-full">
+                    <PromoTags promos={promos} fmt={fmt} appliedId={l.promoId} onPick={(id) => setLine(l.key, { promoId: id })} label={`Line ${i + 1}`} />
+                    {inBundles.map((b) => (
+                      <BundleTag
+                        key={b.id}
+                        bundle={b}
+                        nameOf={(id) => priceList.products.find((p) => p.id === id)?.name ?? "a product"}
+                        fmt={fmt}
+                        // The line becomes the set: one of it, as the bundle's price is for the set.
+                        onUse={() => setLine(l.key, { productId: "", bundleId: b.id, quantity: "1", promoId: "", discountKind: "", discountValue: "", unitPrice: "" })}
+                      />
+                    ))}
+                    {errorFor(`${at}.promoId`) && <p className="mt-1 text-meta text-danger">{errorFor(`${at}.promoId`)}</p>}
+                  </div>
+                )}
               </li>
             );
           })}
@@ -597,10 +623,16 @@ export function QuoteForm({
         )}
       </div>
       {preview && preview.approvalReasons.length > 0 && (
-        <p className="animate-reshape rounded-[14px] bg-hema-tint px-3 py-2 text-meta text-ink-2">
+        <p className="animate-reshape rounded-lg bg-hema-tint px-3 py-2 text-meta text-ink-2">
           Your team lead approves this quote before it goes out:{" "}
           {preview.approvalReasons
-            .map((r) => (r === "price" ? `${priceType?.name} needs approval` : `extra discounts are over ${percent(priceList.discountApprovalBp)}`))
+            .map((r) => {
+              if (r === "price") return `${priceType?.name} needs approval`;
+              if (r === "discount") return `extra discounts are over ${percent(priceList.discountApprovalBp)}`;
+              if (r === "margin") return "gross margin is under the 48% target floor (requires GM approval)";
+              if (r === "s2_license") return "contains S-2 controlled substance (requires valid PDEA license)";
+              return r;
+            })
             .join(", and ")}
           .
         </p>
@@ -667,7 +699,7 @@ export function QuoteForm({
 
       <FormError message={error} />
       {/* The total and the button that commits to it, together, pinned where the hand already is. */}
-      <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
+      <div className="sticky bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sheet px-4 py-3 shadow-overlay sm:-mx-4">
         <div className="min-w-0">
           <p className="text-meta text-ink-3">Total</p>
           <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.tax?.totalDueCentavos ?? preview.totalCentavos) : "—"}</p>

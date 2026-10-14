@@ -74,7 +74,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
           </>
         }
       >
-        <span className="mr-2 inline-flex h-6 items-center rounded-full border border-rule-strong px-2.5 align-middle text-meta text-ink-2">
+        <span className="mr-2 inline-flex h-6 items-center rounded-md border border-rule-strong px-2.5 align-middle text-meta text-ink-2">
           Code: <span className="ml-1 font-mono">{p.sku}</span>
         </span>
         {[p.category?.path, p.brand?.name].filter(Boolean).join(" · ")}
@@ -86,7 +86,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         side={
           <>
             <Card className="p-4">
-              <div className="grid aspect-square place-items-center overflow-hidden rounded-[14px] bg-bench">
+              <div className="grid aspect-square place-items-center overflow-hidden rounded-xl bg-bench">
                 {p.images[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box
                   <img src={`/products/${p.id}/images/${p.images[0]}`} alt={p.name} className="size-full object-contain" />

@@ -10,6 +10,7 @@ import { orgFormat } from "@/src/platform/lib/org";
 import { APPROVAL_STATUSES, LETTER_STATUSES, PAYMENT_STATUSES, approvalReason } from "@/src/platform/lib/labels";
 import type { CustomField, Quote, QuoteLine } from "@/src/platform/lib/types";
 import { extraItems } from "./extra/extra-values";
+import { AppliedPromo } from "./catalogue/promo-tag";
 
 function discountLabel(fmt: Format, line: QuoteLine) {
   if (!line.discountKind || !line.discountValue) return null;
@@ -90,9 +91,8 @@ export async function QuoteView({
                     </td>
                     <td className="px-3 py-2.5 text-meta text-ink-2">
                       {line.promoName && (
-                        <span className="block">
-                          {line.promoName}
-                          {line.promoDiscountCentavos > 0 && ` (−${fmt.peso(line.promoDiscountCentavos)})`}
+                        <span className="mb-1 block">
+                          <AppliedPromo name={line.promoName} discountCentavos={line.promoDiscountCentavos} fmt={fmt} />
                         </span>
                       )}
                       {discountLabel(fmt, line) && (
@@ -246,6 +246,22 @@ export async function QuoteView({
                     <a href={`/quotes/${quote.id}/prescriptions/${f.n}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink hover:underline">
                       <FileText className="size-4" aria-hidden />
                       {f.name} <span className="text-meta text-ink-3">({Math.ceil(f.size / 1024)} KB)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {(quote.documents?.length ?? 0) > 0 && (
+            <section className="py-3" aria-label="Documents">
+              <h3 className="text-meta text-ink-3">Documents, from the customer</h3>
+              <ul className="mt-1 space-y-1">
+                {quote.documents!.map((f) => (
+                  <li key={f.n}>
+                    <a href={`/quotes/${quote.id}/documents/${f.n}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink hover:underline">
+                      <FileText className="size-4" aria-hidden />
+                      {f.label ?? f.name} <span className="text-meta text-ink-3">({f.name}, {Math.ceil(f.size / 1024)} KB)</span>
                     </a>
                   </li>
                 ))}

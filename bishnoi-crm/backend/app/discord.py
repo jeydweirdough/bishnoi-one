@@ -74,7 +74,7 @@ def mode_of(enabled: bool, mode: str, webhook_url: str | None) -> str:
 
 def _explain(status: int, what: str) -> str:
     if status == 401 and what in ("channel", "thread"):
-        return "Discord refused DISCORD_BOT_TOKEN (401). Copy it again from the bot page"
+        return "Discord authorization failed (401). Please check the bot token on the bot configuration page."
     if status == 403 and what == "thread":
         return "The bot can't start threads (403). Invite it again with Create Public Threads"
     if status == 403:

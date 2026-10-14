@@ -91,7 +91,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
                       setOpen(false);
                       router.push(`/companies/${c.id}/quotes/new`);
                     }}
-                    className="w-full rounded-[14px] px-2 py-2 text-left text-sm hover:bg-hema-tint hover:text-ink"
+                    className="w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-hema-tint hover:text-ink"
                   >
                     {c.name}
                   </button>
@@ -100,7 +100,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
             </ul>
           )}
           {shown.length > 0 && typed && mayAdd && (
-            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-[14px] border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-ink hover:underline">
+            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-lg border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-ink hover:underline">
               <UserPlus className="size-4" aria-hidden />
               Not in the list? Add &ldquo;{typed}&rdquo; as a new customer
             </button>

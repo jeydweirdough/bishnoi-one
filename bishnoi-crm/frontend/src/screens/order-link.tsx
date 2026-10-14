@@ -3,10 +3,11 @@ import { COMPANY_HEADER } from "@/src/platform/lib/session-cookie";
 import { EmptyDrawing } from "@/src/platform/ui/empty-drawings";
 import { OrderLinkForm } from "../components/quotes/order-link-form";
 import type { Medicine } from "../components/quotes/medicine-search";
+import type { LinkAsks } from "../actions/quote-links";
 
 export const metadata = { title: "Order medicines", robots: { index: false, follow: false } };
 
-type Link = { company: string; orgName: string; customer: string | null; contact: string | null; asksWho: boolean; rep: string; expiresAt: string; products: Omit<Medicine, "priceCentavos">[] };
+type Link = { company: string; orgName: string; customer: string | null; contact: string | null; asksWho: boolean; rep: string; expiresAt: string; products: Omit<Medicine, "priceCentavos">[]; asks: LinkAsks; uploads: "direct" | "with-order" };
 type Params = Promise<{ company: string; token: string }>;
 
 const until = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" });
@@ -45,7 +46,7 @@ export default async function OrderLinkPage({ params }: { params: Params }) {
                 {until.format(new Date(link.expiresAt))}, once.
               </p>
             </header>
-            <OrderLinkForm company={company} orgName={link.orgName} token={token} medicines={link.products.map((m) => ({ ...m, priceCentavos: 0 }))} rep={link.rep} asksWho={link.asksWho} />
+            <OrderLinkForm company={company} orgName={link.orgName} token={token} medicines={link.products.map((m) => ({ ...m, priceCentavos: 0 }))} rep={link.rep} asksWho={link.asksWho} asks={link.asks} uploads={link.uploads} />
           </>
         )}
       </div>

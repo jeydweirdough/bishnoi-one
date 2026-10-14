@@ -169,7 +169,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
       ) : (
         <div className="space-y-4 pt-1">
           {none ? (
-            <p className="rounded-[14px] bg-mint px-4 py-3 text-sm text-ink-2">
+            <p className="rounded-lg bg-mint px-4 py-3 text-sm text-ink-2">
               Your mailbox isn&apos;t connected, so you&apos;ll send this from your own email, then log it here with a screenshot.{" "}
               <Link href="/account/mailbox" className="font-semibold text-ink underline">
                 Connect your mailbox
