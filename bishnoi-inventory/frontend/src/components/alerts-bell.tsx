@@ -42,11 +42,16 @@ export function AlertsBell({ alerts }: { alerts: Alert[] }) {
     >
       <button
         type="button"
-        aria-label={any ? `Needs attention: ${alerts.length}` : "Needs attention: none"}
-        className="relative inline-flex size-10 items-center justify-center rounded-lg text-ink-2 hover:bg-sheet hover:text-ink"
+        title="Notifications"
+        aria-label={any ? `Notifications: ${alerts.length}` : "Notifications"}
+        className={`relative grid size-10 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-sheet hover:text-ink ${open ? "bg-sheet text-ink" : ""}`}
       >
         <Bell className="size-5" aria-hidden />
-        {any && <span className="absolute top-2 right-2.5 size-2 rounded-full bg-danger ring-2 ring-bench" aria-hidden />}
+        {any && (
+          <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[0.625rem] leading-none font-semibold text-white tabular-nums ring-2 ring-bench" aria-hidden>
+            {alerts.length > 9 ? "9+" : alerts.length}
+          </span>
+        )}
       </button>
     </Popover>
   );
