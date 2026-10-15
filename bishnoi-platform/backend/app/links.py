@@ -42,6 +42,8 @@ KNOWN: dict[tuple[str, str], str] = {
     ("crm", "finance"): "Finance works out the tax on the CRM's quotes.",
     ("crm", "pharmacy"): "The pharmacist checks the CRM's Rx quotes in Pharmacy.",
     ("finance", "crm"): "Finance reads the CRM's customers to invoice them.",
+    ("exec", "pharmacy"): "The pharmacist approves Admin's promotional material designs in Pharmacy.",
+    ("exec", "crm"): "Admin reads the CRM's teams and asks their manager to approve promotional materials going out.",
 }
 
 

@@ -164,9 +164,10 @@ export function LinesEditor({
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead>
             <tr className="border-b border-rule text-left text-meta text-ink-3">
+              <th scope="col" className="w-8 py-2 pr-2 font-semibold">#</th>
               <th scope="col" className="py-2 pr-3 font-semibold">Product</th>
               <th scope="col" className="w-28 px-3 py-2 text-right font-semibold">Quantity</th>
-              {money && <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{money.label}</th>}
+              {money && <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{money.label} ({fmt.symbol})</th>}
               {money && <th scope="col" className="w-32 px-3 py-2 text-right font-semibold">Amount</th>}
               <th scope="col" className="w-10 py-2">
                 <span className="sr-only">Remove</span>
@@ -181,7 +182,10 @@ export function LinesEditor({
               const said = line.productId && note ? note(line.productId) : null;
               return (
                 <tr key={i}>
-                  <td className="py-2 pr-3 align-top">
+                  <td className="py-2.5 pr-2 align-top text-meta text-ink-3 tabular-nums">
+                    <span className="inline-flex h-10 items-center">{i + 1}</span>
+                  </td>
+                  <td className="py-2.5 pr-3 align-top">
                     <Select
                       aria-label={`Line ${i + 1} product`}
                       aria-invalid={productError ? true : undefined}
@@ -201,7 +205,7 @@ export function LinesEditor({
                     {(productError || qtyError) && <p className="mt-1 text-meta text-danger">{productError || qtyError}</p>}
                     {said && <p className="mt-1 text-meta text-ink-3">{said}</p>}
                   </td>
-                  <td className="px-3 py-2 align-top">
+                  <td className="px-3 py-2.5 align-top">
                     <div className="flex items-center justify-end gap-1.5">
                       <QuantityInput
                         label={`Line ${i + 1} quantity`}
@@ -215,18 +219,20 @@ export function LinesEditor({
                     </div>
                   </td>
                   {money && (
-                    <td className="px-3 py-2 align-top">
-                      <CellInput aria-label={`Line ${i + 1} ${money.label}`} inputMode="decimal" value={line.money} onChange={(e) => set(i, { money: e.target.value })} className="w-28" />
+                    <td className="px-3 py-2.5 align-top">
+                      <CellInput aria-label={`Line ${i + 1} ${money.label}`} inputMode="decimal" placeholder="0.00" value={line.money} onChange={(e) => set(i, { money: e.target.value })} className="w-32" />
                     </td>
                   )}
                   {money && (
-                    <td className="px-3 py-2 text-right align-top tabular-nums text-ink-2">
-                      {fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0))}
+                    <td className="px-3 py-2.5 text-right align-top tabular-nums">
+                      <span className="inline-flex h-10 items-center text-ink">
+                        {line.productId && line.quantity ? fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0)) : <span className="text-ink-3">—</span>}
+                      </span>
                     </td>
                   )}
-                  <td className="py-2 text-right align-top">
+                  <td className="py-2.5 text-right align-top">
                     {lines.length > 1 && (
-                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
+                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="mt-1.5 rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
                         <X className="size-4" aria-hidden />
                         <span className="sr-only">Remove line {i + 1}</span>
                       </button>
@@ -239,17 +245,17 @@ export function LinesEditor({
           {money && (
             <tfoot>
               <tr className="border-t border-rule-strong">
-                <td colSpan={3} className="py-2 pr-3 text-right text-meta text-ink-3">
+                <td colSpan={4} className="py-3 pr-3 text-right text-sm font-semibold text-ink">
                   Total
                 </td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmt.peso(total)}</td>
+                <td className="px-3 py-3 text-right text-base font-semibold tabular-nums">{fmt.peso(total)}</td>
                 <td />
               </tr>
             </tfoot>
           )}
         </table>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-rule pt-3">
         <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
           Add line
         </Button>

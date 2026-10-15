@@ -19,7 +19,7 @@ comes from, takes it off that batch's stock, and records the sale.
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -548,6 +548,45 @@ class SaleReturn(Base):
 
     sale: Mapped[Sale] = relationship(lazy="joined")
     by: Mapped[User | None] = relationship(lazy="joined")
+
+
+class MaterialReview(Base):
+    """A promotional material's design sent by Admin (routers/material_reviews.py)
+    for the pharmacist's approval before it's produced: approved, returned for
+    changes (with comments), or rejected. Each version Admin sends is its own
+    review; earlier versions of the same material are shown beside it.
+
+    The design's file is kept here, in the database, as sent."""
+
+    __tablename__ = "nbph_material_reviews"
+    __table_args__ = (
+        CheckConstraint("status IN ('waiting', 'approved', 'returned', 'rejected')", name="material_review_status"),
+        UniqueConstraint("source", "source_id", name="uq_nbph_material_reviews_source"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)  # PMR-2026-00001
+    source: Mapped[str] = mapped_column(String(20))  # the sending app: "exec" (Admin)
+    source_id: Mapped[str] = mapped_column(String(64))  # its id for this version
+    reference: Mapped[str] = mapped_column(String(40), index=True)  # the material, as people there know it: PM-40000001
+    version: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(160))
+    kind: Mapped[str] = mapped_column(String(40))
+    product: Mapped[str | None] = mapped_column(String(160), default=None)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)  # what changed, from the sender
+    file_name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    file_data: Mapped[bytes] = mapped_column(LargeBinary)
+    sent_by: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(10), default="waiting", index=True)
+    comments: Mapped[str | None] = mapped_column(Text, default=None)  # the pharmacist's
+    reviewed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbph_users.id", ondelete="SET NULL"), default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    reviewed_by: Mapped[User | None] = relationship(lazy="joined")
 
 
 # Numbers on SQLite as records are saved (on Postgres the database gives them).

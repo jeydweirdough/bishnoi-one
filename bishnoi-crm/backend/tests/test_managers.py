@@ -198,3 +198,61 @@ def test_a_person_in_two_teams(app, client, ana, crew):
     ria = next(p["id"] for p in client.get("/admin/users", headers=mia).json() if p["email"] == "ria@example.com")
     assert client.patch(f"/admin/users/{ria}", json={"otherTeamIds": [ids["South"]]}, headers=mia).status_code == 422
     assert client.patch(f"/admin/users/{lia}", json={"otherTeamIds": []}, headers=mia).json()["otherTeams"] == [{"id": ids["South"], "name": "South"}]
+
+
+def test_a_manager_proposes_prices_and_finance_approves(app, client, ana, crew):
+    # A manager sets a product's Doctor's and Patient's prices; they wait for Finance, so reps still see the old ones.
+    from app.tools.users import make_demo_catalogue
+
+    with app.state.sessions() as db:
+        make_demo_catalogue(db)
+    mia = make_manager(app, client, ana, ["North"])
+    amox = next(p for p in client.get("/products", headers=mia).json()["items"] if p["code"] == "AMX-500")
+    assert amox["can"]["propose"] is True and amox["can"]["edit"] is False
+    r = client.put(f"/products/{amox['id']}/prices", json={"prices": {"DOCTOR": 125000, "PATIENT": 150000}}, headers=mia)
+    assert r.status_code == 200, r.text
+    waiting = r.json()["priceApprovals"]
+    assert waiting["DOCTOR"]["status"] == "pending" and waiting["DOCTOR"]["proposedAmount"] == 125000
+    # A rep still quotes the approved price.
+    seen = next(p for p in client.get("/products", headers=crew["ria"]).json()["items"] if p["code"] == "AMX-500")
+    assert seen["prices"].get("DOCTOR") != 125000 and seen["prices"].get("PATIENT") != 150000
+    # The SRP is Finance's; a rep can't propose at all.
+    assert client.put(f"/products/{amox['id']}/prices", json={"prices": {"SRP": 1}}, headers=mia).status_code == 422
+    assert client.put(f"/products/{amox['id']}/prices", json={"prices": {"DOCTOR": 1}}, headers=crew["ria"]).status_code == 403
+
+
+def test_a_manager_exports_and_imports_prices(app, client, ana, crew):
+    # Export the products, change a price in the file, import it back: it goes to Finance; unchanged rows change nothing.
+    import csv
+    import io
+
+    from app.tools.users import make_demo_catalogue
+
+    with app.state.sessions() as db:
+        make_demo_catalogue(db)
+    mia = make_manager(app, client, ana, ["North"])
+    r = client.get("/exports/products", params={"format": "csv"}, headers=mia)
+    assert r.status_code == 200
+    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig"))))
+    head, body = rows[0], rows[1:]
+    assert head[:7] == ["Code", "Name", "Generic name", "Strength", "Form", "Unit", "On sale"]
+    doctor = head.index("Doctor's price") if "Doctor's price" in head else next(i for i, h in enumerate(head) if "octor" in h)
+    amox = next(row for row in body if row[0] == "AMX-500")
+
+    read = client.post("/imports/prices/read", files={"file": ("p.csv", r.content, "text/csv")}, headers=mia).json()
+    assert "price:SRP" not in read["mapping"] and read["mapping"]["code"] == 0
+    rows_back = read["rows"]
+    unchanged = client.post("/imports/prices", json={"mapping": read["mapping"], "rows": rows_back, "dryRun": False}, headers=mia).json()
+    assert unchanged["updated"] == 0 and unchanged["problems"] == []
+
+    changed = [row[:] for row in rows_back]
+    i = next(k for k, row in enumerate(changed) if row[0] == "AMX-500")
+    changed[i][doctor] = "1,250.00"
+    changed.append(["NOPE-1"] + [""] * (len(head) - 1))
+    done = client.post("/imports/prices", json={"mapping": read["mapping"], "rows": changed, "dryRun": False}, headers=mia).json()
+    assert done["updated"] == 1 and [p["message"] for p in done["problems"]] == ["Code NOPE-1 isn't a product here."]
+    p = next(x for x in client.get("/products", headers=mia).json()["items"] if x["code"] == "AMX-500")
+    waiting = [a for a in p["priceApprovals"].values() if a["status"] == "pending"]
+    assert [a["proposedAmount"] for a in waiting] == [125000] and amox[0] == "AMX-500"
+    # A rep can't import prices.
+    assert client.post("/imports/prices/read", files={"file": ("p.csv", r.content, "text/csv")}, headers=crew["ria"]).status_code == 403

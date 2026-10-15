@@ -37,6 +37,9 @@ router = APIRouter(tags=["catalogue"])
 View = Annotated[Access, Depends(require("products.view"))]
 Create = Annotated[Access, Depends(require("products.create"))]
 Edit = Annotated[Access, Depends(require("products.edit"))]
+# Proposing a product's prices (a manager's Doctor's, Patient's, Drugstore/Hospital
+# price...): products.prices is enough; Finance approves before reps see them.
+Propose = Annotated[Access, Depends(require("products.edit", "products.prices"))]
 # Promos and bundles: the catalogue's editors, or a manager for their departments.
 EditOffers = Annotated[Access, Depends(require("products.edit", "department.manage"))]
 Delete = Annotated[Access, Depends(require("products.delete"))]
@@ -205,7 +208,8 @@ def update_settings(access: Edit, me: CurrentUser, db: DB, body: SettingsPatch) 
 
 
 def product_out(p: Product, access: Access) -> dict:
-    is_editor = access.can("products.edit") or access.can("products.approve")
+    # Who sees prices waiting for Finance (and what was proposed): whoever sets or decides them.
+    is_editor = access.can("products.edit") or access.can("products.approve") or access.can("products.prices")
     visible_prices = {
         pp.price_type_code: pp.amount_centavos
         for pp in p.prices
@@ -253,6 +257,8 @@ def product_out(p: Product, access: Access) -> dict:
             "edit": access.can("products.edit"),
             "delete": access.can("products.delete"),
             "approve": access.can("products.approve"),
+            # Prices only, sent to Finance (the SRP is Finance's and Inventory's).
+            "propose": access.can("products.edit") or access.can("products.prices"),
         },
     }
 
@@ -500,6 +506,36 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
     if fields or touched:
         action = "product.prices_submitted_for_approval" if (pending and not is_finance) else "product.updated"
         audit(db, me, action, target=product.name, target_type="product", target_id=product.id, fields=camel(fields) + (["prices"] if touched else []))
+        db.commit()
+        db.refresh(product)
+    return product_out(product, access)
+
+
+class PricesIn(Api):
+    # Each price type's amount in centavos; null takes the price away (once Finance agrees).
+    prices: dict[str, int | None] = Field(max_length=30)
+
+    @field_validator("prices")
+    @classmethod
+    def _prices(cls, value: dict) -> dict:
+        if any(v is not None and not 0 < v < 10**11 for v in value.values()):
+            raise ValueError("Prices are amounts above zero.")
+        return value
+
+
+@router.put("/products/{product_id}/prices")
+def propose_prices(access: Propose, me: CurrentUser, db: DB, product_id: str, body: PricesIn) -> dict:
+    """A product's prices at its price types, by a manager (or anyone who edits
+    products): each waits for Finance's approval before salespeople see it. The
+    SRP isn't among them: it's curated by Finance and Inventory."""
+    product = get_product(db, product_id)
+    is_finance = is_finance_user(access, me)
+    if SRP in body.prices and not is_finance:
+        raise field_error("prices", "The SRP is curated by Finance and Inventory: change it there.")
+    touched, pending = set_prices(db, product, body.prices, me, is_finance)
+    if touched:
+        action = "product.prices_submitted_for_approval" if (pending and not is_finance) else "product.updated"
+        audit(db, me, action, target=product.name, target_type="product", target_id=product.id, fields=["prices"])
         db.commit()
         db.refresh(product)
     return product_out(product, access)

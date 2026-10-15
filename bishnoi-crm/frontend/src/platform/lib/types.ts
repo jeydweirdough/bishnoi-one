@@ -1056,7 +1056,12 @@ export type Assignable = { id: string; name: string; team: Ref | null; isMe: boo
 
 // --- the catalogue (Products, Promos, Bundles, Pricing rules) ---
 
-export type CatalogueProduct = Product & { can: { edit: boolean; delete: boolean } };
+export type CatalogueProduct = Product & {
+  /** propose: prices only, sent to Finance for approval (a manager's). */
+  can: { edit: boolean; delete: boolean; propose?: boolean };
+  /** For whoever sets or decides prices: each price type's approval, and what's waiting. */
+  priceApprovals?: Record<string, { status: "approved" | "pending" | "rejected"; amount: number; proposedAmount: number | null; rejectionReason: string | null }>;
+};
 
 export type SalesRules = {
   priceTypes: (PriceType & { rule: PriceRule; sortOrder: number })[];

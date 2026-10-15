@@ -5,9 +5,10 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { loadQuery } from "@/src/platform/lib/api";
 import { Chips, ExpiryMark, FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
 import { MOVEMENT_FILTERS, MOVEMENT_KINDS, param, query, referenceHref, signed } from "../lib/labels";
-import { context, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { context, keepInRange, paging, type Search } from "../lib/page";
 import { given, referenceOf } from "../lib/reference";
-import type { BatchRow, Movement, Page, Reference, SerialRow, StockOverview } from "../lib/types";
+import type { BatchRow, Movement, Page, Paged, Reference, SerialRow, StockOverview } from "../lib/types";
 
 const warehouseOptions = (ref: Pick<Reference, "warehouses">) => [{ value: "", label: "All warehouses" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
 
@@ -16,11 +17,14 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
   if (!may("stock.view")) return <NoAccess what="stock levels" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), warehouse: param(s, "warehouse"), category: param(s, "category"), state: param(s, "state") };
+  const { page, size, vars } = paging(s);
+  const base = `/stock${query(f)}`;
   const { stock: data, reference: ref } = await loadQuery<{ stock: StockOverview; reference: Pick<Reference, "warehouses" | "categories"> }>(
-    `query Stock($q: String, $warehouse: String, $category: String, $state: String) { stock(q: $q, warehouse: $warehouse, category: $category, state: $state) ${referenceOf("warehouses", "categories")} }`,
-    given(f),
+    `query Stock($q: String, $warehouse: String, $category: String, $state: String, $limit: Int, $offset: Int) { stock(q: $q, warehouse: $warehouse, category: $category, state: $state, limit: $limit, offset: $offset) ${referenceOf("warehouses", "categories")} }`,
+    { ...given(f), ...vars },
     ["stock", "reference"],
   );
+  keepInRange(data.items.length, data.count, page, base);
   const t = data.total;
   const chip = (state: string, label: string) => ({ value: state, label, href: `/stock${query({ ...f, state })}` });
 
@@ -71,6 +75,7 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
           </Table>
         )}
       </Sheet>
+      <Pager total={data.count} page={page} size={size} base={base} noun={data.count === 1 ? "row" : "rows"} />
       <p className="mt-3 text-meta text-ink-3">Low stock is based on the product&apos;s total available quantity against its reorder level. A row shows out of stock when nothing is available in that warehouse.</p>
     </>
   );
@@ -165,11 +170,15 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
   if (!may("stock.view")) return <NoAccess what="batches" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), warehouse: param(s, "warehouse"), expiry: param(s, "expiry"), empty: param(s, "empty") };
-  const { batches, reference: ref } = await loadQuery<{ batches: BatchRow[]; reference: Pick<Reference, "warehouses"> }>(
-    `query Batches($q: String, $warehouse: String, $expiry: String, $empty: Boolean) { batches(q: $q, warehouse: $warehouse, expiry: $expiry, empty: $empty) ${referenceOf("warehouses")} }`,
-    given({ ...f, empty: Boolean(f.empty) }),
+  const { page, size, vars } = paging(s);
+  const base = `/batches${query(f)}`;
+  const { batches: list, reference: ref } = await loadQuery<{ batches: Paged<BatchRow>; reference: Pick<Reference, "warehouses"> }>(
+    `query Batches($q: String, $warehouse: String, $expiry: String, $empty: Boolean, $limit: Int, $offset: Int) { batches(q: $q, warehouse: $warehouse, expiry: $expiry, empty: $empty, limit: $limit, offset: $offset) ${referenceOf("warehouses")} }`,
+    { ...given({ ...f, empty: Boolean(f.empty) }), ...vars },
     ["batches", "reference"],
   );
+  keepInRange(list.items.length, list.total, page, base);
+  const batches = list.items;
   const chip = (expiry: string, label: string) => ({ value: expiry, label, href: `/batches${query({ ...f, expiry })}` });
 
   return (
@@ -204,6 +213,7 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "batch" : "batches"} />
     </>
   );
 }
@@ -213,8 +223,13 @@ const SERIAL_STATUS = { in_stock: "In stock", in_transit: "In transit", issued: 
 export async function SerialsPage({ searchParams }: { searchParams: Search }) {
   const { may, at } = await context();
   if (!may("stock.view")) return <NoAccess what="serial numbers" />;
-  const q = param(await searchParams, "q");
-  const units = q ? (await loadQuery<{ serials: SerialRow[] }>(`query Serials($q: String!) { serials(q: $q) }`, { q }, ["serials"])).serials : [];
+  const s = await searchParams;
+  const q = param(s, "q");
+  const { page, size, vars } = paging(s);
+  const base = `/serials${query({ q })}`;
+  const found = q ? (await loadQuery<{ serials: Paged<SerialRow> }>(`query Serials($q: String!, $limit: Int, $offset: Int) { serials(q: $q, limit: $limit, offset: $offset) }`, { q, ...vars }, ["serials"])).serials : { items: [], total: 0 };
+  keepInRange(found.items.length, found.total, page, base);
+  const units = found.items;
   return (
     <>
       <PageHeader title="Serial numbers">Look up a serialized unit&apos;s current location and movement history.</PageHeader>
@@ -244,6 +259,7 @@ export async function SerialsPage({ searchParams }: { searchParams: Search }) {
               </ul>
             </Sheet>
           ))}
+          <Pager total={found.total} page={page} size={size} base={base} noun={found.total === 1 ? "serial number" : "serial numbers"} />
         </div>
       )}
     </>

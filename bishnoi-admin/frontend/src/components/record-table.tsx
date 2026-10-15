@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Car, Motorbike, Pencil, Search, Trash2 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Empty } from "@/src/platform/ui/sheet";
@@ -170,7 +170,19 @@ function PagerButton({ children, label, current, disabled, onClick }: { children
 }
 
 /** The CRM's round initials beside a name: filled for what matters now, outlined for the rest. */
-export function Initials({ name, filled = false }: { name: string; filled?: boolean }) {
+/** What a record is, drawn in its circle instead of letters: a car or a motorcycle. */
+export type Glyph = "car" | "motorcycle";
+const GLYPHS: Record<Glyph, { icon: typeof Car; label: string }> = { car: { icon: Car, label: "Car" }, motorcycle: { icon: Motorbike, label: "Motorcycle" } };
+
+export function Initials({ name, filled = false, glyph }: { name: string; filled?: boolean; glyph?: Glyph }) {
+  if (glyph) {
+    const { icon: I, label } = GLYPHS[glyph];
+    return (
+      <span title={label} className={`grid size-9 shrink-0 place-items-center rounded-full border-[1.5px] border-ink ${filled ? "bg-sage" : "bg-sheet"}`}>
+        <I className="size-[18px]" aria-label={label} />
+      </span>
+    );
+  }
   const letters = name
     .replace(/^(dr|dra|ms|mr|sir)\.?\s+/i, "")
     .split(/\s+/)

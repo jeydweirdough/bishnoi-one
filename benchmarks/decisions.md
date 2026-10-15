@@ -85,3 +85,17 @@ own, and it works the same behind Neon's connection pooler. The sign-in page
 asks for the company; a session belongs to one company. **A person can work
 for two companies**: one Platform password, a standing (title, apps, role) at
 each, and **Switch company** in the apps' menu. Today's data became GetMeds's.
+
+## Promotional materials reviewed before use, decided on 2026-10-15
+
+The ICP decision (2026-09-25) left Veeva's **MLR review** out. On 2026-10-15
+the user asked for its core: promotional materials (leaflets, posters,
+giveaways) are **approved by a pharmacist before they're produced**, and **a
+department's manager approves each distribution**. Built across three apps,
+linked through the Platform (Connections: Admin → Pharmacy, Admin → CRM):
+the marketing assistant designs in **Admin** (role Marketing Assistant), the
+pharmacist approves, returns with comments, or rejects each version in
+**Pharmacy**, the executive office produces them into stock in Admin, and the
+team's manager (or an administrator) approves each request in the **CRM**.
+Still out: legal and medical reviewers beside the pharmacist, e-signatures,
+and expiry dates on approved materials.

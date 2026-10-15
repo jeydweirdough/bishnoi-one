@@ -1,10 +1,13 @@
 "use client";
 
+import { Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { codeFields, previewCode } from "@/src/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { aiPrompt, unfence } from "./ai-prompt";
 import type { CodeFields } from "./types";
 
 // A quotation written as code: the company's own HTML and styles, with
@@ -21,6 +24,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
   const [preview, setPreview] = useState<{ html: string; using: string } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -58,6 +62,18 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
     });
   }
 
+  /** The prompt for another AI, on the clipboard; shown below too, for a browser that won't copy. */
+  async function copyPrompt() {
+    if (!fields) return;
+    try {
+      await navigator.clipboard.writeText(aiPrompt(fields));
+      toast.success("Prompt copied", { description: "Paste it into ChatGPT, describe your design, then paste its answer into Code." });
+    } catch {
+      setShowPrompt(true);
+      toast.message("Copy the prompt below by hand.");
+    }
+  }
+
   const wanted = filter.trim().toLowerCase();
   const groups = (fields?.groups ?? [])
     .map((g) => ({ ...g, fields: g.fields.filter((f) => !wanted || f.label.toLowerCase().includes(wanted) || f.field.includes(wanted)) }))
@@ -70,6 +86,31 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
         Write the quotation in HTML, with your own styles. Put a field where a detail goes, for example %customer_name%. Between {fields?.loop[0] ?? "%lines_start%"} and{" "}
         {fields?.loop[1] ?? "%lines_end%"}, a table row repeats for each product.
       </p>
+      {/* Designing it elsewhere: a prompt that teaches another AI this format, so its answer pastes in and previews as it will print. */}
+      <div className="mt-3 rounded-lg border border-rule bg-bench/40 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-2">
+            <span className="font-medium text-ink">Design it with ChatGPT or another AI.</span> Copy the prompt, add how it should look (or attach your current quotation), then paste the answer into Code. The preview shows it as it will print.
+          </p>
+          <span className="flex shrink-0 gap-2">
+            <Button variant="quiet" onClick={() => setShowPrompt((v) => !v)} disabled={!fields}>
+              {showPrompt ? "Hide prompt" : "See prompt"}
+            </Button>
+            <Button variant="primary" icon={<Copy className="size-4" aria-hidden />} onClick={copyPrompt} disabled={!fields}>
+              Copy prompt
+            </Button>
+          </span>
+        </div>
+        {showPrompt && fields && (
+          <textarea
+            readOnly
+            aria-label="Prompt for another AI"
+            value={aiPrompt(fields)}
+            onFocus={(e) => e.currentTarget.select()}
+            className="mt-3 h-64 w-full resize-y rounded-lg border border-rule-strong bg-sheet p-3 font-mono text-[12px] leading-relaxed text-ink-2"
+          />
+        )}
+      </div>
 
       <div className="mt-3 grid gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0">
@@ -117,6 +158,14 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
             ref={area}
             value={html}
             onChange={(e) => onChange(e.target.value)}
+            // An AI's answer comes wrapped in ```html ... ```: pasted, the fence is left out.
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text/plain");
+              const bare = unfence(text);
+              if (bare === text) return;
+              e.preventDefault();
+              insert(bare);
+            }}
             onKeyDown={(e) => {
               // Tab indents here, as in any code editor; Esc then Tab leaves the box.
               if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {

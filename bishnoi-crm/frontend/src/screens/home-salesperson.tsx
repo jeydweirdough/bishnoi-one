@@ -170,10 +170,11 @@ export async function SalespersonHome() {
       </div>
 
       {/* Then the rest: deals and quotes in hand, and what just happened. */}
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-        <div className="space-y-5">
+      {/* The two columns end level: the left's cards share its height, and an empty card centres its message. */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="flex flex-col gap-5">
           {seesDeals && (
-            <Sheet className="px-5 pt-4 pb-2">
+            <Sheet className="flex flex-1 flex-col px-5 pt-4 pb-2">
               <SectionTitle
                 icon="deals"
                 action={
@@ -185,9 +186,11 @@ export async function SalespersonHome() {
                 Deals closing soon
               </SectionTitle>
               {closing.length === 0 ? (
-                <Empty compact icon="deals" art="steps" title="No open deals">
-                  A deal on a customer shows here until it&apos;s won or lost, soonest to close first.
-                </Empty>
+                <div className="flex flex-1 flex-col justify-center">
+                  <Empty compact icon="deals" art="steps" title="No open deals">
+                    A deal on a customer shows here until it&apos;s won or lost, soonest to close first.
+                  </Empty>
+                </div>
               ) : (
                 <ul className="divide-y divide-rule">
                   {closing.map((d) => (
@@ -211,7 +214,7 @@ export async function SalespersonHome() {
             </Sheet>
           )}
           {seesQuotes && (
-            <Sheet className="px-5 pt-4 pb-2">
+            <Sheet className="flex flex-1 flex-col px-5 pt-4 pb-2">
               <SectionTitle
                 icon="quotes"
                 action={
@@ -232,7 +235,9 @@ export async function SalespersonHome() {
                 myQuotes.total ? (
                   <p className="py-3 text-meta text-ink-3">None waiting or rejected.</p>
                 ) : (
-                  <Empty compact icon="quotes" title="No quotes yet">Make one from a customer&apos;s page, or with New quote.</Empty>
+                  <div className="flex flex-1 flex-col justify-center">
+                    <Empty compact icon="quotes" title="No quotes yet">Make one from a customer&apos;s page, or with New quote.</Empty>
+                  </div>
                 )
               ) : (
                 <ul className="divide-y divide-rule">
@@ -256,7 +261,7 @@ export async function SalespersonHome() {
           )}
 
         </div>
-        <Sheet className="px-5 pt-4 pb-2">
+        <Sheet className="flex flex-col px-5 pt-4 pb-2">
           <SectionTitle
             icon="activity"
             action={
@@ -270,6 +275,7 @@ export async function SalespersonHome() {
             Recent activity
           </SectionTitle>
           {recent.items.length === 0 ? (
+            <div className="flex flex-1 flex-col justify-center">
             <Empty icon="activity" title="No activity yet" actions={can(me, "activities.create") && <LogActivityButton
                   label="Log activity"
                   org={me.org}
@@ -279,6 +285,7 @@ export async function SalespersonHome() {
                 />}>
               Whatever your team logs against a customer shows up here.
             </Empty>
+            </div>
           ) : (
             <ul className="divide-y divide-rule">
               {recent.items.map((a) => {

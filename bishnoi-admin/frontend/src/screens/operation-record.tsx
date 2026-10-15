@@ -60,7 +60,7 @@ export function OperationRecord({ path, data, can }: { path: OperationsPath; dat
       <section className="mt-3 rounded-[22px] border-[1.5px] border-ink bg-sheet px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-start gap-4">
           <span className="scale-125 origin-top-left pt-0.5 sm:mr-2">
-            <Initials name={name} filled />
+            <Initials name={name} filled glyph={kind.glyph?.(record)} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2.5">

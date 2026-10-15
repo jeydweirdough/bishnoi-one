@@ -106,76 +106,111 @@ type Place = Page & {
   unset?: string[];
 };
 
-type Section = { label: string; places: Place[] };
+/** A main page and the pages that belong to it, e.g. Stock: on hand, batches, serials, movements. */
+type Area = { label: string; icon: IconName; places: Place[] };
+
+type Section = { label: string; areas: Area[] };
 
 /**
- * Inventory's sidebar: every page is one row, grouped by what happens to the
- * stock: bring it in, keep it, send it out, check it. Nothing is folded away,
- * so nobody has to remember what's inside what. A role sees the rows it may
- * open, and each row says how many things wait on them there.
+ * Inventory's sidebar, laid out the way ERP systems (SAP, NetSuite, Odoo,
+ * Zoho Inventory) lay out theirs: a few main areas, each opening in place to
+ * its own pages, so batches and serials sit inside Stock rather than beside it.
+ * An area with only one page this role may open is a plain row with that
+ * page's name. Each page says how many things wait on them there.
  */
 function inventoryNav(me: Me): { home: Page | null; sections: Section[] } {
   const may = (permission: string) => me.permissions?.includes(permission) ?? false;
   const sections: Section[] = [
     {
-      label: "Procurement",
-      places: [
-        { href: "/purchase-orders", label: "Purchase orders", icon: "purchaseOrders", also: ["/backorders"], sees: ["purchasing.view"], waiting: may("purchasing.approve") ? ["drafts"] : [] },
-        { href: "/receipts", label: "Receiving", icon: "receiving", sees: ["receiving.view"], waiting: ["receiving"] },
-        { href: "/suppliers", label: "Suppliers", icon: "suppliers", sees: ["suppliers.view"] },
+      label: "General",
+      areas: [{ label: "Reports", icon: "report", places: [{ href: "/reports", label: "Reports", icon: "report", sees: ["reports.view"] }] }],
+    },
+    {
+      label: "Operations",
+      areas: [
+        {
+          label: "Purchasing",
+          icon: "purchaseOrders",
+          places: [
+            { href: "/purchase-orders", label: "Purchase orders", icon: "purchaseOrders", also: ["/backorders"], sees: ["purchasing.view"], waiting: may("purchasing.approve") ? ["drafts"] : [] },
+            { href: "/receipts", label: "Receiving", icon: "receiving", sees: ["receiving.view"], waiting: ["receiving"] },
+            { href: "/suppliers", label: "Suppliers", icon: "suppliers", sees: ["suppliers.view"] },
+          ],
+        },
+        {
+          label: "Stock",
+          icon: "stock",
+          places: [
+            { href: "/stock", label: "Stock on hand", icon: "stock", sees: ["stock.view"] },
+            { href: "/batches", label: "Batches and expiry", icon: "batches", sees: ["stock.view"] },
+            { href: "/serials", label: "Serial numbers", icon: "serials", sees: ["stock.view"] },
+            { href: "/movements", label: "Stock movements", icon: "history", sees: ["stock.view"] },
+            { href: "/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
+          ],
+        },
+        {
+          label: "Fulfillment",
+          icon: "issuance",
+          places: [
+            // One board for every kind of order (the kinds are its filter, each with its own form).
+            { href: "/orders", label: "Orders", icon: "issuance", also: ["/reservations"], sees: ["orders.view"], waiting: ["issue"] },
+            { href: "/transfers", label: "Transfers", icon: "transfers", sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
+          ],
+        },
+        {
+          label: "Stock control",
+          icon: "adjustments",
+          places: [
+            { href: "/adjustments", label: "Adjustments", icon: "adjustments", sees: ["adjustments.view"], waiting: ["adjustments"] },
+            { href: "/counts", label: "Stock counts", icon: "counts", sees: ["counts.view"], waiting: ["counts"] },
+          ],
+        },
       ],
     },
     {
-      label: "Stock",
-      places: [
-        { href: "/stock", label: "Stock on hand", icon: "stock", sees: ["stock.view"] },
-        { href: "/batches", label: "Batches and expiry", icon: "batches", sees: ["stock.view"] },
-        { href: "/serials", label: "Serial numbers", icon: "serials", sees: ["stock.view"] },
-        { href: "/movements", label: "Stock movements", icon: "history", sees: ["stock.view"] },
-        { href: "/products", label: "Products", icon: "products", sees: ["products.view"], unset: ["productPrices"] },
-        { href: "/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
+      label: "Master data",
+      areas: [
+        {
+          label: "Products",
+          icon: "products",
+          places: [
+            { href: "/products", label: "All products", icon: "products", sees: ["products.view"], unset: ["productPrices"] },
+            { href: "/catalog/categories", label: "Categories", icon: "categories", sees: ["products.view"] },
+            { href: "/catalog/brands", label: "Brands", icon: "brands", sees: ["products.view"] },
+            { href: "/catalog/units", label: "Units", icon: "units", sees: ["products.view"] },
+          ],
+        },
       ],
     },
     {
-      label: "Fulfillment",
-      places: [
-        // One board for every kind of order (the kinds are its filter, each with its own form).
-        { href: "/orders", label: "Orders", icon: "issuance", also: ["/reservations"], sees: ["orders.view"], waiting: ["issue"] },
-        { href: "/transfers", label: "Transfers", icon: "transfers", sees: ["transfers.view"], waiting: ["transfer_requests", "dispatch", "transit"] },
-      ],
-    },
-    {
-      label: "Control",
-      places: [
-        { href: "/adjustments", label: "Adjustments", icon: "adjustments", sees: ["adjustments.view"], waiting: ["adjustments"] },
-        { href: "/counts", label: "Stock counts", icon: "counts", sees: ["counts.view"], waiting: ["counts"] },
-        { href: "/reports", label: "Reports", icon: "report", sees: ["reports.view"] },
-      ],
-    },
-    {
-      label: "Catalogs",
-      places: [
-        { href: "/catalog/categories", label: "Categories", icon: "categories", sees: ["products.view"] },
-        { href: "/catalog/brands", label: "Brands", icon: "brands", sees: ["products.view"] },
-        { href: "/catalog/units", label: "Units", icon: "units", sees: ["products.view"] },
-      ],
-    },
-    {
-      label: "Access",
-      places: [
-        { href: "/admin/users", label: "Users", icon: "people", sees: ["admin.users"] },
-        { href: "/admin/roles", label: "Roles and permissions", icon: "roles", sees: ["admin.roles"] },
-        { href: "/admin/audit", label: "Audit log", icon: "auditLog", sees: ["admin.audit"] },
+      label: "Administration",
+      areas: [
+        {
+          label: "Users and access",
+          icon: "people",
+          places: [
+            { href: "/admin/users", label: "Users", icon: "people", sees: ["admin.users"] },
+            { href: "/admin/roles", label: "Roles and permissions", icon: "roles", sees: ["admin.roles"] },
+            { href: "/admin/audit", label: "Audit log", icon: "auditLog", sees: ["admin.audit"] },
+          ],
+        },
       ],
     },
   ];
+  const home: Page | null = may("dashboard.view") ? { href: "/", label: "Home", icon: "home" } : null;
   return {
-    home: may("dashboard.view") ? { href: "/", label: "Home", icon: "home" } : null,
+    home,
     sections: sections
-      .map((s) => ({ ...s, places: s.places.filter((p) => p.sees.some(may)) }))
-      .filter((s) => s.places.length > 0),
+      .map((s) => ({
+        ...s,
+        areas: s.areas.map((a) => ({ ...a, places: a.places.filter((p) => p.sees.some(may)) })).filter((a) => a.places.length > 0),
+      }))
+      .filter((s) => s.areas.length > 0 || (s.label === "General" && home !== null)),
   };
 }
+
+/** Every page in the sidebar, areas opened out. */
+const placesOf = (sections: Section[]) => sections.flatMap((s) => s.areas.flatMap((a) => a.places));
 
 /**
  * The row you're on: the most specific one the address is in. A query counts,
@@ -220,36 +255,100 @@ function InventoryLinks({ me, waiting, unset }: { me: Me; waiting: Waiting; unse
   const search = useSearchParams();
   const { home, sections } = inventoryNav(me);
   const atHome = pathname === "/" || within(pathname, "/alerts");
-  const here = atHome ? undefined : currentPlace(sections.flatMap((s) => s.places), pathname, search);
+  const here = atHome ? undefined : currentPlace(placesOf(sections), pathname, search);
   const count = (p: Place) => (p.waiting ?? []).reduce((n, key) => n + (waiting[key] ?? 0), 0);
   return (
     <nav aria-label="Main">
-      {home && (
-        <Group label="General" dense first>
-          <Row href={home.href} icon={home.icon} current={atHome} dense>
-            {home.label}
-          </Row>
-        </Group>
-      )}
-      {sections.map((s) => (
-        <Group key={s.label} label={s.label} dense>
-          {s.places.map((p) => (
-            <Row
-              key={p.href}
-              href={p.href}
-              icon={p.icon}
-              current={p === here}
-              dense
-              count={count(p)}
-              trailing={<UnsetMark place={p} unset={unset} />}
-            >
-              {p.label}
+      {sections.map((s, i) => (
+        <Group key={s.label} label={s.label} dense first={i === 0}>
+          {s.label === "General" && home && (
+            <Row href={home.href} icon={home.icon} current={atHome} dense>
+              {home.label}
             </Row>
-          ))}
+          )}
+          {s.areas.map((a) =>
+            a.places.length === 1 ? (
+              <Row key={a.label} href={a.places[0].href} icon={a.places[0].icon} current={a.places[0] === here} dense count={count(a.places[0])} trailing={<UnsetMark place={a.places[0]} unset={unset} />}>
+                {a.places[0].label}
+              </Row>
+            ) : (
+              <AreaEntry key={a.label} area={a} here={here} count={count} unset={unset} />
+            ),
+          )}
         </Group>
       ))}
     </nav>
   );
+}
+
+/**
+ * A main area: one row that opens in place to its pages, open already while
+ * you're on one of them. Closed, it carries its pages' counts; open, each page
+ * carries its own. In the narrow rail it is a link to its first page.
+ */
+function AreaEntry({ area, here, count, unset }: { area: Area; here: Place | undefined; count: (p: Place) => number; unset: Unset }) {
+  const inside = here !== undefined && area.places.includes(here);
+  const [open, toggle] = useOpen(inside);
+  const waitingHere = area.places.reduce((n, p) => n + count(p), 0);
+  const unsetHere: Place = { href: area.places[0].href, label: area.label, icon: area.icon, sees: [], unset: area.places.flatMap((p) => p.unset ?? []) };
+  return (
+    <div>
+      <Row
+        href={area.places[0].href}
+        icon={area.icon}
+        current={false}
+        open={open || inside}
+        onToggle={toggle}
+        dense
+        count={open ? 0 : waitingHere}
+        trailing={
+          <>
+            {!open && <UnsetMark place={unsetHere} unset={unset} />}
+            <ChevronRight aria-hidden className={`ml-auto size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} />
+          </>
+        }
+      >
+        {area.label}
+      </Row>
+      {open && (
+        // The guide line sits under the area's icon, so the pages read as its own.
+        <div className="mt-px mb-1 ml-[1.1875rem] animate-reshape space-y-px border-l border-rule pl-2 group-data-[rail=true]/side:hidden" role="group" aria-label={area.label}>
+          {area.places.map((p) => (
+            <Row key={p.href} href={p.href} nested current={p === here} trailing={<SubMarks count={count(p)} place={p} unset={unset} />}>
+              {p.label}
+            </Row>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A page under an area has no icon to put a dot on, so its count is a small number at the end. */
+function SubMarks({ count, place, unset }: { count: number; place: Place; unset: Unset }) {
+  return (
+    <>
+      <UnsetMark place={place} unset={unset} />
+      {count > 0 && (
+        <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-hema px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
+          {count}
+          <span className="sr-only"> waiting on you</span>
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Whether a row is open: open while you're on one of its pages, and opened or
+ * closed by a click in between. The click holds until the page changes, so a
+ * closed row opens again when you go into one of its pages.
+ */
+function useOpen(onIt: boolean): [boolean, () => void] {
+  const pathname = usePathname();
+  const [picked, setPicked] = useState<{ on: string; open: boolean } | null>(null);
+  const open = picked?.on === pathname ? picked.open : onIt;
+  return [open, () => setPicked({ on: pathname, open: !open })];
 }
 
 function modulePages(m: ModuleAccess): Page[] {
@@ -358,6 +457,7 @@ function Row({
   dense = false,
   trailing,
   count = 0,
+  onToggle,
   children,
 }: {
   href: string;
@@ -371,6 +471,8 @@ function Row({
   trailing?: ReactNode;
   /** How many wait on them here: a small red dot on the icon catches the eye; the number is for screen readers. */
   count?: number;
+  /** Set on an area's row: a click opens it in place instead of loading a page (in the rail it stays a link). */
+  onToggle?: () => void;
   children: ReactNode;
 }) {
   const rail = useContext(RailContext);
@@ -398,6 +500,13 @@ function Row({
       <span className="contents group-data-[rail=true]/side:hidden">{trailing ?? (isAway(href) ? <Icon name="external" className="size-3.5 shrink-0 text-ink-3" /> : null)}</span>
     </>
   );
+  if (onToggle && !rail) {
+    return (
+      <button type="button" onClick={onToggle} aria-expanded={open} className={`w-full text-left ${className}`}>
+        {inside}
+      </button>
+    );
+  }
   // Another app is another origin, so there is nothing for Next to route to:
   // it is an ordinary link, and the sign-in it lands on is already held.
   if (isAway(href)) {
@@ -804,7 +913,9 @@ function placeOf(pathname: string, search: URLSearchParams, me: Me): string | nu
   if (THIS_APP === "inventory") {
     const { home, sections } = inventoryNav(me);
     if (home && (pathname === "/" || within(pathname, "/alerts"))) return home.label;
-    return currentPlace(sections.flatMap((x) => x.places), pathname, search)?.label ?? null;
+    const place = currentPlace(placesOf(sections), pathname, search);
+    const area = sections.flatMap((x) => x.areas).find((a) => a.places.length > 1 && place !== undefined && a.places.includes(place));
+    return place ? (area ? `${area.label} · ${place.label}` : place.label) : null;
   }
   if (THIS_APP === "crm" && within(pathname, "/admin")) {
     const page = adminPagesFor(me).find((p) => within(pathname, p.href) || p.also.some((a) => within(pathname, a)));

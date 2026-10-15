@@ -388,6 +388,11 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
                     "daysRemaining": days, "urgencyTier": urgency_tier(days), "actionPath": f"/travel/{t.id}",
                 })
 
+    # Promotional materials needed soon and not yet in stock (app/routers/materials.py).
+    from app.routers.materials import highlights as material_highlights
+
+    highlights.extend(material_highlights(db, today))
+
     # Sort countdown highlights by urgency (most overdue first, then fewest days remaining)
     highlights.sort(key=lambda x: x["daysRemaining"])
 

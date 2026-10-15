@@ -115,3 +115,12 @@ export async function saveSalesSettings(input: Partial<SalesRules["settings"]>):
     return rules;
   });
 }
+
+/** A product's prices at its price types (not the SRP), sent to Finance: reps see them once approved. */
+export async function proposePrices(id: string, prices: Record<string, number | null>): Promise<Result<CatalogueProduct>> {
+  return attempt(async () => {
+    const saved = await api.put<CatalogueProduct>(`/products/${enc(id)}/prices`, { prices });
+    refresh();
+    return saved;
+  });
+}

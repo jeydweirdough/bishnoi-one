@@ -7,6 +7,7 @@ import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet"
 import { loadQuery } from "@/src/platform/lib/api";
 import { deleteOrder, orderStep } from "../actions/inventory";
 import { OrderForm } from "../components/document-forms";
+import { PrintLink } from "../components/print-button";
 import { PickForm, type PickLine } from "../components/pick-form";
 import { RecordTools } from "../components/record-tools";
 import { OrderStamp } from "../components/stamps";
@@ -18,9 +19,10 @@ import { KINDS, kindBySlug, kindOf, listHref, newHref } from "../lib/order-kinds
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { OrdersBoard } from "./boards";
 import { loadSetup } from "../lib/setup";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
 import { batchChoices, given, referenceOf } from "../lib/reference";
-import type { BatchRow, Order, OrderBrief, Reference, Reservation } from "../lib/types";
+import type { BatchRow, Order, OrderBrief, Paged, Reference, Reservation } from "../lib/types";
 
 export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day, at } = await context();
@@ -29,7 +31,17 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind") };
   // A board unless asked for the list, or for one status (which is a column, read as a list).
   const board = param(s, "view") !== "list" && !f.status;
-  const { orders } = await loadQuery<{ orders: OrderBrief[] }>(`query Orders($q: String, $status: String, $kind: String) { orders(q: $q, status: $status, kind: $kind) }`, given(f), ["orders"]);
+  // The board shows every open one in its columns; the list is read a page at a time.
+  const { page, size, vars } = paging(s);
+  const base = `/orders${query({ ...f, view: board ? "" : "list" })}`;
+  const { orders: got } = await loadQuery<{ orders: OrderBrief[] | Paged<OrderBrief> }>(
+    `query Orders($q: String, $status: String, $kind: String, $limit: Int, $offset: Int) { orders(q: $q, status: $status, kind: $kind, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...(board ? {} : vars) },
+    ["orders"],
+  );
+  const list: Paged<OrderBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  if (!board) keepInRange(list.items.length, list.total, page, base);
+  const orders = list.items;
   const issued = f.status === "issued";
   const info = kindOf(f.kind);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/orders${query({ ...f, status })}` });
@@ -78,6 +90,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
         )}
       </Sheet>
       )}
+      {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "order" : "orders"} />}
     </>
   );
 }
@@ -109,6 +122,7 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
         )}
         actions={
           <>
+            <PrintLink href={`/print/orders/${o.id}`} />
             {o.status === "draft" && may("orders.approve") && (
               <StepButton run={orderStep.bind(null, o.id, "confirm")} label="Confirm and reserve stock" done="Stock reserved for this order" variant="primary" />
             )}
@@ -237,10 +251,14 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
   );
 }
 
-export async function ReservationsPage() {
+export async function ReservationsPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
-  const { reservations: rows } = await loadQuery<{ reservations: Reservation[] }>("query Reservations { reservations }", {}, ["reservations"]);
+  const { page, size, vars } = paging(await searchParams);
+  const base = "/reservations";
+  const { reservations: list } = await loadQuery<{ reservations: Paged<Reservation> }>("query Reservations($limit: Int, $offset: Int) { reservations(limit: $limit, offset: $offset) }", vars, ["reservations"]);
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   return (
     <>
       <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="Reservations">Stock reserved for open orders: reserved on confirmation and allocated during picking. Reserved stock is not available to other orders.</PageHeader>
@@ -263,6 +281,7 @@ export async function ReservationsPage() {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "line" : "lines"} />
     </>
   );
 }

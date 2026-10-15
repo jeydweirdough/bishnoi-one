@@ -50,8 +50,9 @@ type CatalogList = "categories" | "brands" | "units";
 export async function saveCatalogItem(list: CatalogList, key: string | null, input: Json): Promise<Result<unknown>> {
   return key ? send("patch", `/inventory/${list}/${enc(key)}`, input) : send("post", `/inventory/${list}`, input);
 }
-export async function deleteCatalogItem(list: CatalogList, key: string): Promise<Result<null>> {
-  return send<null>("del", `/inventory/${list}/${enc(key)}`);
+/** Deletes one; with `moveTo`, what still uses it (products, categories inside it) moves there first. */
+export async function deleteCatalogItem(list: CatalogList, key: string, moveTo?: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/${list}/${enc(key)}${moveTo ? `?moveTo=${enc(moveTo)}` : ""}`);
 }
 
 // --- warehouses -------------------------------------------------------------------------

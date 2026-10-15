@@ -134,6 +134,8 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
         ...only(!admin && !agent && may("activities.create"), { href: "/email", label: "Email", icon: "email" }),
         // Approved materials: everyone shows them; an administrator keeps them.
         ...only(may("customers.view") || may("admin.settings"), { href: "/media", label: "Media", icon: "letters" }),
+        // Promotional materials Admin gives out: the department's manager approves each request.
+        ...only(may("department.manage") || may("admin.settings"), { href: "/materials", label: "Promotional materials", icon: "approvals" }),
         ...only(selling && may("customers.view"), { href: "/retention", label: "Retention", icon: "retention" }),
         // Performance is on each person's profile now (the bell and picture, top right).
       ],

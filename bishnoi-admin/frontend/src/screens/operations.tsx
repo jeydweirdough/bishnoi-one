@@ -18,7 +18,7 @@ export function CellView({ cell, href }: { cell: Cell; href?: string }) {
     case "who":
       return (
         <span className="flex items-center gap-3">
-          <Initials name={cell.name} filled={cell.filled} />
+          <Initials name={cell.name} filled={cell.filled} glyph={cell.glyph} />
           <span className="min-w-0">
             {href ? (
               <Link href={href} className="block font-semibold text-ink hover:underline">

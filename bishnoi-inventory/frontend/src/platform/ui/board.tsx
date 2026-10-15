@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, Plus } from "lucide-react";
+import { ArrowRight, CalendarClock, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dropdown, Modal } from "antd";
@@ -21,6 +21,8 @@ export type BoardColumn = {
   label: string;
   /** A small coloured dot before the name. */
   dot?: string;
+  /** The stage's icon (an element, <Send />: a page on the server can pass it), in a small square tinted with the dot's colour; also on the empty column. */
+  icon?: ReactNode;
   /** Right of the name: "40%". */
   aside?: string;
   /** Under the name: "3 deals · ₱1.2M". */
@@ -38,6 +40,8 @@ export type BoardCard = {
   flag?: ReactNode;
   /** Who or where: the customer, the supplier, from → to. */
   sub?: string;
+  /** Before `sub`: what it is (a supplier, a route). */
+  subIcon?: ReactNode;
   /** Bold, bottom left: the amount. */
   value?: string;
   /** Bottom right: its date. */
@@ -46,6 +50,8 @@ export type BoardCard = {
   late?: boolean;
   /** One quiet line under. */
   meta?: string;
+  /** Before `meta`. */
+  metaIcon?: ReactNode;
   /** False: this person can't move it (another's record). */
   movable?: boolean;
 };
@@ -163,7 +169,17 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
               >
                 <header className="mb-2 px-1.5 pt-1">
                   <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    {col.dot && <span className="size-2 shrink-0 rounded-full" style={{ background: col.dot }} aria-hidden />}
+                    {col.icon ? (
+                      <span
+                        className="grid size-6 shrink-0 place-items-center rounded-md [&>svg]:size-3.5 [&>svg]:stroke-[2.25]"
+                        style={{ background: `color-mix(in srgb, ${col.dot ?? "currentColor"} 14%, transparent)`, color: col.dot }}
+                        aria-hidden
+                      >
+                        {col.icon}
+                      </span>
+                    ) : (
+                      col.dot && <span className="size-2 shrink-0 rounded-full" style={{ background: col.dot }} aria-hidden />
+                    )}
                     <span className="min-w-0 truncate">{col.label}</span>
                     <span className="font-normal text-ink-3 tabular-nums">{list.length}</span>
                     <span className="ml-auto flex items-center gap-1 text-meta font-normal text-ink-3">
@@ -175,7 +191,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                       )}
                     </span>
                   </h2>
-                  {col.note && <p className="text-meta text-ink-3">{col.note}</p>}
+                  {col.note && <p className={`text-meta text-ink-3 ${col.icon ? "pl-8" : ""}`}>{col.note}</p>}
                 </header>
                 {target && <p className="mb-2 rounded-md bg-sheet px-3 py-1.5 text-meta text-ink-2">Drop to {target.label.replace("{to}", col.label).toLowerCase()}</p>}
                 <ul className="flex-1 space-y-2">
@@ -204,14 +220,29 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                           </Link>
                           {c.flag && <span className="shrink-0">{c.flag}</span>}
                         </p>
-                        {c.sub && <p className="truncate text-meta text-ink-3">{c.sub}</p>}
-                        {(c.value || c.when) && (
-                          <p className="mt-1.5 flex items-baseline justify-between gap-2 text-meta">
-                            <span className="truncate font-semibold text-ink">{c.value}</span>
-                            <span className={`shrink-0 ${c.late ? "font-semibold text-danger" : "text-ink-3"}`}>{c.when}</span>
+                        {c.sub && (
+                          <p className="flex min-w-0 items-center gap-1.5 text-meta text-ink-3">
+                            {c.subIcon && <span className="shrink-0 [&>svg]:size-3.5" aria-hidden>{c.subIcon}</span>}
+                            <span className="truncate">{c.sub}</span>
                           </p>
                         )}
-                        {c.meta && <p className="mt-0.5 truncate text-meta text-ink-3">{c.meta}</p>}
+                        {(c.value || c.when) && (
+                          <p className="mt-1.5 flex items-center justify-between gap-2 text-meta">
+                            <span className="truncate font-semibold text-ink">{c.value}</span>
+                            {c.when && (
+                              <span className={`flex shrink-0 items-center gap-1 ${c.late ? "font-semibold text-danger" : "text-ink-3"}`}>
+                                <CalendarClock className="size-3.5" aria-hidden />
+                                {c.when}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {c.meta && (
+                          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-meta text-ink-3">
+                            {c.metaIcon && <span className="shrink-0 [&>svg]:size-3.5" aria-hidden>{c.metaIcon}</span>}
+                            <span className="truncate">{c.meta}</span>
+                          </p>
+                        )}
                         {next.length > 0 && (
                           // The same moves without dragging: for a keyboard, and a phone.
                           <Dropdown
@@ -234,10 +265,16 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                     );
                   })}
                 </ul>
-                {list.length === 0 && !target && <p className="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">{col.hint ?? "No records"}</p>}
+                {list.length === 0 && !target && (
+                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-meta text-ink-3">
+                    {col.icon && <span className="text-ink-3/70 [&>svg]:size-5" aria-hidden>{col.icon}</span>}
+                    <p>{col.hint ?? "No records"}</p>
+                  </div>
+                )}
                 {more?.[col.key] && (
-                  <Link href={more[col.key].href} className="mt-2 px-1.5 text-meta text-ink-2 hover:text-ink hover:underline">
+                  <Link href={more[col.key].href} className="mt-2 inline-flex items-center gap-1 self-start px-1.5 text-meta text-ink-2 hover:text-ink hover:underline">
                     {more[col.key].label}
+                    <ArrowRight className="size-3.5" aria-hidden />
                   </Link>
                 )}
               </section>

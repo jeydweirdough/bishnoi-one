@@ -5,7 +5,7 @@ import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { cache } from "react";
 import { loadQuery } from "@/src/platform/lib/api";
 import { deleteProduct } from "../actions/inventory";
-import { ProductImages, SupplierPrices } from "../components/product-extras";
+import { ProductGallery, SupplierPrices } from "../components/product-extras";
 import { RecordTools } from "../components/record-tools";
 import { ExpiryMark, NoAccess, Stamp, StateMark, Table, Td } from "../components/ui";
 import { Barcode, BarList, Card, DetailPanel, InfoCard, InfoSection, Pill, StatCards } from "../components/detail";
@@ -35,6 +35,60 @@ export async function generateMetadata({ params }: { params: Params<{ id: string
   return { title: (await productPage(id)).product.name };
 }
 
+// The extra attributes a product came with (from the product list): its details
+// in plain labels, and its prices per unit and per pack as a table. Kept as
+// written, so a key we don't know still shows, its label made readable.
+const DETAIL_LABELS: Record<string, string> = {
+  generic_name: "Generic name",
+  dosage_strength: "Strength",
+  dosage_form: "Dosage form",
+  pack_size: "Pack size",
+  count: "Count per pack",
+  shelf_life: "Shelf life",
+};
+const PRICE_LABELS: Record<string, string> = {
+  srp: "SRP",
+  patient_price: "Patient price",
+  doctor_price: "Doctor's price",
+  distributor_price: "Distributor price",
+  trade_price: "Trade price",
+};
+/** "dosage_form" → "Dosage form". */
+const readable = (key: string) => key.replaceAll("_", " ").replace(/^\w/, (c) => c.toUpperCase());
+
+function attributesOf(attributes: Record<string, string>, brand?: string, category?: string) {
+  const details: [string, string][] = [];
+  const prices = new Map<string, { label: string; unit: number | null; pack: number | null }>();
+  for (const [key, raw] of Object.entries(attributes ?? {})) {
+    const value = String(raw ?? "").trim();
+    if (!value) continue;
+    // The same as the product's own brand and category: not said twice.
+    if ((key === "account" && value === brand) || (key === "category" && category?.toUpperCase().includes(value.toUpperCase()))) continue;
+    const price = key.match(/^(.*)_(unit|pack)$/);
+    if (price && (PRICE_LABELS[price[1]] || /price|srp/.test(price[1])) && /^-?\d+(\.\d+)?$/.test(value)) {
+      // Kept in centavos, as the list gave them.
+      const row = prices.get(price[1]) ?? { label: PRICE_LABELS[price[1]] ?? readable(price[1]), unit: null, pack: null };
+      row[price[2] as "unit" | "pack"] = Math.round(Number(value));
+      prices.set(price[1], row);
+      continue;
+    }
+    details.push([DETAIL_LABELS[key] ?? readable(key), value]);
+  }
+  const order = Object.keys(DETAIL_LABELS).map((k) => DETAIL_LABELS[k]);
+  details.sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99));
+  const priceOrder = Object.keys(PRICE_LABELS);
+  const priceRows = [...prices.entries()].sort((a, b) => (priceOrder.indexOf(a[0]) + 1 || 99) - (priceOrder.indexOf(b[0]) + 1 || 99)).map(([, r]) => r);
+  return { details, priceRows };
+}
+
+/** Whether a description only says what the fields already do ("Abiraterone 250 mg Tablet"). */
+function restates(description: string, said: string[]): boolean {
+  const words = (t: string) => t.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const known = new Set(said.flatMap(words));
+  const own = words(description);
+  return own.length > 0 && own.every((w) => known.has(w));
+}
+
 export default async function ProductPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, fmt, may, at, day } = await context();
@@ -42,6 +96,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
   const { product: p, reference: ref } = await productPage(id);
   const groups = p.variantCount > 0;
   const lv = p.level;
+  const { details, priceRows } = attributesOf(p.attributes, p.brand?.name, p.category?.path);
 
   return (
     <>
@@ -86,20 +141,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         side={
           <>
             <Card className="p-4">
-              <div className="grid aspect-square place-items-center overflow-hidden rounded-xl bg-bench">
-                {p.images[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box
-                  <img src={`/products/${p.id}/images/${p.images[0]}`} alt={p.name} className="size-full object-contain" />
-                ) : (
-                  <span className="flex flex-col items-center gap-2 text-ink-3">
-                    <Icon name="picture" className="size-12" />
-                    <span className="text-meta">No image</span>
-                  </span>
-                )}
-              </div>
-              <div className="mt-3">
-                <ProductImages productId={p.id} images={p.images} canEdit={may("products.edit")} />
-              </div>
+              <ProductGallery productId={p.id} name={p.name} images={p.images} canEdit={may("products.edit")} />
             </Card>
             <Card className="px-5 py-4">
               <h2 className="mb-3 text-center text-sm font-semibold text-ink">Barcode</h2>
@@ -116,12 +158,6 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
                   )}
                 </p>
               )}
-            </Card>
-            <Card className="px-5 pt-4 pb-4">
-              <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
-              <div className="mt-2">
-                <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
-              </div>
             </Card>
           </>
         }
@@ -145,24 +181,47 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         )}
 
         <InfoCard>
+          {/* The name, code, category, brand and barcode are in the header and beside it: not said again here. */}
           <InfoSection
-            icon="info"
-            title="Basic information"
+            icon="products"
+            title="Product details"
             items={[
-              ["Product name", p.name],
               ["Type", PRODUCT_TYPES[p.productType]],
-              ["SKU", <span key="sku" className="font-mono">{p.sku}</span>],
-              ["Barcode", p.barcode],
-              ["Category", p.category?.path],
-              ["Brand", p.brand?.name],
-              ["Preferred supplier", p.supplier ? <Link key="supplier" href={`/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
               ["Unit", `${p.unitName} (${p.unit})`],
+              ["Preferred supplier", p.supplier ? <Link key="supplier" href={`/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
               ...(p.variantLabel ? [["Variant", p.variantLabel] as [string, string]] : []),
-              ...Object.entries(p.attributes),
+              ...details,
             ]}
           >
-            {p.description && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{p.description}</p>}
+            {p.description && !restates(p.description, [p.name, ...details.map(([, v]) => v)]) && (
+              <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{p.description}</p>
+            )}
           </InfoSection>
+          {priceRows.length > 0 && (
+            <InfoSection icon="pricing" title="Price list" items={[]}>
+              <p className="mt-1 text-meta text-ink-3">As given with the product list, per unit and per pack. Selling and cost prices are below.</p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[22rem] text-sm">
+                  <thead>
+                    <tr className="border-b border-rule text-left text-meta text-ink-3">
+                      <th scope="col" className="py-2 pr-3 font-medium">Price</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Per unit ({p.unitName.toLowerCase()})</th>
+                      <th scope="col" className="py-2 pl-3 text-right font-medium">Per pack</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rule">
+                    {priceRows.map((r) => (
+                      <tr key={r.label}>
+                        <th scope="row" className="py-2 pr-3 text-left font-semibold text-ink">{r.label}</th>
+                        <td className="px-3 py-2 text-right text-ink-2 tabular-nums">{r.unit === null ? "—" : fmt.peso(r.unit)}</td>
+                        <td className="py-2 pl-3 text-right text-ink-2 tabular-nums">{r.pack === null ? "—" : fmt.peso(r.pack)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </InfoSection>
+          )}
           <InfoSection
             icon="pricing"
             title="Sales information"
@@ -194,7 +253,6 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
                 )
               }
               items={[
-                ["On hand", `${fmt.count(lv.onHand)} ${p.unit}`],
                 ["Value at cost", fmt.peso(p.value)],
                 ["Damaged", fmt.count(lv.damaged)],
                 ["In transit", fmt.count(lv.inTransit)],
@@ -206,6 +264,12 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
             />
           )}
         </InfoCard>
+
+        {/* What each supplier charges: the full width, a row each, and a row to add one. */}
+        <Card className="mt-5 px-5 pt-4 pb-4">
+          <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
+          <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
+        </Card>
 
         {groups ? (
           <BarList
@@ -246,6 +310,25 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
           />
         )}
       </DetailPanel>
+
+      {/* Tracked by batch but nothing received yet: say so, and where batches come from. */}
+      {!groups && p.balances.length === 0 && (p.trackBatches || p.trackExpiry) && (
+        <Sheet className="mt-5 px-5 pt-4 pb-5">
+          <SectionTitle icon="headquarters">Batches and expiry</SectionTitle>
+          <p className="text-sm text-ink-2">
+            This product is tracked by {[p.trackBatches && "batch number", p.trackExpiry && "expiry date"].filter(Boolean).join(" and ")}, but none is in stock yet.
+            Each batch is recorded when stock is received, with its batch number and expiry date, and is issued first-expired, first-out.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <LinkButton href="/receipts/new" variant="primary" size="sm">
+              Receive stock
+            </LinkButton>
+            <LinkButton href="/batches" size="sm">
+              All batches and expiry
+            </LinkButton>
+          </div>
+        </Sheet>
+      )}
 
       {!groups && p.balances.length > 0 && (
         <Sheet className="mt-5">

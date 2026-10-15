@@ -1,3 +1,4 @@
+import { Clock, FilePen, PackageCheck, PackageOpen, PackageX, Truck } from "lucide-react";
 import { ADJUSTMENT_STATUSES, COUNT_STATUSES, ORDER_STATUSES, PO_STATUSES, TRANSFER_STATUSES } from "../lib/labels";
 import type { AdjustmentBrief, CountStatus, OrderStatus, POStatus, TransferStatus } from "../lib/types";
 import { Stamp, type Tone } from "./ui";
@@ -23,3 +24,26 @@ export const OrderStamp = ({ status }: { status: OrderStatus }) => <Stamp tone={
 export const TransferStamp = ({ status }: { status: TransferStatus }) => <Stamp tone={TRANSFER[status]}>{TRANSFER_STATUSES[status]}</Stamp>;
 export const AdjustmentStamp = ({ status }: { status: AdjustmentBrief["status"] }) => <Stamp tone={ADJUSTMENT[status]}>{ADJUSTMENT_STATUSES[status]}</Stamp>;
 export const CountStamp = ({ status }: { status: CountStatus }) => <Stamp tone={COUNT[status]}>{COUNT_STATUSES[status]}</Stamp>;
+
+/** A purchase order's status as a small icon (beside a name, where a stamp is too much), its words on hover and for screen readers. */
+export function POStatusIcon({ status, late }: { status: POStatus; late?: boolean }) {
+  const icon = {
+    draft: { Of: FilePen, color: "text-ink-3" },
+    ordered: { Of: Truck, color: "text-[#2a78d6]" },
+    partial: { Of: PackageOpen, color: "text-[#8a5a00]" },
+    received: { Of: PackageCheck, color: "text-filed" },
+    cancelled: { Of: PackageX, color: "text-danger" },
+  }[status];
+  const said = `${PO_STATUSES[status]}${late ? ", late" : ""}`;
+  // Recognition over recall: the common states (received, ordered) read from the
+  // icon alone; the rarer ones, and a late order, say it in a word too.
+  const word = late ? "Late" : status === "partial" ? "Partial" : status === "cancelled" ? "Cancelled" : status === "draft" ? "Draft" : null;
+  return (
+    <span title={said} className={`inline-flex shrink-0 items-center gap-1 ${late ? "text-danger" : icon.color}`}>
+      <icon.Of className="size-4" aria-hidden />
+      {late && <Clock className="size-3.5" aria-hidden />}
+      {word ? <span className="text-meta font-medium" aria-hidden>{word}</span> : null}
+      <span className="sr-only">{said}</span>
+    </span>
+  );
+}

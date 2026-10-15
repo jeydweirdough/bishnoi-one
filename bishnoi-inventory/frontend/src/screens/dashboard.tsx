@@ -7,11 +7,9 @@ import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { loadQuery } from "@/src/platform/lib/api";
 import { MonthBars, TrendLine } from "../components/home-charts";
-import { POStamp } from "../components/stamps";
+import { POStamp, POStatusIcon } from "../components/stamps";
 import { NoAccess, Table } from "../components/ui";
-import { SetupGuide } from "../components/setup";
 import { context, type Search } from "../lib/page";
-import { loadSetup } from "../lib/setup";
 import type { Dashboard, PurchaseHome } from "../lib/types";
 
 export const metadata = { title: "Dashboard" };
@@ -66,7 +64,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   if (!may("dashboard.view")) return <NoAccess what="the dashboard" />;
   const { dashboard: d } = await loadQuery<{ dashboard: Dashboard }>("query Dashboard { dashboard }", {}, ["dashboard"]);
   const t = d.totals;
-  const setup = await loadSetup();
   const chart = (await searchParams).chart === "received" ? "received" : "issued";
   const series = d.trend;
   const [now, last] = [series[series.length - 1], series[series.length - 2]];
@@ -97,7 +94,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
       </div>
 
-      <SetupGuide setup={setup} may={may} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card
@@ -225,9 +221,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                           <Icon name="purchaseOrders" className="size-5" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-ink">{itemOf(po)}</span>
-                          <span className="mt-1 block">
-                            <POStamp status={po.status} late={po.late} />
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold text-ink">{itemOf(po)}</span>
+                            <POStatusIcon status={po.status} late={po.late} />
                           </span>
                           <span className="mt-1.5 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-y-0.5 text-meta">
                             <span className="text-ink-3">Order</span>

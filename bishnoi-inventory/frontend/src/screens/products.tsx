@@ -4,10 +4,11 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { loadQuery } from "@/src/platform/lib/api";
 import { FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "../components/ui";
-import { PRODUCT_STATUSES, param } from "../lib/labels";
-import { context, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { PRODUCT_STATUSES, param, query } from "../lib/labels";
+import { context, keepInRange, paging, type Search } from "../lib/page";
 import { given, referenceOf } from "../lib/reference";
-import type { ProductRow, Reference } from "../lib/types";
+import type { Paged, ProductRow, Reference } from "../lib/types";
 
 export const metadata = { title: "Products" };
 
@@ -16,14 +17,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock"), missing: param(s, "missing") };
-  const { products, reference: ref } = await loadQuery<{ products: ProductRow[]; reference: Pick<Reference, "categories" | "brands" | "suppliers"> }>(
-    `query Products($q: String, $category: String, $brand: String, $supplier: String, $status: String, $stock: String, $missing: Boolean) {
-      products(q: $q, category: $category, brand: $brand, supplier: $supplier, status: $status, stock: $stock, missing: $missing)
+  const { page, size, vars } = paging(s);
+  const base = `/products${query(f)}`;
+  const { products: list, reference: ref } = await loadQuery<{ products: Paged<ProductRow>; reference: Pick<Reference, "categories" | "brands" | "suppliers"> }>(
+    `query Products($q: String, $category: String, $brand: String, $supplier: String, $status: String, $stock: String, $missing: Boolean, $limit: Int, $offset: Int) {
+      products(q: $q, category: $category, brand: $brand, supplier: $supplier, status: $status, stock: $stock, missing: $missing, limit: $limit, offset: $offset)
       ${referenceOf("categories", "brands", "suppliers")}
     }`,
-    given({ ...f, missing: Boolean(f.missing) }),
+    { ...given({ ...f, missing: Boolean(f.missing) }), ...vars },
     ["products", "reference"],
   );
+  keepInRange(list.items.length, list.total, page, base);
+  const products = list.items;
   // Variants sit under their product, so the catalogue reads Product → 1 mL, 3 mL, 5 mL.
   const ids = new Set(products.map((p) => p.id));
   const tops = products.filter((p) => !p.parentId || !ids.has(p.parentId));
@@ -79,10 +84,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           </Table>
         )}
       </Sheet>
-      <p className="mt-3 text-meta text-ink-3">
-        {products.length} product{products.length === 1 ? "" : "s"}
-        {f.q && <> matching &ldquo;{f.q}&rdquo;</>}.
-      </p>
+      <Pager total={list.total} page={page} size={size} base={base} noun={`product${list.total === 1 ? "" : "s"}${f.q ? ` matching “${f.q}”` : ""}`} />
     </>
   );
 }

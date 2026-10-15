@@ -160,7 +160,27 @@ def take_delivery(body: DeliveryIn, request: Request) -> Response:
 
     platform_links.forget()
     log.info("Connect key: delivered by the Platform.")
+    connect_now(settings)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def connect_now(settings: Settings) -> None:
+    """Asks the Platform for this application's links now, in the background,
+    rather than when someone next opens a screen: the asking is what shows the
+    application as connected there, so a running application connects within
+    seconds of starting or of its key arriving. Without a key, it asks for one."""
+    if not settings.platform_api_url:
+        return
+
+    def run() -> None:
+        from app import platform_links
+
+        try:
+            platform_links.answer(settings)
+        except Exception:
+            log.exception("Links: couldn't ask the Platform.")
+
+    threading.Thread(target=run, name="platform-connect", daemon=True).start()
 
 
 def forget() -> None:

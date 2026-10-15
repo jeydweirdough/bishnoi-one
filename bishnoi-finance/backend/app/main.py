@@ -69,6 +69,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app import platform_connect
 
     app.include_router(platform_connect.router)
+    # Connected on the Platform as soon as this runs, not when someone first uses it.
+    platform_connect.connect_now(settings)
     app.include_router(auth.router)
     app.include_router(profile.router)
     app.include_router(admin.router)

@@ -30,7 +30,7 @@ from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
 from app.executive import sync_notifications, today_in_org, urgency_tier
-from app.models import DeviceIssue, FleetCard, Notification, RecordEvent, TravelSponsorship, Vehicle, utcnow
+from app.models import DeviceIssue, FleetCard, Notification, RecordEvent, TravelSponsorship, Vehicle, guess_vehicle_kind, utcnow
 
 router = APIRouter(prefix="/admin", tags=["fleet, travel and devices"])
 
@@ -45,6 +45,8 @@ VEHICLE_DUES = (("registration_due", "registration", "Registration"), ("insuranc
 
 class VehicleIn(Api):
     name: str = Field(min_length=2, max_length=140)
+    # Its icon. Left out: worked out from the plate and name (guess_vehicle_kind).
+    kind: Literal["car", "motorcycle"] | None = None
     plate: str | None = Field(None, max_length=20)
     year_model: int | None = Field(None, ge=1950, le=2100)
     color: str | None = Field(None, max_length=60)
@@ -119,7 +121,7 @@ def vehicle_out(v: Vehicle, today: date) -> dict:
     dues = vehicle_dues(v, today)
     nearest = dues[0] if dues else None
     return {
-        "id": v.id, "no": v.no, "name": v.name, "plate": v.plate, "yearModel": v.year_model, "color": v.color, "ownerName": v.owner_name,
+        "id": v.id, "no": v.no, "name": v.name, "kind": v.kind, "plate": v.plate, "yearModel": v.year_model, "color": v.color, "ownerName": v.owner_name,
         "registrationDue": _d(v.registration_due), "insuranceDue": _d(v.insurance_due), "pmsDue": _d(v.pms_due),
         "fleetCard": v.fleet_card, "notes": v.notes, "dues": dues,
         "nextDue": nearest["label"] if nearest else None,
@@ -167,13 +169,18 @@ class Kind:
     check: Callable[[Any], None] = lambda body: None
 
 
+def _check_vehicle(body: VehicleIn) -> None:
+    if body.kind is None:
+        body.kind = guess_vehicle_kind(body.name, body.plate)
+
+
 def _check_device(body: DeviceIn) -> None:
     if not (body.laptop or body.phone or body.sim):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, [{"type": "value_error", "loc": ["body", "laptop"], "msg": "Say what was handed over: a laptop, a phone or a SIM."}])
 
 
 KINDS = (
-    Kind("vehicles", "vehicles", Vehicle, VehicleIn, vehicle_out, lambda v: " ".join(x for x in (v.name, v.plate) if x), (Vehicle.name,), "vehicle"),
+    Kind("vehicles", "vehicles", Vehicle, VehicleIn, vehicle_out, lambda v: " ".join(x for x in (v.name, v.plate) if x), (Vehicle.name,), "vehicle", _check_vehicle),
     Kind("fleet-cards", "vehicles", FleetCard, FleetCardIn, fleet_card_out, lambda c: c.holder_name, (FleetCard.holder_name,), "fuel card"),
     Kind("travel", "travel", TravelSponsorship, TravelIn, travel_out, lambda t: f"{t.doctor_name} ({t.kind})", (TravelSponsorship.requested_on.desc(),), "sponsorship"),
     Kind("devices", "devices", DeviceIssue, DeviceIn, device_out, lambda d: d.issued_to, (DeviceIssue.issued_on.desc(),), "device issue", _check_device),

@@ -6,45 +6,47 @@ import {
   AtSign,
   Building2,
   Calendar,
-  Check,
   CheckSquare,
-  Code2,
+  ChevronDown,
+  ChevronUp,
   Coins,
-  Copy,
-  Eye,
   EyeOff,
   FlaskConical,
+  GripVertical,
   Hash,
-  Info,
   Link2,
   List,
   ListChecks,
   Lock,
-  Maximize2,
   Package,
   Phone,
   Plus,
-  RotateCcw,
   Search,
-  Sparkles,
+  Settings2,
+  Trash2,
   Type,
-  Wand2,
-  X,
 } from "lucide-react";
+import { Modal, Switch } from "antd";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
-import type { CustomEntity, FormFieldDef, FormLayout, FormSectionDef } from "@/src/platform/lib/types";
+import type { CustomEntity, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 import { saveForm, type SectionDraft } from "../../actions/settings";
 import { useTerms } from "@/src/components/terms/provider";
 import type { Terms } from "@/src/components/terms/terms";
 import type { TeamName } from "../admin/teams-for";
 
-// XML Form Editor (Settings → Forms)
-// Focused XML-based builder with on-demand interactive preview.
+// The form designer (Settings → Forms).
+//
+// The form is drawn the way it reads, like a printed document: a title between
+// two rules, each section a green band, its fields in bordered cells. Fields
+// not on the form wait in the list on the left; drag one onto the page (or
+// click it) to put it there, drag a cell to move it, and click a cell to change
+// its label, whether it's required, its help text and its options. What's on
+// the page is what's saved, and what everyone fills in.
 
 type Kind = { type: string; label: string; icon: ReactNode };
 const KINDS: Kind[] = [
@@ -68,304 +70,15 @@ const BUILT_IN_KINDS: Record<string, string> = { status: "Customer type", owner:
 const kindLabel = (t: string, words?: Terms) =>
   t === "molecule" && words ? words.genericName : KINDS.find((k) => k.type === t)?.label ?? BUILT_IN_KINDS[t] ?? t;
 const kindIcon = (t: string) => KINDS.find((k) => k.type === t)?.icon ?? <Lock className="size-4" />;
+const WITH_OPTIONS = new Set(["choice", "multi_choice"]);
+const MAY_BE_UNIQUE = new Set(["text", "number", "email", "phone"]);
 
-function escapeXml(unsafe: string): string {
-  return (unsafe || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
+/** The title across the top of the page, as the document would be called. */
+const TITLES: Record<CustomEntity, string> = { company: "Customer", contact: "Contact", product: "Product", quote: "Quotation" } as Record<CustomEntity, string>;
 
-/** Generates canonical XML field name tag based on entity and key */
-function defaultTagForField(f: FormFieldDef, entity: CustomEntity): string {
-  if (entity === "company" && f.key === "name") return "customer_name";
-  if (entity === "company" && f.key === "status") return "customer_type";
-  if (entity === "contact" && f.key === "firstName") return "first_name";
-  if (entity === "contact" && f.key === "lastName") return "last_name";
-  if (entity === "contact" && f.key === "companyId") return "customer";
-  if (entity === "product" && f.key === "name") return "product_name";
-  if (entity === "product" && f.key === "code") return "product_code";
-  if (f.key.startsWith("x_")) return f.key;
-  return f.key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-}
-
-/** Resolves an XML attribute/tag back to an existing FormFieldDef key */
-function resolveFieldKey(rawTag: string, entity: CustomEntity, fieldMap: Map<string, FormFieldDef>): string | null {
-  const clean = rawTag.trim().toLowerCase().replace(/^%+|%+$/g, "");
-  if (fieldMap.has(clean)) return clean;
-
-  const camel = clean.replace(/_([a-z0-9])/g, (_, ch) => ch.toUpperCase());
-  if (fieldMap.has(camel)) return camel;
-
-  if (entity === "company") {
-    if (clean === "customer_name" || clean === "customername" || clean === "customer" || clean === "name") return "name";
-    if (clean === "customer_type" || clean === "customertype" || clean === "type" || clean === "status") return "status";
-    if (clean === "tier") return "x_tier";
-    if (clean === "pvi" || clean === "pvi_zone") return "x_pvi_zone";
-    if (clean === "s2" || clean === "pdea_s2" || clean === "s2_license") return "x_pdea_s2";
-    if (clean === "s2_expiry" || clean === "s2_expiration") return "x_s2_expiry";
-    if (clean === "credit_status") return "x_credit_status";
-    if (clean === "lifecycle" || clean === "account_lifecycle") return "x_account_lifecycle";
-  }
-  if (entity === "contact") {
-    if (clean === "first_name" || clean === "firstname") return "firstName";
-    if (clean === "last_name" || clean === "lastname") return "lastName";
-    if (clean === "customer" || clean === "company" || clean === "hospital") return "companyId";
-    if (clean === "stakeholder") return "x_stakeholder";
-    if (clean === "care_team") return "x_care_team_status";
-  }
-  if (entity === "product") {
-    if (clean === "product_name" || clean === "productname") return "name";
-    if (clean === "product_code" || clean === "productcode") return "code";
-    if (clean === "generic_name" || clean === "genericname") return "genericName";
-  }
-  if (entity === "quote") {
-    if (clean === "quote_notes") return "notes";
-    if (clean === "payer" || clean === "payer_program") return "x_payer_program";
-    if (clean === "procurement" || clean === "procurement_mode") return "x_procurement_mode";
-  }
-
-  if (!clean.startsWith("x_") && fieldMap.has(`x_${clean}`)) return `x_${clean}`;
-
-  for (const k of fieldMap.keys()) {
-    if (k.toLowerCase() === clean || k.toLowerCase().replace(/_/g, "") === clean.replace(/_/g, "")) {
-      return k;
-    }
-  }
-  return null;
-}
-
-/** Generates clean, beautiful XML markup from a layout */
-export function layoutToXml(layout: FormLayout, entity: CustomEntity): string {
-  const lines: string[] = [];
-  lines.push(`<form entity="${entity}">`);
-  for (const s of layout.sections) {
-    lines.push(`  <section title="${escapeXml(s.title)}" columns="${s.columns}">`);
-    for (const f of s.fields) {
-      const tag = defaultTagForField(f, entity);
-      const attrs: string[] = [`name="${tag}"`];
-      if (f.label && f.label.toLowerCase() !== tag.replace(/_/g, " ").toLowerCase()) {
-        attrs.push(`label="${escapeXml(f.label)}"`);
-      }
-      if (f.required && !f.standard) {
-        attrs.push(`required="true"`);
-      }
-      if (f.hidden) {
-        attrs.push(`hidden="true"`);
-      }
-      lines.push(`    <field ${attrs.join(" ")} />`);
-    }
-    lines.push(`  </section>`);
-    lines.push("");
-  }
-  lines.push(`</form>`);
-  return lines.join("\n").trim();
-}
-
-type ParsedSection = {
-  id: string | null;
-  title: string;
-  columns: 1 | 2;
-  fields: FormFieldDef[];
-};
-
-/** Parses XML format into sections and field definitions */
-export function parseXmlToSections(
-  xmlCode: string,
-  entity: CustomEntity,
-  knownFields: Map<string, FormFieldDef>,
-  originalSections: FormSectionDef[]
-): { sections: ParsedSection[]; warnings: string[]; totalFields: number } {
-  const warnings: string[] = [];
-  const sections: ParsedSection[] = [];
-  const seenFieldKeys = new Set<string>();
-
-  // Remove XML comments
-  const cleanCode = xmlCode.replace(/<!--[\s\S]*?-->/g, "");
-
-  const sectionRegex = /<section\s+([^>]*?)>([\s\S]*?)<\/section>/gi;
-  const attrRegex = /([a-zA-Z0-9_-]+)=["']([^"']*)["']/g;
-  const fieldTagRegex = /<field\s+([^>]*?)(?:\/>|>([\s\S]*?)<\/field>)/gi;
-  const percentTagRegex = /%([a-zA-Z0-9_]+)(?::\s*([a-zA-Z0-9_]+))?%/g;
-
-  let sm: RegExpExecArray | null;
-  while ((sm = sectionRegex.exec(cleanCode)) !== null) {
-    const attrStr = sm[1];
-    const body = sm[2];
-
-    const attrs: Record<string, string> = {};
-    let am: RegExpExecArray | null;
-    while ((am = attrRegex.exec(attrStr)) !== null) {
-      attrs[am[1].toLowerCase()] = am[2];
-    }
-
-    const title = attrs.title || attrs.name || "Untitled section";
-    const columns = (attrs.columns === "1" ? 1 : 2) as 1 | 2;
-
-    const orig = originalSections.find((os) => os.title.toLowerCase() === title.toLowerCase());
-    const id = orig ? orig.id : null;
-
-    const sectionFields: FormFieldDef[] = [];
-
-    // Parse <field ... /> tags
-    let fm: RegExpExecArray | null;
-    while ((fm = fieldTagRegex.exec(body)) !== null) {
-      const fAttrStr = fm[1];
-      const inner = (fm[2] || "").trim();
-
-      const fAttrs: Record<string, string> = {};
-      let fam: RegExpExecArray | null;
-      while ((fam = attrRegex.exec(fAttrStr)) !== null) {
-        fAttrs[fam[1].toLowerCase()] = fam[2];
-      }
-
-      const rawTag = fAttrs.name || fAttrs.key || fAttrs.tag || inner.replace(/%/g, "").trim();
-      if (!rawTag) continue;
-
-      const isRequired = fAttrs.required === "true" || fAttrs.required === "1";
-      const isHidden = fAttrs.hidden === "true" || fAttrs.hidden === "1";
-      const customLabel = fAttrs.label?.trim();
-
-      const resolvedKey = resolveFieldKey(rawTag, entity, knownFields);
-      if (resolvedKey && knownFields.has(resolvedKey)) {
-        const base = knownFields.get(resolvedKey)!;
-        if (seenFieldKeys.has(base.key)) {
-          warnings.push(`Field "${rawTag}" appears more than once on the form.`);
-        }
-        seenFieldKeys.add(base.key);
-
-        sectionFields.push({
-          ...base,
-          label: customLabel || base.label,
-          required: isRequired || (base.standard ? base.required : false),
-          hidden: isHidden,
-        });
-      } else {
-        // Custom field defined in XML
-        const customKey = rawTag.startsWith("x_") ? rawTag : `x_${rawTag.toLowerCase()}`;
-        if (seenFieldKeys.has(customKey)) {
-          warnings.push(`Field "${rawTag}" appears more than once.`);
-        }
-        seenFieldKeys.add(customKey);
-
-        sectionFields.push({
-          id: "",
-          key: customKey,
-          label: customLabel || rawTag.replace(/^x_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          type: "text",
-          standard: false,
-          locked: false,
-          required: isRequired,
-          hidden: isHidden,
-          inList: false,
-          options: [],
-          helpText: null,
-          placeholder: null,
-          used: 0,
-        });
-      }
-    }
-
-    // Also support any loose %tag% in body not wrapped in <field>
-    const bodyWithoutFields = body.replace(fieldTagRegex, "");
-    let pm: RegExpExecArray | null;
-    while ((pm = percentTagRegex.exec(bodyWithoutFields)) !== null) {
-      const rawTag = pm[1];
-      const modifier = pm[2]?.toLowerCase();
-      const resolvedKey = resolveFieldKey(rawTag, entity, knownFields);
-
-      if (resolvedKey && knownFields.has(resolvedKey)) {
-        const base = knownFields.get(resolvedKey)!;
-        if (seenFieldKeys.has(base.key)) {
-          warnings.push(`Field "%${rawTag}%" appears more than once.`);
-        }
-        seenFieldKeys.add(base.key);
-        sectionFields.push({
-          ...base,
-          required: modifier === "required" ? true : modifier === "optional" ? false : base.required,
-          hidden: modifier === "hidden",
-        });
-      }
-    }
-
-    sections.push({ id, title, columns, fields: sectionFields });
-  }
-
-  // Fallback: If no <section> tags found, wrap whole code in default section
-  if (sections.length === 0 && cleanCode.trim().length > 0) {
-    const sectionFields: FormFieldDef[] = [];
-    let fm: RegExpExecArray | null;
-    while ((fm = fieldTagRegex.exec(cleanCode)) !== null) {
-      const fAttrs: Record<string, string> = {};
-      let fam: RegExpExecArray | null;
-      while ((fam = attrRegex.exec(fm[1])) !== null) {
-        fAttrs[fam[1].toLowerCase()] = fam[2];
-      }
-      const rawTag = fAttrs.name || fAttrs.key || "";
-      const resolvedKey = resolveFieldKey(rawTag, entity, knownFields);
-      if (resolvedKey && knownFields.has(resolvedKey)) {
-        const base = knownFields.get(resolvedKey)!;
-        seenFieldKeys.add(base.key);
-        sectionFields.push({
-          ...base,
-          required: fAttrs.required === "true" || base.required,
-          hidden: fAttrs.hidden === "true",
-        });
-      }
-    }
-    sections.push({ id: null, title: "General", columns: 2, fields: sectionFields });
-  }
-
-  // Ensure standard built-in fields are not dropped from backend validation
-  for (const f of knownFields.values()) {
-    if (f.standard && !seenFieldKeys.has(f.key)) {
-      warnings.push(`Built-in field "${f.label}" was omitted from XML; keeping it hidden.`);
-      if (sections.length > 0) {
-        sections[sections.length - 1].fields.push({ ...f, hidden: true });
-      }
-    }
-  }
-
-  const totalFields = sections.reduce((sum, s) => sum + s.fields.length, 0);
-  return { sections, warnings, totalFields };
-}
-
-/** Formats XML code with clean 2-space indentation */
-function formatXml(xml: string): string {
-  let formatted = "";
-  let pad = 0;
-  // Normalize self-closing and separate tags
-  const tokens = xml
-    .replace(/>\s*</g, "><")
-    .replace(/></g, ">\n<")
-    .split("\n");
-
-  for (const rawToken of tokens) {
-    const token = rawToken.trim();
-    if (!token) continue;
-
-    if (token.startsWith("</")) {
-      pad = Math.max(0, pad - 1);
-    }
-
-    formatted += "  ".repeat(pad) + token + "\n";
-
-    if (token.startsWith("<") && !token.startsWith("</") && !token.endsWith("/>") && !token.startsWith("<?") && !token.startsWith("<!--")) {
-      // Check if it's not a single-line tag like <tag>content</tag>
-      if (!/<\w+[^>]*>.*?<\/\w+>/.test(token)) {
-        pad += 1;
-      }
-    }
-  }
-  return formatted.trim();
-}
-
-/** Realistic sample values for previewing */
+/** Realistic sample values, so the page reads like a filled-in record. */
 const SAMPLE_VALUES: Record<string, string> = {
   name: "St. Luke's Medical Center - BGC",
-  customer_name: "St. Luke's Medical Center - BGC",
   firstName: "Manuel",
   lastName: "Santos",
   jobTitle: "Chief of Medical Staff",
@@ -377,29 +90,37 @@ const SAMPLE_VALUES: Record<string, string> = {
   city: "Taguig City",
   country: "Philippines",
   x_tier: "Tier 1 (Core)",
-  x_pvi_zone: "Red (Peak / Tender <72h)",
   x_pdea_s2: "PDEA-S2-2026-08841",
-  x_s2_expiry: "2027-12-31",
-  x_credit_status: "Good Standing",
+  x_s2_expiry: "31 Dec 2027",
+  x_credit_status: "Good standing",
   x_account_lifecycle: "Active",
-  x_stakeholder: "Pharmacy Director",
-  x_care_team_status: "Active Prescriber",
+  x_stakeholder: "Pharmacy director",
+  x_care_team_status: "Active prescriber",
   code: "MED-500",
-  genericName: "Amoxicillin Trihydrate",
+  genericName: "Amoxicillin trihydrate",
   strength: "500 mg",
   notes: "Hospital tender pricing with 30-day term delivery.",
   x_payer_program: "PCSO / DOH MAIP",
-  x_procurement_mode: "Small Value Procurement (RA 9184)",
-  x_gl_number: "GL-2026-90412",
-  x_gl_expiry: "2026-11-30",
-  x_csp_number: "CSP-2026-5510",
+  x_procurement_mode: "Small value procurement (RA 9184)",
 };
+
+type DraftSection = { ref: string; id: string | null; title: string; columns: 1 | 2; fields: FormFieldDef[] };
+/** Where a dragged field is about to land: before a field, or at the end of a section. */
+type Spot = { section: string; before: string | null };
+
+let made = 0;
+const newRef = () => `s${++made}`;
+
+const fromLayout = (layout: FormLayout): DraftSection[] =>
+  layout.sections.map((s) => ({ ref: s.id || newRef(), id: s.id || null, title: s.title, columns: s.columns, fields: s.fields }));
+
+/** What would be saved, to tell whether anything changed. */
+const fingerprint = (sections: DraftSection[]) =>
+  JSON.stringify(sections.map((s) => [s.id, s.title, s.columns, s.fields.map((f) => [f.key, f.label, f.required, f.hidden, f.inList, f.unique, f.helpText, f.placeholder, f.options])]));
 
 export function FormEditor({
   entity,
   layout,
-  teams = [],
-  kinds = [],
 }: {
   entity: CustomEntity;
   layout: FormLayout;
@@ -408,112 +129,135 @@ export function FormEditor({
 }) {
   const terms = useTerms();
   const router = useRouter();
-
-  // Map of all known fields in this layout
-  const fieldMap = useMemo(() => {
-    const map = new Map<string, FormFieldDef>();
-    for (const s of layout.sections) {
-      for (const f of s.fields) {
-        map.set(f.key, f);
-      }
-    }
-    return map;
-  }, [layout]);
-
-  // Initial XML generated from current layout
-  const initialXml = useMemo(() => layoutToXml(layout, entity), [layout, entity]);
-  const [code, setCode] = useState(initialXml);
-  const [savedCode, setSavedCode] = useState(initialXml);
-
-  // Active View Mode: "editor" (Focus on forming the XML) or "preview" (Full interactive preview)
-  const [activeView, setActiveView] = useState<"editor" | "preview">("editor");
-
+  const [sections, setSections] = useState<DraftSection[]>(() => fromLayout(layout));
+  const [saved, setSaved] = useState(() => fingerprint(fromLayout(layout)));
+  const [selected, setSelected] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [spot, setSpot] = useState<Spot | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "standard" | "custom">("all");
-  const [previewSample, setPreviewSample] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [sample, setSample] = useState(true);
+  const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // Add custom field modal state
-  const [newFieldOpen, setNewFieldOpen] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [newType, setNewType] = useState("text");
-  const [newRequired, setNewRequired] = useState(false);
-  const [newOptions, setNewOptions] = useState("Option 1\nOption 2");
+  const dirty = fingerprint(sections) !== saved;
+  const all = sections.flatMap((s) => s.fields);
+  const onForm = all.filter((f) => !f.hidden).length;
+  const waiting = all.filter((f) => f.hidden);
+  const shown = waiting.filter((f) => !search.trim() || f.label.toLowerCase().includes(search.trim().toLowerCase()));
+  const chosen = selected ? all.find((f) => f.key === selected) ?? null : null;
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // --- changes to the page ---
 
-  // Parse XML in real time
-  const parsed = useMemo(
-    () => parseXmlToSections(code, entity, fieldMap, layout.sections),
-    [code, entity, fieldMap, layout.sections]
-  );
+  /** Takes a field out of wherever it is and puts it at a spot, on the form. */
+  function place(key: string, to: Spot) {
+    setSections((list) => {
+      const field = list.flatMap((s) => s.fields).find((f) => f.key === key);
+      if (!field || key === to.before) return list;
+      const without = list.map((s) => ({ ...s, fields: s.fields.filter((f) => f.key !== key) }));
+      return without.map((s) => {
+        if (s.ref !== to.section) return s;
+        const at = to.before ? s.fields.findIndex((f) => f.key === to.before) : -1;
+        const fields = [...s.fields];
+        fields.splice(at < 0 ? fields.length : at, 0, { ...field, hidden: false });
+        return { ...s, fields };
+      });
+    });
+  }
 
-  const isDirty = code.trim() !== savedCode.trim();
-
-  /** Inserts text at current cursor position */
-  const insertText = useCallback((text: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setCode((c) => `${c}\n${text}`);
+  /** Off the page: built-in and used fields are kept, hidden; a field added since saving goes. */
+  function takeOff(field: FormFieldDef) {
+    if (field.locked) return;
+    if (selected === field.key) setSelected(null);
+    if (!field.id) {
+      setSections((list) => list.map((s) => ({ ...s, fields: s.fields.filter((f) => f.key !== field.key) })));
       return;
     }
-    const start = textarea.selectionStart ?? textarea.value.length;
-    const end = textarea.selectionEnd ?? start;
-    const nextCode = textarea.value.slice(0, start) + text + textarea.value.slice(end);
-    setCode(nextCode);
-    setTimeout(() => {
-      textarea.focus();
-      const pos = start + text.length;
-      textarea.setSelectionRange(pos, pos);
-    }, 10);
-  }, []);
+    change(field.key, { hidden: true });
+  }
 
-  /** Inserts a field XML element */
-  const insertFieldXml = (tag: string, label?: string) => {
-    const snippet = label
-      ? `  <field name="${tag}" label="${escapeXml(label)}" />\n`
-      : `  <field name="${tag}" />\n`;
-    insertText(snippet);
-    toast.success(`Inserted <field name="${tag}" />`);
+  /** Deleted for good: only an added field no record has a value in. */
+  function remove(field: FormFieldDef) {
+    setSections((list) => list.map((s) => ({ ...s, fields: s.fields.filter((f) => f.key !== field.key) })));
+  }
+
+  function change(key: string, patch: Partial<FormFieldDef>) {
+    setSections((list) => list.map((s) => ({ ...s, fields: s.fields.map((f) => (f.key === key ? { ...f, ...patch } : f)) })));
+  }
+
+  function changeSection(ref: string, patch: Partial<DraftSection>) {
+    setSections((list) => list.map((s) => (s.ref === ref ? { ...s, ...patch } : s)));
+  }
+
+  function moveSection(ref: string, by: -1 | 1) {
+    setSections((list) => {
+      const i = list.findIndex((s) => s.ref === ref);
+      const j = i + by;
+      if (i < 0 || j < 0 || j >= list.length) return list;
+      const next = [...list];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+
+  /** A section goes once nothing shows in it; its hidden fields move to the one beside it. */
+  function dropSection(ref: string) {
+    setSections((list) => {
+      const i = list.findIndex((s) => s.ref === ref);
+      if (i < 0 || list.length === 1) return list;
+      const keep = list[i].fields;
+      const next = list.filter((s) => s.ref !== ref);
+      const into = Math.max(0, i - 1);
+      next[into] = { ...next[into], fields: [...next[into].fields, ...keep] };
+      return next;
+    });
+  }
+
+  function addSection() {
+    setSections((list) => [...list, { ref: newRef(), id: null, title: "New section", columns: 2, fields: [] }]);
+  }
+
+  /** A click on a waiting field: onto the end of the section being worked in, or the last one. */
+  function addToPage(key: string) {
+    const target = (chosen && sections.find((s) => s.fields.some((f) => f.key === chosen.key))) || sections[sections.length - 1];
+    if (target) place(key, { section: target.ref, before: null });
+  }
+
+  function addField(field: FormFieldDef) {
+    const target = sections[sections.length - 1];
+    if (!target) return;
+    setSections((list) => list.map((s) => (s.ref === target.ref ? { ...s, fields: [...s.fields, field] } : s)));
+    setSelected(field.key);
+  }
+
+  // --- dragging ---
+
+  const startDrag = (key: string) => (e: DragEvent) => {
+    e.dataTransfer.setData("text/plain", key);
+    e.dataTransfer.effectAllowed = "move";
+    setDragging(key);
+  };
+  const over = (to: Spot) => (e: DragEvent) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (spot?.section !== to.section || spot.before !== to.before) setSpot(to);
+  };
+  const drop = (to: Spot) => (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = e.dataTransfer.getData("text/plain") || dragging;
+    if (key) place(key, to);
+    endDrag();
+  };
+  const endDrag = () => {
+    setDragging(null);
+    setSpot(null);
   };
 
-  /** Formats the XML in the editor */
-  const handleFormat = () => {
-    try {
-      const formatted = formatXml(code);
-      setCode(formatted);
-      toast.success("XML formatted");
-    } catch {
-      toast.error("Could not format XML");
-    }
-  };
+  // --- saving ---
 
-  /** Handles Tab key in editor */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      insertText("  ");
-    }
-  };
-
-  /** Copies code */
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    toast.success("XML code copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  /** Inserts a new section snippet */
-  const handleInsertSection = () => {
-    const snippet = `\n  <section title="New Section" columns="2">\n    \n  </section>\n`;
-    insertText(snippet);
-  };
-
-  /** Saves the coded form layout */
-  const handleSave = () => {
-    const body: SectionDraft[] = parsed.sections.map((s) => ({
+  function save() {
+    const body: SectionDraft[] = sections.map((s) => ({
       id: s.id,
       title: s.title.trim() || "Untitled section",
       columns: s.columns,
@@ -530,7 +274,7 @@ export function FormEditor({
         optionNames: Object.fromEntries(
           Object.entries(f.optionNames ?? {})
             .filter(([o, n]) => f.options.includes(o) && typeof n === "string" && Boolean(n.trim()))
-            .map(([o, n]) => [o, String(n).trim()])
+            .map(([o, n]) => [o, String(n).trim()]),
         ),
         unique: f.unique ?? false,
         onlyTeams: f.onlyTeams ?? [],
@@ -539,547 +283,524 @@ export function FormEditor({
         exceptTypes: f.exceptTypes ?? [],
       })),
     }));
-
     startTransition(async () => {
       const result = await saveForm(entity, body);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      setSavedCode(code);
-      toast.success("Form saved successfully", {
-        description: "Your XML layout is now active for all users.",
-      });
+      if (!result.ok) return void toast.error(result.error);
+      const next = fromLayout(result.data);
+      setSections(next);
+      setSaved(fingerprint(next));
+      setSelected(null);
+      toast.success("Form saved", { description: "Everyone gets this form from now on." });
       router.refresh();
     });
-  };
+  }
 
-  /** Adds custom field */
-  const handleCreateCustomField = () => {
-    const cleanLabel = newLabel.trim();
-    if (!cleanLabel) {
-      toast.error("Please enter a field label");
-      return;
-    }
-    const cleanKey = `x_${cleanLabel.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}`;
-    const opts =
-      newType === "choice" || newType === "multi_choice"
-        ? newOptions
-            .split("\n")
-            .map((o) => o.trim())
-            .filter(Boolean)
-        : [];
-
-    const newFieldDef: FormFieldDef = {
-      id: "",
-      key: cleanKey,
-      label: cleanLabel,
-      type: newType as FormFieldDef["type"],
-      standard: false,
-      locked: false,
-      required: newRequired,
-      hidden: false,
-      inList: false,
-      options: opts,
-      helpText: null,
-      placeholder: null,
-      used: 0,
-    };
-
-    fieldMap.set(cleanKey, newFieldDef);
-    insertText(`  <field name="${cleanKey}" label="${escapeXml(cleanLabel)}"${newRequired ? ' required="true"' : ""} />\n`);
-    setNewFieldOpen(false);
-    setNewLabel("");
-    toast.success(`Created field <field name="${cleanKey}" />`);
-  };
-
-  // Filtered field list for the palette
-  const allFieldList = useMemo(() => Array.from(fieldMap.values()), [fieldMap]);
-  const filteredFields = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allFieldList.filter((f) => {
-      if (activeTab === "standard" && !f.standard) return false;
-      if (activeTab === "custom" && f.standard) return false;
-      if (!q) return true;
-      const tag = defaultTagForField(f, entity).toLowerCase();
-      return f.label.toLowerCase().includes(q) || f.key.toLowerCase().includes(q) || tag.includes(q);
-    });
-  }, [allFieldList, search, activeTab, entity]);
+  function discard() {
+    const back = fromLayout(layout);
+    setSections(back);
+    setSaved(fingerprint(back));
+    setSelected(null);
+  }
 
   return (
     <div className="space-y-4">
-      {/* Top Header & View Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-meta text-ink-3">
+          {onForm} {onForm === 1 ? "field" : "fields"} on the form in {sections.length} {sections.length === 1 ? "section" : "sections"}. Drag fields onto the page, or click one to change it.
+        </p>
         <div className="flex items-center gap-3">
-          <span className="flex size-8 items-center justify-center rounded-xl bg-hema-tint text-hema shadow-xs">
-            <Code2 className="size-4.5" />
-          </span>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-ink">XML Form Studio</h2>
-              <span className="rounded-md bg-bench px-2 py-0.5 text-[11px] font-medium text-ink-2 capitalize">
-                {entity}
-              </span>
-            </div>
-            <p className="text-meta text-ink-3">
-              Define form layout with clean XML tags. Focus on building your structure, then click preview.
-            </p>
-          </div>
-        </div>
-
-        {/* View Mode Switcher and Actions */}
-        <div className="flex items-center gap-2">
-          {/* Segmented Mode Control */}
-          <div className="flex rounded-xl bg-bench p-1 text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveView("editor")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-all ${
-                activeView === "editor"
-                  ? "bg-sheet text-ink shadow-sm"
-                  : "text-ink-3 hover:text-ink"
-              }`}
-            >
-              <Code2 className="size-3.5" />
-              <span>XML Editor</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView("preview")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-all ${
-                activeView === "preview"
-                  ? "bg-hema-tint text-hema font-semibold shadow-sm"
-                  : "text-ink-3 hover:text-ink"
-              }`}
-            >
-              <Eye className="size-3.5" />
-              <span>Preview Form</span>
-              <span className="ml-1 rounded-md bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                {parsed.totalFields}
-              </span>
-            </button>
-          </div>
-
-          {isDirty && (
-            <Button variant="quiet" onClick={() => setCode(savedCode)}>
-              Discard
+          <label className="flex items-center gap-2 text-sm text-ink-2">
+            <Switch size="small" checked={sample} onChange={setSample} />
+            Sample values
+          </label>
+          {dirty && (
+            <Button variant="quiet" onClick={discard}>
+              Discard changes
             </Button>
           )}
-
-          <Button variant="primary" loading={pending} disabled={!isDirty} onClick={handleSave}>
+          <Button variant="primary" loading={pending} disabled={!dirty} onClick={save}>
             Save form
           </Button>
         </div>
       </div>
 
-      {/* VIEW 1: FOCUSED XML FORM BUILDER */}
-      {activeView === "editor" && (
-        <div className="grid gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
-          {/* Left Column: Available Fields Palette */}
-          <Sheet className="flex flex-col p-3.5 self-start">
-            <div className="flex items-center justify-between pb-2 border-b border-rule">
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">Available Fields</span>
-              <span className="rounded-md bg-bench px-2 py-0.5 text-[11px] font-medium text-ink-2">
-                {allFieldList.length}
-              </span>
+      <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
+        {/* The field's settings while one is picked; otherwise the fields not on the form. */}
+        <Sheet className="p-4 lg:sticky lg:top-4">
+          {chosen ? (
+            <FieldSettings
+              field={chosen}
+              terms={terms}
+              onChange={(patch) => change(chosen.key, patch)}
+              onTakeOff={() => takeOff(chosen)}
+              onClose={() => setSelected(null)}
+            />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-ink">Not on the form</h3>
+                <span className="rounded-md bg-bench px-2 py-0.5 text-meta text-ink-2 tabular-nums">{waiting.length}</span>
+              </div>
+              {waiting.length > 6 && (
+                <div className="mt-3">
+                  <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search fields" prefix={<Search className="size-3.5 text-ink-3" />} />
+                </div>
+              )}
+              <ul className="mt-3 max-h-[28rem] space-y-1 overflow-y-auto">
+                {shown.map((f) => (
+                  <li key={f.key} className="group flex items-center gap-1">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={startDrag(f.key)}
+                      onDragEnd={endDrag}
+                      onClick={() => addToPage(f.key)}
+                      title="Drag onto the page, or click to add it"
+                      className="flex min-w-0 flex-1 cursor-grab items-center gap-2.5 rounded-lg border border-rule bg-sheet px-2.5 py-2 text-left text-sm hover:border-sage-deep hover:bg-mint active:cursor-grabbing"
+                    >
+                      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-bench text-ink-3">{kindIcon(f.type)}</span>
+                      <span className="min-w-0 flex-1 truncate text-ink">{f.label}</span>
+                      <Plus className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+                    </button>
+                    {!f.standard && !f.used && f.id && (
+                      <IconButton label={`Delete ${f.label}`} size="sm" tone="danger" onClick={() => remove(f)}>
+                        <Trash2 className="size-3.5" />
+                      </IconButton>
+                    )}
+                  </li>
+                ))}
+                {waiting.length === 0 && <li className="py-4 text-center text-meta text-ink-3">Every field is on the form.</li>}
+                {waiting.length > 0 && shown.length === 0 && <li className="py-4 text-center text-meta text-ink-3">No field matches.</li>}
+              </ul>
+              <div className="mt-4 border-t border-rule pt-4">
+                <Button className="w-full" icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>
+                  New field
+                </Button>
+              </div>
+            </>
+          )}
+        </Sheet>
+
+        {/* The page. */}
+        <Sheet className="overflow-x-auto px-5 py-8 sm:px-10">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-8 flex items-center gap-5">
+              <span className="h-px flex-1 bg-rule" aria-hidden />
+              <h3 className="text-2xl font-normal tracking-[0.12em] text-ink uppercase">{TITLES[entity] ?? entity}</h3>
+              <span className="h-px flex-1 bg-rule" aria-hidden />
             </div>
 
-            <div className="mt-2.5">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search fields or tags..."
-                prefix={<Search className="size-3.5 text-ink-3" />}
-              />
-            </div>
-
-            {/* Filter Pills */}
-            <div className="mt-2 flex gap-1 rounded-lg bg-bench p-1 text-[11px]">
-              {(["all", "standard", "custom"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 rounded-md py-1 font-medium capitalize transition-colors ${
-                    activeTab === tab ? "bg-sheet text-ink shadow-sm" : "text-ink-3 hover:text-ink"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Field Cards Palette */}
-            <div className="mt-2.5 max-h-[38rem] flex-1 space-y-1 overflow-y-auto pr-1">
-              {filteredFields.map((f) => {
-                const tag = defaultTagForField(f, entity);
+            <div className="space-y-6">
+              {sections.map((s, i) => {
+                const visible = s.fields.filter((f) => !f.hidden);
+                const hiddenHere = s.fields.length - visible.length;
                 return (
-                  <button
-                    key={f.key}
-                    type="button"
-                    onClick={() => insertFieldXml(tag, f.label)}
-                    title={`Click to insert <field name="${tag}" /> at cursor`}
-                    className="group flex w-full items-center justify-between gap-2 rounded-xl border border-transparent bg-sheet px-2.5 py-2 text-left text-xs transition-all hover:border-hema/40 hover:bg-bench hover:shadow-xs"
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-bench text-ink-3 transition-colors group-hover:bg-hema-tint group-hover:text-hema">
-                        {kindIcon(f.type)}
-                      </span>
-                      <span className="truncate font-medium text-ink transition-colors group-hover:text-hema">
-                        {f.label}
-                      </span>
+                  <section key={s.ref} aria-label={s.title}>
+                    <div className="group/band flex items-center gap-2 bg-sage-deep px-3 py-2 text-white">
+                      <input
+                        value={s.title}
+                        onChange={(e) => changeSection(s.ref, { title: e.target.value })}
+                        aria-label="Section title"
+                        className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[0.9375rem] font-medium text-white placeholder:text-white/60 hover:bg-white/10 focus:bg-white/15 focus:outline-none"
+                        placeholder="Section title"
+                      />
+                      <div className="flex items-center gap-0.5 rounded-md bg-white/10 p-0.5 text-meta" role="group" aria-label="Columns">
+                        {([1, 2] as const).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            aria-pressed={s.columns === n}
+                            onClick={() => changeSection(s.ref, { columns: n })}
+                            className={`rounded px-2 py-0.5 ${s.columns === n ? "bg-white text-sage-deep" : "text-white/85 hover:bg-white/15"}`}
+                          >
+                            {n} {n === 1 ? "column" : "columns"}
+                          </button>
+                        ))}
+                      </div>
+                      <BandButton label="Move section up" disabled={i === 0} onClick={() => moveSection(s.ref, -1)}>
+                        <ChevronUp className="size-4" />
+                      </BandButton>
+                      <BandButton label="Move section down" disabled={i === sections.length - 1} onClick={() => moveSection(s.ref, 1)}>
+                        <ChevronDown className="size-4" />
+                      </BandButton>
+                      <BandButton
+                        label={visible.length > 0 ? "Move or take off its fields first" : "Delete section"}
+                        disabled={visible.length > 0 || sections.length === 1}
+                        onClick={() => dropSection(s.ref)}
+                      >
+                        <Trash2 className="size-4" />
+                      </BandButton>
                     </div>
-                    <span className="shrink-0 rounded-md bg-bench px-1.5 py-0.5 font-mono text-[10px] text-ink-3 transition-colors group-hover:bg-hema-tint group-hover:text-hema">
-                      +{tag}
-                    </span>
-                  </button>
+
+                    <div
+                      className={`grid border-l border-rule ${s.columns === 2 ? "sm:grid-cols-2" : ""}`}
+                      onDragOver={over({ section: s.ref, before: null })}
+                      onDrop={drop({ section: s.ref, before: null })}
+                    >
+                      {visible.map((f) => (
+                        <Cell
+                          key={f.key}
+                          field={f}
+                          wide={s.columns === 2 && f.type === "long_text"}
+                          sample={sample}
+                          terms={terms}
+                          picked={selected === f.key}
+                          lifted={dragging === f.key}
+                          landing={spot?.section === s.ref && spot.before === f.key && dragging !== f.key}
+                          onPick={() => setSelected(selected === f.key ? null : f.key)}
+                          onTakeOff={() => takeOff(f)}
+                          onDragStart={startDrag(f.key)}
+                          onDragEnd={endDrag}
+                          onDragOver={over({ section: s.ref, before: f.key })}
+                          onDrop={drop({ section: s.ref, before: f.key })}
+                        />
+                      ))}
+                      <div
+                        className={`flex min-h-14 items-center justify-center border-r border-b border-dashed px-3 py-3 text-meta ${s.columns === 2 ? "sm:col-span-2" : ""} ${
+                          spot?.section === s.ref && spot.before === null ? "border-sage-deep bg-mint text-sage-deep" : "border-rule text-ink-3"
+                        }`}
+                      >
+                        {dragging
+                          ? "Drop here"
+                          : visible.length === 0
+                            ? "Drag fields here from the list"
+                            : hiddenHere > 0
+                              ? `${hiddenHere} hidden ${hiddenHere === 1 ? "field" : "fields"} from this section in Not on the form`
+                              : "Drag more fields here"}
+                      </div>
+                    </div>
+                  </section>
                 );
               })}
-              {filteredFields.length === 0 && (
-                <p className="py-6 text-center text-meta text-ink-3">No matching field found.</p>
-              )}
             </div>
 
-            {/* Add Custom Field Button */}
-            <div className="mt-3 pt-3 border-t border-rule">
-              <Button
-                variant="quiet"
-                size="sm"
-                className="w-full justify-center !text-hema hover:!bg-hema-tint"
-                icon={<Plus className="size-3.5" />}
-                onClick={() => setNewFieldOpen(true)}
-              >
-                Add custom field
-              </Button>
-            </div>
-          </Sheet>
+            <button
+              type="button"
+              onClick={addSection}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-rule-strong py-3 text-sm text-ink-2 hover:border-sage-deep hover:bg-mint hover:text-ink"
+            >
+              <Plus className="size-4" aria-hidden />
+              Add section
+            </button>
 
-          {/* Right Column: Full-Width XML Code Editor */}
-          <Sheet className="flex flex-col p-4">
-            {/* Editor Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule pb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-mono text-xs font-semibold text-hema">&lt;form entity=&quot;{entity}&quot;&gt;</span>
-                <span className="text-meta text-ink-3">
-                  · {parsed.sections.length} sections, {parsed.totalFields} fields defined
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" variant="quiet" icon={<Plus className="size-3.5" />} onClick={handleInsertSection}>
-                  Section
-                </Button>
-                <Button size="sm" variant="quiet" icon={<Wand2 className="size-3.5" />} onClick={handleFormat}>
-                  Format
-                </Button>
-                <Button
-                  size="sm"
-                  variant="quiet"
-                  icon={copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-                  onClick={handleCopy}
-                >
-                  {copied ? "Copied" : "Copy"}
-                </Button>
-                <Button size="sm" variant="quiet" icon={<RotateCcw className="size-3.5" />} onClick={() => setCode(savedCode)}>
-                  Reset
-                </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="!bg-hema !text-white"
-                  icon={<Eye className="size-3.5" />}
-                  onClick={() => setActiveView("preview")}
-                >
-                  Preview Form
-                </Button>
-              </div>
-            </div>
-
-            {/* Editor Input Area */}
-            <div className="mt-3 flex-1 flex flex-col">
-              <textarea
-                ref={textareaRef}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                onKeyDown={handleKeyDown}
-                spellCheck={false}
-                aria-label="XML Form Structure Editor"
-                className="min-h-[40rem] flex-1 resize-y rounded-xl border border-slate-700 bg-[#0b1329] p-4 font-mono text-[13px] leading-relaxed text-[#e2e8f0] shadow-inner focus:border-hema focus:outline-none focus:ring-1 focus:ring-hema"
-              />
-            </div>
-
-            {/* Calm, Stress-Free Editor Footer */}
-            <div className="mt-2.5 flex items-center justify-between text-xs text-ink-3 px-1">
-              <div className="flex items-center gap-2">
-                <span className={`size-2 rounded-full ${parsed.sections.length > 0 ? "bg-emerald-500" : "bg-amber-500"}`} />
-                <span className="font-mono text-[11px] text-ink-2">
-                  {parsed.sections.length} sections · {parsed.totalFields} fields
-                </span>
-              </div>
-              <span className="text-meta text-ink-3">
-                Click any field on the left to insert into your form structure.
-              </span>
-            </div>
-          </Sheet>
-        </div>
-      )}
-
-      {/* VIEW 2: ON-DEMAND FULL INTERACTIVE PREVIEW */}
-      {activeView === "preview" && (
-        <Sheet className="flex flex-col p-5">
-          {/* Preview Navigation Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-3.5">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="quiet"
-                size="sm"
-                icon={<ArrowLeft className="size-4" />}
-                onClick={() => setActiveView("editor")}
-              >
-                Back to XML Editor
-              </Button>
-              <div className="h-4 w-px bg-rule" />
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                  <Eye className="size-3.5" />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">Interactive Form Preview</span>
-                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
-                  {parsed.sections.length} sections · {parsed.totalFields} fields
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPreviewSample((s) => !s)}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                  previewSample ? "bg-hema-tint text-hema font-semibold" : "bg-bench text-ink-3 hover:text-ink"
-                }`}
-              >
-                {previewSample ? "Sample Data: ON" : "Blank Form Mode"}
-              </button>
-
-              <Button variant="primary" loading={pending} disabled={!isDirty} onClick={handleSave}>
-                Save form
-              </Button>
-            </div>
-          </div>
-
-          {/* Form Preview Canvas */}
-          <div className="mt-5 max-w-4xl mx-auto w-full space-y-6 pb-8">
-            {parsed.sections.map((section, sIdx) => (
-              <div key={sIdx} className="rounded-xl border border-rule bg-sheet p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between border-b border-rule pb-2.5">
-                  <h3 className="text-sm font-semibold text-ink">{section.title}</h3>
-                  <span className="rounded-md bg-bench px-2 py-0.5 text-[11px] font-medium text-ink-3">
-                    {section.columns} column{section.columns === 2 ? "s" : ""}
-                  </span>
-                </div>
-
-                <div className={`grid gap-4 ${section.columns === 2 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
-                  {section.fields.map((f, fIdx) => (
-                    <PreviewField key={`${f.key}-${fIdx}`} field={f} sample={previewSample} terms={terms} />
-                  ))}
-                  {section.fields.length === 0 && (
-                    <p className="col-span-full py-6 text-center text-meta text-ink-3 italic">
-                      No fields placed in this section. Add &lt;field name=&quot;...&quot; /&gt; tags in XML.
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {parsed.sections.length === 0 && (
-              <div className="py-16 text-center text-meta text-ink-3 space-y-3">
-                <p>No valid sections parsed from XML.</p>
-                <Button variant="quiet" size="sm" onClick={() => setActiveView("editor")}>
-                  Return to XML Editor
-                </Button>
-              </div>
-            )}
+            {entity === "quote" && <QuoteLines />}
           </div>
         </Sheet>
-      )}
+      </div>
 
-      {/* Modal: Add Custom Field */}
-      {newFieldOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
-          <Sheet className="w-full max-w-md p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-rule pb-3">
-              <h3 className="text-base font-semibold text-ink">Add Custom Field</h3>
-              <button
-                type="button"
-                onClick={() => setNewFieldOpen(false)}
-                className="rounded-md p-1 text-ink-3 hover:bg-bench hover:text-ink"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+      <NewField open={adding} onClose={() => setAdding(false)} onAdd={addField} taken={new Set(all.map((f) => f.label.trim().toLowerCase()))} terms={terms} />
+    </div>
+  );
+}
 
-            <div className="mt-4 space-y-3.5 text-sm">
-              <Field label="Field label">
-                {(p) => (
-                  <Input
-                    {...p}
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    placeholder="e.g. Hospital Accreditation"
-                    autoFocus
-                  />
-                )}
-              </Field>
+function BandButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="grid size-7 place-items-center rounded-md text-white/85 hover:bg-white/15 hover:text-white disabled:opacity-35 disabled:hover:bg-transparent"
+    >
+      {children}
+    </button>
+  );
+}
 
-              <Field label="Field type">
-                {(p) => (
-                  <Select
-                    {...p}
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value)}
-                  >
-                    {KINDS.map((k) => (
-                      <option key={k.type} value={k.type}>
-                        {kindLabel(k.type, terms)}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+/** One field on the page: its label over its value, in a bordered cell, as the document reads. */
+function Cell({
+  field,
+  wide,
+  sample,
+  terms,
+  picked,
+  lifted,
+  landing,
+  onPick,
+  onTakeOff,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: {
+  field: FormFieldDef;
+  wide: boolean;
+  sample: boolean;
+  terms: Terms | undefined;
+  picked: boolean;
+  lifted: boolean;
+  landing: boolean;
+  onPick: () => void;
+  onTakeOff: () => void;
+  onDragStart: (e: DragEvent) => void;
+  onDragEnd: () => void;
+  onDragOver: (e: DragEvent) => void;
+  onDrop: (e: DragEvent) => void;
+}) {
+  const value = sample ? sampleOf(field) : "";
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`group/cell relative min-w-0 border-r border-b border-rule px-4 py-3 transition-colors ${wide ? "sm:col-span-2" : ""} ${
+        picked ? "bg-mint ring-2 ring-sage-deep ring-inset" : "hover:bg-bench/60"
+      } ${lifted ? "opacity-40" : ""} ${landing ? "shadow-[inset_0_3px_0_var(--color-sage-deep,#4f7f44)]" : ""}`}
+    >
+      <button type="button" onClick={onPick} className="block w-full cursor-pointer text-left" aria-label={`${field.label}: change its settings`}>
+        <span className="flex items-center gap-1.5 text-meta text-ink-3">
+          <GripVertical className="-ml-2.5 size-3.5 shrink-0 cursor-grab opacity-0 group-hover/cell:opacity-100" aria-hidden />
+          <span className="truncate">{field.label}</span>
+          {field.required && <span className="text-danger">*</span>}
+          {field.locked && <Lock className="size-3 shrink-0" aria-label="Always on the form" />}
+        </span>
+        <span className={`mt-1 block truncate text-sm ${value ? "text-ink" : "text-ink-3"}`}>
+          {value || field.placeholder || kindLabel(field.type, terms)}
+        </span>
+        {field.helpText && <span className="mt-0.5 block truncate text-meta text-ink-3">{field.helpText}</span>}
+      </button>
+      <span className="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover/cell:opacity-100 focus-within:opacity-100">
+        <IconButton label={`${field.label} settings`} size="sm" onClick={onPick}>
+          <Settings2 className="size-3.5" />
+        </IconButton>
+        {!field.locked && (
+          <IconButton label={`Take ${field.label} off the form`} size="sm" onClick={onTakeOff}>
+            <EyeOff className="size-3.5" />
+          </IconButton>
+        )}
+      </span>
+    </div>
+  );
+}
 
-              {(newType === "choice" || newType === "multi_choice") && (
-                <Field label="Options (one per line)">
-                  {(p) => (
-                    <Textarea
-                      {...p}
-                      rows={3}
-                      value={newOptions}
-                      onChange={(e) => setNewOptions(e.target.value)}
-                      placeholder="Option 1&#10;Option 2"
-                    />
-                  )}
-                </Field>
-              )}
+function sampleOf(field: FormFieldDef): string {
+  if (SAMPLE_VALUES[field.key]) return SAMPLE_VALUES[field.key];
+  if (field.type === "yes_no") return "Yes";
+  if (field.type === "money") return "₱1,250,000.00";
+  if (field.type === "number") return "12";
+  if (field.type === "date") return "15 Oct 2026";
+  if (field.type === "email") return "name@example.com";
+  if (field.type === "url") return "https://example.com";
+  if (field.options.length) {
+    const first = field.options.slice(0, field.type === "multi_choice" ? 2 : 1);
+    return first.map((o) => field.optionNames?.[o] || o).join(", ");
+  }
+  return "";
+}
 
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={newRequired}
-                  onChange={(e) => setNewRequired(e.target.checked)}
-                  className="rounded border-rule text-hema focus:ring-hema"
-                />
-                <span className="text-ink">Required field</span>
-              </label>
-
-              <div className="mt-5 flex justify-end gap-2 pt-2 border-t border-rule">
-                <Button variant="quiet" onClick={() => setNewFieldOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={handleCreateCustomField}>
-                  Add &amp; Insert XML Field
-                </Button>
-              </div>
-            </div>
-          </Sheet>
+/** The picked field's settings, in the list's place, with the way back above them. */
+function FieldSettings({
+  field,
+  terms,
+  onChange,
+  onTakeOff,
+  onClose,
+}: {
+  field: FormFieldDef;
+  terms: Terms | undefined;
+  onChange: (patch: Partial<FormFieldDef>) => void;
+  onTakeOff: () => void;
+  onClose: () => void;
+}) {
+  const options = WITH_OPTIONS.has(field.type) && !field.sharedList;
+  return (
+    <div>
+      <button type="button" onClick={onClose} className="mb-3 inline-flex items-center gap-1.5 text-meta text-ink-2 hover:text-ink">
+        <ArrowLeft className="size-3.5" aria-hidden />
+        Fields not on the form
+      </button>
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-8 place-items-center rounded-lg bg-bench text-ink-2">{kindIcon(field.type)}</span>
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-ink">{field.label || "Untitled field"}</h3>
+          <p className="text-meta text-ink-3">
+            {kindLabel(field.type, terms)}
+            {field.standard ? " · Built in" : ""}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3.5">
+        <Field label="Label">{(p) => <Input {...p} value={field.label} onChange={(e) => onChange({ label: e.target.value })} />}</Field>
+        <Field label="Help text" optional>
+          {(p) => <Input {...p} value={field.helpText ?? ""} onChange={(e) => onChange({ helpText: e.target.value })} placeholder="Shown under the field" />}
+        </Field>
+        <Field label="Placeholder" optional>
+          {(p) => <Input {...p} value={field.placeholder ?? ""} onChange={(e) => onChange({ placeholder: e.target.value })} placeholder="Shown inside the empty field" />}
+        </Field>
+        {options && (
+          <Field label="Options" hint="One per line.">
+            {(p) => (
+              <Textarea
+                {...p}
+                rows={4}
+                value={field.options.join("\n")}
+                onChange={(e) => onChange({ options: e.target.value.split("\n").map((o) => o.trimStart()) })}
+              />
+            )}
+          </Field>
+        )}
+        {field.sharedList && <p className="text-meta text-ink-3">Its options are kept in Settings → Deal stages.</p>}
+        <Toggle label="Required" hint={field.locked ? "Always required." : undefined} checked={field.locked || field.required} disabled={field.locked} onChange={(v) => onChange({ required: v })} />
+        <Toggle label="Show in lists" checked={field.inList} onChange={(v) => onChange({ inList: v })} />
+        {MAY_BE_UNIQUE.has(field.type) && !field.standard && (
+          <Toggle label="No two records the same" checked={field.unique ?? false} onChange={(v) => onChange({ unique: v })} />
+        )}
+      </div>
+      {!field.locked && (
+        <div className="mt-5 border-t border-rule pt-4">
+          <Button className="w-full" icon={<EyeOff className="size-4" />} onClick={onTakeOff}>
+            Take off the form
+          </Button>
+          <p className="mt-2 text-meta text-ink-3">{field.id ? "Kept in Not on the form, with its values, until you put it back." : "Not saved yet, so it goes."}</p>
         </div>
       )}
     </div>
   );
 }
 
-/** Individual Field rendering in the Interactive Preview */
-function PreviewField({ field, sample, terms }: { field: FormFieldDef; sample: boolean; terms: Terms | undefined }) {
-  const isHidden = field.hidden;
-  const sampleValue = sample ? SAMPLE_VALUES[field.key] ?? (field.options.length ? field.options[0] : "Sample value") : "";
+function Toggle({ label, hint, checked, disabled, onChange }: { label: string; hint?: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-3 text-sm text-ink">
+      <span>
+        {label}
+        {hint && <span className="block text-meta text-ink-3">{hint}</span>}
+      </span>
+      <Switch size="small" checked={checked} disabled={disabled} onChange={onChange} />
+    </label>
+  );
+}
 
-  if (isHidden) {
-    return (
-      <div className="rounded-xl border border-dashed border-rule bg-bench/50 p-2.5 text-xs text-ink-3 flex items-center justify-between opacity-60">
-        <span className="flex items-center gap-1.5">
-          <EyeOff className="size-3.5" />
-          <span className="line-through">{field.label}</span>
-        </span>
-        <span className="text-[10px] font-mono">&lt;field hidden=&quot;true&quot; /&gt;</span>
-      </div>
-    );
+/** A new field: its name and kind, then it's on the page to place and set up. */
+function NewField({
+  open,
+  onClose,
+  onAdd,
+  taken,
+  terms,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (field: FormFieldDef) => void;
+  taken: Set<string>;
+  terms: Terms | undefined;
+}) {
+  const [label, setLabel] = useState("");
+  const [type, setType] = useState("text");
+  const [options, setOptions] = useState("");
+  const clean = label.trim();
+  const list = options.split("\n").map((o) => o.trim()).filter(Boolean);
+  const problem = !clean
+    ? null
+    : taken.has(clean.toLowerCase())
+      ? "A field already has that name."
+      : WITH_OPTIONS.has(type) && list.length < 2
+        ? "Give it at least two options."
+        : null;
+
+  function add() {
+    if (!clean || problem) return;
+    const key = `x_new_${clean.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}_${Date.now().toString(36)}`;
+    onAdd({
+      id: "",
+      key,
+      label: clean,
+      type: type as FormFieldDef["type"],
+      standard: false,
+      locked: false,
+      required: false,
+      hidden: false,
+      inList: false,
+      options: WITH_OPTIONS.has(type) ? list : [],
+      helpText: null,
+      placeholder: null,
+      used: 0,
+    });
+    setLabel("");
+    setOptions("");
+    setType("text");
+    onClose();
   }
 
+  const kinds = useMemo(() => KINDS.map((k) => ({ value: k.type, label: kindLabel(k.type, terms) })), [terms]);
   return (
-    <div className={`min-w-0 ${field.type === "long_text" ? "sm:col-span-2" : ""}`}>
-      <label className="mb-1 block text-xs font-medium text-ink">
-        {field.label}
-        {field.required && <span className="text-danger font-semibold"> *</span>}
-        {!field.required && <span className="text-ink-3 font-normal"> (optional)</span>}
-      </label>
-
-      {field.type === "long_text" ? (
-        <textarea
-          rows={2}
-          readOnly
-          value={sampleValue}
-          placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
-          className="w-full rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs text-ink placeholder:text-ink-3/70 focus:outline-none"
-        />
-      ) : field.type === "choice" || field.type === "status" ? (
-        <select
-          disabled
-          value={sampleValue}
-          className="w-full rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs text-ink focus:outline-none disabled:bg-sheet disabled:opacity-100"
-        >
-          {field.options.map((o) => (
-            <option key={o} value={o}>
-              {field.optionNames?.[o] || o}
-            </option>
-          ))}
-          {!field.options.length && <option>Select {field.label.toLowerCase()}...</option>}
-        </select>
-      ) : field.type === "date" ? (
-        <input
-          type="date"
-          readOnly
-          value={sample ? (SAMPLE_VALUES[field.key] || "2026-10-14") : ""}
-          className="w-full rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs text-ink focus:outline-none"
-        />
-      ) : field.type === "money" ? (
-        <div className="relative">
-          <span className="absolute left-3 top-1.5 text-xs text-ink-3">₱</span>
-          <input
-            type="text"
-            readOnly
-            value={sample ? "1,250,000.00" : ""}
-            placeholder="0.00"
-            className="w-full rounded-lg border border-rule bg-sheet pl-7 pr-3 py-1.5 text-xs text-ink text-right tabular-nums focus:outline-none"
-          />
-        </div>
-      ) : field.type === "yes_no" ? (
-        <label className="mt-1 flex items-center gap-2 text-xs text-ink cursor-pointer">
-          <input type="checkbox" checked={sample} readOnly className="rounded border-rule text-hema" />
-          <span>{field.label}</span>
-        </label>
-      ) : field.type === "multi_choice" || field.type === "products" ? (
-        <div className="flex flex-wrap gap-1 rounded-lg border border-rule bg-sheet p-1.5 min-h-8 items-center">
-          {sample ? (
-            (field.options.slice(0, 2).length ? field.options.slice(0, 2) : ["Option A", "Option B"]).map((opt) => (
-              <span key={opt} className="rounded-md bg-hema-tint px-2 py-0.5 text-[10px] font-medium text-hema">
-                {opt}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-ink-3 px-1.5">Select options...</span>
+    <Modal open={open} title="New field" onCancel={onClose} footer={null} width={440} destroyOnHidden>
+      <div className="space-y-3.5 pt-2">
+        <Field label="Name" error={problem ?? undefined}>
+          {(p) => <Input {...p} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="For example, Hospital accreditation" autoFocus onPressEnter={add} />}
+        </Field>
+        <Field label="Kind">
+          {(p) => (
+            <Select {...p} value={type} onChange={(e) => setType(e.target.value)}>
+              {kinds.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </Select>
           )}
+        </Field>
+        {WITH_OPTIONS.has(type) && (
+          <Field label="Options" hint="One per line.">
+            {(p) => <Textarea {...p} rows={4} value={options} onChange={(e) => setOptions(e.target.value)} />}
+          </Field>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="quiet" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!clean || Boolean(problem)} onClick={add}>
+            Add to the form
+          </Button>
         </div>
-      ) : (
-        <input
-          type="text"
-          readOnly
-          value={sampleValue}
-          placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
-          className="w-full rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs text-ink placeholder:text-ink-3/70 focus:outline-none"
-        />
-      )}
+      </div>
+    </Modal>
+  );
+}
 
-      {field.helpText && <p className="mt-1 text-[11px] text-ink-3">{field.helpText}</p>}
+/** A quotation's lines and totals: always on it, so shown on the page but not changed here. */
+function QuoteLines() {
+  return (
+    <div className="mt-8" aria-label="Always on the quotation">
+      <p className="mb-2 text-meta text-ink-3">Always on the quotation: the products and the totals.</p>
+      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_6rem_6.5rem] bg-sage-deep px-1 py-2 text-sm text-white">
+        <span className="px-2">#</span>
+        <span className="px-2">Item and description</span>
+        <span className="px-2 text-right">Qty</span>
+        <span className="px-2 text-right">Rate</span>
+        <span className="px-2 text-right">Amount</span>
+      </div>
+      {[
+        ["1", "Amoxicillin 500 mg capsule", "Box of 100", "10", "450.00", "4,500.00"],
+        ["2", "Paracetamol 500 mg tablet", "Box of 100", "5", "180.00", "900.00"],
+      ].map(([n, name, unit, qty, rate, amount]) => (
+        <div key={n} className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_6rem_6.5rem] border-x border-b border-rule px-1 py-3 text-sm text-ink-2">
+          <span className="px-2">{n}</span>
+          <span className="px-2">
+            <span className="block text-ink">{name}</span>
+            <span className="block text-meta text-ink-3">{unit}</span>
+          </span>
+          <span className="px-2 text-right tabular-nums">{qty}</span>
+          <span className="px-2 text-right tabular-nums">{rate}</span>
+          <span className="px-2 text-right tabular-nums">{amount}</span>
+        </div>
+      ))}
+      <div className="ml-auto w-full max-w-xs bg-bench text-sm">
+        <div className="flex justify-between px-4 py-2 text-ink-2">
+          <span>Sub total</span>
+          <span className="tabular-nums">5,400.00</span>
+        </div>
+        <div className="flex justify-between px-4 py-2 font-semibold text-ink">
+          <span>Total</span>
+          <span className="tabular-nums">₱5,400.00</span>
+        </div>
+        <div className="flex justify-between bg-mint-2 px-4 py-2.5 font-semibold text-ink">
+          <span>Balance due</span>
+          <span className="tabular-nums">₱5,400.00</span>
+        </div>
+      </div>
     </div>
   );
 }

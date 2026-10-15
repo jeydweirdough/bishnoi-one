@@ -88,6 +88,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app import platform_connect
 
     app.include_router(platform_connect.router)
+    # Connected on the Platform as soon as this runs, not when someone first uses it.
+    platform_connect.connect_now(settings)
     # The platform's word when a company changes there (hidden: app/company.py).
     from app import company as company_check
 
@@ -131,4 +133,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(quote_links.router)
     app.include_router(integration.router)
     app.include_router(integration_prices.router)
+    from app.routers import materials
+
+    app.include_router(materials.router)
+    app.include_router(materials.integration)
     return app

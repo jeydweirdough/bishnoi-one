@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
@@ -22,6 +22,61 @@ const asOption = (a: Added) => ({ value: a.value, label: a.label });
 const options = (list: { value: string; label: string }[]) => list.map((o) => <option key={o.value} value={o.value}>{o.label}</option>);
 
 // The three documents made of product lines: purchase orders, orders, transfers.
+// Each is laid out the same way: its details and its items on the left, and on
+// the right a summary (lines, quantity, total) with what to do, kept in view.
+
+/** The document's figures, worked out from its lines as they're typed. */
+function figures(lines: Line[], fmt: ReturnType<typeof makeFormat>, priced: boolean) {
+  const used = lines.filter((l) => l.productId);
+  return {
+    lines: used.length,
+    quantity: used.reduce((n, l) => n + (Number(l.quantity) || 0), 0),
+    total: priced ? used.reduce((n, l) => n + (Number(l.quantity) || 0) * (fmt.toCentavos(l.money) ?? 0), 0) : null,
+  };
+}
+
+function DocumentLayout({ details, items, summary }: { details: ReactNode; items: ReactNode; summary: ReactNode }) {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+      <div className="min-w-0 space-y-5">
+        {details}
+        {items}
+      </div>
+      <aside className="xl:sticky xl:top-4">{summary}</aside>
+    </div>
+  );
+}
+
+function Summary({ fmt, counts, error, children, note }: { fmt: ReturnType<typeof makeFormat>; counts: ReturnType<typeof figures>; error?: string | null; children: ReactNode; note?: string }) {
+  return (
+    <Sheet className="px-5 pt-4 pb-5">
+      <h2 className="text-heading text-ink">Summary</h2>
+      <dl className="mt-3 space-y-2 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-2">Lines</dt>
+          <dd className="font-medium text-ink tabular-nums">{counts.lines}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-2">Total quantity</dt>
+          <dd className="font-medium text-ink tabular-nums">{fmt.count(counts.quantity)}</dd>
+        </div>
+        {counts.total !== null && (
+          <div className="flex justify-between gap-3 border-t border-rule pt-2">
+            <dt className="font-semibold text-ink">Total</dt>
+            <dd className="text-lg font-semibold text-ink tabular-nums">{fmt.peso(counts.total)}</dd>
+          </div>
+        )}
+      </dl>
+      <div className="mt-4">
+        <FormError message={error} />
+      </div>
+      <div className="mt-3 flex flex-col gap-2">{children}</div>
+      {note && <p className="mt-3 text-meta text-ink-3">{note}</p>}
+    </Sheet>
+  );
+}
+
+const Heading = ({ children }: { children: ReactNode }) => <h2 className="mb-4 text-heading text-ink">{children}</h2>;
 
 const active = <T extends { isActive: boolean }>(items: T[], keep?: string, id: (t: T) => string = (t) => (t as unknown as { id: string }).id) =>
   items.filter((t) => t.isActive || id(t) === keep);
@@ -56,43 +111,53 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
-      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <div className="grid gap-5 sm:grid-cols-3">
-          <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
-            <Field label="Supplier" error={fields.supplierId}>
-              {(p) => (
-                <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                  <option value="">Select a supplier…</option>
-                  {options(supplierOptions)}
-                </Select>
-              )}
-            </Field>
-          </WithAdd>
-          <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); }} />}>
-            <Field label="Deliver to" error={fields.warehouseId}>
-              {(p) => (
-                <Select {...p} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-                  {options(warehouseOptions)}
-                </Select>
-              )}
-            </Field>
-          </WithAdd>
-          <Field label="Expected delivery date" optional error={fields.expectedOn}>
-            {(p) => <Input {...p} type="date" value={expectedOn} onChange={(e) => setExpectedOn(e.target.value)} />}
-          </Field>
-        </div>
-      </Sheet>
-      <Sheet className="px-5 pt-4 pb-4 sm:px-6">
-        <LinesEditor products={products} lines={lines} onChange={setLines} errors={fields} fmt={fmt} money={{ label: `Unit cost (${fmt.symbol})`, from: "costPrice" }} addProduct={canAdd.product ? { org, units: reference.units.filter((u) => u.isActive) } : undefined} />
-      </Sheet>
-      <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
-      <FormError message={error ?? fields.lines} />
-      <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{order ? "Save draft" : "Save as draft"}</Button>
-        <LinkButton href={order ? `/purchase-orders/${order.id}` : "/purchase-orders"} variant="quiet">Cancel</LinkButton>
-      </div>
-      <p className="text-meta text-ink-3">A draft can be edited until an approver places the order with the supplier.</p>
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
+      <DocumentLayout
+        details={
+          <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+            <Heading>Details</Heading>
+            <div className="grid gap-5 sm:grid-cols-3">
+              <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
+                <Field label="Supplier" error={fields.supplierId}>
+                  {(p) => (
+                    <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                      <option value="">Select a supplier</option>
+                      {options(supplierOptions)}
+                    </Select>
+                  )}
+                </Field>
+              </WithAdd>
+              <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); }} />}>
+                <Field label="Deliver to" error={fields.warehouseId}>
+                  {(p) => (
+                    <Select {...p} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                      {options(warehouseOptions)}
+                    </Select>
+                  )}
+                </Field>
+              </WithAdd>
+              <Field label="Expected delivery date" optional error={fields.expectedOn}>
+                {(p) => <Input {...p} type="date" value={expectedOn} onChange={(e) => setExpectedOn(e.target.value)} />}
+              </Field>
+            </div>
+            <div className="mt-5">
+              <Field label="Notes" optional hint="For the supplier or the people receiving it." error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+            </div>
+          </Sheet>
+        }
+        items={
+          <Sheet className="px-5 pt-4 pb-4 sm:px-6">
+            <Heading>Items</Heading>
+            <LinesEditor products={products} lines={lines} onChange={setLines} errors={fields} fmt={fmt} money={{ label: "Unit cost", from: "costPrice" }} addProduct={canAdd.product ? { org, units: reference.units.filter((u) => u.isActive) } : undefined} />
+          </Sheet>
+        }
+        summary={
+          <Summary fmt={fmt} counts={figures(lines, fmt, true)} error={error ?? fields.lines} note="A draft can be edited until an approver places the order with the supplier.">
+            <Button type="submit" variant="primary" loading={pending} className="w-full">{order ? "Save draft" : "Save as draft"}</Button>
+            <LinkButton href={order ? `/purchase-orders/${order.id}` : "/purchase-orders"} variant="quiet" className="w-full">Cancel</LinkButton>
+          </Summary>
+        }
+      />
     </form>
   );
 }
@@ -126,44 +191,54 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
-      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field label={info.recipient.label} hint={info.recipient.hint} error={fields.recipient}>
-            {(p) => <Input {...p} value={recipient} placeholder={info.recipient.placeholder} onChange={(e) => setRecipient(e.target.value)} autoFocus={!order} />}
-          </Field>
-          <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); }} />}>
-            <Field label="From warehouse" error={fields.warehouseId}>
-              {(p) => (
-                <Select {...p} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-                  {options(warehouseOptions)}
-                </Select>
-              )}
-            </Field>
-          </WithAdd>
-          <Field label="Required date" optional error={fields.neededOn}>{(p) => <Input {...p} type="date" value={neededOn} onChange={(e) => setNeededOn(e.target.value)} />}</Field>
-        </div>
-      </Sheet>
-      <Sheet className="px-5 pt-4 pb-4 sm:px-6">
-        <LinesEditor
-          products={reference.products}
-          lines={lines}
-          onChange={setLines}
-          errors={fields}
-          fmt={fmt}
-          money={sale ? { label: `Unit price (${fmt.symbol})`, from: "sellingPrice" } : undefined}
-          note={(id) => `${fmt.count(available[`${id}:${warehouseId}`] ?? 0)} available in this warehouse`}
-          limit={(id) => available[`${id}:${warehouseId}`] ?? 0}
-          addProduct={canAdd.product ? { org, units: reference.units.filter((u) => u.isActive) } : undefined}
-        />
-      </Sheet>
-      <Field label={info.notes.label} hint={info.notes.hint} optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
-      <FormError message={error ?? fields.lines} />
-      <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{order ? "Save" : "Save as draft"}</Button>
-        <LinkButton href={order ? `/orders/${order.id}` : "/orders"} variant="quiet">Cancel</LinkButton>
-      </div>
-      <p className="text-meta text-ink-3">Confirming the order reserves its stock. The order is then picked and issued.</p>
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
+      <DocumentLayout
+        details={
+          <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+            <Heading>Details</Heading>
+            <div className="grid gap-5 sm:grid-cols-3">
+              <Field label={info.recipient.label} hint={info.recipient.hint} error={fields.recipient}>
+                {(p) => <Input {...p} value={recipient} placeholder={info.recipient.placeholder} onChange={(e) => setRecipient(e.target.value)} autoFocus={!order} />}
+              </Field>
+              <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setWarehouseId(a.value); }} />}>
+                <Field label="From warehouse" error={fields.warehouseId}>
+                  {(p) => (
+                    <Select {...p} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                      {options(warehouseOptions)}
+                    </Select>
+                  )}
+                </Field>
+              </WithAdd>
+              <Field label="Required date" optional error={fields.neededOn}>{(p) => <Input {...p} type="date" value={neededOn} onChange={(e) => setNeededOn(e.target.value)} />}</Field>
+            </div>
+            <div className="mt-5">
+              <Field label={info.notes.label} hint={info.notes.hint} optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+            </div>
+          </Sheet>
+        }
+        items={
+          <Sheet className="px-5 pt-4 pb-4 sm:px-6">
+            <Heading>Items</Heading>
+            <LinesEditor
+              products={reference.products}
+              lines={lines}
+              onChange={setLines}
+              errors={fields}
+              fmt={fmt}
+              money={sale ? { label: "Unit price", from: "sellingPrice" } : undefined}
+              note={(id) => `${fmt.count(available[`${id}:${warehouseId}`] ?? 0)} available in this warehouse`}
+              limit={(id) => available[`${id}:${warehouseId}`] ?? 0}
+              addProduct={canAdd.product ? { org, units: reference.units.filter((u) => u.isActive) } : undefined}
+            />
+          </Sheet>
+        }
+        summary={
+          <Summary fmt={fmt} counts={figures(lines, fmt, Boolean(sale))} error={error ?? fields.lines} note="Confirming the order reserves its stock. The order is then picked and issued.">
+            <Button type="submit" variant="primary" loading={pending} className="w-full">{order ? "Save" : "Save as draft"}</Button>
+            <LinkButton href={order ? `/orders/${order.id}` : "/orders"} variant="quiet" className="w-full">Cancel</LinkButton>
+          </Summary>
+        }
+      />
     </form>
   );
 }
@@ -184,29 +259,40 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(!transfer); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
-      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Source warehouse" error={fields.fromWarehouseId}>
-            {(p) => <Select {...p} value={from} onChange={(e) => { const next = e.target.value; setFrom(next); /* From and To can't be one warehouse: To moves to the next one. */ if (next === to) setTo(warehouses.find((w) => w.value !== next)?.value ?? ""); }}>{options(warehouses)}</Select>}
-          </Field>
-          <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setTo(a.value); }} />}>
-            <Field label="Destination warehouse" error={fields.toWarehouseId}>
-              {(p) => <Select {...p} value={to} onChange={(e) => setTo(e.target.value)}>{warehouses.map((w) => <option key={w.value} value={w.value} disabled={w.value === from}>{w.label}</option>)}</Select>}
-            </Field>
-          </WithAdd>
-        </div>
-      </Sheet>
-      <Sheet className="px-5 pt-4 pb-4 sm:px-6">
-        <LinesEditor products={reference.products} lines={lines} onChange={setLines} errors={fields} fmt={fmt} note={(id) => `${fmt.count(available[`${id}:${from}`] ?? 0)} available to send`} limit={(id) => available[`${id}:${from}`] ?? 0} />
-      </Sheet>
-      <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
-      <FormError message={error ?? fields.lines} />
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{transfer ? "Save" : "Request transfer"}</Button>
-        {!transfer && <Button loading={pending} onClick={() => submit(false)}>Save as draft</Button>}
-        <LinkButton href={transfer ? `/transfers/${transfer.id}` : "/transfers"} variant="quiet">Cancel</LinkButton>
-      </div>
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(!transfer); }} className={`rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
+      <DocumentLayout
+        details={
+          <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+            <Heading>Details</Heading>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Source warehouse" error={fields.fromWarehouseId}>
+                {(p) => <Select {...p} value={from} onChange={(e) => { const next = e.target.value; setFrom(next); /* From and To can't be one warehouse: To moves to the next one. */ if (next === to) setTo(warehouses.find((w) => w.value !== next)?.value ?? ""); }}>{options(warehouses)}</Select>}
+              </Field>
+              <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setTo(a.value); }} />}>
+                <Field label="Destination warehouse" error={fields.toWarehouseId}>
+                  {(p) => <Select {...p} value={to} onChange={(e) => setTo(e.target.value)}>{warehouses.map((w) => <option key={w.value} value={w.value} disabled={w.value === from}>{w.label}</option>)}</Select>}
+                </Field>
+              </WithAdd>
+            </div>
+            <div className="mt-5">
+              <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+            </div>
+          </Sheet>
+        }
+        items={
+          <Sheet className="px-5 pt-4 pb-4 sm:px-6">
+            <Heading>Items</Heading>
+            <LinesEditor products={reference.products} lines={lines} onChange={setLines} errors={fields} fmt={fmt} note={(id) => `${fmt.count(available[`${id}:${from}`] ?? 0)} available to send`} limit={(id) => available[`${id}:${from}`] ?? 0} />
+          </Sheet>
+        }
+        summary={
+          <Summary fmt={fmt} counts={figures(lines, fmt, false)} error={error ?? fields.lines} note="A requested transfer goes to an approver; the source warehouse then sends it.">
+            <Button type="submit" variant="primary" loading={pending} className="w-full">{transfer ? "Save" : "Request transfer"}</Button>
+            {!transfer && <Button loading={pending} onClick={() => submit(false)} className="w-full">Save as draft</Button>}
+            <LinkButton href={transfer ? `/transfers/${transfer.id}` : "/transfers"} variant="quiet" className="w-full">Cancel</LinkButton>
+          </Summary>
+        }
+      />
     </form>
   );
 }

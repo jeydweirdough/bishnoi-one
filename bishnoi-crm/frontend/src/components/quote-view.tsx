@@ -116,7 +116,7 @@ export async function QuoteView({
           </div>
           <div className="mt-3 ml-auto max-w-xs space-y-1 text-sm">
             <p className="flex justify-between text-ink-2">
-              <span>List value</span>
+              <span>Total value</span>
               <span className="tabular-nums">{fmt.peso(quote.grossCentavos)}</span>
             </p>
             {quote.promoDiscountCentavos > 0 && (

@@ -497,6 +497,8 @@ const COMPLIANCE_PAGES: Page[] = [
   { href: "/properties", label: "Properties", icon: "properties", reach: sees("properties.view") },
 ];
 const OFFICE_PAGES: Page[] = [{ href: "/tickets", label: "Office requests", icon: "tickets", reach: sees("tickets.view") }];
+/** Promotional materials: marketing's designs, through review and production to giving them out. */
+const MARKETING_PAGES: Page[] = [{ href: "/materials", label: "Promotional materials", icon: "approvals", reach: sees("materials.view") }];
 
 /** The executive assistant's trackers, under their own heading. */
 const FLEET_PAGES: Page[] = [
@@ -599,6 +601,7 @@ function Links({ me, unset }: { me: Me; unset: Unset }) {
               ["Compliance", executivePages(me, unset, COMPLIANCE_PAGES)],
               ["Fleet and travel", fleetPages(me)],
               ["Office", executivePages(me, unset, OFFICE_PAGES)],
+              ["Marketing", executivePages(me, unset, MARKETING_PAGES)],
             ] as [string, Page[]][]
           ).map(
             ([label, pages]) =>

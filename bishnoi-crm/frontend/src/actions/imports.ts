@@ -8,7 +8,7 @@ import { attempt, type Result } from "@/src/platform/lib/result";
 // our fields, checked row by row, then saved. The API checks the permission
 // on each call.
 
-export type ImportKind = "products" | "people" | "balances" | "customers";
+export type ImportKind = "products" | "prices" | "people" | "balances" | "customers";
 
 export type ImportFile = {
   fileName: string;

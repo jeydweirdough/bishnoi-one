@@ -58,8 +58,8 @@ export function InfoSection({ icon, title, action, items, children }: { icon: Ic
       </div>
       <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2">
         {items.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-3 text-sm">
-            <dt className="font-semibold text-ink">{label}</dt>
+          <div key={label} className="grid grid-cols-[9.5rem_minmax(0,1fr)] items-baseline gap-3 text-sm">
+            <dt className="font-semibold break-words text-ink">{label}</dt>
             <dd className="min-w-0 break-words text-ink-2">{value ?? <span className="text-ink-3">—</span>}</dd>
           </div>
         ))}

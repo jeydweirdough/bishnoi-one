@@ -32,6 +32,20 @@ class Settings(BaseSettings):
     # is used instead. Neither set: only this app's own accounts sign in.
     platform_api_url: str | None = None
     platform_public_key: str | None = None
+    # This app's connect key on the platform. Normally the platform delivers it
+    # (app/platform_connect.py); set it only for a copy at another address (this PC).
+    platform_app_key: SecretStr | None = None
+    # The other apps promotional materials go through (app/linked.py). The
+    # platform's Connections page sets these while connected; .env only without it.
+    pharmacy_api_url: str | None = None
+    pharmacy_api_key: SecretStr | None = None
+    crm_api_url: str | None = None
+    crm_api_key: SecretStr | None = None
+    # Apps allowed to call this one, "name:key" (the platform sets these too).
+    integration_keys: list[SecretStr] = []
+    # The company's short name on the platform: whose CRM database the teams and
+    # distribution approvals are in. Unset off production: the CRM's own default.
+    company: str | None = None
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15

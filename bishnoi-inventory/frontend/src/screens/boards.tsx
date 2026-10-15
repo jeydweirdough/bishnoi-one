@@ -1,3 +1,4 @@
+import { ArrowRightLeft, Building, CircleCheck, ClipboardList, FilePenLine, Hourglass, Lock, PackageCheck, PackageOpen, ScanBarcode, Send, Truck, User, Warehouse } from "lucide-react";
 import { Board, type BoardCard, type BoardColumn, type BoardMove } from "@/src/platform/ui/board";
 import { orderStep, purchaseOrderStep, transferStep } from "../actions/inventory";
 import { kindOf } from "../lib/order-kinds";
@@ -43,10 +44,10 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
   const shown = orders.filter((o) => o.status !== "cancelled" && (o.status !== "issued" || keep.has(o.id)));
   const units = (status: string) => shown.filter((o) => o.status === status).reduce((n, o) => n + o.units, 0);
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: `${fmt.count(units("draft"))} units`, hint: "Created; no stock reserved" },
-    { key: "confirmed", label: "Reserved", dot: DOT.under, note: `${fmt.count(units("confirmed"))} units held`, hint: "Confirmed; stock reserved" },
-    { key: "picking", label: "Picking", dot: DOT.moving, note: `${fmt.count(units("picking"))} units`, hint: "Being picked" },
-    { key: "issued", label: "Issued", dot: DOT.done, note: "Recent", hint: "Stock issued" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, icon: <FilePenLine />, note: `${fmt.count(units("draft"))} units`, hint: "Created; no stock reserved" },
+    { key: "confirmed", label: "Reserved", dot: DOT.under, icon: <Lock />, note: `${fmt.count(units("confirmed"))} units held`, hint: "Confirmed; stock reserved" },
+    { key: "picking", label: "Picking", dot: DOT.moving, icon: <ScanBarcode />, note: `${fmt.count(units("picking"))} units`, hint: "Being picked" },
+    { key: "issued", label: "Issued", dot: DOT.done, icon: <CircleCheck />, note: "Recent", hint: "Stock issued" },
   ];
   const cards: BoardCard[] = shown.map((o) => {
     const open = o.status !== "issued";
@@ -59,10 +60,12 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
       title: o.number,
       flag: kind ? undefined : <Tag>{info?.plural.replace(/ orders$| requests$/, "") ?? o.kind}</Tag>,
       sub: o.recipient,
+      subIcon: <User />,
       value: info?.priced && o.total ? fmt.peso(o.total) : `${fmt.count(o.units)} units`,
       when: open ? (o.neededOn ? (o.neededOn === today ? "Required today" : `Required ${short(day(o.neededOn))}`) : undefined) : o.issuedAt ? `Issued ${short(day(o.issuedAt.slice(0, 10)))}` : undefined,
       late,
       meta: `${lines(o.lineCount)} · from ${o.warehouse.code}`,
+      metaIcon: <Warehouse />,
     };
   });
   const moves = allowed([
@@ -89,10 +92,10 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
   const shown = orders.filter((o) => o.status !== "cancelled" && (o.status !== "received" || keep.has(o.id)));
   const worth = (status: string) => fmt.peso(shown.filter((o) => o.status === status).reduce((n, o) => n + o.total, 0));
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: worth("draft"), hint: "Not yet placed with the supplier" },
-    { key: "ordered", label: "Ordered", dot: DOT.under, note: worth("ordered"), hint: "Placed; awaiting delivery" },
-    { key: "partial", label: "Partially received", dot: DOT.moving, note: worth("partial"), hint: "Balance outstanding" },
-    { key: "received", label: "Received", dot: DOT.done, note: "Recent", hint: "Fully received" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, icon: <FilePenLine />, note: worth("draft"), hint: "Not yet placed with the supplier" },
+    { key: "ordered", label: "Ordered", dot: DOT.under, icon: <Send />, note: worth("ordered"), hint: "Placed; awaiting delivery" },
+    { key: "partial", label: "Partially received", dot: DOT.moving, icon: <PackageOpen />, note: worth("partial"), hint: "Balance outstanding" },
+    { key: "received", label: "Received", dot: DOT.done, icon: <PackageCheck />, note: "Recent", hint: "Fully received" },
   ];
   const cards: BoardCard[] = shown.map((o) => ({
     id: o.id,
@@ -100,10 +103,12 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
     href: `/purchase-orders/${o.id}`,
     title: o.number,
     sub: o.supplier.name,
+    subIcon: <Building />,
     value: fmt.peso(o.total),
     when: o.status !== "received" && o.expectedOn ? `Due ${short(day(o.expectedOn))}` : undefined,
     late: o.late,
     meta: o.status === "partial" ? `${fmt.count(o.received)} of ${fmt.count(o.ordered)} received · to ${o.warehouse.code}` : `${lines(o.lineCount)} · to ${o.warehouse.code}`,
+    metaIcon: <Warehouse />,
   }));
   const receive = may("receiving.receive");
   const moves = allowed([
@@ -129,11 +134,11 @@ export function TransfersBoard({ transfers, fmt, day, may }: { transfers: Transf
   const shown = transfers.filter((t) => t.status !== "cancelled" && (t.status !== "received" || keep.has(t.id)));
   const units = (status: string) => `${fmt.count(shown.filter((t) => t.status === status).reduce((n, t) => n + t.units, 0))} units`;
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, note: units("draft"), hint: "Not yet requested" },
-    { key: "requested", label: "Requested", dot: DOT.waiting, note: units("requested"), hint: "Pending approval" },
-    { key: "approved", label: "Approved", dot: DOT.under, note: units("approved"), hint: "Ready to dispatch" },
-    { key: "in_transit", label: "In transit", dot: DOT.moving, note: units("in_transit"), hint: "Dispatched" },
-    { key: "received", label: "Received", dot: DOT.done, note: "Recent", hint: "Received at destination" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, icon: <FilePenLine />, note: units("draft"), hint: "Not yet requested" },
+    { key: "requested", label: "Requested", dot: DOT.waiting, icon: <Hourglass />, note: units("requested"), hint: "Pending approval" },
+    { key: "approved", label: "Approved", dot: DOT.under, icon: <ClipboardList />, note: units("approved"), hint: "Ready to dispatch" },
+    { key: "in_transit", label: "In transit", dot: DOT.moving, icon: <Truck />, note: units("in_transit"), hint: "Dispatched" },
+    { key: "received", label: "Received", dot: DOT.done, icon: <PackageCheck />, note: "Recent", hint: "Received at destination" },
   ];
   const dateOf = (iso: string | null) => short(day(iso ? iso.slice(0, 10) : null));
   const cards: BoardCard[] = shown.map((t) => ({
@@ -142,6 +147,7 @@ export function TransfersBoard({ transfers, fmt, day, may }: { transfers: Transf
     href: `/transfers/${t.id}`,
     title: t.number,
     sub: `${t.from.name} → ${t.to.name}`,
+    subIcon: <ArrowRightLeft />,
     value: `${fmt.count(t.units)} units`,
     when: t.status === "received" ? `Received ${dateOf(t.receivedAt)}` : t.status === "in_transit" ? `Dispatched ${dateOf(t.dispatchedAt)}` : t.requestedAt ? `Requested ${dateOf(t.requestedAt)}` : undefined,
     meta: lines(t.lineCount),

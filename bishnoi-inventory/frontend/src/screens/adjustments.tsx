@@ -12,15 +12,25 @@ import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "../componen
 import { param, query, signed } from "../lib/labels";
 import { NeedsFirst } from "../components/setup";
 import { loadSetup } from "../lib/setup";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
 import { referenceOf } from "../lib/reference";
-import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, ReasonOption, Reference } from "../lib/types";
+import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, Paged, ReasonOption, Reference } from "../lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
-  const status = param(await searchParams, "status");
-  const { adjustments: rows } = await loadQuery<{ adjustments: AdjustmentBrief[] }>(`query Adjustments($status: String) { adjustments(status: $status) }`, status ? { status } : {}, ["adjustments"]);
+  const s = await searchParams;
+  const status = param(s, "status");
+  const { page, size, vars } = paging(s);
+  const base = `/adjustments${query({ status })}`;
+  const { adjustments: list } = await loadQuery<{ adjustments: Paged<AdjustmentBrief> }>(
+    `query Adjustments($status: String, $limit: Int, $offset: Int) { adjustments(status: $status, limit: $limit, offset: $offset) }`,
+    { ...(status ? { status } : {}), ...vars },
+    ["adjustments"],
+  );
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   const chip = (s: string, label: string) => ({ value: s, label, href: `/adjustments${query({ status: s })}` });
   return (
     <>
@@ -51,6 +61,7 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "adjustment" : "adjustments"} />
     </>
   );
 }
@@ -132,11 +143,15 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
   const s = await searchParams;
   const status = param(s, "status");
-  const { counts: rows, reference: ref } = await loadQuery<{ counts: CountBrief[]; reference: Pick<Reference, "categories" | "warehouses"> }>(
-    `query Counts($status: String) { counts(status: $status) ${referenceOf("categories", "warehouses")} }`,
-    status ? { status } : {},
+  const { page, size, vars } = paging(s);
+  const base = `/counts${query({ status })}`;
+  const { counts: list, reference: ref } = await loadQuery<{ counts: Paged<CountBrief>; reference: Pick<Reference, "categories" | "warehouses"> }>(
+    `query Counts($status: String, $limit: Int, $offset: Int) { counts(status: $status, limit: $limit, offset: $offset) ${referenceOf("categories", "warehouses")} }`,
+    { ...(status ? { status } : {}), ...vars },
     ["counts", "reference"],
   );
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   return (
     <>
       <PageHeader title="Inventory counts">
@@ -166,6 +181,7 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "count" : "counts"} />
     </>
   );
 }

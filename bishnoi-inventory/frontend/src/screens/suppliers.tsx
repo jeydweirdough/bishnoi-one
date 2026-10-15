@@ -12,9 +12,10 @@ import { SupplierForm } from "../components/supplier-form";
 import { Chips, Figures, Filters, NoAccess, RowLink, Table, Td } from "../components/ui";
 import { BarList, DetailPanel, InfoCard, InfoSection, StatCards } from "../components/detail";
 import { param, query } from "../lib/labels";
-import { context, type Params, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { context, keepInRange, paging, type Params, type Search } from "../lib/page";
 import { given } from "../lib/reference";
-import type { Supplier, SupplierRow } from "../lib/types";
+import type { Paged, Supplier, SupplierRow } from "../lib/types";
 
 const rate = (r: number | null | undefined) => (r == null ? "—" : `${Math.round(r * 100)}%`);
 
@@ -23,7 +24,15 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
   if (!may("suppliers.view")) return <NoAccess what="suppliers" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), state: param(s, "state") || "active" };
-  const { suppliers } = await loadQuery<{ suppliers: SupplierRow[] }>(`query Suppliers($q: String, $state: String) { suppliers(q: $q, state: $state) }`, given(f), ["suppliers"]);
+  const { page, size, vars } = paging(s);
+  const base = `/suppliers${query({ q: f.q, state: f.state === "active" ? "" : f.state })}`;
+  const { suppliers: list } = await loadQuery<{ suppliers: Paged<SupplierRow> }>(
+    `query Suppliers($q: String, $state: String, $limit: Int, $offset: Int) { suppliers(q: $q, state: $state, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...vars },
+    ["suppliers"],
+  );
+  keepInRange(list.items.length, list.total, page, base);
+  const suppliers = list.items;
   return (
     <>
       <PageHeader
@@ -54,6 +63,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "supplier" : "suppliers"} />
     </>
   );
 }

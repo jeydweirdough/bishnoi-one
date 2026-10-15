@@ -21,6 +21,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import Batch, Product, Transfer, TransferLine, Warehouse
 from app.out import person, product_ref, warehouse_ref
+from app.paging import Limit, Offset, cut, total
 from app.stock import Ref, available, clean_serials, location_in, next_number, pick_out, post, serials_arrive, serials_out
 
 router = APIRouter(prefix="/inventory", tags=["transfers"])
@@ -130,15 +131,20 @@ def list_transfers(
     status_: str | None = Query(None, alias="status", max_length=80),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=60),
-) -> list[dict]:
-    query = select(Transfer).order_by(Transfer.created_at.desc()).limit(500)
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 500 (the board's columns)."""
+    query = select(Transfer).order_by(Transfer.created_at.desc())
     if status_:
         query = query.where(Transfer.status.in_(status_.split(",")))
     if warehouse:
         query = query.where(or_(Transfer.from_warehouse_id == warehouse, Transfer.to_warehouse_id == warehouse))
     if q:
         query = query.where(func.lower(Transfer.number).like(f"%{q.lower()}%"))
-    return [transfer_brief(t) for t in db.scalars(query)]
+    if limit is not None:
+        return {"items": [transfer_brief(t) for t in db.scalars(cut(query.order_by(Transfer.id), limit, offset))], "total": total(db, query)}
+    return [transfer_brief(t) for t in db.scalars(query.limit(500))]
 
 
 def pin(w) -> dict | None:

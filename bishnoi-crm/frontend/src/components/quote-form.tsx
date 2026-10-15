@@ -6,11 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { CellInput, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { FileDrop } from "@/src/platform/ui/file-drop";
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
-import type { CustomField, Org, PriceList, QuotePreview, StockAnswer } from "@/src/platform/lib/types";
+import type { CustomField, Org, PriceList, QuotePreview, StockAnswer, StockLevel } from "@/src/platform/lib/types";
 import { Flag } from "@/src/platform/ui/marks";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { BundleTag, PromoTags, bundlesWith, promosFor, startingPromo, withPromoFlag } from "./catalogue/promo-tag";
@@ -59,6 +59,10 @@ const blankLine = (key: number): LineDraft => ({
 const LINE_GRID = "sm:grid-cols-[minmax(0,2.8fr)_4.5rem_minmax(0,1.6fr)_7rem_2.25rem]";
 const mobileLabel = "mb-0.5 block text-meta text-ink-3 sm:sr-only";
 
+/** A product's stock before its name in the list: "80 · ". Nothing when Inventory isn't linked or hasn't counted it. */
+function stockFirst(level: StockLevel | null | undefined): string {
+  return level?.state ? `${level.available.toLocaleString()} · ` : "";
+}
 const cell = "h-9 w-full min-w-0 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none aria-[invalid=true]:border-danger";
 
 /** The quote as the API takes it. `null` in place of a number the rep hasn't typed properly yet. */
@@ -380,7 +384,8 @@ export function QuoteForm({
                       { value: "", label: `Select ${offeredBundles.length ? "a product or bundle" : "a product"}…`, promos: 0 },
                       ...productsFor(priceType?.code).map((p) => ({
                         value: p.id,
-                        label: `${p.name} · ${p.unit}${!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}${levelOf(p.id)?.state === "out" ? " · out of stock" : ""}`,
+                        // How many Inventory has, first, so the stock is read before the name.
+                        label: `${stockFirst(levelOf(p.id))}${p.name} · ${p.unit}${!entered && priceType ? ` · ${fmt.peso(p.prices[priceType.code])}` : ""}${levelOf(p.id)?.state === "out" ? " · out of stock" : ""}`,
                         promos: promosFor(priceList.promos, p.id).length,
                         bundles: bundlesWith(offeredBundles, p.id).length,
                       })),
@@ -421,12 +426,12 @@ export function QuoteForm({
                       <span className="text-meta text-ink-3">
                         {priceType?.name} per unit {fmt.symbol}
                       </span>
-                      <input
+                      <CellInput
                         aria-label={`Line ${i + 1}: ${priceType?.name} per unit`}
                         inputMode="decimal"
                         value={l.unitPrice}
                         onChange={(e) => setLine(l.key, { unitPrice: e.target.value })}
-                        className={`${cell} w-28 text-right`}
+                        className="w-28"
                         placeholder="0.00"
                       />
                     </div>
@@ -438,13 +443,12 @@ export function QuoteForm({
 
                 <div>
                   <span className={mobileLabel}>Quantity</span>
-                  <input
+                  <CellInput
                     aria-label={`Line ${i + 1}: quantity`}
                     aria-invalid={errorFor(`${at}.quantity`) ? true : undefined}
                     inputMode="numeric"
                     value={l.quantity}
                     onChange={(e) => setLine(l.key, { quantity: e.target.value })}
-                    className={`${cell} sm:text-right`}
                   />
                   {rows.some((r) => r.freeQuantity > 0) && (
                     <p className="mt-0.5 text-meta text-ink-2 sm:text-right">+{rows.reduce((n, r) => n + r.freeQuantity, 0)} free</p>
@@ -454,49 +458,30 @@ export function QuoteForm({
 
                 <div className="min-w-0">
                   <span className={mobileLabel}>Extra discount</span>
-                  {/* Most lines have none, so it waits behind a link instead of asking on every line. */}
+                  {/* Always a field: left blank, the line has no extra discount. */}
                   {l.bundleId ? (
                     <p className="text-meta text-ink-3 sm:h-9 sm:leading-9">—</p>
-                  ) : l.discountKind ? (
-                    <div className="flex items-end gap-1.5">
+                  ) : (
+                    <div className="flex items-center gap-1.5">
                       <Select
-                        aria-label={`Line ${i + 1}: extra discount`}
-                        value={l.discountKind}
+                        aria-label={`Line ${i + 1}: extra discount in`}
+                        value={l.discountKind || "percent"}
                         onChange={(e) => setLine(l.key, { discountKind: e.target.value as LineDraft["discountKind"] })}
-                        className={`${cell} w-auto`}
+                        className="!w-24 shrink-0"
                       >
                         <option value="percent">% off</option>
                         <option value="amount">{fmt.symbol} off</option>
                       </Select>
-                      <input
-                        aria-label={`Line ${i + 1}: discount ${l.discountKind === "percent" ? "percent" : "amount"}`}
+                      <CellInput
+                        aria-label={`Line ${i + 1}: extra discount ${(l.discountKind || "percent") === "percent" ? "percent" : "amount"}`}
+                        aria-invalid={errorFor(`${at}.discount`) ? true : undefined}
                         inputMode="decimal"
                         value={l.discountValue}
-                        onChange={(e) => setLine(l.key, { discountValue: e.target.value })}
-                        className={`${cell} w-20 text-right`}
-                        placeholder={l.discountKind === "percent" ? "5" : "100.00"}
+                        onChange={(e) => setLine(l.key, { discountValue: e.target.value, discountKind: l.discountKind || "percent" })}
+                        className="min-w-0 flex-1"
+                        placeholder="None"
                       />
-                      <Button
-                        size="sm"
-                        variant="quiet"
-                        className="!px-1.5 !text-ink-3 hover:!text-danger"
-                        onClick={() => setLine(l.key, { discountKind: "", discountValue: "" })}
-                      >
-                        <X className="size-3.5" aria-hidden />
-                        <span className="sr-only">Remove the discount on line {i + 1}</span>
-                      </Button>
                     </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="quiet"
-                      className="-ml-3 sm:mt-0.5"
-                      icon={<Plus className="size-3.5" aria-hidden />}
-                      onClick={() => setLine(l.key, { discountKind: "percent" })}
-                      aria-label={`Add an extra discount to line ${i + 1}`}
-                    >
-                      Discount
-                    </Button>
                   )}
                   {errorFor(`${at}.discount`) && <p className="mt-1 text-meta text-danger">{errorFor(`${at}.discount`)}</p>}
                 </div>
@@ -578,7 +563,7 @@ export function QuoteForm({
         {preview ? (
           <>
             <p className="flex justify-between text-ink-2">
-              <span>List value</span>
+              <span>Total value</span>
               <span className="tabular-nums">{fmt.peso(preview.grossCentavos)}</span>
             </p>
             {preview.promoDiscountCentavos > 0 && (

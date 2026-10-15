@@ -136,6 +136,7 @@ function pharmacyGroups(me: Me, unset: Unset = {}): PageGroup[] {
       label: "Work",
       pages: [
         { href: "/prescriptions", label: "Prescriptions", icon: "prescriptions", reach: () => may("prescriptions.view") },
+        { href: "/material-reviews", label: "Promotional materials", icon: "approvals", reach: () => may("materials.view") },
         { href: "/dispensing", label: "Dispensing", icon: "dispensing", reach: () => may("dispensing.view") },
         { href: "/sales", label: "Sales", icon: "sales", reach: () => may("sales.view") },
         { href: "/patients", label: "Patients & customers", icon: "patients", reach: () => may("patients.view") },

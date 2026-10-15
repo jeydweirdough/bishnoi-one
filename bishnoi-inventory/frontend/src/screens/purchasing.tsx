@@ -5,6 +5,7 @@ import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet"
 import { enc, loadQuery } from "@/src/platform/lib/api";
 import { deletePurchaseOrder, purchaseOrderStep } from "../actions/inventory";
 import { PurchaseOrderForm } from "../components/document-forms";
+import { PrintLink } from "../components/print-button";
 import { ReceiveForm } from "../components/receive-form";
 import { RecordTools } from "../components/record-tools";
 import { POStamp } from "../components/stamps";
@@ -15,9 +16,10 @@ import { FirstStep, NeedsFirst } from "../components/setup";
 import { loadSetup } from "../lib/setup";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { PurchaseOrdersBoard } from "./boards";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
 import { given, referenceOf } from "../lib/reference";
-import type { Backorder, PO, POBrief, Receipt, ReceiptBrief, Reference } from "../lib/types";
+import type { Backorder, Paged, PO, POBrief, Receipt, ReceiptBrief, Reference } from "../lib/types";
 
 // The purchase order and receiving forms pick from the same lists.
 const FORM_LISTS = referenceOf("products", "suppliers", "units", "warehouses");
@@ -28,7 +30,17 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
   const board = param(s, "view") !== "list" && !f.status;
-  const { orders } = await loadQuery<{ orders: POBrief[] }>(`query PurchaseOrders($q: String, $status: String) { orders: purchaseOrders(q: $q, status: $status) }`, given(f), ["orders"]);
+  // The board shows every open order in its columns; the list is read a page at a time.
+  const { page, size, vars } = paging(s);
+  const base = `/purchase-orders${query({ ...f, view: board ? "" : "list" })}`;
+  const { orders: got } = await loadQuery<{ orders: POBrief[] | Paged<POBrief> }>(
+    `query PurchaseOrders($q: String, $status: String, $limit: Int, $offset: Int) { orders: purchaseOrders(q: $q, status: $status, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...(board ? {} : vars) },
+    ["orders"],
+  );
+  const list: Paged<POBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  if (!board) keepInRange(list.items.length, list.total, page, base);
+  const orders = list.items;
   const chip = (status: string, label: string) => ({ value: status, label, href: `/purchase-orders${query({ q: f.q, status })}` });
   return (
     <>
@@ -79,6 +91,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
         )}
       </Sheet>
       )}
+      {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "purchase order" : "purchase orders"} />}
     </>
   );
 }
@@ -113,6 +126,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
         }
         actions={
           <>
+            <PrintLink href={`/print/purchase-orders/${po.id}`} />
             {po.status === "draft" && may("purchasing.approve") && (
               <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve and place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "Once placed, it cannot be edited, only received or cancelled.", danger: false }} />
             )}
@@ -234,8 +248,13 @@ export async function EditPurchaseOrderPage({ params }: { params: Params<{ id: s
 export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
   if (!may("receiving.view")) return <NoAccess what="receiving" />;
-  const q = param(await searchParams, "q");
-  const { receipts } = await loadQuery<{ receipts: ReceiptBrief[] }>(`query Receipts($q: String) { receipts(q: $q) }`, given({ q }), ["receipts"]);
+  const s = await searchParams;
+  const q = param(s, "q");
+  const { page, size, vars } = paging(s);
+  const base = `/receipts${query({ q })}`;
+  const { receipts: list } = await loadQuery<{ receipts: Paged<ReceiptBrief> }>(`query Receipts($q: String, $limit: Int, $offset: Int) { receipts(q: $q, limit: $limit, offset: $offset) }`, { ...given({ q }), ...vars }, ["receipts"]);
+  keepInRange(list.items.length, list.total, page, base);
+  const receipts = list.items;
   return (
     <>
       <PageHeader
@@ -248,6 +267,7 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
       <Sheet>
         {receipts.length === 0 ? <FirstStep icon="receiving" title="No goods receipts" body="Stock is received through a goods receipt, with or without a purchase order." needs={["warehouse", "product"]} href="/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "goods receipt" : "goods receipts"} />
     </>
   );
 }
@@ -259,7 +279,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
   const { receipt: r } = await loadQuery<{ receipt: Receipt }>(`query Receipt($id: String!) { receipt(id: $id) }`, { id }, ["receipt"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title={r.number} actions={may("stock.view") && <LinkButton href={`/movements?q=${enc(r.number)}`}>View stock movements</LinkButton>}>
+      <PageHeader crumbs={[{ href: "/receipts", label: "Receiving" }]} title={r.number} actions={<><PrintLink href={`/print/receipts/${r.id}`} />{may("stock.view") && <LinkButton href={`/movements?q=${enc(r.number)}`}>View stock movements</LinkButton>}</>}>
         Received {at(r.receivedAt)} by {r.receivedBy?.name ?? "—"} into {r.warehouse.name} · {r.location.code}
         {r.supplier && <> from {r.supplier.name}</>}
         {r.order && <> against <Link href={`/purchase-orders/${r.order.id}`} className="text-ink hover:underline">{r.order.number}</Link></>}
@@ -307,10 +327,14 @@ export async function NewReceiptPage() {
   );
 }
 
-export async function BackordersPage() {
+export async function BackordersPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, day } = await context();
   if (!may("purchasing.view")) return <NoAccess what="purchase orders" />;
-  const { backorders: rows } = await loadQuery<{ backorders: Backorder[] }>("query Backorders { backorders }", {}, ["backorders"]);
+  const { page, size, vars } = paging(await searchParams);
+  const base = "/backorders";
+  const { backorders: list } = await loadQuery<{ backorders: Paged<Backorder> }>("query Backorders($limit: Int, $offset: Int) { backorders(limit: $limit, offset: $offset) }", vars, ["backorders"]);
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   return (
     <>
       <PageHeader title="Backorders">Outstanding quantities on placed purchase orders, earliest expected date first.</PageHeader>
@@ -334,6 +358,7 @@ export async function BackordersPage() {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "line" : "lines"} />
     </>
   );
 }

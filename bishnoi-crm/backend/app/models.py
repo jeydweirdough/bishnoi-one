@@ -1336,6 +1336,44 @@ class QuoteLink(Base):
     owner: Mapped[User] = relationship(foreign_keys="QuoteLink.owner_id", lazy="joined")
 
 
+class MaterialRequest(Base):
+    """Promotional materials Admin asks to give to a team (or one person in it):
+    the team's manager approves or rejects it here (app/routers/materials.py),
+    and Admin reads the answer back. Admin also says when it was given out, or
+    that it was cancelled (admin_state)."""
+
+    __tablename__ = "nbcm_material_requests"
+    __table_args__ = (
+        CheckConstraint("status IN ('waiting', 'approved', 'rejected')", name="material_request_status"),
+        CheckConstraint("admin_state IN ('requested', 'distributed', 'cancelled')", name="material_request_admin_state"),
+        UniqueConstraint("source", "source_id", name="uq_nbcm_material_requests_source"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source: Mapped[str] = mapped_column(String(20))  # the sending app: "exec" (Admin)
+    source_id: Mapped[str] = mapped_column(String(64))  # its id for the request
+    reference: Mapped[str] = mapped_column(String(40))  # what people there call it: PD-40000001
+    # The material as Admin describes it: {"no", "title", "kind", "product"}.
+    material: Mapped[dict] = mapped_column(JSON, default=dict)
+    team_id: Mapped[str] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="CASCADE"), index=True)
+    recipient_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    quantity: Mapped[int] = mapped_column(Integer)
+    purpose: Mapped[str | None] = mapped_column(String(500), default=None)
+    requested_by: Mapped[str | None] = mapped_column(String(140), default=None)
+    status: Mapped[str] = mapped_column(String(10), default="waiting", index=True)
+    admin_state: Mapped[str] = mapped_column(String(12), default="requested")
+    distributed_on: Mapped[date | None] = mapped_column(Date, default=None)
+    note: Mapped[str | None] = mapped_column(String(500), default=None)  # the manager's
+    decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    team: Mapped[Team] = relationship(lazy="joined")
+    recipient: Mapped[User | None] = relationship(lazy="joined", foreign_keys=[recipient_id])
+    decided_by: Mapped[User | None] = relationship(lazy="joined", foreign_keys=[decided_by_id])
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 

@@ -25,7 +25,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
   const kinds = types.map((t) => ({ id: t.code, name: t.name, isActive: t.isActive }));
   return (
     <>
-      <PageHeader title="Settings">Lay out each form using XML: write sections, columns, and &lt;field&gt; tags with on-demand interactive preview. Everyone gets the form as saved here.</PageHeader>
+      <PageHeader title="Settings">Lay out each form as it reads: drag fields onto the page, group them in sections, and click a field to change it. Everyone gets the form as saved here.</PageHeader>
       <div className="mb-4">
         <ToggleLinks current={entity} options={ENTITIES.map((e) => ({ value: e, label: ENTITY_WORDS[e].many, href: `/admin/settings?entity=${e}` }))} />
       </div>

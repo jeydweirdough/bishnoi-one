@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import make_engine
 from app.migrate import upgrade
-from app.models import DeviceIssue, FleetCard, TravelSponsorship, Vehicle
+from app.models import DeviceIssue, FleetCard, TravelSponsorship, Vehicle, guess_vehicle_kind
 
 MONTHS = {m: i for i, names in enumerate(
     [("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"), ("may",), ("jun", "june"), ("jul", "july"),
@@ -147,7 +147,7 @@ def vehicles(book) -> list[Vehicle]:
             notes.append(f"parts: {text(r[11])}")
         year = r[2] if isinstance(r[2], (int, float)) else None
         out.append(Vehicle(
-            name=text(r[0]) or "Unnamed vehicle", plate=text(r[1]), year_model=int(year) if year else None, color=text(r[3]),
+            name=text(r[0]) or "Unnamed vehicle", kind=guess_vehicle_kind(text(r[0]), text(r[1])), plate=text(r[1]), year_model=int(year) if year else None, color=text(r[3]),
             owner_name=text(r[4]), registration_due=max(regs) if regs else None, insurance_due=insurance, pms_due=pms,
             fleet_card=text(r[10]), notes=kept(notes),
         ))

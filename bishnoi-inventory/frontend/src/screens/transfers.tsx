@@ -5,6 +5,7 @@ import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { loadQuery } from "@/src/platform/lib/api";
 import { deleteTransfer, transferStep } from "../actions/inventory";
 import { TransferForm } from "../components/document-forms";
+import { PrintLink } from "../components/print-button";
 import { PickForm, type PickLine } from "../components/pick-form";
 import { ReceiveTransfer } from "../components/receive-transfer";
 import { RecordTools } from "../components/record-tools";
@@ -15,9 +16,10 @@ import { param, query } from "../lib/labels";
 import { FirstStep, NeedsFirst } from "../components/setup";
 import { loadSetup } from "../lib/setup";
 import { TransfersBoard } from "./boards";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
 import { batchChoices, given, referenceOf } from "../lib/reference";
-import type { BatchRow, Reference, Transfer, TransferBrief } from "../lib/types";
+import type { BatchRow, Paged, Reference, Transfer, TransferBrief } from "../lib/types";
 
 export async function TransfersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, at, day } = await context();
@@ -25,7 +27,17 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
   const board = param(s, "view") !== "list" && !f.status;
-  const { transfers } = await loadQuery<{ transfers: TransferBrief[] }>(`query Transfers($q: String, $status: String) { transfers(q: $q, status: $status) }`, given(f), ["transfers"]);
+  // The board shows every open one in its columns; the list is read a page at a time.
+  const { page, size, vars } = paging(s);
+  const base = `/transfers${query({ ...f, view: board ? "" : "list" })}`;
+  const { transfers: got } = await loadQuery<{ transfers: TransferBrief[] | Paged<TransferBrief> }>(
+    `query Transfers($q: String, $status: String, $limit: Int, $offset: Int) { transfers(q: $q, status: $status, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...(board ? {} : vars) },
+    ["transfers"],
+  );
+  const list: Paged<TransferBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  if (!board) keepInRange(list.items.length, list.total, page, base);
+  const transfers = list.items;
   const chip = (status: string, label: string) => ({ value: status, label, href: `/transfers${query({ q: f.q, status })}` });
   return (
     <>
@@ -70,6 +82,7 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
         )}
       </Sheet>
       )}
+      {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "transfer" : "transfers"} />}
     </>
   );
 }
@@ -105,6 +118,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
         )}
         actions={
           <>
+            <PrintLink href={`/print/transfers/${t.id}`} />
             {t.status === "draft" && may("transfers.create") && <StepButton run={transferStep.bind(null, t.id, "request")} label="Submit request" done="Transfer requested" />}
             {pending && may("transfers.approve") && <StepButton run={transferStep.bind(null, t.id, "approve")} label="Approve" done="Transfer approved" variant="primary" />}
             {(pending ? may("transfers.create") : t.status === "approved" && may("transfers.approve")) && (

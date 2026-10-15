@@ -21,6 +21,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import ADJUSTMENT_REASONS, Adjustment, AdjustmentLine, Batch, Category, Count, CountLine, Location, Product, Stock, User, Warehouse
 from app.out import batch_ref, location_ref, person, product_ref, warehouse_ref
+from app.paging import Limit, Offset, cut, total
 from app.routers.stock import in_category
 from app.stock import Ref, available, clean_serials, next_number, post, resolve_batch, serials_in, serials_out
 
@@ -180,15 +181,20 @@ def list_adjustments(
     status_: str | None = Query(None, alias="status", max_length=40),
     warehouse: str | None = Query(None, max_length=36),
     reason: str | None = Query(None, max_length=20),
-) -> list[dict]:
-    query = select(Adjustment).order_by(Adjustment.created_at.desc()).limit(500)
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 500; with it, one page and the total."""
+    query = select(Adjustment).order_by(Adjustment.created_at.desc())
     if status_:
         query = query.where(Adjustment.status.in_(status_.split(",")))
     if warehouse:
         query = query.where(Adjustment.warehouse_id == warehouse)
     if reason:
         query = query.where(Adjustment.reason == reason)
-    return [adjustment_brief(a) for a in db.scalars(query)]
+    if limit is not None:
+        return {"items": [adjustment_brief(a) for a in db.scalars(cut(query.order_by(Adjustment.id), limit, offset))], "total": total(db, query)}
+    return [adjustment_brief(a) for a in db.scalars(query.limit(500))]
 
 
 @router.post("/adjustments", status_code=status.HTTP_201_CREATED)
@@ -304,11 +310,20 @@ def count_out(c: Count, warn: int) -> dict:
 
 
 @router.get("/counts")
-def list_counts(_: allowed("counts.view"), db: DB, status_: str | None = Query(None, alias="status", max_length=40)) -> list[dict]:
-    query = select(Count).order_by(Count.created_at.desc()).limit(200)
+def list_counts(
+    _: allowed("counts.view"),
+    db: DB,
+    status_: str | None = Query(None, alias="status", max_length=40),
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 200; with it, one page and the total."""
+    query = select(Count).order_by(Count.created_at.desc())
     if status_:
         query = query.where(Count.status.in_(status_.split(",")))
-    return [count_brief(c) for c in db.scalars(query)]
+    if limit is not None:
+        return {"items": [count_brief(c) for c in db.scalars(cut(query.order_by(Count.id), limit, offset))], "total": total(db, query)}
+    return [count_brief(c) for c in db.scalars(query.limit(200))]
 
 
 @router.post("/counts", status_code=status.HTTP_201_CREATED)

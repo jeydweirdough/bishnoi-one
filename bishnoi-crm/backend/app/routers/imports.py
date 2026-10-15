@@ -19,7 +19,9 @@ A customer is matched by its customer code: a row with one updates that
 customer, a row without one adds a new customer (names may repeat: the same
 hospital can be a customer of several divisions).
 
-Products need products.create and products.edit; people need admin.users;
+Products need products.create and products.edit; prices (for products
+already here, by code) need products.prices or products.edit, and a
+manager's go to Finance for approval; people need admin.users;
 balances need goals.import; customers need customers.create to add and
 customers.edit to update, within the person's reach.
 """
@@ -48,12 +50,16 @@ from app.security import check_password_rules, hash_password
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
-Kind = Literal["products", "people", "balances", "customers"]
+Kind = Literal["products", "prices", "people", "balances", "customers"]
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 5000
 
 
 def allowed(access: Access, kind: str) -> None:
+    if kind == "prices":
+        # A manager's prices (products.prices) go to Finance; whoever edits products may too.
+        access.require(("products.prices", "products.edit"))
+        return
     if kind == "customers":
         access.require("customers.view")
         if not (access.can("customers.create") or access.can("customers.edit")):
@@ -77,6 +83,12 @@ def fields_of(db: Session, kind: str) -> list[dict]:
     header might call it."""
     if kind == "customers":
         return import_fields(db)
+    if kind == "prices":
+        # The product's code, then each price type set here (the SRP is Finance's and Inventory's).
+        out = [{"key": "code", "label": "Code", "required": True, "aliases": ["code", "sku", "itemcode", "productcode", "item"]}]
+        for t in db.scalars(select(PriceType).where(PriceType.entry == "list", PriceType.code != SRP).order_by(PriceType.sort_order, PriceType.name)):
+            out.append({"key": f"price:{t.code}", "label": f"Price: {t.name}", "required": False, "aliases": [t.name, t.code, f"{t.name}price", f"{t.code}price"]})
+        return out
     if kind == "balances":
         return [
             {"key": "doctor", "label": "Customer", "required": True, "aliases": ["doctor", "name", "doctorname", "customer", "customername", "account", "accountname", "physician"]},
@@ -291,6 +303,58 @@ def import_products(db: Session, me: User, body: ImportIn, get, linked: bool = F
     return made, changed, problems
 
 
+
+def import_prices(db: Session, access: Access, me: User, body: ImportIn, get) -> tuple[int, int, list[dict]]:
+    """Prices for products already here, matched by code. Only prices that differ
+    from what the product has are sent, so a file exported and imported back as
+    it was changes nothing. A manager's go to Finance for approval (catalogue.set_prices);
+    Finance's are approved at once. The SRP isn't one of them."""
+    from app.routers.catalogue import set_prices
+    from app.routers.prices import is_finance_user
+
+    is_finance = is_finance_user(access, me)
+    existing = {p.code.upper(): p for p in db.scalars(select(Product))}
+    seen: set[str] = set()
+    changed = 0
+    problems: list[dict] = []
+    for n, row in enumerate(body.rows, start=2):
+        if not any(c.strip() for c in row):
+            continue
+        try:
+            code = get(row, "code").upper()
+            if not code:
+                raise ValueError("No code.")
+            if code in seen:
+                raise ValueError(f"Code {code} is on another row of this file too.")
+            product = existing.get(code)
+            if product is None:
+                raise ValueError(f"Code {code} isn't a product here.")
+            have = {pp.price_type_code: pp for pp in product.prices}
+            prices: dict[str, int] = {}
+            for key, column in body.mapping.items():
+                if not key.startswith("price:") or column is None or not get(row, key):
+                    continue
+                code_of = key.removeprefix("price:")
+                try:
+                    amount = money(get(row, key))
+                except ValueError as e:
+                    raise ValueError(f"{code_of}: {e}") from None
+                there = have.get(code_of)
+                current = None if there is None else (there.proposed_amount_centavos if there.approval_status == "pending" else there.amount_centavos)
+                if amount != current:
+                    prices[code_of] = amount
+        except ValueError as e:
+            problems.append({"row": n, "message": str(e)})
+            continue
+        seen.add(code)
+        if prices:
+            set_prices(db, product, prices, me, is_finance)
+            changed += 1
+    db.flush()
+    if changed:
+        audit(db, me, "product.prices_submitted_for_approval" if not is_finance else "products.imported", target=f"Prices of {changed} products", target_type="product")
+    return 0, changed, problems
+
 def balance_amount(text: str) -> int:
     """What's owed, in centavos. Zero is allowed: a doctor who has paid up."""
     clean = re.sub(r"[^0-9.\-]", "", text)
@@ -409,6 +473,10 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setting
     allowed(access, kind)
     keys = {f["key"]: f for f in fields_of(db, kind)}
     missing = [f["label"] for f in keys.values() if f["required"] and body.mapping.get(f["key"]) is None]
+    if kind == "prices" and body.mapping.get("code") is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each product's code: it's how products are matched.")
+    if kind == "prices" and not any(k.startswith("price:") and v is not None for k, v in body.mapping.items()):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick at least one price column.")
     if kind == "products" and body.mapping.get("code") is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each product's code: it's how products are matched.")
     if kind == "balances" and (body.mapping.get("doctor") is None or body.mapping.get("amount") is None):
@@ -424,7 +492,9 @@ def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setting
 
     if kind == "customers" and body.mapping.get("name") is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick the column that holds each customer's name.")
-    if kind == "customers":
+    if kind == "prices":
+        made, changed, problems = import_prices(db, access, me, body, get)
+    elif kind == "customers":
         made, changed, problems = import_customers(db, access, me, body, get)
         if made or changed:
             audit(db, me, "customers.imported", target=f"{made} added, {changed} updated", target_type="company")

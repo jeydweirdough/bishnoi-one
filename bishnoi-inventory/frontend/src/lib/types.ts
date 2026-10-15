@@ -116,7 +116,8 @@ export type BrandRow = { id: string; name: string; isActive: boolean; productCou
 export type UnitRow = { code: string; name: string; isActive: boolean; productCount: number };
 
 export type StockRow = Level & { product: ProductRef; warehouse: Ref; reorderPoint: number; state: StockState; value: number };
-export type StockOverview = { items: StockRow[]; total: Level & { value: number } };
+/** One page of the stock list: `total` sums every matching row, `count` is how many there are. */
+export type StockOverview = { items: StockRow[]; total: Level & { value: number }; count: number };
 
 export type MovementKind =
   | "receive"
@@ -153,6 +154,9 @@ export type Movement = {
   user: string;
 };
 export type Page<T> = { items: T[]; more: boolean };
+
+/** One page of a list the server pages: its rows and how many match in all. */
+export type Paged<T> = { items: T[]; total: number };
 
 export type BatchRow = BatchRef & {
   product: ProductRef;

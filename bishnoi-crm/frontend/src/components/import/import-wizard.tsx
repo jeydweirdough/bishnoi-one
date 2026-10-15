@@ -12,6 +12,11 @@ import { readImport, runImport, type ImportFile, type ImportKind, type ImportRes
 
 const WORDS: Record<ImportKind, { one: string; many: string; match: string }> = {
   products: { one: "product", many: "products", match: "A product already here (same code) is updated; the rest are added." },
+  prices: {
+    one: "product",
+    many: "products",
+    match: "Each row is matched to a product by its code. Only prices that differ from today's are sent; a manager's go to Finance for approval first. The SRP isn't imported: it's set by Finance.",
+  },
   people: { one: "person", many: "people", match: "Someone already here (same email) is updated; the rest are added as new accounts." },
   customers: {
     one: "customer",
@@ -205,11 +210,26 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
           <SectionTitle icon="approvals">3 · Check, then import</SectionTitle>
           {check ? (
             <div className="mt-2 space-y-3">
-              <p className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="size-4 text-filed" aria-hidden />
-                {check.dryRun ? "Ready:" : "Done:"} {check.added} {check.added === 1 ? words.one : words.many} {check.dryRun ? "to add" : "added"}, {check.updated}{" "}
-                {check.dryRun ? "to update" : "updated"}.
-              </p>
+              {kind === "prices" ? (
+                // Prices: only what differs from today's is sent, so say which, and what to do when none does.
+                <p className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={`mt-0.5 size-4 shrink-0 ${check.updated ? "text-filed" : "text-ink-3"}`} aria-hidden />
+                  <span>
+                    {check.updated
+                      ? `${check.dryRun ? "Ready" : "Done"}: ${check.updated} ${check.updated === 1 ? "product has" : "products have"} new prices${check.dryRun ? " to send" : " sent"}. A manager's go to Finance for approval.`
+                      : "No price in the file differs from today's, so there's nothing to send."}
+                    {!check.updated && check.dryRun && (
+                      <span className="block text-meta text-ink-3">Change prices in the file, save and close it in Excel, then choose it again and read it.</span>
+                    )}
+                  </span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="size-4 text-filed" aria-hidden />
+                  {check.dryRun ? "Ready:" : "Done:"} {check.added} {check.added === 1 ? words.one : words.many} {check.dryRun ? "to add" : "added"}, {check.updated}{" "}
+                  {check.dryRun ? "to update" : "updated"}.
+                </p>
+              )}
               {check.problems.length > 0 && (
                 <div className="rounded-lg border border-danger/40 bg-danger-tint/40 px-4 py-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-danger">
@@ -240,7 +260,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
               disabled={!check || !check.dryRun || check.added + check.updated === 0}
               icon={<ArrowRight className="size-4" aria-hidden />}
             >
-              Import {check && check.dryRun ? check.added + check.updated : ""} {words.many}
+              {kind === "prices" ? `Send ${check && check.dryRun ? check.updated : ""} ${check && check.dryRun && check.updated === 1 ? "product's prices" : "products' prices"}` : <>Import {check && check.dryRun ? check.added + check.updated : ""} {words.many}</>}
             </Button>
             <LinkButton href={back} variant="quiet">
               {check && !check.dryRun ? "Done" : "Cancel"}

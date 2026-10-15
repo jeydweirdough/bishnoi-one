@@ -20,6 +20,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import ORDER_KINDS, Order, OrderLine, Product, Warehouse
 from app.out import day, person, product_ref, warehouse_ref
+from app.paging import Limit, Offset, cut, total
 from app.stock import Ref, available, clean_serials, next_number, pick_out, post, serials_out
 
 router = APIRouter(prefix="/inventory", tags=["orders"])
@@ -138,8 +139,11 @@ def list_orders(
     kind: str | None = Query(None, max_length=16),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=100),
-) -> list[dict]:
-    query = select(Order).order_by(Order.created_at.desc()).limit(500)
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 500 (the board's columns)."""
+    query = select(Order).order_by(Order.created_at.desc())
     if status_:
         query = query.where(Order.status.in_(status_.split(",")))
     if kind:
@@ -149,16 +153,19 @@ def list_orders(
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Order.number).like(like), func.lower(Order.recipient).like(like)))
-    return [order_brief(o) for o in db.scalars(query)]
+    if limit is not None:
+        return {"items": [order_brief(o) for o in db.scalars(cut(query.order_by(Order.id), limit, offset))], "total": total(db, query)}
+    return [order_brief(o) for o in db.scalars(query.limit(500))]
 
 
 @router.get("/reservations")
-def reservations(_: View, db: DB, warehouse: str | None = Query(None, max_length=36)) -> list[dict]:
+def reservations(_: View, db: DB, warehouse: str | None = Query(None, max_length=36), limit: int | None = Limit(), offset: int = Offset()) -> list[dict] | dict:
     """Every unit held for an open order: reserved (confirmed) or allocated (being picked)."""
     query = select(OrderLine, Order).join(Order).where(Order.status.in_(("confirmed", "picking"))).order_by(Order.needed_on.is_(None), Order.needed_on, Order.number)
     if warehouse:
         query = query.where(Order.warehouse_id == warehouse)
-    return [
+    rows = db.execute(cut(query.order_by(OrderLine.position, OrderLine.id), limit, offset) if limit is not None else query)
+    out = [
         {
             "order": {"id": o.id, "number": o.number, "status": o.status, "recipient": o.recipient, "neededOn": day(o.needed_on)},
             "warehouse": warehouse_ref(o.warehouse),
@@ -166,8 +173,9 @@ def reservations(_: View, db: DB, warehouse: str | None = Query(None, max_length
             "quantity": line.quantity,
             "state": "reserved" if o.status == "confirmed" else "allocated",
         }
-        for line, o in db.execute(query)
+        for line, o in rows
     ]
+    return {"items": out, "total": total(db, query)} if limit is not None else out
 
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED)

@@ -114,3 +114,29 @@ def file_out(body: bytes, file_format: str, name: str) -> Response:
         media_type=XLSX if file_format == "xlsx" else "text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{name}.{file_format}"', "Cache-Control": "private, no-store"},
     )
+
+
+@router.get("/products")
+def export_products(
+    access: CurrentAccess,
+    me: CurrentUser,
+    db: DB,
+    file_format: Literal["xlsx", "csv"] = Query("xlsx", alias="format"),
+) -> Response:
+    """Every product with the prices this person sees: its code, name, form and
+    unit, and a column per listed price type. The same columns Import prices
+    reads, so the file can be edited and brought back."""
+    from app.models import PriceType, Product
+    from app.routers.catalogue import product_out
+
+    access.require("products.view")
+    types = db.scalars(select(PriceType).where(PriceType.entry == "list").order_by(PriceType.sort_order, PriceType.name)).all()
+    head = ["Code", "Name", "Generic name", "Strength", "Form", "Unit", "On sale", *[t.name for t in types]]
+    rows = []
+    for p in db.scalars(select(Product).order_by(func.lower(Product.name)).limit(MAX_ROWS)):
+        shown = product_out(p, access)["prices"]
+        rows.append([p.code, p.name, p.generic_name or "", p.strength or "", p.form or "", p.unit, "Yes" if p.is_active else "No", *[f"{shown[t.code] / 100:.2f}" if t.code in shown else "" for t in types]])
+    body = workbook([("Products", head, rows)]) if file_format == "xlsx" else as_csv(head, rows)
+    audit(db, me, "products.exported", target=f"{len(rows)} products ({file_format})", target_type="product")
+    db.commit()
+    return file_out(body, file_format, f"products-{date.today().isoformat()}")

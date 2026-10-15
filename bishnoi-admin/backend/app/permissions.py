@@ -16,6 +16,8 @@ ACTION_LABELS = {
     "delete": "Delete",
     "assign": "Assign",
     "resolve": "Resolve",
+    "produce": "Produce",
+    "distribute": "Distribute",
     "acknowledge": "Acknowledge",
     "users": "Users",
     "roles": "Roles & permissions",
@@ -49,6 +51,13 @@ AREAS: tuple[Area, ...] = (
         "Office Services",
         ("view", "create", "edit", "assign", "resolve", "delete"),
     ),
+    # Designed by marketing, approved in Pharmacy, produced here, given out with the CRM manager's approval.
+    Area(
+        "materials",
+        "Promotional materials",
+        "Marketing",
+        ("view", "create", "edit", "produce", "distribute", "delete"),
+    ),
     Area("notifications", "Renewal alerts & countdowns", "Executive", ("view", "acknowledge", "resolve")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
@@ -80,11 +89,13 @@ ADMINISTRATOR = "Administrator"
 EXECUTIVE_ASSISTANT = "Executive Assistant"
 COMPLIANCE_OFFICER = "Compliance Officer"
 AUDITOR = "Auditor"
+MARKETING_ASSISTANT = "Marketing Assistant"
 
 ROLE_ADMIN_ID = "00000000-0000-4000-8000-000000000001"
 ROLE_EXEC_ASST_ID = "00000000-0000-4000-8000-000000000002"
 ROLE_COMPLIANCE_ID = "00000000-0000-4000-8000-000000000003"
 ROLE_AUDITOR_ID = "00000000-0000-4000-8000-000000000004"
+ROLE_MARKETING_ID = "00000000-0000-4000-8000-000000000005"
 
 STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     (
@@ -101,6 +112,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         | _grant("permits", "immigration", "documents", "properties", actions=("create", "edit"))
         | _grant("tickets", actions=("create", "edit", "assign", "resolve"))
         | _grant("vehicles", "travel", "devices", actions=("create", "edit"))
+        | _grant("materials", actions=("produce",))
         | _grant("notifications", actions=("acknowledge", "resolve")),
     ),
     (
@@ -116,5 +128,11 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         AUDITOR,
         "Read-only visibility across all corporate records, alerts, and the administration activity log.",
         VIEW_ALL | {"admin.audit"},
+    ),
+    (
+        ROLE_MARKETING_ID,
+        MARKETING_ASSISTANT,
+        "Designs promotional materials, sends them for the pharmacist's approval, and gives them out once the manager approves.",
+        _grant("materials", actions=("view", "create", "edit", "distribute")),
     ),
 )

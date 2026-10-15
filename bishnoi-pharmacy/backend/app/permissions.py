@@ -22,6 +22,7 @@ ACTION_LABELS = {
     "receive": "Receive stock",
     "adjust": "Adjust stock",
     "refund": "Returns & refunds",
+    "review": "Approve or return",
     "users": "Users",
     "roles": "Roles & permissions",
     "audit": "Activity log",
@@ -49,6 +50,8 @@ AREAS: tuple[Area, ...] = (
     Area("batches", "Batches & expiry", "Stock", ("view", "manage")),
     Area("stock", "Stock", "Stock", ("view", "receive", "adjust")),
     Area("suppliers", "Suppliers", "Stock", CRUD),
+    # Designs sent by Admin: the pharmacist approves them before they're produced.
+    Area("materials", "Promotional material reviews", "Pharmacy", ("view", "review")),
     Area("reports", "Reports", "Reports", ("view",)),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )

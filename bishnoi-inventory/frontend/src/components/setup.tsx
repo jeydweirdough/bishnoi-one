@@ -1,80 +1,10 @@
-import { Check, ChevronRight, Lock } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Icon } from "@/src/platform/ui/icons";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import type { IconName } from "@/src/platform/ui/icons";
-import { STEPS, blockedBy, loadSetup, missingFor, type Need, type Setup } from "../lib/setup";
-
-/**
- * Home's "Get started": the setup steps in their order, each ticked once done.
- * The next one is open with its button; one that waits on another says which.
- * Gone once everything that must be done is.
- */
-export function SetupGuide({ setup, may }: { setup: Setup; may: (permission: string) => boolean }) {
-  const steps = STEPS.filter((s) => may(s.permission) || s.done(setup));
-  const needed = steps.filter((s) => !s.optional);
-  if (needed.every((s) => s.done(setup))) return null;
-  const done = steps.filter((s) => s.done(setup)).length;
-  const next = steps.find((s) => !s.done(setup) && !blockedBy(s, setup) && may(s.permission));
-  const pct = Math.round((100 * done) / Math.max(1, steps.length));
-  return (
-    <Sheet className="mb-5 px-5 py-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-ink">Get started</h2>
-          <p className="text-meta text-ink-3">Complete these steps in order. Each step depends on the one before it.</p>
-        </div>
-        <span className="flex items-center gap-3 text-meta text-ink-2">
-          <span className="h-2 w-32 overflow-hidden rounded-full bg-mint-2">
-            <span className="block h-full rounded-full bg-sage" style={{ width: `${pct}%` }} />
-          </span>
-          {done} of {steps.length} done
-        </span>
-      </div>
-      <ol className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {steps.map((s, i) => {
-          const isDone = s.done(setup);
-          const waits = !isDone ? blockedBy(s, setup) : undefined;
-          const isNext = s === next;
-          return (
-            <li
-              key={s.key}
-              className={`flex flex-col rounded-lg border px-4 py-3.5 ${isNext ? "border-ink bg-sheet shadow-[0_0_0_1px_var(--color-ink)]" : isDone ? "border-rule bg-hema-tint" : "border-rule bg-sheet"}`}
-            >
-              <span className="flex items-center gap-2.5">
-                <span
-                  className={`grid size-7 shrink-0 place-items-center rounded-full text-meta font-semibold ${isDone ? "bg-sage-deep text-white" : isNext ? "bg-ink text-white" : "border border-rule-strong text-ink-3"}`}
-                >
-                  {isDone ? <Check className="size-4" aria-hidden /> : i + 1}
-                </span>
-                <span className={`text-sm font-semibold ${isDone ? "text-ink-2" : "text-ink"}`}>{s.title}</span>
-              </span>
-              <span className="mt-2 flex-1 text-meta text-ink-3">{s.why}</span>
-              <span className="mt-3">
-                {isDone ? (
-                  <span className="text-meta font-medium text-sage-deep">Done</span>
-                ) : waits ? (
-                  <span className="flex items-center gap-1.5 text-meta text-ink-3">
-                    <Lock className="size-3.5" aria-hidden />
-                    After &ldquo;{waits.title.toLowerCase()}&rdquo;
-                  </span>
-                ) : !may(s.permission) ? (
-                  <span className="text-meta text-ink-3">Done by an administrator</span>
-                ) : (
-                  <LinkButton href={s.href} size="sm" variant={isNext ? "primary" : "default"}>
-                    {s.action}
-                  </LinkButton>
-                )}
-                {s.optional && !isDone && <span className="ml-2 text-meta text-ink-3">Optional</span>}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </Sheet>
-  );
-}
+import { loadSetup, missingFor, type Need, type Setup } from "../lib/setup";
 
 /**
  * In place of a New page whose form can't be finished yet: what it needs

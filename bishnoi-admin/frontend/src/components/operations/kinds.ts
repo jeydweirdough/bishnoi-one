@@ -6,6 +6,7 @@
 
 import type { IconName } from "@/src/platform/ui/icons";
 import type { OperationsPath } from "@/src/actions/operations";
+import type { Glyph } from "@/src/components/record-table";
 
 export type Item = Record<string, unknown> & { id: string };
 
@@ -22,7 +23,7 @@ export type Field = {
 
 export type Tone = "outline" | "good" | "warn" | "bad" | "info" | "mute";
 export type Cell =
-  | { type: "who"; name: string; sub?: string | null; filled?: boolean }
+  | { type: "who"; name: string; sub?: string | null; filled?: boolean; glyph?: Glyph }
   | { type: "text"; text: string | null; sub?: string | null }
   | { type: "due"; date: string | null; days: number | null; note?: string }
   | { type: "tag"; text: string; tone: Tone; dot?: boolean }
@@ -39,6 +40,8 @@ export type Kind = {
   one: string; // "vehicle": "New vehicle", "Delete this vehicle?"
   fields: Field[];
   name: (i: Item) => string;
+  /** An icon for the record's circle instead of its initials (a vehicle: car or motorcycle). */
+  glyph?: (i: Item) => Glyph;
   /** The table: its columns, the first being the name. */
   columns: { key: string; label: string; cell: (i: Item) => Cell; kind?: "num" | "hide-sm" }[];
   /** The one switch above the table. */
@@ -63,6 +66,8 @@ export const CARD_STATE = { active: "Active", blocked: "Blocked" };
 export const TRAVEL_STATUS = { for_approval: "For approval", for_processing: "For processing", approved: "Approved", booked: "Booked", cancelled: "Cancelled" };
 export const TRAVEL_KIND = { hotel: "Hotel stay", flight: "Flight" };
 export const CONDITION = { brand_new: "Brand new", repaired: "Repaired", used: "Used" };
+export const VEHICLE_KIND: Record<Glyph, string> = { car: "Car", motorcycle: "Motorcycle" };
+const vehicleGlyph = (i: Item): Glyph => (i.kind === "motorcycle" ? "motorcycle" : "car");
 
 /** A vehicle's state in one tag: the worst of its three dates. */
 function vehicleStatus(i: Item): { text: string; tone: Tone } {
@@ -93,6 +98,7 @@ export const KINDS: Record<OperationsPath, Kind> = {
     one: "vehicle",
     fields: [
       { key: "name", label: "Vehicle", type: "text", required: true, placeholder: "Ford Ranger AT" },
+      { key: "kind", label: "Type", type: "choice", options: VEHICLE_KIND },
       { key: "plate", label: "Plate number", type: "text" },
       { key: "yearModel", label: "Year model", type: "number" },
       { key: "color", label: "Color", type: "text" },
@@ -104,8 +110,9 @@ export const KINDS: Record<OperationsPath, Kind> = {
       { key: "notes", label: "Notes", type: "long", wide: true },
     ],
     name: (i) => s(i.name),
+    glyph: vehicleGlyph,
     columns: [
-      { key: "name", label: "Vehicle", cell: (i) => ({ type: "who", name: s(i.name), sub: [i.plate, i.yearModel, i.color].filter(Boolean).join(" · "), filled: vehicleStatus(i).tone === "bad" || vehicleStatus(i).tone === "warn" }) },
+      { key: "name", label: "Vehicle", cell: (i) => ({ type: "who", name: s(i.name), sub: [i.plate, i.yearModel, i.color].filter(Boolean).join(" · "), filled: vehicleStatus(i).tone === "bad" || vehicleStatus(i).tone === "warn", glyph: vehicleGlyph(i) }) },
       { key: "owner", label: "Owner", kind: "hide-sm", cell: (i) => ({ type: "text", text: s(i.ownerName) || null }) },
       { key: "reg", label: "Registration", cell: (i) => ({ type: "due", date: i.registrationDue as string | null, days: daysTo(i.registrationDue) }) },
       { key: "ins", label: "Insurance", kind: "hide-sm", cell: (i) => ({ type: "due", date: i.insuranceDue as string | null, days: daysTo(i.insuranceDue) }) },
@@ -114,9 +121,15 @@ export const KINDS: Record<OperationsPath, Kind> = {
     ],
     filter: {
       label: "Show",
-      options: { soon: "Due in 30 days", overdue: "Overdue", getmeds: "Getmeds", "2mg": "2MG" },
+      options: { soon: "Due in 30 days", overdue: "Overdue", car: "Cars", motorcycle: "Motorcycles", getmeds: "Getmeds", "2mg": "2MG" },
       matches: (i, key) =>
-        key === "overdue" ? vehicleStatus(i).tone === "bad" : key === "soon" ? vehicleStatus(i).tone === "warn" : s(i.ownerName).toLowerCase().includes(key === "getmeds" ? "getmeds" : "2mg"),
+        key === "overdue"
+          ? vehicleStatus(i).tone === "bad"
+          : key === "soon"
+            ? vehicleStatus(i).tone === "warn"
+            : key === "car" || key === "motorcycle"
+              ? vehicleGlyph(i) === key
+              : s(i.ownerName).toLowerCase().includes(key === "getmeds" ? "getmeds" : "2mg"),
     },
     search: (i) => [i.name, i.plate, i.ownerName, i.color].map(s).join(" "),
     subline: (i) => [i.yearModel, i.color, i.ownerName ? `owned by ${i.ownerName}` : null].filter(Boolean).join(" · "),
@@ -140,7 +153,7 @@ export const KINDS: Record<OperationsPath, Kind> = {
       { action: "pms_done", label: "PMS done", primary: (i) => i.nextDue === "Maintenance (PMS)" && (daysTo(i.pmsDue) ?? 999) <= 30 },
     ],
     details: (i) => [
-      { title: "The vehicle", rows: [{ label: "Year model", value: s(i.yearModel) || null }, { label: "Color", value: s(i.color) || null }, { label: "Plate number", value: s(i.plate) || null }] },
+      { title: "The vehicle", rows: [{ label: "Type", value: VEHICLE_KIND[vehicleGlyph(i)] }, { label: "Year model", value: s(i.yearModel) || null }, { label: "Color", value: s(i.color) || null }, { label: "Plate number", value: s(i.plate) || null }] },
       { title: "Who has it", rows: [{ label: "Registered owner, and who uses it", value: s(i.ownerName) || null }, { label: "Fuel card", value: s(i.fleetCard) || null }] },
       { title: "Notes", rows: [{ label: "Notes", value: s(i.notes) || null }] },
     ],

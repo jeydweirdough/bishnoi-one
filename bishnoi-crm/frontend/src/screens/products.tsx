@@ -1,6 +1,6 @@
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import Link from "next/link";
-import { LinkButton } from "@/src/platform/ui/button";
+import { LinkButton, buttonClass } from "@/src/platform/ui/button";
 import { PageHeader } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
@@ -59,7 +59,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         actions={
           <>
             {link.linked && can(me, "products.edit") && <SyncNow />}
-            {can(me, "products.create") && can(me, "products.edit") && (
+            {/* The list with its prices, as a spreadsheet: edit it and bring it back with Import prices. */}
+            <a href="/products/export?format=xlsx" download className={buttonClass("default")}>
+              <Download className="size-4" aria-hidden />
+              Export
+            </a>
+            {(can(me, "products.prices") || can(me, "products.edit")) && (
+              <LinkButton href="/products/import?kind=prices" icon={<Upload className="size-4" aria-hidden />}>
+                Import prices
+              </LinkButton>
+            )}
+            {!link.linked && can(me, "products.create") && can(me, "products.edit") && (
               <LinkButton href="/products/import" icon={<Upload className="size-4" aria-hidden />}>
                 Import
               </LinkButton>

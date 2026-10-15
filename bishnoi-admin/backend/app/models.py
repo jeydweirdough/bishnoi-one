@@ -7,7 +7,7 @@ a migration (migrations/versions)."""
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -307,8 +307,21 @@ class Notification(Base):
 # team's fuel cards, doctors' hotel and flight sponsorships, and the laptops,
 # phones and SIMs handed out.
 
+VEHICLE_KINDS = ("car", "motorcycle")
+
+
+def guess_vehicle_kind(name: str | None, plate: str | None) -> str:
+    """A motorcycle by its plate (Philippine motorcycle plates start with
+    digits: 707XEZ, 133606; a car's with letters: NKT 4569) or its name; else a car."""
+    plate = (plate or "").strip()
+    if plate[:1].isdigit():
+        return "motorcycle"
+    words = (name or "").upper()
+    return "motorcycle" if any(w in words for w in ("MOTORCYCLE", "MOTORBIKE", "SCOOTER")) else "car"
+
+
 class Vehicle(Base):
-    """A company car: its registration, insurance and maintenance falling due."""
+    """A company car or motorcycle: its registration, insurance and maintenance falling due."""
 
     __tablename__ = "nbad_vehicles"
     __mapper_args__ = {"eager_defaults": True}
@@ -318,6 +331,7 @@ class Vehicle(Base):
     # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
     no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(140))  # "Ford Ranger AT"
+    kind: Mapped[str] = mapped_column(String(12), default="car")  # car or motorcycle: its icon
     plate: Mapped[str | None] = mapped_column(String(20), default=None, index=True)
     year_model: Mapped[int | None] = mapped_column(Integer, default=None)
     color: Mapped[str | None] = mapped_column(String(60), default=None)
@@ -428,7 +442,150 @@ class RecordEvent(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class StoredFile(Base):
+    """An uploaded file (a promotional material's design), kept in the database
+    itself: a server without a lasting disk (Vercel) keeps it all the same, and
+    it is backed up with everything else."""
+
+    __tablename__ = "nbad_stored_files"
+
+    ref: Mapped[str] = mapped_column(String(32), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(100))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PromoMaterial(Base):
+    """A promotional material (a leaflet, a poster, a giveaway): designed by the
+    marketing assistant, approved by the pharmacist in Pharmacy, produced by the
+    executive office, and given out to the CRM's teams once their manager approves.
+
+    status: draft -> pharmacy_review -> approved (or returned for changes, or
+    rejected) -> in_production -> available; retired when no longer given out.
+    stock is what has been received from production less what has been given out."""
+
+    __tablename__ = "nbad_promo_materials"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'pharmacy_review', 'returned', 'rejected', 'approved', 'in_production', 'available', 'retired')", name="nbad_promo_status"),
+        Index("nbad_promo_materials_no", "no", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    title: Mapped[str] = mapped_column(String(160), index=True)
+    kind: Mapped[str] = mapped_column(String(40))  # Leaflet, Poster, Standee, Giveaway...
+    product: Mapped[str | None] = mapped_column(String(160), default=None)  # what it promotes
+    description: Mapped[str | None] = mapped_column(String(1000), default=None)
+    quantity: Mapped[int | None] = mapped_column(Integer, default=None)  # how many are planned
+    specs: Mapped[str | None] = mapped_column(String(300), default=None)  # size, paper, colours
+    needed_by: Mapped[date | None] = mapped_column(Date, default=None)
+    budget: Mapped[float | None] = mapped_column(default=None)  # pesos, the whole run
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    stock: Mapped[int] = mapped_column(Integer, default=0)
+    created_by_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    versions: Mapped[list["PromoVersion"]] = relationship(back_populates="material", cascade="all, delete-orphan", order_by="PromoVersion.number", lazy="selectin")
+
+
+class PromoVersion(Base):
+    """One design of a material, as sent to the pharmacist. A design returned
+    for changes is followed by a new version; each keeps its file and the
+    pharmacist's comments.
+
+    review: draft (not sent), waiting, approved, returned or rejected; the last
+    answer from Pharmacy is kept with when it was had."""
+
+    __tablename__ = "nbad_promo_versions"
+    __table_args__ = (CheckConstraint("review IN ('draft', 'waiting', 'approved', 'returned', 'rejected')", name="nbad_promo_version_review"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    material_id: Mapped[str] = mapped_column(ForeignKey("nbad_promo_materials.id", ondelete="CASCADE"), index=True)
+    number: Mapped[int] = mapped_column(Integer)  # 1, 2, 3...
+    file_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    file_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    notes: Mapped[str | None] = mapped_column(String(1000), default=None)  # what changed, for the pharmacist
+    review: Mapped[str] = mapped_column(String(10), default="draft")
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    sent_by_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    pharmacy_number: Mapped[str | None] = mapped_column(String(40), default=None)  # Pharmacy's reference
+    comments: Mapped[str | None] = mapped_column(String(2000), default=None)  # the pharmacist's
+    reviewed_by: Mapped[str | None] = mapped_column(String(140), default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    sync_error: Mapped[str | None] = mapped_column(String(300), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    material: Mapped[PromoMaterial] = relationship(back_populates="versions")
+
+
+class PromoProduction(Base):
+    """A print run or order of a material: ordered, then received into stock (or cancelled)."""
+
+    __tablename__ = "nbad_promo_productions"
+    __table_args__ = (CheckConstraint("status IN ('ordered', 'received', 'cancelled')", name="nbad_promo_production_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    material_id: Mapped[str] = mapped_column(ForeignKey("nbad_promo_materials.id", ondelete="CASCADE"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer)  # the approved design produced
+    quantity: Mapped[int] = mapped_column(Integer)
+    supplier: Mapped[str | None] = mapped_column(String(160), default=None)  # the printer or maker
+    cost: Mapped[float | None] = mapped_column(default=None)  # pesos, the whole run
+    ordered_on: Mapped[date | None] = mapped_column(Date, default=None)
+    expected_on: Mapped[date | None] = mapped_column(Date, default=None)
+    received_on: Mapped[date | None] = mapped_column(Date, default=None)
+    status: Mapped[str] = mapped_column(String(10), default="ordered")
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    by_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    # A photo or scan of the delivery, as proof it was received (nbad_stored_files).
+    proof_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    proof_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PromoDistribution(Base):
+    """Some of a material given to a CRM team (or one person in it), once the
+    team's manager approves in the CRM. The CRM's last answer is kept with when
+    it was had.
+
+    status: for_approval -> approved (or rejected) -> distributed; cancelled
+    while not yet given out."""
+
+    __tablename__ = "nbad_promo_distributions"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (
+        CheckConstraint("status IN ('for_approval', 'approved', 'rejected', 'distributed', 'cancelled')", name="nbad_promo_distribution_status"),
+        Index("nbad_promo_distributions_no", "no", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    material_id: Mapped[str] = mapped_column(ForeignKey("nbad_promo_materials.id", ondelete="CASCADE"), index=True)
+    team_id: Mapped[str] = mapped_column(String(36))  # the CRM's
+    team_name: Mapped[str] = mapped_column(String(140))
+    recipient_id: Mapped[str | None] = mapped_column(String(36), default=None)  # a person in that team, the CRM's
+    recipient_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    quantity: Mapped[int] = mapped_column(Integer)
+    purpose: Mapped[str | None] = mapped_column(String(500), default=None)
+    status: Mapped[str] = mapped_column(String(12), default="for_approval")
+    requested_by_name: Mapped[str | None] = mapped_column(String(140), default=None)
+    manager_name: Mapped[str | None] = mapped_column(String(140), default=None)  # who decided, in the CRM
+    decision_note: Mapped[str | None] = mapped_column(String(500), default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    distributed_on: Mapped[date | None] = mapped_column(Date, default=None)
+    # A photo of the hand-over or the signed receipt, as proof it was given out.
+    proof_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    proof_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    sync_error: Mapped[str | None] = mapped_column(String(300), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, ComplianceRecord, ImmigrationRecord, CorporateDocument, PropertyRecord, Vehicle, FleetCard, TravelSponsorship, DeviceIssue)
+numbered(User, ComplianceRecord, ImmigrationRecord, CorporateDocument, PropertyRecord, Vehicle, FleetCard, TravelSponsorship, DeviceIssue, PromoMaterial, PromoDistribution)

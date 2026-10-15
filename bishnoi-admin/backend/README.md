@@ -34,7 +34,8 @@ There is no sign-up page. Accounts are made from the command line:
 | `uv run python -m app.tools.users enable --email …` | Switches it back on |
 
 The roles start as Administrator (everything, can't be changed), Executive
-Assistant, Compliance Officer and Auditor (read-only). What each may do is in
+Assistant, Compliance Officer, Auditor (read-only) and Marketing Assistant
+(promotional materials only). What each may do is in
 `app/permissions.py`; administrators can change that from the app. `--admin`
 is short for `--role Administrator`.
 
@@ -50,6 +51,22 @@ is short for `--role Administrator`.
 Send the token as `Authorization: Bearer <token>`. The database keeps only a
 hash of each token. Passwords are hashed with scrypt. Five wrong passwords for
 one email make it wait 15 minutes (`LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`).
+
+## Promotional materials
+
+`app/routers/materials.py`. The marketing assistant adds a material (type,
+product, quantity needed, size and specifications, date needed, budget) and
+uploads its design (PDF or picture, up to 3 MB, kept in the database); **Submit for
+review** sends it to Pharmacy, where the pharmacist approves it, returns it with
+comments (a new version is uploaded and submitted again) or rejects it. The
+Executive Assistant (`materials.produce`) orders production and marks it
+received into stock, with a photo of the delivery as proof. **Request distribution** asks the CRM: the team's manager
+approves or rejects it there, and Admin records it as distributed, with a photo of the hand-over or the
+signed receipt as proof. Admin asks
+Pharmacy and the CRM for their answer when someone opens the material
+(`app/linked.py`). Both links are made on the Platform's Connections page
+(Admin → Pharmacy, Admin → CRM); without them the screens say Admin isn't
+connected yet.
 
 ## Settings (`.env`)
 

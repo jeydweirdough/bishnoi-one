@@ -18,7 +18,10 @@ SIGN_IN_AGAIN = "Your session has ended. Please sign in again."
 
 
 def get_settings_dep(request: Request) -> Settings:
-    return request.app.state.settings
+    # With the platform's links laid over them (app/platform_links.py).
+    from app.platform_links import effective
+
+    return effective(request.app.state.settings)
 
 
 def get_db(request: Request):
