@@ -37,6 +37,7 @@ def me_out(user: User, settings: Settings) -> dict:
         "org": org_out(settings),
         "role": {"id": user.role.id, "name": user.role.name, "scope": user.role.scope},
         "team": {"id": user.team.id, "name": user.team.name} if user.team else None,
+        "otherTeams": [{"id": t.id, "name": t.name} for t in user.other_teams],
         "permissions": sorted(access.permissions),
         "canManageSettings": administers,
         "canRecover": False,

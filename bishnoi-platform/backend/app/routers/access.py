@@ -24,6 +24,7 @@ from app.audit import audit
 from app.deps import DB, Address, AdminUser, CurrentSession, CurrentUser
 from app.identity import ROLE_NAMES
 from app.models import AccessRequest, Application, Company, CompanyApp, Identity, IdentityApp, SignInSession, User
+from app.routers.profile import split_name
 
 router = APIRouter(prefix="/platform", tags=["access"])
 
@@ -316,7 +317,8 @@ def create_staff(body: StaffIn, db: DB, me: AdminUser, address: Address) -> dict
     if _email_taken(db, email):
         raise field_error("email", "There's already a staff account with this email.")
     password, made = _password(body.password)
-    u = User(email=email, full_name=body.full_name.strip(), password_hash=hash_password(password), role=body.role)
+    first, last = split_name(body.full_name.strip())
+    u = User(email=email, full_name=body.full_name.strip(), first_name=first or None, last_name=last or None, password_hash=hash_password(password), role=body.role)
     db.add(u)
     db.flush()
     audit(db, me, "staff.created", category="security", target=u.email, target_type="staff", target_id=u.id, fields=["role"], address=address)
@@ -343,6 +345,10 @@ def update_staff(staff_id: str, body: StaffPatch, db: DB, me: AdminUser, address
         raise HTTPException(status.HTTP_409_CONFLICT, "This is the last Platform Admin. Make someone else a Platform Admin first.")
     for name, value in fields.items():
         setattr(u, name, value)
+    if "full_name" in fields:
+        # Typed in one piece here: its parts follow (the person can tidy them on their profile).
+        u.first_name, u.last_name = split_name(u.full_name)
+        u.middle_initial = u.suffix = None
     if fields:
         if "role" in fields:
             action = "staff.role_changed"

@@ -141,3 +141,60 @@ def test_a_manager_sets_targets_for_their_own_departments_people_only(app, clien
     with app.state.sessions() as db:
         sam = db.scalar(select(User).where(User.full_name == "Sam")).id
     assert client.put("/sales/targets", json={"targets": [{"userId": sam, "amountCentavos": 100}]}, headers=mia).status_code == 422
+
+
+def test_a_manager_runs_the_people_in_their_teams(app, client, ana, crew):
+    # Like an administrator, for the teams she manages: their people, the roles below hers, those teams.
+    mia = make_manager(app, client, ana, ["North"])
+    people = {p["email"]: p for p in client.get("/admin/users", headers=mia).json()}
+    assert "ria@example.com" in people and "lia@example.com" in people
+    assert "sam@example.com" not in people and "mia@example.com" not in people and "ana@example.com" not in people
+    options = client.get("/admin/users/options", headers=mia).json()
+    roles = {r["name"]: r["id"] for r in options["roles"]}
+    assert set(roles) >= {"Team Lead", "Salesperson", "Field agent"} and not {"Administrator", "Manager", "Finance"} & set(roles)
+    assert [t["name"] for t in options["teams"]] == ["North"]
+    with app.state.sessions() as db:
+        ids = {t.name: t.id for t in db.scalars(select(Team))}
+        admin_role = role_id(db, "Administrator")
+    ria = people["ria@example.com"]["id"]
+
+    # Her people: role, details, on and off, a new password.
+    changed = client.patch(f"/admin/users/{ria}", json={"roleId": roles["Field agent"], "fullName": "Ria Santos"}, headers=mia)
+    assert changed.status_code == 200 and changed.json()["role"]["name"] == "Field agent" and changed.json()["fullName"] == "Ria Santos"
+    assert client.patch(f"/admin/users/{ria}", json={"isActive": False}, headers=mia).json()["isActive"] is False
+    assert client.post(f"/admin/users/{ria}/password", json={"password": "a brand new phrase"}, headers=mia).status_code == 204
+    # Not beyond her: another team, a role above, someone outside her teams, herself.
+    assert client.patch(f"/admin/users/{ria}", json={"teamId": ids["South"]}, headers=mia).status_code == 422
+    assert client.patch(f"/admin/users/{ria}", json={"roleId": admin_role}, headers=mia).status_code == 422
+    sam = client.get("/admin/users", headers=ana).json()
+    sam = next(p["id"] for p in sam if p["email"] == "sam@example.com")
+    assert client.patch(f"/admin/users/{sam}", json={"fullName": "Not hers"}, headers=mia).status_code == 404
+    # A new person: into her team, in a role she may give.
+    new = {"email": "nina@example.com", "fullName": "Nina Cruz", "roleId": roles["Salesperson"], "teamId": ids["North"], "password": "a brand new phrase"}
+    assert client.post("/admin/users", json=new, headers=mia).status_code == 201
+    assert client.post("/admin/users", json={**new, "email": "nino@example.com", "teamId": None}, headers=mia).status_code == 422
+    # A team lead isn't a manager: no people pages.
+    assert client.get("/admin/users", headers=crew["lia"]).status_code == 403
+
+
+def test_a_person_in_two_teams(app, client, ana, crew):
+    # A team lead in North and South reaches both teams' records; what she makes stays in her main team.
+    company(client, crew["sam"], "South Clinic")
+    with app.state.sessions() as db:
+        ids = {t.name: t.id for t in db.scalars(select(Team))}
+        lia = db.scalar(select(User).where(User.email == "lia@example.com")).id
+    assert "South Clinic" not in names(client, crew["lia"])
+    saved = client.patch(f"/admin/users/{lia}", json={"otherTeamIds": [ids["South"]]}, headers=ana).json()
+    assert saved["team"]["name"] == "North" and [t["name"] for t in saved["otherTeams"]] == ["South"]
+    assert "South Clinic" in names(client, crew["lia"])
+    made = company(client, crew["lia"], "Lia's Clinic")
+    assert client.get(f"/companies/{made['id']}", headers=ana).json()["team"]["name"] == "North"
+    # Both teams count her.
+    teams = {t["name"]: t for t in client.get("/admin/teams", headers=ana).json()}
+    assert teams["South"]["memberCount"] >= 2
+
+    # A manager of North only adds and removes North; South stays as the admin set it.
+    mia = make_manager(app, client, ana, ["North"])
+    ria = next(p["id"] for p in client.get("/admin/users", headers=mia).json() if p["email"] == "ria@example.com")
+    assert client.patch(f"/admin/users/{ria}", json={"otherTeamIds": [ids["South"]]}, headers=mia).status_code == 422
+    assert client.patch(f"/admin/users/{lia}", json={"otherTeamIds": []}, headers=mia).json()["otherTeams"] == [{"id": ids["South"], "name": "South"}]

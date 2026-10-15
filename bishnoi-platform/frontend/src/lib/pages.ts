@@ -47,7 +47,7 @@ const within = (pathname: string, href: string) => pathname === href || pathname
 /** Where you are, for the phone's top bar. */
 export function platformPlace(pathname: string): string | null {
   if (pathname === "/") return "Dashboard";
-  if (within(pathname, "/account")) return "My account";
+  if (within(pathname, "/account")) return "Your profile";
   for (const group of PLATFORM_GROUPS) {
     const page = group.pages.find((p) => p.href !== "/" && within(pathname, p.href));
     if (page) return page.label;

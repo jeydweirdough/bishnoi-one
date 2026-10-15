@@ -90,6 +90,8 @@ const ACTIONS: Record<string, string> = {
   "staff.enabled": "activated",
   "staff.disabled": "deactivated",
   "staff.password_reset": "reset the password of",
+  "staff.updated": "changed the account of",
+  "staff.profile_changed": "updated their profile",
   "company.created": "added the company",
   "company.updated": "changed the company",
   "company.suspended": "suspended",
@@ -124,6 +126,11 @@ const ACTIONS: Record<string, string> = {
   "incident.declared": "declared",
   "incident.updated": "changed",
 };
+
+/** The same, as a line of its own ("Signed in", "Created a staff account for"): your profile's recent activity. */
+export const ACTION_LINES: Record<string, string> = Object.fromEntries(
+  Object.entries(ACTIONS).map(([code, words]) => [code, words.replace(/:$/, "").replace(/^\w/, (c) => c.toUpperCase())]),
+);
 
 export function actionWords(e: Pick<AuditEntry, "action">): string {
   if (ACTIONS[e.action]) return ACTIONS[e.action];

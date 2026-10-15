@@ -115,7 +115,7 @@ function Profile({ me }: { me: Me }) {
       ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
       : null;
   const items: MenuProps["items"] = [
-    { key: "account", label: process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? "Your profile" : "Your account", icon: <UserRound className="size-4" aria-hidden /> },
+    { key: "account", label: "Your profile", icon: <UserRound className="size-4" aria-hidden /> },
     // The CRM sends email from each person's own mailbox.
     ...(process.env.NEXT_PUBLIC_BISHNOI_APP === "crm" ? [{ key: "mailbox", label: "Mailbox", icon: <Mail className="size-4" aria-hidden /> }] : []),
     // Each company has its own data here. Someone who works for more than one

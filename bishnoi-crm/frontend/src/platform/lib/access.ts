@@ -4,13 +4,15 @@ import type { Me } from "./types";
 export const can = (me: Me, permission: string): boolean => me.permissions?.includes(permission) ?? false;
 
 /** Who's who: users, their roles, their teams. One place in the sidebar, a sub-page each. */
+/** The Users pages: an administrator for everyone, a manager for the people in the teams they manage. */
+export const USERS = ["admin.users", "department.manage"] as const;
+
 export const PEOPLE_PAGES = [
-  { href: "/admin/users", label: "Users", permission: "admin.users" },
+  { href: "/admin/users", label: "Users", permission: USERS },
   { href: "/admin/roles", label: "Roles and permissions", permission: "admin.roles" },
   { href: "/admin/teams", label: "Teams", permission: "admin.teams" },
 ] as const;
 
-export const peoplePagesFor = (me: Me) => PEOPLE_PAGES.filter((t) => can(me, t.permission));
 
 /** A manager's own department's settings (its templates, attention rules and
  *  retention windows), beside an administrator's for every department. */
@@ -39,6 +41,8 @@ export const SETTINGS_PAGES = [
 /** Any one of these permissions. */
 export const canAny = (me: Me, permission: string | readonly string[]): boolean =>
   typeof permission === "string" ? can(me, permission) : permission.some((p) => can(me, p));
+
+export const peoplePagesFor = (me: Me) => PEOPLE_PAGES.filter((t) => canAny(me, t.permission));
 
 /** A manager without the company's settings sees only their department's. */
 export const settingsPagesFor = (me: Me) =>

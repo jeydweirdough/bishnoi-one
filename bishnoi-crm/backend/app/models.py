@@ -80,6 +80,15 @@ class RolePermission(Base):
     role: Mapped[Role] = relationship(back_populates="grants")
 
 
+class UserTeam(Base):
+    """One of the other teams a person is in (their main team is users.team_id)."""
+
+    __tablename__ = "nbcm_user_teams"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), primary_key=True)
+    team_id: Mapped[str] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
 class User(Base):
     __tablename__ = "nbcm_users"
     __mapper_args__ = {"eager_defaults": True}
@@ -116,6 +125,14 @@ class User(Base):
     team: Mapped[Team | None] = relationship(lazy="joined", foreign_keys=[team_id])
     # The teams this person is the manager of (Team.manager_id).
     managed_teams: Mapped[list[Team]] = relationship(lazy="selectin", primaryjoin="User.id == Team.manager_id", foreign_keys="Team.manager_id", viewonly=True)
+    # The other teams they're in, beside their main one (team_id). Their reach
+    # covers all of them; what they make still goes to their main team.
+    other_teams: Mapped[list[Team]] = relationship(secondary="nbcm_user_teams", lazy="selectin")
+
+    @property
+    def all_team_ids(self) -> set[str]:
+        """Every team they're in: the main one first in meaning, then the others."""
+        return ({self.team_id} if self.team_id else set()) | {t.id for t in self.other_teams}
 
 
 class PlatformPass(Base):

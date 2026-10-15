@@ -60,12 +60,15 @@ export async function RolesPage() {
   );
 }
 
-const ACTIONS: Record<string, string> = {
+export const ACTIONS: Record<string, string> = {
   "user.created": "Added a person",
   "user.updated": "Updated user details",
   "user.switched_off": "Switched a person off",
   "user.switched_on": "Switched a person back on",
   "user.password_reset": "Reset user password",
+  "auth.signed_in": "Signed in",
+  "user.profile_changed": "Updated their profile",
+  "user.password_changed": "Changed their password",
   "role.created": "Added a new role",
   "role.updated": "Updated role permissions",
   "role.deleted": "Deleted a role",

@@ -1,7 +1,7 @@
 "use server";
 
-// Announcements, settings and your own password (app/routers/communications.py,
-// settings.py, auth.py).
+// Announcements and settings (app/routers/communications.py, settings.py).
+// Your own profile and password are the shared kit's (src/platform/actions).
 
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
@@ -49,21 +49,5 @@ export async function saveSettings<K extends keyof PlatformSettings>(section: K,
     const body = await api.put<{ settings: PlatformSettings }>(`/platform/settings/${enc(section)}`, value);
     refresh();
     return body.settings;
-  });
-}
-
-/** Your own name and email on the console; a new email takes your current password. */
-export async function changeMe(change: { fullName: string; email: string; currentPassword?: string }): Promise<Result> {
-  return attempt(async () => {
-    await api.patch("/auth/me", change);
-    refresh();
-    return null;
-  });
-}
-
-export async function changePassword(currentPassword: string, newPassword: string): Promise<Result> {
-  return attempt(async () => {
-    await api.post("/auth/password", { currentPassword, newPassword });
-    return null;
   });
 }

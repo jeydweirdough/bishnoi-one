@@ -70,7 +70,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Sear
 /** The person: a band, their picture, name, email, when they joined, their role and team. */
 function Hero({ me, account, profile, today }: { me: Awaited<ReturnType<typeof getCompanyMe>>; account: Account | null; profile: Profile; today: string }) {
   const joined = account ? new Intl.DateTimeFormat(me.org.locale, { dateStyle: "medium", timeZone: me.org.timezone }).format(new Date(account.memberSince)) : null;
-  const team = account?.team?.name ?? me.team?.name ?? null;
+  // Their main team first, then the others they're in.
+  const team = [account?.team?.name ?? me.team?.name, ...(me.otherTeams ?? []).map((t) => t.name)].filter(Boolean).join(", ") || null;
   const role = account?.role.name ?? me.role?.name ?? null;
   return (
     <Sheet className="mb-4 overflow-hidden">

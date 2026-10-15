@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import desc, func, or_, select
 
+from app.routers.profile import split_name
 from app.access import (
     access_of,
     allowed,
@@ -1198,9 +1199,12 @@ def create_user(_: UsersPerm, me: CurrentUser, db: DB, body: UserIn) -> dict:
     if email_taken(db, body.email):
         raise field_error("email", "Someone here already has that email.")
     check_role(db, body.role_id)
+    first, last = split_name(body.full_name)
     user = User(
         email=body.email,
         full_name=body.full_name,
+        first_name=first or None,
+        last_name=last or None,
         role_id=body.role_id,
         password_hash=hash_password(body.password),
     )
@@ -1228,6 +1232,10 @@ def update_user(_: UsersPerm, me: CurrentUser, db: DB, user_id: str, body: UserP
     fields = [k for k, v in wanted.items() if getattr(user, k) != v]
     for key in fields:
         setattr(user, key, wanted[key])
+    if "full_name" in fields:
+        # Typed in one piece here: its parts follow (the person can tidy them on their profile).
+        user.first_name, user.last_name = split_name(user.full_name)
+        user.middle_initial = user.suffix = None
     if not fields:
         return user_out(user)
     keep_an_administrator(db)

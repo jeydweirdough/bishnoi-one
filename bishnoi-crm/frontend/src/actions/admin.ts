@@ -9,8 +9,8 @@ import type { AdminUserRow, CustomerType, CustomerTypeColor, RoleRow, Scope, Tea
 // permission and every rule (nobody left able to administer, a role in use
 // can't go); these only carry the request and hand back what it said.
 
-export type NewUser = { email: string; fullName: string; roleId: string; teamId: string | null; password: string };
-export type UserChange = Partial<{ email: string; fullName: string; roleId: string; teamId: string | null; isActive: boolean }>;
+export type NewUser = { email: string; fullName: string; roleId: string; teamId: string | null; otherTeamIds: string[]; password: string };
+export type UserChange = Partial<{ email: string; fullName: string; roleId: string; teamId: string | null; otherTeamIds: string[]; isActive: boolean }>;
 
 export async function createUser(input: NewUser): Promise<Result<AdminUserRow>> {
   return attempt(async () => {

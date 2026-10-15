@@ -77,6 +77,15 @@ class User(Base):
     no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # Their name in parts, as they keep it on their profile; full_name is made
+    # from these (app/routers/profile.py), and is what everything else reads.
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
     password_hash: Mapped[str] = mapped_column(String(255))
     role_id: Mapped[str] = mapped_column(ForeignKey("nbin_roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)

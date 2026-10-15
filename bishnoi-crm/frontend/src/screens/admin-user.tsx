@@ -1,5 +1,5 @@
 import { Particulars, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { can } from "@/src/platform/lib/access";
+import { USERS, can, canAny } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow, AuditLog, UserOptions } from "@/src/platform/lib/types";
 import { describeAudit } from "../components/admin/audit-words";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Params }) {
 
 export default async function UserPage({ params }: { params: Params }) {
   const me = await getCompanyMe();
-  if (!can(me, "admin.users")) return <NoAccess what="managing users" />;
+  if (!canAny(me, USERS)) return <NoAccess what="managing users" />;
   const { id } = await params;
   const [user, options, history] = await Promise.all([
     load<AdminUserRow>(`/admin/users/${enc(id)}`),

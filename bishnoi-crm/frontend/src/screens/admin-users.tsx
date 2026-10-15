@@ -5,7 +5,7 @@ import { LinkButton } from "@/src/platform/ui/button";
 import { Pager } from "@/src/platform/ui/pager";
 import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { can } from "@/src/platform/lib/access";
+import { USERS, can, canAny } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow } from "@/src/platform/lib/types";
 import { NoAccess, OffTag } from "../components/admin/words";
@@ -39,7 +39,7 @@ type SortKey = keyof typeof SORTS;
 /** Everyone who uses the CRM: three figures to act on, then a table to search, filter and sort. */
 export default async function AdminUsersPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  if (!can(me, "admin.users")) return <NoAccess what="managing users" />;
+  if (!canAny(me, USERS)) return <NoAccess what="managing users" />;
   const params = await searchParams;
   const everyone = await load<AdminUserRow[]>("/admin/users");
   const now = Date.now();
@@ -51,7 +51,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
   const sort = (Object.keys(SORTS) as SortKey[]).find((k) => k === one(params.sort)) ?? "name";
   const reverse = one(params.desc) === "1";
   const people = everyone
-    .filter((p) => (!team || p.team?.id === team) && (!role || p.role.id === role) && (!status || standing(p, now).key === status))
+    .filter((p) => (!team || p.team?.id === team || p.otherTeams.some((t) => t.id === team)) && (!role || p.role.id === role) && (!status || standing(p, now).key === status))
     .filter((p) => !search || p.fullName.toLowerCase().includes(search) || p.email.toLowerCase().includes(search) || (p.employeeId ?? "").toLowerCase().includes(search))
     .sort((a, b) => (reverse ? -1 : 1) * SORTS[sort](a, b));
   const shown = slicePage(people, pageOf(params.page));
@@ -86,16 +86,20 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
         title="People and access"
         actions={
           <>
-            <LinkButton href="/admin/users/import" icon={<Upload className="size-4" aria-hidden />}>
-              Import
-            </LinkButton>
+            {can(me, "admin.users") && (
+              <LinkButton href="/admin/users/import" icon={<Upload className="size-4" aria-hidden />}>
+                Import
+              </LinkButton>
+            )}
             <LinkButton href="/admin/users/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
               Add person
             </LinkButton>
           </>
         }
       >
-        Everyone who uses the CRM. Each person has one role, which says what they may do, and may be in one team.
+        {can(me, "admin.users")
+          ? "Everyone who uses the CRM. Each person has one role, which says what they may do, and may be in one team."
+          : "The people in the teams you manage: their role, their team and their details. Other roles are given by an administrator."}
       </PageHeader>
 
       {/* Three figures, each a filter: the few things an administrator acts on. */}
@@ -173,7 +177,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
                       </Link>
                     </td>
                     <td className="px-3 py-2.5 text-ink">{p.role.name}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{p.team?.name ?? <span className="text-ink-3">No team</span>}</td>
+                    <td className="px-3 py-2.5 text-ink-2">
+                      {p.team?.name ?? <span className="text-ink-3">No team</span>}
+                      {p.otherTeams.length > 0 && <span className="block text-meta text-ink-3">Also {p.otherTeams.map((t) => t.name).join(", ")}</span>}
+                    </td>
                     <td className="px-3 py-2.5">
                       {s.key === "off" ? (
                         <OffTag />

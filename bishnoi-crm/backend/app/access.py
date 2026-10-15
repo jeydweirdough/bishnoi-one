@@ -79,7 +79,7 @@ def access_of(user: User) -> Access:
 def teams_reached(user: User) -> frozenset[str]:
     """The teams whose records this person's scope reaches."""
     scope = user.role.scope
-    own = {user.team_id} if user.team_id else set()
+    own = user.all_team_ids
     if scope == "team":
         return frozenset(own)
     if scope == "managed":

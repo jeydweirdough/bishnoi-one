@@ -25,6 +25,7 @@ from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, Address, CurrentSession, CurrentUser, SettingsDep
 from app.identity import me_out
 from app.models import SignInSession, User
+from app.routers.profile import split_name
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["sign-in"])
@@ -136,6 +137,8 @@ def change_me(body: MeIn, user: CurrentUser, db: DB, settings: SettingsDep, addr
     fields: list[str] = []
     if body.full_name is not None and body.full_name.strip() and body.full_name.strip() != user.full_name:
         user.full_name = body.full_name.strip()
+        user.first_name, user.last_name = split_name(user.full_name)
+        user.middle_initial = user.suffix = None
         fields.append("fullName")
     if body.email is not None and body.email.strip().lower() != user.email:
         email = body.email.strip().lower()

@@ -140,6 +140,8 @@ export type Me = {
    *  every permission the role gives, as "area.action". */
   role?: { id: string; name: string; scope: Scope };
   team?: { id: string; name: string } | null;
+  /** The other teams they're in, beside the main one (the CRM's). */
+  otherTeams?: { id: string; name: string }[];
   permissions?: string[];
   // The company's own words for its customers, its activities and how a call went.
   // Only the switched-on ones: a record holding a switched-off code falls back to the code.
@@ -873,7 +875,10 @@ export type AdminUserRow = {
   employeeId: string | null;
   isActive: boolean;
   role: { id: string; name: string; scope: Scope };
+  /** Their main team: what they make goes there. */
   team: { id: string; name: string } | null;
+  /** The other teams they're in; their reach covers these too. */
+  otherTeams: { id: string; name: string }[];
   createdAt: string;
   lastSignInAt: string | null;
 };

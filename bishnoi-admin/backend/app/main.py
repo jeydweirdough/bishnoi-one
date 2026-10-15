@@ -15,7 +15,7 @@ from app.discord import log_requests, logs_for
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
 from app import graphql_api
-from app.routers import admin, auth, operations, sheets, unset
+from app.routers import admin, auth, profile, operations, sheets, unset
 from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"ok": True, "app": "admin"}
 
     app.include_router(auth.router)
+    app.include_router(profile.router)
     app.include_router(admin.router)
     app.include_router(sheets.router)
     app.include_router(operations.router)

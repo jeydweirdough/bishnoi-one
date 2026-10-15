@@ -1,13 +1,10 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Avatar } from "../ui/avatar";
-import { ConfirmButton } from "../ui/confirm";
 import { Icon, moduleIcon, type IconName } from "../ui/icons";
-import { signOut } from "../actions/session";
 import { THIS_APP, appLabel, appOf, appUrl, href as appHref, isOurs, moduleBase, platformHome, thisAppLabel } from "../lib/apps";
 import { adminPagesFor } from "../lib/access";
 import { APP_NAME } from "../lib/labels";
@@ -729,42 +726,8 @@ function placeOf(pathname: string, me: Me): string | null {
   return crmPages(me).find((p) => isCurrent(p, pathname, false))?.label ?? null;
 }
 
-function Account({ me }: { me: Me }) {
-  const pathname = usePathname();
-  return (
-    <div className="border-t border-rule pt-4">
-      <Link
-        href="/account"
-        aria-current={pathname === "/account" ? "page" : undefined}
-        title={me.user.fullName}
-        className={`flex items-center gap-2.5 rounded-[3px] px-3 py-1.5 group-data-[rail=true]/side:justify-center group-data-[rail=true]/side:px-1.5 ${pathname === "/account" ? "bg-hema-tint" : "hover:bg-sheet"}`}
-      >
-        <Avatar name={me.user.fullName} id={me.user.id} photoAt={me.user.photoAt} size="md" />
-        <span className="min-w-0 group-data-[rail=true]/side:sr-only">
-          <span className={`block truncate text-sm font-semibold ${pathname === "/account" ? "text-hema" : ""}`}>{me.user.fullName}</span>
-          <span className="block truncate text-meta text-ink-3">{me.user.email}</span>
-        </span>
-      </Link>
-      <ConfirmButton
-        label={<span className="group-data-[rail=true]/side:sr-only">Sign out</span>}
-        icon={<LogOut className="size-4" aria-hidden />}
-        triggerTitle="Sign out"
-        triggerVariant="quiet"
-        triggerSize="sm"
-        triggerClassName="mt-2 w-full !justify-start group-data-[rail=true]/side:!justify-center"
-        title="Sign out?"
-        body="You'll need your email and password to get back in."
-        confirmLabel="Sign out"
-        danger={false}
-        onConfirm={async () => {
-          await signOut();
-        }}
-      />
-    </div>
-  );
-}
-
-export function Nav({ me, unset = {}, rail: railAtFirst = false }: { me: Me; unset?: Unset; rail?: boolean }) {
+/** `actions`: the profile (and an app's bell), which sit at the top right; on a phone, beside the menu button. */
+export function Nav({ me, unset = {}, rail: railAtFirst = false, actions }: { me: Me; unset?: Unset; rail?: boolean; actions?: ReactNode }) {
   const pathname = usePathname();
   const [rail, setRail] = useState(railAtFirst);
   function toggleRail() {
@@ -815,7 +778,6 @@ export function Nav({ me, unset = {}, rail: railAtFirst = false }: { me: Me; uns
             </div>
             <Links me={me} unset={unset} />
           </div>
-          <Account me={me} />
         </RailContext.Provider>
       </aside>
 
@@ -823,24 +785,24 @@ export function Nav({ me, unset = {}, rail: railAtFirst = false }: { me: Me; uns
       <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-36 shrink-0">{brand}</div>
-          <button
-            type="button"
-            onClick={() => setOpenOn(open ? null : pathname)}
-            aria-expanded={open}
-            aria-controls="phone-menu"
-            className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
-          >
-            {place && <span className="min-w-0 truncate text-meta font-semibold text-ink-2">{place}</span>}
-            {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}
-            <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
-          </button>
+          <div className="flex min-w-0 items-center gap-1">
+            {actions}
+            <button
+              type="button"
+              onClick={() => setOpenOn(open ? null : pathname)}
+              aria-expanded={open}
+              aria-controls="phone-menu"
+              className="inline-flex h-10 min-w-0 items-center gap-2 rounded-[3px] pr-2 pl-3 text-ink hover:bg-sheet"
+            >
+              {place && <span className="hidden min-w-0 truncate text-meta font-semibold text-ink-2 sm:inline">{place}</span>}
+              {open ? <X className="size-5 shrink-0" aria-hidden /> : <Menu className="size-5 shrink-0" aria-hidden />}
+              <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
+            </button>
+          </div>
         </div>
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
             <Links me={me} unset={unset} />
-            <div className="mt-5">
-              <Account me={me} />
-            </div>
           </div>
         )}
       </div>

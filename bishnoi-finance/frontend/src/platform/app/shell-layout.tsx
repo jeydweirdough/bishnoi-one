@@ -1,4 +1,5 @@
 import { Nav, type Unset, type Waiting } from "../shell/nav";
+import { TopActions } from "../shell/topbar";
 import { Suspense } from "react";
 import { NavProgress } from "../shell/nav-progress";
 import { Notices } from "./notices";
@@ -49,6 +50,8 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
   const stranded = me.org === null && Boolean(THIS_APP) && THIS_APP !== "platform";
   // The sidebar as it was left: full, or collapsed to its icons.
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
+  // Who you are (after the app's bell, if it has one): the top right of every page.
+  const actions = <TopActions me={me} />;
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}
@@ -58,8 +61,10 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
         <NavProgress />
       </Suspense>
       <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[auto_minmax(0,1fr)] print:block">
-        <Nav me={me} waiting={waiting} unset={unset} rail={rail} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
+        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} />
+        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
+          {/* Wider screens: the profile at the top right (on a phone, in the top bar). */}
+          <header className="mb-4 hidden justify-end lg:flex print:hidden">{actions}</header>
           <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             {/* Announcements from Bishnoi One Platform (kept in Discord), for this app and for everyone. */}
             <Notices timeZone={me.org?.timezone} />

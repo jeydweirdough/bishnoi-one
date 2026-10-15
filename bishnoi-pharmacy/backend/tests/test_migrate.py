@@ -40,7 +40,7 @@ def test_an_orbit_pharmacy_database_is_carried_over(tmp_path):
     check.dispose()
     assert tables and all(t.startswith("nbph_") for t in tables), tables
     backups = sorted(p.name for p in tmp_path.iterdir() if ".before-" in p.name)
-    assert backups == ["pharmacy.db.before-0004"]  # the latest update's number
+    assert backups == ["pharmacy.db.before-0005"]  # the latest update's number
 
     # Starting again changes nothing and copies nothing more.
     create_app(settings)

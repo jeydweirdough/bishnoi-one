@@ -34,7 +34,7 @@ export async function RolesPage() {
 }
 
 // What each recorded change was, said plainly. Anything not listed reads from its code.
-const ACTIONS: Record<string, string> = {
+export const ACTIONS: Record<string, string> = {
   "auth.signed_in": "Signed in",
   "user.created": "Added a user",
   "user.updated": "Updated a user",
