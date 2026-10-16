@@ -3,5 +3,5 @@
 import { FormSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <FormSkeleton sections={1} summary lines />;
+  return <FormSkeleton title="Counter sale" sections={1} summary lines />;
 }

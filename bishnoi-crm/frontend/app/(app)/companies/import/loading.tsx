@@ -3,5 +3,5 @@
 import { ImportSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <ImportSkeleton />;
+  return <ImportSkeleton title="Import customers" />;
 }

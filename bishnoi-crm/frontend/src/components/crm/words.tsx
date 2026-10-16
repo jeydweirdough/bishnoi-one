@@ -28,9 +28,11 @@ export const typeOptions = (types: CustomerType[], current?: string) =>
 
 export function StatusTag({ status, types }: { status: CompanyStatus; types: CustomerType[] }) {
   const type = types.find((t) => t.code === status);
+  const name = type?.name ?? status;
+  // Shrinks to its column and ends in "…" when the name is too long; the full name shows on hover.
   return (
-    <span className={`inline-flex h-6 items-center rounded-md border px-2.5 text-meta font-medium whitespace-nowrap ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
-      {type?.name ?? status}
+    <span title={name} className={`inline-flex h-6 max-w-full items-center rounded-md border px-2.5 text-meta font-medium whitespace-nowrap ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
+      <span className="truncate">{name}</span>
     </span>
   );
 }

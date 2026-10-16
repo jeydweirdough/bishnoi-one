@@ -3,5 +3,5 @@
 import { SettingsSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <SettingsSkeleton sections={1} />;
+  return <SettingsSkeleton title="Mailbox" sections={1} />;
 }

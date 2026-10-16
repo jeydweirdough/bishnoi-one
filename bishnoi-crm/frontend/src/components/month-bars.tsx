@@ -8,17 +8,20 @@ export function MonthBars({
   points,
   label,
   current,
+  fill = false,
 }: {
   points: { month: string; value: number; text: string; monthLabel: string }[];
   /** What the figure is, for the hover and the table: "Revenue won". */
   label: string;
   /** The running month (YYYY-MM). */
   current: string;
+  /** Grow to the height of the card it's in (beside a taller card), never shorter than usual. */
+  fill?: boolean;
 }) {
   const top = Math.max(1, ...points.map((p) => p.value));
   return (
-    <div>
-      <div className="flex h-44 items-end gap-1.5 border-b border-rule-strong" role="img" aria-label={`${label} by month`}>
+    <div className={fill ? "flex flex-1 flex-col" : ""}>
+      <div className={`flex items-end gap-1.5 border-b border-rule-strong ${fill ? "min-h-44 flex-1" : "h-44"}`} role="img" aria-label={`${label} by month`}>
         {points.map((p) => {
           const running = p.month === current;
           return (
@@ -38,7 +41,8 @@ export function MonthBars({
           </span>
         ))}
       </div>
-      <table className="sr-only">
+      <div className="sr-only">
+      <table>
         <caption>{label} by month</caption>
         <tbody>
           {points.map((p) => (
@@ -49,6 +53,7 @@ export function MonthBars({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

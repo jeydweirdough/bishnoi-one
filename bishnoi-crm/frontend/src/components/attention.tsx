@@ -47,12 +47,14 @@ function usePrompts(prompts: Prompt[]) {
 /** One thing to do: what, why, the one action, and putting it aside. */
 function PromptRow({ p, aside }: { p: Prompt; aside: (p: Prompt, how: "snooze" | "dismiss") => void }) {
   return (
-    <li className="flex items-start gap-3.5 py-3.5">
+    <li className="flex flex-wrap items-start gap-x-3.5 gap-y-2 py-3.5">
       <span className="grid size-10 shrink-0 place-items-center rounded-lg border-[1.5px] border-ink bg-sheet text-ink">{ICONS[p.kind] ?? <CircleAlert className="size-4" aria-hidden />}</span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[13rem]">
         <p className="font-semibold text-ink">{p.title}</p>
         <p className="text-meta text-ink-3">{p.reason}</p>
       </div>
+      {/* Beside the words; on a phone, under them (lined up with them), so the words keep their width. */}
+      <span className="flex items-center gap-2 self-center max-sm:ml-[3.375rem]">
       <Link href={p.href} className="shrink-0 self-center rounded-lg border border-ink bg-sheet px-3.5 py-1 text-sm font-medium text-ink hover:bg-sage/40">
         {p.action}
       </Link>
@@ -70,6 +72,7 @@ function PromptRow({ p, aside }: { p: Prompt; aside: (p: Prompt, how: "snooze" |
           <MoreHorizontal className="size-4" aria-hidden />
         </IconButton>
       </Dropdown>
+      </span>
     </li>
   );
 }

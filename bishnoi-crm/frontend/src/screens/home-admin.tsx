@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -11,7 +11,8 @@ import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { DealSummary, Me, ModuleRetention, Org, PeopleInsights, PersonInsight, SalesResults } from "@/src/platform/lib/types";
 import { dayOf } from "../components/crm/follow-up-rows";
 import { Donut, SERIES } from "../components/deals/donut";
-import { Breakdown, FigureCard, type Figure } from "../components/deals/figure-card";
+import { Breakdown, BreakdownLoading, FigureCard, FigureCardLoading, type Figure } from "../components/deals/figure-card";
+import { ListRows } from "@/src/platform/ui/skeleton";
 import { TargetProgress } from "../components/deals/target-progress";
 import type { Performance } from "../components/field/types";
 import { MonthBars } from "../components/month-bars";
@@ -40,7 +41,45 @@ type SortKey = keyof typeof SORTS;
  * and three smaller figures beside it; then how each person is doing, one role
  * at a time. Who signs in is under People and access.
  */
-export async function AdminDashboard({ me, params = {} }: { me: Me & { org: Org }; params?: Params }) {
+export function AdminDashboard({ me, params = {} }: { me: Me & { org: Org }; params?: Params }) {
+  // The title and every card's frame at once; the figures fill in.
+  return (
+    <>
+      <PageHeader title="Dashboard">How the company is selling: revenue and its growth, the pipeline, and how each person is doing.</PageHeader>
+      <Suspense fallback={<AdminLoading />}>
+        <AdminFigures me={me} params={params} />
+      </Suspense>
+    </>
+  );
+}
+
+function AdminLoading() {
+  return (
+    <>
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {["Pipeline, weighted", "Quoted this month", "New customers this month", "Win rate this month"].map((label, n) => (
+          <FigureCardLoading key={label} label={label} first={n === 0} />
+        ))}
+      </div>
+      <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <BreakdownLoading title="Sales growth" action={<SmallLink href="/deals">Results</SmallLink>} />
+        <div className="grid gap-3 md:grid-cols-2">
+          <BreakdownLoading title="Revenue against target" action={<SmallLink href="/performance/targets">Targets</SmallLink>} />
+          <BreakdownLoading title="Pipeline by stage" action={<SmallLink href="/deals">Deals</SmallLink>} />
+        </div>
+      </div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
+        <FigureCardLoading label="Collected this month" />
+        <FigureCardLoading label="Customers kept" />
+      </div>
+      <Sheet>
+        <ListRows rows={5} />
+      </Sheet>
+    </>
+  );
+}
+
+async function AdminFigures({ me, params }: { me: Me & { org: Org }; params: Params }) {
   const fmt = makeFormat(me.org);
   const reports = can(me, "reports.view");
   // Home's one request: each figure only when the person may see it.
@@ -116,8 +155,6 @@ export async function AdminDashboard({ me, params = {} }: { me: Me & { org: Org 
 
   return (
     <>
-      <PageHeader title="Dashboard">How the company is selling: revenue and its growth, the pipeline, and how each person is doing.</PageHeader>
-
       {/* As on the Deals page: the figure first, large; what it is; then how it compares. */}
       <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {top.map((f, n) => (

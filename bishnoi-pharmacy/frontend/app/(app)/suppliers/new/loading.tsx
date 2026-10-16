@@ -3,5 +3,5 @@
 import { FormSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <FormSkeleton />;
+  return <FormSkeleton title="Add supplier" />;
 }

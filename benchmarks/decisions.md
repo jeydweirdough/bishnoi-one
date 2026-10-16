@@ -99,3 +99,17 @@ pharmacist approves, returns with comments, or rejects each version in
 team's manager (or an administrator) approves each request in the **CRM**.
 Still out: legal and medical reviewers beside the pharmacist, e-signatures,
 and expiry dates on approved materials.
+
+## The page first, its records after, decided on 2026-10-16
+
+The loading screens of 2026-10-15 drew a grey copy of the whole page (title,
+toolbar, cards) while it loaded. The user set the rule instead: **render the
+interface before the data**. The sidebar, top bar, the page's real title, its
+search and filters and its cards with their headings show at once; only the
+records arrive afterward. A server screen awaits only who is signed in (for
+permissions) and the address, starts its data request without waiting, and
+wraps what depends on it in `Later` (`src/platform/ui/later.tsx`) with an
+in-card placeholder from `skeleton.tsx` (`ListRows`, `Figures`, `Lines`,
+`Pairs`, `Chart`; `FigureCardLoading` keeps a figure card's label). Each
+`loading.tsx` passes the page's real `title`. A record's name is data, so a
+record page keeps its loading screen until the record arrives.

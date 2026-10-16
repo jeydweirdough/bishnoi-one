@@ -1,7 +1,9 @@
 import { ArrowDown, ArrowUp, Download, Target } from "lucide-react";
 import Link from "next/link";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
+import { Suspense } from "react";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { Figures, ListRows } from "@/src/platform/ui/skeleton";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { Board as KanbanBoard, type BoardCard } from "@/src/platform/ui/board";
 import { moveDealStage } from "../actions/deals";
@@ -62,6 +64,18 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
   };
   const owner = who === "me" ? "me" : "";
   const month = /^\d{4}-\d{2}$/.test(results) ? results : periods.thisMonth;
+  // The header and switches are drawn at once; each part below fills in as its figures arrive.
+  const rows = (
+    <Sheet>
+      <ListRows />
+    </Sheet>
+  );
+  const later = (
+    <>
+      <Figures n={4} />
+      {rows}
+    </>
+  );
 
   return (
     <>
@@ -107,39 +121,49 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
       </div>
 
       {view === "open" && (
-        <Overview
-          fmt={fmt}
-          today={today}
-          period={results || periods.thisMonth}
-          owner={owner}
-          team={who === "team" && can(me, "reports.view")}
-          mayTarget={can(me, "goals.manage")}
-          filtered={Boolean(one(params.q) || one(params.stage) || one(params.priority) || one(params.closing) || (asked !== "results" && one(params.period)))}
-        >
-          <div className="mb-3">
-            <ToggleLinks
-              current={layout}
-              options={[
-                { value: "table", label: "Table", href: href("open", who, "table") },
-                { value: "board", label: "Board", href: href("open", who, "board") },
-              ]}
-            />
-          </div>
-          {layout === "board" ? (
-            <Board fmt={fmt} today={today} owner={owner} period={asked === "results" ? "" : one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />
-          ) : (
-            <Table fmt={fmt} today={today} owner={owner} state="open" params={params} base={href("open")} mayAdd={can(me, "deals.create")} />
-          )}
-        </Overview>
+        <Suspense fallback={later}>
+          <Overview
+            fmt={fmt}
+            today={today}
+            period={results || periods.thisMonth}
+            owner={owner}
+            team={who === "team" && can(me, "reports.view")}
+            mayTarget={can(me, "goals.manage")}
+            filtered={Boolean(one(params.q) || one(params.stage) || one(params.priority) || one(params.closing) || (asked !== "results" && one(params.period)))}
+          >
+            <div className="mb-3">
+              <ToggleLinks
+                current={layout}
+                options={[
+                  { value: "table", label: "Table", href: href("open", who, "table") },
+                  { value: "board", label: "Board", href: href("open", who, "board") },
+                ]}
+              />
+            </div>
+            <Suspense fallback={rows}>
+              {layout === "board" ? (
+                <Board fmt={fmt} today={today} owner={owner} period={asked === "results" ? "" : one(params.period)} periods={periods} mayAdd={can(me, "deals.create")} />
+              ) : (
+                <Table fmt={fmt} today={today} owner={owner} state="open" params={params} base={href("open")} mayAdd={can(me, "deals.create")} />
+              )}
+            </Suspense>
+          </Overview>
+        </Suspense>
       )}
       {view === "closed" && (
-        <>
+        <Suspense fallback={later}>
           <Summary state="closed" owner={owner} fmt={fmt} mayAdd={false} filtered={Boolean(one(params.q) || one(params.stage) || one(params.priority))}>
-            <Table fmt={fmt} today={today} owner={owner} state="closed" params={params} base={href("closed")} mayAdd={false} />
+            <Suspense fallback={rows}>
+              <Table fmt={fmt} today={today} owner={owner} state="closed" params={params} base={href("closed")} mayAdd={false} />
+            </Suspense>
           </Summary>
-        </>
+        </Suspense>
       )}
-      {view === "forecast" && <Forecast fmt={fmt} period={one(params.period) || periods.thisMonth} periods={periods} showPeople={who === "team"} />}
+      {view === "forecast" && (
+        <Suspense fallback={later}>
+          <Forecast fmt={fmt} period={one(params.period) || periods.thisMonth} periods={periods} showPeople={who === "team"} />
+        </Suspense>
+      )}
     </>
   );
 }

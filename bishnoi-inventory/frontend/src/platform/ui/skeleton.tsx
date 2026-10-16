@@ -1,11 +1,13 @@
+import { Search } from "lucide-react";
 import type { ReactNode } from "react";
-import { Sheet } from "./sheet";
+import { PageHeader, Sheet } from "./sheet";
 
-// What a page looks like while its data is on the way, shown the moment a
-// link is clicked so the app answers at once instead of seeming to hang.
-// Each kind of page has its own shape (a list is a table, a board is columns,
-// a record is its details beside a side panel), so when the data lands the
-// page fills in where the eye already is instead of jumping to a new layout.
+// The interface comes first, the records after. The sidebar and top bar never
+// leave; the moment a link is clicked the page's own title, its search and
+// filters and its cards are drawn (loading.tsx passes the real `title`), and
+// only where records will be is there a pulse. A screen that streams its data
+// (ui/later.tsx) uses the same pieces (ListRows, Lines, Pairs, Chart) inside
+// its real cards, so nothing moves when the data lands.
 
 /** A grey bar where text is about to be. */
 export function Bone({ className = "" }: { className?: string }) {
@@ -21,7 +23,7 @@ const WIDTHS = ["w-full", "w-5/6", "w-2/3", "w-3/4", "w-1/2"];
 const width = (i: number) => WIDTHS[i % WIDTHS.length];
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
-function Lines({ rows }: { rows: number }) {
+export function Lines({ rows }: { rows: number }) {
   return (
     <div className="space-y-3">
       {range(rows).map((i) => (
@@ -41,8 +43,15 @@ function Loading({ children }: { children: ReactNode }) {
   );
 }
 
-/** The page header: a breadcrumb on a record or form, the title, and the main button on the right. */
-function Header({ crumbs = false, action = true, sub = true }: { crumbs?: boolean; action?: boolean; sub?: boolean }) {
+/** The page header: the real title when the route knows it (a record's name is data, so it pulses). */
+function Header({ title, crumbs = false, sub = true }: { title?: string; crumbs?: boolean; sub?: boolean }) {
+  if (title)
+    return (
+      <>
+        {crumbs && <Bone className="mb-2 h-3 w-40" />}
+        <PageHeader title={title}>{sub && <Bone className="mt-1 h-3.5 w-64 max-w-full" />}</PageHeader>
+      </>
+    );
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0 flex-1">
@@ -50,13 +59,12 @@ function Header({ crumbs = false, action = true, sub = true }: { crumbs?: boolea
         <Bone className="h-7 w-64 max-w-full" />
         {sub && <Bone className="mt-2 h-3.5 w-80 max-w-full" />}
       </div>
-      {action && <Bone className="h-9 w-32" />}
     </div>
   );
 }
 
 /** A row of figure cards (count, value, change). */
-function Figures({ n }: { n: number }) {
+export function Figures({ n }: { n: number }) {
   return (
     <div className={`mb-5 grid gap-3 sm:grid-cols-2 ${n >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
       {range(n).map((i) => (
@@ -70,19 +78,21 @@ function Figures({ n }: { n: number }) {
   );
 }
 
-/** The search box and quick filters above a list or board. */
+/** The search box and quick filters above a list or board, drawn as themselves (waiting, not yet usable). */
 function Toolbar() {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <Bone className="h-9 w-64 max-w-full" />
-      <Bone className="h-9 w-56 max-sm:hidden" />
-      <Bone className="ml-auto h-9 w-24" />
+    <div className="mb-4 flex flex-wrap items-end gap-3" aria-hidden>
+      <div className="relative min-w-[14rem] flex-1">
+        <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" />
+        <input type="search" disabled placeholder="Search" tabIndex={-1} className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm placeholder:text-ink-3/80" />
+      </div>
+      <span className="h-10 w-40 rounded-lg border border-control bg-sheet max-sm:hidden" />
     </div>
   );
 }
 
 /** Bars rising from a baseline: a chart is coming. */
-function Chart({ bars = 12 }: { bars?: number }) {
+export function Chart({ bars = 12 }: { bars?: number }) {
   const heights = ["h-1/3", "h-1/2", "h-2/3", "h-2/5", "h-3/4", "h-1/2", "h-4/5", "h-3/5"];
   return (
     <div className="flex h-44 items-end gap-2 border-b border-rule pb-px">
@@ -120,8 +130,28 @@ function Table({ columns, rows }: { columns: number; rows: number }) {
   );
 }
 
+/** Rows of a list on the way, inside the list's own card: a name with a line under it, a few short columns. */
+export function ListRows({ rows = 8, columns = 4 }: { rows?: number; columns?: number }) {
+  return (
+    <div role="status" aria-label="Loading" className="divide-y divide-rule">
+      <span className="sr-only">Loading…</span>
+      {range(rows).map((r) => (
+        <div key={r} className="grid gap-4 px-5 py-3.5" style={{ gridTemplateColumns: `minmax(0,2fr) repeat(${columns - 1}, minmax(0,1fr))` }}>
+          <div className="min-w-0">
+            <Bone className={`h-3.5 ${width(r)}`} />
+            <Bone className="mt-1.5 h-3 w-1/2" />
+          </div>
+          {range(columns - 1).map((c) => (
+            <Bone key={c} className={`h-3.5 self-center ${width(r + c + 1)}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Label and value pairs, as a record's details read. */
-function Pairs({ rows }: { rows: number }) {
+export function Pairs({ rows }: { rows: number }) {
   return (
     <div className="divide-y divide-rule">
       {range(rows).map((i) => (
@@ -153,10 +183,10 @@ function SectionHead() {
 }
 
 /** The old all-purpose shape, kept for a page with none of its own. */
-export function PageSkeleton({ aside = true }: { aside?: boolean }) {
+export function PageSkeleton({ title, aside = true }: { title?: string; aside?: boolean }) {
   return (
     <Loading>
-      <Header action={false} />
+      <Header title={title} />
       <div className={aside ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" : ""}>
         <div className="space-y-5">
           <Sheet className="px-5 py-5">
@@ -180,10 +210,10 @@ export function PageSkeleton({ aside = true }: { aside?: boolean }) {
 }
 
 /** A list page: header with its New button, search and filters, a table, the pager. */
-export function ListSkeleton({ figures = 0, columns = 5, rows = 8, chart = false }: { figures?: number; columns?: number; rows?: number; chart?: boolean }) {
+export function ListSkeleton({ title, figures = 0, columns = 5, rows = 8, chart = false }: { title?: string; figures?: number; columns?: number; rows?: number; chart?: boolean }) {
   return (
     <Loading>
-      <Header />
+      <Header title={title} />
       {figures > 0 && <Figures n={figures} />}
       {chart && (
         <Sheet className="mb-5 px-5 py-5">
@@ -204,10 +234,10 @@ export function ListSkeleton({ figures = 0, columns = 5, rows = 8, chart = false
 }
 
 /** A board: a column per status, each with a few cards. */
-export function BoardSkeleton({ columns = 4 }: { columns?: number }) {
+export function BoardSkeleton({ title, columns = 4 }: { title?: string; columns?: number }) {
   return (
     <Loading>
-      <Header />
+      <Header title={title} />
       <Toolbar />
       <div className="grid auto-cols-[minmax(13rem,1fr)] grid-flow-col gap-3 overflow-hidden">
         {range(columns).map((c) => (
@@ -237,10 +267,10 @@ export function BoardSkeleton({ columns = 4 }: { columns?: number }) {
 }
 
 /** One record: breadcrumb and title, its figures, its details and history beside a side panel. */
-export function RecordSkeleton({ figures = 3, picture = false }: { figures?: number; picture?: boolean }) {
+export function RecordSkeleton({ title, figures = 3, picture = false }: { title?: string; figures?: number; picture?: boolean }) {
   return (
     <Loading>
-      <Header crumbs />
+      <Header title={title} crumbs />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="space-y-5">
           {figures > 0 && (
@@ -292,10 +322,10 @@ export function RecordSkeleton({ figures = 3, picture = false }: { figures?: num
 }
 
 /** A form: breadcrumb and title, sections of fields, its buttons at the end; a summary beside it where the form has one. */
-export function FormSkeleton({ sections = 2, summary = false, lines = false }: { sections?: number; summary?: boolean; lines?: boolean }) {
+export function FormSkeleton({ title, sections = 2, summary = false, lines = false }: { title?: string; sections?: number; summary?: boolean; lines?: boolean }) {
   return (
     <Loading>
-      <Header crumbs action={false} />
+      <Header title={title} crumbs />
       <div className={summary ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" : "max-w-3xl"}>
         <div className="space-y-5">
           {range(sections).map((s) => (
@@ -332,10 +362,10 @@ export function FormSkeleton({ sections = 2, summary = false, lines = false }: {
 }
 
 /** Home: a greeting, the figures, a chart, then two lists side by side. */
-export function DashboardSkeleton({ figures = 4 }: { figures?: number }) {
+export function DashboardSkeleton({ title, figures = 4 }: { title?: string; figures?: number }) {
   return (
     <Loading>
-      <Header action={false} />
+      <Header title={title} />
       <Figures n={figures} />
       <Sheet className="mb-5 px-5 py-5">
         <div className="mb-4 flex items-center justify-between">
@@ -394,10 +424,10 @@ export function ProfileSkeleton() {
 }
 
 /** Settings: sections down the page, each a heading, a line saying what it's for, and its entries. */
-export function SettingsSkeleton({ sections = 2 }: { sections?: number }) {
+export function SettingsSkeleton({ title, sections = 2 }: { title?: string; sections?: number }) {
   return (
     <Loading>
-      <Header action={false} />
+      <Header title={title} />
       <div className="max-w-4xl space-y-5">
         {range(sections).map((s) => (
           <Sheet key={s} className="px-5 py-5">
@@ -419,10 +449,10 @@ export function SettingsSkeleton({ sections = 2 }: { sections?: number }) {
 }
 
 /** A month: the toolbar, then the days as a grid. */
-export function CalendarSkeleton() {
+export function CalendarSkeleton({ title }: { title?: string }) {
   return (
     <Loading>
-      <Header />
+      <Header title={title} />
       <Toolbar />
       <Sheet className="overflow-hidden">
         <div className="grid grid-cols-7 border-b border-rule">
@@ -446,10 +476,10 @@ export function CalendarSkeleton() {
 }
 
 /** Fields on the left, a map on the right (logging a visit, the transfers map). */
-export function MapSkeleton({ fields = true }: { fields?: boolean }) {
+export function MapSkeleton({ title, fields = true }: { title?: string; fields?: boolean }) {
   return (
     <Loading>
-      <Header crumbs action={false} />
+      <Header title={title} crumbs />
       <div className={fields ? "grid gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]" : ""}>
         {fields && (
           <Sheet className="px-5 py-5">
@@ -471,10 +501,10 @@ export function MapSkeleton({ fields = true }: { fields?: boolean }) {
 }
 
 /** An import: the steps across the top, then the place to drop the file. */
-export function ImportSkeleton() {
+export function ImportSkeleton({ title }: { title?: string }) {
   return (
     <Loading>
-      <Header crumbs action={false} />
+      <Header title={title} crumbs />
       <div className="mb-5 flex items-center gap-3">
         {range(4).map((i) => (
           <div key={i} className="flex flex-1 items-center gap-2">

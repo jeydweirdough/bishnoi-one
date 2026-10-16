@@ -3,5 +3,5 @@
 import { DashboardSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <DashboardSkeleton />;
+  return <DashboardSkeleton title="Field work" />;
 }

@@ -3,5 +3,5 @@
 import { MapSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <MapSkeleton fields={false} />;
+  return <MapSkeleton title="Stock transfers" fields={false} />;
 }

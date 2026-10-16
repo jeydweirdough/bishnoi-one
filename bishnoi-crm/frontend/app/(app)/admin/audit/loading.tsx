@@ -3,5 +3,5 @@
 import { ListSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <ListSkeleton columns={4} rows={10} />;
+  return <ListSkeleton title="Audit log" columns={4} rows={10} />;
 }

@@ -1,11 +1,28 @@
 import type { ReactNode } from "react";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
+import { Bone, Chart } from "@/src/platform/ui/skeleton";
 
 // The figure cards and breakdowns of the Deals page, shared with the dashboard
 // so both read the same way: the figure first, large; what it is under it;
 // then how it compares.
 
-export { FigureCard, type Figure } from "@/src/platform/ui/figures";
+export { FigureCard, FigureCardLoading, type Figure } from "@/src/platform/ui/figures";
+
+/** A breakdown while its figures are on the way: its title now, the share and chart when they land. */
+export function BreakdownLoading({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    <Sheet className="px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-caps text-ink-3 uppercase">{title}</p>
+        {action}
+      </div>
+      <Bone className="mt-3 h-6 w-40" />
+      <div className="mt-4">
+        <Chart bars={8} />
+      </div>
+    </Sheet>
+  );
+}
 
 /** A breakdown: its headline share first, then the chart that shows the rest; a drawing while it's empty. */
 export function Breakdown({

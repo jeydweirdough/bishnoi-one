@@ -3,5 +3,5 @@
 import { BoardSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <BoardSkeleton />;
+  return <BoardSkeleton title="Stock transfers" />;
 }

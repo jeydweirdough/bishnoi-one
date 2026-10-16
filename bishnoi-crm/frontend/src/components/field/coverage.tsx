@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sheet } from "@/src/platform/ui/sheet";
+import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import type { Coverage } from "./types";
 import { ZONES } from "./words";
 
@@ -14,10 +14,9 @@ export function CoverageCard({ coverage, monthName, doctorsHref = "/field/doctor
   const zoned = (z: string) => `${doctorsHref}?zone=${z}`;
   return (
     <Sheet className="px-5 pt-4 pb-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-heading text-ink">Coverage</h2>
-        <span className="text-meta text-ink-3">{monthName}</span>
-      </div>
+      <SectionTitle icon="goals" action={<span className="text-meta text-ink-3">{monthName}</span>}>
+        Coverage
+      </SectionTitle>
       {coverage.doctors === 0 ? (
         <p className="mt-2 text-sm text-ink-3">No {many} on your list yet.</p>
       ) : (

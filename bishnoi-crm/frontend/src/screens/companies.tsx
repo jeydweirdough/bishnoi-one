@@ -4,6 +4,8 @@ import Link from "next/link";
 import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { Later } from "@/src/platform/ui/later";
+import { Bone, ListRows } from "@/src/platform/ui/skeleton";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, loadQuery } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -44,20 +46,26 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const page = Math.max(1, Number(one(params.page)) || 1);
   const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
   const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
-  const answer = await loadQuery<Answer>(
+  // Asked for, not waited on: the title, filters and list card are drawn now and the rows fill in.
+  const answer = loadQuery<Answer>(
     CUSTOMERS,
     { q: q || null, status: status || null, owner: owner || null, limit: SIZE, offset: (page - 1) * SIZE, withPeople: bulkAllowed },
     ["companies"],
   );
-  const list = answer.companies!;
-  const people = answer.people ?? [];
-  const types = answer.customerTypes ?? [];
-  const fields = answer.form ? layoutFields(answer.form).filter((f) => !f.standard) : [];
-  // Fields an admin added and chose to show in the list: under each name, after the industry.
-  const inList = fields.filter((f) => f.inList);
   const fmt = makeFormat(me.org);
   const filtered = Boolean(q || status || owner);
   const here = new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(owner && { owner }) });
+  const filters = (types: CustomerType[]) => (
+    <Filters
+      search="Search by name, code, city or industry"
+      selects={[
+        { name: "status", label: "Type", options: [{ value: "", label: "Any type" }, ...typeOptions(types)] },
+        ...(me.role?.scope !== "own"
+          ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Mine" }] }]
+          : []),
+      ]}
+    />
+  );
 
   return (
     <>
@@ -88,93 +96,113 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           </>
         }
       >
-        {list.total} {list.total === 1 ? "customer" : "customers"}
-        {filtered ? " match" : ""}
-        {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : me.role?.scope === "managed" ? " in the teams you manage" : ""}.
-      </PageHeader>
-
-
-      <Filters
-        search="Search by name, code, city or industry"
-        selects={[
-          { name: "status", label: "Type", options: [{ value: "", label: "Any type" }, ...typeOptions(types)] },
-          ...(me.role?.scope !== "own"
-            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Mine" }] }]
-            : []),
-        ]}
-      />
-
-      <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
-        <Sheet>
-          {list.items.length === 0 ? (
-            <Empty
-              icon="company"
-              title={filtered ? "No customers match" : "No customers yet"}
-              actions={
-                filtered ? (
-                  <LinkButton href="/companies">Clear filters</LinkButton>
-                ) : (
-                  can(me, "customers.create") && (
-<NewCustomerButton />
-                  )
-                )
-              }
-            >
-              {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
-            </Empty>
-          ) : (
+        <Later data={answer} fallback={<Bone className="mt-1 h-3.5 w-48" />}>
+          {({ companies: list }) => (
             <>
-              {bulkAllowed && (
-                <div className="border-b border-rule px-5">
-                  <SelectAllBox>
-                    <span className="text-meta text-ink-3">Select all on this page</span>
-                  </SelectAllBox>
-                </div>
-              )}
-              <ul className="divide-y divide-rule">
-                {list.items.map((c) => (
-                  <SelectableRow key={c.id} id={c.id} as="li" className="flex items-center gap-3 px-5 hover:bg-bench/40">
-                    {bulkAllowed && <SelectBox id={c.id} label={c.name} />}
-                    <Link
-                      href={`/companies/${c.id}`}
-                      className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_6.5rem_minmax(0,9rem)_minmax(0,9rem)_7rem] md:items-center md:gap-4"
-                    >
-                      <span className="min-w-0">
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          <span className="truncate font-semibold text-ink">{c.name}</span>
-                          {c.code && <span className="shrink-0 font-mono text-meta text-ink-3">{c.code}</span>}
-                        </span>
-                        <span className="block truncate text-meta text-ink-3">
-                          {[
-                            c.industry,
-                            `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`,
-                            ...inList.map((f) => {
-                              const v = extraText(fmt, f, c.extra[f.key]);
-                              return v && `${f.label}: ${v}`;
-                            }),
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      </span>
-                      <span>
-                        <StatusTag status={c.status} types={types} />
-                      </span>
-                      <span className="truncate text-meta text-ink-2">{[c.city, c.country].filter(Boolean).join(", ") || "—"}</span>
-                      <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
-                      <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
-                    </Link>
-                  </SelectableRow>
-                ))}
-              </ul>
+              {list!.total} {list!.total === 1 ? "customer" : "customers"}
+              {filtered ? " match" : ""}
+              {me.role?.scope === "own" ? " of yours" : me.role?.scope === "team" ? " in your team" : me.role?.scope === "managed" ? " in the teams you manage" : ""}.
             </>
           )}
-        </Sheet>
-        {bulkAllowed && (
-          <RecordsBulk kind="companies" types={types} can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
-        )}
-      </SelectionProvider>
-      <Pager total={list.total} page={page} size={SIZE} base={`/companies${here.size ? `?${here}` : ""}`} />
+        </Later>
+      </PageHeader>
+
+      <Later data={answer} fallback={filters([])}>
+        {(a) => filters(a.customerTypes ?? [])}
+      </Later>
+
+      <Later
+        data={answer}
+        fallback={
+          <Sheet>
+            <ListRows />
+          </Sheet>
+        }
+      >
+        {(answer) => {
+          const list = answer.companies!;
+          const people = answer.people ?? [];
+          const types = answer.customerTypes ?? [];
+          const fields = answer.form ? layoutFields(answer.form).filter((f) => !f.standard) : [];
+          // Fields an admin added and chose to show in the list: under each name, after the industry.
+          const inList = fields.filter((f) => f.inList);
+          return (
+            <>
+              <SelectionProvider key={here.toString() + page} items={list.items.filter((c) => c.can.edit || c.can.delete || bulk.followUp).map((c) => ({ id: c.id, name: c.name }))}>
+                <Sheet>
+                  {list.items.length === 0 ? (
+                    <Empty
+                      icon="company"
+                      title={filtered ? "No customers match" : "No customers yet"}
+                      actions={
+                        filtered ? (
+                          <LinkButton href="/companies">Clear filters</LinkButton>
+                        ) : (
+                          can(me, "customers.create") && (
+        <NewCustomerButton />
+                          )
+                        )
+                      }
+                    >
+                      {filtered ? "Try another search, or clear the filters." : "Add the organisations you sell to, then their people under Contacts."}
+                    </Empty>
+                  ) : (
+                    <>
+                      {bulkAllowed && (
+                        <div className="border-b border-rule px-5">
+                          <SelectAllBox>
+                            <span className="text-meta text-ink-3">Select all on this page</span>
+                          </SelectAllBox>
+                        </div>
+                      )}
+                      <ul className="divide-y divide-rule">
+                        {list.items.map((c) => (
+                          <SelectableRow key={c.id} id={c.id} as="li" className="flex items-center gap-3 px-5 hover:bg-bench/40">
+                            {bulkAllowed && <SelectBox id={c.id} label={c.name} />}
+                            <Link
+                              href={`/companies/${c.id}`}
+                              className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,9rem)_minmax(0,9rem)_6rem] md:items-center md:gap-4"
+                            >
+                              <span className="min-w-0">
+                                <span className="flex min-w-0 items-baseline gap-2">
+                                  <span className="truncate font-semibold text-ink">{c.name}</span>
+                                  {c.code && <span className="shrink-0 font-mono text-meta text-ink-3">{c.code}</span>}
+                                </span>
+                                <span className="block truncate text-meta text-ink-3">
+                                  {[
+                                    c.industry,
+                                    `${c.contactCount} ${c.contactCount === 1 ? "contact" : "contacts"}`,
+                                    ...inList.map((f) => {
+                                      const v = extraText(fmt, f, c.extra[f.key]);
+                                      return v && `${f.label}: ${v}`;
+                                    }),
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </span>
+                              </span>
+                              <span className="min-w-0">
+                                <StatusTag status={c.status} types={types} />
+                              </span>
+                              <span className="truncate text-meta text-ink-2">{[c.city, c.country].filter(Boolean).join(", ") || "—"}</span>
+                              <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
+                              <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
+                            </Link>
+                          </SelectableRow>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </Sheet>
+                {bulkAllowed && (
+                  <RecordsBulk kind="companies" types={types} can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
+                )}
+              </SelectionProvider>
+              <Pager total={list.total} page={page} size={SIZE} base={`/companies${here.size ? `?${here}` : ""}`} />
+            </>
+          );
+        }}
+      </Later>
     </>
   );
 }

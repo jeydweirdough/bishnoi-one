@@ -3,5 +3,5 @@
 import { SettingsSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <SettingsSkeleton />;
+  return <SettingsSkeleton title="Quotation templates" />;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Bone } from "./skeleton";
 
 // The pieces figures are drawn with, one of each, used by every page: the
 // pill that says where something stands, the ring that shows how far along it
@@ -79,6 +80,17 @@ export function FigureCard({ figure: f, first = false }: { figure: Figure; first
       </div>
       <p className={`mt-1 text-meta ${f.alert ? "font-semibold text-due-today" : "text-ink-3"}`}>{f.note}</p>
     </Linked>
+  );
+}
+
+/** The same card while its number is on the way: what it counts now, the number when it lands. */
+export function FigureCardLoading({ label, first = false }: { label: string; first?: boolean }) {
+  return (
+    <div className={`block rounded-xl bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
+      <Bone className="my-1.5 h-7 w-28" />
+      <p className="mt-1 text-sm font-medium text-ink">{label}</p>
+      <Bone className="mt-2 h-3 w-36" />
+    </div>
   );
 }
 
