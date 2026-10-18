@@ -13,7 +13,9 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
+    FetchedValue,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -61,11 +63,23 @@ class RolePermission(Base):
 
 class User(Base):
     __tablename__ = "nbfi_users"
-    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="user_role"), Index("nbfi_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # Their name in parts, as they keep it on their profile; full_name is made
+    # from these (app/routers/profile.py), and is what everything else reads.
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
     password_hash: Mapped[str] = mapped_column(String(255))
     # What they may do: their role's permissions (app/permissions.py).
     role_id: Mapped[str] = mapped_column(ForeignKey("nbfi_roles.id"), index=True)
@@ -245,9 +259,12 @@ class Account(Base):
     """One account of the chart: 1000 Cash on hand, 6100 Food."""
 
     __tablename__ = "nbfi_accounts"
-    __table_args__ = (CheckConstraint(f"type IN {ACCOUNT_TYPES}", name="account_type"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint(f"type IN {ACCOUNT_TYPES}", name="account_type"), Index("nbfi_accounts_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     type: Mapped[str] = mapped_column(String(10))
@@ -537,3 +554,9 @@ class InvoicePayment(Base):
     removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
 
     invoice: Mapped[Invoice] = relationship(back_populates="payments")
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Account)

@@ -78,6 +78,7 @@ class GrantIn(Api):
 def user_out(p: Identity, company: Company | None = None, **extra) -> dict:
     return {
         "id": p.id,
+        "no": p.no,
         "fullName": p.full_name,
         "email": p.email,
         "title": p.title,
@@ -118,8 +119,10 @@ def _company_apps(db: Session, company_id: str) -> set[str]:
     return set(db.scalars(select(CompanyApp.application_id).where(CompanyApp.company_id == company_id)))
 
 
-def _email_taken(db: Session, email: str, other_than: str | None = None) -> bool:
-    query = select(Identity.id).where(func.lower(Identity.email) == email)
+def _email_taken(db: Session, email: str, company_id: str, other_than: str | None = None) -> bool:
+    """Somebody at this company has it. At another company it's the same person,
+    who may work for both (models.Identity)."""
+    query = select(Identity.id).where(func.lower(Identity.email) == email, Identity.company_id == company_id)
     if other_than:
         query = query.where(Identity.id != other_than)
     return db.scalar(query) is not None
@@ -171,13 +174,17 @@ def add_user(body: UserIn, db: DB, me: AdminUser) -> dict:
     company = db.get(Company, body.company_id)
     if company is None:
         raise field_error("companyId", "Pick the company they work for.")
-    if _email_taken(db, body.email):
-        raise field_error("email", "Somebody on the platform already has that email.")
+    if _email_taken(db, body.email, company.id):
+        raise field_error("email", f"Somebody at {company.name} already has that email.")
     allowed = _company_apps(db, company.id)
     for g in body.applications:
         if g.application_id not in allowed:
             raise field_error("applications", f"{company.name} doesn't have one of those applications. Give it to the company first.")
     p = Identity(company_id=company.id, full_name=body.full_name, email=body.email, title=body.title, is_company_admin=body.is_company_admin)
+    # Already at another company: the same person, with the password they have.
+    elsewhere = db.scalar(select(Identity).where(func.lower(Identity.email) == body.email.lower(), Identity.password_hash.is_not(None)))
+    if elsewhere is not None:
+        p.password_hash, p.password_changed_at = elsewhere.password_hash, elsewhere.password_changed_at
     db.add(p)
     db.flush()
     for g in {g.application_id: g for g in body.applications}.values():
@@ -238,8 +245,8 @@ def update_user(user_id: str, body: UserPatch, db: DB, me: AdminUser) -> dict:
         if required in fields and fields[required] is None:
             raise field_error(required, "This can't be empty.")
     fields = {k: v for k, v in fields.items() if getattr(p, k) != v}
-    if "email" in fields and _email_taken(db, fields["email"], other_than=p.id):
-        raise field_error("email", "Somebody on the platform already has that email.")
+    if ("email" in fields or "company_id" in fields) and _email_taken(db, fields.get("email", p.email), fields.get("company_id") or p.company_id, other_than=p.id):
+        raise field_error("email", "Somebody at that company already has that email.")
     withdrawn = 0
     if "company_id" in fields:
         if db.get(Company, fields["company_id"]) is None:
@@ -299,6 +306,17 @@ def withdraw_application(user_id: str, app_id: str, db: DB, me: AdminUser) -> Re
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone from the platform: their applications and sign-ins go with them;
+    tickets they raised stay, with nobody on them. Suspending keeps the person."""
+    p = _person(db, user_id)
+    audit(db, me, "user.deleted", category="security", target=p.email, target_type="user", target_id=p.id, company_id=p.company_id)
+    db.delete(p)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 class FirstPasswordIn(Api):
     # None: one is made, and shown once.
     password: str | None = Field(None, max_length=256)
@@ -318,8 +336,10 @@ def set_password(user_id: str, body: FirstPasswordIn, me: AdminUser, db: DB) -> 
     problem = check_password_rules(password)
     if problem:
         raise field_error("password", problem)
-    person.password_hash = hash_password(password)
-    person.password_changed_at = datetime.now(UTC)
+    hashed, now = hash_password(password), datetime.now(UTC)
+    # One password at every company of theirs.
+    for row in db.scalars(select(Identity).where(func.lower(Identity.email) == person.email.lower())):
+        row.password_hash, row.password_changed_at = hashed, now
     audit(db, me, "identity.password_set", category="security", target=person.email, target_type="identity", target_id=person.id, company_id=person.company_id)
     db.commit()
     return {"password": password if made else None}

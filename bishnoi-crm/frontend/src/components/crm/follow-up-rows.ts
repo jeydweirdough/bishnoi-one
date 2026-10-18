@@ -34,6 +34,7 @@ export function followUpRow(a: ActivityItem, today: string, timeZone: string, ex
     href: customer.href ?? undefined,
     doneAt: a.doneAt,
     canEdit: a.can.edit,
+    meetingLink: a.meetingLink ?? null,
     ...extra,
   };
 }

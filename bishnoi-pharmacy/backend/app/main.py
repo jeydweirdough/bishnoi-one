@@ -15,7 +15,8 @@ from app.discord import logs_for, mirror_audit
 from app.models import AuditEntry
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
-from app.routers import admin, auth, batches, dispensing, integration, medicines, patients, prescriptions, reports, sales, stock, suppliers, unset
+from app.routers import admin, auth, profile, batches, dispensing, integration, medicines, patients, prescriptions, reports, sales, stock, suppliers, unset
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -34,6 +35,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Pharmacy API", version="0.2.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Pharmacy")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # The audit log goes to Discord too, a thread a day (app/discord.py).
@@ -61,6 +64,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "pharmacy"}
 
-    for module in (auth, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers, integration, unset):
+    for module in (auth, profile, admin, reports, medicines, patients, prescriptions, dispensing, sales, batches, stock, suppliers, integration, unset):
         app.include_router(module.router)
+    from app.routers import material_reviews
+
+    app.include_router(material_reviews.router)
+    app.include_router(material_reviews.integration)
+    from app import platform_connect
+
+    app.include_router(platform_connect.router)
+    # Connected on the Platform as soon as this runs, not when someone first uses it.
+    platform_connect.connect_now(settings)
     return app

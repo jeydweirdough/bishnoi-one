@@ -60,21 +60,23 @@ export async function RolesPage() {
   );
 }
 
-const ACTIONS: Record<string, string> = {
-  "user.created": "Added a person",
+export const ACTIONS: Record<string, string> = {
+  "user.created": "Added a user",
   "user.updated": "Updated user details",
-  "user.switched_off": "Switched a person off",
-  "user.switched_on": "Switched a person back on",
+  "user.switched_off": "Deactivated a user",
+  "user.switched_on": "Reactivated a user",
   "user.password_reset": "Reset user password",
   "role.created": "Added a new role",
   "role.updated": "Updated role permissions",
   "role.deleted": "Deleted a role",
   "auth.signed_in": "Signed in",
+  "user.profile_changed": "Updated their profile",
+  "user.password_changed": "Changed their password",
   "fund.released": "Released a cash advance",
   "fund.cancelled": "Cancelled a marketing request",
-  "fund.expense_checked": "Checked a receipt",
-  "fund.sent_back": "Sent a liquidation back",
-  "fund.checked": "Finished a liquidation review",
+  "fund.expense_checked": "Reviewed an expense",
+  "fund.sent_back": "Returned a liquidation for correction",
+  "fund.checked": "Completed a liquidation review",
   "fund.returned": "Recorded a refund",
   "fund.reimbursed": "Recorded a reimbursement",
   "category.created": "Added an expense category",
@@ -92,14 +94,14 @@ const ACTIONS: Record<string, string> = {
   "invoice.issued": "Issued an invoice",
   "invoice.voided": "Voided an invoice",
   "invoice.paid": "Recorded a payment",
-  "invoice.payment_removed": "Took a payment off",
+  "invoice.payment_removed": "Reversed a payment",
   "series.created": "Added invoice numbers",
   "series.updated": "Changed invoice numbers",
 };
 
 const FILTERS = [
-  { key: "", label: "Everything" },
-  { key: "user.", label: "People" },
+  { key: "", label: "All" },
+  { key: "user.", label: "Users" },
   { key: "role.", label: "Roles" },
   { key: "fund.", label: "Marketing requests" },
   { key: "invoice.", label: "Invoices" },
@@ -164,7 +166,7 @@ export async function AuditPage({
       </div>
       <Sheet className="px-5 pt-2 pb-3">
         {page.items.length === 0 ? (
-          <Empty title={beforeParam ? "Nothing older" : "Nothing recorded yet"} icon="auditLog" />
+          <Empty title={beforeParam ? "No older entries" : "No activity yet"} icon="auditLog" />
         ) : (
           <ol className="divide-y divide-rule">
             {page.items.map((e) => (

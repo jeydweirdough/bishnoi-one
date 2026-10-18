@@ -157,3 +157,31 @@ How the apps already agree, kept that way:
   caller says so plainly and never saves a half-done record.
 - **The shared kit** (`frontend/src/platform/`) is one design across apps: a
   pattern adopted in one app goes into the kit for the rest.
+
+## P13. Associations with labels · adopted · A10, C6
+
+**From:** HubSpot's associations: any record links to any other, both ways,
+each link with a label an administrator defines.
+
+**For us:** one association table: from a record (type and id) to a record
+(type and id), with a label from a list per pair of types ("Works at",
+"Consultant at" for a doctor and a hospital; "Part of" for a hospital and its
+group; "Decision maker" for a contact and a deal). Each record page lists its
+associations grouped by label, each group with + Add. An activity can be
+associated with several records, and shows on each.
+
+**Reach:** an association never lets someone open a record they couldn't
+open before; they see that it exists (its name), as with the look-alikes.
+
+**Today:** a customer field of kind "customer" (a doctor's hospital), built
+2026-10-03; it becomes an association with the label "Works at".
+
+## P14. The record page in three columns · adopted · I1
+
+**From:** HubSpot's record page.
+
+**For us:** left, who it is: name, type, code, owner, then quick actions
+(Note, Email, Call, Task, Meeting) and the details by section. Middle:
+Overview (the figures that matter for its type) and Activities, with search
+and filters. Right: associations, quotes, deals and materials, each with
++ Add. Same wording as today; on a phone the three stack.

@@ -47,7 +47,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
   org: Org;
   /** What this person may add from here without leaving the form. */
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "brands" | "categories" | "suppliers" | "units">;
   product?: Product;
   /** Products a new one could be a variant of. */
   parents: { id: string; name: string; sku: string }[];
@@ -56,7 +56,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
   preset?: { parentId?: string };
 }) {
   const fmt = makeFormat(org);
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const parent = product ? null : parents.find((p) => p.id === preset?.parentId);
   const [d, setD] = useState<Draft>(() => ({
     sku: product?.sku ?? (parent ? `${parent.sku}-` : ""),
@@ -132,17 +132,17 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
   const suppliers = withAdded(reference.suppliers.filter((x) => x.isActive || x.id === d.supplierId).map((x) => ({ value: x.id, label: x.name })), added, "supplier", opt);
   const pickFrom = (list: { value: string; label: string }[]) => list.map((o) => <option key={o.value} value={o.value}>{o.label}</option>);
   const tracking = [
-    { key: "trackBatches" as const, label: "Batch / lot numbers", hint: "Each delivery's lot is kept apart." },
-    { key: "trackExpiry" as const, label: "Expiry dates", hint: "Per batch. Stock goes out first-expired-first-out." },
+    { key: "trackBatches" as const, label: "Batch numbers", hint: "Each delivery's batch is tracked separately." },
+    { key: "trackExpiry" as const, label: "Expiry dates", hint: "Per batch. Stock is issued first-expired, first-out." },
     { key: "trackSerials" as const, label: "Serial numbers", hint: "One per unit, for equipment." },
   ];
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <SectionTitle icon="products">What it is</SectionTitle>
+        <SectionTitle icon="products">Basic information</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="SKU / item code" error={fields.sku}>
+          <Field label="SKU" error={fields.sku}>
             {(p) => <Input {...p} value={d.sku} onChange={(e) => set({ sku: e.target.value })} autoFocus={!product} />}
           </Field>
           <Field label="Product name" error={fields.name} className="lg:col-span-2">
@@ -171,7 +171,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
           <Field label="Barcode" optional error={fields.barcode}>
             {(p) => <Input {...p} value={d.barcode} onChange={(e) => set({ barcode: e.target.value })} inputMode="numeric" />}
           </Field>
-          <Field label="Product type" error={fields.productType} hint={locked ? "Stock has moved, so this is fixed." : undefined}>
+          <Field label="Product type" error={fields.productType} hint={locked ? "Locked after the first stock movement." : undefined}>
             {(p) => (
               <Select {...p} value={d.productType} disabled={locked} onChange={(e) => set({ productType: e.target.value as ProductType })}>
                 {Object.entries(PRODUCT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -201,11 +201,11 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <SectionTitle icon="pricing">Buying and selling</SectionTitle>
+        <SectionTitle icon="pricing">Purchasing and sales</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2">
             <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" onAdded={took("supplierId")} label="New" />}>
-              <Field label="Usual supplier" optional error={fields.supplierId}>
+              <Field label="Preferred supplier" optional error={fields.supplierId}>
                 {(p) => (
                   <Select {...p} value={d.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
                     <option value="">None</option>
@@ -215,7 +215,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               </Field>
             </WithAdd>
           </div>
-          <Field label={`Cost price (${fmt.symbol})`} error={fields.costPrice} hint="Per unit. Stock is valued at this.">
+          <Field label={`Cost price (${fmt.symbol})`} error={fields.costPrice} hint="Per unit. Used to value stock.">
             {(p) => <Input {...p} inputMode="decimal" value={d.costPrice} onChange={(e) => set({ costPrice: e.target.value })} />}
           </Field>
           <Field label={`Selling price (${fmt.symbol})`} error={fields.sellingPrice}>
@@ -226,31 +226,31 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-2 sm:col-span-3">
             <input type="checkbox" checked={d.taxInclusive} onChange={(e) => set({ taxInclusive: e.target.checked })} className="size-4 accent-hema" />
-            Prices include the tax
+            Prices include tax
           </label>
         </div>
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="stock">Stock levels</SectionTitle>
-        <p className="mt-1 text-meta text-ink-3">Counted across every warehouse, on what&apos;s available (not held for orders).</p>
+        <p className="mt-1 text-meta text-ink-3">Applied to available stock across all warehouses, excluding reserved stock.</p>
         <div className="mt-4 grid gap-5 sm:grid-cols-4">
-          <Field label="Minimum" error={fields.minStock}>
+          <Field label="Minimum stock" error={fields.minStock}>
             {(p) => <Input {...p} inputMode="numeric" value={d.minStock} onChange={(e) => set({ minStock: whole(e.target.value) })} />}
           </Field>
-          <Field label="Reorder point" error={fields.reorderPoint} hint="At or below this, it's flagged low.">
+          <Field label="Reorder level" error={fields.reorderPoint} hint="Stock at or below this level is flagged as low.">
             {(p) => <Input {...p} inputMode="numeric" value={d.reorderPoint} onChange={(e) => set({ reorderPoint: whole(e.target.value) })} />}
           </Field>
           <Field label="Reorder quantity" error={fields.reorderQty}>
             {(p) => <Input {...p} inputMode="numeric" value={d.reorderQty} onChange={(e) => set({ reorderQty: whole(e.target.value) })} />}
           </Field>
-          <Field label="Maximum" optional error={fields.maxStock}>
+          <Field label="Maximum stock" optional error={fields.maxStock}>
             {(p) => <Input {...p} inputMode="numeric" value={d.maxStock} onChange={(e) => set({ maxStock: whole(e.target.value) })} />}
           </Field>
         </div>
         <fieldset className="mt-5" disabled={locked}>
           <legend className="mb-2 text-meta font-medium text-ink-2">
-            Tracking{locked && <span className="font-normal text-ink-3"> · fixed once stock has moved</span>}
+            Tracking{locked && <span className="font-normal text-ink-3"> · locked after the first stock movement</span>}
           </legend>
           <div className="grid gap-3 sm:grid-cols-3">
             {tracking.map((t) => (
@@ -275,10 +275,10 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="lists">Variant and specifications</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <Field label="A variant of" optional error={fields.parentId} hint="e.g. 3 mL is a variant of BD Syringe.">
+          <Field label="Parent product" optional error={fields.parentId} hint="For example, 3 mL is a variant of BD Syringe.">
             {(p) => (
               <Select {...p} value={d.parentId} onChange={(e) => set({ parentId: e.target.value })}>
-                <option value="">Not a variant</option>
+                <option value="">None</option>
                 {parents.filter((x) => x.id !== product?.id).map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
               </Select>
             )}
@@ -293,7 +293,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
             <div key={i} className="flex items-end gap-3">
               <Input aria-label={`Specification ${i + 1} name`} placeholder="Size" value={k} className="max-w-48" onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [e.target.value, a[1]] : a)) })} />
               <Input aria-label={`Specification ${i + 1} value`} placeholder="Medium" value={v} onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [a[0], e.target.value] : a)) })} />
-              <button type="button" title="Remove this specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+              <button type="button" title="Remove specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                 <X className="size-4" aria-hidden />
               </button>
             </div>
@@ -301,7 +301,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
         </div>
         {fields.attributes && <p className="mt-1 text-meta text-danger">{fields.attributes}</p>}
         <Button size="sm" variant="quiet" className="mt-2" icon={<Plus className="size-4" aria-hidden />} onClick={() => set({ attributes: [...d.attributes, ["", ""]] })}>
-          Add a specification
+          Add specification
         </Button>
       </Sheet>
 

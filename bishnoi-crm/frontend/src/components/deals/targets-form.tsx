@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button, LinkButton } from "@/src/platform/ui/button";
+import { Button, LinkButton, TextButton } from "@/src/platform/ui/button";
 import { CellInput, FormError } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org, RevenueTargets } from "@/src/platform/lib/types";
@@ -31,7 +31,7 @@ export function TargetsForm({
   const [pending, start] = useTransition();
   const lastMonth = new Map(previous.people.filter((p) => p.targetCentavos).map((p) => [p.person.id, p.targetCentavos]));
   const noneYet = data.people.every((p) => !p.targetCentavos);
-  const done = `/deals?view=results&period=${data.month}`;
+  const done = `/deals?results=${data.month}`;
 
   const total = data.people.reduce((sum, p) => sum + (fmt.toCentavos(drafts[p.person.id] || "0") ?? 0), 0);
 
@@ -69,13 +69,13 @@ export function TargetsForm({
       {noneYet && lastMonth.size > 0 && (
         <p className="mb-3 text-sm">
           No targets set for {monthName} yet.{" "}
-          <button
-            type="button"
-            className="font-semibold text-hema hover:underline"
+          <TextButton
+           
+            size="inherit" className="font-semibold"
             onClick={() => setDrafts(Object.fromEntries(data.people.map((p) => [p.person.id, toText(lastMonth.get(p.person.id))])))}
           >
             Start from {previousName}&apos;s
-          </button>
+          </TextButton>
         </p>
       )}
       <table className="w-full text-sm">

@@ -23,10 +23,13 @@ class Demo:
     role: str  # what the sign-in page says they are
     access: str  # the role they're given (app/permissions.py)
     team: str | None = None
+    # A manager's divisions: they're made those teams' manager (Manager reaches every team it manages).
+    manages: tuple[str, ...] = ()
 
 
 DEMO_ACCOUNTS: tuple[Demo, ...] = (
     Demo("Administration", "carmen@pharmacrm.test", "Carmen Villanueva", "Admin · users, roles, teams and the audit log", "Administrator"),
+    Demo("Management", "mia@pharmacrm.test", "Mia Santos", "Manager · B2C and B2B divisions: approves their quotes, sets their targets", "Manager", "B2C", ("B2C", "B2B")),
     Demo("Sales · B2C", "ben@pharmacrm.test", "Ben Cruz", "Salesperson · B2C MD Telesales", "Salesperson", "B2C"),
     Demo("Sales · B2C", "tess@pharmacrm.test", "Tess Aquino", "Team Lead · B2C General", "Team Lead", "B2C"),
     Demo("Sales · STC", "nena@pharmacrm.test", "Nena Gutierrez", "Salesperson · STC MD Telesales", "Salesperson", "STC"),
@@ -109,10 +112,12 @@ DEMO_PRICE_TYPES: tuple[tuple[str, str, str, str, bool, bool], ...] = (
     ("TRADE", "Drugstore/Hospital Price", "list", "always", False, False),
     ("DOCTOR", "Doctor's Price", "list", "with_rx", False, False),
     ("SPECIAL", "Requested price", "entered", "always", True, True),
+    # Finance's own: a product with no approved SRP can't be quoted (app/pricing.py).
+    ("SRP", "SRP", "list", "always", False, False),
 )
 
 # code, name
-DEMO_ISSUERS: tuple[tuple[str, str], ...] = (("DSWD", "DSWD"), ("PCSO", "PCSO"), ("MAYOR", "Office of the Mayor"))
+DEMO_ISSUERS: tuple[tuple[str, str], ...] = (("DSWD", "DSWD"), ("PCSO", "PCSO"), ("MAYOR", "Office of the Mayor"), ("OP", "Office of the President"))
 
 # code, name, generic name, strength, form, unit, prices in pesos (PATIENT, TRADE, DOCTOR)
 DEMO_PRODUCTS: tuple[tuple[str, str, str, str, str, str, tuple[int, int, int]], ...] = (

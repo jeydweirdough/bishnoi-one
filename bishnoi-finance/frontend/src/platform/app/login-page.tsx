@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
+import { loadAddresses } from "../lib/addresses";
+import { addressKnown, appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
 import { buttonClass } from "../ui/button";
 import { APP_NAME } from "../lib/labels";
 import { api } from "../lib/api";
@@ -30,12 +31,13 @@ async function demoAccounts(): Promise<{ items: Demo[]; password: string | null 
  * address is set for this build (NEXT_PUBLIC_BISHNOI_PLATFORM_URL).
  */
 function platformSignIn(): string | null {
-  if (!THIS_APP || THIS_APP === "platform" || !(process.env.NEXT_PUBLIC_BISHNOI_PLATFORM_URL ?? process.env.NEXT_PUBLIC_NABHI_PLATFORM_URL)) return null;
+  if (!THIS_APP || THIS_APP === "platform" || !addressKnown("platform")) return null;
   const back = `${appUrl(THIS_APP)}/auth/platform`;
   return `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(back)}`;
 }
 
 export async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await loadAddresses();
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : "/";
   const expired = params.expired === "1";

@@ -3,13 +3,13 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { QuoteTemplate, TemplateDesign } from "@/src/quote-templates/types";
+import type { CodeFields, QuoteTemplate, TemplateDesign } from "@/src/quote-templates/types";
 
 // Settings -> Quotation templates. The API checks that the caller manages settings.
 
 export type TemplateInput = Partial<{
   name: string;
-  kind: "form" | "excel";
+  kind: "form" | "excel" | "code";
   payer: string | null;
   teamId: string | null;
   isActive: boolean;
@@ -60,4 +60,14 @@ export async function removeTemplateImage(id: string, which: "logo" | "signature
     refresh();
     return saved;
   });
+}
+
+/** The %fields% a template written as code can use, and a layout to start from. */
+export async function codeFields(): Promise<Result<CodeFields>> {
+  return attempt(() => api.get<CodeFields>("/admin/quote-template-fields"));
+}
+
+/** The code as it would print, before it's saved: with the template's latest quote, or made-up values. */
+export async function previewCode(id: string, html: string): Promise<Result<{ html: string; using: string }>> {
+  return attempt(() => api.post<{ html: string; using: string }>(`/admin/quote-templates/${enc(id)}/preview`, { html }));
 }

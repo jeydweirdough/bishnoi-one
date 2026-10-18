@@ -5,9 +5,9 @@
  * another is not a path — it is a whole URL. This is the one place that knows
  * which app owns which screen.
  *
- * Addresses come from the environment so a deployment can put them anywhere;
- * the defaults are the local ports, so `npm run dev` in each folder just works.
- * `NEXT_PUBLIC_` because the sidebar is drawn in the browser too.
+ * Addresses come from Bishnoi One Platform (Applications), read as each page is
+ * served (lib/addresses.ts): a new domain is set there once. Before it answers,
+ * NEXT_PUBLIC_ settings if any, then the local ports, so `npm run dev` just works.
  */
 
 import type { Me } from "./types";
@@ -58,7 +58,18 @@ const FROM_ENV: Record<AppName, string | undefined> = {
 /** Which app this one is. Each app sets it; unset means the shell, which has them all. */
 export const THIS_APP = ((process.env.NEXT_PUBLIC_BISHNOI_APP ?? process.env.NEXT_PUBLIC_NABHI_APP) ?? "") as AppName | "";
 
-export const appUrl = (app: AppName): string => (FROM_ENV[app] || DEFAULTS[app]).replace(/\/$/, "");
+// What the Platform says (lib/addresses.ts), set as each page is served.
+let LIVE: Partial<Record<AppName, string>> = {};
+
+export function setAddresses(map: Partial<Record<AppName, string>>): void {
+  LIVE = map;
+}
+
+/** Where an app's screens are: as the Platform's Applications page says; else NEXT_PUBLIC_, else the local port. */
+export const appUrl = (app: AppName): string => (LIVE[app] || FROM_ENV[app] || DEFAULTS[app]).replace(/\/$/, "");
+
+/** Whether an app's address is known for real (the Platform says, or it's set), not only the local default. */
+export const addressKnown = (app: AppName): boolean => Boolean(LIVE[app] || FROM_ENV[app]);
 
 /**
  * A link to a screen, wherever it lives.
@@ -89,7 +100,7 @@ export const appOf = (key: string): AppName | null => (NAMES.has(key) ? (key as 
 export const isOurs = (app: AppName): boolean => !THIS_APP || THIS_APP === app;
 
 const LABELS: Record<AppName, string> = {
-  exec: "Executive Admin",
+  exec: "Admin",
   crm: "CRM",
   finance: "Finance",
   inventory: "Inventory",

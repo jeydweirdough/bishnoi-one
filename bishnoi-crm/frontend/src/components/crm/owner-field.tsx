@@ -21,14 +21,9 @@ export function OwnerField({
   error?: string;
   label?: string;
 }) {
-  if (people.length <= 1) {
-    return (
-      <div>
-        <p className="mb-1 text-meta font-medium text-ink-2">{label}</p>
-        <p className="flex h-9 items-center border-b border-rule text-sm">{people[0]?.isMe ? "You" : (people[0]?.name ?? "You")}</p>
-      </div>
-    );
-  }
+  // Nobody else to give it to (a salesperson's own records): nothing to ask.
+  // It's theirs, and the API makes it so when nobody is sent.
+  if (people.length <= 1) return null;
   const teams = [...new Set(people.map((p) => p.team?.name ?? ""))];
   return (
     <Field label={label} error={error}>

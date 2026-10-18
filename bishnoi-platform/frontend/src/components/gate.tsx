@@ -25,7 +25,7 @@ export async function adminsOnly(): Promise<ReactNode | null> {
   if (staff.canAdminister) return null;
   return (
     <Sheet className="px-6 py-10 text-center">
-      <h1 className="text-heading">This one is for Platform Admins</h1>
+      <h1 className="text-heading">Platform Admin access required</h1>
       <p className="mx-auto mt-1 max-w-md text-ink-2">
         Support sees everything on the platform and works its tickets and incidents. Changing it takes a Platform Admin.
       </p>

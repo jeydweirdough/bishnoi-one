@@ -80,7 +80,7 @@ export function LocationGuide({ why, onRetry, retrying }: { why: NoLocation; onR
 
   return (
     <div role="alertdialog" aria-modal="true" aria-labelledby="location-title" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-      <div className="max-h-[90vh] w-[min(30rem,100%)] overflow-y-auto rounded-[3px] bg-sheet p-6 text-ink shadow-overlay">
+      <div className="max-h-[90vh] w-[min(30rem,100%)] overflow-y-auto rounded-xl bg-sheet p-6 text-ink shadow-overlay">
         <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-danger/10 text-danger">
           <MapPinOff className="size-5" aria-hidden />
         </span>

@@ -12,6 +12,7 @@ import { useCan } from "../quick-add/can";
 import { AddCustomer } from "../quick-add/forms";
 import { QuickAdd } from "../quick-add/quick-add";
 import { KINDS, kindOf, localDateTime, tomorrowMorning } from "./words";
+import { AlsoAbout } from "./also-about";
 
 const PLACEHOLDERS: Record<CrmKind, string> = {
   call: "What was the call about?",
@@ -35,6 +36,7 @@ export function LogActivity({
   contacts = [],
   companies,
   onDone,
+  initialKind = "call",
 }: {
   org: Org;
   /** The moment the page was made, so the server and the browser start the
@@ -49,19 +51,23 @@ export function LogActivity({
   companies?: Ref[];
   /** Called once it's saved (the panel it sits in closes). */
   onDone?: () => void;
+  /** Opened for one kind (the customer page's Note, Email, Call, Task, Meeting). */
+  initialKind?: CrmKind;
 }) {
-  const [kind, setKind] = useState<CrmKind>("call");
+  const [kind, setKind] = useState<CrmKind>(initialKind);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [at, setAt] = useState(() => localDateTime(new Date(now), org.timezone));
-  const [planned, setPlanned] = useState(false);
+  const [at, setAt] = useState(() => (kindOf(initialKind).planned ? tomorrowMorning(org.timezone) : localDateTime(new Date(now), org.timezone)));
+  const [planned, setPlanned] = useState(kindOf(initialKind).planned);
   const [duration, setDuration] = useState("");
+  const [link, setLink] = useState("");
   const [direction, setDirection] = useState<"out" | "in">("out");
   const [contact, setContact] = useState(contactId ?? "");
   const [company, setCompany] = useState(companyId ?? "");
   const can = useCan();
   const [made, setMade] = useState<Ref[]>([]);
   const [ownerId, setOwnerId] = useState(people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
+  const [alsoAbout, setAlsoAbout] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -86,8 +92,10 @@ export function LogActivity({
       companyId: company || null,
       contactId: contact || null,
       durationMinutes: (kind === "call" || kind === "meeting") && duration ? Number(duration) : null,
+      meetingLink: (kind === "call" || kind === "meeting") && link.trim() ? link.trim() : null,
       direction: kind === "call" || kind === "email" ? direction : null,
       ownerId: ownerId || null,
+      alsoCompanyIds: alsoAbout,
     };
     start(async () => {
       const result = await createActivity(input);
@@ -98,6 +106,7 @@ export function LogActivity({
       }
       toast.success(info.planned ? `${info.label} planned` : `${info.label} logged`, { description: result.data.subject });
       setSubject("");
+      setAlsoAbout([]);
       setBody("");
       setDuration("");
       setError(null);
@@ -118,35 +127,45 @@ export function LogActivity({
     >
       <Choice<CrmKind>
         name="kind"
-        legend="What"
+        legend="Activity type"
         value={kind}
         onChange={pick}
         options={KINDS.map((k) => ({ value: k.kind, label: k.label, icon: <Icon name={k.icon} className="size-3.5" /> }))}
       />
-      <Field label={info.planned ? "What it's for" : "Subject"} error={fields.subject}>
+      <Field label={info.planned ? "Purpose" : "Subject"} error={fields.subject}>
         {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={PLACEHOLDERS[kind]} required />}
       </Field>
       <Field label="Details" optional error={fields.body}>
         {(p) => <Textarea {...p} rows={2} value={body} onChange={(e) => setBody(e.target.value)} />}
       </Field>
+      {(kind === "meeting" || kind === "call") && (
+        <Field
+          label={kind === "meeting" ? "Meeting link" : "Video call link"}
+          optional
+          error={fields.meetingLink}
+          hint={kind === "meeting" ? "Paste the Google Meet, Zoom or Teams link: a Join button shows wherever the meeting does." : "When the call is online: paste its link, and it can be joined from here."}
+        >
+          {(p) => <Input {...p} type="url" inputMode="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://meet.google.com/abc-defg-hij" maxLength={500} />}
+        </Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={info.planned ? "When it's due" : "When"} error={fields.at}>
+        <Field label={info.planned ? "Due date" : "Date and time"} error={fields.at}>
           {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}
         </Field>
         {(kind === "call" || kind === "meeting") && (
-          <Field label="How long (minutes)" optional error={fields.durationMinutes}>
+          <Field label="Duration (minutes)" optional error={fields.durationMinutes}>
             {(p) => <Input {...p} type="number" min={0} max={1440} inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />}
           </Field>
         )}
         {(kind === "call" || kind === "email") && (
           <Choice<"out" | "in">
             name="direction"
-            legend="Which way"
+            legend="Direction"
             value={direction}
             onChange={setDirection}
             options={[
-              { value: "out", label: kind === "call" ? "We called" : "We sent it" },
-              { value: "in", label: kind === "call" ? "They called" : "They sent it" },
+              { value: "out", label: kind === "call" ? "Outbound" : "Sent" },
+              { value: "in", label: kind === "call" ? "Inbound" : "Received" },
             ]}
           />
         )}
@@ -172,10 +191,10 @@ export function LogActivity({
           </div>
         )}
         {contacts.length > 0 && !contactId && (
-          <Field label="With" optional error={fields.contactId}>
+          <Field label="Contact" optional error={fields.contactId}>
             {(p) => (
               <Select {...p} value={contact} onChange={(e) => setContact(e.target.value)}>
-                <option value="">Nobody in particular</option>
+                <option value="">None</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -185,8 +204,9 @@ export function LogActivity({
             )}
           </Field>
         )}
+        <AlsoAbout value={alsoAbout} onChange={setAlsoAbout} except={company || undefined} />
         {info.planned && people.length > 1 && (
-          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label="Who's doing it" />
+          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label="Assigned to" />
         )}
       </div>
       <FormError message={error} />

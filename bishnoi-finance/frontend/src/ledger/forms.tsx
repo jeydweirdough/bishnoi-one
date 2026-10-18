@@ -196,7 +196,7 @@ export function ReverseButton({ id, number }: { id: string; number: string }) {
       triggerSize="sm"
       title={`Reverse ${number}?`}
       body="A reversing entry dated today is posted with every debit and credit swapped. The original entry remains in the journal; posted entries are never edited or deleted."
-      confirmLabel="Post the reversal"
+      confirmLabel="Post reversal"
       onConfirm={async () => {
         const result = await reverseEntry(id);
         if (!result.ok) {
@@ -237,7 +237,7 @@ export function ChartEditor({ accounts, canEdit }: { accounts: Account[]; canEdi
                     {!a.isActive && <span className="ml-2 text-meta font-normal">inactive</span>}
                   </a>
                   {canEdit && (
-                    <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Change ${a.name}`} onClick={() => setEditing(a)}>
+                    <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Edit ${a.name}`} onClick={() => setEditing(a)}>
                       <Pencil className="size-3.5" aria-hidden />
                     </Button>
                   )}

@@ -68,6 +68,8 @@ def health(db, settings, refresh: bool = False) -> dict:
         "overall": overall,
         "checkedAt": iso(monitor.last_checked(db)),
         "staleSeconds": config.stale_seconds,
+        # What counts as slow (Settings > Monitoring): the answer-time gauge's scale is twice it.
+        "slowMs": config.slow_ms,
         "platformApi": {"status": api_status, "failedPercent": last["failedPercent"], "averageMs": last["averageMs"]},
         "database": {"status": database.status if database else "unknown", **(monitor.check_out(database) or {})},
         "applications": applications,

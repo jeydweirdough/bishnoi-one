@@ -3,7 +3,7 @@
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton, TextButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { CellInput, Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
@@ -81,9 +81,9 @@ export function PriceGroupsEditor({ rules }: { rules: PriceRules }) {
               <span className="flex items-center gap-3 text-meta text-ink-3">
                 {g.customers} customer{g.customers === 1 ? "" : "s"}
                 {edit && (
-                  <button
-                    type="button"
-                    className="font-semibold text-hema hover:underline"
+                  <TextButton
+                   
+                    size="inherit" className="font-semibold"
                     onClick={() =>
                       start(async () => {
                         const r = await updatePriceGroup(g.code, { isActive: !g.isActive });
@@ -92,7 +92,7 @@ export function PriceGroupsEditor({ rules }: { rules: PriceRules }) {
                     }
                   >
                     {g.isActive ? `Switch ${g.name} off` : `Switch ${g.name} on`}
-                  </button>
+                  </TextButton>
                 )}
               </span>
             </li>
@@ -100,7 +100,7 @@ export function PriceGroupsEditor({ rules }: { rules: PriceRules }) {
           {adding && (
             <li className="flex flex-wrap items-end gap-2 px-5 py-3">
               <CellInput className="w-28 !text-left" aria-label="Code" placeholder="HOSP" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoFocus />
-              <CellInput className="w-56 !text-left" aria-label="Name" placeholder="Hospital" value={name} onChange={(e) => setName(e.target.value)} />
+              <CellInput className="w-56 !text-left" aria-label="Name" placeholder="Wholesale" value={name} onChange={(e) => setName(e.target.value)} />
               <Button size="sm" variant="primary" loading={pending} onClick={add} disabled={!code.trim() || !name.trim()}>
                 Add
               </Button>
@@ -180,9 +180,9 @@ export function PriceRulesEditor({ rules, products, types, org }: { rules: Price
                   <p className="flex flex-wrap items-center gap-1.5 font-medium">
                     {r.name}
                     {edit && (
-                      <button type="button" onClick={() => setEditing(r)} title={`Change ${r.name}`} aria-label={`Change ${r.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                      <IconButton onClick={() => setEditing(r)} label={`Change ${r.name}`} size="sm">
                         <Pencil className="size-3.5" aria-hidden />
-                      </button>
+                      </IconButton>
                     )}
                     <StateTag state={r.state} />
                   </p>
@@ -279,12 +279,12 @@ function RuleForm({
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" error={fields.name}>
-            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "volume" ? "Bulk orders" : kind === "surcharge" ? "Cold chain" : "Amoxil for hospitals"} autoFocus />}
+            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "volume" ? "Bulk orders" : kind === "surcharge" ? "Cold chain" : "Brand X for distributors"} autoFocus />}
           </Field>
           <Field label="Product" optional={kind !== "group_price"} error={fields.productId}>
             {(p) => (
               <Select {...p} value={productId} onChange={(e) => setProductId(e.target.value)}>
-                <option value="">{kind === "group_price" ? "Pick a product" : "Every product"}</option>
+                <option value="">{kind === "group_price" ? "Select a product" : "All products"}</option>
                 {products.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name} · {x.code}
@@ -296,7 +296,7 @@ function RuleForm({
           <Field label="Price group" optional={kind !== "group_price"} error={fields.priceGroupCode}>
             {(p) => (
               <Select {...p} value={group} onChange={(e) => setGroup(e.target.value)}>
-                <option value="">{kind === "group_price" ? "Pick a group" : "Every customer"}</option>
+                <option value="">{kind === "group_price" ? "Select a group" : "All customers"}</option>
                 {rules.groups
                   .filter((g) => g.isActive || g.code === rule?.priceGroup?.code)
                   .map((g) => (
@@ -377,7 +377,7 @@ function RuleForm({
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-            Switched on
+            Active
           </label>
         </div>
         <FormError message={error} />

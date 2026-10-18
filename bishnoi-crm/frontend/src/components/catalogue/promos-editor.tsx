@@ -3,6 +3,7 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Pager, usePages } from "@/src/platform/ui/pager";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
@@ -34,6 +35,7 @@ export function PromosEditor({
 }) {
   const fmt = makeFormat(org);
   const [editing, setEditing] = useState<PromoRow | "new" | null>(null);
+  const { rows: page, pager } = usePages(promos);
   const name = (id: string) => products.find((p) => p.id === id)?.name ?? "a product no longer here";
 
   return (
@@ -54,7 +56,7 @@ export function PromosEditor({
           </Empty>
         ) : (
           <ul className="divide-y divide-rule">
-            {promos.map((p) => (
+            {page.map((p) => (
               <li key={p.id} className="flex items-start justify-between gap-4 px-5 py-3">
                 <div className="min-w-0">
                   <p className="font-medium">
@@ -82,6 +84,7 @@ export function PromosEditor({
           </ul>
         )}
       </Sheet>
+      <Pager {...pager} />
     </div>
   );
 }
@@ -140,7 +143,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
     if (teamIds.length === 0) problems.teamIds = "Pick the divisions it's for.";
     if (Object.keys(problems).length) {
       setFields(problems);
-      setError("Some fields need a look.");
+      setError("Some fields need attention.");
       return;
     }
     start(async () => {
@@ -216,7 +219,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
                     inputMode="numeric"
                     value={t.minQty}
                     onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)))}
-                    className="h-9 w-20 rounded-[3px] border border-control px-2 text-right"
+                    className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                   />
                   units,
                   <input
@@ -224,7 +227,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
                     inputMode="decimal"
                     value={t.percent}
                     onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)))}
-                    className="h-9 w-20 rounded-[3px] border border-control px-2 text-right"
+                    className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                   />
                   % off
                   {tiers.length > 1 && (
@@ -253,7 +256,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
             Every product
           </label>
           {!every && (
-            <ul className="mt-2 grid max-h-64 gap-1 overflow-y-auto rounded-[3px] border border-rule p-2 sm:grid-cols-2">
+            <ul className="mt-2 grid max-h-64 gap-1 overflow-y-auto rounded-lg border border-rule p-2 sm:grid-cols-2">
               {products.map((p) => (
                 <li key={p.id}>
                   <label className="flex items-center gap-2 text-sm">
@@ -281,7 +284,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
-            Switched on
+            Active
           </label>
         </div>
 

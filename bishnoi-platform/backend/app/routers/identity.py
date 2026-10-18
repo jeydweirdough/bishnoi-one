@@ -3,9 +3,14 @@ application they have been given.
 
 - /identity/login, /identity/logout: their sign-in (not the console's staff).
 - /identity/me: who they are, and the applications they may open.
+- /identity/switch: to another company they work for (same email, one password).
 - /identity/pass: a pass into one application (app/passes.py), sent back to
-  that application's own address (or to Bishnoi One.exe on the same PC) only.
-- /identity/password: changing their password.
+  that application's own address (or to Bishnoi One.exe on the same PC) only;
+  for the company they're in, or another of theirs when it names one.
+- /identity/password: changing their password (at every company of theirs).
+
+Someone who works for two companies has a row at each (models.Identity), under
+the same email; a sign-in is at one of them at a time.
 - /pass/key: the platform's public key, for the applications to check passes.
 
 A pass is refused, in words a person can act on, when the account or its
@@ -66,6 +71,35 @@ class LoginIn(Api):
     password: str = Field(min_length=1, max_length=MAX_PASSWORD)
 
 
+def same_person(db: Session, email: str) -> list[Identity]:
+    """Every company's row for this email: the most recently used first."""
+    return list(db.scalars(
+        select(Identity).where(func.lower(Identity.email) == email.strip().lower())
+        .order_by(Identity.last_active_at.desc().nulls_last(), Identity.created_at)
+    ))
+
+
+def usable(db: Session, rows: list[Identity]) -> list[tuple[Identity, Company]]:
+    """The rows they can work in now: active, at an active company."""
+    out = []
+    for row in rows:
+        company = db.get(Company, row.company_id)
+        if row.status == "active" and company is not None and company.status == "active":
+            out.append((row, company))
+    return out
+
+
+def open_session(db: Session, settings, person: Identity, address, action: str) -> dict:
+    token = new_token()
+    now = datetime.now(UTC)
+    expires_in = settings.identity_session_hours * 3600
+    db.add(IdentitySession(token_hash=token_hash(token), identity_id=person.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
+    person.last_active_at = now
+    audit(db, person.email, action, category="security", target=person.email, target_type="identity", target_id=person.id, company_id=person.company_id, address=address)
+    db.commit()
+    return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
+
+
 @router.post("/identity/login")
 def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
     email = body.email.strip().lower()
@@ -77,28 +111,24 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
             f"Too many wrong passwords. Try again in {max(1, wait // 60)} minute(s).",
             headers={"Retry-After": str(wait)},
         )
-    person = db.scalar(select(Identity).where(func.lower(Identity.email) == email))
+    rows = same_person(db, email)
+    # One password for all their companies (kept the same at each row).
+    person = next((r for r in rows if r.password_hash), rows[0] if rows else None)
     ok = verify_password(body.password, person.password_hash if person and person.password_hash else DUMMY_HASH)
     if person is None or not person.password_hash or not ok:
         attempts.failed(email, window)
         audit(db, email, "identity.sign_in_failed", category="security", target=email, target_type="identity", target_id=person.id if person else None, address=address)
         db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
-    company = db.get(Company, person.company_id)
-    if person.status != "active":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
-    if company is None or company.status != "active":
+    # At the company they last worked in, of those they can work in now.
+    open_rows = usable(db, rows)
+    if not open_rows:
+        if all(r.status != "active" for r in rows):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     attempts.clear(email)
-    token = new_token()
-    now = datetime.now(UTC)
-    expires_in = settings.identity_session_hours * 3600
-    db.add(IdentitySession(token_hash=token_hash(token), identity_id=person.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
-    person.last_active_at = now
-    audit(db, person.email, "identity.signed_in", category="security", target=person.email, target_type="identity", target_id=person.id, company_id=person.company_id, address=address)
-    db.commit()
     response.headers["Cache-Control"] = "no-store"
-    return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
+    return open_session(db, settings, open_rows[0][0], address, "identity.signed_in")
 
 
 @router.post("/identity/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -133,6 +163,11 @@ def me(signed: Signed, db: DB) -> dict:
         "title": person.title,
         "isCompanyAdmin": person.is_company_admin,
         "company": {"id": company.id, "name": company.name, "slug": company.slug} if company else None,
+        # Every company they work for, to switch to (this one too).
+        "companies": sorted(
+            ({"id": c.id, "name": c.name, "slug": c.slug, "current": c.id == person.company_id} for _, c in usable(db, same_person(db, person.email))),
+            key=lambda c: c["name"].lower(),
+        ),
         "apps": [
             {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": g.role, "isAppAdmin": g.is_app_admin}
             for a, g in granted(db, person)
@@ -140,9 +175,33 @@ def me(signed: Signed, db: DB) -> dict:
     }
 
 
+class SwitchIn(Api):
+    company: str = Field(min_length=1, max_length=60)
+
+
+def at_company(db: Session, person: Identity, slug: str) -> Identity:
+    """Their row at another company of theirs (by its short name), or 403."""
+    for row, company in usable(db, same_person(db, person.email)):
+        if company.slug == slug.strip().lower():
+            return row
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "You don't work for that company on Bishnoi One, or its access is suspended. Ask its administrator.")
+
+
+@router.post("/identity/switch")
+def switch(body: SwitchIn, signed: Signed, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
+    """To another company they work for: a new sign-in there, in place of this one."""
+    record, person = signed
+    there = at_company(db, person, body.company)
+    record.revoked_at = datetime.now(UTC)
+    response.headers["Cache-Control"] = "no-store"
+    return open_session(db, settings, there, address, "identity.switched_company")
+
+
 class PassIn(Api):
     app: str = Field(min_length=1, max_length=40)
     return_to: str = Field(min_length=1, max_length=500)
+    # Another company of theirs (its short name); the one they're in when not given.
+    company: str | None = Field(default=None, max_length=60)
 
 
 def check_return(app: Application, return_to: str, settings) -> str:
@@ -166,6 +225,8 @@ def check_return(app: Application, return_to: str, settings) -> str:
 @router.post("/identity/pass")
 def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
     _, person = signed
+    if body.company:
+        person = at_company(db, person, body.company)
     app = db.scalar(select(Application).where(Application.key == body.app, Application.is_active))
     if app is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such application.")
@@ -203,8 +264,11 @@ def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
     if problem:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
     now = datetime.now(UTC)
-    person.password_hash = hash_password(body.new_password)
-    person.password_changed_at = now
+    password = hash_password(body.new_password)
+    # One password at every company of theirs.
+    for row in same_person(db, person.email):
+        row.password_hash = password
+        row.password_changed_at = now
     # this sign-in carries on; every other one ends
     record.created_at = now
     audit(db, person.email, "identity.password_changed", category="security", target=person.email, target_type="identity", target_id=person.id)

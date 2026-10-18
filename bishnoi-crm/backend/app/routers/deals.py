@@ -14,21 +14,23 @@ admin.settings.
 """
 
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
+from app import clidp
 from app.access import Access, require
 from app.api import Api, camel, changed, field_error, iso, not_found, person_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Company, Contact, Deal, DealStage, Quote
+from app.likely import likely
+from app.models import DEAL_PRIORITIES, Activity, Company, Contact, Deal, DealStage, Quote
 from app.pricing import price_lines, sales_settings, today
 from app.routers.quotes import book_for
 from app.scope import owner_for, reaches, within
@@ -232,6 +234,7 @@ def deal_out(db: Session, deal: Deal, access: Access, *, full: bool = False) -> 
     state = state_of(deal)
     out = {
         "id": deal.id,
+        "no": deal.no,
         "name": deal.name,
         "company": {"id": deal.company.id, "name": deal.company.name},
         "contact": {"id": deal.contact.id, "name": deal.contact.full_name} if deal.contact else None,
@@ -243,7 +246,9 @@ def deal_out(db: Session, deal: Deal, access: Access, *, full: bool = False) -> 
         "weightedCentavos": deal.value_centavos * deal.probability // 100,
         "expectedCloseOn": deal.expected_close_on,
         "leadSource": deal.lead_source,
+        "priority": deal.priority,
         "owner": person_out(deal.owner),
+        "createdBy": person_out(deal.created_by),
         "closedAt": iso(deal.closed_at),
         "lostReason": deal.lost_reason,
         "competitor": deal.competitor,
@@ -261,6 +266,8 @@ def deal_out(db: Session, deal: Deal, access: Access, *, full: bool = False) -> 
             "notes": deal.notes,
             "priceType": deal.price_type,
             "lines": deal.lines,
+            # A bid or deal with a product whose CLIDP has run out, or isn't on file where it's needed.
+            "clidpWarnings": clidp.warnings(db, [l.get("productCode") for l in deal.lines or []], deal.company, date.today().isoformat()),
             "wonQuoteId": deal.won_quote_id,
             "quotes": [
                 {
@@ -299,16 +306,31 @@ def linked(db: Session, access: Access, company_id: str | None, contact_id: str 
 class LineIn(Api):
     product_id: str = Field(min_length=1, max_length=36)
     quantity: int = Field(ge=1, le=100_000)
+    # The promo it's sold under, from the customer's price list; it goes on to the quote.
+    promo_id: str | None = Field(None, max_length=36)
 
 
-def priced(db: Session, settings: Settings, company: Company, price_type: str | None, lines: list[LineIn]) -> tuple[list[dict], int]:
-    """The products on a deal, priced by the price rules for this customer (no tax)."""
+def priced(
+    db: Session, settings: Settings, company: Company, price_type: str | None, lines: list[LineIn], *, kept_promos: bool = False
+) -> tuple[list[dict], int]:
+    """The products on a deal, priced by the price rules for this customer (no tax).
+
+    kept_promos: the lines are the deal's own, re-priced (a new price type): a
+    promo that has ended since, or that the price rules no longer take, is
+    let go rather than stopping the change."""
     if not lines:
         return [], 0
     if not price_type:
         raise field_error("priceType", "Pick the price the products are valued at.")
     book = book_for(db, company, None, today(settings.org_timezone))
-    result = price_lines(book, price_type, False, [{"productId": l.product_id, "quantity": l.quantity} for l in lines])
+    takes = "promo" in book.procedure.get("adjust", [])
+
+    def promo_of(l: LineIn) -> str | None:
+        if not l.promo_id or (kept_promos and (not takes or l.promo_id not in book.promos)):
+            return None
+        return l.promo_id
+
+    result = price_lines(book, price_type, False, [{"productId": l.product_id, "quantity": l.quantity, "promoId": promo_of(l)} for l in lines])
     kept = [
         {
             "productId": l["productId"],
@@ -316,7 +338,12 @@ def priced(db: Session, settings: Settings, company: Company, price_type: str | 
             "productName": l["productName"],
             "unit": l["unit"],
             "quantity": l["quantity"],
+            "freeQuantity": l["freeQuantity"],
             "unitPriceCentavos": l["unitPriceCentavos"],
+            "grossCentavos": l["grossCentavos"],
+            "promoId": l["promoId"],
+            "promoName": l["promoName"],
+            "promoDiscountCentavos": l["promoDiscountCentavos"],
             "totalCentavos": l["totalCentavos"],
         }
         for l in result["lines"]
@@ -330,6 +357,25 @@ def check_source(db: Session, source: str | None) -> str | None:
     return source
 
 
+Priority = Literal["urgent", "high", "normal", "low"]
+Sort = Literal["name", "created", "value", "close", "priority", "stage"]
+
+
+def next_steps(db: Session, company_ids: list[str]) -> dict[str, dict]:
+    """For each customer, the soonest meeting or task still to do: the next step with them."""
+    if not company_ids:
+        return {}
+    out: dict[str, dict] = {}
+    rows = db.scalars(
+        select(Activity)
+        .where(Activity.company_id.in_(company_ids), Activity.done_at.is_(None), Activity.kind.in_(("meeting", "task")))
+        .order_by(Activity.at)
+    )
+    for a in rows:
+        out.setdefault(a.company_id, {"at": iso(a.at), "kind": a.kind, "subject": a.subject})
+    return out
+
+
 class DealFields(Api):
     name: str | None = Field(None, min_length=1, max_length=160)
     contact_id: str | None = Field(None, max_length=36)
@@ -339,6 +385,7 @@ class DealFields(Api):
     value_centavos: int | None = Field(None, ge=0)
     expected_close_on: date | None = None
     lead_source: str | None = Field(None, max_length=60)
+    priority: Priority | None = None
     price_type: str | None = Field(None, max_length=40)
     lines: list[LineIn] | None = Field(None, max_length=50)
     notes: str | None = Field(None, max_length=5000)
@@ -346,9 +393,35 @@ class DealFields(Api):
 
 
 class DealIn(DealFields):
-    name: str = Field(min_length=1, max_length=160)
+    # Both filled in when left out: the name from the products and the customer,
+    # the close CLOSE_IN_DAYS from today. A rep says only what they decide.
+    name: str | None = Field(None, min_length=1, max_length=160)
     company_id: str = Field(min_length=1, max_length=36)
-    expected_close_on: date
+    expected_close_on: date | None = None
+
+
+CLOSE_IN_DAYS = 30  # a new deal's expected close, when none is given
+
+
+def deal_name(company: Company, lines: list[dict], on: str) -> str:
+    """What's being bought, for whom: "Amoxicillin and Cefalexin for Davao Care
+    Hospital", or with no products "Davao Care Hospital · November 2026"."""
+    names = [l["productName"] for l in lines if l.get("productName")]
+    if names:
+        what = names[0] if len(names) == 1 else f"{names[0]} and {names[1]}" if len(names) == 2 else f"{names[0]} and {len(names) - 1} more"
+        return f"{what} for {company.name}"[:160]
+    closing = date.fromisoformat(on)
+    return f"{company.name} · {closing.strftime('%B %Y')}"[:160]
+
+
+@router.get("/deals/likely")
+def how_likely(access: View, me: CurrentUser, db: DB, settings: SettingsDep, stage: str = Query(max_length=40), owner: str | None = Query(None, max_length=36)) -> dict:
+    """A deal's probability at this stage for this owner (app/likely.py), before it's saved."""
+    found = db.get(DealStage, stage)
+    if found is None:
+        raise not_found("stage")
+    value, why = likely(db, owner or me.id, found, date.fromisoformat(today(settings.org_timezone)))
+    return {"probability": value, "why": why}
 
 
 @router.get("/deals")
@@ -356,8 +429,11 @@ def list_deals(
     access: View,
     db: DB,
     settings: SettingsDep,
-    state: Literal["open", "won", "lost"] | None = None,
+    state: Literal["open", "won", "lost", "closed"] | None = None,
     stage: str | None = Query(None, max_length=40),
+    priority: Literal["urgent", "high", "normal", "low", "none"] | None = None,
+    sort: Sort | None = None,
+    desc: bool = False,
     company: str | None = Query(None, max_length=36),
     owner: str | None = Query(None, max_length=36, description="'me', or a person's id"),
     team: str | None = Query(None, max_length=36, description="a team's id: its people's deals"),
@@ -367,10 +443,14 @@ def list_deals(
     offset: int = Query(0, ge=0),
 ) -> dict:
     query = within(select(Deal).join(Deal.stage), Deal, access)
-    if state:
+    if state == "closed":
+        query = query.where(DealStage.outcome.in_(("won", "lost")))
+    elif state:
         query = query.where(DealStage.outcome == state)
     if stage:
         query = query.where(Deal.stage_code == stage)
+    if priority:
+        query = query.where(Deal.priority.is_(None) if priority == "none" else Deal.priority == priority)
     if company:
         query = query.where(Deal.company_id == company)
     query = owner_filter(query, access, owner, team)
@@ -387,9 +467,67 @@ def list_deals(
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     found = query.subquery()
     value = db.scalar(select(func.coalesce(func.sum(found.c.value_centavos), 0))) or 0
-    order = (Deal.closed_at.desc(),) if state in ("won", "lost") else (Deal.expected_close_on.asc(), Deal.name)
+    if sort:
+        column = {
+            "name": func.lower(Deal.name),
+            "created": Deal.created_at,
+            "value": Deal.value_centavos,
+            "close": Deal.expected_close_on,
+            # Urgent first; not said last.
+            "priority": case({p: n for n, p in enumerate(DEAL_PRIORITIES)}, value=Deal.priority, else_=len(DEAL_PRIORITIES)),
+            "stage": DealStage.sort_order,
+        }[sort]
+        order = (column.desc() if desc else column.asc(), Deal.name)
+    else:
+        order = (Deal.closed_at.desc(),) if state in ("won", "lost", "closed") else (Deal.expected_close_on.asc(), Deal.name)
     items = db.scalars(query.order_by(*order).limit(limit).offset(offset)).unique().all()
-    return {"items": [deal_out(db, d, access) for d in items], "total": total, "valueCentavos": value}
+    steps = next_steps(db, list({d.company_id for d in items}))
+    return {
+        "items": [deal_out(db, d, access) | {"nextStep": steps.get(d.company_id)} for d in items],
+        "total": total,
+        "valueCentavos": value,
+    }
+
+
+@router.get("/deals-summary")
+def summary(
+    access: View,
+    db: DB,
+    settings: SettingsDep,
+    state: Literal["open", "closed"] = "open",
+    owner: str | None = Query(None, max_length=36, description="'me', or a person's id"),
+    team: str | None = Query(None, max_length=36),
+) -> dict:
+    """The figures above the deals: their value, weighted and expected this
+    month (open deals) or won and lost (closed ones); and the deals by
+    probability, stage and priority, for the charts."""
+    query = owner_filter(within(select(Deal).join(Deal.stage), Deal, access), access, owner, team)
+    query = query.where(DealStage.outcome == "open") if state == "open" else query.where(DealStage.outcome.in_(("won", "lost")))
+    deals = db.scalars(query).unique().all()
+    month = today(settings.org_timezone)[:7]
+    start, end, _ = period_bounds(month)
+    this_month = [d for d in deals if start <= d.expected_close_on < end]
+    bands = [("80–100%", 80, 100), ("51–79%", 51, 79), ("0–50%", 0, 50)]
+    stages = db.scalars(select(DealStage).order_by(DealStage.sort_order)).all()
+    by_stage = [
+        {"code": s.code, "name": s.name, "outcome": s.outcome, "count": sum(1 for d in deals if d.stage_code == s.code), "valueCentavos": sum(d.value_centavos for d in deals if d.stage_code == s.code)}
+        for s in stages
+    ]
+    won = [d for d in deals if d.stage.outcome == "won"]
+    return {
+        "state": state,
+        "count": len(deals),
+        "valueCentavos": sum(d.value_centavos for d in deals),
+        "weightedCentavos": sum(d.value_centavos * d.probability // 100 for d in deals),
+        "thisMonthCentavos": sum(d.value_centavos * d.probability // 100 for d in this_month),
+        "wonCentavos": sum(d.value_centavos for d in won),
+        "wonCount": len(won),
+        "lostCount": len(deals) - len(won) if state == "closed" else 0,
+        "byProbability": [{"label": label, "count": sum(1 for d in deals if lo <= d.probability <= hi)} for label, lo, hi in bands],
+        "byStage": [s for s in by_stage if s["count"]],
+        "byPriority": [{"priority": p, "count": sum(1 for d in deals if d.priority == p)} for p in DEAL_PRIORITIES]
+        + [{"priority": None, "count": sum(1 for d in deals if d.priority is None)}],
+    }
 
 
 @router.get("/deals/{deal_id}")
@@ -403,17 +541,19 @@ def create_deal(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, 
     stage = open_stage(db, body.stage_code)
     owner = owner_for(db, access, body.owner_id)
     lines, value = priced(db, settings, company, body.price_type, body.lines or [])
+    close_on = (body.expected_close_on or date.fromisoformat(today(settings.org_timezone)) + timedelta(days=CLOSE_IN_DAYS)).isoformat()
     deal = Deal(
-        name=body.name,
+        name=(body.name or "").strip() or deal_name(company, lines, close_on),
         company_id=company.id,
         contact_id=contact.id if contact else None,
         stage_code=stage.code,
-        probability=body.probability if body.probability is not None else stage.probability,
+        probability=body.probability if body.probability is not None else likely(db, owner.id, stage, date.fromisoformat(today(settings.org_timezone)))[0],
         forecast_category=body.forecast_category or stage.forecast_category,
         value_centavos=value if lines else (body.value_centavos or 0),
-        expected_close_on=body.expected_close_on.isoformat(),
+        expected_close_on=close_on,
         # Not given: the customer's own (how they first came to us).
         lead_source=check_source(db, body.lead_source) if "lead_source" in body.model_fields_set else company.lead_source,
+        priority=body.priority,
         price_type=body.price_type if lines else None,
         lines=lines,
         notes=body.notes,
@@ -447,7 +587,7 @@ def update_deal(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, de
         # A deal entering a stage takes its probability and forecast category,
         # unless they were given with the move.
         if stage.code != deal.stage_code:
-            wanted.setdefault("probability", stage.probability)
+            wanted.setdefault("probability", likely(db, deal.owner_id, stage, date.fromisoformat(today(settings.org_timezone)))[0])
             wanted.setdefault("forecast_category", stage.forecast_category)
     for key in ("probability", "forecast_category"):
         if key in wanted and wanted[key] is None:
@@ -461,9 +601,10 @@ def update_deal(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, de
     if "lead_source" in wanted:
         check_source(db, wanted["lead_source"])
     if "lines" in wanted or "price_type" in wanted:
-        lines_in = body.lines if "lines" in wanted else [LineIn(product_id=l["productId"], quantity=l["quantity"]) for l in deal.lines]
+        kept = "lines" not in wanted
+        lines_in = body.lines if not kept else [LineIn(product_id=l["productId"], quantity=l["quantity"], promo_id=l.get("promoId")) for l in deal.lines]
         price_type = wanted.get("price_type", deal.price_type)
-        lines, value = priced(db, settings, deal.company, price_type, lines_in or [])
+        lines, value = priced(db, settings, deal.company, price_type, lines_in or [], kept_promos=kept)
         wanted["lines"], wanted["price_type"] = lines, (price_type if lines else None)
         if lines:
             wanted["value_centavos"] = value
@@ -590,8 +731,31 @@ def closing_window(on: date, which: str) -> tuple[str, str]:
     return month_start(on.year, first).isoformat(), month_start(on.year, first + 3).isoformat()
 
 
+# A range of days, both ends included: 2026-07-01..2026-10-15. At most this many days.
+LONGEST_RANGE = 3 * 366
+
+
+def range_label(first: date, last: date) -> str:
+    """1 Jul – 15 Oct 2026, or 1 Dec 2025 – 15 Jan 2026 across years."""
+    if first == last:
+        return f"{first.day} {first:%b %Y}"
+    left = f"{first.day} {first:%b}" if first.year == last.year else f"{first.day} {first:%b %Y}"
+    return f"{left} – {last.day} {last:%b %Y}"
+
+
 def period_bounds(period: str) -> tuple[str, str, str]:
-    """A month (2026-10) or a quarter (2026-Q4): its [start, end) and its label."""
+    """A month (2026-10), a quarter (2026-Q4) or a range of days
+    (2026-07-01..2026-10-15, both included): its [start, end) and its label."""
+    if m := re.fullmatch(r"(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})", period):
+        try:
+            first, last = date.fromisoformat(m[1]), date.fromisoformat(m[2])
+        except ValueError:
+            raise field_error("period", "Pick real dates.") from None
+        if last < first:
+            raise field_error("period", "The range ends before it starts.")
+        if (last - first).days > LONGEST_RANGE:
+            raise field_error("period", "Pick at most three years.")
+        return first.isoformat(), (last + timedelta(days=1)).isoformat(), range_label(first, last)
     if m := re.fullmatch(r"(\d{4})-(\d{2})", period):
         y, mo = int(m[1]), int(m[2])
         if 1 <= mo <= 12:
@@ -603,7 +767,7 @@ def period_bounds(period: str) -> tuple[str, str, str]:
         start = date(y, (q - 1) * 3 + 1, 1)
         end = date(y + (1 if q == 4 else 0), 1 if q == 4 else q * 3 + 1, 1)
         return start.isoformat(), end.isoformat(), f"Q{q} {y}"
-    raise field_error("period", "A period is a month like 2026-10 or a quarter like 2026-Q4.")
+    raise field_error("period", "A period is a month like 2026-10, a quarter like 2026-Q4, or days like 2026-07-01..2026-10-15.")
 
 
 def owner_filter(query: Select, access: Access, owner: str | None, team: str | None = None) -> Select:

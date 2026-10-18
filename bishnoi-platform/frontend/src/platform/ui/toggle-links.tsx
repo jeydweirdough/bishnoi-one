@@ -1,22 +1,31 @@
-import Link from "next/link";
+"use client";
 
-/** A segmented switch made of links, so the choice lives in the URL. */
+import { Segmented } from "antd";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+/**
+ * A switch between views, as Ant Design's segmented control. Each option is a
+ * real link, so the choice lives in the URL (and opens in a new tab if asked).
+ */
 export function ToggleLinks({ options, current }: { options: { href: string; label: string; value: string }[]; current: string }) {
+  const router = useRouter();
   return (
-    <div className="inline-flex rounded-[3px] border border-rule-strong bg-sheet p-0.5">
-      {options.map((o) => (
-        <Link
-          key={o.value}
-          href={o.href}
-          scroll={false} // a filter changes what's below it; the page shouldn't jump back to the top
-          aria-current={o.value === current ? "true" : undefined}
-          className={`rounded-[2px] px-3 py-1 text-meta ${
-            o.value === current ? "bg-hema-tint font-semibold text-hema" : "text-ink-2 hover:text-ink"
-          }`}
-        >
-          {o.label}
-        </Link>
-      ))}
-    </div>
+    <Segmented
+      value={current}
+      onChange={(v) => {
+        const o = options.find((x) => x.value === v);
+        // a filter changes what's below it; the page shouldn't jump back to the top
+        if (o) router.push(o.href, { scroll: false });
+      }}
+      options={options.map((o) => ({
+        value: o.value,
+        label: (
+          <Link href={o.href} scroll={false} aria-current={o.value === current ? "true" : undefined} className="block !text-inherit">
+            {o.label}
+          </Link>
+        ),
+      }))}
+    />
   );
 }

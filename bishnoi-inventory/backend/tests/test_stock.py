@@ -188,6 +188,14 @@ def test_low_and_expiring_stock_raise_alerts(ana, world):
     assert (totals["units"], totals["value"], totals["low"], totals["out"], totals["expiring"]) == (50, 30 * 18500 + 20 * 9500, 1, 1, 1)
 
 
+def test_the_home_page_has_twelve_months_of_movement(ana, world):
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 30}])
+    trend = ana.get("/inventory/dashboard")["trend"]
+    assert len(trend) == 12
+    assert trend[-1]["received"] == 30 and trend[-1]["issued"] == 0
+    assert all(t["received"] == 0 for t in trend[:-1])
+
+
 def test_the_reports_answer_and_export(ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 30}])
     for report in ana.get("/inventory/reports"):
@@ -207,3 +215,23 @@ def test_history_is_kept_so_products_with_stock_arent_deleted(ana, world):
     assert ana.c.patch(f"/inventory/products/{world['gloves']}", headers=ana.h, json={"trackBatches": True}).status_code == 409
     # A product nothing has happened to can go.
     assert ana.c.delete(f"/inventory/products/{world['pump']}", headers=ana.h).status_code == 204
+
+
+def test_transfers_show_as_routes_between_pinned_warehouses(ana, world):
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 30}])
+    ana.patch(f"/inventory/warehouses/{world['mnl']}", {"latitude": 14.5764, "longitude": 121.0851})
+    t = ana.post("/inventory/transfers", {"fromWarehouseId": world["mnl"], "toWarehouseId": world["ceb"], "lines": [{"productId": world["gloves"], "quantity": 5}], "request": True})
+    seen = ana.get("/inventory/transfers/map")
+    route = next(x for x in seen["transfers"] if x["id"] == t["id"])
+    assert route["fromPin"] == {"latitude": 14.5764, "longitude": 121.0851}
+    assert route["toPin"] is None  # Cebu has no pin yet: listed, but not drawn
+    assert route["firstItem"] == "Gloves M" and route["units"] == 5
+    assert {w["code"] for w in seen["warehouses"]} == {"MNL", "CEB"}
+
+
+def test_setup_counts_what_exists_in_order(ana, world):
+    before = ana.get("/inventory/setup")
+    assert (before["warehouses"], before["suppliers"], before["products"], before["stocked"], before["receipts"]) == (2, 1, 3, 0, 0)
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 30}])
+    after = ana.get("/inventory/setup")
+    assert (after["stocked"], after["receipts"]) == (1, 1)

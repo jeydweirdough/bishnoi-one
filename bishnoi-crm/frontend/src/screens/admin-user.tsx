@@ -1,5 +1,5 @@
 import { Particulars, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { can } from "@/src/platform/lib/access";
+import { USERS, can, canAny } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import type { AdminUserRow, AuditLog, UserOptions } from "@/src/platform/lib/types";
 import { describeAudit } from "../components/admin/audit-words";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Params }) {
 
 export default async function UserPage({ params }: { params: Params }) {
   const me = await getCompanyMe();
-  if (!can(me, "admin.users")) return <NoAccess what="managing users" />;
+  if (!canAny(me, USERS)) return <NoAccess what="managing users" />;
   const { id } = await params;
   const [user, options, history] = await Promise.all([
     load<AdminUserRow>(`/admin/users/${enc(id)}`),
@@ -69,9 +69,9 @@ export default async function UserPage({ params }: { params: Params }) {
 
           {history && (
             <Sheet className="px-5 pt-4 pb-4">
-              <SectionTitle icon="auditLog">What they did lately</SectionTitle>
+              <SectionTitle icon="auditLog">Recent activity</SectionTitle>
               {history.items.length === 0 ? (
-                <p className="mt-2 text-meta text-ink-3">Nothing recorded yet.</p>
+                <p className="mt-2 text-meta text-ink-3">No activity recorded.</p>
               ) : (
                 <ol className="mt-2 divide-y divide-rule">
                   {history.items.map((e) => (

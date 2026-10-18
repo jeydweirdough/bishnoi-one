@@ -29,7 +29,38 @@ def make_engine(url: str) -> Engine:
             cursor.close()
 
         return engine
-    return create_engine(url, pool_pre_ping=True)
+    engine = create_engine(url)
+    _ping_when_idle(engine)
+    return engine
+
+
+# A pooled connection is tested only when it has sat unused a while: the
+# database (Neon) may have dropped it while asleep. Testing it on every request
+# cost a round trip each time (about 0.1 s from this computer).
+IDLE_BEFORE_PING = 60  # seconds
+
+
+def _ping_when_idle(engine: Engine) -> None:
+    import time
+
+    from sqlalchemy import exc
+
+    @event.listens_for(engine, "checkin")
+    def _back(dbapi_connection, record) -> None:
+        record.info["back_at"] = time.monotonic()
+
+    @event.listens_for(engine, "checkout")
+    def _out(dbapi_connection, record, proxy) -> None:
+        back = record.info.get("back_at")
+        if back is None or time.monotonic() - back < IDLE_BEFORE_PING:
+            return
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+        except Exception as e:
+            # The pool drops this connection and hands out a fresh one.
+            raise exc.DisconnectionError() from e
 
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:

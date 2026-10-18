@@ -13,9 +13,9 @@ should reach what, and what is happening across all of it.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -41,11 +41,23 @@ STAFF_ROLES = ("admin", "member")  # admin: Platform Admin. member: Support.
 
 class User(Base):
     __tablename__ = "nbpl_users"
-    __table_args__ = (_one_of("role", STAFF_ROLES, "nbpl_user_role"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (_one_of("role", STAFF_ROLES, "nbpl_user_role"), Index("nbpl_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # Their name in parts, as they keep it on their profile; full_name is made
+    # from these (app/routers/profile.py), and is what everything else reads.
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), default="member")
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -78,9 +90,12 @@ UNIT_KINDS = ("department", "branch")
 
 class Company(Base):
     __tablename__ = "nbpl_companies"
-    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     name: Mapped[str] = mapped_column(String(120))
     slug: Mapped[str] = mapped_column(String(40), unique=True)
     status: Mapped[str] = mapped_column(String(16), default="active")
@@ -120,11 +135,15 @@ INTEGRATION_STATUSES = ("operational", "degraded", "down", "unknown")
 
 class Application(Base):
     __tablename__ = "nbpl_applications"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("status_override IS NULL OR status_override IN ('degraded', 'maintenance', 'outage')", name="nbpl_application_override"),
+        Index("nbpl_applications_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     # The app key the screens use (crm, inventory, platform...).
     key: Mapped[str] = mapped_column(String(40), unique=True)
     name: Mapped[str] = mapped_column(String(120))
@@ -132,7 +151,21 @@ class Application(Base):
     # Where people open it, and where the platform asks whether it is up.
     app_url: Mapped[str | None] = mapped_column(String(500), default=None)
     health_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    # Its API, which other applications call when they're linked to it.
+    api_url: Mapped[str | None] = mapped_column(String(500), default=None)
     version: Mapped[str | None] = mapped_column(String(40), default=None)
+    # The key it connects to the platform with (PLATFORM_APP_KEY on its server):
+    # only its hash is kept, and the last characters to tell keys apart.
+    connect_key_hash: Mapped[str | None] = mapped_column(String(64), default=None)
+    connect_key_hint: Mapped[str | None] = mapped_column(String(12), default=None)
+    # The key itself, encrypted (app/links.py), to deliver to the application's address again.
+    connect_key_sealed: Mapped[str | None] = mapped_column(Text, default=None)
+    connect_key_made_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When it last asked for its links: how the platform knows it's connected.
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The key it encrypts its own secrets with (each person's mailbox, its order
+    # links), given with its links: made once, kept encrypted, the same through new connect keys.
+    data_key: Mapped[str | None] = mapped_column(Text, default=None)
     # Retired applications stay for their history, out of the lists.
     is_active: Mapped[bool] = mapped_column(default=True)
     status_override: Mapped[str | None] = mapped_column(String(16), default=None)
@@ -174,6 +207,44 @@ class Integration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AppLink(Base):
+    """One application uses another (the CRM uses Inventory): the caller is
+    given the other's address and a key, the other accepts that key. The key
+    is kept encrypted (app/links.py); switching the link off takes it from both."""
+
+    __tablename__ = "nbpl_app_links"
+    __table_args__ = (UniqueConstraint("from_app_id", "to_app_id", name="nbpl_app_link_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    from_app_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    to_app_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    is_on: Mapped[bool] = mapped_column(default=True)
+    secret: Mapped[str] = mapped_column(Text)
+    made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ServiceConnection(Base):
+    """A company's details for an outside service (Zoho Books, Gmail...): which
+    ones and what they need are in app/services.py. The secret ones are one
+    encrypted JSON object; the applications that use the service are given them."""
+
+    __tablename__ = "nbpl_service_connections"
+    __table_args__ = (UniqueConstraint("company_id", "service", name="nbpl_service_connection_once"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    service: Mapped[str] = mapped_column(String(40))
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    secrets: Mapped[str | None] = mapped_column(Text, default=None)
+    is_enabled: Mapped[bool] = mapped_column(default=False)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    check_ok: Mapped[bool | None] = mapped_column(default=None)
+    check_message: Mapped[str | None] = mapped_column(String(300), default=None)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_users.id", ondelete="SET NULL"), default=None)
+
+
 class CompanyApp(Base):
     """A company may use an application."""
 
@@ -184,6 +255,25 @@ class CompanyApp(Base):
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class CompanyPass(Base):
+    """A company pass the platform gave an application: asked for (every hour)
+    or sent to it when the company changed (app/company_push.py)."""
+
+    __tablename__ = "nbpl_company_passes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # None once the company is deleted; the slug says who it was.
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="SET NULL"), index=True, default=None)
+    company_slug: Mapped[str] = mapped_column(String(40))
+    application_id: Mapped[str] = mapped_column(ForeignKey("nbpl_applications.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    granted: Mapped[bool] = mapped_column(default=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    how: Mapped[str] = mapped_column(String(10))  # asked | pushed
+    answer: Mapped[str | None] = mapped_column(String(80), default=None)  # pushed: taken, or what went wrong
+
+
 # ---- Platform users and their access -------------------------------------------
 
 IDENTITY_STATUSES = ("active", "suspended")
@@ -191,15 +281,25 @@ REQUEST_STATUSES = ("pending", "approved", "declined")
 
 
 class Identity(Base):
-    """A person on the platform: one account, whichever applications it reaches."""
+    """A person at a company: their standing there (title, whether they run it,
+    the applications they have). Someone who works for two companies has a row
+    at each, under the same email, and one password for both: they sign in
+    once and switch between them (app/routers/identity.py)."""
 
     __tablename__ = "nbpl_identities"
-    __table_args__ = (_one_of("status", IDENTITY_STATUSES, "nbpl_identity_status"),)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (
+        _one_of("status", IDENTITY_STATUSES, "nbpl_identity_status"),
+        UniqueConstraint("company_id", "email", name="nbpl_identity_email"),
+        Index("nbpl_identities_no", "no", unique=True),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="RESTRICT"), index=True)
     full_name: Mapped[str] = mapped_column(String(120))
-    email: Mapped[str] = mapped_column(String(254), unique=True)
+    email: Mapped[str] = mapped_column(String(254), index=True)
     title: Mapped[str | None] = mapped_column(String(120), default=None)
     # Runs their own company: its people, its application access, its settings.
     is_company_admin: Mapped[bool] = mapped_column(default=False)
@@ -478,3 +578,9 @@ class PlatformSetting(Base):
     value: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_by: Mapped[str | None] = mapped_column(String(254), default=None)
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Identity, Company, Application)

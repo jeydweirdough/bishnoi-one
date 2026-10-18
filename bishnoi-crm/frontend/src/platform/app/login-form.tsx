@@ -1,112 +1,245 @@
 "use client";
 
-import { useActionState, useRef, useState, type ReactNode } from "react";
-import { signIn, type SignInState } from "../actions/session";
-import { Button } from "../ui/button";
-import { Field, FormError, Input } from "../ui/field";
+import { Eye, EyeOff } from "lucide-react";
+import { useActionState, useId, useRef, useState } from "react";
+import { checkCompany, checkPassword, signIn, type SignInState } from "../actions/session";
+import { SignInProgress } from "../screens/sign-in-progress";
 
 /** `group` heads a run of accounts, so a long list stays scannable. */
 export type Demo = { email: string; who: string; role: string; group: string };
 
+// The sign-in form's own look (src/components/sign-in/showcase.tsx has the
+// picture beside it): rounded fields with a grey outline, a black button.
+const FIELD =
+  "block h-12 w-full rounded-lg border border-[#8a8a8a] bg-white px-4 text-sm text-[#141414] placeholder:text-[#7a7a7a] transition-colors focus:border-[#141414] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a8d69b] aria-[invalid=true]:border-danger";
+
 /**
- * The sign-in screen: this app's demo accounts on the left (development only),
- * the sign-in card on the right. Picking a demo account fills the form. On a
- * narrow screen the card comes first and the accounts follow it.
+ * Company, work email and password, then Sign in. The company is filled in
+ * from the last sign-in on this browser. In development, the demo accounts
+ * sit under the form, closed, and picking one fills it.
  */
 export function LoginForm({
   next,
+  company,
   demo,
   demoPassword,
-  children,
+  bishnoiAccount,
 }: {
   next: string;
+  /** The company last signed in to on this browser. */
+  company: string;
   demo: Demo[];
   demoPassword: string | null;
-  children: ReactNode;
+  /** Where "Sign in with your Bishnoi One account" goes; null when the platform isn't set up. */
+  bishnoiAccount: string | null;
 }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
-  const email = useRef<HTMLInputElement>(null);
   const password = useRef<HTMLInputElement>(null);
+  const ids = { company: useId(), email: useId(), password: useId(), hint: useId(), forgot: useId() };
+  const [companyValue, setCompanyValue] = useState(state?.company ?? company);
+  const [emailValue, setEmailValue] = useState(state?.email ?? "");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [shown, setShown] = useState(false);
+  const [forgot, setForgot] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
+  // Signing in, a step at a time, on a screen of its own; back here, with why, if a step fails.
+  // Signed in (the credentials checked on the form): then the loading screen, a step at a time.
+  const [signing, setSigning] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const error = failed ?? state?.error;
 
   function fillDemo(address: string) {
     setPicked(address);
-    if (email.current) email.current.value = address;
-    if (password.current && demoPassword) password.current.value = demoPassword;
+    setEmailValue(address);
+    if (demoPassword) setPasswordValue(demoPassword);
     password.current?.focus();
   }
 
-  const card = (
-    <div className="rounded-[3px] bg-sheet px-6 pt-6 pb-7 shadow-sheet sm:px-8">
-      {children}
-      <form action={action} className="mt-6 space-y-5" noValidate>
-        <input type="hidden" name="next" value={next} />
-        <Field label="Work email">
-          {(p) => (
-            <Input
-              {...p}
-              ref={email}
-              name="email"
-              type="email"
-              autoComplete="username"
-              inputMode="email"
-              defaultValue={state?.email}
-              required
-              autoFocus
-            />
-          )}
-        </Field>
-        <Field label="Password">
-          {(p) => <Input {...p} ref={password} name="password" type="password" autoComplete="current-password" required />}
-        </Field>
-        <FormError message={state?.error} />
-        <Button type="submit" variant="primary" loading={pending} className="w-full">
-          {pending ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
-    </div>
-  );
-
-  if (demo.length === 0) return <div className="w-full max-w-[25rem]">{card}</div>;
-
   return (
-    <div className="grid w-full max-w-[56rem] gap-6 md:grid-cols-[minmax(0,1fr)_25rem] md:items-start">
-      <div className="md:order-2">{card}</div>
-      <aside aria-labelledby="demo-accounts" className="rounded-[3px] border border-rule px-5 py-5 text-meta md:order-1 md:max-h-[calc(100dvh-5rem)] md:overflow-y-auto">
-        <h2 id="demo-accounts" className="font-semibold text-ink-2">
-          Demo accounts
-        </h2>
-        <p className="mt-1 text-ink-3">
-          Pick one to fill the form{demoPassword ? <>. Password <span className="font-medium text-ink-2">{demoPassword}</span></> : null}.
-        </p>
-        <div className="mt-2">
-          {groups(demo).map(([group, people]) => (
-            <section key={group} className="mt-4 first:mt-3">
-              <h3 className="text-caps text-ink-3 uppercase">{group}</h3>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {people.map((d) => (
-                  <li key={d.email}>
-                    <button
-                      type="button"
-                      onClick={() => fillDemo(d.email)}
-                      title={`${d.role} — ${d.email}`}
-                      aria-pressed={picked === d.email}
-                      className={`rounded-full border px-3 py-1 transition-colors ${
-                        picked === d.email
-                          ? "border-hema bg-hema-tint text-hema"
-                          : "border-rule-strong bg-sheet text-ink hover:border-hema hover:text-hema"
-                      }`}
-                    >
-                      <span className="font-medium">{d.who}</span>
-                      <span className="text-ink-3"> · {shortRole(d.role)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+    <div className="w-full">
+      {signing && (
+        <SignInProgress
+          next={next}
+          onBack={(why) => {
+            setSigning(false);
+            setFailed(why);
+          }}
+        />
+      )}
+      {/* Without scripts, the form posts as before (signIn); with them, the steps are shown. */}
+      <form
+        action={action}
+        className="space-y-3"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setFailed(null);
+          if (!emailValue.trim() || !passwordValue) return setFailed("Enter your email and password.");
+          // The credentials are checked here, on the form: a wrong one is said
+          // beside the fields. The loading screen opens only once they're right.
+          setChecking(true);
+          (async () => {
+            const unanswered = "Bishnoi One didn't answer. Check your connection, and try again.";
+            const found = await checkCompany(companyValue.trim()).catch(() => ({ ok: false as const, error: unanswered }));
+            if (!found.ok) return setFailed(found.error);
+            const right = await checkPassword(companyValue.trim(), emailValue.trim(), passwordValue).catch(() => ({ ok: false as const, error: unanswered }));
+            if (!right.ok) return setFailed(right.error);
+            setSigning(true);
+          })().finally(() => setChecking(false));
+        }}
+      >
+        <input type="hidden" name="next" value={next} />
+        <div>
+          <label htmlFor={ids.company} className="sr-only">
+            Company
+          </label>
+          <input
+            id={ids.company}
+            name="company"
+            className={FIELD}
+            placeholder="Company, e.g. getmeds"
+            autoComplete="organization"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={companyValue}
+            onChange={(e) => setCompanyValue(e.target.value)}
+            aria-describedby={ids.hint}
+            required
+            autoFocus={!companyValue}
+          />
+          <p id={ids.hint} className="mt-1.5 px-6 text-meta text-[#6a6a6a]">
+            Your company&apos;s short name on Bishnoi One.
+          </p>
         </div>
-      </aside>
+        <div>
+          <label htmlFor={ids.email} className="sr-only">
+            Work email
+          </label>
+          <input
+            id={ids.email}
+            name="email"
+            type="email"
+            className={FIELD}
+            placeholder="Work email"
+            autoComplete="username"
+            inputMode="email"
+            value={emailValue}
+            onChange={(e) => setEmailValue(e.target.value)}
+            required
+            autoFocus={!!companyValue}
+          />
+        </div>
+        <div className="relative">
+          <label htmlFor={ids.password} className="sr-only">
+            Password
+          </label>
+          <input
+            id={ids.password}
+            ref={password}
+            name="password"
+            type={shown ? "text" : "password"}
+            className={`${FIELD} pr-14`}
+            placeholder="Password"
+            autoComplete="current-password"
+            value={passwordValue}
+            onChange={(e) => setPasswordValue(e.target.value)}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShown((s) => !s)}
+            aria-label={shown ? "Hide password" : "Show password"}
+            aria-pressed={shown}
+            className="absolute top-1/2 right-4 -translate-y-1/2 rounded-md p-1.5 text-[#6a6a6a] hover:text-[#141414] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:outline-none"
+          >
+            {shown ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
+          </button>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setForgot((f) => !f)}
+            aria-expanded={forgot}
+            aria-controls={ids.forgot}
+            className="text-meta font-medium text-[#141414] hover:underline focus-visible:underline focus-visible:outline-none"
+          >
+            Forgot password?
+          </button>
+        </div>
+        {forgot && (
+          <p id={ids.forgot} className="rounded-lg bg-[#f1f7ee] px-5 py-2.5 text-meta text-[#3b3b3b]">
+            Passwords are reset by your administrator. Ask them for a new one, then change it from your account page.
+          </p>
+        )}
+
+        {error && (
+          <p role="alert" className="rounded-lg bg-danger-tint px-5 py-2.5 text-sm text-danger">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={pending || checking || signing}
+          className="mt-2 flex h-12 w-full items-center justify-center rounded-lg bg-[#141414] text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-70"
+        >
+          {pending || checking || signing ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+
+      {bishnoiAccount && (
+        <div className="mt-8">
+          <p className="flex items-center gap-4 text-sm text-[#3b3b3b]">
+            <span className="h-px flex-1 bg-[#d6d6d6]" aria-hidden />
+            or continue with
+            <span className="h-px flex-1 bg-[#d6d6d6]" aria-hidden />
+          </p>
+          <div className="mt-5 flex justify-center">
+            <a
+              href={bishnoiAccount}
+              className="group flex items-center gap-3 rounded-lg bg-[#141414] py-2 pr-5 pl-2 text-sm font-medium text-white transition-colors hover:bg-[#2b2b2b] focus-visible:ring-2 focus-visible:ring-[#a8d69b] focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 rounded-full bg-white p-0.5" />
+              Sign in with Bishnoi One
+            </a>
+          </div>
+        </div>
+      )}
+
+      {demo.length > 0 && (
+        <details className="mt-8 rounded-xl border border-[#e2e2e2] px-5 py-3 text-meta">
+          <summary className="cursor-pointer font-medium text-[#3b3b3b]">
+            Demo accounts (this computer only){demoPassword ? ` · password ${demoPassword}` : ""}
+          </summary>
+          <div className="mt-2 max-h-64 overflow-y-auto">
+            {groups(demo).map(([group, people]) => (
+              <section key={group} className="mt-3">
+                <h3 className="text-caps text-[#6a6a6a] uppercase">{group}</h3>
+                <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                  {people.map((d) => (
+                    <li key={d.email}>
+                      <button
+                        type="button"
+                        onClick={() => fillDemo(d.email)}
+                        title={`${d.role} — ${d.email}`}
+                        aria-pressed={picked === d.email}
+                        className={`rounded-md border px-3 py-1 transition-colors ${
+                          picked === d.email ? "border-[#5e8f52] bg-[#f1f7ee] text-[#141414]" : "border-[#cfcfcf] bg-white text-[#141414] hover:border-[#5e8f52]"
+                        }`}
+                      >
+                        <span className="font-medium">{d.who}</span>
+                        <span className="text-[#6a6a6a]"> · {shortRole(d.role)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

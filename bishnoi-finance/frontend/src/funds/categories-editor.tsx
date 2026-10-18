@@ -43,7 +43,7 @@ export function CategoriesEditor({ categories, accounts, canEdit }: { categories
                 <p className="flex items-center gap-1 text-sm font-semibold">
                   {top.name}
                   {canEdit && (
-                    <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Change ${top.name}`} onClick={() => setEditing({ category: top, parentId: null })}>
+                    <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Edit ${top.name}`} onClick={() => setEditing({ category: top, parentId: null })}>
                       <Pencil className="size-3.5" aria-hidden />
                     </Button>
                   )}
@@ -63,7 +63,7 @@ export function CategoriesEditor({ categories, accounts, canEdit }: { categories
                       {sub.name}
                       {!sub.isActive && <span className="text-meta">(inactive)</span>}
                       {canEdit && (
-                        <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Change ${sub.name}`} onClick={() => setEditing({ category: sub, parentId: top.id })}>
+                        <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Edit ${sub.name}`} onClick={() => setEditing({ category: sub, parentId: top.id })}>
                           <Pencil className="size-3.5" aria-hidden />
                         </Button>
                       )}

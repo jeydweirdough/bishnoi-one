@@ -6,7 +6,7 @@ export const can = (me: Me, permission: string): boolean => me.permissions?.incl
 /** Who's who: users, their roles, their teams. One place, three tabs. */
 export const PEOPLE_TABS = [
   { href: "/admin/users", label: "Users", permission: "admin.users" },
-  { href: "/admin/roles", label: "Roles & permissions", permission: "admin.roles" },
+  { href: "/admin/roles", label: "Roles and permissions", permission: "admin.roles" },
   { href: "/admin/teams", label: "Teams", permission: "admin.teams" },
 ] as const;
 
@@ -19,7 +19,7 @@ export function adminPagesFor(me: Me): AdminPage[] {
   const pages: AdminPage[] = [];
   const people = peopleTabsFor(me);
   // It opens on the first tab this person may see.
-  if (people.length) pages.push({ href: people[0].href, label: "People & access", icon: "people", also: PEOPLE_TABS.map((t) => t.href) });
+  if (people.length) pages.push({ href: people[0].href, label: "People and access", icon: "people", also: PEOPLE_TABS.map((t) => t.href) });
   if (can(me, "admin.settings") || can(me, "admin.types")) {
     pages.push({ href: can(me, "admin.settings") ? "/admin/settings" : "/admin/settings/customer-types", label: "Settings", icon: "settings", also: ["/admin/settings"] });
   }

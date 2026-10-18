@@ -54,7 +54,7 @@ def app(tmp_path, fake):
         db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role_id=role_id(db, "Administrator")))
         db.commit()
     yield app
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()
 
 
 @pytest.fixture

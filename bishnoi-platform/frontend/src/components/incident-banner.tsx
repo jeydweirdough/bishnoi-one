@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/src/platform/lib/api";
+import { getFrame } from "@/src/platform/lib/api";
 import type { Incident } from "../lib/types";
 import { INCIDENT_STATUSES } from "../lib/words";
 
@@ -8,9 +8,9 @@ import { INCIDENT_STATUSES } from "../lib/words";
 // when the API can't be asked: the page below says why on its own.
 
 export async function IncidentBanner() {
-  const incidents = await api
-    .get<{ incidents: Incident[] }>("/platform/banner")
-    .then((b) => b.incidents)
+  // Part of the page's one frame request (GET /platform/frame).
+  const incidents = await getFrame()
+    .then((f) => f.banner.incidents as Incident[])
     .catch(() => []);
   if (incidents.length === 0) return null;
   return (
@@ -19,7 +19,7 @@ export async function IncidentBanner() {
         <Link
           key={i.id}
           href={`/incidents/${i.id}`}
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[3px] border border-danger/40 bg-danger-tint px-4 py-2.5 text-sm hover:border-danger"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[18px] border border-danger/40 bg-danger-tint px-4 py-2.5 text-sm hover:border-danger"
         >
           <span className="inline-flex items-center gap-2 font-semibold text-danger">
             <span aria-hidden className="size-2 animate-pulse rounded-full bg-danger" />

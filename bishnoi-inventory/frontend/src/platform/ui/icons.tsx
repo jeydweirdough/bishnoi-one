@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Handshake,
   Activity,
   ArrowUpRight,
   BadgePercent,
@@ -53,6 +54,7 @@ import {
   UsersRound,
   Mail,
   SquareCheckBig,
+  type LucideIcon,
   Bell,
   ArrowLeftRight,
   SlidersHorizontal,
@@ -62,7 +64,15 @@ import {
   PackageCheck,
   ShoppingBag,
   ChartColumn,
-  type LucideIcon,
+  PackageX,
+  ScanBarcode,
+  Lock,
+  Map as MapGlyph,
+  Tag,
+  Ruler,
+  PackageOpen,
+  Image as ImageGlyph,
+  Info as InfoGlyph,
 } from "lucide-react";
 
 // Every icon in the app, by what it means. One library (Lucide) at one stroke,
@@ -94,6 +104,7 @@ export const ICONS = {
   lists: ListChecks, // the company's own words for its records
   retention: Repeat,
   goals: Target,
+  deals: Handshake,
   company: Building,
   apps: LayoutGrid, // the other applications this company reaches from Bishnoi One
   companies: Globe, // every company on the platform, for a Developer Admin
@@ -149,6 +160,19 @@ export const ICONS = {
   receiving: PackageCheck,
   issuance: ShoppingBag,
   report: ChartColumn,
+  backorders: PackageX,
+  batches: CalendarClock,
+  serials: ScanBarcode,
+  reservations: Lock,
+  transferMap: MapGlyph,
+  counts: ClipboardCheck,
+  categories: Tags,
+  brands: Tag,
+  units: Ruler,
+  distribution: Truck,
+  toIssue: PackageOpen,
+  picture: ImageGlyph,
+  info: InfoGlyph,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

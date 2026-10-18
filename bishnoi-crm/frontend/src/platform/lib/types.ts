@@ -48,6 +48,14 @@ export type Org = {
   timezone: string;
   /** Decimal places the currency keeps: two for pesos, none for yen. Two when the API doesn't say. */
   minorUnits?: number;
+  /** The company's own words (Settings → Terms; src/components/terms). */
+  terms?: {
+    visited: { one: string; many: string };
+    visitedType: string | null;
+    detailing: string;
+    site: string;
+    genericName: string;
+  };
 };
 
 /** One company as the switcher lists it. `isMine` is false for a company a
@@ -132,6 +140,8 @@ export type Me = {
    *  every permission the role gives, as "area.action". */
   role?: { id: string; name: string; scope: Scope };
   team?: { id: string; name: string } | null;
+  /** The other teams they're in, beside the main one (the CRM's). */
+  otherTeams?: { id: string; name: string }[];
   permissions?: string[];
   // The company's own words for its customers, its activities and how a call went.
   // Only the switched-on ones: a record holding a switched-off code falls back to the code.
@@ -396,11 +406,12 @@ export type PromoTerms = {
   freeQty: number | null;
   tiers: PromoTier[];
   productIds: string[] | null; // null: every product
+  /** Its last day (YYYY-MM-DD), for the tag's "3 days left". null: no end set. */
+  endsOn: string | null;
 };
 
 export type Promo = PromoTerms & {
   startsOn: string;
-  endsOn: string | null;
   divisionCodes: string[];
   isActive: boolean;
   state: "running" | "upcoming" | "ended" | "off";
@@ -416,6 +427,8 @@ export type Product = {
   unit: string;
   /** For VAT, as Finance's tax pack names it (the price rules' tax step). */
   vatCategory?: "standard" | "zero_rated" | "exempt";
+  /** Rx: sold only on a prescription. */
+  needsPrescription?: boolean;
   isActive: boolean;
   /** Its code, name, unit, state and SRP are Bishnoi One Inventory's, changed there. */
   fromInventory?: boolean;
@@ -475,10 +488,10 @@ export type PriceList = {
   products: Omit<Product, "isActive" | "updatedAt">[];
   promos: PromoTerms[];
   /** Picked instead of a product, not on top of one. */
-  bundles: Pick<Bundle, "id" | "code" | "name" | "priceCentavos" | "asOneLine" | "items">[];
+  bundles: Pick<Bundle, "id" | "code" | "name" | "priceCentavos" | "asOneLine" | "items" | "endsOn">[];
 };
 
-export type ApprovalReason = "price" | "discount";
+export type ApprovalReason = "price" | "discount" | "asked" | "margin" | "s2_license";
 
 export type QuoteLine = {
   productId: string;
@@ -552,6 +565,10 @@ export type Quote = {
   priceType: string;
   priceTypeName: string;
   rx: boolean;
+  /** Attached by the customer on an order link, for Rx medicines: opened at /quotes/{id}/prescriptions/{n}. */
+  prescriptions?: { n: number; name: string; contentType: string; size: number }[];
+  /** Other documents the order link asked for (a valid ID...): opened at /quotes/{id}/documents/{n}. */
+  documents?: { n: number; label: string | null; name: string; contentType: string; size: number }[];
   payer: string;
   payerName: string | null;
   notes: string | null;
@@ -569,6 +586,8 @@ export type Quote = {
     note: string | null;
     by: Person | null;
     at: string | null;
+    /** Who it waits on, while pending: the team's approvers, else its manager, else whoever reaches every team. */
+    approvers: { id: string; name: string; role: string; isMe?: boolean }[];
   };
   letter: {
     number: string;
@@ -655,6 +674,8 @@ export type QuotePreview = {
   tax?: QuoteTax;
   /** Why there's no tax yet (Finance couldn't be asked): saving waits for it. */
   taxError?: string;
+  /** Products whose CLIDP has run out, or isn't on file where the division needs one. */
+  clidpWarnings?: string[];
 };
 
 export type FinanceTask = "approvals" | "letters" | "payments";
@@ -845,15 +866,19 @@ export type AppModule = RolesPayload["modules"][number];
 // --- Administration (the CRM's own users, roles, teams and audit log) -------------
 
 /** Whose records a role's permissions reach. */
-export type Scope = "own" | "team" | "all";
+export type Scope = "own" | "team" | "managed" | "all";
 
 export type AdminUserRow = {
   id: string;
   email: string;
   fullName: string;
+  employeeId: string | null;
   isActive: boolean;
   role: { id: string; name: string; scope: Scope };
+  /** Their main team: what they make goes there. */
   team: { id: string; name: string } | null;
+  /** The other teams they're in; their reach covers these too. */
+  otherTeams: { id: string; name: string }[];
   createdAt: string;
   lastSignInAt: string | null;
 };
@@ -887,7 +912,16 @@ export type UserOptions = {
   teams: { id: string; name: string; isActive: boolean }[];
 };
 
-export type TeamRow = { id: string; name: string; description: string | null; headquarters: string[]; isActive: boolean; memberCount: number };
+export type TeamRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  headquarters: string[];
+  isActive: boolean;
+  memberCount: number;
+  /** The manager over it (above its team lead). */
+  manager: { id: string; name: string } | null;
+};
 
 export type AuditItem = {
   id: number;
@@ -910,11 +944,23 @@ export type CompanyStatus = string;
 
 export type CustomerTypeColor = "gray" | "brand" | "green" | "blue" | "amber" | "red" | "purple" | "muted";
 
-export type CustomerType = { code: string; name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean; companies: number };
+export type CustomerType = {
+  code: string;
+  name: string;
+  color: CustomerTypeColor;
+  sortOrder: number;
+  isActive: boolean;
+  companies: number;
+  /** Which teams are offered it: only these, or everyone but these (both empty: everyone). */
+  onlyTeams?: string[];
+  exceptTeams?: string[];
+};
 export type Can = { edit: boolean; delete: boolean };
 
 export type CompanyRow = {
   id: string;
+  /** The customer's code (CUS-000001): given by the system, never changed. */
+  code: string | null;
   name: string;
   status: CompanyStatus;
   priceGroupCode?: string | null;
@@ -935,7 +981,14 @@ export type CompanyRow = {
   can: Can;
 };
 
+/** Another customer a customer field points at. */
+export type CustomerLink = { id: string; name: string; teamName: string | null; canOpen: boolean };
+
 export type CompanyDetail = CompanyRow & {
+  /** The customers its customer fields point at (its doctor's hospital), by field key. */
+  links: Record<string, CustomerLink>;
+  /** Customers in reach that point at this one (the doctors at a hospital). */
+  linkedHere: { id: string; name: string; status: string; field: string }[];
   address: string | null;
   notes: string | null;
   createdAt: string;
@@ -977,6 +1030,18 @@ export type ActivityItem = {
   isOverdue: boolean;
   durationMinutes: number | null;
   direction: "in" | "out" | null;
+  /** A planned call: what it's for, and the products to bring up. */
+  objective?: string | null;
+  /** Where a meeting (or an online call) happens: its Google Meet, Zoom or Teams link. */
+  meetingLink?: string | null;
+  products?: { code: string; name: string }[];
+  /** Once done: what came of it, and the products discussed. */
+  outcome?: string | null;
+  discussed?: { code: string; name: string }[];
+  /** More customers it's about than its own. */
+  alsoOn?: Ref[];
+  /** An email sent from the person's own email app: a screenshot of it sent is kept as proof. */
+  hasProof?: boolean;
   company: Ref | null;
   contact: Ref | null;
   owner: Ref;
@@ -991,7 +1056,12 @@ export type Assignable = { id: string; name: string; team: Ref | null; isMe: boo
 
 // --- the catalogue (Products, Promos, Bundles, Pricing rules) ---
 
-export type CatalogueProduct = Product & { can: { edit: boolean; delete: boolean } };
+export type CatalogueProduct = Product & {
+  /** propose: prices only, sent to Finance for approval (a manager's). */
+  can: { edit: boolean; delete: boolean; propose?: boolean };
+  /** For whoever sets or decides prices: each price type's approval, and what's waiting. */
+  priceApprovals?: Record<string, { status: "approved" | "pending" | "rejected"; amount: number; proposedAmount: number | null; rejectionReason: string | null }>;
+};
 
 export type SalesRules = {
   priceTypes: (PriceType & { rule: PriceRule; sortOrder: number })[];
@@ -1013,7 +1083,24 @@ export type BundleRow = Omit<Bundle, "divisionCodes" | "startsOn"> & { startsOn:
 
 export type CustomEntity = "product" | "company" | "contact" | "quote";
 /** Kinds an admin can add. Built-in fields also have their own (status, owner, company). */
-export type CustomFieldType = "text" | "long_text" | "number" | "money" | "date" | "choice" | "multi_choice" | "yes_no" | "email" | "phone" | "url";
+export type CustomFieldType =
+  | "text"
+  | "long_text"
+  | "number"
+  | "money"
+  | "date"
+  | "choice"
+  | "multi_choice"
+  | "yes_no"
+  | "email"
+  | "phone"
+  | "url"
+  /** Several of our products, kept as their codes; `options` are the ones it leaves out. */
+  | "products"
+  /** A generic name, offered from the catalogue's and free to type. */
+  | "molecule"
+  /** Another customer, kept as its id (a doctor's hospital); `options` are the types it may be. */
+  | "customer";
 
 /** One field on a form (Administration → Settings → Forms): built in, or added.
  *  An added field keeps its values in the record's `extra`, by `key`. */
@@ -1033,6 +1120,18 @@ export type FormFieldDef = {
   sharedList?: boolean;
   helpText: string | null;
   placeholder: string | null;
+  /** A short option's full name ("MED ONCO": "Medical oncology"): the short one is shown, either is searched. */
+  optionNames?: Record<string, string>;
+  /** No two records may have the same value in it. */
+  unique?: boolean;
+  /** Whose records it's on: only these teams', or everyone's but these (both empty: everyone's). */
+  onlyTeams?: string[];
+  exceptTeams?: string[];
+  /** Which customer types it's asked of: only these, or all but these (both empty: every type). */
+  onlyTypes?: string[];
+  exceptTypes?: string[];
+  /** A products or molecule field's choices, from the catalogue. */
+  picks?: { value: string; label: string; hint: string }[];
   /** Only in Settings: how many records have a value in it. */
   used?: number;
 };
@@ -1127,6 +1226,12 @@ export type DealLine = {
   quantity: number;
   unitPriceCentavos: number;
   totalCentavos: number;
+  /** The promo it's sold under, and what it takes off (since 14 October 2026; older lines have none). */
+  promoId?: string | null;
+  promoName?: string | null;
+  promoDiscountCentavos?: number;
+  freeQuantity?: number;
+  grossCentavos?: number;
 };
 
 export type DealRow = {
@@ -1142,7 +1247,9 @@ export type DealRow = {
   weightedCentavos: number;
   expectedCloseOn: string;
   leadSource: string | null;
+  priority: DealPriority | null;
   owner: { id: string; name: string } | null;
+  createdBy: { id: string; name: string } | null;
   closedAt: string | null;
   lostReason: string | null;
   competitor: string | null;
@@ -1155,11 +1262,34 @@ export type Deal = DealRow & {
   notes: string | null;
   priceType: string | null;
   lines: DealLine[];
+  /** Products whose CLIDP has run out, or isn't on file where the division needs one. */
+  clidpWarnings?: string[];
   wonQuoteId: string | null;
   quotes: { id: string; number: string; totalCentavos: number; approvalStatus: string; createdAt: string }[];
 };
 
-export type DealList = { items: DealRow[]; total: number; valueCentavos: number };
+export type DealPriority = "urgent" | "high" | "normal" | "low";
+
+/** In the deals table: the soonest meeting or task still to do with the deal's customer. */
+export type DealNextStep = { at: string; kind: "meeting" | "task"; subject: string } | null;
+
+export type DealList = { items: (DealRow & { nextStep: DealNextStep })[]; total: number; valueCentavos: number };
+
+/** The figures and charts above the deals table (/deals-summary). */
+export type DealSummary = {
+  state: "open" | "closed";
+  count: number;
+  valueCentavos: number;
+  weightedCentavos: number;
+  /** Open deals expected to close this month, weighted by probability. */
+  thisMonthCentavos: number;
+  wonCentavos: number;
+  wonCount: number;
+  lostCount: number;
+  byProbability: { label: string; count: number }[];
+  byStage: { code: string; name: string; outcome: "open" | "won" | "lost"; count: number; valueCentavos: number }[];
+  byPriority: { priority: DealPriority | null; count: number }[];
+};
 
 export type DealBoard = {
   columns: { stage: DealStage; count: number; valueCentavos: number; weightedCentavos: number; deals: DealRow[] }[];
@@ -1237,4 +1367,84 @@ export type DuplicatePairs = {
   kind: "company" | "contact";
   total: number;
   pairs: { score: number; reasons: string[]; a: DuplicateRecord; b: DuplicateRecord }[];
+};
+
+// --- KPI management (CRM) ---------------------------------------------------------------------
+
+export type KpiUnit = "count" | "money" | "percent";
+
+export type KpiDef = {
+  id: string;
+  /** Built-in KPIs have one (revenue_won, doctors_visited...). */
+  code: string | null;
+  name: string;
+  description: string | null;
+  /** One of the measures, or "manual" (entered by hand). */
+  measure: string;
+  measureLabel: string;
+  filters: Record<string, string>;
+  filterLabel: string | null;
+  unit: KpiUnit;
+  better: "higher" | "lower";
+  /** Empty: everyone. */
+  roles: { id: string; name: string }[];
+  greenAt: number;
+  amberAt: number;
+  isActive: boolean;
+  builtIn: boolean;
+  sortOrder: number;
+};
+
+export type KpiMeasure = { key: string; label: string; unit: KpiUnit; about: string; filter: "kind" | "outcome" | "productId" | null };
+
+export type KpiCatalogue = {
+  items: KpiDef[];
+  measures: KpiMeasure[];
+  filterChoices: Record<string, string[]>;
+  roles: { id: string; name: string }[];
+};
+
+export type KpiTargets = {
+  month: string;
+  kpis: KpiDef[];
+  people: {
+    person: { id: string; name: string };
+    team: { id: string; name: string } | null;
+    role: string;
+    roleId: string;
+    /** The KPIs that apply to them. */
+    applies: string[];
+    targets: Record<string, number>;
+    /** Results of manual KPIs, entered by hand. */
+    entries: Record<string, number>;
+  }[];
+  teams: { team: { id: string; name: string }; targets: Record<string, number> }[];
+};
+
+export type KpiStatus = "green" | "amber" | "red" | "none" | "waiting";
+
+export type KpiResult = {
+  actual: number | null;
+  target: number | null;
+  attainment: number | null;
+  /** What should be done by now: the target over the month so far (or the whole target). */
+  expected: number | null;
+  status: KpiStatus;
+  /** A team's: whether the target is its own, not its people's added up. */
+  ownTarget?: boolean;
+};
+
+export type KpiScorecard = {
+  month: string;
+  thisMonth: string;
+  elapsed: number;
+  view: "mine" | "team";
+  kpis: KpiDef[];
+  people: { person: { id: string; name: string }; team: { id: string; name: string } | null; results: Record<string, KpiResult> }[];
+  teams: { team: { id: string; name: string } | null; results: Record<string, KpiResult> }[];
+  totals: Record<string, KpiResult>;
+  /** The team view shows one role at a time: the roles there are, biggest first, and the one shown. */
+  roles: { id: string; name: string; people: number }[];
+  role: string | null;
+  canSetTargets: boolean;
 };

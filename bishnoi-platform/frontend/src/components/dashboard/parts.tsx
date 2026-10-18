@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HealthGauges } from "../health-gauges";
 import type { ReactNode } from "react";
 import { Flag } from "@/src/platform/ui/marks";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -25,10 +26,10 @@ export function Counts({ counts }: { counts: Dashboard["counts"] }) {
   const tiles: { label: string; value: number; note?: string; href: string; flag?: boolean }[] = [
     { label: "Companies", value: counts.activeCompanies, note: `active of ${counts.companies.toLocaleString("en-PH")}`, href: "/companies" },
     { label: "Users", value: counts.activeUsers, note: `active of ${counts.users.toLocaleString("en-PH")}`, href: "/users" },
-    { label: "Applications", value: counts.applications, note: "in use", href: "/applications" },
+    { label: "Applications", value: counts.applications, note: "active", href: "/applications" },
     { label: "Open issues", value: counts.openTickets, note: "tickets not yet resolved", href: "/support" },
     { label: "Incidents", value: counts.activeIncidents, note: "active now", href: "/incidents", flag: true },
-    { label: "Access requests", value: counts.pendingRequests, note: "waiting for a decision", href: "/access" },
+    { label: "Access requests", value: counts.pendingRequests, note: "pending decision", href: "/access" },
   ];
   return (
     <Sheet className="mb-5 overflow-hidden">
@@ -84,9 +85,9 @@ export function ActiveIncidents({ incidents }: { incidents: Dashboard["incidents
 }
 
 const OVERALL: Record<Dashboard["health"]["overall"], string> = {
-  operational: "Everything is running",
-  degraded: "Something is slow or partly down",
-  down: "Something is down",
+  operational: "All systems operational",
+  degraded: "Some services degraded",
+  down: "Service outage",
 };
 
 function HealthRow({ name, status, ms, note, href }: { name: string; status: Health; ms?: number | null; note?: string | null; href?: string }) {
@@ -124,6 +125,9 @@ export function SystemHealth({ health }: { health: Dashboard["health"] }) {
         <HealthMark status={health.overall} label={OVERALL[health.overall]} />
         <span className="text-meta text-ink-3">checked {ago(health.checkedAt)}</span>
       </p>
+      <div className="mt-4 mb-2">
+        <HealthGauges health={health} />
+      </div>
       <ul className="mt-1 divide-y divide-rule" role="list">
         <HealthRow
           name="Platform API"
@@ -138,12 +142,12 @@ export function SystemHealth({ health }: { health: Dashboard["health"] }) {
             name={a.name}
             status={a.status}
             ms={a.lastCheck?.ms}
-            note={a.statusNote ?? (a.monitored ? null : "Not monitored: it has no health address")}
+            note={a.statusNote ?? (a.monitored ? null : "Not monitored: no health check URL")}
             href={`/applications/${a.id}`}
           />
         ))}
       </ul>
-      {apps.length === 0 && <p className="py-2 text-meta text-ink-3">No applications registered yet. Add one on Applications to watch it here.</p>}
+      {apps.length === 0 && <p className="py-2 text-meta text-ink-3">No applications registered yet. Register one under Applications to monitor it here.</p>}
     </Sheet>
   );
 }
@@ -151,10 +155,10 @@ export function SystemHealth({ health }: { health: Dashboard["health"] }) {
 /** The Platform API's own traffic over the last hour. */
 export function Traffic({ traffic }: { traffic: Dashboard["traffic"] }) {
   const figures: [string, string][] = [
-    ["Requests a minute", traffic.requestsPerMinute.toLocaleString("en-PH")],
+    ["Requests per minute", traffic.requestsPerMinute.toLocaleString("en-PH")],
     ["Staff signed in", traffic.activeSessions.toLocaleString("en-PH")],
     ["Failed requests", `${traffic.failedPercent}%`],
-    ["Average answer", traffic.averageMs == null ? "—" : `${traffic.averageMs.toLocaleString("en-PH")} ms`],
+    ["Average response time", traffic.averageMs == null ? "—" : `${traffic.averageMs.toLocaleString("en-PH")} ms`],
   ];
   return (
     <Sheet className="px-5 pt-4 pb-4">
@@ -185,7 +189,7 @@ export function SupportSummary({ support, overdue }: { support: Dashboard["suppo
     { label: TICKET_KINDS.issue.many, value: support.issues, href: "/support?kind=issue" },
     { label: TICKET_KINDS.feature.many, value: support.features, href: "/support?kind=feature" },
     { label: TICKET_KINDS.support.many, value: support.support, href: "/support?kind=support" },
-    { label: "Nobody assigned", value: support.unassigned, href: "/support?assignee=none" },
+    { label: "Unassigned", value: support.unassigned, href: "/support?assignee=none" },
     { label: "Overdue", value: support.overdue, href: "/support", flag: true },
   ];
   return (
@@ -205,9 +209,9 @@ export function SupportSummary({ support, overdue }: { support: Dashboard["suppo
         ))}
       </ul>
 
-      <h3 className="mt-4 text-sm font-semibold text-ink">Past their response target</h3>
+      <h3 className="mt-4 text-sm font-semibold text-ink">Overdue tickets</h3>
       {overdue.length === 0 ? (
-        <p className="py-2 text-meta text-ink-3">Nothing overdue. Every open ticket is inside its response target (Settings, Notifications).</p>
+        <p className="py-2 text-meta text-ink-3">No overdue tickets. Every open ticket is within its response target (Settings, Notifications).</p>
       ) : (
         <ul className="divide-y divide-rule" role="list">
           {overdue.map((t) => {
@@ -238,7 +242,7 @@ export function Notices({ notices }: { notices: Dashboard["notices"] }) {
         Notices
       </SectionTitle>
       {sorted.length === 0 ? (
-        <Empty title="Nothing showing or coming up" icon="communications">
+        <Empty title="No active or scheduled notices" icon="communications">
           Announce maintenance or news on Communications, and the applications show it to their users.
         </Empty>
       ) : (

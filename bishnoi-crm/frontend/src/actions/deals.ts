@@ -3,27 +3,37 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { Deal, DealLists, DealStage, ForecastCategory, RevenueTargets } from "@/src/platform/lib/types";
+import type { DealPriority, Deal, DealLists, DealStage, ForecastCategory, RevenueTargets } from "@/src/platform/lib/types";
 
 // Deals: on a customer, through stages, won with a quote or lost with a reason.
 // The API decides whose deals someone reaches and what their role lets them
 // do; these carry the request and hand back what it said.
 
 export type DealInput = {
-  name: string;
+  /** Left out on a new deal: made from its products and customer. */
+  name?: string;
   companyId: string;
   contactId: string | null;
   stageCode: string | null;
   probability?: number | null;
   forecastCategory?: Exclude<ForecastCategory, "closed"> | null;
   valueCentavos: number | null;
-  expectedCloseOn: string;
-  leadSource: string | null;
+  /** Left out on a new deal: 30 days from today. */
+  expectedCloseOn?: string;
+  /** Left out: the customer's own. */
+  leadSource?: string | null;
+  priority?: DealPriority | null;
   priceType: string | null;
-  lines: { productId: string; quantity: number }[];
+  lines: { productId: string; quantity: number; promoId?: string | null }[];
   notes: string | null;
   ownerId: string | null;
 };
+
+/** How likely a deal is at this stage for this owner: the stage's own, adjusted by their record (the API's app/likely.py). */
+export async function howLikely(stage: string, owner: string | null): Promise<{ probability: number; why: string } | null> {
+  const q = new URLSearchParams({ stage, ...(owner ? { owner } : {}) });
+  return api.get<{ probability: number; why: string }>(`/deals/likely?${q}`).catch(() => null);
+}
 
 export async function createDeal(input: DealInput): Promise<Result<Deal>> {
   return attempt(() => api.post<Deal>("/deals", input));
@@ -35,6 +45,11 @@ export async function updateDeal(id: string, change: Partial<Omit<DealInput, "co
     refresh();
     return deal;
   });
+}
+
+/** A deal moved to another stage on the board. */
+export async function moveDealStage(id: string, stageCode: string): Promise<Result<Deal>> {
+  return updateDeal(id, { stageCode });
 }
 
 export async function winDeal(id: string, quoteId: string | null): Promise<Result<Deal>> {
@@ -103,4 +118,14 @@ export async function saveTargets(month: string, targets: { userId: string; amou
     refresh();
     return saved;
   });
+}
+
+// --- picking the customer for a new deal ---
+
+/** Customers in reach whose name (or city, or industry) matches, for the new-deal picker. */
+export async function findCustomers(q: string): Promise<{ id: string; name: string; city: string | null; email: string | null }[]> {
+  const found = await api.get<{ items: { id: string; name: string; city: string | null; email: string | null }[] }>(
+    `/companies?limit=20&sort=name${q.trim() ? `&q=${enc(q.trim())}` : ""}`,
+  );
+  return found.items.map((c) => ({ id: c.id, name: c.name, city: c.city, email: c.email ?? null }));
 }

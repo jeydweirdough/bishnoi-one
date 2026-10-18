@@ -10,6 +10,7 @@ import type {
   Brand,
   Category,
   Dispensing,
+  MaterialReviewDetail,
   Medicine,
   MedicineStatus,
   Movement,
@@ -264,4 +265,12 @@ export async function updateRole(id: string, change: Partial<RoleInput>): Promis
 
 export async function deleteRole(id: string): Promise<Result> {
   return attempt(async () => done(await api.del(`/admin/roles/${enc(id)}`)) ?? null);
+}
+
+// --- promotional material reviews ---
+
+export type MaterialDecision = { outcome: "approved" | "returned" | "rejected"; comments: string | null };
+
+export async function decideMaterial(id: string, input: MaterialDecision): Promise<Result<MaterialReviewDetail>> {
+  return attempt(async () => done(await api.post<MaterialReviewDetail>(`/material-reviews/${enc(id)}/decision`, input)));
 }

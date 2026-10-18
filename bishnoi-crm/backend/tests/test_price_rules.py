@@ -49,9 +49,10 @@ def test_a_price_groups_price_comes_first(client, ana, crew, ids):
 def test_the_admin_decides_which_price_wins(client, ana, crew, ids):
     add_group(client, ana)
     add_rule(client, ana, kind="group_price", name="Hospital Amoxil", productId=ids["AMX-500"], priceGroupCode="HOSP", amountCentavos=120000)
-    # Ria's team (North) has its own price too, set by Lia, its lead.
+    # Ria's team (North) has its own price too, set by Finance (here an Administrator, so it stands at once;
+    # a lead's waits for Finance: tests/test_price_approvals.py).
     north = next(t["id"] for t in client.get("/prices/teams", headers=crew["lia"]).json() if t["name"] == "North")
-    r = client.put(f"/prices?team={north}", json={"items": [{"productId": ids["AMX-500"], "priceTypeCode": "PATIENT", "amountCentavos": 110000}]}, headers=crew["lia"])
+    r = client.put(f"/prices?team={north}", json={"items": [{"productId": ids["AMX-500"], "priceTypeCode": "PATIENT", "amountCentavos": 110000}]}, headers=ana)
     assert r.status_code == 200, r.text
     hospital = company(client, crew["ria"], name="St. Luke's", priceGroupCode="HOSP")
 

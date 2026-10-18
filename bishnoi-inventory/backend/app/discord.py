@@ -571,16 +571,16 @@ def logs_for(code: str, settings) -> Logs:
 # ---- Hooks: what each app sends to its log ------------------------------------------------------
 
 
-def mirror_audit(sessions, model, logs: Logs) -> None:
+def mirror_audit(sessions, model, logs: Logs, company: str | None = None) -> None:
     """Sends every audit line (model: the app's audit table) to the log once its change is committed,
-    and never one whose change was rolled back."""
+    and never one whose change was rolled back. With several companies, each line says whose."""
     from sqlalchemy import event
 
     def after_flush(session, _context) -> None:
         for obj in session.new:
             if isinstance(obj, model):
                 session.info.setdefault("discord_lines", []).append(Line(
-                    action=obj.action, actor=obj.actor or "", target=obj.target or "", target_type=obj.target_type,
+                    action=obj.action, actor=f"{obj.actor or ''} ({company})" if company else obj.actor or "", target=obj.target or "", target_type=obj.target_type,
                     target_id=obj.target_id, fields=list(obj.fields or []),
                 ))
 

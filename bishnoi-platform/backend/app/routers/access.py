@@ -11,6 +11,7 @@ Also here: access requests (someone asks for an application; a Platform Admin
 decides), the staff who sign in to this console, and their sign-in sessions.
 """
 
+import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -18,11 +19,12 @@ from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api import Api, camel, changed, conflict, field_error, iso, not_found
+from app.api import Api, camel, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, Address, AdminUser, CurrentSession, CurrentUser
 from app.identity import ROLE_NAMES
 from app.models import AccessRequest, Application, Company, CompanyApp, Identity, IdentityApp, SignInSession, User
+from app.routers.profile import split_name
 
 router = APIRouter(prefix="/platform", tags=["access"])
 
@@ -60,8 +62,50 @@ class DecisionIn(Api):
 
 
 class StaffPatch(Api):
+    full_name: str | None = Field(None, min_length=1, max_length=120)
+    email: str | None = Field(None, max_length=254)
     role: str | None = Field(None, pattern="^(admin|member)$")
     is_active: bool | None = None
+
+
+class StaffIn(Api):
+    full_name: str = Field(min_length=1, max_length=120)
+    email: str = Field(max_length=254)
+    role: str = Field("member", pattern="^(admin|member)$")
+    # None: one is made, and shown once.
+    password: str | None = Field(None, max_length=256)
+
+
+class StaffPasswordIn(Api):
+    # None: one is made, and shown once.
+    password: str | None = Field(None, max_length=256)
+
+
+def _email(value: str) -> str:
+    try:
+        return check_email(value.strip())
+    except ValueError as e:
+        raise field_error("email", str(e)) from None
+
+
+def _email_taken(db: Session, email: str, but: str | None = None) -> bool:
+    found = db.scalar(select(User).where(func.lower(User.email) == email))
+    return found is not None and found.id != but
+
+
+def _other_admins(db: Session, u: User) -> int:
+    """Platform Admins still able to sign in, besides this one."""
+    return db.scalar(select(func.count()).select_from(User).where(User.role == "admin", User.is_active, User.id != u.id)) or 0
+
+
+def _password(given: str | None) -> tuple[str, bool]:
+    from app.security import check_password_rules
+
+    password = given or secrets.token_urlsafe(9)
+    problem = check_password_rules(password)
+    if problem:
+        raise field_error("password", problem)
+    return password, given is None
 
 
 def request_out(r: AccessRequest, person: Identity, app: Application, company: Company, company_has_app: bool) -> dict:
@@ -214,6 +258,7 @@ def application_access(db: DB, _: CurrentUser) -> dict:
 def staff_out(u: User, sessions: int = 0) -> dict:
     return {
         "id": u.id,
+        "no": u.no,
         "fullName": u.full_name,
         "email": u.email,
         "role": u.role,
@@ -263,22 +308,92 @@ def list_staff(db: DB, _: CurrentUser) -> dict:
     return {"staff": [staff_out(u, live.get(u.id, 0)) for u in db.scalars(select(User).order_by(User.full_name))]}
 
 
+@router.post("/staff", status_code=status.HTTP_201_CREATED)
+def create_staff(body: StaffIn, db: DB, me: AdminUser, address: Address) -> dict:
+    """A new staff account for this console. Its password is shown once, to hand over; they change it after."""
+    from app.security import hash_password
+
+    email = _email(body.email)
+    if _email_taken(db, email):
+        raise field_error("email", "There's already a staff account with this email.")
+    password, made = _password(body.password)
+    first, last = split_name(body.full_name.strip())
+    u = User(email=email, full_name=body.full_name.strip(), first_name=first or None, last_name=last or None, password_hash=hash_password(password), role=body.role)
+    db.add(u)
+    db.flush()
+    audit(db, me, "staff.created", category="security", target=u.email, target_type="staff", target_id=u.id, fields=["role"], address=address)
+    db.commit()
+    return {"staff": staff_out(u), "password": password if made else None}
+
+
 @router.patch("/staff/{staff_id}")
 def update_staff(staff_id: str, body: StaffPatch, db: DB, me: AdminUser, address: Address) -> dict:
     u = db.get(User, staff_id)
     if u is None:
         raise not_found("staff account")
+    if body.email is not None:
+        body.email = _email(body.email)
+        if _email_taken(db, body.email, but=u.id):
+            raise field_error("email", "There's already a staff account with this email.")
+    if body.full_name is not None:
+        body.full_name = body.full_name.strip()
     fields = {k: v for k, v in changed(body).items() if v is not None and getattr(u, k) != v}
-    if u.id == me.id and fields:
+    if u.id == me.id and ({"role", "is_active"} & fields.keys()):
         # So the platform can't be left with nobody to run it by one slip.
         raise HTTPException(status.HTTP_409_CONFLICT, "You can't change your own role or switch yourself off. Ask another Platform Admin.")
+    if u.role == "admin" and (fields.get("role") == "member" or fields.get("is_active") is False) and not _other_admins(db, u):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This is the last Platform Admin. Make someone else a Platform Admin first.")
     for name, value in fields.items():
         setattr(u, name, value)
+    if "full_name" in fields:
+        # Typed in one piece here: its parts follow (the person can tidy them on their profile).
+        u.first_name, u.last_name = split_name(u.full_name)
+        u.middle_initial = u.suffix = None
     if fields:
-        action = "staff.role_changed" if "role" in fields else f"staff.{'enabled' if u.is_active else 'disabled'}"
+        if "role" in fields:
+            action = "staff.role_changed"
+        elif "is_active" in fields:
+            action = f"staff.{'enabled' if u.is_active else 'disabled'}"
+        else:
+            action = "staff.updated"
         audit(db, me, action, category="security", target=u.email, target_type="staff", target_id=u.id, fields=camel(fields), address=address)
     db.commit()
     return {"staff": staff_out(u, _live_sessions(db).get(u.id, 0))}
+
+
+@router.post("/staff/{staff_id}/password")
+def reset_staff_password(staff_id: str, body: StaffPasswordIn, db: DB, me: AdminUser, address: Address) -> dict:
+    """A new password for someone else's staff account, shown once. Their sign-ins end.
+    Your own is changed under Account."""
+    from app.security import hash_password
+
+    u = db.get(User, staff_id)
+    if u is None:
+        raise not_found("staff account")
+    if u.id == me.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Change your own password under Account.")
+    password, made = _password(body.password)
+    u.password_hash, u.password_changed_at = hash_password(password), datetime.now(UTC)
+    audit(db, me, "staff.password_reset", category="security", target=u.email, target_type="staff", target_id=u.id, address=address)
+    db.commit()
+    return {"password": password if made else None}
+
+
+@router.delete("/staff/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_staff(staff_id: str, db: DB, me: AdminUser, address: Address) -> Response:
+    """Gone for good: their sign-ins end; tickets and incidents they had are kept, with nobody on them.
+    Switching off is the way to keep the account."""
+    u = db.get(User, staff_id)
+    if u is None:
+        raise not_found("staff account")
+    if u.id == me.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You can't delete your own account. Ask another Platform Admin.")
+    if u.role == "admin" and u.is_active and not _other_admins(db, u):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This is the last Platform Admin. Make someone else a Platform Admin first.")
+    audit(db, me, "staff.deleted", category="security", target=u.email, target_type="staff", target_id=u.id, address=address)
+    db.delete(u)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/sessions")
@@ -317,5 +432,18 @@ def end_session(session_id: str, db: DB, me: CurrentUser, address: Address) -> R
     owner = db.get(User, s.user_id)
     audit(db, me, "auth.session_ended", category="security", target=owner.email if owner else "", target_type="staff",
           target_id=s.user_id, address=address)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/access/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_request(request_id: str, db: DB, me: AdminUser) -> Response:
+    """A request logged by mistake, or no longer wanted: gone, decided or not."""
+    r = db.get(AccessRequest, request_id)
+    if r is None:
+        raise not_found("request")
+    person = db.get(Identity, r.identity_id)
+    audit(db, me, "access.request_deleted", target=person.email if person else "", target_type="user", target_id=r.identity_id, application_id=r.application_id)
+    db.delete(r)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

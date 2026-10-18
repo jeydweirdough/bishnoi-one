@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { Empty } from "@/src/platform/ui/sheet";
 import Link from "next/link";
 import { DeleteQuote } from "./delete-quote";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -13,13 +14,13 @@ export async function QuotesPanel({ customerHref, quotes, canAdd, showWho = fals
   return (
     <div>
       {quotes.length === 0 ? (
-        <p className="py-3 text-meta text-ink-3">No quotes yet.</p>
+        <Empty compact icon="quotes" title="No quotes yet">Quotes made for this customer show here.</Empty>
       ) : (
         <ul className="divide-y divide-rule">
           {quotes.map((q) => (
             <li key={q.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <Link href={`/quotes/${q.id}`} className="font-semibold text-hema hover:underline">
+                <Link href={`/quotes/${q.id}`} className="font-semibold text-ink hover:underline">
                   {q.number}
                 </Link>
                 <p className="text-meta text-ink-3">

@@ -1,11 +1,12 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { CellInput } from "@/src/platform/ui/field";
+import { CellInput, Select } from "@/src/platform/ui/field";
+import { QuantityInput } from "./quantity";
 import type { Format } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 import { QuickAdd, type Added } from "./quick-add";
@@ -19,31 +20,75 @@ type Outcome<T> = { ok: true; data: T } | Failure;
 /**
  * Saving a form: runs the action, keeps the API's words for what's wrong
  * (overall and per field), and on success says so and moves on.
+ * Uses Anticipation Method with rollback and shake animations on error.
  */
 export function useSave() {
   const router = useRouter();
+  // Sent here to make something another page needs first (?then=/receipts/new):
+  // once it's saved, back to that page. Only an address inside this app.
+  const then = useSearchParams().get("then");
+  const back = then && then.startsWith("/") && !then.startsWith("//") ? then : null;
   const [pending, start] = useTransition();
+  const [shaking, setShaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerShake = useCallback(() => {
+    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    setShaking(true);
+    shakeTimeoutRef.current = setTimeout(() => {
+      setShaking(false);
+    }, 480);
+  }, []);
+
+  function fail(message: string, fieldProblems?: Record<string, string>) {
+    setError(message);
+    if (fieldProblems) setFields(fieldProblems);
+    triggerShake();
+    toast.error(message);
+  }
 
   function save<T>(run: () => Promise<Outcome<T>>, done: (data: T) => { message: string; go?: string }) {
+    setError(null);
+    setFields({});
     start(async () => {
-      const result = await run();
-      if (!result.ok) {
-        setError(result.error);
-        setFields(result.fields ?? {});
-        return;
+      try {
+        const result = await run();
+        if (!result.ok) {
+          setError(result.error);
+          setFields(result.fields ?? {});
+          triggerShake();
+          toast.error(result.error || "Action could not be completed.");
+          return;
+        }
+        setError(null);
+        setFields({});
+        const next = done(result.data);
+        toast.success(next.message);
+        if (back) router.push(back);
+        else if (next.go) router.push(next.go);
+        else router.refresh();
+      } catch (err) {
+        const errText = err instanceof Error ? err.message : "Connection failed. Please try again.";
+        setError(errText);
+        triggerShake();
+        toast.error(errText);
       }
-      setError(null);
-      setFields({});
-      const next = done(result.data);
-      toast.success(next.message);
-      if (next.go) router.push(next.go);
-      else router.refresh();
     });
   }
 
-  return { pending, error, fields, save, fail: (message: string) => setError(message) };
+  return {
+    pending,
+    shaking,
+    error,
+    fields,
+    save,
+    fail,
+    triggerShake,
+    shakeClass: shaking ? "animate-shake ring-2 ring-danger/40 ring-offset-2 transition-all duration-300" : "",
+    anticipateClass: pending ? "animate-anticipate pointer-events-none opacity-90" : "",
+  };
 }
 
 /**
@@ -59,6 +104,7 @@ export function LinesEditor({
   fmt,
   note,
   addProduct,
+  limit,
 }: {
   products: PickableProduct[];
   lines: Line[];
@@ -71,6 +117,8 @@ export function LinesEditor({
   note?: (productId: string) => string | null;
   /** "+ New product", for someone who may add one: it goes on the first empty line. */
   addProduct?: { org: Org; units: { code: string; name: string }[] };
+  /** The most a line may ask for (what's available to send); none for stock coming in. */
+  limit?: (productId: string) => number | undefined;
 }) {
   // Products added from here, listed until the page's own list has them.
   const [fresh, setFresh] = useState<PickableProduct[]>([]);
@@ -98,6 +146,16 @@ export function LinesEditor({
     onChange(next);
   }
 
+  // When the most changes under a line (another warehouse picked), it comes down to it.
+  const limits = lines.map((l) => (l.productId && limit ? limit(l.productId) : undefined));
+  const key = limits.join(",");
+  useEffect(() => {
+    if (!limit) return;
+    const over = lines.some((l, i) => limits[i] !== undefined && Number(l.quantity) > limits[i]!);
+    if (over) onChange(lines.map((l, i) => (limits[i] !== undefined && Number(l.quantity) > limits[i]! ? { ...l, quantity: String(Math.max(0, limits[i]!)) } : l)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
   const total = money ? lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (fmt.toCentavos(l.money) ?? 0), 0) : 0;
 
   return (
@@ -105,10 +163,11 @@ export function LinesEditor({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead>
-            <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+            <tr className="border-b border-rule text-left text-meta text-ink-3">
+              <th scope="col" className="w-8 py-2 pr-2 font-semibold">#</th>
               <th scope="col" className="py-2 pr-3 font-semibold">Product</th>
               <th scope="col" className="w-28 px-3 py-2 text-right font-semibold">Quantity</th>
-              {money && <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{money.label}</th>}
+              {money && <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{money.label} ({fmt.symbol})</th>}
               {money && <th scope="col" className="w-32 px-3 py-2 text-right font-semibold">Amount</th>}
               <th scope="col" className="w-10 py-2">
                 <span className="sr-only">Remove</span>
@@ -123,15 +182,18 @@ export function LinesEditor({
               const said = line.productId && note ? note(line.productId) : null;
               return (
                 <tr key={i}>
-                  <td className="py-2 pr-3 align-top">
-                    <select
+                  <td className="py-2.5 pr-2 align-top text-meta text-ink-3 tabular-nums">
+                    <span className="inline-flex h-10 items-center">{i + 1}</span>
+                  </td>
+                  <td className="py-2.5 pr-3 align-top">
+                    <Select
                       aria-label={`Line ${i + 1} product`}
                       aria-invalid={productError ? true : undefined}
                       value={line.productId}
                       onChange={(e) => set(i, { productId: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none aria-[invalid=true]:border-danger"
+                      className="w-full"
                     >
-                      <option value="">Pick a product…</option>
+                      <option value="">Select a product…</option>
                       {offered.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name} · {o.sku}
@@ -139,36 +201,38 @@ export function LinesEditor({
                       ))}
                       {/* Kept, so a line already on a document still shows what it is. */}
                       {p && p.status !== "active" && <option value={p.id}>{p.name} · {p.sku} ({p.status})</option>}
-                    </select>
+                    </Select>
                     {(productError || qtyError) && <p className="mt-1 text-meta text-danger">{productError || qtyError}</p>}
                     {said && <p className="mt-1 text-meta text-ink-3">{said}</p>}
                   </td>
-                  <td className="px-3 py-2 align-top">
+                  <td className="px-3 py-2.5 align-top">
                     <div className="flex items-center justify-end gap-1.5">
-                      <CellInput
-                        aria-label={`Line ${i + 1} quantity`}
-                        aria-invalid={qtyError ? true : undefined}
-                        inputMode="numeric"
+                      <QuantityInput
+                        label={`Line ${i + 1} quantity`}
+                        invalid={Boolean(qtyError)}
                         value={line.quantity}
-                        onChange={(e) => set(i, { quantity: e.target.value.replace(/[^\d]/g, "") })}
-                        className="w-20"
+                        onChange={(quantity) => set(i, { quantity })}
+                        max={limits[i]}
+                        unit={p?.unit}
                       />
                       <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>
                     </div>
                   </td>
                   {money && (
-                    <td className="px-3 py-2 align-top">
-                      <CellInput aria-label={`Line ${i + 1} ${money.label}`} inputMode="decimal" value={line.money} onChange={(e) => set(i, { money: e.target.value })} className="w-28" />
+                    <td className="px-3 py-2.5 align-top">
+                      <CellInput aria-label={`Line ${i + 1} ${money.label}`} inputMode="decimal" placeholder="0.00" value={line.money} onChange={(e) => set(i, { money: e.target.value })} className="w-32" />
                     </td>
                   )}
                   {money && (
-                    <td className="px-3 py-2 text-right align-top tabular-nums text-ink-2">
-                      {fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0))}
+                    <td className="px-3 py-2.5 text-right align-top tabular-nums">
+                      <span className="inline-flex h-10 items-center text-ink">
+                        {line.productId && line.quantity ? fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0)) : <span className="text-ink-3">—</span>}
+                      </span>
                     </td>
                   )}
-                  <td className="py-2 text-right align-top">
+                  <td className="py-2.5 text-right align-top">
                     {lines.length > 1 && (
-                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
+                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="mt-1.5 rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
                         <X className="size-4" aria-hidden />
                         <span className="sr-only">Remove line {i + 1}</span>
                       </button>
@@ -181,21 +245,21 @@ export function LinesEditor({
           {money && (
             <tfoot>
               <tr className="border-t border-rule-strong">
-                <td colSpan={3} className="py-2 pr-3 text-right text-meta text-ink-3">
+                <td colSpan={4} className="py-3 pr-3 text-right text-sm font-semibold text-ink">
                   Total
                 </td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmt.peso(total)}</td>
+                <td className="px-3 py-3 text-right text-base font-semibold tabular-nums">{fmt.peso(total)}</td>
                 <td />
               </tr>
             </tfoot>
           )}
         </table>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-rule pt-3">
         <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange([...lines, { productId: "", quantity: "", money: "" }])}>
-          Add a line
+          Add line
         </Button>
-        {addProduct && <QuickAdd kind="product" onAdded={added} context={{ org: addProduct.org, units: addProduct.units }} label="New product (not in the list)" />}
+        {addProduct && <QuickAdd kind="product" onAdded={added} context={{ org: addProduct.org, units: addProduct.units }} label="New product" />}
       </div>
     </div>
   );

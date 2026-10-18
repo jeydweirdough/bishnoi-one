@@ -5,6 +5,12 @@ import type { ExtraValues, FormFieldDef } from "@/src/platform/lib/types";
 /** An added field's value as a person reads it. */
 export function extraText(fmt: Format, field: FormFieldDef, value: ExtraValues[string] | undefined): string | null {
   if (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0)) return null;
+  // A customer field shows the customer's name where the page knows it (company.tsx); its id means nothing to read.
+  if (field.type === "customer") return null;
+  if (field.type === "products" && Array.isArray(value)) {
+    const names = new Map((field.picks ?? []).map((p) => [p.value, p.label]));
+    return value.map((code) => names.get(code) ?? code).join(", ");
+  }
   if (Array.isArray(value)) return value.join(", ");
   if (field.type === "yes_no") return value ? "Yes" : "No";
   if (field.type === "date") return fmt.dateLabel(String(value));

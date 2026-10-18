@@ -19,7 +19,7 @@ import type {
 } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
 
-function FormField({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
+export function FormField({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <label className="mb-1 block text-meta font-medium text-ink-2">
@@ -31,10 +31,10 @@ function FormField({ label, optional, children }: { label: string; optional?: bo
   );
 }
 
-const inputClass =
-  "block w-full min-w-0 bg-transparent border-0 border-b border-control rounded-none px-0 py-1.5 text-sm text-ink placeholder:text-ink-3/70 focus:outline-none focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:border-hema aria-[invalid=true]:border-danger disabled:text-ink-3";
+export const inputClass =
+  "block w-full min-w-0 rounded-[14px] bg-sheet border border-rule-strong px-3.5 py-2 text-sm text-ink placeholder:text-ink-3/70 hover:border-control focus:outline-none focus:border-ink focus:ring-3 focus:ring-mint-2 aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
 
-function ModalFrame({
+export function ModalFrame({
   title,
   subtitle,
   children,
@@ -48,7 +48,7 @@ function ModalFrame({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-ink/40 backdrop-blur-xs" onClick={onClose} aria-hidden />
-      <div className="relative z-10 w-full max-w-xl rounded-[3px] border border-rule bg-sheet p-6 shadow-overlay max-h-[92dvh] overflow-y-auto">
+      <div className="relative z-10 w-full max-w-xl rounded-[28px] border border-rule bg-sheet p-6 shadow-overlay max-h-[92dvh] overflow-y-auto">
         <div className="mb-5 flex items-start justify-between gap-4 border-b border-rule pb-3.5">
           <div>
             <h2 className="text-heading text-ink">{title}</h2>
@@ -57,7 +57,7 @@ function ModalFrame({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink"
+            className="rounded-full p-1.5 text-ink-3 hover:bg-mint hover:text-ink"
           >
             <X className="size-4" />
             <span className="sr-only">Close</span>
@@ -117,7 +117,7 @@ export function PermitModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Permit name">
           <input
@@ -125,7 +125,7 @@ export function PermitModal({
             required
             defaultValue={permit?.title ?? ""}
             placeholder="e.g. BOC CPRS Importer Accreditation"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -134,7 +134,7 @@ export function PermitModal({
             <select
               name="category"
               defaultValue={permit?.category ?? "boc"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="boc">Bureau of Customs (BOC)</option>
               <option value="lgu">Mayor's business permit</option>
@@ -152,7 +152,7 @@ export function PermitModal({
               required
               defaultValue={permit?.agency ?? "Bureau of Customs (BOC)"}
               placeholder="e.g. Bureau of Customs"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -164,7 +164,7 @@ export function PermitModal({
               required
               defaultValue={permit?.referenceNumber ?? ""}
               placeholder="e.g. BOC-CPRS-2026-0941"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -172,7 +172,7 @@ export function PermitModal({
             <select
               name="status"
               defaultValue={permit?.status ?? "active"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="active">Active</option>
               <option value="pending_renewal">For renewal</option>
@@ -188,7 +188,7 @@ export function PermitModal({
               type="date"
               name="issuanceDate"
               defaultValue={permit?.issuanceDate ? permit.issuanceDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -198,7 +198,7 @@ export function PermitModal({
               name="expirationDate"
               required
               defaultValue={permit?.expirationDate ? permit.expirationDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -207,7 +207,7 @@ export function PermitModal({
               type="number"
               name="renewalWindowDays"
               defaultValue={permit?.renewalWindowDays ?? 60}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -218,7 +218,7 @@ export function PermitModal({
               name="responsiblePerson"
               defaultValue={permit?.responsiblePerson ?? ""}
               placeholder="e.g. Deo Castillo"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -229,7 +229,7 @@ export function PermitModal({
               name="estimatedCost"
               defaultValue={permit?.estimatedCost ?? ""}
               placeholder="e.g. 15000"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -240,7 +240,7 @@ export function PermitModal({
             rows={2}
             defaultValue={permit?.notes ?? ""}
             placeholder="Broker contact, filing instructions"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -306,7 +306,7 @@ export function ImmigrationModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Full name">
@@ -315,7 +315,7 @@ export function ImmigrationModal({
               required
               defaultValue={record?.individualName ?? ""}
               placeholder="e.g. Dr. Alistair Finch"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -325,7 +325,7 @@ export function ImmigrationModal({
               required
               defaultValue={record?.designation ?? ""}
               placeholder="e.g. Managing Director - APAC"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -337,7 +337,7 @@ export function ImmigrationModal({
               required
               defaultValue={record?.nationality ?? ""}
               placeholder="e.g. British"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -345,7 +345,7 @@ export function ImmigrationModal({
             <select
               name="documentType"
               defaultValue={record?.documentType ?? "acr_card"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="acr_card">ACR I-Card</option>
               <option value="aep_permit">DOLE work permit (AEP)</option>
@@ -361,7 +361,7 @@ export function ImmigrationModal({
               required
               defaultValue={record?.documentNumber ?? ""}
               placeholder="e.g. ACR-F00009841"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -372,7 +372,7 @@ export function ImmigrationModal({
               type="date"
               name="issuanceDate"
               defaultValue={record?.issuanceDate ? record.issuanceDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -382,7 +382,7 @@ export function ImmigrationModal({
               name="expirationDate"
               required
               defaultValue={record?.expirationDate ? record.expirationDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -391,7 +391,7 @@ export function ImmigrationModal({
               type="number"
               name="renewalLeadDays"
               defaultValue={record?.renewalLeadDays ?? 60}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -401,7 +401,7 @@ export function ImmigrationModal({
             <input
               name="sponsoringEntity"
               defaultValue={record?.sponsoringEntity ?? "Bishnoi One Pharma Philippines Inc."}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -410,7 +410,7 @@ export function ImmigrationModal({
               name="assignedAssistant"
               defaultValue={record?.assignedAssistant ?? ""}
               placeholder="e.g. Mila Aguilar"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -419,7 +419,7 @@ export function ImmigrationModal({
           <select
             name="status"
             defaultValue={record?.status ?? "valid"}
-            className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
           >
             <option value="valid">Valid</option>
             <option value="expiring_soon">Expiring soon</option>
@@ -434,7 +434,7 @@ export function ImmigrationModal({
             rows={2}
             defaultValue={record?.notes ?? ""}
             placeholder="Biometrics appointment, counsel contact"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -494,7 +494,7 @@ export function DocumentModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Document name">
           <input
@@ -502,7 +502,7 @@ export function DocumentModal({
             required
             defaultValue={document?.title ?? ""}
             placeholder="e.g. Directors and officers liability insurance"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -511,7 +511,7 @@ export function DocumentModal({
             <select
               name="category"
               defaultValue={document?.category ?? "insurance"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="insurance">Insurance policy</option>
               <option value="commercial_contract">Contract</option>
@@ -528,7 +528,7 @@ export function DocumentModal({
               required
               defaultValue={document?.counterparty ?? ""}
               placeholder="e.g. Malayan Insurance Co., Inc."
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -539,7 +539,7 @@ export function DocumentModal({
               name="referenceNumber"
               defaultValue={document?.referenceNumber ?? ""}
               placeholder="e.g. POL-DO-2026-01"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -548,7 +548,7 @@ export function DocumentModal({
               type="date"
               name="expirationDate"
               defaultValue={document?.expirationDate ? document.expirationDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -557,7 +557,7 @@ export function DocumentModal({
               type="number"
               name="noticePeriodDays"
               defaultValue={document?.noticePeriodDays ?? 30}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -570,7 +570,7 @@ export function DocumentModal({
               name="annualValue"
               defaultValue={document?.annualValue ?? ""}
               placeholder="e.g. 350000"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -578,7 +578,7 @@ export function DocumentModal({
             <input
               name="custodian"
               defaultValue={document?.custodian ?? "Corporate Secretary"}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -589,7 +589,7 @@ export function DocumentModal({
             id="autoRenews"
             name="autoRenews"
             defaultChecked={document?.autoRenews ?? false}
-            className="size-4 rounded-[2px] border-control text-hema"
+            className="size-4 rounded-full border-control text-hema"
           />
           <label htmlFor="autoRenews" className="text-meta text-ink-2">
             Auto-renews unless prior cancellation notice is provided
@@ -602,7 +602,7 @@ export function DocumentModal({
             rows={2}
             defaultValue={document?.notes ?? ""}
             placeholder="Coverage, renewal terms, broker"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -671,7 +671,7 @@ export function PropertyModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Property name">
           <input
@@ -679,7 +679,7 @@ export function PropertyModal({
             required
             defaultValue={property?.name ?? ""}
             placeholder="e.g. Head office, Makati"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -688,7 +688,7 @@ export function PropertyModal({
             <select
               name="propertyType"
               defaultValue={property?.propertyType ?? "office"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="office">Office</option>
               <option value="warehouse">Warehouse</option>
@@ -704,7 +704,7 @@ export function PropertyModal({
               required
               defaultValue={property?.lessorName ?? ""}
               placeholder="e.g. Ayala Land Offices Inc."
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -715,7 +715,7 @@ export function PropertyModal({
             required
             defaultValue={property?.address ?? ""}
             placeholder="e.g. 24th Floor, Tower One, Ayala Ave, Makati City"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -725,7 +725,7 @@ export function PropertyModal({
               type="date"
               name="leaseStart"
               defaultValue={property?.leaseStart ? property.leaseStart.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -735,7 +735,7 @@ export function PropertyModal({
               name="leaseEnd"
               required
               defaultValue={property?.leaseEnd ? property.leaseEnd.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -744,7 +744,7 @@ export function PropertyModal({
               type="number"
               name="noticeDeadlineDays"
               defaultValue={property?.noticeDeadlineDays ?? 90}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -757,7 +757,7 @@ export function PropertyModal({
               name="monthlyRent"
               defaultValue={property?.monthlyRent ?? ""}
               placeholder="e.g. 385000"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -767,7 +767,7 @@ export function PropertyModal({
               step="0.1"
               name="escalationRatePct"
               defaultValue={property?.escalationRatePct ?? 5.0}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -778,7 +778,7 @@ export function PropertyModal({
               name="securityDeposit"
               defaultValue={property?.securityDeposit ?? ""}
               placeholder="e.g. 1155000"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -789,7 +789,7 @@ export function PropertyModal({
             rows={2}
             defaultValue={property?.utilitiesInfo ?? ""}
             placeholder="Meralco, Manila Water, telecom, association dues"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -848,7 +848,7 @@ export function TicketModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Request">
           <input
@@ -856,7 +856,7 @@ export function TicketModal({
             required
             defaultValue={ticket?.title ?? ""}
             placeholder="e.g. Boardroom A air conditioning not cooling"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -865,7 +865,7 @@ export function TicketModal({
             <select
               name="category"
               defaultValue={ticket?.category ?? "facilities"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="facilities">Facilities and repairs</option>
               <option value="vip_logistics">Guest transport</option>
@@ -881,7 +881,7 @@ export function TicketModal({
             <select
               name="priority"
               defaultValue={ticket?.priority ?? "normal"}
-              className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
             >
               <option value="urgent">Urgent (same day)</option>
               <option value="high">High (within 2 days)</option>
@@ -898,7 +898,7 @@ export function TicketModal({
               required
               defaultValue={ticket?.requesterName ?? ""}
               placeholder="e.g. Carmen Villanueva"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -907,7 +907,7 @@ export function TicketModal({
               name="executiveSponsor"
               defaultValue={ticket?.executiveSponsor ?? "CEO Office"}
               placeholder="e.g. Office of the Managing Director"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -918,7 +918,7 @@ export function TicketModal({
               name="assignedTo"
               defaultValue={ticket?.assignedTo ?? "Deo Castillo"}
               placeholder="e.g. Deo Castillo"
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
 
@@ -927,7 +927,7 @@ export function TicketModal({
               type="date"
               name="slaDueDate"
               defaultValue={ticket?.slaDueDate ? ticket.slaDueDate.slice(0, 10) : ""}
-              className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+              className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
             />
           </FormField>
         </div>
@@ -939,7 +939,7 @@ export function TicketModal({
             required
             defaultValue={ticket?.description ?? ""}
             placeholder="What is needed, where, and by when"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -949,7 +949,7 @@ export function TicketModal({
               <select
                 name="status"
                 defaultValue={ticket.status}
-                className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+                className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
               >
                 <option value="open">Open</option>
                 <option value="in_progress">In progress</option>
@@ -964,7 +964,7 @@ export function TicketModal({
                 name="resolutionNotes"
                 defaultValue={ticket.resolutionNotes ?? ""}
                 placeholder="What was done"
-                className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+                className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
               />
             </FormField>
           </div>
@@ -1002,7 +1002,7 @@ export function TicketUpdateModal({
       return;
     }
     const newStatus = (formData.get("newStatus") as string) || undefined;
-    const authorName = (formData.get("authorName") as string) || "Executive Admin";
+    const authorName = (formData.get("authorName") as string) || "Bishnoi One Admin";
 
     const res = await addTicketUpdate(ticket.id, {
       authorName,
@@ -1024,9 +1024,9 @@ export function TicketUpdateModal({
       onClose={onClose}
     >
       <form action={handleSubmit} className="space-y-4 text-sm">
-        {error && <div className="rounded-[2px] bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
+        {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
-        <div className="rounded-[2px] bg-bench p-3 text-meta text-ink-2">
+        <div className="rounded-full bg-bench p-3 text-meta text-ink-2">
           <div className="font-semibold text-ink">Original Description:</div>
           <p className="mt-1 line-clamp-3 text-ink-3">{ticket.description}</p>
         </div>
@@ -1035,8 +1035,8 @@ export function TicketUpdateModal({
           <input
             name="authorName"
             required
-            defaultValue="Executive Admin"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            defaultValue="Bishnoi One Admin"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -1046,7 +1046,7 @@ export function TicketUpdateModal({
             rows={3}
             required
             placeholder="e.g. Technician arriving at 2:00 PM today"
-            className="w-full rounded-[2px] border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
           />
         </FormField>
 
@@ -1054,7 +1054,7 @@ export function TicketUpdateModal({
           <select
             name="newStatus"
             defaultValue={ticket.status}
-            className="w-full rounded-[2px] border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
+            className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
           >
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>

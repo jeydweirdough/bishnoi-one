@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileSpreadsheet } from "lucide-react";
 import { PrintButton } from "../components/print-button";
+import { CodeQuotation } from "../quote-templates/code-page";
 import { DesignedQuotation } from "../quote-templates/designed";
 import type { QuoteDocument } from "../quote-templates/types";
 import { buttonClass, LinkButton } from "@/src/platform/ui/button";
@@ -11,7 +12,7 @@ import type { Quote } from "@/src/platform/lib/types";
 type Letterhead = { name: string; address: string | null; tin: string | null; contact: string | null };
 type Params = Promise<{ id: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;
-type Fitting = { items: { id: string; name: string; kind: "form" | "excel" }[] };
+type Fitting = { items: { id: string; name: string; kind: "form" | "excel" | "code" }[] };
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { id } = await params;
@@ -28,7 +29,7 @@ const paper =
 
 /** A quote on paper. With a quotation template set up for it (Settings,
  *  Quotation templates), that template: designed ones print from here,
- *  uploaded Excel forms download filled in. Otherwise the standard quotation.
+ *  and written-as-code ones print from here, uploaded Excel forms download filled in. Otherwise the standard quotation.
  *  Outside the app's frame, so only the document prints. */
 export default async function QuotePrintPage({ params, searchParams }: { params: Params; searchParams: Search }) {
   const [{ id }, search] = await Promise.all([params, searchParams]);
@@ -45,10 +46,10 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
     <div className="min-h-screen bg-bench print:bg-white">
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-rule bg-sheet px-6 py-3 print:hidden">
         <LinkButton href={`/quotes/${id}`} variant="quiet">
-          Back to the quote
+          Back to quote
         </LinkButton>
         {choices.length > 1 && (
-          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
+          <nav aria-label="Quotation template" className="inline-flex flex-wrap rounded-lg border border-rule-strong bg-sheet p-0.5">
             {choices.map((c) => {
               const on = (template?.id ?? "standard") === c.id;
               return (
@@ -56,7 +57,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
                   key={c.id}
                   href={`/print/quotes/${id}?template=${c.id}`}
                   aria-current={on ? "page" : undefined}
-                  className={`rounded-[2px] px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-hema" : "text-ink-2 hover:text-ink"}`}
+                  className={`rounded-md px-3 py-1 text-meta ${on ? "bg-hema-tint font-semibold text-ink" : "text-ink-2 hover:text-ink"}`}
                 >
                   {c.name}
                   {c.kind === "excel" ? " (Excel)" : ""}
@@ -77,7 +78,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
       </div>
 
       {doc && template?.kind === "excel" ? (
-        <section className="mx-auto my-8 max-w-[210mm] rounded-[4px] bg-sheet px-6 py-5 shadow-sm">
+        <section className="mx-auto my-8 max-w-[210mm] rounded-xl bg-sheet px-6 py-5 shadow-sm">
           <h1 className="text-heading text-ink">{doc.template.name}</h1>
           <p className="mt-1 text-sm text-ink-2">
             This quotation is your Excel form, filled in: control no. <strong>{doc.controlNumber}</strong>, {doc.lines.length}{" "}
@@ -88,8 +89,10 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
             <FileSpreadsheet className="size-4" aria-hidden />
             Download Excel
           </a>
-          <p className="mt-3 text-meta text-ink-3">Open it in Excel to print it or save it as PDF before sending it to the patient.</p>
+          <p className="mt-3 text-meta text-ink-3">Open it in Excel to print it or save it as PDF before sending it to the customer.</p>
         </section>
+      ) : doc && template?.kind === "code" ? (
+        <CodeQuotation html={doc.html ?? ""} title={`Quotation ${quote.number}`} />
       ) : doc ? (
         <article className={paper}>
           <DesignedQuotation doc={doc} fmt={fmt} />

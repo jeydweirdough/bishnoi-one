@@ -1,10 +1,10 @@
-import { Button } from "@/src/platform/ui/button";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
-import type { Assignable, CompanyDetail, CompanyRow, Deal, DealLists, DealStage, Paged, PriceList } from "@/src/platform/lib/types";
+import type { Assignable, CompanyDetail, Deal, DealLists, DealStage, PriceList } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
 import { DealForm } from "../components/deals/deal-form";
+import { CustomerStep } from "../components/deals/new-deal";
 
 export const metadata = { title: "New deal" };
 
@@ -29,36 +29,13 @@ export default async function NewDealPage({ searchParams }: { searchParams: Sear
   const companyId = typeof asked === "string" ? asked : "";
 
   if (!companyId) {
-    const companies = await load<Paged<CompanyRow>>("/companies?limit=200");
     return (
       <>
         <PageHeader crumbs={[{ href: "/deals", label: "Deals" }]} title="New deal">
-          A deal is with a customer. Pick which one.
+          A deal is with a customer. Which one?
         </PageHeader>
         <Sheet className="max-w-xl px-5 py-6 sm:px-8">
-          {companies.items.length === 0 ? (
-            <p className="text-sm text-ink-2">There are no customers you can see yet. Add one first, then its deal.</p>
-          ) : (
-            <form method="get" className="flex flex-wrap items-end gap-3">
-              <label className="min-w-0 flex-1">
-                <span className="mb-1 block text-meta font-medium text-ink-2">Customer</span>
-                <select
-                  name="company"
-                  required
-                  className="block h-9 w-full border-0 border-b border-control bg-transparent text-sm focus:border-hema focus:outline-none"
-                >
-                  {companies.items.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Button type="submit" variant="primary">
-                Continue
-              </Button>
-            </form>
-          )}
+          <CustomerStep />
         </Sheet>
       </>
     );

@@ -26,17 +26,21 @@ from app.routers import (
     auth,
     communications,
     companies,
+    connections,
     dashboard,
     identity,
     incidents,
     monitoring,
+    profile,
     public,
     support,
     unset,
     users,
 )
+from app.routers import services as services_router
 from app.routers import settings as settings_router
 from app.traffic import traffic
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -55,6 +59,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Platform API", version="0.1.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Platform")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     make_first_admin(app.state.sessions, settings)
@@ -71,7 +77,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logging.getLogger("bishnoi.discord").warning("[discord:announcements] couldn't read them yet, trying again in a minute: %s", e)
 
     app.add_middleware(
-        CORSMiddleware,
+        RegisteredOrigins,
+        sessions=app.state.sessions,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
@@ -96,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"ok": True, "app": "platform"}
 
     app.include_router(auth.router)
+    app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
@@ -110,4 +118,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(communications.router)
     app.include_router(settings_router.router)
     app.include_router(public.router)
+    app.include_router(connections.router)
+    app.include_router(services_router.router)
     return app
+
+
+class RegisteredOrigins(CORSMiddleware):
+    """CORS where the allowed origins are the applications' own addresses
+    (Applications), read every minute, as well as CORS_ORIGINS: registering an
+    application lets its pages call the Platform from the browser."""
+
+    def __init__(self, app, sessions, **options) -> None:
+        super().__init__(app, **options)
+        self._sessions = sessions
+        # Never read yet: -inf, not 0.0. The clock is time since the machine
+        # started, so on a machine up for under a minute 0.0 would look fresh
+        # and the first minute would allow no registered origin at all.
+        self._known: tuple[float, set[str]] = (float("-inf"), set())
+
+    def _registered(self) -> set[str]:
+        import time
+        from urllib.parse import urlsplit
+
+        from sqlalchemy import select
+
+        from app.models import Application
+
+        at, known = self._known
+        if time.monotonic() - at < 60:
+            return known
+        try:
+            with self._sessions() as db:
+                urls = db.scalars(select(Application.app_url).where(Application.is_active, Application.app_url.is_not(None))).all()
+            known = {f"{u.scheme}://{u.netloc}" for u in map(urlsplit, urls) if u.scheme and u.netloc}
+        except Exception:  # the database is out of reach: keep what was known
+            pass
+        self._known = (time.monotonic(), known)
+        return known
+
+    def is_allowed_origin(self, origin: str) -> bool:
+        return super().is_allowed_origin(origin) or origin.rstrip("/") in self._registered()

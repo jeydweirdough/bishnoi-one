@@ -1,5 +1,6 @@
 "use client";
 
+import { Empty } from "@/src/platform/ui/sheet";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isPending, useActivityFeed } from "../components/activity-feed";
@@ -27,7 +28,7 @@ export function Timeline({
   const fmt = makeFormat(org);
   const activities = feed?.activities ?? given;
   if (activities.length === 0) {
-    return <p className="py-3 text-meta text-ink-3">Nothing logged yet. Everything your team records against this customer shows up here.</p>;
+    return <Empty compact icon="activity" title="No activity yet">Everything your team records against this customer shows up here.</Empty>;
   }
   return (
     <ol className="divide-y divide-rule">
@@ -35,7 +36,7 @@ export function Timeline({
         const kind = listName(kinds, a.kind);
         return (
           <li key={a.id} className={`flex gap-3 py-3.5 ${isPending(a.id) ? "animate-reshape opacity-60" : ""}`}>
-            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-bench text-ink-2">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-bench text-ink-2">
               {/* A switched-off kind is no longer on the list, so its code stands in for the picture too. */}
               <Icon name={listIcon(kinds.find((k) => k.code === a.kind) ?? { code: a.kind, icon: null })} />
             </span>

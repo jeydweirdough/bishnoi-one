@@ -231,7 +231,7 @@ export function BulkBar({
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay"
+      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-xl bg-sheet px-4 py-3 shadow-overlay"
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <p aria-live="polite" className="font-semibold">
@@ -355,7 +355,7 @@ export function useBulkRun() {
         );
         if (queued) router.refresh();
         if (!job) {
-          toast.info("Still working on it in the background", {
+          toast.info("Processing in the background", {
             id: toastId,
             description: "Reload in a minute to see the changes.",
           });

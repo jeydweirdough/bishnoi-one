@@ -7,21 +7,23 @@ activities.view / create / edit / delete, within the person's reach; a
 company or contact linked to one must be within reach too.
 """
 
+import re
+from urllib.parse import urlsplit
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy import Select, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.access import Access, require
 from app.api import Api, as_utc, camel, changed, field_error, iso, not_found, person_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import PLANNED_KINDS, Activity, Company, Contact
+from app.models import Product, PLANNED_KINDS, Activity, ActivityLink, Company, Contact, Visit
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -45,6 +47,38 @@ class ActivityFields(Api):
     direction: Literal["in", "out"] | None = None
     owner_id: str | None = Field(None, max_length=36)
     done: bool | None = None
+    # A planned call: what it's for and the products to bring up (codes); once
+    # done, what came of it and the products discussed.
+    objective: str | None = Field(None, max_length=300)
+    products: list[Annotated[str, Field(max_length=40)]] | None = Field(None, max_length=30)
+    outcome: str | None = Field(None, max_length=5000)
+    discussed: list[Annotated[str, Field(max_length=40)]] | None = Field(None, max_length=30)
+    # Where a meeting or an online call happens: a Google Meet, Zoom or Teams link (web addresses only).
+    meeting_link: str | None = Field(None, max_length=500)
+    # More customers it's about than its own (the doctor's hospital): it shows on each.
+    also_company_ids: list[Annotated[str, Field(max_length=36)]] | None = Field(None, max_length=10)
+
+
+    @field_validator("meeting_link")
+    @classmethod
+    def _web_address(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if not v:
+            return None
+        wrong = ValueError("Paste the meeting's web link, starting with https://")
+        # Another kind of address ("javascript:", "mailto:") is refused, never turned into a web one.
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(?!//)", v) and not re.match(r"^[\w.-]+:\d+(/|$)", v):
+            raise wrong
+        if "://" not in v:
+            v = f"https://{v}"
+        parts = urlsplit(v)
+        try:
+            parts.port  # noqa: B018 (raises on a port that isn't one)
+        except ValueError:
+            raise wrong from None
+        if parts.scheme not in ("https", "http") or not parts.hostname or "." not in parts.hostname or " " in v:
+            raise wrong
+        return v
 
 
 class ActivityIn(ActivityFields):
@@ -60,6 +94,51 @@ def to_utc(moment: datetime, settings: Settings) -> datetime:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=ZoneInfo(settings.org_timezone))
     return moment.astimezone(UTC)
+
+
+def check_products(db: Session, codes: list[str] | None, field: str) -> list[str]:
+    """Product codes, each one in the catalogue; in the order given, once each."""
+    if not codes:
+        return []
+    known = set(db.scalars(select(Product.code).where(Product.code.in_(codes))))
+    if any(c not in known for c in codes):
+        raise field_error(field, "Pick products from the catalogue.")
+    return list(dict.fromkeys(codes))
+
+
+def product_names(db: Session | None, codes: list[str]) -> list[dict]:
+    if not codes:
+        return []
+    if db is None:  # not in a session (never in practice): the codes will do
+        return [{"code": c, "name": c} for c in codes]
+    names = dict(db.execute(select(Product.code, Product.name).where(Product.code.in_(codes))).all())
+    return [{"code": c, "name": names.get(c, c)} for c in codes]
+
+
+def also_on(db: Session | None, activity: Activity) -> list[dict]:
+    """The other customers an activity is about, by name."""
+    if db is None:
+        return []
+    rows = db.execute(
+        select(Company.id, Company.name).join(ActivityLink, ActivityLink.company_id == Company.id).where(ActivityLink.activity_id == activity.id).order_by(Company.name)
+    ).all()
+    return [{"id": i, "name": n} for i, n in rows]
+
+
+def set_also_on(db: Session, activity: Activity, ids: list[str] | None) -> None:
+    """Puts it on these customers too (any customer: a hospital may be another division's)."""
+    if ids is None:
+        return
+    wanted = [i for i in dict.fromkeys(ids) if i != activity.company_id]
+    if len(set(db.scalars(select(Company.id).where(Company.id.in_(wanted))))) != len(wanted):
+        raise field_error("alsoCompanyIds", "Pick customers from the list.")
+    for link in db.scalars(select(ActivityLink).where(ActivityLink.activity_id == activity.id)):
+        if link.company_id not in wanted:
+            db.delete(link)
+    have = set(db.scalars(select(ActivityLink.company_id).where(ActivityLink.activity_id == activity.id)))
+    for i in wanted:
+        if i not in have:
+            db.add(ActivityLink(activity_id=activity.id, company_id=i))
 
 
 def is_planned(activity: Activity) -> bool:
@@ -81,6 +160,14 @@ def activity_out(activity: Activity, access: Access) -> dict:
         "isOverdue": activity.done_at is None and as_utc(activity.at) < now,
         "durationMinutes": activity.duration_minutes,
         "direction": activity.direction,
+        "objective": activity.objective,
+        "meetingLink": activity.meeting_link,
+        "products": product_names(object_session(activity), activity.products or []),
+        "outcome": activity.outcome,
+        "discussed": product_names(object_session(activity), activity.discussed or []),
+        "alsoOn": also_on(object_session(activity), activity),
+        # Sent from the person's own email app: a screenshot of it sent is kept as proof.
+        "hasProof": bool(activity.proof_ref),
         "company": {"id": activity.company.id, "name": activity.company.name} if activity.company else None,
         "contact": {"id": activity.contact.id, "name": activity.contact.full_name} if activity.contact else None,
         "owner": person_out(activity.owner),
@@ -192,6 +279,35 @@ def summary(
     return counts
 
 
+@router.get("/daily")
+def daily(
+    access: View,
+    db: DB,
+    settings: SettingsDep,
+    from_: date = Query(alias="from", description="from this day (the company's own)"),
+    to: date = Query(description="up to, not including, this day"),
+) -> dict:
+    """How much the person signed in got done each day, for their profile's
+    charts: activities done, and visits made, counted on the company's own days.
+    At most a year at a time."""
+    if to <= from_ or (to - from_).days > 366:
+        raise field_error("to", "Pick up to a year, ending after it starts.")
+    zone = ZoneInfo(settings.org_timezone)
+    start = datetime.combine(from_, time(), zone).astimezone(UTC)
+    end = datetime.combine(to, time(), zone).astimezone(UTC)
+    done = db.scalars(
+        select(Activity.done_at).where(Activity.owner_id == access.user_id, Activity.done_at >= start, Activity.done_at < end)
+    ).all()
+    visited = db.scalars(
+        select(Visit.visited_at).where(Visit.owner_id == access.user_id, Visit.visited_at >= start, Visit.visited_at < end)
+    ).all()
+    days: dict[str, int] = {}
+    for at in [*done, *visited]:
+        day = as_utc(at).astimezone(zone).date().isoformat()
+        days[day] = days.get(day, 0) + 1
+    return {"days": days}
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_activity(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: ActivityIn) -> dict:
     company, contact = linked(db, access, body.company_id, body.contact_id)
@@ -206,6 +322,11 @@ def create_activity(access: Create, me: CurrentUser, db: DB, settings: SettingsD
         done_at=(datetime.now(UTC) if body.done else None) if planned else at,
         duration_minutes=body.duration_minutes if body.kind in ("call", "meeting") else None,
         direction=body.direction if body.kind in ("call", "email") else None,
+        objective=body.objective,
+        meeting_link=body.meeting_link if body.kind in ("meeting", "call") else None,
+        products=check_products(db, body.products, "products"),
+        outcome=body.outcome,
+        discussed=check_products(db, body.discussed, "discussed"),
         company_id=company.id if company else None,
         contact_id=contact.id if contact else None,
         owner_id=owner.id,
@@ -214,6 +335,7 @@ def create_activity(access: Create, me: CurrentUser, db: DB, settings: SettingsD
     )
     db.add(activity)
     db.flush()
+    set_also_on(db, activity, body.also_company_ids)
     audit(db, me, "activity.created", target=audit_label(activity), target_type="activity", target_id=activity.id)
     db.commit()
     db.refresh(activity)
@@ -240,6 +362,11 @@ def update_activity(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep
             raise field_error("at", "Pick when.")
         wanted["at"] = to_utc(wanted["at"], settings)
     done = wanted.pop("done", None)
+    if "also_company_ids" in wanted:
+        set_also_on(db, activity, wanted.pop("also_company_ids"))
+    for key in ("products", "discussed"):
+        if key in wanted:
+            wanted[key] = check_products(db, wanted[key], key)
 
     fields = [k for k, v in wanted.items() if getattr(activity, k) != v]
     for key in fields:

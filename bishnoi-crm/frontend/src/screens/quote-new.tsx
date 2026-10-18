@@ -32,7 +32,7 @@ async function NewQuote({ to, dealId }: { to: QuoteFor; dealId?: string }) {
   return (
     <>
       <PageHeader crumbs={[list, { href: `/${to.kind}/${to.id}`, label: customer.name }]} title={`New quote for ${customer.name}`}>
-        {deal ? `For the deal ${deal.name}. ` : ""}
+        {deal ? `For the deal ${deal.name}${deal.lines.length ? ", starting with its products and their promos" : ""}. ` : ""}
         {customer.team ? `Priced with ${customer.team.name}'s prices. ` : ""}Promos and extra discounts are per product line.
         {stock?.linked && (
           <span className={`mt-1 block ${stock.error ? "text-danger" : "text-ink-3"}`}>
@@ -41,7 +41,7 @@ async function NewQuote({ to, dealId }: { to: QuoteFor; dealId?: string }) {
         )}
       </PageHeader>
       <Sheet className="max-w-[70rem] px-5 py-6 sm:px-8">
-        <QuoteForm to={to} priceList={priceList} org={me.org} fields={fields} stock={stock} deal={deal ? { id: deal.id, name: deal.name } : null} />
+        <QuoteForm to={to} priceList={priceList} org={me.org} fields={fields} stock={stock} deal={deal ? { id: deal.id, name: deal.name, priceType: deal.priceType, lines: deal.lines } : null} />
       </Sheet>
     </>
   );

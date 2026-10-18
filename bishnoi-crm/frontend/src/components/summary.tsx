@@ -1,42 +1,49 @@
-import { Sheet } from "@/src/platform/ui/sheet";
+import { Empty, Sheet } from "@/src/platform/ui/sheet";
+import { Ring, Tile } from "@/src/platform/ui/figures";
 import { plural } from "@/src/platform/lib/format";
 import { rateLabel } from "@/src/platform/lib/labels";
 import type { RetentionRules, RetentionSummary } from "@/src/platform/lib/types";
 
-function Tile({ label, value, note }: { label: string; value: number; note?: string }) {
-  return (
-    <div className="min-w-0 px-5 py-4">
-      <span className="block text-figure text-ink [font-variant-numeric:proportional-nums]">{value}</span>
-      <span className="mt-0.5 block text-meta text-ink-3">{label}</span>
-      {note && <span className="block text-meta text-ink-3">{note}</span>}
-    </div>
-  );
-}
-
-/** The one number the page leads with, then the counts behind it. */
+/**
+ * Where the page starts: the rate, in its own block (or, with nothing to
+ * measure yet, what it's waiting for); then the counts behind it, a tile each,
+ * those to act on first.
+ */
 export function RetentionFigures({ summary, rules }: { summary: RetentionSummary; rules: RetentionRules }) {
+  const measured = summary.rate !== null;
+  const pct = measured ? Math.round(summary.rate! * 100) : null;
   return (
-    <Sheet className="mb-5 grid lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <div className="border-b border-rule px-5 py-5 lg:border-r lg:border-b-0">
-        <p className="text-meta font-medium text-ink-2">Retention, last {rules.lostDays} days</p>
-        <p className="mt-1 text-5xl leading-none font-semibold tracking-tight text-ink [font-variant-numeric:proportional-nums]">
-          {rateLabel(summary.rate)}
-        </p>
-        <p className="mt-2 text-meta text-ink-3">
-          {summary.base
-            ? `${summary.retained} of the ${plural(summary.base, "customer")} who got a quote in the ${rules.lostDays} days before got another since.`
-            : `Nobody got a quote in the ${rules.lostDays} days before, so there's nothing to compare yet.`}
-        </p>
+    <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <Sheet className="px-5 py-4">
+        <p className="text-caps text-ink-3 uppercase">Retention, last {rules.lostDays} days</p>
+        {measured ? (
+          <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-mint px-4 py-4">
+            <div className="min-w-0">
+              <p className="text-[2.25rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{rateLabel(summary.rate)}</p>
+              <p className="mt-1 text-sm font-medium text-ink">of customers kept</p>
+              <p className="mt-1 text-meta text-ink-3">
+                {summary.retained} of the {plural(summary.base, "customer")} quoted in the {rules.lostDays} days before got another quote since.
+              </p>
+            </div>
+            <Ring pct={pct ?? 0} size="lg" />
+          </div>
+        ) : (
+          // Nothing to measure yet: the same drawing and words as every empty place.
+          <div className="mt-3 rounded-xl bg-mint">
+            <Empty compact icon="trend" title="Not enough data to compare">
+              It shows once customers quoted in one {rules.lostDays}-day window can be compared with the next. Keep quoting, and it fills in.
+            </Empty>
+          </div>
+        )}
+      </Sheet>
+      <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3">
+        <Tile figure={{ value: String(summary.atRisk), label: "At risk now", note: `no quote in ${rules.atRiskDays}+ days`, href: "#worth-a-call", alert: summary.atRisk > 0 }} />
+        <Tile figure={{ value: String(summary.lost), label: "Lost", note: "no quote since", href: "#worth-a-call" }} />
+        <Tile figure={{ value: String(summary.noQuotes), label: "No recent quotes", note: "never quoted lately" }} />
+        <Tile figure={{ value: String(summary.retained), label: "Kept", note: "quoted again" }} />
+        <Tile figure={{ value: String(summary.new), label: "New customers", note: "first quote" }} />
+        <Tile figure={{ value: String(summary.healthy), label: "Active customers", note: `quoted in ${rules.atRiskDays} days` }} />
       </div>
-      {/* A 1px gap over the rule colour draws the hairlines between tiles at every width. */}
-      <div className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 [&>*]:bg-sheet">
-        <Tile label="Kept" value={summary.retained} />
-        <Tile label="Lost" value={summary.lost} note="no quote since" />
-        <Tile label="New customers" value={summary.new} note="first quote" />
-        <Tile label="At risk now" value={summary.atRisk} note={`no quote in ${rules.atRiskDays}+ days`} />
-        <Tile label="Healthy now" value={summary.healthy} />
-        <Tile label="No recent quotes" value={summary.noQuotes} />
-      </div>
-    </Sheet>
+    </div>
   );
 }

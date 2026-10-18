@@ -175,5 +175,15 @@ if (runWeb) start("web", "34", "npm", ["run", "dev"], frontend);
 if (asApp) start("app", "33", process.execPath, [join(desktop, "node_modules", "electron", "cli.js"), desktop, `--bishnoi-app=${app}`], ROOT, true);
 if (!children.length) fail("Nothing to run.");
 
+// The terminal tab is named after the app. Next.js renames its process to
+// "next-server (vX)", which on Windows renames the shared console too, so the
+// name is put back every few seconds.
+function nameTheTab() {
+  process.title = app;
+  if (process.stdout.isTTY && !WINDOWS) process.stdout.write(`\x1b]0;${app}\x07`);
+}
+nameTheTab();
+if (process.stdout.isTTY) setInterval(nameTheTab, 2000).unref();
+
 process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));

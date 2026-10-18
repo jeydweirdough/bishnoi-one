@@ -2,6 +2,7 @@ import type { Format } from "@/src/platform/lib/format";
 import { Sheet } from "@/src/platform/ui/sheet";
 import type { FieldCounts } from "./types";
 import { MEASURES, progress } from "./words";
+import { worded, type Terms } from "@/src/components/terms/terms";
 
 /** One goal: what's done, what the goal is, and a bar for how far along. */
 export function Meter({ label, actual, goal, money, fmt }: { label: string; actual: number; goal: number | null | undefined; money?: boolean; fmt: Format }) {
@@ -28,11 +29,11 @@ export function Meter({ label, actual, goal, money, fmt }: { label: string; actu
 }
 
 /** The four goals side by side. */
-export function Meters({ actual, goal, fmt }: { actual: FieldCounts; goal: FieldCounts | null; fmt: Format }) {
+export function Meters({ actual, goal, fmt, terms }: { actual: FieldCounts; goal: FieldCounts | null; fmt: Format; terms: Terms }) {
   return (
     <Sheet className="mb-5 grid grid-cols-2 gap-px overflow-hidden bg-rule xl:grid-cols-4 [&>*]:bg-sheet">
       {MEASURES.map((m) => (
-        <Meter key={m.key} label={m.label} actual={actual[m.key]} goal={goal?.[m.key]} money={m.money} fmt={fmt} />
+        <Meter key={m.key} label={worded(m.label, terms)} actual={actual[m.key]} goal={goal?.[m.key]} money={m.money} fmt={fmt} />
       ))}
     </Sheet>
   );

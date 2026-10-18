@@ -5,5 +5,5 @@ export { proxy } from "@/src/platform/proxy";
 // Next reads this field from the file itself, so it is written here rather
 // than re-exported — a re-exported `config` is ignored and the default used.
 export const config = {
-  matcher: ["/((?!login|auth/platform|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|busy|unavailable|auth/platform|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|brand/).*)"],
 };

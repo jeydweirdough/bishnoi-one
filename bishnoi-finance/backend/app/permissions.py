@@ -24,6 +24,7 @@ ACTION_LABELS = {
     "users": "Users",
     "roles": "Roles and permissions",
     "audit": "Activity log",
+    "approve": "Approve and reject",
 }
 
 
@@ -46,6 +47,8 @@ AREAS: tuple[Area, ...] = (
     Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
+    # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.
+    Area("prices", "Product prices", "Prices", ("view", "approve")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
 
@@ -84,18 +87,19 @@ ROLE_AUDITOR_ID = "00000000-0000-4000-8000-00000000f003"
 
 # The roles Finance starts with. Administrator is the system role: it always
 # holds every permission and can't be changed or deleted. Finance Staff is
-# what "member" used to be: the day's work, not the setup. The Auditor sees
+# what "member" used to be: the day's work, not the setup (approving prices included). The Auditor sees
 # everything and changes nothing.
 STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     (ROLE_ADMIN_ID, ADMINISTRATOR, "Everything: the setup (accounts, categories, tax), users, roles and the activity log.", ALL_PERMISSIONS),
     (
         ROLE_STAFF_ID,
         FINANCE_STAFF,
-        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, and makes and issues invoices and records their payments.",
+        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, makes and issues invoices and records their payments, and approves prices.",
         VIEW_ALL
         | _grant("funds", actions=("release", "check", "settle", "cancel"))
         | _grant("journal", actions=("post", "reverse"))
-        | _grant("invoices", actions=("create", "issue", "collect")),
+        | _grant("invoices", actions=("create", "issue", "collect"))
+        | _grant("prices", actions=("approve",)),
     ),
     (ROLE_AUDITOR_ID, AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"admin.audit"}),
 )

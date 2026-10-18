@@ -7,6 +7,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 
 from app.config import Settings
 from app.db import make_engine
@@ -14,6 +15,7 @@ from app.main import create_app
 from app.models import Role, User
 from app.routers.auth import attempts
 from app.security import hash_password
+from app.tenants import database_url
 
 PASSWORD = "correct horse battery"
 # The key the CRM reads the product list and stock with.
@@ -34,11 +36,17 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 def fresh_database(tmp_path) -> str:
     if not TEST_DATABASE_URL:
         return f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
-    engine = make_engine(TEST_DATABASE_URL)
-    with engine.begin() as connection:
-        connection.execute(text("DROP SCHEMA public CASCADE"))
-        connection.execute(text("CREATE SCHEMA public"))
-    engine.dispose()
+    # Each company's database is beside it (app/tenants.py): those made already are emptied.
+    for slug in ("getmeds", "northwind"):
+        engine = make_engine(database_url(TEST_DATABASE_URL, slug))
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA public CASCADE"))
+                connection.execute(text("CREATE SCHEMA public"))
+        except OperationalError:
+            pass  # not made yet: it will be, empty
+        finally:
+            engine.dispose()
     return TEST_DATABASE_URL
 
 
@@ -57,7 +65,7 @@ def app(tmp_path):
         db.commit()
     yield app
     # Let go of its connections, so the next test can empty the database.
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()
 
 
 @pytest.fixture

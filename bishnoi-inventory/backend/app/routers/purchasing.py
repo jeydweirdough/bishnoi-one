@@ -21,6 +21,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import Product, PurchaseOrder, PurchaseOrderLine, Receipt, ReceiptLine, Supplier, SupplierProduct, Warehouse
 from app.out import batch_ref, day, location_ref, person, product_ref, supplier_ref, today, warehouse_ref
+from app.paging import Limit, Offset, cut, total
 from app.stock import Ref, clean_serials, location_in, next_number, post, resolve_batch, serials_in
 
 router = APIRouter(prefix="/inventory", tags=["purchasing"])
@@ -113,16 +114,24 @@ def supplier_out(s: Supplier, perf: dict | None = None) -> dict:
 
 
 @router.get("/suppliers")
-def list_suppliers(_: allowed("suppliers.view"), db: DB, q: str | None = Query(None, max_length=100), state: str | None = Query(None, max_length=8)) -> list[dict]:
+def list_suppliers(
+    _: allowed("suppliers.view"),
+    db: DB,
+    q: str | None = Query(None, max_length=100),
+    state: str | None = Query(None, max_length=8),
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
     query = select(Supplier).order_by(Supplier.is_active.desc(), func.lower(Supplier.name))
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Supplier.name).like(like), func.lower(Supplier.code).like(like), func.lower(Supplier.contact_person).like(like)))
     if state in ("active", "off"):
         query = query.where(Supplier.is_active.is_(state == "active"))
-    suppliers = db.scalars(query).all()
+    suppliers = db.scalars(cut(query.order_by(Supplier.id), limit, offset) if limit is not None else query).all()
     perf = performance(db, [s.id for s in suppliers])
-    return [supplier_out(s, perf.get(s.id)) for s in suppliers]
+    rows = [supplier_out(s, perf.get(s.id)) for s in suppliers]
+    return {"items": rows, "total": total(db, query)} if limit is not None else rows
 
 
 @router.post("/suppliers", status_code=status.HTTP_201_CREATED)
@@ -284,15 +293,20 @@ def list_pos(
     status_: str | None = Query(None, alias="status", max_length=40, description="a status, or several: ordered,partial"),
     supplier: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=60),
-) -> list[dict]:
-    query = select(PurchaseOrder).order_by(PurchaseOrder.created_at.desc()).limit(500)
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 500 (the board's columns)."""
+    query = select(PurchaseOrder).order_by(PurchaseOrder.created_at.desc())
     if status_:
         query = query.where(PurchaseOrder.status.in_(status_.split(",")))
     if supplier:
         query = query.where(PurchaseOrder.supplier_id == supplier)
     if q:
         query = query.join(Supplier).where(or_(func.lower(PurchaseOrder.number).like(f"%{q.lower()}%"), func.lower(Supplier.name).like(f"%{q.lower()}%")))
-    return [po_brief(po) for po in db.scalars(query)]
+    if limit is not None:
+        return {"items": [po_brief(po) for po in db.scalars(cut(query.order_by(PurchaseOrder.id), limit, offset))], "total": total(db, query)}
+    return [po_brief(po) for po in db.scalars(query.limit(500))]
 
 
 @router.post("/purchase-orders", status_code=status.HTTP_201_CREATED)
@@ -390,15 +404,16 @@ def delete_po(_: allowed("purchasing.edit"), me: CurrentUser, db: DB, po_id: str
 
 
 @router.get("/backorders")
-def backorders(_: allowed("purchasing.view"), db: DB) -> list[dict]:
+def backorders(_: allowed("purchasing.view"), db: DB, limit: int | None = Limit(), offset: int = Offset()) -> list[dict] | dict:
     """Every unit still owed on a placed order."""
-    rows = db.execute(
+    query = (
         select(PurchaseOrderLine, PurchaseOrder)
         .join(PurchaseOrder)
         .where(PurchaseOrder.status.in_(("ordered", "partial")), PurchaseOrderLine.received < PurchaseOrderLine.quantity)
         .order_by(PurchaseOrder.expected_on.is_(None), PurchaseOrder.expected_on, PurchaseOrder.number)
-    ).all()
-    return [
+    )
+    rows = db.execute(cut(query.order_by(PurchaseOrderLine.position, PurchaseOrderLine.id), limit, offset) if limit is not None else query).all()
+    out = [
         {
             "order": {"id": po.id, "number": po.number, "status": po.status, "expectedOn": day(po.expected_on), "late": po.expected_on is not None and po.expected_on < today()},
             "supplier": supplier_ref(po.supplier),
@@ -411,6 +426,7 @@ def backorders(_: allowed("purchasing.view"), db: DB) -> list[dict]:
         }
         for line, po in rows
     ]
+    return {"items": out, "total": total(db, query)} if limit is not None else out
 
 
 # --- receiving --------------------------------------------------------------------------
@@ -461,9 +477,11 @@ def list_receipts(
     supplier: str | None = Query(None, max_length=36),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=60),
-    limit: int = Query(200, ge=1, le=1000),
-) -> list[dict]:
-    query = select(Receipt).order_by(Receipt.received_at.desc()).limit(limit)
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
+    """Newest first. Without `limit`, the latest 200; with it, one page and the total."""
+    query = select(Receipt).order_by(Receipt.received_at.desc())
     if supplier:
         query = query.where(Receipt.supplier_id == supplier)
     if warehouse:
@@ -471,7 +489,9 @@ def list_receipts(
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Receipt.number).like(like), func.lower(Receipt.delivery_ref).like(like)))
-    return [receipt_brief(r) for r in db.scalars(query)]
+    if limit is not None:
+        return {"items": [receipt_brief(r) for r in db.scalars(cut(query.order_by(Receipt.id), limit, offset))], "total": total(db, query)}
+    return [receipt_brief(r) for r in db.scalars(query.limit(200))]
 
 
 @router.get("/receipts/{receipt_id}")

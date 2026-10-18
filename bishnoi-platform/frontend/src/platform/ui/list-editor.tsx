@@ -1,7 +1,8 @@
 "use client";
 
+import { IconButton } from "./button";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Field, FormError, Input } from "../ui/field";
@@ -33,38 +34,12 @@ export function listRows(items: { code: string; name: string; icon?: string | nu
 /** The one line under a list's name in the picker, so the picker itself answers most questions. */
 export function listDetail(items: { isActive: boolean }[]): string {
   const off = items.filter((i) => !i.isActive).length;
-  return items.length === 0 ? "Empty" : off ? `${items.length - off} on · ${off} off` : plural(items.length, "choice");
+  return items.length === 0 ? "Empty" : off ? `${items.length - off} active · ${off} inactive` : plural(items.length, "option");
 }
 
-export function IconButton({
-  label,
-  onClick,
-  disabled,
-  pressed,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  pressed?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] hover:bg-bench/60 hover:text-ink disabled:pointer-events-none disabled:opacity-30 ${
-        pressed ? "bg-hema-tint text-hema" : "text-ink-3"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+
+/** The shared icon button (src/platform/ui/button.tsx), for this kit's callers. */
+export { IconButton };
 
 export function moved<T>(rows: T[], from: number, by: number): T[] {
   const next = [...rows];
@@ -93,8 +68,8 @@ function IconRow({
           aria-label={label}
           title={label}
           onClick={() => onPick(name)}
-          className={`inline-flex size-7 items-center justify-center rounded-[3px] border ${
-            value === name ? "border-hema bg-hema-tint text-hema" : "border-rule text-ink-3 hover:border-control"
+          className={`inline-flex size-7 items-center justify-center rounded-[14px] border ${
+            value === name ? "border-hema bg-hema-tint text-ink" : "border-rule text-ink-3 hover:border-control"
           }`}
         >
           <Icon name={name} className="size-4" />
@@ -166,7 +141,7 @@ export function ListEditor({
     setErrors(found);
     if (Object.keys(found).length) return;
     if (required && !rows.some((r) => r.isActive)) {
-      return setError(`Leave at least one ${label.toLowerCase().replace(/s$/, "")} switched on: records can't be made without one.`);
+      return setError(`Keep at least one ${label.toLowerCase().replace(/s$/, "")} active: records can't be created without one.`);
     }
     start(async () => {
       const result = await onSave(rows.map((r) => ({ code: r.code, name: r.name.trim(), icon: r.icon, isActive: r.isActive })));
@@ -188,7 +163,7 @@ export function ListEditor({
         {hint} {note}
       </p>
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-ink-2">Nothing here yet. Add the first choice below.</p>
+        <p className="mt-4 text-sm text-ink-2">No options yet. Add the first one below.</p>
       ) : (
         <ol className="mt-3 divide-y divide-rule border-y border-rule">
           {rows.map((row, i) => {
@@ -200,7 +175,7 @@ export function ListEditor({
                   <span className="w-6 shrink-0 text-right text-meta text-ink-3 tabular-nums">{i + 1}</span>
                   {icons && (
                     <IconButton
-                      label={`Picture for ${row.name || "this choice"}`}
+                      label={`Icon for ${row.name || "this option"}`}
                       pressed={open}
                       onClick={() => setPicking(open ? null : row.id)}
                     >
@@ -257,7 +232,7 @@ export function ListEditor({
           add();
         }}
       >
-        <Field label="Add a choice" className="flex-1" error={errors.adding}>
+        <Field label="Add option" className="flex-1" error={errors.adding}>
           {(p) => <Input {...p} value={adding} maxLength={120} onChange={(e) => setAdding(e.target.value)} />}
         </Field>
         <Button type="submit" size="sm" icon={<Plus className="size-4" aria-hidden />} disabled={!adding.trim()}>

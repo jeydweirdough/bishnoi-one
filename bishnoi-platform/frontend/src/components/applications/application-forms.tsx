@@ -16,7 +16,7 @@ import { PanelActions, PanelButton } from "../support/panel";
 // declaring its status over what the check says. Platform Admins only; the
 // screens don't draw these for Support.
 
-type Details = { key: string; name: string; description: string; appUrl: string; healthUrl: string; version: string };
+type Details = { key: string; name: string; description: string; appUrl: string; apiUrl: string; healthUrl: string; version: string };
 
 function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => void }) {
   const router = useRouter();
@@ -26,6 +26,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
     name: app?.name ?? "",
     description: app?.description ?? "",
     appUrl: app?.appUrl ?? "",
+    apiUrl: app?.apiUrl ?? "",
     healthUrl: app?.healthUrl ?? "",
     version: app?.version ?? "",
   });
@@ -38,6 +39,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
       name: v.name.trim(),
       description: orNull(v.description),
       appUrl: orNull(v.appUrl),
+      apiUrl: orNull(v.apiUrl),
       healthUrl: orNull(v.healthUrl),
       version: orNull(v.version),
     };
@@ -82,7 +84,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
           {(p) => <Input {...p} value={v.name} onChange={set("name")} autoFocus required />}
         </Field>
         {app ? (
-          <Field label="Key" hint="Set when it was registered; the other apps know it by this.">
+          <Field label="Key" hint="Set at registration. Other applications identify it by this key.">
             {(p) => <Input {...p} value={app.key} disabled />}
           </Field>
         ) : (
@@ -91,16 +93,19 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
           </Field>
         )}
       </div>
-      <Field label="What it's for" optional error={fieldError(fields, "description")}>
+      <Field label="Description" optional error={fieldError(fields, "description")}>
         {(p) => <Textarea {...p} rows={2} value={v.description} onChange={set("description")} />}
       </Field>
-      <Field label="Where people open it" optional hint="The address of its screens." error={fieldError(fields, "appUrl")}>
+      <Field label="App URL" optional hint="The web address users open." error={fieldError(fields, "appUrl")}>
         {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://" value={v.appUrl} onChange={set("appUrl")} />}
       </Field>
+      <Field label="API URL" optional hint="The address connected applications call (see Connections), e.g. https://crm-api.example.com." error={fieldError(fields, "apiUrl")}>
+        {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://" value={v.apiUrl} onChange={set("apiUrl")} />}
+      </Field>
       <Field
-        label="Health address"
+        label="Health check URL"
         optional
-        hint="Its API's /health. The platform asks this address itself whether the app is up and how fast it answers, so nobody has to report it. Without one, it shows as not checked."
+        hint="The API's /health endpoint. The platform checks it for uptime and response time. Without one, the application is not monitored."
         error={fieldError(fields, "healthUrl")}
       >
         {(p) => <Input {...p} type="url" inputMode="url" placeholder="https://…/health" value={v.healthUrl} onChange={set("healthUrl")} />}
@@ -109,7 +114,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
         {(p) => <Input {...p} value={v.version} onChange={set("version")} className="max-w-[12rem]" />}
       </Field>
       <FormError message={error} />
-      <PanelActions pending={pending} save={app ? "Save changes" : "Register it"} onCancel={onDone} />
+      <PanelActions pending={pending} save={app ? "Save changes" : "Register"} onCancel={onDone} />
     </form>
   );
 }
@@ -148,7 +153,7 @@ export function RetireApplication({ app }: { app: Application }) {
           ? "The platform stops checking it, and it leaves the registry, monitoring and the pickers for tickets and incidents. Its deployments, checks and tickets are kept, and you can restore it."
           : "It comes back into the registry and monitoring, and the platform starts checking its health address again."
       }
-      confirmLabel={retiring ? "Retire it" : "Restore it"}
+      confirmLabel={retiring ? "Retire" : "Restore"}
       onConfirm={async () => {
         const result = await updateApplication(app.id, { isActive: !retiring });
         if (!result.ok) {
@@ -165,7 +170,7 @@ type Override = NonNullable<Application["statusOverride"]>;
 const OVERRIDES: { value: Override; label: string; what: string }[] = [
   { value: "maintenance", label: "Maintenance", what: "Planned work: people may not be able to use it for a while." },
   { value: "degraded", label: "Degraded", what: "It works, but slowly or with parts missing." },
-  { value: "outage", label: "Outage", what: "It isn't working, whatever the check says." },
+  { value: "outage", label: "Outage", what: "Not working, regardless of the health check result." },
 ];
 
 function DeclareForm({ app, onDone }: { app: Application; onDone: () => void }) {
@@ -193,7 +198,7 @@ function DeclareForm({ app, onDone }: { app: Application; onDone: () => void }) 
       className="space-y-5"
     >
       <p className="text-sm text-ink-2">
-        What you declare is what every screen shows for {app.name}, over what its health check says, until you set it back.
+        The declared status shows for {app.name} on every screen, in place of the health check result, until it is cleared.
       </p>
       <div>
         <Choice<Override> name="override" legend="Status" value={status} onChange={setStatus} options={OVERRIDES} />
@@ -203,14 +208,14 @@ function DeclareForm({ app, onDone }: { app: Application; onDone: () => void }) 
         {(p) => <Textarea {...p} rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       <FormError message={error} />
-      <PanelActions pending={pending} save="Declare it" onCancel={onDone} />
+      <PanelActions pending={pending} save="Declare status" onCancel={onDone} />
     </form>
   );
 }
 
 export function DeclareStatus({ app }: { app: Application }) {
   return (
-    <PanelButton label={app.statusOverride ? "Change the declared status" : "Declare a status"} title={`Declare ${app.name}'s status`}>
+    <PanelButton label={app.statusOverride ? "Change declared status" : "Declare status"} title={`Declare ${app.name}'s status`}>
       {(close) => <DeclareForm app={app} onDone={close} />}
     </PanelButton>
   );
@@ -224,10 +229,10 @@ export function BackToCheck({ app }: { app: Application }) {
       onRun={async () => {
         const result = await updateApplication(app.id, { statusOverride: null });
         if (!result.ok) toast.error(result.error);
-        else toast.success(`${app.name} shows what its check says again`);
+        else toast.success("Declared status cleared", { description: app.name });
       }}
     >
-      Back to what the check says
+      Clear declared status
     </AsyncButton>
   );
 }

@@ -142,3 +142,8 @@ def test_the_first_administrator_comes_from_the_settings(tmp_path):
     create_app(Settings(_env_file=None, allowed_hosts=["testserver"], database_url=url, first_admin_email="x@example.com", first_admin_password=SecretStr("another long password")))
     with app.state.sessions() as db:
         assert [u.email for u in db.query(User)] == ["boss@example.com"]
+
+
+def test_the_screens_are_told_which_company_is_signed_in(client, ana):
+    """Order links are made with it: the company's own short name, never a placeholder."""
+    assert client.get("/auth/me", headers=ana).json()["org"]["slug"] == "getmeds"

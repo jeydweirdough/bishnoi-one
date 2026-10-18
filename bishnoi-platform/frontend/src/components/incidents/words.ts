@@ -6,7 +6,7 @@ import { ago } from "@/src/lib/words";
 /** Naming no companies means everyone on its application, or everyone at all. */
 export function reach(i: Pick<Incident, "companies" | "application">): string {
   if (i.companies.length > 0) return i.companies.map((c) => c.name).join(", ");
-  return i.application ? `Everyone on ${i.application.name}` : "Everyone";
+  return i.application ? `All users of ${i.application.name}` : "All users";
 }
 
 /** "40 min", "3 h 10 min", "2 d 4 h". */

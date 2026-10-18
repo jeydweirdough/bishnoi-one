@@ -30,7 +30,7 @@ from app.access import Access, require
 from app.api import Api, digits, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser
-from app.models import Activity, Balance, Company, Contact, Deal, FundRequest, MergedRecord, NotDuplicate, Quote, Visit
+from app.models import Activity, Balance, Company, Contact, Deal, MergedRecord, NotDuplicate, Quote, Visit
 from app.scope import reaches, within
 
 router = APIRouter(tags=["duplicates"])
@@ -224,7 +224,7 @@ def merge(access: Edit, me: CurrentUser, db: DB, body: PairIn) -> dict:
     access.require("customers.delete")
     keep, other = both(db, access, body)
     if body.kind == "company":
-        for model in (Contact, Activity, Quote, Deal, Visit, Balance, FundRequest):
+        for model in (Contact, Activity, Quote, Deal, Visit, Balance):
             db.execute(update(model).where(model.company_id == other.id).values(company_id=keep.id))
         took = fill(keep, other, COMPANY_FILL)
         if keep.latitude is None and other.latitude is not None:

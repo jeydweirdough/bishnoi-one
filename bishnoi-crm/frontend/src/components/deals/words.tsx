@@ -1,4 +1,5 @@
-import type { DealRow, ForecastCategory } from "@/src/platform/lib/types";
+import { Flag } from "lucide-react";
+import type { DealPriority, DealRow, ForecastCategory } from "@/src/platform/lib/types";
 
 // How deals are worded on every screen.
 
@@ -19,7 +20,7 @@ export const OPEN_CATEGORIES: { value: Exclude<ForecastCategory, "closed">; labe
 ];
 
 const STATE_STYLE: Record<DealRow["state"], string> = {
-  open: "bg-hema-tint text-hema",
+  open: "bg-hema-tint text-ink",
   won: "bg-filed/10 text-filed",
   lost: "bg-danger-tint text-danger",
 };
@@ -27,7 +28,7 @@ const STATE_STYLE: Record<DealRow["state"], string> = {
 /** The deal's stage, coloured by whether it's open, won or lost. */
 export function StageTag({ deal }: { deal: Pick<DealRow, "state" | "stage"> }) {
   return (
-    <span className={`inline-flex items-center rounded-[3px] px-2 py-0.5 text-meta font-semibold whitespace-nowrap ${STATE_STYLE[deal.state]}`}>
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-meta font-semibold whitespace-nowrap ${STATE_STYLE[deal.state]}`}>
       {deal.stage.name}
     </span>
   );
@@ -49,4 +50,25 @@ export function periodsFrom(today: string) {
     nextMonth: month(y, m + 1),
     thisQuarter: `${y}-Q${Math.floor((m - 1) / 3) + 1}`,
   };
+}
+
+/** A deal's priority, most urgent first; "Not set" last. Colours from the checked chart palette. */
+export const PRIORITIES: { value: DealPriority | null; label: string; color: string }[] = [
+  { value: "urgent", label: "Urgent", color: "#e34948" },
+  { value: "high", label: "High", color: "#eda100" },
+  { value: "normal", label: "Normal", color: "#2a78d6" },
+  { value: "low", label: "Low", color: "#8f98a3" },
+  { value: null, label: "Not set", color: "#d5d9df" },
+];
+
+/** A flag in the priority's colour, always with its word: the colour never speaks alone. */
+export function PriorityFlag({ priority }: { priority: DealPriority | null }) {
+  const p = PRIORITIES.find((x) => x.value === priority) ?? PRIORITIES[PRIORITIES.length - 1];
+  if (!priority) return <span className="text-meta text-ink-3">Not set</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-meta font-medium whitespace-nowrap text-ink-2">
+      <Flag className="size-3.5" style={{ color: p.color, fill: p.color }} aria-hidden />
+      {p.label}
+    </span>
+  );
 }

@@ -5,6 +5,8 @@ import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
 import { KindMark, Lifecycle, SeverityMark, TicketStatusMark } from "@/src/components/marks";
 import { TicketFields } from "@/src/components/support/ticket-fields";
+import { DeleteRecord } from "@/src/components/delete-record";
+import { getStaff } from "@/src/components/gate";
 import { AddNote, EditTicketWords } from "@/src/components/support/ticket-forms";
 import type { Options, TicketDetail, TicketNote } from "@/src/lib/types";
 import { TICKET_KINDS, TICKET_STATUSES, ago, when } from "@/src/lib/words";
@@ -34,11 +36,11 @@ function Note({ note }: { note: TicketNote }) {
           {moved ? (
             note.from ? (
               <span className="text-ink-2">
-                moved it <TicketStatusMark status={note.from} /> → <TicketStatusMark status={note.to!} />
+                changed status <TicketStatusMark status={note.from} /> → <TicketStatusMark status={note.to!} />
               </span>
             ) : (
               <span className="text-ink-2">
-                logged it as <TicketStatusMark status={note.to!} />
+                logged it with status <TicketStatusMark status={note.to!} />
               </span>
             )
           ) : (
@@ -56,7 +58,7 @@ function Note({ note }: { note: TicketNote }) {
 
 export default async function TicketPage({ params }: { params: Params }) {
   const { id } = await params;
-  const [ticket, options] = await Promise.all([getTicket(id), load<Options>("/platform/options")]);
+  const [ticket, options, staff] = await Promise.all([getTicket(id), load<Options>("/platform/options"), getStaff()]);
   const newestFirst = [...ticket.notes].reverse();
 
   return (
@@ -65,7 +67,21 @@ export default async function TicketPage({ params }: { params: Params }) {
         crumbs={[{ href: `/support?kind=${ticket.kind}`, label: `Support · ${TICKET_KINDS[ticket.kind].many}` }]}
         title={`${ticket.number} ${ticket.title}`}
         // Its title and description are the ticket's own words, so their editor sits with the title.
-        tools={<EditTicketWords ticket={ticket} />}
+        tools={
+          <>
+            <EditTicketWords ticket={ticket} />
+            {staff.canAdminister && (
+              <DeleteRecord
+                kind="ticket"
+                id={ticket.id}
+                name={`${ticket.number} ${ticket.title}`}
+                after="/support"
+                done="Ticket deleted"
+                body="It is deleted with its notes. Use this for tickets logged by mistake or for testing. This can't be undone; to keep it, close it instead."
+              />
+            )}
+          </>
+        }
       >
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <KindMark kind={ticket.kind} />
@@ -84,14 +100,14 @@ export default async function TicketPage({ params }: { params: Params }) {
         <p className="mt-2 text-meta text-ink-3">
           {ticket.isOpen
             ? `${TICKET_STATUSES[ticket.status]} now. Change the status beside it under Details; steps can be skipped.`
-            : `${TICKET_STATUSES[ticket.status]} ${ago(ticket.closedAt ?? ticket.resolvedAt)}. Moving it back to an earlier step reopens it.`}
+            : `${TICKET_STATUSES[ticket.status]} ${ago(ticket.closedAt ?? ticket.resolvedAt)}. Changing it back to an earlier status reopens it.`}
         </p>
       </Sheet>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="message">What they said</SectionTitle>
+            <SectionTitle icon="message">Description</SectionTitle>
             {ticket.description ? (
               <p className="mt-2 text-sm whitespace-pre-line text-ink">{ticket.description}</p>
             ) : (
@@ -100,9 +116,9 @@ export default async function TicketPage({ params }: { params: Params }) {
           </Sheet>
 
           <Sheet className="px-5 pt-4 pb-5">
-            <SectionTitle icon="history">Notes and moves</SectionTitle>
+            <SectionTitle icon="history">Notes and status history</SectionTitle>
             {newestFirst.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">Nothing yet. Add a note below as you work it.</p>
+              <p className="py-2 text-meta text-ink-3">No notes yet. Add a note below as work progresses.</p>
             ) : (
               <ol className="mt-1 divide-y divide-rule">
                 {newestFirst.map((n) => (

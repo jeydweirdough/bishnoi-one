@@ -27,9 +27,9 @@ export function Grants({ user, canChange }: { user: PlatformUserDetail; canChang
         <Empty title={`${first} has no applications`} icon="apps">
           {canChange
             ? user.canBeGiven.length
-              ? "Give them one of their company's with “Give an application”."
-              : `${user.companyName ?? "Their company"} has no applications to give. Give it some on its Applications tab first.`
-            : "A Platform Admin gives people their applications. You can log an access request for them below."}
+              ? "Grant access to one of their company's applications with “Grant access”."
+              : `${user.companyName ?? "Their company"} has no assigned applications. Assign them on its Applications tab first.`
+            : "A Platform Admin grants application access. Log an access request for them below."}
         </Empty>
       ) : (
         <ul className="divide-y divide-rule" role="list">
@@ -45,7 +45,7 @@ export function Grants({ user, canChange }: { user: PlatformUserDetail; canChang
           user.canBeGiven.length > 0 && (
             <div className="border-t border-rule px-5 py-3">
               <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setGiving(true)}>
-                Give an application
+                Grant access
               </Button>
             </div>
           )
@@ -77,27 +77,27 @@ function GrantRow({ grant, user, canChange }: { grant: Grant; user: PlatformUser
             <ConfirmButton
               label={<span className="sr-only">Withdraw {grant.name} from {first}</span>}
               icon={<Trash2 className="size-4" aria-hidden />}
-              triggerTitle={`Withdraw ${grant.name} from ${first}`}
+              triggerTitle={`Revoke ${first}'s access to ${grant.name}`}
               triggerVariant="quiet"
               triggerSize="sm"
               triggerClassName={ICON_TRIGGER_DANGER}
-              title={`Withdraw ${grant.name} from ${user.fullName}?`}
-              body={`${first} can't use ${grant.name} any more${grant.role ? `, and their role (${grant.role}) is forgotten` : ""}. You can give it back later.`}
-              confirmLabel="Withdraw access"
+              title={`Revoke ${user.fullName}'s access to ${grant.name}?`}
+              body={`${first} can't use ${grant.name} any more${grant.role ? `, and their role (${grant.role}) is removed` : ""}. Access can be granted again later.`}
+              confirmLabel="Revoke access"
               onConfirm={async () => {
                 const result = await withdrawApplication(user.id, grant.applicationId);
                 if (!result.ok) {
                   toast.error(result.error);
                   return false;
                 }
-                toast.success("Access withdrawn", { description: `${grant.name} · ${user.fullName}` });
+                toast.success("Access revoked", { description: `${grant.name} · ${user.fullName}` });
               }}
             />
           </span>
         )}
       </span>
       <span className="block text-meta text-ink-3">
-        {grant.role ? <span className="text-ink-2">{grant.role}</span> : "No role given"} · given by {grant.grantedBy}{" "}
+        {grant.role ? <span className="text-ink-2">{grant.role}</span> : "No role assigned"} · granted by {grant.grantedBy}{" "}
         <time dateTime={grant.grantedAt} title={when(grant.grantedAt)}>
           {ago(grant.grantedAt)}
         </time>
@@ -125,7 +125,7 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
         setFields(result.fields ?? {});
         return;
       }
-      toast.success(grant ? "Access changed" : "Application given", { description: `${appName} · ${user.fullName}` });
+      toast.success(grant ? "Access changed" : "Access granted", { description: `${appName} · ${user.fullName}` });
       onDone();
     });
   }
@@ -157,7 +157,7 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
               )}
             </Field>
           )}
-          <Field label={`Role in ${appName}`} optional error={fields.role} hint="What they do in it, like Pharmacist or Sales rep.">
+          <Field label={`Role in ${appName}`} optional error={fields.role} hint="Their role in the application, e.g. Pharmacist or Sales rep.">
             {(p) => <Input {...p} value={role} onChange={(e) => setRole(e.target.value)} maxLength={60} autoFocus={Boolean(grant)} />}
           </Field>
         </div>
@@ -173,7 +173,7 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
         <FormError message={error} />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="sm" variant="primary" loading={pending} disabled={!appId}>
-            {grant ? "Save" : `Give ${appName}`}
+            {grant ? "Save" : "Grant access"}
           </Button>
           <Button size="sm" variant="quiet" onClick={onDone} disabled={pending}>
             Cancel

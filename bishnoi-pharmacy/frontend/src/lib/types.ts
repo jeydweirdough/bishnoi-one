@@ -339,3 +339,30 @@ export type AuditItem = {
   targetType: string | null;
   fields: string[];
 };
+
+// Promotional material designs Admin sends for the pharmacist's approval.
+export type MaterialReviewStatus = "waiting" | "approved" | "returned" | "rejected";
+
+export type MaterialReview = {
+  id: string;
+  number: string;
+  source: string;
+  reference: string;
+  version: number;
+  title: string;
+  kind: string;
+  product: string | null;
+  description: string | null;
+  notes: string | null;
+  fileName: string;
+  contentType: string;
+  sentBy: string;
+  status: MaterialReviewStatus;
+  comments: string | null;
+  reviewedBy: string | null;
+  reviewedByLicense: string | null;
+  reviewedAt: string | null;
+  receivedAt: string;
+};
+
+export type MaterialReviewDetail = { review: MaterialReview; earlier: MaterialReview[]; canDecide: boolean };

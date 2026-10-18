@@ -7,20 +7,22 @@ supplier prices), categories, brands and units of measure.
 
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.access import allowed
 from app.api import Api, changed, conflict, field_error, found, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
-from app.levels import ZERO, by_product, by_warehouse, state, suggested_order
+from app.levels import ZERO, by_product, by_warehouse, levels_by_product, state, state_sql, suggested_order
 from app.models import (
     PRODUCT_STATUSES,
     PRODUCT_TYPES,
     Batch,
     Brand,
     Category,
+    Count,
     Location,
     Movement,
     Product,
@@ -32,6 +34,7 @@ from app.models import (
     Warehouse,
 )
 from app.out import batch_ref, product_ref, supplier_ref, warehouse_ref
+from app.paging import Limit, Offset, cut, total
 
 router = APIRouter(prefix="/inventory", tags=["catalog"])
 
@@ -61,31 +64,53 @@ def category_path(c: Category | None) -> str | None:
 @router.get("/reference")
 def reference(_: CurrentUser, db: DB) -> dict:
     """The lists forms pick from: categories, brands, units, suppliers,
-    warehouses with their locations, and products."""
-    categories = db.scalars(select(Category)).all()
+    warehouses with their locations, and products. GraphQL reads each list on
+    its own (app/graphql_api.py), so a page gets only the lists it picks from."""
+    return {name: part(db) for name, part in REFERENCE.items()}
+
+
+def reference_categories(db: Session) -> list[dict]:
+    return sorted(
+        ({"id": c.id, "name": c.name, "path": category_path(c), "parentId": c.parent_id, "isActive": c.is_active} for c in db.scalars(select(Category))),
+        key=lambda c: c["path"].lower(),
+    )
+
+
+def reference_brands(db: Session) -> list[dict]:
+    return [{"id": b.id, "name": b.name, "isActive": b.is_active} for b in db.scalars(select(Brand).order_by(func.lower(Brand.name)))]
+
+
+def reference_units(db: Session) -> list[dict]:
+    return [{"code": u.code, "name": u.name, "isActive": u.is_active} for u in db.scalars(select(Unit).order_by(Unit.name))]
+
+
+def reference_suppliers(db: Session) -> list[dict]:
+    return [{**supplier_ref(s), "isActive": s.is_active} for s in db.scalars(select(Supplier).order_by(func.lower(Supplier.name)))]
+
+
+def reference_warehouses(db: Session) -> list[dict]:
     locations: dict[str, list[dict]] = {}
     for loc in db.scalars(select(Location).order_by(Location.is_default.desc(), Location.code)):
         locations.setdefault(loc.warehouse_id, []).append({"id": loc.id, "code": loc.code, "name": loc.name, "isDefault": loc.is_default, "isActive": loc.is_active})
-    products = db.scalars(select(Product).where(Product.product_type != "service").order_by(func.lower(Product.name)))
-    return {
-        "categories": sorted(
-            ({"id": c.id, "name": c.name, "path": category_path(c), "parentId": c.parent_id, "isActive": c.is_active} for c in categories),
-            key=lambda c: c["path"].lower(),
-        ),
-        "brands": [{"id": b.id, "name": b.name, "isActive": b.is_active} for b in db.scalars(select(Brand).order_by(func.lower(Brand.name)))],
-        "units": [{"code": u.code, "name": u.name, "isActive": u.is_active} for u in db.scalars(select(Unit).order_by(Unit.name))],
-        "suppliers": [
-            {**supplier_ref(s), "isActive": s.is_active} for s in db.scalars(select(Supplier).order_by(func.lower(Supplier.name)))
-        ],
-        "warehouses": [
-            {**warehouse_ref(w), "isActive": w.is_active, "locations": locations.get(w.id, [])}
-            for w in db.scalars(select(Warehouse).order_by(Warehouse.code))
-        ],
-        "products": [
-            {**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id}
-            for p in products
-        ],
-    }
+    return [{**warehouse_ref(w), "isActive": w.is_active, "locations": locations.get(w.id, [])} for w in db.scalars(select(Warehouse).order_by(Warehouse.code))]
+
+
+def reference_products(db: Session) -> list[dict]:
+    """What a document's lines can be for: products that hold stock. One that only
+    groups its sizes (BD Syringe, with 1, 3 and 5 mL) holds none itself, so its
+    sizes are listed instead."""
+    products = db.scalars(select(Product).where(Product.product_type != "service", Product.variant_count == 0).order_by(func.lower(Product.name)))
+    return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id} for p in products]
+
+
+REFERENCE = {
+    "categories": reference_categories,
+    "brands": reference_brands,
+    "units": reference_units,
+    "suppliers": reference_suppliers,
+    "warehouses": reference_warehouses,
+    "products": reference_products,
+}
 
 
 # --- categories -------------------------------------------------------------------------
@@ -167,15 +192,42 @@ def update_category(_: Edit, me: CurrentUser, db: DB, category_id: str, body: Ca
     return {"id": category.id}
 
 
+PLURAL = {"product": "products", "category": "categories"}
+
+
+def _moved(what: list[tuple[int, str]]) -> str:
+    """ "70 products and 2 categories": what moves, for messages and the activity log."""
+    return " and ".join(f"{n} {word if n == 1 else PLURAL[word]}" for n, word in what if n)
+
+
+MoveTo = Query(None, alias="moveTo", max_length=36, description="Move what uses it here first, then delete it.")
+
+
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(_: Delete, me: CurrentUser, db: DB, category_id: str) -> Response:
+def delete_category(_: Delete, me: CurrentUser, db: DB, category_id: str, move_to: str | None = MoveTo) -> Response:
+    """Deletes a category. One still in use (products, categories inside it,
+    counts) is deleted only with `moveTo`: all of that moves there first."""
     category = found(db, Category, category_id, "category")
-    if db.scalar(select(func.count()).select_from(Category).where(Category.parent_id == category.id)):
-        raise conflict("Other categories sit inside this one. Move or delete them first.")
+    inside = db.scalar(select(func.count()).select_from(Category).where(Category.parent_id == category.id)) or 0
     products = db.scalar(select(func.count()).select_from(Product).where(Product.category_id == category.id)) or 0
-    if products:
-        raise conflict(f"{products} product{'s are' if products != 1 else ' is'} in this category. Move them first, or switch it off.")
-    audit(db, me, "category.deleted", target=category.name, target_type="category", target_id=category.id)
+    target = None
+    if (inside or products) and not move_to:
+        raise conflict(f"{_moved([(products, 'product'), (inside, 'category')])} still use this category. Pick a category to move them to.")
+    if move_to:
+        target = found(db, Category, move_to, "category")
+        if target.id == category.id:
+            raise field_error("moveTo", "Pick another category to move them to.")
+        # Not into one of its own: that would leave them inside what's deleted.
+        up = target
+        while up is not None:
+            if up.parent_id == category.id:
+                raise field_error("moveTo", "That category is inside this one. Pick one outside it.")
+            up = db.get(Category, up.parent_id) if up.parent_id else None
+        db.execute(update(Product).where(Product.category_id == category.id).values(category_id=target.id))
+        db.execute(update(Category).where(Category.parent_id == category.id).values(parent_id=target.id))
+        db.execute(update(Count).where(Count.category_id == category.id).values(category_id=target.id))
+    moved = _moved([(products, "product"), (inside, "category")])
+    audit(db, me, "category.deleted", target=f"{category.name} ({moved} moved to {target.name})" if target and moved else category.name, target_type="category", target_id=category.id)
     db.delete(category)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -236,12 +288,20 @@ def update_brand(_: Edit, me: CurrentUser, db: DB, brand_id: str, body: BrandPat
 
 
 @router.delete("/brands/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_brand(_: Delete, me: CurrentUser, db: DB, brand_id: str) -> Response:
+def delete_brand(_: Delete, me: CurrentUser, db: DB, brand_id: str, move_to: str | None = MoveTo) -> Response:
+    """Deletes a brand. One products still carry is deleted only with `moveTo`: they move there first."""
     brand = found(db, Brand, brand_id, "brand")
     products = db.scalar(select(func.count()).select_from(Product).where(Product.brand_id == brand.id)) or 0
-    if products:
-        raise conflict(f"{products} product{'s carry' if products != 1 else ' carries'} this brand. Switch it off instead.")
-    audit(db, me, "brand.deleted", target=brand.name, target_type="brand", target_id=brand.id)
+    target = None
+    if products and not move_to:
+        raise conflict(f"{products} product{'s carry' if products != 1 else ' carries'} this brand. Pick a brand to move them to.")
+    if move_to:
+        target = found(db, Brand, move_to, "brand")
+        if target.id == brand.id:
+            raise field_error("moveTo", "Pick another brand to move them to.")
+        db.execute(update(Product).where(Product.brand_id == brand.id).values(brand_id=target.id))
+    moved = _moved([(products, "product")])
+    audit(db, me, "brand.deleted", target=f"{brand.name} ({moved} moved to {target.name})" if target and moved else brand.name, target_type="brand", target_id=brand.id)
     db.delete(brand)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -290,11 +350,21 @@ def update_unit(_: Edit, me: CurrentUser, db: DB, code: str, body: UnitPatch) ->
 
 
 @router.delete("/units/{code}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_unit(_: Delete, me: CurrentUser, db: DB, code: str) -> Response:
+def delete_unit(_: Delete, me: CurrentUser, db: DB, code: str, move_to: str | None = MoveTo) -> Response:
+    """Deletes a unit. One products are counted in is deleted only with `moveTo`:
+    they're counted in that unit from then on (their quantities stay as they are)."""
     unit = found(db, Unit, code, "unit")
-    if db.scalar(select(func.count()).select_from(Product).where(Product.unit_code == code)):
-        raise conflict("Products are measured in this unit. Switch it off instead.")
-    audit(db, me, "unit.deleted", target=unit.code, target_type="unit", target_id=unit.code)
+    products = db.scalar(select(func.count()).select_from(Product).where(Product.unit_code == code)) or 0
+    target = None
+    if products and not move_to:
+        raise conflict(f"{products} product{'s are' if products != 1 else ' is'} counted in this unit. Pick a unit to move them to.")
+    if move_to:
+        target = found(db, Unit, move_to, "unit")
+        if target.code == unit.code:
+            raise field_error("moveTo", "Pick another unit to move them to.")
+        db.execute(update(Product).where(Product.unit_code == code).values(unit_code=target.code))
+    moved = _moved([(products, "product")])
+    audit(db, me, "unit.deleted", target=f"{unit.code} ({moved} moved to {target.code})" if target and moved else unit.code, target_type="unit", target_id=unit.code)
     db.delete(unit)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -460,7 +530,9 @@ def list_products(
     stock: str | None = Query(None, max_length=8, description="low, out, over"),
     parent: str | None = Query(None, max_length=36, description="the variants of this product"),
     missing: bool = Query(False, description="only products on sale with no selling price or cost"),
-) -> list[dict]:
+    limit: int | None = Limit(),
+    offset: int = Offset(),
+) -> list[dict] | dict:
     query = select(Product).order_by(func.lower(Product.name))
     if missing:
         query = query.where(missing_a_price())
@@ -482,6 +554,15 @@ def list_products(
         query = query.where(Product.status == status_)
     if parent:
         query = query.where(Product.parent_id == parent)
+    if limit is not None:
+        # One page: the stock state is worked out by the database, so the
+        # filter on it comes before the page is cut, not after.
+        if stock:
+            lv = levels_by_product()
+            query = query.outerjoin(lv, lv.c.product_id == Product.id).where(state_sql(func.coalesce(lv.c.available, 0), func.coalesce(lv.c.on_hand, 0)) == stock)
+        products = db.scalars(cut(query.order_by(Product.id), limit, offset)).all()  # the id keeps pages apart where names tie
+        levels = by_product(db, [p.id for p in products])
+        return {"items": [product_row(p, levels.get(p.id, dict(ZERO))) for p in products], "total": total(db, query)}
     products = db.scalars(query).all()
     levels = by_product(db, [p.id for p in products])
     rows = [product_row(p, levels.get(p.id, dict(ZERO))) for p in products]

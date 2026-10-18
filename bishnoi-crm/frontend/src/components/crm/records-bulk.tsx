@@ -73,7 +73,7 @@ export function RecordsBulk({
           const title = String(form.get("title") ?? "").trim();
           const dueOn = String(form.get("dueOn") ?? "");
           if (title.length < 2 || !dueOn) {
-            toast.error("Give the task a title and a date.");
+            toast.error("Enter a title and a date.");
             return false;
           }
           await run({ doing: "Adding tasks", did: (n) => `Task added for ${plural(n, ...noun)}` }, (ids) =>
@@ -124,13 +124,13 @@ export function RecordsBulk({
     ),
     owner: (
       <BulkStep
-        submitLabel={`Give ${many}`}
+        submitLabel={`Reassign ${many}`}
         onCancel={() => setStep(null)}
         onSubmit={async (form) => {
           const ownerId = String(form.get("ownerId") ?? "");
           if (!ownerId) return false;
           const name = people.find((p) => p.id === ownerId)?.name ?? "them";
-          await run({ doing: "Changing owner", did: (n) => `${plural(n, ...noun)} now with ${name}` }, (ids) =>
+          await run({ doing: "Changing owner", did: (n) => `${plural(n, ...noun)} reassigned to ${name}` }, (ids) =>
             bulkRecords(kind, ids, { action: "owner", ownerId }),
           );
         }}
@@ -139,7 +139,7 @@ export function RecordsBulk({
           {(p) => (
             <Select {...p} name="ownerId" required defaultValue="" autoFocus>
               <option value="" disabled>
-                Pick someone
+                Select a person
               </option>
               {people.map((person) => (
                 <option key={person.id} value={person.id}>

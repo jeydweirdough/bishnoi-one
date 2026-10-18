@@ -13,6 +13,7 @@ export type ApplicationInput = {
   name: string;
   description?: string | null;
   appUrl?: string | null;
+  apiUrl?: string | null;
   healthUrl?: string | null;
   version?: string | null;
 };

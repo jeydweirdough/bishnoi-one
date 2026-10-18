@@ -1,9 +1,11 @@
 import { ArrowRight, Plus } from "lucide-react";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteTransfer, transferStep } from "../actions/inventory";
 import { TransferForm } from "../components/document-forms";
+import { PrintLink } from "../components/print-button";
 import { PickForm, type PickLine } from "../components/pick-form";
 import { ReceiveTransfer } from "../components/receive-transfer";
 import { RecordTools } from "../components/record-tools";
@@ -11,16 +13,31 @@ import { TransferStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query } from "../lib/labels";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
-import type { BatchRow, Reference, Transfer, TransferBrief } from "../lib/types";
-import { availability } from "./orders";
+import { FirstStep, NeedsFirst } from "../components/setup";
+import { loadSetup } from "../lib/setup";
+import { TransfersBoard } from "./boards";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
+import { batchChoices, given, referenceOf } from "../lib/reference";
+import type { BatchRow, Paged, Reference, Transfer, TransferBrief } from "../lib/types";
 
 export async function TransfersPage({ searchParams }: { searchParams: Search }) {
-  const { fmt, may, at } = await context();
+  const { fmt, may, at, day } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status") };
-  const transfers = await load<TransferBrief[]>(`/inventory/transfers${query(f)}`);
+  const board = param(s, "view") !== "list" && !f.status;
+  // The board shows every open one in its columns; the list is read a page at a time.
+  const { page, size, vars } = paging(s);
+  const base = `/transfers${query({ ...f, view: board ? "" : "list" })}`;
+  const { transfers: got } = await loadQuery<{ transfers: TransferBrief[] | Paged<TransferBrief> }>(
+    `query Transfers($q: String, $status: String, $limit: Int, $offset: Int) { transfers(q: $q, status: $status, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...(board ? {} : vars) },
+    ["transfers"],
+  );
+  const list: Paged<TransferBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  if (!board) keepInRange(list.items.length, list.total, page, base);
+  const transfers = list.items;
   const chip = (status: string, label: string) => ({ value: status, label, href: `/transfers${query({ q: f.q, status })}` });
   return (
     <>
@@ -30,11 +47,24 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
       >
         Moving stock between warehouses: requested, approved, dispatched, in transit, received.
       </PageHeader>
-      <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("requested", "Requested"), chip("approved", "Approved"), chip("in_transit", "In transit"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />
-      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status }} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <ToggleLinks
+          current={board ? "board" : "list"}
+          options={[
+            { value: "board", label: "Board", href: `/transfers${query({ ...f, status: "", view: "" })}` },
+            { value: "list", label: "List", href: `/transfers${query({ ...f, view: "list" })}` },
+            { value: "map", label: "Map", href: "/transfers/map" },
+          ]}
+        />
+      </div>
+      {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("requested", "Requested"), chip("approved", "Approved"), chip("in_transit", "In transit"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
+      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status, view: board ? "" : "list" }} />
+      {board && transfers.length > 0 ? (
+        <TransfersBoard transfers={transfers} fmt={fmt} day={day} may={may} />
+      ) : (
       <Sheet>
         {transfers.length === 0 ? (
-          <Empty icon="transfers" title="No transfers here" />
+          <FirstStep icon="transfers" title="No transfers" body="Move stock between warehouses, with approval and in-transit tracking." needs={["twoWarehouses", "stock"]} href="/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/transfers" may={may} />
         ) : (
           <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units"]} min="52rem">
             {transfers.map((t) => (
@@ -51,6 +81,8 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
           </Table>
         )}
       </Sheet>
+      )}
+      {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "transfer" : "transfers"} />}
     </>
   );
 }
@@ -59,17 +91,20 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
-  const [t, ref] = await Promise.all([load<Transfer>(`/inventory/transfers/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { transfer: t, reference: ref } = await loadQuery<{ transfer: Transfer; reference: Pick<Reference, "warehouses"> }>(
+    `query Transfer($id: String!) { transfer(id: $id) ${referenceOf("warehouses")} }`,
+    { id },
+    ["transfer", "reference"],
+  );
   const pending = t.status === "draft" || t.status === "requested";
-  const pickLines: PickLine[] = t.status === "approved" && may("transfers.dispatch")
-    ? await Promise.all(t.lines.map(async (l) => ({
-        id: l.id,
-        product: l.product,
-        quantity: l.quantity,
-        batches: l.product.trackBatches
-          ? (await load<BatchRow[]>(`/inventory/batches${query({ product: l.product.id, warehouse: t.from.id })}`)).map((b) => ({ id: b.id, label: `${b.batchNo}${b.expiresOn ? `, expires ${day(b.expiresOn)}` : ""} (${b.onHand})` }))
-          : [],
-      })))
+  // The batches each batch-tracked line could leave from: the sending
+  // warehouse's batches in one read, rather than one per line.
+  const dispatching = t.status === "approved" && may("transfers.dispatch");
+  const { batches } = dispatching && t.lines.some((l) => l.product.trackBatches)
+    ? await loadQuery<{ batches: BatchRow[] }>(`query Batches($w: String) { batches(warehouse: $w) }`, { w: t.from.id }, ["batches"])
+    : { batches: [] as BatchRow[] };
+  const pickLines: PickLine[] = dispatching
+    ? t.lines.map((l) => ({ id: l.id, product: l.product, quantity: l.quantity, batches: l.product.trackBatches ? batchChoices(batches, l.product.id, day) : [] }))
     : [];
   const destination = ref.warehouses.find((w) => w.id === t.to.id)?.locations.filter((l) => l.isActive) ?? [];
 
@@ -83,7 +118,8 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
         )}
         actions={
           <>
-            {t.status === "draft" && may("transfers.create") && <StepButton run={transferStep.bind(null, t.id, "request")} label="Request it" done="Transfer requested" />}
+            <PrintLink href={`/print/transfers/${t.id}`} />
+            {t.status === "draft" && may("transfers.create") && <StepButton run={transferStep.bind(null, t.id, "request")} label="Submit request" done="Transfer requested" />}
             {pending && may("transfers.approve") && <StepButton run={transferStep.bind(null, t.id, "approve")} label="Approve" done="Transfer approved" variant="primary" />}
             {(pending ? may("transfers.create") : t.status === "approved" && may("transfers.approve")) && (
               <StepButton run={transferStep.bind(null, t.id, "cancel")} label="Cancel transfer" done="Transfer cancelled" variant="quiet" confirm={{ title: `Cancel ${t.number}?`, danger: true }} />
@@ -105,7 +141,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       </Sheet>
 
       <Sheet className="mt-5">
-        <Table head={["Product", " Quantity", ...(pending || t.status === "approved" ? [` Free in ${t.from.code}`] : ["Batches sent"])]}>
+        <Table head={["Product", " Quantity", ...(pending || t.status === "approved" ? [` Available in ${t.from.code}`] : ["Batches dispatched"])]}>
           {t.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
@@ -124,16 +160,16 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       </Sheet>
 
       {t.status === "approved" && may("transfers.dispatch") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="dispatch">
           <SectionTitle icon="transfers">Dispatch</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">It leaves {t.from.name} now and is in transit until {t.to.name} receives it.</p>
+          <p className="mb-3 text-meta text-ink-3">Stock leaves {t.from.name} and stays in transit until received at {t.to.name}.</p>
           <PickForm kind="transfer" documentId={t.id} lines={pickLines} label="Dispatch" />
         </Sheet>
       )}
       {t.status === "in_transit" && may("transfers.receive") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
-          <SectionTitle icon="receiving">It arrived</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">The same batches go into {t.to.name}.</p>
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="receive">
+          <SectionTitle icon="receiving">Receive transfer</SectionTitle>
+          <p className="mb-3 text-meta text-ink-3">The dispatched batches are received into {t.to.name}.</p>
           <ReceiveTransfer transferId={t.id} locations={destination} />
         </Sheet>
       )}
@@ -141,10 +177,17 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
   );
 }
 
+/** The transfer form's lists, with what's free per product per warehouse. */
+const TRANSFER_FORM = `${referenceOf("products", "warehouses")} availability`;
+type TransferFormData = { reference: Pick<Reference, "products" | "warehouses">; availability: Record<string, number> };
+
 export async function NewTransferPage() {
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
-  const [ref, available] = await Promise.all([load<Reference>("/inventory/reference"), availability()]);
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["twoWarehouses", "stock"], then: "/transfers/new", title: "New transfer", doing: "move stock between warehouses", crumbs: [{ href: "/transfers", label: "Transfers" }], may });
+  if (gate) return gate;
+  const { reference: ref, availability: available } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }]} title="New transfer" />
@@ -157,7 +200,11 @@ export async function EditTransferPage({ params }: { params: Params<{ id: string
   const { id } = await params;
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
-  const [t, ref, available] = await Promise.all([load<Transfer>(`/inventory/transfers/${enc(id)}`), load<Reference>("/inventory/reference"), availability()]);
+  const { transfer: t, reference: ref, availability: available } = await loadQuery<TransferFormData & { transfer: Transfer }>(
+    `query EditTransfer($id: String!) { transfer(id: $id) ${TRANSFER_FORM} }`,
+    { id },
+    ["transfer", "reference", "availability"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/transfers", label: "Transfers" }, { href: `/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />

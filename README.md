@@ -61,7 +61,9 @@ bishnoi/
 | `main` | **Everything**: every app, each in its own folder |
 | `bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`, … | **One app only**, named after it |
 
-An app branch holds the same files as that app's folder on `main`. You can
+An app branch holds the same files as that app's folder on `main`, with its
+own `README.md` on top: open the branch on GitHub to see how to clone, run,
+pull, push and deploy just that app. You can
 work on either one; GitHub keeps them matched for you
 ([section 9](#9-what-happens-after-you-push)).
 
@@ -292,42 +294,6 @@ Every app with screens has one: `bishnoi-admin:app`, `bishnoi-crm:app`,
 This is for trying the apps on your own computer. Installers for other PCs
 come later.
 
-### The license
-
-A desktop app opens only with the company's license. It is set up once on
-each PC, in whichever Bishnoi One app is opened first, and kept for every Bishnoi One app
-on that PC: an app installed later opens with it straight away, as long as
-the license includes that app.
-
-Each company gets three things from us:
-
-| What | Example | Secret? |
-|---|---|---|
-| Company ID | `NBH-GETMEDS-01` | No |
-| Activation key | `7KQ4M-2XD9P-RTH6W-A3CFN-8B5JE` | Yes: give it to their administrator only, apart from the file |
-| License file | `NBH-GETMEDS-01.bishnoi` | No: it is encrypted, and useless without the key |
-
-The license file says which apps the company has and until when (30 days
-by default), and carries each app's database connection. On the PC it is
-kept in `%APPDATA%\Bishnoi One\license.json`, with the activation key locked to
-that Windows account (it can't be copied to another PC or account). When it
-runs out, the apps warn a week before, keep working three days after, then
-stop until a renewed file is chosen (Help > Use a renewed license file).
-
-Issuing and renewing, from `desktop/`:
-
-```
-npm run license -- issue           # a new company: Company ID, activation key, file
-npm run license -- renew <file>    # a new file with the same IDs: new apps, passwords or expiry
-npm run license -- check <file>    # what's inside, passwords hidden
-```
-
-Files are written to `desktop/issued/`, which is never committed. To try the
-desktop apps on your own PC, add `--local` and type `local` for each app's
-database: the apps then keep using their own `backend/.env` databases. Trying
-the apps from the repo keeps its license apart from a real one, in
-`%APPDATA%\Bishnoi One development\license.json`.
-
 ### By hand (or on a one-app clone)
 
 Every app runs the same way, in **two terminals**. On a full clone, first go
@@ -431,18 +397,48 @@ FIRST_ADMIN_PASSWORD=<at least 8 characters>
   `FIRST_ADMIN_PASSWORD` once you've signed in, and add everyone else from
   the app itself.
 
+**The CRM and Inventory on Neon** (decided 2026-10-05; Supabase works the same way):
+
+1. At neon.com (free, no card), make **one project per app**: `bishnoi-crm` and
+   `bishnoi-inventory`, region **Singapore** (closest to the Philippines). Set
+   the compute to **0.25 CU, autoscaling up to 0.5 CU**: the free plan's 100
+   compute-hours a month then cover office hours. Each project gets its own
+   1 GB and hours, and the two apps only talk through their APIs anyway.
+2. In each project: **Connect**, pooled connection (the address with
+   `-pooler`), and copy it. That's the API project's `DATABASE_URL` on Vercel.
+3. Copy this computer's data into it, once, from the app's `backend/` folder:
+   `uv run python -m app.tools.copy_database --to "<the pooled address>"`.
+   It makes the tables, copies every row, and checks every table matches. A
+   database that already has people in it is refused unless `--replace`.
+4. Backups: put the same address in the app's `backend/.env` as `BACKUP_FROM`
+   (this computer keeps its own SQLite file for trying things), and run
+   `scripts/backup-online-databases.cmd` by hand or nightly with Task
+   Scheduler (the command is in the file). The last 30 days stay in
+   `backend/.data/backups/`.
+
+**Several companies, one CRM (and one Inventory)** (since 2026-10-05). Each
+company has a database of its own, beside `DATABASE_URL` with the company's
+short name added: `neondb` → `neondb_getmeds`, `neondb_northwind`; on this
+computer `crm.db` → `crm-getmeds.db`. So `DATABASE_URL` on Vercel stays the
+**base** address (`…/neondb`): the app makes each company's database the first
+time that company signs in, once the company is registered on Bishnoi One
+Platform and given the app. Which company a request is for comes from the
+sign-in (the session's token starts with it). The tools take
+`--company getmeds` (default on this computer: `DEFAULT_COMPANY`), and the
+backup copies every company, one file each. Someone who works for two
+companies has a Platform account row at each, under one email and one
+password, and uses **Switch company** in the app's menu.
+
 **Every screens project:**
 
 ```
 API_URL=https://<this app's API address>.vercel.app
-NEXT_PUBLIC_BISHNOI_CRM_URL=https://<the CRM's screens address>.vercel.app
-NEXT_PUBLIC_BISHNOI_INVENTORY_URL=https://<Inventory's screens address>.vercel.app
+PLATFORM_API_URL=https://<the Platform's API address>.vercel.app
 ```
 
-- Add one `NEXT_PUBLIC_BISHNOI_<APP>_URL` for each other app you've put
-  online, so the sidebar's links between apps go to the right place
-  ([section 6](#screens-settings-every-app)). These are read when the
-  screens are built: redeploy after you set or change one.
+- The other apps' addresses come from **Platform > Applications**: set each
+  app's screens address there once. A new domain is changed there, and every
+  app follows within 5 minutes, with no redeploy.
 - Each app already knows which app it is: `NEXT_PUBLIC_BISHNOI_APP` isn't
   needed.
 - Don't set `SHOW_DEMO_ACCOUNTS` online.
@@ -459,12 +455,14 @@ the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
 | Platform | `bishnoi-platform/backend` | `bishnoi-platform/frontend` |
 
 Use the addresses Vercel actually gives your projects (e.g.
-`nabhi-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
+`bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
 screens' `API_URL` must both name it.
 
-**Pushing doesn't deploy.** To put apps online, the repo owner opens
-**Actions → Deploy → Run workflow** on GitHub and ticks the apps; each one
-says whether it's on Vercel yet (MAINTAINING.md, "Deployments on Vercel").
+**Pushing doesn't deploy.** To put an app online, the repo owner opens
+**Actions → Deploy → Run workflow** on GitHub, ticking the apps to deploy
+(the Platform goes first). It checks each app is set up first and, when one
+isn't, stops before deploying it and says what to do next (MAINTAINING.md,
+"Deployments on Vercel").
 
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
@@ -517,6 +515,9 @@ after you change a file.
 | App | Setting | Default | What it does |
 |---|---|---|---|
 | CRM, Inventory, Pharmacy, Platform | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | not set | Makes the first administrator on start, **only** while the app has no accounts. For hosts where you can't run the users tool (Vercel). Remove the password after you've signed in. |
+| CRM, Inventory | `PLATFORM_API_URL` | not set | Bishnoi One Platform's API, where the app checks that a company is registered, active and given the app; its public key, for passes, is fetched from there too. Not set: on this computer the companies in `DEV_COMPANIES` are allowed; in production, none. |
+| CRM, Inventory | `FIRST_ADMIN_COMPANY` | not set | The one company whose database gets the `FIRST_ADMIN_*` account (each company has its own database). Not set: `DEFAULT_COMPANY` on this computer, none in production, where a company's administrators sign in with their Bishnoi One account. |
+| CRM, Inventory | `DEFAULT_COMPANY`, `DEV_COMPANIES` | `getmeds`, `["getmeds","northwind"]` | This computer only: the company a request is for when it doesn't say, and the companies allowed without the Platform. Ignored in production. |
 | Inventory, Pharmacy | `EXPIRY_WARNING_DAYS` | `90` | A batch expiring within this many days is flagged "expiring soon". |
 | Inventory | `DEAD_STOCK_DAYS` | `180` | Stock with nothing issued or moved out for this long counts as dead stock. |
 | Pharmacy | `PRESCRIPTION_VALID_DAYS` | `180` | A prescription older than this can't be verified. |
@@ -563,16 +564,16 @@ the CRM tells its users the other app can't be reached; nothing breaks.
 | Setting | Default | What it does |
 |---|---|---|
 | `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
-| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API, for the announcements above every page. Unreachable: none show. |
+| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API: every other app's address (Platform > Applications) and the announcements above every page. Unreachable: the last addresses it had (or the ones below) are used, and no announcements show. |
 | `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
 | `NEXT_PUBLIC_BISHNOI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
-| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Where the **other** apps' screens are, for the sidebar's links between apps. Online, set one for each app you deploy (below). |
+| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Only a fallback, while the Platform can't be reached: the apps' addresses come from Platform > Applications. Not needed online. |
 
 The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
 `PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
-`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://nabhi-finance.vercel.app`.
+`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://bishnoi-one-finance.vercel.app`.
 `NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
-change one.
+change one. Better: leave them unset and change the address on the Platform.
 
 ### Complete files, app by app
 
@@ -878,7 +879,7 @@ decision before building it).
 | Country and tax | **Several countries**: a tax engine with a pack per country. **The Philippines first** (VAT, BIR invoices). |
 | Pricing, quotes and invoices | **Pricing rules + invoices**: ordered, dated price rules an admin sets, with tax last; then invoices, payments and ageing in Finance. **Sales orders live in Bishnoi One Orders**, outside this repo. |
 | Leads and the pipeline | **Deals on customers**: a stage, an expected value, a forecast category. No separate lead record. |
-| Sales targets | A monthly **revenue target** per seller (Deals → Results → Set targets); a team's is its people's added up. Won deals count against it, on Deals → Results and on the home page. |
+| KPIs and targets | **Settings → KPIs**: an administrator defines what each person's month is measured by (13 measures the CRM counts, narrowed by activity kind, visit outcome or product, or entered by hand), who it's for, and from what share of the target it's on target or slightly behind. **KPIs → Targets**: monthly targets per person and per team (a team's own, or its people's added up). **KPIs**: a scorecard, one's own or the team's. Revenue won and the four field goals are built-in KPIs. |
 | Visit record | A visit records the **products discussed**, in order, each with its key message and the doctor's reaction, and the **next visit's objective**, shown when the next visit is logged. **Field work** shows a month's products detailed and how doctors took them. |
 | Lead source | Customers and deals share one list (Settings → Deal stages); a new deal starts with its customer's. |
 | Duplicates | **Customers → Possible duplicates** finds lookalike customers and contacts (same phone however it's written, same email, same or similar name) and merges two into one with all their history. A merged id still leads to the one kept. Merging needs Delete. |
@@ -939,6 +940,7 @@ name. Inside it, add:
 | `frontend/` | the screens: start from another app's `frontend/` |
 | `backend/` | the API: start from another app's `backend/` |
 | `.gitignore` | copy it from another app |
+| `README.md` | your branch's front page on GitHub: copy it from another app, and change the app's name, what it does, its ports and its deploy workflow |
 | `GIT-GUIDE.md` | copy it from another app, and change the app name and ports |
 | `.github/workflows/sync-branches.yml` | copy `.github/workflows/sync-branches.yml` from the top of the repo, **unchanged** |
 

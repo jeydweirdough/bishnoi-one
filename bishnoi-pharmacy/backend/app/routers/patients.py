@@ -63,6 +63,7 @@ class PatientPatch(Api):
 def patient_out(p: Patient) -> dict:
     return {
         "id": p.id,
+        "no": p.no,
         "kind": p.kind,
         "fullName": p.full_name,
         "birthDate": day(p.birth_date),

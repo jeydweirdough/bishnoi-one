@@ -15,7 +15,8 @@ MODULE_ACTIONS = ("view", "create", "edit", "delete")
 def org_out(settings: Settings) -> dict:
     return {
         "id": ORG_ID,
-        "slug": "bishnoi",
+        # The company signed in to (its short name on the platform): order links are made with it.
+        "slug": settings.company,
         "name": settings.org_name,
         "brandName": settings.org_name,
         "currency": settings.org_currency,

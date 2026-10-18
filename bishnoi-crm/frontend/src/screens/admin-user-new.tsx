@@ -1,5 +1,5 @@
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { can } from "@/src/platform/lib/access";
+import { USERS, can, canAny } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { UserOptions } from "@/src/platform/lib/types";
 import { UserForm } from "../components/admin/user-form";
@@ -9,7 +9,7 @@ export const metadata = { title: "Add a person" };
 
 export default async function NewUserPage() {
   const me = await getCompanyMe();
-  if (!can(me, "admin.users")) return <NoAccess what="managing users" />;
+  if (!canAny(me, USERS)) return <NoAccess what="managing users" />;
   const options = await load<UserOptions>("/admin/users/options");
 
   return (

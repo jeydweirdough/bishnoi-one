@@ -35,6 +35,15 @@ export async function updateUser(id: string, patch: UserPatch): Promise<Result<{
   });
 }
 
+/** Gone from the platform, with their applications; suspending keeps the person. */
+export async function deleteUser(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/platform/users/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}
+
 /** A first (or new) password for someone's Bishnoi One account, made here and shown once. Their sign-ins end. */
 export async function makePassword(id: string): Promise<Result<string>> {
   return attempt(async () => {
@@ -77,7 +86,34 @@ export async function decideRequest(id: string, approve: boolean, note?: string 
   });
 }
 
-export async function updateStaff(id: string, patch: { role?: Staff["role"]; isActive?: boolean }): Promise<Result> {
+/** A new staff account for the console; with no password given, one is made and comes back, shown once. */
+export async function createStaff(input: { fullName: string; email: string; role: Staff["role"]; password: string | null }): Promise<Result<string | null>> {
+  return attempt(async () => {
+    const body = await api.post<{ password: string | null }>("/platform/staff", input);
+    refresh();
+    return body.password;
+  });
+}
+
+/** A new password for someone else's staff account, made here and shown once. Their sign-ins end. */
+export async function resetStaffPassword(id: string): Promise<Result<string>> {
+  return attempt(async () => {
+    const body = await api.post<{ password: string }>(`/platform/staff/${enc(id)}/password`, {});
+    refresh();
+    return body.password;
+  });
+}
+
+/** Gone for good; switching off keeps the account. */
+export async function deleteStaff(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/platform/staff/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}
+
+export async function updateStaff(id: string, patch: { fullName?: string; email?: string; role?: Staff["role"]; isActive?: boolean }): Promise<Result> {
   return attempt(async () => {
     await api.patch(`/platform/staff/${enc(id)}`, patch);
     refresh();

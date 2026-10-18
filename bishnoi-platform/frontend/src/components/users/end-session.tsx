@@ -10,7 +10,7 @@ export function EndSession({ id, name, yours }: { id: string; name: string; your
   const router = useRouter();
   return (
     <ConfirmButton
-      label={yours ? "Sign out here" : "End session"}
+      label={yours ? "Sign out" : "End session"}
       triggerSize="sm"
       triggerTitle={yours ? "End your own session" : `End ${name}'s session`}
       title={yours ? "End your own session?" : `End ${name}'s session?`}

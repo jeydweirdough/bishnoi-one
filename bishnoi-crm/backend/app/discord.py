@@ -74,7 +74,7 @@ def mode_of(enabled: bool, mode: str, webhook_url: str | None) -> str:
 
 def _explain(status: int, what: str) -> str:
     if status == 401 and what in ("channel", "thread"):
-        return "Discord refused DISCORD_BOT_TOKEN (401). Copy it again from the bot page"
+        return "Discord authorization failed (401). Please check the bot token on the bot configuration page."
     if status == 403 and what == "thread":
         return "The bot can't start threads (403). Invite it again with Create Public Threads"
     if status == 403:
@@ -571,16 +571,16 @@ def logs_for(code: str, settings) -> Logs:
 # ---- Hooks: what each app sends to its log ------------------------------------------------------
 
 
-def mirror_audit(sessions, model, logs: Logs) -> None:
+def mirror_audit(sessions, model, logs: Logs, company: str | None = None) -> None:
     """Sends every audit line (model: the app's audit table) to the log once its change is committed,
-    and never one whose change was rolled back."""
+    and never one whose change was rolled back. With several companies, each line says whose."""
     from sqlalchemy import event
 
     def after_flush(session, _context) -> None:
         for obj in session.new:
             if isinstance(obj, model):
                 session.info.setdefault("discord_lines", []).append(Line(
-                    action=obj.action, actor=obj.actor or "", target=obj.target or "", target_type=obj.target_type,
+                    action=obj.action, actor=f"{obj.actor or ''} ({company})" if company else obj.actor or "", target=obj.target or "", target_type=obj.target_type,
                     target_id=obj.target_id, fields=list(obj.fields or []),
                 ))
 

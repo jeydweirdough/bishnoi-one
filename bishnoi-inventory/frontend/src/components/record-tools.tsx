@@ -26,7 +26,7 @@ export function RecordTools({ what, name, editHref, remove, after, removeNote }:
   return (
     <>
       {editHref && (
-        <Link href={editHref} title={`Edit ${what}`} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-sheet hover:text-hema">
+        <Link href={editHref} title={`Edit ${what}`} className="rounded-md p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
           <Pencil className="size-4" aria-hidden />
           <span className="sr-only">Edit {what}</span>
         </Link>

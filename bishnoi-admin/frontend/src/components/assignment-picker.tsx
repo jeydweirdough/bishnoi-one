@@ -162,7 +162,7 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
           </Field>
         )}
       </div>
-      <p className="rounded-[3px] bg-bench/60 px-3 py-2 text-meta text-ink-2">
+      <p className="rounded-[12px] bg-bench/60 px-3 py-2 text-meta text-ink-2">
         {personName} will be <strong className="font-semibold text-ink">{role?.name ?? "—"}</strong> {sentence}.
       </p>
     </div>

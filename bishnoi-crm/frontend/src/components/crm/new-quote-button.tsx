@@ -1,11 +1,14 @@
 "use client";
 
-import { FilePlus2, Search, UserPlus, X } from "lucide-react";
+import { Modal } from "antd";
+import { FilePlus2, Search, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/src/platform/ui/button";
 import { useCan } from "../quick-add/can";
 import { findCustomers } from "../../actions/crm";
+import { AddCustomer } from "../quick-add/forms";
+import { QuickAddWindow } from "../quick-add/quick-add";
 
 type Customer = { id: string; name: string };
 
@@ -16,9 +19,8 @@ type Customer = { id: string; name: string };
  * Someone not on the list yet can be added from here, and the quote follows.
  */
 export function NewQuoteButton({ customers, variant = "primary", label = "New quote" }: { customers: Customer[]; variant?: "primary" | "default"; label?: string }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const router = useRouter();
-  const titleId = useId();
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Customer[] | null>(null);
   const local = useMemo(() => {
@@ -38,10 +40,12 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
   const shown = found ?? local;
   const mayAdd = useCan()("customers.create");
   const typed = q.trim();
-  // Adding someone new, then straight on to their quote (the new-customer form carries it through).
-  const addNew = () => {
-    dialog.current?.close();
-    router.push(`/companies/new?then=quote${typed ? `&name=${encodeURIComponent(typed)}` : ""}`);
+  // Adding someone new right here, by name (their details follow on their page), then straight on to their quote.
+  const [adding, setAdding] = useState(false);
+  const addNew = () => setAdding(true);
+  const quoteFor = (c: Customer) => {
+    setOpen(false);
+    router.push(`/companies/${c.id}/quotes/new`);
   };
   const addButton = (text: string) =>
     mayAdd && (
@@ -52,19 +56,10 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
 
   return (
     <>
-      <Button variant={variant} icon={<FilePlus2 className="size-4" aria-hidden />} onClick={() => dialog.current?.showModal()}>
+      <Button variant={variant} icon={<FilePlus2 className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         {label}
       </Button>
-      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay backdrop:bg-ink/30">
-        <div className="flex items-center justify-between border-b border-rule px-5 py-3">
-          <h2 id={titleId} className="text-heading">
-            New quote for…
-          </h2>
-          <button type="button" onClick={() => dialog.current?.close()} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-        <div className="px-5 pt-3 pb-4">
+      <Modal open={open} title={"New quote for…"} onCancel={() => setOpen(false)} footer={null} width={480}>
           <label className="flex items-center gap-2 border-b border-rule-strong pb-1.5 focus-within:border-hema">
             <Search className="size-4 text-ink-3" aria-hidden />
             <input
@@ -78,7 +73,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
           </label>
           {customers.length === 0 && !typed ? (
             <div className="space-y-3 py-6 text-center">
-              <p className="text-meta text-ink-3">You have no customers yet. Add the first one, and their quote opens next.</p>
+              <p className="text-meta text-ink-3">You have no customers yet. Add the first one here, and their quote opens next.</p>
               {addButton("Add a customer")}
             </div>
           ) : shown.length === 0 ? (
@@ -93,10 +88,10 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
                   <button
                     type="button"
                     onClick={() => {
-                      dialog.current?.close();
+                      setOpen(false);
                       router.push(`/companies/${c.id}/quotes/new`);
                     }}
-                    className="w-full rounded-[3px] px-2 py-2 text-left text-sm hover:bg-hema-tint hover:text-hema"
+                    className="w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-hema-tint hover:text-ink"
                   >
                     {c.name}
                   </button>
@@ -105,13 +100,15 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
             </ul>
           )}
           {shown.length > 0 && typed && mayAdd && (
-            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-[3px] border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-hema hover:underline">
+            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-lg border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-ink hover:underline">
               <UserPlus className="size-4" aria-hidden />
               Not in the list? Add &ldquo;{typed}&rdquo; as a new customer
             </button>
           )}
-        </div>
-      </dialog>
+      </Modal>
+      <QuickAddWindow open={adding} title="New customer" onClose={() => setAdding(false)}>
+        {(done) => <AddCustomer initialName={typed} onAdded={quoteFor} done={done} />}
+      </QuickAddWindow>
     </>
   );
 }

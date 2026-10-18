@@ -16,7 +16,7 @@ works tickets; Support is who they're for.
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app import platform_settings
 from app.api import Api, as_utc, camel, changed, check_email, field_error, iso, not_found
 from app.audit import audit
-from app.deps import DB, CurrentUser, SettingsDep
+from app.deps import DB, AdminUser, CurrentUser, SettingsDep
 from app.models import TICKET_STATUSES, Application, Company, Identity, Incident, Ticket, TicketNote, User
 from app.numbers import TICKET_PREFIXES, insert_numbered
 
@@ -275,3 +275,13 @@ def add_note(ticket_id: str, body: NoteIn, db: DB, me: CurrentUser) -> dict:
     t.updated_at = datetime.now(UTC)
     db.commit()
     return {"note": note_out(n)}
+
+
+@router.delete("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ticket(ticket_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone, with its notes: a ticket raised by mistake, or a test."""
+    t = _ticket(db, ticket_id)
+    audit(db, me, "ticket.deleted", target=f"{getattr(t, 'number', '')} {t.title}".strip(), target_type="ticket", target_id=t.id, company_id=t.company_id)
+    db.delete(t)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

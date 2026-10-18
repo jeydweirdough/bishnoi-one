@@ -4,23 +4,26 @@
 // marker in the corner saying so.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
-import { api, getMe } from "@/src/platform/lib/api";
+import { getFrame, load } from "@/src/platform/lib/api";
+import type { Prompt } from "@/src/actions/attention";
 import { FieldTracker } from "@/src/components/field/tracker";
 import { CanProvider } from "@/src/components/quick-add/can";
 import { isFieldAgent } from "@/src/components/field/words";
+import { TermsProvider } from "@/src/components/terms/provider";
+import { termsOf } from "@/src/components/terms/terms";
 
 export default async function Layout({ children }: { children: ReactNode }) {
-  const me = await getMe();
-  // What waits on them, for the sidebar's counts. A count that can't be had
-  // is left out rather than stopping the page.
-  const [waiting, unset] = await Promise.all([
-    me.permissions?.includes("funds.view") ? api.get<Record<string, number>>("/funds/waiting").catch(() => undefined) : undefined,
-    // What isn't set up yet (a product with no price), in red.
-    api.get<Record<string, number>>("/unset").catch(() => undefined),
-  ]);
+  // Who you are and what isn't set up yet (a product with no price, in red):
+  // one request, shared with the page below (lib/api.ts getFrame).
+  const { me, unset: counts } = await getFrame();
+  const unset = counts ?? undefined;
+  // The bell's notifications are the attention prompts; not awaited, so no page waits for them.
+  const notifications = load<Prompt[]>("/attention").catch(() => [] as Prompt[]);
   return (
-    <ShellLayout waiting={waiting} unset={unset}>
-      <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
+    <ShellLayout unset={unset} notifications={notifications} allHref="/attention">
+      <TermsProvider terms={termsOf(me)}>
+        <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
+      </TermsProvider>
       {isFieldAgent(me) && me.org && <FieldTracker userId={me.user.id} timeZone={me.org.timezone} />}
     </ShellLayout>
   );

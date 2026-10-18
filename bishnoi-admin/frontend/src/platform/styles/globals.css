@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 /*
- * The Geima look: every record is a white sheet on a cool grey bench.
- * - One ink for actions: hematoxylin violet marks buttons, links, focus and selection. Nothing else.
- * - Eosin appears only inside flags (e.g. overdue), always with words, never colour alone.
- * - Status is printed in ink: dashed = lead, solid = active, outlined = inactive.
- * - Only sheets lift. No cards inside sheets, no interior shadows, corners 3px or less.
- * - The one colour key: the home calendar marks days eosin (overdue), amber (due today) and
- *   violet (coming up), always beside a legend and day labels that say it in words.
+ * The sign-in page's look, everywhere (Desktop: bishnoi-one-crm-components.html):
+ * - Ink (#141414) for what you read and press: main buttons, links, the current tab.
+ * - Sage for progress and what's done; mint for calm surfaces, hover and the current page.
+ * - Rounded: fields and buttons are pills, sheets and cards have soft 22px corners,
+ *   outlined rather than shadowed.
+ * - Red only for what's overdue or failed, always with words, never colour alone.
+ * The token names (hema, eosin…) are the old ones, so every screen picks the look up.
  */
 @theme {
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
@@ -51,31 +51,41 @@
   --text-tick: 0.6875rem;
   --text-tick--line-height: 1.2;
 
-  --color-bench: #eceef2;
+  --color-bench: #fafaf8;
   --color-sheet: #ffffff;
-  --color-ink: #1b1d22;
-  --color-ink-2: #454a54;
-  --color-ink-3: #636973;
-  --color-rule: #dfe2e7;
-  --color-rule-strong: #c5cad3;
-  --color-control: #7f8793;
-  --color-hema: #33307a;
-  --color-hema-hover: #27245f;
-  --color-hema-tint: #edecf7;
-  --color-eosin: #a62f58;
-  --color-eosin-tint: #f9ebf0;
+  /* The sidebar's panel, and its section titles (Executive Admin's nav). */
+  --color-rail: #fafaf8;
+  --color-section: #4f7f44;
+  --color-section-hover: #3f6f35;
+  --color-ink: #141414;
+  --color-ink-2: #3b3b3b;
+  --color-ink-3: #6a6a6a;
+  --color-rule: #ececea;
+  --color-rule-strong: #d6d6d4;
+  --color-control: #8a8a8a;
+  /* The action colour: ink. Its tint is mint (hover, the current page, selected rows). */
+  --color-hema: #141414;
+  --color-hema-hover: #2b2b2b;
+  --color-hema-tint: #f1f7ee;
+  --color-sage: #a8d69b;
+  --color-sage-deep: #4f7f44;
+  --color-mint: #f1f7ee;
+  --color-mint-2: #e3eedf;
+  --color-eosin: #b42318;
+  --color-eosin-tint: #fde8e6;
   --color-danger: #b42318;
-  --color-danger-tint: #fdeceb;
-  --color-filed: #1f6f47;
+  --color-danger-tint: #fde8e6;
+  --color-filed: #3f6f35;
   /* The home calendar's key, with eosin for overdue. Checked as a set for colour
      blindness (every pair, deutan/protan/tritan); green was dropped because it
      reads the same as eosin to red-green colour-blind people. */
-  --color-due-today: #b7791f;
-  --color-due-later: #4c47a8;
+  --color-due-today: #d48806;
+  --color-due-later: #2f54eb;
 
-  --radius-sheet: 3px;
-  --shadow-sheet: 0 1px 2px rgb(20 22 30 / 0.06), 0 14px 34px -14px rgb(20 22 30 / 0.2);
-  --shadow-overlay: 0 0 0 1px rgb(20 22 30 / 0.08), 0 18px 48px -12px rgb(20 22 30 / 0.3);
+  --radius-sheet: 22px;
+  /* Sheets are outlined (border-rule), so their shadow is only a breath. */
+  --shadow-sheet: 0 1px 2px 0 rgb(20 20 20 / 0.03);
+  --shadow-overlay: 0 6px 16px 0 rgb(0 0 0 / 0.08), 0 3px 6px -4px rgb(0 0 0 / 0.12), 0 9px 28px 8px rgb(0 0 0 / 0.05);
 
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-reshape: reshape 180ms var(--ease-out-soft);
@@ -120,7 +130,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-hema);
+    outline: 2px solid var(--color-sage-deep);
     outline-offset: 2px;
   }
 
@@ -180,4 +190,28 @@ a[data-nav-pending] {
     opacity: 0.5;
     animation: none !important;
   }
+}
+
+/* Ant Design's table head on every table: a light grey row, dark headings in
+   normal case. (Set over the utilities each table gives its <th>.) */
+table > thead > tr > th {
+  background: #fbfbfa;
+  color: var(--color-ink-3) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+table > thead > tr {
+  border-color: var(--color-rule) !important;
+}
+
+/* The sign-in page's drawing (src/components/sign-in/showcase.tsx): the route
+   draws itself in, and each new card rises into place. */
+@keyframes route-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

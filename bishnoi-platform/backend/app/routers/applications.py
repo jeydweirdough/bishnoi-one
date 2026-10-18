@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -40,7 +40,7 @@ KEY = re.compile(r"[a-z][a-z0-9-]{1,39}")
 
 
 class UrlFields(Api):
-    @field_validator("app_url", "health_url", check_fields=False)
+    @field_validator("app_url", "health_url", "api_url", check_fields=False)
     @classmethod
     def _url(cls, v):
         return check_url(v)
@@ -52,6 +52,8 @@ class ApplicationIn(UrlFields):
     description: str | None = Field(None, max_length=2000)
     app_url: str | None = Field(None, max_length=500)
     health_url: str | None = Field(None, max_length=500)
+    # Its API, for the applications linked to it (Connections).
+    api_url: str | None = Field(None, max_length=500)
     version: str | None = Field(None, max_length=40)
 
     @field_validator("key")
@@ -67,6 +69,8 @@ class ApplicationPatch(UrlFields):
     description: str | None = Field(None, max_length=2000)
     app_url: str | None = Field(None, max_length=500)
     health_url: str | None = Field(None, max_length=500)
+    # Its API, for the applications linked to it (Connections).
+    api_url: str | None = Field(None, max_length=500)
     version: str | None = Field(None, max_length=40)
     is_active: bool | None = None
     status_override: Literal["degraded", "maintenance", "outage"] | None = None
@@ -106,12 +110,16 @@ def statuses(db: Session, apps: list[Application]) -> dict[str, str]:
 def app_out(a: Application, check: HealthCheck | None = None, **extra) -> dict:
     return {
         "id": a.id,
+        "no": a.no,
         "key": a.key,
         "name": a.name,
         "description": a.description,
         "appUrl": a.app_url,
         "healthUrl": a.health_url,
+        "apiUrl": a.api_url,
         "version": a.version,
+        "connected": bool(a.connect_key_hash),
+        "connectedAt": iso(a.connected_at),
         "isActive": a.is_active,
         "status": monitor.app_status(a, check),
         "statusOverride": a.status_override,
@@ -241,6 +249,7 @@ def get_application(app_id: str, db: DB, settings: SettingsDep, _: CurrentUser) 
             a,
             check,
             uptime=monitor.uptime(db, "application").get(a.id),
+            slowMs=platform_settings.monitoring(db, settings).slow_ms,
             userCount=sum(per_company.values()),
             companies=[
                 {"id": c.id, "name": c.name, "status": c.status, "userCount": per_company.get(c.id, 0)} for c in companies
@@ -357,5 +366,32 @@ def delete_integration(integration_id: str, db: DB, me: AdminUser) -> Response:
     audit(db, me, "integration.deleted", target=i.name, target_type="integration", target_id=i.id, application_id=i.application_id)
     db.execute(delete(HealthCheck).where(HealthCheck.target_kind == "integration", HealthCheck.target_id == i.id))
     db.delete(i)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/applications/{app_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_application(app_id: str, db: DB, me: AdminUser) -> Response:
+    """Gone from the registry, with its deployments, integrations and links.
+    Only while no company has it: the applications sign in through it."""
+    a = _app(db, app_id)
+    using = db.scalar(select(func.count()).select_from(CompanyApp).where(CompanyApp.application_id == a.id)) or 0
+    if using:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{using} {'company has' if using == 1 else 'companies have'} {a.name}. Take it from them first (each company's Applications tab), or retire it instead.")
+    audit(db, me, "application.deleted", category="security", target=a.name, target_type="application", target_id=a.id)
+    db.delete(a)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/deployments/{deployment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_deployment(deployment_id: str, db: DB, me: AdminUser) -> Response:
+    """A deployment recorded by mistake: gone from the history."""
+    d = db.get(Deployment, deployment_id)
+    if d is None:
+        raise not_found("deployment")
+    a = db.get(Application, d.application_id)
+    audit(db, me, "deployment.deleted", target=f"{a.name if a else 'An application'} {d.version}", target_type="application", target_id=d.application_id, application_id=d.application_id)
+    db.delete(d)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

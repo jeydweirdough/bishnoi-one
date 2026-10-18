@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { CellInput, Field, FormError, Select, Textarea } from "@/src/platform/ui/field";
+import { QuantityInput } from "./quantity";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { addCountLine, countStep, createAdjustment, recordCounts, startCount } from "../actions/inventory";
 import type { AdjustmentReason, BatchRow, Count, ReasonOption, Reference } from "../lib/types";
@@ -14,7 +15,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "./quick-add";
 
 type Row = { productId: string; locationId: string; batchId: string; batchNo: string; expiresOn: string; quantity: string; serials: string };
 const blank = (): Row => ({ productId: "", locationId: "", batchId: "", batchNo: "", expiresOn: "", quantity: "", serials: "" });
-const cell = "h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
 
 /**
  * Writing up an adjustment: where, why, and what changes. Someone who may
@@ -22,14 +23,14 @@ const cell = "h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 t
  */
 export function AdjustmentForm({ reference, reasons, batches, approves, preset, canAdd = {} }: {
   canAdd?: CanAdd;
-  reference: Reference;
+  reference: Pick<Reference, "products" | "units" | "warehouses">;
   reasons: ReasonOption[];
   /** Every batch with stock, for picking which one. */
   batches: BatchRow[];
   approves: boolean;
   preset?: { reason?: string; warehouseId?: string };
 }) {
-  const { pending, error, fields, save } = useSave();
+  const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const warehouses = reference.warehouses.filter((w) => w.isActive);
   const [warehouseId, setWarehouseId] = useState(preset?.warehouseId || warehouses[0]?.id || "");
   const [reason, setReason] = useState<AdjustmentReason>((reasons.find((r) => r.key === preset?.reason)?.key ?? "count") as AdjustmentReason);
@@ -61,13 +62,13 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
         serials: r.serials.split(/[\s,]+/).filter(Boolean),
       }));
     save(() => createAdjustment({ warehouseId, reason, notes: notes.trim() || null, lines }), (out) => ({
-      message: out.status === "posted" ? `${out.number} posted` : `${out.number} sent for approval`,
+      message: out.status === "posted" ? `${out.number} posted` : `${out.number} submitted for approval`,
       go: `/adjustments/${out.id}`,
     }));
   }
 
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
+    <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setFresh((l) => [...l, a]); setWarehouseId(a.value); setRows([blank()]); }} />}>
@@ -75,7 +76,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
               {(p) => <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setRows([blank()]); }}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}{fresh.filter((a) => a.kind === "warehouse").map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</Select>}
             </Field>
           </WithAdd>
-          <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Sets stock aside as damaged: still on hand, no longer available." : "Removes stock.") : "Either way: a minus removes, a plus adds."}>
+          <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Marks stock as damaged: still on hand, but no longer available." : "Removes stock.") : "A negative quantity removes stock; a positive one adds it."}>
             {(p) => <Select {...p} value={reason} onChange={(e) => setReason(e.target.value as AdjustmentReason)}>{reasons.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</Select>}
           </Field>
         </div>
@@ -84,7 +85,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[48rem] text-left text-sm">
             <thead>
-              <tr className="border-b border-rule text-caps text-ink-3 uppercase">
+              <tr className="border-b border-rule text-left text-meta text-ink-3">
                 <th className="py-2 pr-2 font-semibold">Product</th>
                 <th className="w-36 px-2 py-2 font-semibold">Location</th>
                 <th className="w-56 px-2 py-2 font-semibold">Batch</th>
@@ -97,45 +98,58 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                 const p = byId.get(r.productId);
                 const own = batches.filter((b) => b.product.id === r.productId && (!warehouse || b.warehouses.some((w) => w.code === warehouse.code)));
                 const err = fields[`lines.${i}.productId`] || fields[`lines.${i}.quantity`] || fields[`lines.${i}.batchId`] || fields[`lines.${i}.locationId`];
+                // How much of the picked batch is here: the most a removal can take.
+                const picked = own.find((b) => b.id === r.batchId);
+                const hereOnHand = picked && warehouse ? picked.warehouses.find((w) => w.code === warehouse.code)?.onHand : undefined;
                 return (
                   <tr key={i}>
                     <td className="py-2 pr-2 align-top">
-                      <select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value, batchId: "", batchNo: "" })} className={cell}>
-                        <option value="">Pick a product…</option>
+                      <Select aria-label={`Line ${i + 1} product`} value={r.productId} onChange={(e) => set(i, { productId: e.target.value, batchId: "", batchNo: "" })}>
+                        <option value="">Select a product…</option>
                         {products.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.sku}</option>)}
-                      </select>
+                      </Select>
                       {p?.trackSerials && (
-                        <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder="Their serial numbers, one per unit" value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
+                        <Textarea aria-label={`Line ${i + 1} serial numbers`} rows={2} placeholder="Serial numbers, one per unit" value={r.serials} onChange={(e) => set(i, { serials: e.target.value })} className="mt-2 !min-h-14 font-mono text-meta" />
                       )}
                       {err && <p className="mt-1 text-meta text-danger">{err}</p>}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <select aria-label={`Line ${i + 1} location`} value={r.locationId} onChange={(e) => set(i, { locationId: e.target.value })} className={cell}>
+                      <Select aria-label={`Line ${i + 1} location`} value={r.locationId} onChange={(e) => set(i, { locationId: e.target.value })}>
                         {warehouse?.locations.filter((l) => l.isActive).map((l) => <option key={l.id} value={l.isDefault ? "" : l.id}>{l.code}</option>)}
-                      </select>
+                      </Select>
                     </td>
                     <td className="px-2 py-2 align-top">
                       {p?.trackBatches ? (
                         <>
-                          <select aria-label={`Line ${i + 1} batch`} value={r.batchId} onChange={(e) => set(i, { batchId: e.target.value })} className={cell}>
-                            <option value="">{adds || direction === "either" ? "A new batch…" : "Pick a batch…"}</option>
+                          <Select aria-label={`Line ${i + 1} batch`} value={r.batchId} onChange={(e) => set(i, { batchId: e.target.value })}>
+                            <option value="">{adds || direction === "either" ? "New batch…" : "Select a batch…"}</option>
                             {own.map((b) => <option key={b.id} value={b.id}>{b.batchNo} ({b.onHand}){b.expiresOn ? ` · ${b.expiresOn}` : ""}</option>)}
-                          </select>
+                          </Select>
                           {!r.batchId && (adds || direction === "either") && (
                             <div className="mt-1.5 flex gap-1.5">
-                              <input aria-label="New batch number" placeholder="Batch no." value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
-                              {p.trackExpiry && <input aria-label="Expires on" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
+                              <input aria-label="New batch number" placeholder="Batch number" value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
+                              {p.trackExpiry && <input aria-label="Expiry date" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
                             </div>
                           )}
                         </>
                       ) : <span className="text-meta text-ink-3">—</span>}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <CellInput aria-label={`Line ${i + 1} quantity`} inputMode={direction === "either" ? "text" : "numeric"} placeholder={direction === "either" ? "-3" : ""} value={r.quantity} onChange={(e) => set(i, { quantity: e.target.value.replace(direction === "either" ? /[^\d-]/g : /\D/g, "") })} className="w-24" />
+                      <QuantityInput
+                        label={`Line ${i + 1} quantity`}
+                        signed={direction === "either"}
+                        placeholder={direction === "either" ? "-3" : ""}
+                        value={r.quantity}
+                        onChange={(quantity) => set(i, { quantity })}
+                        className="w-24"
+                        unit={p?.unit}
+                        max={direction === "removes" && hereOnHand !== undefined ? hereOnHand : undefined}
+                        min={direction === "either" && hereOnHand !== undefined ? -hereOnHand : undefined}
+                      />
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-[3px] p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
+                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
                       )}
                     </td>
                   </tr>
@@ -145,11 +159,11 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
           </table>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
-          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add a line</Button>
+          <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => setRows([...rows, blank()])}>Add line</Button>
           {canAdd.product && adds && (
             <QuickAdd
               kind="product"
-              label="New product (not in the list)"
+              label="New product"
               context={{ units: reference.units.filter((u) => u.isActive) }}
               onAdded={(a) => {
                 setFresh((list) => [...list, a]);
@@ -160,12 +174,12 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
           )}
         </div>
       </Sheet>
-      <Field label="Notes" optional error={fields.notes} hint="What happened. It goes on the movement trail.">
+      <Field label="Notes" optional error={fields.notes} hint="Recorded in the stock movement history.">
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </Field>
       <FormError message={error ?? fields.lines} />
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{approves ? "Post adjustment" : "Send for approval"}</Button>
+        <Button type="submit" variant="primary" loading={pending}>{approves ? "Post adjustment" : "Submit for approval"}</Button>
         <LinkButton href="/adjustments" variant="quiet">Cancel</LinkButton>
       </div>
     </form>
@@ -173,7 +187,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
 }
 
 /** Starting a count of one warehouse, or of one category in it. */
-export function StartCount({ reference, warehouseId, canAdd = {} }: { reference: Reference; warehouseId?: string; canAdd?: CanAdd }) {
+export function StartCount({ reference, warehouseId, canAdd = {} }: { reference: Pick<Reference, "categories" | "warehouses">; warehouseId?: string; canAdd?: CanAdd }) {
   const { pending, error, fields, save } = useSave();
   const [w, setW] = useState(warehouseId || reference.warehouses.find((x) => x.isActive)?.id || "");
   const [category, setCategory] = useState("");
@@ -188,11 +202,11 @@ export function StartCount({ reference, warehouseId, canAdd = {} }: { reference:
           </Field>
         </WithAdd>
       </div>
-      <Field label="Only" optional className="min-w-56">
-        {(p) => <Select {...p} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Everything in it</option>{reference.categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}</Select>}
+      <Field label="Category" optional className="min-w-56">
+        {(p) => <Select {...p} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>{reference.categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}</Select>}
       </Field>
       <Button variant="primary" loading={pending} onClick={() => save(() => startCount({ warehouseId: w, categoryId: category || null }), (out) => ({ message: `${out.number} started`, go: `/counts/${out.id}` }))}>
-        Start a count
+        Start count
       </Button>
       {error && <div className="w-full"><FormError message={error} /></div>}
     </div>
@@ -203,42 +217,64 @@ export function StartCount({ reference, warehouseId, canAdd = {} }: { reference:
  * The count sheet: what the system expected on each line, and what was
  * found. Blank means not counted yet. Differences show as they're typed.
  */
-export function CountSheet({ count, reference, canCount, day }: { count: Count; reference: Reference; canCount: boolean; day: Record<string, string> }) {
+export function CountSheet({ count, reference, canCount, day }: { count: Count; reference: Pick<Reference, "products">; canCount: boolean; day: Record<string, string> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [shaking, setShaking] = useState(false);
   const open = count.status === "open" && canCount;
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(count.lines.map((l) => [l.id, l.counted == null ? "" : String(l.counted)])));
   const [error, setError] = useState<string | null>(null);
   const [extra, setExtra] = useState({ productId: "", counted: "" });
   const dirty = count.lines.some((l) => (values[l.id] ?? "") !== (l.counted == null ? "" : String(l.counted)));
 
+  function triggerShake() {
+    setShaking(true);
+    setTimeout(() => setShaking(false), 480);
+  }
+
   function persist(then?: () => Promise<{ ok: boolean; error?: string }>, message = "Counts saved") {
     start(async () => {
-      if (dirty) {
-        const r = await recordCounts(count.id, count.lines.map((l) => ({ lineId: l.id, counted: values[l.id] === "" ? null : Number(values[l.id]) })));
-        if (!r.ok) return setError(r.error);
+      try {
+        if (dirty) {
+          const r = await recordCounts(count.id, count.lines.map((l) => ({ lineId: l.id, counted: values[l.id] === "" ? null : Number(values[l.id]) })));
+          if (!r.ok) {
+            triggerShake();
+            toast.error(r.error || "Could not save counts.");
+            return setError(r.error);
+          }
+        }
+        if (then) {
+          const r = await then();
+          if (!r.ok) {
+            triggerShake();
+            const err = r.error ?? "Something went wrong.";
+            toast.error(err);
+            return setError(err);
+          }
+        }
+        setError(null);
+        toast.success(message);
+        router.refresh();
+      } catch (err) {
+        triggerShake();
+        const errText = err instanceof Error ? err.message : "Network error. Please try again.";
+        setError(errText);
+        toast.error(errText);
       }
-      if (then) {
-        const r = await then();
-        if (!r.ok) return setError(r.error ?? "That didn't work.");
-      }
-      setError(null);
-      toast.success(message);
-      router.refresh();
     });
   }
 
   return (
-    <div>
+    <div className={`rounded-xl transition-all duration-300 ${shaking ? "animate-shake ring-2 ring-danger/40 ring-offset-2" : ""} ${pending ? "animate-anticipate pointer-events-none opacity-90" : ""}`}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] text-left text-sm">
           <thead>
-            <tr className="border-b border-rule text-caps text-ink-3 uppercase">
-              <th className="py-3 pr-3 pl-5 font-semibold">Item</th>
+            <tr className="border-b border-rule text-left text-meta text-ink-3">
+              <th className="py-3 pr-3 pl-5 font-semibold">Product</th>
               <th className="px-3 py-3 font-semibold">Location · batch</th>
               <th className="px-3 py-3 text-right font-semibold">Expected</th>
               <th className="px-3 py-3 text-right font-semibold">Counted</th>
-              <th className="py-3 pr-5 pl-3 text-right font-semibold">Difference</th>
+              <th className="py-3 pr-5 pl-3 text-right font-semibold">Variance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
@@ -267,14 +303,14 @@ export function CountSheet({ count, reference, canCount, day }: { count: Count; 
       {open && (
         <div className="space-y-3 border-t border-rule px-5 py-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-meta text-ink-2">Found something not on the list?</span>
-            <select aria-label="Product found" value={extra.productId} onChange={(e) => setExtra({ ...extra, productId: e.target.value })} className="h-8 min-w-56 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+            <span className="text-meta text-ink-2">Add an item not on the count sheet</span>
+            <Select aria-label="Product" value={extra.productId} onChange={(e) => setExtra({ ...extra, productId: e.target.value })} className="min-w-56">
               <option value="">Product…</option>
               {reference.products.filter((p) => !p.trackBatches).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <CellInput aria-label="How many" placeholder="0" value={extra.counted} onChange={(e) => setExtra({ ...extra, counted: e.target.value.replace(/\D/g, "") })} className="w-20" />
+            </Select>
+            <CellInput aria-label="Counted quantity" placeholder="0" value={extra.counted} onChange={(e) => setExtra({ ...extra, counted: e.target.value.replace(/\D/g, "") })} className="w-20" />
             <Button size="sm" disabled={!extra.productId} loading={pending} onClick={() => persist(async () => { const r = await addCountLine(count.id, { productId: extra.productId, counted: Number(extra.counted) || 0 }); if (r.ok) setExtra({ productId: "", counted: "" }); return r; }, "Line added")}>
-              Add it
+              Add line
             </Button>
           </div>
           <FormError message={error} />

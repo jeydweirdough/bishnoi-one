@@ -277,7 +277,7 @@ export function CheckLiquidation({ request, categories, org }: { request: FundRe
               icon={<CornerUpLeft className="size-4" aria-hidden />}
               onClick={() => (note.trim() ? run(() => sendBack(request.id, note.trim()), "Returned for correction") : setFields({ note: "State the corrections needed." }))}
             >
-              Send back
+              Return for correction
             </Button>
             <Button variant="quiet" onClick={() => setBacking(false)}>
               Back

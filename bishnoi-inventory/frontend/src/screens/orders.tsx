@@ -1,57 +1,96 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Icon } from "@/src/platform/ui/icons";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { deleteOrder, orderStep } from "../actions/inventory";
 import { OrderForm } from "../components/document-forms";
+import { PrintLink } from "../components/print-button";
 import { PickForm, type PickLine } from "../components/pick-form";
 import { RecordTools } from "../components/record-tools";
 import { OrderStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Stamp, Table, Td, Trail } from "../components/ui";
 import { ORDER_KINDS, param, query } from "../lib/labels";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
-import type { BatchRow, Order, OrderBrief, Reference, Reservation, StockOverview } from "../lib/types";
+import { FirstStep, NeedsFirst } from "../components/setup";
+import { KINDS, kindBySlug, kindOf, listHref, newHref } from "../lib/order-kinds";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { OrdersBoard } from "./boards";
+import { loadSetup } from "../lib/setup";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
+import { batchChoices, given, referenceOf } from "../lib/reference";
+import type { BatchRow, Order, OrderBrief, Paged, Reference, Reservation } from "../lib/types";
 
 export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day, at } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind") };
-  const orders = await load<OrderBrief[]>(`/inventory/orders${query(f)}`);
+  // A board unless asked for the list, or for one status (which is a column, read as a list).
+  const board = param(s, "view") !== "list" && !f.status;
+  // The board shows every open one in its columns; the list is read a page at a time.
+  const { page, size, vars } = paging(s);
+  const base = `/orders${query({ ...f, view: board ? "" : "list" })}`;
+  const { orders: got } = await loadQuery<{ orders: OrderBrief[] | Paged<OrderBrief> }>(
+    `query Orders($q: String, $status: String, $kind: String, $limit: Int, $offset: Int) { orders(q: $q, status: $status, kind: $kind, limit: $limit, offset: $offset) }`,
+    { ...given(f), ...(board ? {} : vars) },
+    ["orders"],
+  );
+  const list: Paged<OrderBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  if (!board) keepInRange(list.items.length, list.total, page, base);
+  const orders = list.items;
   const issued = f.status === "issued";
+  const info = kindOf(f.kind);
   const chip = (status: string, label: string) => ({ value: status, label, href: `/orders${query({ ...f, status })}` });
   return (
     <>
       <PageHeader
-        title={issued ? "Issuance history" : "Orders"}
-        actions={may("orders.create") && <LinkButton href="/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New order</LinkButton>}
+        title={issued ? (info ? `${info.plural}: issued` : "Issuance history") : info ? info.plural : "All orders"}
+        actions={may("orders.create") && <LinkButton href={info ? newHref(info) : "/orders/new"} variant="primary" icon={<Plus className="size-4" aria-hidden />}>{info ? info.newLabel : "New order"}</LinkButton>}
       >
-        Stock going out: customer orders, and issues to departments and projects. Order → reserved → picked → issued.
+        {info ? `${info.intro} Reserved, picked, then issued.` : "Outbound stock: customer orders and issues to departments and projects. Order → reserved → picked → issued."}
       </PageHeader>
-      {!issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder="Order number or who it's for" keep={{ status: f.status }} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <ToggleLinks
+          current={board ? "board" : "list"}
+          options={[
+            { value: "board", label: "Board", href: `/orders${query({ ...f, status: "", view: "" })}` },
+            { value: "list", label: "List", href: `/orders${query({ ...f, view: "list" })}` },
+            { value: "reservations", label: "Reservations", href: "/reservations" },
+          ]}
+        />
+      </div>
+      <Chips label="Type" current={f.kind} options={[{ value: "", label: "All types", href: `/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/orders${query({ ...f, kind: k.kind })}` }))]} />
+      {!board && !issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
+      <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: board ? "" : "list" }} />
+      {board && orders.length > 0 ? (
+        <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
+      ) : (
       <Sheet>
         {orders.length === 0 ? (
-          <Empty icon="issuance" title="No orders here" />
+          <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={info ? listHref(info) : "/orders"} may={may} />
         ) : (
-          <Table head={["Order", "For", "Kind", "From", "Status", issued ? "Issued" : "Needed by", " Units", " Value"]} min="56rem">
+          <Table head={["Order", info ? info.recipient.label : "Recipient", ...(info ? [] : ["Type"]), "Warehouse", "Status", issued ? "Issued" : "Required date", " Units", ...(info && !info.priced ? [] : [" Value"])]} min="52rem">
             {orders.map((o) => (
               <tr key={o.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/orders/${o.id}`}>{o.number}</RowLink></Td>
                 <Td>{o.recipient}</Td>
-                <Td className="text-ink-2">{ORDER_KINDS[o.kind]}</Td>
+                {!info && <Td className="text-ink-2">{ORDER_KINDS[o.kind]}</Td>}
                 <Td>{o.warehouse.code}</Td>
                 <Td><OrderStamp status={o.status} /></Td>
                 <Td className="whitespace-nowrap">{issued ? at(o.issuedAt) : day(o.neededOn)}</Td>
                 <Td num>{fmt.count(o.units)}</Td>
-                <Td num>{o.total ? fmt.peso(o.total) : "—"}</Td>
+                {(!info || info.priced) && <Td num>{o.total ? fmt.peso(o.total) : "—"}</Td>}
               </tr>
             ))}
           </Table>
         )}
       </Sheet>
+      )}
+      {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "order" : "orders"} />}
     </>
   );
 }
@@ -60,57 +99,56 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
-  const o = await load<Order>(`/inventory/orders/${enc(id)}`);
+  const { order: o } = await loadQuery<{ order: Order }>(`query Order($id: String!) { order(id: $id) }`, { id }, ["order"]);
   const held = o.status === "confirmed" || o.status === "picking";
-  // The batches each batch-tracked line could come from, soonest to expire first.
-  const pickLines: PickLine[] = held && may("orders.issue")
-    ? await Promise.all(o.lines.map(async (l) => ({
-        id: l.id,
-        product: l.product,
-        quantity: l.quantity,
-        batches: l.product.trackBatches
-          ? (await load<BatchRow[]>(`/inventory/batches${query({ product: l.product.id, warehouse: o.warehouse.id })}`)).map((b) => ({ id: b.id, label: `${b.batchNo}${b.expiresOn ? `, expires ${day(b.expiresOn)}` : ""} (${b.onHand})` }))
-          : [],
-      })))
+  // The batches each batch-tracked line could come from, soonest to expire
+  // first: the warehouse's batches in one read, rather than one per line.
+  const picking = held && may("orders.issue");
+  const { batches } = picking && o.lines.some((l) => l.product.trackBatches)
+    ? await loadQuery<{ batches: BatchRow[] }>(`query Batches($w: String) { batches(warehouse: $w) }`, { w: o.warehouse.id }, ["batches"])
+    : { batches: [] as BatchRow[] };
+  const pickLines: PickLine[] = picking
+    ? o.lines.map((l) => ({ id: l.id, product: l.product, quantity: l.quantity, batches: l.product.trackBatches ? batchChoices(batches, l.product.id, day) : [] }))
     : [];
   const short = o.lines.filter((l) => l.available !== null && l.available < l.quantity);
 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/orders", label: "Orders" }]}
+        crumbs={[{ href: listHref(kindOf(o.kind)!), label: kindOf(o.kind)!.plural }]}
         title={o.number}
         tools={o.status === "draft" && (
           <RecordTools what="order" name={o.number} editHref={may("orders.edit") ? `/orders/${o.id}/edit` : undefined} remove={may("orders.edit") ? deleteOrder.bind(null, o.id) : undefined} after="/orders" />
         )}
         actions={
           <>
+            <PrintLink href={`/print/orders/${o.id}`} />
             {o.status === "draft" && may("orders.approve") && (
-              <StepButton run={orderStep.bind(null, o.id, "confirm")} label="Confirm & reserve stock" done="Stock reserved for this order" variant="primary" />
+              <StepButton run={orderStep.bind(null, o.id, "confirm")} label="Confirm and reserve stock" done="Stock reserved for this order" variant="primary" />
             )}
             {o.status === "confirmed" && (may("orders.issue") || may("orders.approve")) && (
-              <StepButton run={orderStep.bind(null, o.id, "pick")} label="Start picking" done="Picking: the stock is allocated" />
+              <StepButton run={orderStep.bind(null, o.id, "pick")} label="Start picking" done="Picking started; stock allocated" />
             )}
             {(o.status === "draft" ? may("orders.edit") : held && may("orders.approve")) && (
-              <StepButton run={orderStep.bind(null, o.id, "cancel")} label="Cancel order" done="Order cancelled" variant="quiet" confirm={{ title: `Cancel ${o.number}?`, body: held ? "The stock it holds is let go for others." : undefined, danger: true }} />
+              <StepButton run={orderStep.bind(null, o.id, "cancel")} label="Cancel order" done="Order cancelled" variant="quiet" confirm={{ title: `Cancel ${o.number}?`, body: held ? "Its reserved stock is released." : undefined, danger: true }} />
             )}
           </>
         }
       >
-        <OrderStamp status={o.status} /> <span className="ml-1">{ORDER_KINDS[o.kind]} for <strong>{o.recipient}</strong>, from {o.warehouse.name}{o.neededOn && <>, needed by {day(o.neededOn)}</>}</span>
+        <OrderStamp status={o.status} /> <span className="ml-1">{ORDER_KINDS[o.kind]} for <strong>{o.recipient}</strong>, from {o.warehouse.name}{o.neededOn && <>, required by {day(o.neededOn)}</>}</span>
       </PageHeader>
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
-          { label: "Written up", who: o.createdBy, when: at(o.createdAt) },
-          { label: "Confirmed & reserved", who: o.confirmedBy, when: o.confirmedAt ? at(o.confirmedAt) : null },
+          { label: "Created", who: o.createdBy, when: at(o.createdAt) },
+          { label: "Confirmed and reserved", who: o.confirmedBy, when: o.confirmedAt ? at(o.confirmedAt) : null },
           { label: "Issued", who: o.issuedBy, when: o.issuedAt ? at(o.issuedAt) : null },
         ]} />
         {o.notes && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{o.notes}</p>}
       </Sheet>
 
       <Sheet className="mt-5">
-        <Table head={["Product", " Quantity", ...(o.status === "draft" ? [" Available now"] : []), ...(o.status === "issued" ? ["Taken from"] : []), " Unit price", " Amount"]}>
+        <Table head={["Product", " Quantity", ...(o.status === "draft" ? [" Available now"] : []), ...(o.status === "issued" ? ["Picked from"] : []), " Unit price", " Amount"]}>
           {o.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
@@ -129,37 +167,69 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
         </Table>
       </Sheet>
       {o.status === "draft" && short.length > 0 && (
-        <p className="mt-3 text-meta text-eosin">Not enough is available for {short.map((l) => l.product.name).join(", ")}: it can&apos;t be confirmed until there is.</p>
+        <p className="mt-3 text-meta text-eosin">Insufficient stock available for {short.map((l) => l.product.name).join(", ")}. The order cannot be confirmed until stock is available.</p>
       )}
 
       {held && may("orders.issue") && (
-        <Sheet className="mt-6 px-5 pt-4 pb-5">
-          <SectionTitle icon="issuance">Issue it</SectionTitle>
-          <p className="mb-3 text-meta text-ink-3">Stock leaves {o.warehouse.name} now, and the reservation is let go.</p>
-          <PickForm kind="order" documentId={o.id} lines={pickLines} label="Issue & ship" />
+        <Sheet className="mt-6 scroll-mt-6 px-5 pt-4 pb-5" id="issue">
+          <SectionTitle icon="issuance">Issue stock</SectionTitle>
+          <p className="mb-3 text-meta text-ink-3">Stock is issued from {o.warehouse.name} and the reservation is released.</p>
+          <PickForm kind="order" documentId={o.id} lines={pickLines} label="Issue and ship" />
         </Sheet>
       )}
       {o.status === "issued" && may("stock.view") && (
-        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-hema hover:underline">See its movements</Link></p>
+        <p className="mt-4 text-meta"><Link href={`/movements${query({ q: o.number })}`} className="text-ink hover:underline">View stock movements</Link></p>
       )}
     </>
   );
 }
 
-/** What's free, per product per warehouse, for the order and transfer forms. */
-export async function availability(): Promise<Record<string, number>> {
-  const stock = await load<StockOverview>("/inventory/stock");
-  return Object.fromEntries(stock.items.map((r) => [`${r.product.id}:${r.warehouse.id}`, r.available]));
-}
+/** The order form's lists, with what's free per product per warehouse ("productId:warehouseId" → units). */
+const ORDER_FORM = `${referenceOf("products", "units", "warehouses")} availability`;
+type OrderFormData = { reference: Pick<Reference, "products" | "units" | "warehouses">; availability: Record<string, number> };
 
-export async function NewOrderPage() {
-  const { me, may } = await context();
-  if (!may("orders.create")) return <NoAccess what="writing orders" />;
-  const [ref, available] = await Promise.all([load<Reference>("/inventory/reference"), availability()]);
+/** New order with no kind: which one, each with what it's for, as the CRM's Add customer asks the type first. */
+export async function NewOrderChooser() {
+  const { may } = await context();
+  if (!may("orders.create")) return <NoAccess what="creating orders" />;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order" />
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
+      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="New order">
+        Select the order type.
+      </PageHeader>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {KINDS.map((k) => (
+          <Link key={k.kind} href={newHref(k)} className="group flex gap-4 rounded-xl border border-rule bg-sheet px-5 py-4 transition-colors hover:border-ink">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-hema-tint text-sage-deep">
+              <Icon name={k.icon} className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink group-hover:underline">{k.newLabel}</span>
+              <span className="mt-0.5 block text-meta text-ink-3">{k.intro}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export async function NewOrderPage({ params }: { params: Params<{ kind: string }> }) {
+  const info = kindBySlug((await params).kind);
+  if (!info) notFound();
+  const { me, may } = await context();
+  if (!may("orders.create")) return <NoAccess what="creating orders" />;
+  const crumbs = [{ href: listHref(info), label: info.plural }];
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "stock"], then: newHref(info), title: info.newLabel, doing: `create a ${info.one}`, crumbs, may });
+  if (gate) return gate;
+  const { reference: ref, availability: available } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability"]);
+  return (
+    <>
+      <PageHeader crumbs={crumbs} title={info.newLabel}>
+        {info.intro}
+      </PageHeader>
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} kind={info.kind} />
     </>
   );
 }
@@ -167,31 +237,39 @@ export async function NewOrderPage() {
 export async function EditOrderPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { me, may } = await context();
-  if (!may("orders.edit")) return <NoAccess what="changing orders" />;
-  const [o, ref, available] = await Promise.all([load<Order>(`/inventory/orders/${enc(id)}`), load<Reference>("/inventory/reference"), availability()]);
+  if (!may("orders.edit")) return <NoAccess what="editing orders" />;
+  const { order: o, reference: ref, availability: available } = await loadQuery<OrderFormData & { order: Order }>(
+    `query EditOrder($id: String!) { order(id: $id) ${ORDER_FORM} }`,
+    { id },
+    ["order", "reference", "availability"],
+  );
   return (
     <>
-      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} />
+      <PageHeader crumbs={[{ href: listHref(kindOf(o.kind)!), label: kindOf(o.kind)!.plural }, { href: `/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} kind={o.kind} />
     </>
   );
 }
 
-export async function ReservationsPage() {
+export async function ReservationsPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
-  const rows = await load<Reservation[]>("/inventory/reservations");
+  const { page, size, vars } = paging(await searchParams);
+  const base = "/reservations";
+  const { reservations: list } = await loadQuery<{ reservations: Paged<Reservation> }>("query Reservations($limit: Int, $offset: Int) { reservations(limit: $limit, offset: $offset) }", vars, ["reservations"]);
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   return (
     <>
-      <PageHeader title="Reservations">Stock held for open orders: reserved once confirmed, allocated while it&apos;s being picked. Nobody else can take it.</PageHeader>
+      <PageHeader crumbs={[{ href: "/orders", label: "Orders" }]} title="Reservations">Stock reserved for open orders: reserved on confirmation and allocated during picking. Reserved stock is not available to other orders.</PageHeader>
       <Sheet>
         {rows.length === 0 ? (
-          <Empty icon="issuance" title="Nothing is held" />
+          <Empty icon="issuance" title="No reservations" />
         ) : (
-          <Table head={["Product", "Order", "For", "Warehouse", "Needed by", "State", " Quantity"]} min="52rem">
+          <Table head={["Product", "Order", "Recipient", "Warehouse", "Required date", "Status", " Quantity"]} min="52rem">
             {rows.map((r, i) => (
               <tr key={i} className="relative hover:bg-bench/40">
-                <Td><Link href={`/products/${r.product.id}`} className="font-semibold hover:text-hema hover:underline">{r.product.name}</Link></Td>
+                <Td><Link href={`/products/${r.product.id}`} className="font-semibold hover:text-ink hover:underline">{r.product.name}</Link></Td>
                 <Td><RowLink href={`/orders/${r.order.id}`}>{r.order.number}</RowLink></Td>
                 <Td>{r.order.recipient}</Td>
                 <Td>{r.warehouse.code}</Td>
@@ -203,6 +281,7 @@ export async function ReservationsPage() {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "line" : "lines"} />
     </>
   );
 }

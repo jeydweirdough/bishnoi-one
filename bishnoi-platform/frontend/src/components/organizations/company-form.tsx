@@ -102,25 +102,25 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
         <Field
           label="Name"
           error={fields.name}
-          hint={!company && (slug ? <>Other applications will know it as <b className="font-semibold text-ink-2">{slug}</b>.</> : "Its address is made from the name.")}
+          hint={!company && (slug ? <>Company code: <b className="font-semibold text-ink-2">{slug}</b>.</> : "The company code is generated from the name.")}
           className="sm:col-span-2"
         >
           {(p) => <Input {...p} value={values.name} onChange={set("name")} autoFocus={!company} required />}
         </Field>
         {company && (
           <Field
-            label="Address"
+            label="Company code"
             error={fields.slug}
-            hint="Other applications find the company by this. Change it only if they're told."
+            hint="Other applications identify the company by this code. Change it only after informing them."
             className="sm:col-span-2"
           >
             {(p) => <Input {...p} value={values.slug} onChange={set("slug")} autoCapitalize="none" spellCheck={false} />}
           </Field>
         )}
-        <Field label="Currency" error={fields.currency} hint="Three letters, like PHP.">
+        <Field label="Currency" error={fields.currency} hint="Three-letter code, e.g. PHP.">
           {(p) => <Input {...p} value={values.currency} onChange={set("currency")} maxLength={3} autoCapitalize="characters" />}
         </Field>
-        <Field label="Time zone" error={fields.timezone} hint="Like Asia/Manila.">
+        <Field label="Time zone" error={fields.timezone} hint="E.g. Asia/Manila.">
           {(p) => <Input {...p} value={values.timezone} onChange={set("timezone")} spellCheck={false} />}
         </Field>
         <Field label="Contact email" optional error={fields.contactEmail} className="sm:col-span-2">
@@ -135,9 +135,9 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
         <>
           <fieldset className="space-y-2">
             <legend className="mb-1">
-              <Subheading>Applications it gets</Subheading>
+              <Subheading>Assigned applications</Subheading>
             </legend>
-            <p className="text-meta text-ink-3">Its people can only be given these. You can change this later.</p>
+            <p className="text-meta text-ink-3">Users can only be given access to these. This can be changed later.</p>
             {applications.length === 0 ? (
               <p className="text-meta text-ink-3">No applications are registered yet.</p>
             ) : (
@@ -160,14 +160,14 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
 
           <fieldset className="space-y-3">
             <legend className="mb-1">
-              <Subheading>Who runs it</Subheading>
+              <Subheading>Company admin</Subheading>
             </legend>
-            <p className="text-meta text-ink-3">Optional. They join as its first company admin. Give both, or leave both empty.</p>
+            <p className="text-meta text-ink-3">Optional. Added as the first company admin. Enter both, or leave both blank.</p>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Their name" optional error={fields.adminName}>
+              <Field label="Admin name" optional error={fields.adminName}>
                 {(p) => <Input {...p} value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} />}
               </Field>
-              <Field label="Their email" optional error={fields.adminEmail}>
+              <Field label="Admin email" optional error={fields.adminEmail}>
                 {(p) => <Input {...p} type="email" inputMode="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} />}
               </Field>
             </div>

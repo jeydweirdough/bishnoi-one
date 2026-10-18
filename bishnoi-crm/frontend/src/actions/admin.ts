@@ -9,8 +9,8 @@ import type { AdminUserRow, CustomerType, CustomerTypeColor, RoleRow, Scope, Tea
 // permission and every rule (nobody left able to administer, a role in use
 // can't go); these only carry the request and hand back what it said.
 
-export type NewUser = { email: string; fullName: string; roleId: string; teamId: string | null; password: string };
-export type UserChange = Partial<{ email: string; fullName: string; roleId: string; teamId: string | null; isActive: boolean }>;
+export type NewUser = { email: string; fullName: string; roleId: string; teamId: string | null; otherTeamIds: string[]; password: string };
+export type UserChange = Partial<{ email: string; fullName: string; roleId: string; teamId: string | null; otherTeamIds: string[]; isActive: boolean }>;
 
 export async function createUser(input: NewUser): Promise<Result<AdminUserRow>> {
   return attempt(async () => {
@@ -61,7 +61,7 @@ export async function deleteRole(id: string): Promise<Result> {
   });
 }
 
-export type TeamInput = { name: string; description: string | null; headquarters: string[] };
+export type TeamInput = { name: string; description: string | null; headquarters: string[] ; managerId?: string | null };
 
 export async function createTeam(input: TeamInput): Promise<Result<TeamRow>> {
   return attempt(async () => {
@@ -89,7 +89,7 @@ export async function deleteTeam(id: string): Promise<Result> {
 
 // --- customer types ---
 
-export type CustomerTypeChange = Partial<{ name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean }>;
+export type CustomerTypeChange = Partial<{ name: string; color: CustomerTypeColor; sortOrder: number; isActive: boolean; onlyTeams: string[]; exceptTeams: string[] }>;
 
 /** A new type (no code yet), or a change to one. Answers with the whole list. */
 export async function saveCustomerType(code: string | null, change: CustomerTypeChange): Promise<Result<CustomerType[]>> {

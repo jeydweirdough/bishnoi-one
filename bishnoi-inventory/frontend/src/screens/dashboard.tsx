@@ -1,167 +1,246 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { LinkButton } from "@/src/platform/ui/button";
-import { Bars } from "@/src/platform/ui/bars";
-import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { load } from "@/src/platform/lib/api";
-import { AlertList } from "../components/alerts";
-import { Figures, NoAccess } from "../components/ui";
-import { MOVEMENT_KINDS, ORDER_KINDS, referenceHref, signed } from "../lib/labels";
-import { context } from "../lib/page";
-import type { Dashboard } from "../lib/types";
+import { Icon, type IconName } from "@/src/platform/ui/icons";
+import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { loadQuery } from "@/src/platform/lib/api";
+import { MonthBars, TrendLine } from "../components/home-charts";
+import { POStamp, POStatusIcon } from "../components/stamps";
+import { NoAccess, Table } from "../components/ui";
+import { context, type Search } from "../lib/page";
+import type { Dashboard, PurchaseHome } from "../lib/types";
 
 export const metadata = { title: "Dashboard" };
 
-export default async function DashboardPage() {
-  const { fmt, may, at } = await context();
+// Home, read top to bottom: a greeting; four figures, each with how it compares
+// with last month and its twelve-month line; the months as bars beside the
+// latest purchase orders; then what's on its way beside what needs attention.
+
+/** This month against last, in words: "+21% vs last month". */
+function change(now: number, before: number): { text: string; tone: "up" | "down" | "flat" } {
+  if (!before) return { text: now ? "New" : "—", tone: "flat" };
+  const pct = Math.round(((now - before) / before) * 100);
+  return { text: `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${Math.abs(pct)}%`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+}
+
+function Card({ icon, label, value, note, trend, href }: { icon: IconName; label: string; value: string; note: ReactNode; trend?: ReactNode; href: string }) {
+  return (
+    <Link href={href} className="group block rounded-xl border border-rule bg-sheet px-5 py-4 transition-colors hover:border-rule-strong">
+      <p className="flex items-center gap-2.5 border-b border-dashed border-rule pb-3 text-sm font-medium text-ink">
+        <span className="grid size-8 place-items-center rounded-lg border border-rule text-ink-2">
+          <Icon name={icon} className="size-4" />
+        </span>
+        {label}
+      </p>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{value}</p>
+          <p className="mt-1 text-meta text-ink-3">{note}</p>
+        </div>
+        {trend}
+      </div>
+    </Link>
+  );
+}
+
+function Change({ c }: { c: ReturnType<typeof change> }) {
+  const tone = c.tone === "up" ? "text-sage-deep" : c.tone === "down" ? "text-danger" : "text-ink-3";
+  return (
+    <>
+      <span className={`font-semibold ${tone}`}>{c.text}</span> vs last month
+    </>
+  );
+}
+
+function itemOf(po: PurchaseHome): string {
+  if (!po.firstItem) return "No lines";
+  return po.moreItems ? `${po.firstItem} and ${po.moreItems} more` : po.firstItem;
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Search }) {
+  const { me, fmt, may, day } = await context();
   if (!may("dashboard.view")) return <NoAccess what="the dashboard" />;
-  const d = await load<Dashboard>("/inventory/dashboard");
+  const { dashboard: d } = await loadQuery<{ dashboard: Dashboard }>("query Dashboard { dashboard }", {}, ["dashboard"]);
   const t = d.totals;
+  const chart = (await searchParams).chart === "received" ? "received" : "issued";
+  const series = d.trend;
+  const [now, last] = [series[series.length - 1], series[series.length - 2]];
+  const average = Math.round(series.reduce((n, p) => n + p[chart], 0) / Math.max(1, series.length));
+  const yearTotal = series.reduce((n, p) => n + p[chart], 0);
+  const firstName = me.user.fullName.split(" ")[0];
 
   return (
     <>
-      <PageHeader
-        title="Inventory"
-        actions={
-          <>
-            {may("receiving.receive") && (
-              <LinkButton href="/receipts/new" icon={<Plus className="size-4" aria-hidden />}>
-                Receive stock
-              </LinkButton>
-            )}
-            {may("orders.create") && (
-              <LinkButton href="/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                New order
-              </LinkButton>
-            )}
-          </>
-        }
-      >
-        What you have, where it is, what&apos;s moving, and what needs attention.
-      </PageHeader>
-
-      <Figures
-        items={[
-          { label: "Products", value: fmt.count(t.products), href: "/products" },
-          { label: "Units on hand", value: fmt.count(t.units), href: "/stock" },
-          { label: "Stock value (at cost)", value: fmt.pesoCompact(t.value), href: "/reports/valuation" },
-          { label: "Low stock", value: fmt.count(t.low), flag: t.low > 0, href: "/stock?state=low" },
-          { label: "Out of stock", value: fmt.count(t.out), flag: t.out > 0, href: "/stock?state=out" },
-          { label: "Batches expiring", value: fmt.count(t.expiring), flag: t.expiring > 0, href: "/batches?expiry=expiring" },
-        ]}
-      />
-
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Sheet className="px-5 pt-4 pb-4">
-          <SectionTitle icon="alerts" action={<Link href="/alerts" className="text-meta text-hema hover:underline">All alerts</Link>}>
-            Needs attention
-          </SectionTitle>
-          <AlertList alerts={d.alerts} compact />
-        </Sheet>
-
-        <Sheet className="px-5 pt-4 pb-4">
-          <SectionTitle icon="warehouses" action={<Link href="/warehouses" className="text-meta text-hema hover:underline">Warehouses</Link>}>
-            Stock by warehouse
-          </SectionTitle>
-          {d.warehouses.length === 0 ? (
-            <Empty title="No warehouses yet" icon="warehouses">
-              Add a warehouse, then receive stock into it.
-            </Empty>
-          ) : (
-            <>
-              <Bars rows={d.warehouses.map((w) => ({ label: `${w.name} · ${fmt.pesoCompact(w.value)}`, value: w.units, href: `/warehouses/${w.id}` }))} unit="units" />
-              <p className="mt-3 text-meta text-ink-3">
-                {fmt.count(t.reserved)} units held for orders · {fmt.count(t.inTransit)} in transit
-              </p>
-            </>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-ink">
+            {fmt.greeting()}, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-ink-2">Stock, orders and deliveries across {fmt.plural(d.warehouses.length, "warehouse")}.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {may("receiving.receive") && (
+            <LinkButton href="/receipts/new" icon={<Plus className="size-4" aria-hidden />}>
+              Receive stock
+            </LinkButton>
           )}
-        </Sheet>
+          {may("orders.create") && (
+            <LinkButton href="/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+              New order
+            </LinkButton>
+          )}
+        </div>
       </div>
 
-      {d.recentMovements.length > 0 && (
-        <Sheet className="mt-5 px-5 pt-4 pb-3">
-          <SectionTitle icon="history" action={<Link href="/movements" className="text-meta text-hema hover:underline">Every movement</Link>}>
-            Recent stock movements
-          </SectionTitle>
-          <ul className="mt-1 divide-y divide-rule">
-            {d.recentMovements.map((m) => {
-              const href = referenceHref(m.referenceType, m.referenceId);
-              return (
-                <li key={m.id} className="grid gap-x-4 py-2.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)_6rem]">
-                  <span className="text-meta text-ink-3 tabular-nums">{at(m.at)}</span>
-                  <span className="min-w-0">
-                    <Link href={`/products/${m.product.id}`} className="font-semibold hover:text-hema hover:underline">
-                      {m.product.name}
-                    </Link>
-                    <span className="text-ink-2"> · {MOVEMENT_KINDS[m.kind]} · {m.warehouse.code}</span>
-                    <span className="block text-meta text-ink-3">
-                      {href ? <Link href={href} className="hover:text-hema hover:underline">{m.reference}</Link> : m.reference} · {m.user}
-                    </span>
-                  </span>
-                  <span className={`text-right font-semibold tabular-nums ${m.quantity < 0 ? "text-ink" : "text-hema"}`}>{signed(m.quantity, fmt.count)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Sheet>
-      )}
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        {may("receiving.view") && (
-          <Sheet className="px-5 pt-4 pb-3">
-            <SectionTitle icon="receiving" action={<Link href="/receipts" className="text-meta text-hema hover:underline">All receiving</Link>}>
-              Recently received
-            </SectionTitle>
-            {d.recentReceipts.length === 0 ? (
-              <p className="py-3 text-meta text-ink-3">Nothing received yet.</p>
-            ) : (
-              <ul className="mt-1 divide-y divide-rule">
-                {d.recentReceipts.map((r) => (
-                  <li key={r.id} className="flex items-baseline justify-between gap-3 py-2.5 text-sm">
-                    <span className="min-w-0">
-                      <Link href={`/receipts/${r.id}`} className="font-semibold hover:text-hema hover:underline">
-                        {r.number}
-                      </Link>
-                      <span className="text-ink-2"> · {r.supplier?.name ?? "No supplier"}</span>
-                      <span className="block text-meta text-ink-3">
-                        {at(r.receivedAt)} · {r.warehouse.code}
-                        {r.order && <> · {r.order.number}</>}
-                      </span>
-                    </span>
-                    <span className="shrink-0 tabular-nums">{fmt.count(r.units)} units</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card
+          icon="issuance"
+          label="Open orders"
+          value={fmt.count(d.openOrders)}
+          note={<Change c={change(now?.orders ?? 0, last?.orders ?? 0)} />}
+          trend={<TrendLine values={series.map((p) => p.orders)} label="Orders per month, last 12 months" />}
+          href="/orders?status=confirmed"
+        />
+        <Card
+          icon="receiving"
+          label="Received this month"
+          value={`${fmt.count(now?.received ?? 0)} units`}
+          note={<Change c={change(now?.received ?? 0, last?.received ?? 0)} />}
+          trend={<TrendLine values={series.map((p) => p.received)} label="Units received per month, last 12 months" />}
+          href="/receipts"
+        />
+        <Card
+          icon="stock"
+          label="Issued this month"
+          value={`${fmt.count(now?.issued ?? 0)} units`}
+          note={<Change c={change(now?.issued ?? 0, last?.issued ?? 0)} />}
+          trend={<TrendLine values={series.map((p) => p.issued)} label="Units issued per month, last 12 months" />}
+          href="/orders?status=issued"
+        />
+        <Card
+          icon="warehouses"
+          label="Stock value at cost"
+          value={fmt.pesoCompact(t.value)}
+          note={
+            <>
+              {fmt.count(t.units)} units ·{" "}
+              <span className={t.out || t.low ? "font-semibold text-danger" : ""}>
+                {t.out} out, {t.low} low
+              </span>
+            </>
+          }
+          href="/reports/valuation"
+        />
+      </div>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="min-w-0 space-y-5">
+          <Sheet className="px-5 pt-4 pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-ink">Overview</h2>
+                <p className="mt-2 text-meta text-ink-3">Monthly average, last 12 months</p>
+                <p className="flex items-baseline gap-2">
+                  <span className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">{fmt.count(average)} units</span>
+                  <span className="rounded-md bg-hema-tint px-2.5 py-0.5 text-meta font-semibold text-sage-deep">{fmt.count(yearTotal)} in all</span>
+                </p>
+              </div>
+              <ToggleLinks
+                current={chart}
+                options={[
+                  { value: "issued", label: "Issued", href: "/" },
+                  { value: "received", label: "Received", href: "/?chart=received" },
+                ]}
+              />
+            </div>
+            <div className="mt-6">
+              <MonthBars
+                unit="units"
+                points={series.map((p) => ({ label: fmt.monthLabel(p.month).slice(0, 3), long: fmt.monthLabel(p.month), value: p[chart] }))}
+              />
+            </div>
           </Sheet>
-        )}
-        {may("orders.view") && (
-          <Sheet className="px-5 pt-4 pb-3">
-            <SectionTitle icon="issuance" action={<Link href="/orders?status=issued" className="text-meta text-hema hover:underline">All issued</Link>}>
-              Recently issued
-            </SectionTitle>
-            {d.recentIssues.length === 0 ? (
-              <p className="py-3 text-meta text-ink-3">Nothing issued yet.</p>
-            ) : (
-              <ul className="mt-1 divide-y divide-rule">
-                {d.recentIssues.map((o) => (
-                  <li key={o.id} className="flex items-baseline justify-between gap-3 py-2.5 text-sm">
-                    <span className="min-w-0">
-                      <Link href={`/orders/${o.id}`} className="font-semibold hover:text-hema hover:underline">
-                        {o.number}
+
+          {may("purchasing.view") && (
+            <Sheet className="overflow-hidden">
+              <div className="px-5 pt-4">
+                <SectionTitle icon="receiving" action={<Link href="/purchase-orders?status=ordered" className="text-meta text-ink hover:underline">View all</Link>}>
+                  Upcoming deliveries
+                </SectionTitle>
+              </div>
+              {d.upcoming.length === 0 ? (
+                <div className="px-5 pb-4">
+                  <Empty title="No open purchase orders" icon="purchaseOrders" actions={may("purchasing.create") && <LinkButton href="/purchase-orders/new" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}>
+                    Purchase orders placed with suppliers show here until they&apos;re received.
+                  </Empty>
+                </div>
+              ) : (
+                <Table head={["Order", "Product", " Quantity", "Expected", "Status"]} min="36rem">
+                  {d.upcoming.map((po) => (
+                    <tr key={po.id} className="hover:bg-bench/50">
+                      <td className="px-3 py-3 pl-5">
+                        <Link href={`/purchase-orders/${po.id}`} className="font-semibold whitespace-nowrap text-ink hover:underline">
+                          {po.number}
+                        </Link>
+                        <span className="block text-meta text-ink-3">{po.supplier.name}</span>
+                      </td>
+                      <td className="px-3 py-3 text-ink-2">
+                        {itemOf(po)}
+                        <span className="block text-meta text-ink-3">To {po.warehouse.name}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">{fmt.count(Math.max(0, po.ordered - po.received))}</td>
+                      <td className={`px-3 py-3 whitespace-nowrap ${po.late ? "font-semibold text-danger" : "text-ink-2"}`}>{day(po.expectedOn)}</td>
+                      <td className="px-3 py-3 pr-5">
+                        <POStamp status={po.status} late={po.late} />
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </Sheet>
+          )}
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          {may("purchasing.view") && (
+            <Sheet className="px-5 pt-4 pb-3">
+              <SectionTitle icon="purchaseOrders" action={<Link href="/purchase-orders" className="text-meta text-ink hover:underline">View all</Link>}>
+                Purchase history
+              </SectionTitle>
+              {d.recentPurchases.length === 0 ? (
+                <p className="py-3 text-meta text-ink-3">No purchase orders.</p>
+              ) : (
+                <ul className="divide-y divide-rule">
+                  {d.recentPurchases.map((po) => (
+                    <li key={po.id}>
+                      <Link href={`/purchase-orders/${po.id}`} className="flex gap-3 py-3 hover:opacity-80">
+                        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-hema-tint text-sage-deep">
+                          <Icon name="purchaseOrders" className="size-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold text-ink">{itemOf(po)}</span>
+                            <POStatusIcon status={po.status} late={po.late} />
+                          </span>
+                          <span className="mt-1.5 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-y-0.5 text-meta">
+                            <span className="text-ink-3">Order</span>
+                            <span className="truncate text-ink-2">{po.number}</span>
+                            <span className="text-ink-3">{po.status === "received" ? "Ordered" : "Expected"}</span>
+                            <span className="text-ink-2">{day(po.status === "received" ? po.orderedOn : po.expectedOn)}</span>
+                          </span>
+                        </span>
                       </Link>
-                      <span className="text-ink-2"> · {o.recipient}</span>
-                      <span className="block text-meta text-ink-3">
-                        {at(o.issuedAt)} · {ORDER_KINDS[o.kind]} · {o.warehouse.code}
-                      </span>
-                    </span>
-                    <span className="shrink-0 tabular-nums">{fmt.count(o.units)} units</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Sheet>
-        )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Sheet>
+          )}
+
+        </div>
       </div>
     </>
   );

@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { ActivityItem, CompanyDetail, CompanyRow, CompanyStatus, ContactDetail, CrmKind, Job, Paged } from "@/src/platform/lib/types";
+import type { ActivityItem, Assignable, CustomerType, CompanyDetail, CompanyRow, CompanyStatus, ContactDetail, CrmKind, Job, Paged } from "@/src/platform/lib/types";
 
 // Companies, contacts and activities. The API decides whose records someone
 // reaches and what their role lets them do; these carry the request and hand
@@ -93,7 +93,17 @@ export type ActivityInput = {
   durationMinutes: number | null;
   direction: "in" | "out" | null;
   ownerId: string | null;
+  /** A planned call: what it's for and the products to bring up (codes). */
+  objective?: string | null;
+  /** A meeting's (or an online call's) link. */
+  meetingLink?: string | null;
+  products?: string[];
+  /** Once done: what came of it, and the products discussed (codes). */
+  outcome?: string | null;
+  discussed?: string[];
   done?: boolean;
+  /** More customers it's about than its own: it shows on each. */
+  alsoCompanyIds?: string[];
 };
 
 export async function createActivity(input: ActivityInput): Promise<Result<ActivityItem>> {
@@ -175,4 +185,56 @@ export async function quickCustomer(name: string): Promise<Result<{ id: string; 
     refresh();
     return { id: made.id, name: made.name };
   });
+}
+
+// --- handing a customer to someone else ---
+
+export type TransferPerson = { id: string; name: string; employeeId: string; role: string; team: { id: string; name: string } | null };
+
+/** Who an employee ID names, shown before the customer goes to them. */
+export async function findTransferPerson(companyId: string, employeeId: string): Promise<Result<TransferPerson>> {
+  return attempt(() => api.get<TransferPerson>(`/companies/${enc(companyId)}/transfer?employeeId=${enc(employeeId.trim())}`));
+}
+
+/** Hands the customer, its contacts and its open deals to the person with that employee ID. */
+export async function transferCustomer(
+  companyId: string,
+  employeeId: string,
+): Promise<Result<{ to: TransferPerson; moved: { contacts: number; deals: number }; stillYours: boolean }>> {
+  return attempt(async () => {
+    const done = await api.post<{ to: TransferPerson; moved: { contacts: number; deals: number }; stillYours: boolean }>(
+      `/companies/${enc(companyId)}/transfer`,
+      { employeeId: employeeId.trim() },
+    );
+    if (done.stillYours) refresh();
+    return done;
+  });
+}
+
+// --- look-alikes while a new customer is typed in ---
+
+export type Lookalike = { id: string; name: string; teamName: string | null; city: string | null; owner: string | null; canOpen: boolean };
+
+/** Customers who may be this one: part of the name among one's own, the same name, email or phone among everyone's. */
+export async function findLookalikes(name: string, phone: string, email: string): Promise<Lookalike[]> {
+  const q = new URLSearchParams({ name: name.trim(), phone: phone.trim(), email: email.trim() });
+  return api.get<Lookalike[]>(`/companies/lookalikes?${q}`).catch(() => []);
+}
+
+/** What the add-customer pop-up offers: who customers can be assigned to (and so their divisions), and the types. */
+export async function addCustomerChoices(): Promise<{ people: Assignable[]; types: CustomerType[] }> {
+  const [people, types] = await Promise.all([api.get<Assignable[]>("/people/assignable"), api.get<CustomerType[]>("/customer-types")]);
+  return { people, types };
+}
+
+/** Customers a customer field can point at (a doctor's hospital), in any division, by name. */
+export async function findLinkOptions(field: string, q: string): Promise<{ id: string; name: string; teamName: string | null }[]> {
+  const query = new URLSearchParams({ field, q: q.trim() });
+  return api.get<{ id: string; name: string; teamName: string | null }[]>(`/companies/link-options?${query}`).catch(() => []);
+}
+
+/** What a new call offers: the catalogue's products on sale (none for a role that can't see them). */
+export async function callChoices(): Promise<{ products: { value: string; label: string }[] }> {
+  const list = await api.get<{ items: { code: string; name: string }[] }>("/products?active=true&limit=500").catch(() => ({ items: [] }));
+  return { products: list.items.map((p) => ({ value: p.code, label: p.name })) };
 }

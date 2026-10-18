@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     root: path.resolve(import.meta.dirname, ".."),
   },
   poweredByHeader: false,
+  // forbidden(): a page the person's role doesn't reach shows app/forbidden.tsx.
+  experimental: { authInterrupts: true },
   // Bishnoi One.exe runs the screens on each PC as a small server of their own
   // (its build sets BISHNOI_DESKTOP). Vercel builds are unchanged.
   ...(process.env.BISHNOI_DESKTOP ? { output: "standalone" as const } : {}),

@@ -13,7 +13,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const TABS = [
   { key: "platform", label: "Platform" },
-  { key: "monitoring", label: "Applications & monitoring" },
+  { key: "monitoring", label: "Applications and monitoring" },
   { key: "notifications", label: "Notifications" },
   { key: "security", label: "Security" },
 ] as const;
@@ -26,12 +26,12 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
 
   return (
     <>
-      <PageHeader title="Settings">How the platform runs. Each section saves on its own, and takes effect straight away.</PageHeader>
+      <PageHeader title="Settings">How the platform runs. Each section saves separately and takes effect immediately.</PageHeader>
 
       <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: t.key === "platform" ? "/settings" : `/settings?tab=${t.key}` }))} current={tab} />
 
       {readOnly && (
-        <p className="mb-4 text-meta text-ink-3">You can see every setting. Changing them takes a Platform Admin.</p>
+        <p className="mb-4 text-meta text-ink-3">Read only. Only a Platform Admin can change settings.</p>
       )}
 
       <div className="max-w-[44rem]">

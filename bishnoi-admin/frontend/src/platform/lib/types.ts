@@ -874,7 +874,8 @@ export type ExecutiveNotification = {
 };
 
 export type CountdownHighlight = {
-  entityType: "permit" | "immigration" | "document" | "property" | "ticket";
+  /** permit, immigration, document, property, ticket, vehicle_registration, vehicle_insurance, vehicle_pms, travel */
+  entityType: string;
   entityId: string;
   title: string;
   subtitle: string;
@@ -889,7 +890,7 @@ export type CountdownHighlight = {
 export type AreaHealth = { key: string; label: string; href: string; windowDays: number; total: number; current: number; dueSoon: number; overdue: number };
 
 /** Renewals falling due in a month ("YYYY-MM"), or already overdue ("overdue"), per area. */
-export type RenewalMonth = { month: string; permits: number; expatriates: number; documents: number; properties: number };
+export type RenewalMonth = { month: string; permits: number; expatriates: number; documents: number; properties: number; vehicles: number };
 
 export type ExecutiveDashboardSummary = {
   health: AreaHealth[];
@@ -902,6 +903,10 @@ export type ExecutiveDashboardSummary = {
     properties: { total: number; leasesExpiring: number };
     tickets: { totalOpen: number; urgent: number };
     notifications: { totalActive: number; unread: number; critical: number };
+    vehicles: { total: number; dueSoon: number; overdue: number };
+    fleetCards: { active: number; blocked: number; processing: number };
+    travel: { upcoming: number; waiting: number };
+    devices: { issued: number };
   };
   countdownHighlights: CountdownHighlight[];
 };

@@ -79,10 +79,10 @@ export function RateChangeForm({ codes, today }: { codes: TaxCode[]; today: stri
         <Field label="New rate (%)" error={fields.rateBp}>
           {(f) => <Input {...f} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="12" />}
         </Field>
-        <Field label="From" error={fields.validFrom}>
+        <Field label="Effective date" error={fields.validFrom}>
           {(f) => <Input {...f} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />}
         </Field>
-        <Field label="The law or circular behind it" error={fields.basis} className="sm:col-span-3">
+        <Field label="Legal basis" error={fields.basis} className="sm:col-span-3">
           {(f) => <Input {...f} value={basis} onChange={(e) => setBasis(e.target.value)} placeholder="RA 00000, sec. 00" />}
         </Field>
       </div>

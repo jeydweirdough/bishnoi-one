@@ -62,16 +62,16 @@ export function DuplicatePair({
         {[a, b].map((r) => (
           <label
             key={r.id}
-            className={`block cursor-pointer rounded-[3px] border px-4 py-3 ${keep === r.id ? "border-hema bg-hema/5" : "border-rule"} ${mayMerge ? "" : "cursor-default"}`}
+            className={`block cursor-pointer rounded-lg border px-4 py-3 ${keep === r.id ? "border-hema bg-hema/5" : "border-rule"} ${mayMerge ? "" : "cursor-default"}`}
           >
             <span className="flex items-start justify-between gap-3">
-              <Link href={`${path}/${r.id}`} className="font-medium text-hema hover:underline">
+              <Link href={`${path}/${r.id}`} className="font-medium text-ink hover:underline">
                 {r.name}
               </Link>
               {mayMerge && (
                 <span className="flex shrink-0 items-center gap-1.5 text-meta text-ink-2">
                   <input type="radio" name={`keep-${a.id}-${b.id}`} checked={keep === r.id} onChange={() => setKeep(r.id)} className="accent-hema" />
-                  Keep this one
+                  Keep this record
                 </span>
               )}
             </span>

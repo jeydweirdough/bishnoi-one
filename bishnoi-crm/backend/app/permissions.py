@@ -50,17 +50,18 @@ AREAS: tuple[Area, ...] = (
     Area("customers", "Customers & contacts", "CRM", CRUD),
     Area("deals", "Deals", "CRM", CRUD),
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "CRM", CRUD),
-    Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices")),
+    Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices", "approve")),
     Area("quotes", "Quotes", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
     Area("visits", "Visits & collections", "Field work", CRUD),
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.
-    Area("goals", "Goals & balances", "Field work", ("view", "manage", "import")),
-    # Money asked for ahead of spending it (a partnership dinner): funds.create
-    # asks, funds.approve approves the requests in reach; Finance releases it.
-    Area("funds", "Marketing requests", "Field work", ("view", "create", "approve")),
+    Area("goals", "Targets and balances", "Field work", ("view", "manage", "import")),
     Area("reports", "Reports", "Insight & tools", ("view", "export")),
+    # A manager's own department: its promos and bundles, quotation templates,
+    # attention rules, retention windows and people's targets. Only for the
+    # teams the role reaches; company-wide settings stay with admin.settings.
+    Area("department", "Department settings", "Administration", ("manage",)),
     Area("admin", "Administration", "Administration", ("users", "roles", "teams", "types", "settings", "audit")),
 )
 
@@ -77,8 +78,8 @@ ADMIN_PERMISSIONS: frozenset[str] = frozenset(p for p in ALL_PERMISSIONS if p.st
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
 
-SCOPES = ("own", "team", "all")
-SCOPE_LABELS = {"own": "Their own records", "team": "Their team's records", "all": "Every record"}
+SCOPES = ("own", "team", "managed", "all")
+SCOPE_LABELS = {"own": "Their own records", "team": "Their team's records", "managed": "The records of every team they manage", "all": "Every record"}
 
 
 def catalogue_out() -> list[dict]:
@@ -103,6 +104,7 @@ def _grant(*areas: str, actions: tuple[str, ...] = CRUD) -> set[str]:
 # holds every permission and can't be changed or deleted. The other two are
 # ordinary roles, there to start from.
 ADMINISTRATOR = "Administrator"
+MANAGER = "Manager"
 TEAM_LEAD = "Team Lead"
 SALESPERSON = "Salesperson"
 FIELD_AGENT = "Field agent"
@@ -120,7 +122,6 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
             | _grant("reports", actions=("view", "export"))
             | _grant("visits")
             | _grant("goals", actions=("view",))
-            | _grant("funds", actions=("view", "create", "approve"))
         ),
     ),
     (
@@ -130,21 +131,41 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         frozenset(
             _grant("customers", "deals", "activities", "quotes", "orders", actions=("view", "create", "edit"))
             | _grant("dashboard", "products", actions=("view",))
-            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )
 STARTING_ROLES += (
     (
+        MANAGER,
+        "Above the team leads: manages every team they're the manager of, and its people. Approves their quotes, sets their targets, and runs their department's settings.",
+        "managed",
+        frozenset(
+            dict(((r[0], r[3]) for r in STARTING_ROLES))[TEAM_LEAD]
+            | _grant("goals", actions=("view", "manage"))
+            | _grant("department", actions=("manage",))
+        ),
+    ),
+    (
+        "Finance",
+        "Curates baseline product prices and SRP, approves doctor's price, patient's price, and special price proposals from managers.",
+        "all",
+        frozenset(
+            _grant("products", actions=("view", "edit", "prices", "approve"))
+            | _grant("quotes", actions=("view", "approve"))
+            | _grant("orders", actions=("view", "approve"))
+            | _grant("reports", actions=("view", "export"))
+            | _grant("dashboard", actions=("view",))
+        ),
+    ),
+    (
         FIELD_AGENT,
-        "Visits their own doctors and collects what they owe; sees their own goals.",
+        "Visits their own accounts and collects what they owe; sees their own goals.",
         "own",
         frozenset(
             _grant("customers", actions=("view", "edit"))
             | _grant("visits", actions=("view", "create", "edit"))
             | _grant("activities", actions=("view", "create", "edit"))
             | _grant("dashboard", actions=("view",))
-            | _grant("funds", actions=("view", "create"))
         ),
     ),
 )

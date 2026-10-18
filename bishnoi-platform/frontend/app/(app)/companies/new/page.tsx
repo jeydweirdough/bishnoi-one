@@ -5,7 +5,7 @@ import { load } from "@/src/platform/lib/api";
 import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import type { Options } from "@/src/lib/types";
 
-export const metadata = { title: "Add a company" };
+export const metadata = { title: "Add company" };
 
 export default async function NewCompanyPage() {
   const refused = await adminsOnly();
@@ -13,8 +13,8 @@ export default async function NewCompanyPage() {
   const options = await load<Options>("/platform/options");
   return (
     <>
-      <PageHeader title="Add a company" crumbs={[{ href: "/companies", label: "Companies" }]}>
-        A company on the platform, with the applications its people may use.
+      <PageHeader title="Add company" crumbs={[{ href: "/companies", label: "Companies" }]}>
+        A company on the platform, with the applications its users can access.
       </PageHeader>
       <Sheet className="max-w-3xl px-5 py-5 sm:px-6">
         <CompanyForm applications={options.applications} />

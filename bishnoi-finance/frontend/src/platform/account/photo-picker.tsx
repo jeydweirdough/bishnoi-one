@@ -50,7 +50,7 @@ export function PhotoPicker({
         setError(result.fields?.photo ?? result.error);
         return;
       }
-      toast.success("Picture saved");
+      toast.success("Photo saved");
     });
     if (input.current) input.current.value = "";
   }
@@ -71,7 +71,7 @@ export function PhotoPicker({
             loading={saving}
             onClick={() => input.current?.click()}
           >
-            {photoAt ? "Change picture" : "Add a picture"}
+            {photoAt ? "Change photo" : "Add photo"}
           </Button>
           {photoAt && (
             <ConfirmButton
@@ -79,7 +79,7 @@ export function PhotoPicker({
               triggerSize="sm"
               triggerVariant="quiet"
               icon={<Trash2 className="size-4" aria-hidden />}
-              title={`Remove ${whose} picture?`}
+              title={`Remove ${whose} photo?`}
               body="Initials take its place. A new one can be added any time."
               confirmLabel="Remove"
               onConfirm={async () => {
@@ -88,7 +88,7 @@ export function PhotoPicker({
                   toast.error(result.error);
                   return false;
                 }
-                toast.success("Picture removed");
+                toast.success("Photo removed");
               }}
             />
           )}

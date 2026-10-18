@@ -22,7 +22,7 @@ type Props = {
   children: (close: () => void) => ReactNode;
 };
 
-export const TOOL = "inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] text-ink-3 transition-colors hover:bg-hema-tint hover:text-hema";
+export const TOOL = "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-hema-tint hover:text-hema";
 
 export function PanelButton({ label, title, icon, variant = "default", size = "md", tool = false, wide = false, children }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -51,13 +51,13 @@ export function PanelButton({ label, title, icon, variant = "default", size = "m
           ref={dialog}
           onClose={() => setOpen(false)}
           aria-labelledby={titleId}
-          className={`m-auto ${wide ? "w-[min(40rem,calc(100vw-2rem))]" : "w-[min(30rem,calc(100vw-2rem))]"} rounded-[3px] bg-sheet p-0 text-left text-ink shadow-overlay backdrop:bg-ink/30`}
+          className={`m-auto ${wide ? "w-[min(40rem,calc(100vw-2rem))]" : "w-[min(30rem,calc(100vw-2rem))]"} rounded-[22px] bg-sheet p-0 text-left text-ink shadow-overlay backdrop:bg-ink/30`}
         >
           <div className="flex items-center justify-between gap-3 border-b border-rule px-5 py-3">
             <h2 id={titleId} className="text-heading">
               {title}
             </h2>
-            <button type="button" onClick={close} className="rounded-[3px] p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
+            <button type="button" onClick={close} className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
               <X className="size-4" aria-hidden />
             </button>
           </div>

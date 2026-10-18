@@ -1,5 +1,6 @@
 "use client";
 
+import { JoinLink } from "./crm/join-link";
 import { Check, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
@@ -25,6 +26,8 @@ export type FollowUpRow = {
   doneByName?: string | null;
   doneAt?: string | null;
   canEdit: boolean;
+  /** A meeting's link: Join beside it. */
+  meetingLink?: string | null;
 };
 
 export function FollowUpItem({ row, today, org, showCustomer = true }: { row: FollowUpRow; today: string; org: Org; showCustomer?: boolean }) {
@@ -72,8 +75,8 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           aria-busy={pending || undefined}
           aria-label={done ? `Reopen: ${row.title}` : `Mark done: ${row.title}`}
           // 24px to look at, 40px to hit: marking done is the most repeated tap in the app.
-          className={`relative mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full border before:absolute before:-inset-2 ${
-            done ? "border-ink bg-ink text-white" : "border-control text-transparent hover:border-hema hover:text-hema"
+          className={`relative mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md border before:absolute before:-inset-2 ${
+            done ? "border-ink bg-ink text-white" : "border-control text-transparent hover:border-hema hover:text-ink"
           }`}
         >
           <Check className="size-3.5" aria-hidden />
@@ -88,7 +91,7 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
             <>
               <Link
                 href={row.href ?? `/companies/${row.customerId}`}
-                className="font-medium text-hema hover:underline"
+                className="font-medium text-ink hover:underline"
               >
                 {row.customerName}
               </Link>
@@ -97,6 +100,11 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           )}
           {meta}
         </p>
+        {row.meetingLink && !done && (
+          <div className="mt-1.5">
+            <JoinLink link={row.meetingLink} size="sm" />
+          </div>
+        )}
       </div>
       <div className="shrink-0 pt-0.5 text-right text-meta">
         {saving ? (

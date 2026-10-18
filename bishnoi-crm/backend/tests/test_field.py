@@ -17,8 +17,14 @@ HERE = {"latitude": 14.5547, "longitude": 121.0244, "accuracyM": 15}
 @pytest.fixture
 def field(app, client, ana) -> dict[str, dict]:
     """North: Fay and Finn (field agents) and Lia (their Team Lead). South: Sol
-    (field agent). Ana is the Administrator."""
+    (field agent). Ana is the Administrator. The company works as GetMeds does:
+    its field agents visit doctors (Settings → Terms, the Doctor type on)."""
     with app.state.sessions() as db:
+        from app.pricing import sales_settings
+        from app.terms import PHARMA
+
+        db.scalar(select(CustomerType).where(CustomerType.code == "doctor")).is_active = True
+        sales_settings(db).terms = dict(PHARMA)
         north, south = Team(name="North"), Team(name="South")
         db.add_all([north, south])
         db.flush()
@@ -146,3 +152,46 @@ def test_doctors_updated_counts_each_doctor_once_this_month(client, field):
     now = client.get("/field/performance", headers=field["fay"]).json()
     assert now["month"] == now["thisMonth"]
     assert now["people"][0]["actual"]["doctorsUpdated"] == 2
+
+
+def test_the_plan_tiers_zones_and_coverage(client, field):
+    # The Rx playbook's plan: each doctor a tier (visits a month) and a zone; the month's coverage of the list.
+    cruz, reyes, santos = (doctor(client, field, n, "fay") for n in ("Dr. Cruz", "Dr. Reyes", "Dr. Santos"))
+    sols = doctor(client, field, "Dr. Lim", "sol")
+    plan = client.put(f"/field/doctors/{cruz['id']}/plan", json={"tier": 1, "zone": "red"}, headers=field["fay"]).json()
+    assert (plan["tier"], plan["zone"], plan["visitsNeeded"]) == (1, "red", 4) and plan["zoneSetAt"]
+    client.put(f"/field/doctors/{reyes['id']}/plan", json={"tier": 3, "zone": "green"}, headers=field["fay"])
+    # Someone else's doctor isn't hers to plan; a zone that isn't one is refused.
+    assert client.put(f"/field/doctors/{sols['id']}/plan", json={"tier": 1}, headers=field["fay"]).status_code == 404
+    assert client.put(f"/field/doctors/{santos['id']}/plan", json={"zone": "blue"}, headers=field["fay"]).status_code == 422
+    # Clearing one leaves the other.
+    cleared = client.put(f"/field/doctors/{reyes['id']}/plan", json={"zone": None}, headers=field["fay"]).json()
+    assert (cleared["tier"], cleared["zone"]) == (3, None)
+
+    visit(client, field["fay"], reyes)
+    for day in (3, 10, 17, 24):
+        visit(client, field["fay"], cruz, visitedAt=f"{MONTH}-{day:02d}T09:00:00")
+    c = client.get("/field/coverage", params={"month": MONTH}, headers=field["fay"]).json()
+    assert (c["doctors"], c["visited"], c["coveragePct"], c["goalPct"]) == (3, 2, 67, 80)
+    tiers = {t["tier"]: t for t in c["tiers"]}
+    assert (tiers[1]["doctors"], tiers[1]["onPlan"]) == (1, 1) and (tiers[3]["doctors"], tiers[3]["onPlan"]) == (1, 1)
+    assert c["untiered"] == 1 and c["zones"] == {"red": 1, "yellow": 0, "green": 0, "none": 2}
+    # Her lead's list is the team's.
+    assert client.get("/field/coverage", params={"month": MONTH}, headers=field["lia"]).json()["doctors"] == 3
+
+    by_plan = client.get("/field/doctors", params={"sort": "plan"}, headers=field["fay"]).json()["items"]
+    assert [d["name"] for d in by_plan] == ["Dr. Cruz", "Dr. Reyes", "Dr. Santos"]
+    reds = client.get("/field/doctors", params={"zone": "red"}, headers=field["fay"]).json()["items"]
+    assert [d["name"] for d in reds] == ["Dr. Cruz"]
+    unzoned = client.get("/field/doctors", params={"zone": "none", "tier": 3}, headers=field["fay"]).json()["items"]
+    assert [d["name"] for d in unzoned] == ["Dr. Reyes"]
+
+
+def test_a_call_logged_as_a_visit(client, field):
+    # The Rx playbook's call: products detailed, and the Patient Care Group step; enrolling marks the doctor.
+    cruz = doctor(client, field, "Dr. Cruz", "fay")
+    v = visit(client, field["fay"], cruz, outcome="detailed", careGroup="enrolled")
+    assert (v["outcome"], v["careGroup"], v["amountCentavos"]) == ("detailed", "enrolled", 0)
+    row = next(d for d in client.get("/field/doctors", headers=field["fay"]).json()["items"] if d["id"] == cruz["id"])
+    assert row["careGroupAt"]
+    assert client.post("/visits", json={"companyId": cruz["id"], "outcome": "detailed", "careGroup": "maybe", "location": HERE}, headers=field["fay"]).status_code == 422

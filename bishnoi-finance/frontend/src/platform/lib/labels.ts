@@ -86,26 +86,26 @@ export const GOAL_STATUSES: Record<GoalStatus, string> = {
 
 export const PROMO_KINDS: Record<PromoKind, string> = {
   percent: "Percent off",
-  amount: "Amount off each",
+  amount: "Amount off per unit",
   free_goods: "Free goods",
   tiered: "Volume tiers",
 };
 
 export const QUOTE_STATES: Record<Quote["state"], string> = {
-  waiting: "Waiting on Finance",
+  waiting: "For Finance approval",
   ready: "Ready",
   rejected: "Rejected",
 };
 
 export const APPROVAL_STATUSES: Record<Quote["approval"]["status"], string> = {
   none: "Not needed",
-  pending: "Waiting",
+  pending: "For approval",
   approved: "Approved",
   rejected: "Rejected",
 };
 
 export const LETTER_STATUSES: Record<NonNullable<Quote["letter"]>["status"], string> = {
-  pending: "To check",
+  pending: "For verification",
   verified: "Verified",
   rejected: "Rejected",
 };
@@ -113,7 +113,7 @@ export const LETTER_STATUSES: Record<NonNullable<Quote["letter"]>["status"], str
 export const PAYMENT_STATUSES: Record<Quote["payment"]["status"], string> = {
   none: "—",
   unpaid: "Unpaid",
-  partial: "Part paid",
+  partial: "Partially paid",
   paid: "Paid",
 };
 

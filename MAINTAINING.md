@@ -19,8 +19,8 @@ The repo has three actions, in `.github/workflows/`:
 | Action | Runs when | What it does |
 |---|---|---|
 | **Sync branches** (`sync-branches.yml`) | any push to `main` or a `bishnoi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
-| **Deploy** (`deploy.yml`) | only by hand: **Run workflow** | Deploys to Vercel the apps you tick ([below](#deployments-on-vercel-only-when-you-ask)). |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `README.md`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Deploy** (`deploy.yml`) | only by hand: **Run workflow**, ticking the apps | Checks each ticked app is set up, then deploys it to Vercel, the Platform first; stops and says what to do when one isn't ([below](#deployments-on-vercel-only-when-you-ask)). |
 
 Set these once:
 
@@ -77,26 +77,44 @@ Then **merge** it. About a minute later, Sync branches creates the
 ## Deployments on Vercel: only when you ask
 
 Nothing deploys by itself. Vercel doesn't build from Git (every app's
-`vercel.json`, screens and API: `git.deploymentEnabled: false`), and the
-**Deploy** action (`.github/workflows/deploy.yml`) runs only when you press
-its button:
+`vercel.json`, screens and API: `git.deploymentEnabled: false`). One
+**Deploy** workflow runs only when you press its button
+(`.github/workflows/deploy.yml`; each app's steps are in `deploy-app.yml`).
 
 1. **Actions → Deploy → Run workflow** (branch `main`).
-2. Tick the apps to put online. Each says whether it's on Vercel, e.g. "CRM
-   (on Vercel: screens + API)" or "Pharmacy (not on Vercel yet)".
-3. Pick **screens and API**, **screens only** or **API only**. Tick **Skip a
-   part that hasn't changed** to leave out any that are already up to date.
-4. **Run workflow.** The run's summary is a table of every app: whether you
-   ticked it, its Vercel projects, and what this run did with it. An app
-   that isn't on Vercel is listed as skipped, never an error.
+2. Tick the apps to deploy: Platform, CRM, Inventory, Executive Admin, Finance,
+   Pharmacy, In-Licensing, Regulatory. Pick **screens and API**, **API only** or
+   **screens only** (for every ticked app), and whether to run the APIs' tests
+   first (on by default). The Platform goes first; the others follow once it's
+   done, side by side, and none follows a Platform deploy that failed.
+3. **Run workflow.** It goes in this order, and stops at the first step that
+   isn't right, before anything is deployed:
+   1. **Is it set up?** The app's code can run on Vercel; `VERCEL_TOKEN`
+      works; the app's Vercel projects exist with the right Root Directory;
+      their **Production** environment variables are there (names only, never
+      values: `.github/deploy.json` lists what each app needs); and the apps
+      it depends on are online (the CRM and Inventory need the Platform's API
+      first). The run's summary is a checklist: ✅ ready, ⚠️ optional and
+      missing, ❌ blocking, with **What to do before deploying**, step by step.
+   2. **Tests:** the API's tests, on GitHub's machines.
+   3. **Deploy the API**, then **the screens**, each checked afterwards (the
+      API's `/health`, the screens' sign-in page). An API that doesn't start
+      says which setting to look at.
+4. Blocked? Do the steps in the summary, then run it again.
+
+Order the first time: **Platform** first, then the CRM and Inventory, then
+the others. In-Licensing and Regulatory stop at the first check until their
+code is ready for Vercel (the summary says what's missing).
 
 - It deploys `main` as it is, to production. Commits get no Vercel checks,
   and the app branches get no preview builds.
-- Each project's last deployed commit is the tag `deployed/<project>` (the
-  repo's Tags show what's live).
-- Which folder goes to which project: `.github/deploy.json`. When an app gets
-  its Vercel projects, add them there, and change its "(not on Vercel yet)"
-  in `deploy.yml` to "(on Vercel: screens + API)".
+- Each project's last deployed commit is kept as `refs/deployed/<project>`:
+  `git ls-remote origin "refs/deployed/*"` shows what's live. (Not a tag: a
+  tag that moves clashes with everyone's copy on their next pull.) A bad deploy is put back from Vercel →
+  the project → Deployments → **Instant Rollback**.
+- Which folder goes to which project, and what each app needs:
+  `.github/deploy.json`. When an app gets its Vercel projects, add them under
+  `projects`; when its code is ready, set its `ready` to `true`.
 
 Set up once:
 
@@ -130,18 +148,24 @@ they call each other, so set them up in this order.
 1. **Database logins.** On Supabase, run `scripts/supabase/app-users.sql`
    (SQL Editor). It gives each app its own login; copy each app's address
    from the result (the pooler, port 6543).
-2. **Keys.** `node scripts/deploy-keys.mjs` prints every key the apps use to
-   trust each other, beside the project and setting each goes in. Shown once.
+2. **Key.** `node scripts/deploy-keys.mjs` prints the Platform's signing key
+   (`PASS_SIGNING_KEY`), the one key made by hand. Shown once. Every other key
+   comes from the Platform's Connections page (step 6).
 3. **Projects.** On Vercel, make any project that doesn't exist yet, named as
    in `.github/deploy.json` (`bishnoi-<app>` for the screens, Root Directory
    `bishnoi-<app>/frontend`; `bishnoi-<app>-backend` for the API, Root Directory
-   `bishnoi-<app>/backend`). The Deploy action stops with a message if one is
+   `bishnoi-<app>/backend`). The app's Deploy workflow stops with a message if one is
    missing.
 4. **Settings**, below (each project → Settings → Environment Variables →
    Production).
-5. **Deploy**: Actions → Deploy, tick the apps. APIs first, then screens.
+5. **Deploy**: Actions → Deploy, tick the apps (the Platform goes first). Each deploys its API, then its screens.
 6. **Platform > Applications:** set each app's address to its screens'
-   address. A Bishnoi One account opens an app only at that address.
+   address and its API. A Bishnoi One account opens an app only at that address.
+   Then **Platform > Connections:** switch on the links between the apps. Each
+   app's connect key is sent to its registered API address, signed, when it
+   first asks: nothing to copy onto Vercel.
+   A company's outside services (Zoho Books, Gmail, Outlook, Zoho Mail) are
+   filled in on the Platform too: **Companies > the company > Connections**.
 7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
    `FIRST_ADMIN_PASSWORD` from the project and redeploy.
 8. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
@@ -155,23 +179,14 @@ they call each other, so set them up in this order.
 | `DATABASE_URL` | Its login from step 1 |
 | `ALLOWED_HOSTS` | `["bishnoi-<app>-backend.vercel.app"]`, its own address |
 | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
-| `PLATFORM_PUBLIC_KEY` | From step 2 (not the Platform itself) |
+| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not the Platform itself): its public key is fetched from there |
 
 **Only some APIs:**
 
 | Project | Setting | Value |
 |---|---|---|
 | `bishnoi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
-| `bishnoi-inventory-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-finance-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-pharmacy-backend` | `INTEGRATION_KEYS` | From step 2 |
-| `bishnoi-crm-backend` | `INVENTORY_API_URL` | `https://nabhi-inventory-backend.vercel.app` |
-| | `INVENTORY_API_KEY` | From step 2 |
-| | `INVENTORY_APP_URL` | `https://nabhi-inventory.vercel.app` |
-| | `FINANCE_API_URL` | `https://nabhi-finance-backend.vercel.app` |
-| | `FINANCE_API_KEY` | From step 2 |
-| | `PHARMACY_API_URL` | `https://nabhi-pharmacy-backend.vercel.app` |
-| | `PHARMACY_API_KEY` | From step 2 |
+| `bishnoi-crm-backend` | `CRM_APP_URL` | `https://bishnoi-one-crm.vercel.app` (links in emails) |
 | | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
 
 **Every screens project** (`bishnoi-<app>`). The `NEXT_PUBLIC_` ones are built
@@ -179,13 +194,15 @@ in, so redeploy the screens after changing them:
 
 | Setting | Value |
 |---|---|
-| `API_URL` | Its own API, e.g. `https://nabhi-crm-backend.vercel.app` |
-| `PLATFORM_API_URL` | `https://nabhi-platform-backend.vercel.app` (announcements) |
-| `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` | `https://nabhi-platform.vercel.app` (the Bishnoi One account button; not on the Platform itself) |
-| `NEXT_PUBLIC_BISHNOI_CRM_URL`, `_INVENTORY_URL`, `_FINANCE_URL`, `_EXEC_URL`, `_PHARMACY_URL` | Each app's screens, for links between the apps |
+| `API_URL` | Its own API, e.g. `https://bishnoi-one-crm-backend.vercel.app` |
+| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not on the Platform itself) |
 
-Leave `SHOW_DEMO_ACCOUNTS` unset online. The addresses above are the
-defaults Vercel gives; use the real ones if a project has its own domain.
+That's all. Every other app's address (the sidebar's links between apps, the
+Bishnoi One account button, the redirects) is read from **Platform >
+Applications** as pages are served, kept 5 minutes: to move an app to a new
+domain, change it there, and every app follows without a redeploy. No
+`NEXT_PUBLIC_BISHNOI_*_URL` is needed; one that's set is only used while the
+Platform can't be reached. Leave `SHOW_DEMO_ACCOUNTS` unset online.
 
 What was checked before these were called ready (September 28, 2026): each
 app's tests, its production build, its migrations on a Supabase-like Postgres
@@ -207,7 +224,7 @@ Variables**, then redeploy it):
 2. **bishnoi-inventory-backend:** `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **bishnoi-crm-backend:**
    - `INVENTORY_API_URL` = the Inventory API's address, e.g.
-     `https://nabhi-inventory-backend.vercel.app` (no `/` at the end).
+     `https://bishnoi-one-inventory-backend.vercel.app` (no `/` at the end).
    - `INVENTORY_API_KEY` = the key.
    - `INVENTORY_APP_URL` = Inventory's screens, for the "Add it in Inventory"
      button (optional).
@@ -245,7 +262,7 @@ rules.
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `FINANCE_API_URL` = Finance's API address (e.g.
-   `https://nabhi-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
+   `https://bishnoi-one-finance-backend.vercel.app`, or `http://127.0.0.1:8303` on
    one computer) and `FINANCE_API_KEY` = the key.
 4. Restart both. In Finance, an admin fills in **Tax → Registration** (VAT
    status, registered name, TIN and address, as the invoice shows them).
@@ -300,7 +317,7 @@ ordered until a pharmacist in Pharmacy verifies its prescription.
    `INTEGRATION_KEYS` = `["crm:<the key>"]`.
 3. **CRM API** (`bishnoi-crm-backend`, or `bishnoi-crm/backend/.env`):
    `PHARMACY_API_URL` = Pharmacy's API address (e.g.
-   `https://nabhi-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
+   `https://bishnoi-one-pharmacy-backend.vercel.app`, or `http://127.0.0.1:8307` on
    one computer) and `PHARMACY_API_KEY` = the key.
 4. Restart both.
 
@@ -366,8 +383,9 @@ To set it up:
 1. Make the platform's key pair once: in `bishnoi-platform/backend`,
    `uv run python -m app.passes`. It prints both halves.
 2. Platform API on Vercel: `PASS_SIGNING_KEY` = the private half (secret).
-3. Each app's API on Vercel: `PLATFORM_PUBLIC_KEY` = the public half (not
-   secret; also shown at the platform API's `/pass/key`).
+3. Each app's API on Vercel: `PLATFORM_API_URL` = the platform's API. The app
+   fetches the public half from its `/pass/key`, and again when the key is
+   replaced; `PLATFORM_PUBLIC_KEY` is only for pinning it.
 4. Each app's screens on Vercel: `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` = the
    platform's address. The sign-in page then shows "Sign in with your Bishnoi One
    account".

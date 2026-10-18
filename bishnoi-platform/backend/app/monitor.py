@@ -16,6 +16,7 @@ What people see is the check, unless a Platform Admin has declared otherwise
 """
 
 import logging
+import threading
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -44,11 +45,23 @@ class Answer:
     detail: str | None
 
 
+def _ipv4_localhost(url: str) -> str:
+    """localhost as 127.0.0.1: on Windows "localhost" tries IPv6 (::1) first,
+    where the apps don't listen, and each check waited seconds before falling back."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    if parts.hostname == "localhost":
+        port = f":{parts.port}" if parts.port else ""
+        return urlunsplit(parts._replace(netloc=f"127.0.0.1{port}"))
+    return url
+
+
 def probe(url: str, timeout: float, slow_ms: int) -> Answer:
     """One look at one address. Replaced in tests, which have nothing to call."""
     started = time.perf_counter()
     try:
-        response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
+        response = httpx.get(_ipv4_localhost(url), timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
     except httpx.TimeoutException:
         return Answer("down", None, None, f"No answer within {timeout:g} seconds.")
     except httpx.HTTPError:
@@ -120,9 +133,35 @@ def check_all(db: Session, config: MonitoringSection) -> None:
 
 
 def ensure_fresh(db: Session, config: MonitoringSection, force: bool = False) -> None:
-    if force or is_stale(db, config):
+    """Fresh checks before answering only when asked (Check now) or when there
+    are none yet. Otherwise a page never waits on them: it shows the latest,
+    and when those are old a new round runs in the background, for the next look."""
+    last = last_checked(db)
+    if force or last is None:
         check_all(db, config)
         db.commit()
+    elif datetime.now(UTC) - last > timedelta(seconds=config.stale_seconds):
+        _in_background(db.get_bind(), config)
+
+
+_running = threading.Lock()  # one background round at a time
+
+
+def _in_background(bind, config: MonitoringSection) -> None:
+    if not _running.acquire(blocking=False):
+        return
+
+    def run() -> None:
+        try:
+            with Session(bind) as db:
+                check_all(db, config)
+                db.commit()
+        except Exception:
+            log.exception("Monitoring: a background round of checks failed.")
+        finally:
+            _running.release()
+
+    threading.Thread(target=run, name="health-checks", daemon=True).start()
 
 
 def latest(db: Session, kind: str, ids: Iterable[str] | None = None) -> dict[str, HealthCheck]:

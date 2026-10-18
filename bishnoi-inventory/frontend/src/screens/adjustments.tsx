@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { enc, load } from "@/src/platform/lib/api";
+import { loadQuery } from "@/src/platform/lib/api";
 import { adjustmentStep, countStep, withdrawAdjustment } from "../actions/inventory";
 import { AdjustmentForm, CountSheet, StartCount } from "../components/adjust-forms";
 import { RecordTools } from "../components/record-tools";
@@ -10,14 +10,27 @@ import { AdjustmentStamp, CountStamp } from "../components/stamps";
 import { StepButton } from "../components/step-button";
 import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "../components/ui";
 import { param, query, signed } from "../lib/labels";
-import { canAddFrom, context, type Params, type Search } from "../lib/page";
-import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, ReasonOption, Reference } from "../lib/types";
+import { NeedsFirst } from "../components/setup";
+import { loadSetup } from "../lib/setup";
+import { Pager } from "@/src/platform/ui/pager";
+import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "../lib/page";
+import { referenceOf } from "../lib/reference";
+import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, Paged, ReasonOption, Reference } from "../lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
-  const status = param(await searchParams, "status");
-  const rows = await load<AdjustmentBrief[]>(`/inventory/adjustments${query({ status })}`);
+  const s = await searchParams;
+  const status = param(s, "status");
+  const { page, size, vars } = paging(s);
+  const base = `/adjustments${query({ status })}`;
+  const { adjustments: list } = await loadQuery<{ adjustments: Paged<AdjustmentBrief> }>(
+    `query Adjustments($status: String, $limit: Int, $offset: Int) { adjustments(status: $status, limit: $limit, offset: $offset) }`,
+    { ...(status ? { status } : {}), ...vars },
+    ["adjustments"],
+  );
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   const chip = (s: string, label: string) => ({ value: s, label, href: `/adjustments${query({ status: s })}` });
   return (
     <>
@@ -25,19 +38,19 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
         title="Stock adjustments"
         actions={may("adjustments.create") && <LinkButton href="/adjustments/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New adjustment</LinkButton>}
       >
-        When what&apos;s on the shelf doesn&apos;t match the system. Every one has a reason and goes on the trail.
-        {!may("adjustments.approve") && may("adjustments.create") && " Yours wait for someone who may approve them."}
+        Corrects stock when the physical quantity differs from the system. Each adjustment needs a reason and is recorded in stock movements.
+        {!may("adjustments.approve") && may("adjustments.create") && " Adjustments you create need approval before they are posted."}
       </PageHeader>
-      <Chips label="Status" current={status} options={[chip("", "All"), chip("pending", "Waiting for approval"), chip("posted", "Posted"), chip("rejected", "Rejected")]} />
+      <Chips label="Status" current={status} options={[chip("", "All"), chip("pending", "Pending approval"), chip("posted", "Posted"), chip("rejected", "Rejected")]} />
       <Sheet>
         {rows.length === 0 ? (
-          <Empty icon="adjustments" title="No adjustments here" />
+          <Empty icon="adjustments" title="No adjustments" />
         ) : (
-          <Table head={["Adjustment", "Reason", "Warehouse", "Status", "Written by", " Units", " Value"]} min="52rem">
+          <Table head={["Adjustment", "Reason", "Warehouse", "Status", "Created by", " Units", " Value"]} min="52rem">
             {rows.map((a) => (
               <tr key={a.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/adjustments/${a.id}`} sub={at(a.createdAt)}>{a.number}</RowLink></Td>
-                <Td>{a.reasonLabel}{a.countId && <span className="block text-meta text-ink-3">From a count</span>}</Td>
+                <Td>{a.reasonLabel}{a.countId && <span className="block text-meta text-ink-3">From an inventory count</span>}</Td>
                 <Td>{a.warehouse.code}</Td>
                 <Td><AdjustmentStamp status={a.status} /></Td>
                 <Td className="text-ink-2">{a.createdBy?.name ?? "—"}</Td>
@@ -48,6 +61,7 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "adjustment" : "adjustments"} />
     </>
   );
 }
@@ -56,7 +70,7 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
-  const a = await load<Adjustment>(`/inventory/adjustments/${enc(id)}`);
+  const { adjustment: a } = await loadQuery<{ adjustment: Adjustment }>(`query Adjustment($id: String!) { adjustment(id: $id) }`, { id }, ["adjustment"]);
   const pending = a.status === "pending";
   return (
     <>
@@ -67,19 +81,19 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
         actions={
           pending && may("adjustments.approve") && (
             <>
-              <StepButton run={adjustmentStep.bind(null, a.id, "approve")} label="Approve & post" done={`${a.number} posted`} variant="primary" confirm={{ title: `Post ${a.number}?`, body: "Stock changes now, and the change is on the trail.", danger: false }} />
+              <StepButton run={adjustmentStep.bind(null, a.id, "approve")} label="Approve and post" done={`${a.number} posted`} variant="primary" confirm={{ title: `Post ${a.number}?`, body: "Stock is updated and the change is recorded in stock movements.", danger: false }} />
               <StepButton run={adjustmentStep.bind(null, a.id, "reject")} label="Reject" done={`${a.number} rejected`} variant="quiet" confirm={{ title: `Reject ${a.number}?`, body: "Nothing in stock changes.", danger: true }} />
             </>
           )
         }
       >
         <AdjustmentStamp status={a.status} /> <span className="ml-1">{a.reasonLabel} · {a.warehouse.name}</span>
-        {a.countId && <> · from <Link href={`/counts/${a.countId}`} className="text-hema hover:underline">a count</Link></>}
+        {a.countId && <> · from <Link href={`/counts/${a.countId}`} className="text-ink hover:underline">a count</Link></>}
       </PageHeader>
       <Sheet className="px-5 py-4">
         <Trail steps={[
-          { label: "Written by", who: a.createdBy, when: at(a.createdAt) },
-          { label: a.status === "rejected" ? "Rejected by" : "Approved & posted by", who: a.decidedBy, when: a.decidedAt ? at(a.decidedAt) : null },
+          { label: "Created by", who: a.createdBy, when: at(a.createdAt) },
+          { label: a.status === "rejected" ? "Rejected by" : "Approved and posted by", who: a.decidedBy, when: a.decidedAt ? at(a.decidedAt) : null },
         ]} />
         {a.notes && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{a.notes}</p>}
       </Sheet>
@@ -97,20 +111,27 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
           ))}
         </Table>
       </Sheet>
-      {a.reason === "damaged" && <p className="mt-3 text-meta text-ink-3">Damaged stock stays on hand, set aside, until it&apos;s written off (reason: Written off).</p>}
+      {a.reason === "damaged" && <p className="mt-3 text-meta text-ink-3">Damaged stock stays on hand, held separately, until it is written off (reason: Written off).</p>}
     </>
   );
 }
 
 export async function NewAdjustmentPage({ searchParams }: { searchParams: Search }) {
   const { may } = await context();
-  if (!may("adjustments.create")) return <NoAccess what="writing adjustments" />;
+  if (!may("adjustments.create")) return <NoAccess what="creating adjustments" />;
+  // What this page needs first; if any is missing, that instead of a form that can't be finished.
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/adjustments/new", title: "New adjustment", doing: "adjust stock", crumbs: [{ href: "/adjustments", label: "Adjustments" }], may });
+  if (gate) return gate;
   const s = await searchParams;
-  const [ref, reasons, batches] = await Promise.all([load<Reference>("/inventory/reference"), load<ReasonOption[]>("/inventory/adjustments/reasons"), load<BatchRow[]>("/inventory/batches")]);
+  const { reference: ref, reasons, batches } = await loadQuery<{ reference: Pick<Reference, "products" | "units" | "warehouses">; reasons: ReasonOption[]; batches: BatchRow[] }>(
+    `query NewAdjustment { ${referenceOf("products", "units", "warehouses")} reasons: adjustmentReasons batches }`,
+    {},
+    ["reference", "reasons", "batches"],
+  );
   return (
     <>
       <PageHeader crumbs={[{ href: "/adjustments", label: "Adjustments" }]} title="New adjustment">
-        {may("adjustments.approve") ? "It's posted as soon as you save it." : "It waits for someone who may approve adjustments before stock changes."}
+        {may("adjustments.approve") ? "Stock is updated when you save." : "Requires approval before stock is updated."}
       </PageHeader>
       <AdjustmentForm canAdd={canAddFrom(may)} reference={ref} reasons={reasons} batches={batches} approves={may("adjustments.approve")} preset={{ reason: param(s, "reason"), warehouseId: param(s, "warehouse") }} />
     </>
@@ -122,11 +143,19 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
   const s = await searchParams;
   const status = param(s, "status");
-  const [rows, ref] = await Promise.all([load<CountBrief[]>(`/inventory/counts${query({ status })}`), load<Reference>("/inventory/reference")]);
+  const { page, size, vars } = paging(s);
+  const base = `/counts${query({ status })}`;
+  const { counts: list, reference: ref } = await loadQuery<{ counts: Paged<CountBrief>; reference: Pick<Reference, "categories" | "warehouses"> }>(
+    `query Counts($status: String, $limit: Int, $offset: Int) { counts(status: $status, limit: $limit, offset: $offset) ${referenceOf("categories", "warehouses")} }`,
+    { ...(status ? { status } : {}), ...vars },
+    ["counts", "reference"],
+  );
+  keepInRange(list.items.length, list.total, page, base);
+  const rows = list.items;
   return (
     <>
       <PageHeader title="Inventory counts">
-        A physical count: the system writes down what it expects, people count what&apos;s there, and once approved every difference becomes an adjustment.
+        Physical inventory counts. Counted quantities are compared with system quantities, and on approval each variance is posted as an adjustment.
       </PageHeader>
       {may("counts.create") && (
         <Sheet className="mb-5 px-5 py-4">
@@ -135,9 +164,9 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
       )}
       <Sheet>
         {rows.length === 0 ? (
-          <div className="px-5 py-10 text-center text-sm text-ink-2">No counts yet.</div>
+          <div className="px-5 py-10 text-center text-sm text-ink-2">No inventory counts.</div>
         ) : (
-          <Table head={["Count", "Warehouse", "Status", " Counted", " Differences", " Units off", " Value off"]} min="52rem">
+          <Table head={["Count", "Warehouse", "Status", " Counted", " Variances", " Variance units", " Variance value"]} min="52rem">
             {rows.map((c) => (
               <tr key={c.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/counts/${c.id}`} sub={`${at(c.createdAt)} · ${c.createdBy?.name ?? ""}`}>{c.number}</RowLink></Td>
@@ -152,6 +181,7 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
           </Table>
         )}
       </Sheet>
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "count" : "counts"} />
     </>
   );
 }
@@ -160,7 +190,11 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
   const { id } = await params;
   const { fmt, may, at, day } = await context();
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
-  const [c, ref] = await Promise.all([load<Count>(`/inventory/counts/${enc(id)}`), load<Reference>("/inventory/reference")]);
+  const { count: c, reference: ref } = await loadQuery<{ count: Count; reference: Pick<Reference, "products"> }>(
+    `query Count($id: String!) { count(id: $id) ${referenceOf("products")} }`,
+    { id },
+    ["count", "reference"],
+  );
   const days = Object.fromEntries(c.lines.filter((l) => l.batch?.expiresOn).map((l) => [l.batch!.expiresOn!, day(l.batch!.expiresOn!)]));
   return (
     <>
@@ -173,12 +207,12 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
               <>
                 <StepButton
                   run={countStep.bind(null, c.id, "approve")}
-                  label="Approve & adjust"
-                  done={c.varianceCount ? "Approved: the differences are posted" : "Approved: nothing was off"}
+                  label="Approve and adjust"
+                  done={c.varianceCount ? "Approved; variances posted" : "Approved; no variances"}
                   variant="primary"
-                  confirm={{ title: `Approve ${c.number}?`, body: c.varianceCount ? `${c.varianceCount} difference${c.varianceCount === 1 ? "" : "s"} (${signed(c.varianceUnits, fmt.count)} units, ${fmt.peso(c.varianceValue)}) will be posted as one adjustment.` : "Everything matched, so stock doesn't change.", danger: false }}
+                  confirm={{ title: `Approve ${c.number}?`, body: c.varianceCount ? `${c.varianceCount} variance${c.varianceCount === 1 ? "" : "s"} (${signed(c.varianceUnits, fmt.count)} units, ${fmt.peso(c.varianceValue)}) will be posted as one adjustment.` : "No variances, so stock is unchanged.", danger: false }}
                 />
-                <StepButton run={countStep.bind(null, c.id, "reopen")} label="Send back to recount" done="Sent back for counting" />
+                <StepButton run={countStep.bind(null, c.id, "reopen")} label="Return for recount" done="Returned for recount" />
               </>
             )}
             {(c.status === "open" || c.status === "submitted") && may("counts.create") && (
@@ -189,22 +223,22 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
       >
         <CountStamp status={c.status} />
         {c.category && <span className="ml-1">{c.category.name} only</span>}
-        {c.adjustmentId && <> · posted as <Link href={`/adjustments/${c.adjustmentId}`} className="text-hema hover:underline">an adjustment</Link></>}
+        {c.adjustmentId && <> · posted as <Link href={`/adjustments/${c.adjustmentId}`} className="text-ink hover:underline">an adjustment</Link></>}
       </PageHeader>
       <Figures
         items={[
           { label: "Lines", value: c.lineCount },
           { label: "Counted", value: `${c.countedCount} of ${c.lineCount}` },
-          { label: "Differences", value: c.varianceCount, flag: c.varianceCount > 0 },
-          { label: "Units off", value: signed(c.varianceUnits, fmt.count) },
-          { label: "Value off", value: fmt.peso(c.varianceValue) },
+          { label: "Variances", value: c.varianceCount, flag: c.varianceCount > 0 },
+          { label: "Variance units", value: signed(c.varianceUnits, fmt.count) },
+          { label: "Variance value", value: fmt.peso(c.varianceValue) },
           { label: "Started", value: <span className="text-sm">{at(c.createdAt)}</span> },
         ]}
       />
       <Sheet className="mt-5">
         <div className="px-5 pt-4"><SectionTitle icon="lists">Count sheet</SectionTitle></div>
         {c.lines.length === 0 ? (
-          <p className="px-5 pb-4 text-meta text-ink-3">The system expected nothing here. Add anything you find.</p>
+          <p className="px-5 pb-4 text-meta text-ink-3">No system quantities for this count. Add any items found.</p>
         ) : null}
         <CountSheet count={c} reference={ref} canCount={may("counts.create")} day={days} />
       </Sheet>

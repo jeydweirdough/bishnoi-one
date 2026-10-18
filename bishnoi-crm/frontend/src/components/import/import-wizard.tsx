@@ -5,17 +5,28 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
-import { Field, FileInput, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { readImport, runImport, type ImportFile, type ImportKind, type ImportResult } from "../../actions/imports";
 
 const WORDS: Record<ImportKind, { one: string; many: string; match: string }> = {
   products: { one: "product", many: "products", match: "A product already here (same code) is updated; the rest are added." },
+  prices: {
+    one: "product",
+    many: "products",
+    match: "Each row is matched to a product by its code. Only prices that differ from today's are sent; a manager's go to Finance for approval first. The SRP isn't imported: it's set by Finance.",
+  },
   people: { one: "person", many: "people", match: "Someone already here (same email) is updated; the rest are added as new accounts." },
+  customers: {
+    one: "customer",
+    many: "customers",
+    match: "A row with a customer code updates that customer; a row without one is added as new. Pick lists take the short code or the full name; a hospital, by its name or code.",
+  },
   balances: {
     one: "balance",
     many: "balances",
-    match: "Each row is matched to its doctor by name. The balances are added as of the date below; earlier ones stay as the history.",
+    match: "Each row is matched to its customer by name. The balances are added as of the date below; earlier ones stay as the history.",
   },
 };
 
@@ -92,15 +103,35 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             e.preventDefault();
             read(new FormData(e.currentTarget));
           }}
-          className="mt-3 flex flex-wrap items-end gap-3"
+          className="mt-3 space-y-3"
         >
-          <Field label="Spreadsheet" className="min-w-64 flex-1">
-            {(p) => <FileInput {...p} name="file" accept=".xlsx,.xlsm,.csv" onChange={(e) => e.currentTarget.form?.requestSubmit()} />}
+          <Field label="Spreadsheet">
+            {(p) => (
+              <FileDrop
+                {...p}
+                name="file"
+                accept=".xlsx,.xlsm,.csv"
+                note="Excel (.xlsx) or CSV, with the column names in the first row"
+                busy={pending && !file}
+                onChange={(e) => e.currentTarget.form?.requestSubmit()}
+              />
+            )}
           </Field>
+          <div className="flex justify-end">
           <Button type="submit" loading={pending && !file} icon={<FileSpreadsheet className="size-4" aria-hidden />}>
             Read file
           </Button>
+          </div>
         </form>
+        {kind === "customers" && !file && (
+          <p className="mt-3 text-meta text-ink-3">
+            Starting from nothing?{" "}
+            <a href="/companies/export?template=true" download className="font-semibold text-ink underline">
+              Download a blank sheet
+            </a>{" "}
+            with our columns. To change many customers at once, export them from Customers, edit the file, and import it here.
+          </p>
+        )}
         {file && (
           <p className="mt-3 text-sm text-ink-2">
             <strong>{file.fileName}</strong>: {file.rows.length} {file.rows.length === 1 ? "row" : "rows"}, {file.headers.length} columns.
@@ -116,7 +147,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
             <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th scope="col" className="py-2 pr-3 font-semibold">Our field</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">CRM field</th>
                   <th scope="col" className="px-3 py-2 font-semibold">Column in your file</th>
                   <th scope="col" className="py-2 pl-3 font-semibold">First row</th>
                 </tr>
@@ -131,7 +162,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                         {f.required && <span className="text-danger"> *</span>}
                       </th>
                       <td className="px-3 py-2">
-                        <select
+                        <Select
                           aria-label={`Column for ${f.label}`}
                           value={col ?? ""}
                           onChange={(e) => map(f.key, e.target.value)}
@@ -143,7 +174,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                               {h}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </td>
                       <td className="max-w-64 truncate py-2 pl-3 text-ink-2">{col !== null && col !== undefined ? first[col] || <span className="text-ink-3">empty</span> : <span className="text-ink-3">—</span>}</td>
                     </tr>
@@ -167,7 +198,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
               </Field>
               <label className="flex items-center gap-2 self-center text-sm">
                 <input type="checkbox" checked={makeTeams} onChange={(e) => (setMakeTeams(e.target.checked), setCheck(null))} className="size-4 accent-hema" />
-                Make the teams that aren&apos;t here yet
+                Create missing teams
               </label>
             </div>
           )}
@@ -179,13 +210,28 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
           <SectionTitle icon="approvals">3 · Check, then import</SectionTitle>
           {check ? (
             <div className="mt-2 space-y-3">
-              <p className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="size-4 text-filed" aria-hidden />
-                {check.dryRun ? "Ready:" : "Done:"} {check.added} {check.added === 1 ? words.one : words.many} {check.dryRun ? "to add" : "added"}, {check.updated}{" "}
-                {check.dryRun ? "to update" : "updated"}.
-              </p>
+              {kind === "prices" ? (
+                // Prices: only what differs from today's is sent, so say which, and what to do when none does.
+                <p className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={`mt-0.5 size-4 shrink-0 ${check.updated ? "text-filed" : "text-ink-3"}`} aria-hidden />
+                  <span>
+                    {check.updated
+                      ? `${check.dryRun ? "Ready" : "Done"}: ${check.updated} ${check.updated === 1 ? "product has" : "products have"} new prices${check.dryRun ? " to send" : " sent"}. A manager's go to Finance for approval.`
+                      : "No price in the file differs from today's, so there's nothing to send."}
+                    {!check.updated && check.dryRun && (
+                      <span className="block text-meta text-ink-3">Change prices in the file, save and close it in Excel, then choose it again and read it.</span>
+                    )}
+                  </span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="size-4 text-filed" aria-hidden />
+                  {check.dryRun ? "Ready:" : "Done:"} {check.added} {check.added === 1 ? words.one : words.many} {check.dryRun ? "to add" : "added"}, {check.updated}{" "}
+                  {check.dryRun ? "to update" : "updated"}.
+                </p>
+              )}
               {check.problems.length > 0 && (
-                <div className="rounded-[3px] border border-danger/40 bg-danger-tint/40 px-4 py-3">
+                <div className="rounded-lg border border-danger/40 bg-danger-tint/40 px-4 py-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-danger">
                     <TriangleAlert className="size-4" aria-hidden />
                     {check.problems.length} {check.problems.length === 1 ? "row is" : "rows are"} {check.dryRun ? "skipped unless you fix them" : "skipped"}
@@ -214,13 +260,13 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
               disabled={!check || !check.dryRun || check.added + check.updated === 0}
               icon={<ArrowRight className="size-4" aria-hidden />}
             >
-              Import {check && check.dryRun ? check.added + check.updated : ""} {words.many}
+              {kind === "prices" ? `Send ${check && check.dryRun ? check.updated : ""} ${check && check.dryRun && check.updated === 1 ? "product's prices" : "products' prices"}` : <>Import {check && check.dryRun ? check.added + check.updated : ""} {words.many}</>}
             </Button>
             <LinkButton href={back} variant="quiet">
               {check && !check.dryRun ? "Done" : "Cancel"}
             </LinkButton>
           </div>
-          {!ready && <p className="mt-2 text-meta text-danger">Pick a column for each field marked *.</p>}
+          {!ready && <p className="mt-2 text-meta text-danger">Select a column for each field marked *.</p>}
         </Sheet>
       )}
       {!file && <FormError message={error} />}

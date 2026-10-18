@@ -1,8 +1,9 @@
 """Whose records a person reaches: their role's scope, applied to owned records.
 
-- own:  records they own;
-- team: records owned in their team (their own too, even without a team);
-- all:  every record.
+- own:     records they own;
+- team:    records owned in their team (their own too, even without a team);
+- managed: records owned in every team they're the manager of, and in their own;
+- all:     every record.
 
 Reading and changing use the same reach; the role's permissions then say what
 they may do within it. A record out of reach is answered as not found, so
@@ -21,15 +22,15 @@ def within(query: Select, model: type[Owned], access: Access) -> Select:
     """The query, narrowed to what this person reaches."""
     if access.scope == "all":
         return query
-    if access.scope == "team" and access.team_id:
-        return query.where(or_(model.team_id == access.team_id, model.owner_id == access.user_id))
+    if access.team_ids:
+        return query.where(or_(model.team_id.in_(access.team_ids), model.owner_id == access.user_id))
     return query.where(model.owner_id == access.user_id)
 
 
 def reaches(record: Owned, access: Access) -> bool:
     if access.scope == "all" or record.owner_id == access.user_id:
         return True
-    return access.scope == "team" and access.team_id is not None and record.team_id == access.team_id
+    return record.team_id is not None and record.team_id in access.team_ids
 
 
 def reachable_people(db: Session, access: Access) -> list[User]:
@@ -38,8 +39,8 @@ def reachable_people(db: Session, access: Access) -> list[User]:
     q = select(User).where(User.is_active).order_by(User.full_name)
     if access.scope == "all":
         return list(db.scalars(q))
-    if access.scope == "team" and access.team_id:
-        return list(db.scalars(q.where(or_(User.team_id == access.team_id, User.id == access.user_id))))
+    if access.team_ids:
+        return list(db.scalars(q.where(or_(User.team_id.in_(access.team_ids), User.id == access.user_id))))
     return list(db.scalars(q.where(User.id == access.user_id)))
 
 

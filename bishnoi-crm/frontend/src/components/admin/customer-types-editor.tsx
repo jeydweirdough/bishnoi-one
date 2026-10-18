@@ -1,21 +1,23 @@
 "use client";
 
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { Popover } from "antd";
+import { ArrowDown, ArrowUp, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, Input, Select } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import type { CustomerType, CustomerTypeColor } from "@/src/platform/lib/types";
 import { deleteCustomerType, saveCustomerType, type CustomerTypeChange } from "../../actions/admin";
 import { StatusTag, TYPE_COLORS } from "../crm/words";
+import { TeamsFor, teamsSummary, type TeamName } from "./teams-for";
 
 const COLORS = Object.entries(TYPE_COLORS) as [CustomerTypeColor, { label: string }][];
 
 /** The customer types: add, rename, recolour, reorder, switch off, delete an unused one. */
-export function CustomerTypesEditor({ types }: { types: CustomerType[] }) {
+export function CustomerTypesEditor({ types, teams = [] }: { types: CustomerType[]; teams?: TeamName[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [name, setName] = useState("");
@@ -91,6 +93,7 @@ export function CustomerTypesEditor({ types }: { types: CustomerType[] }) {
               first={i === 0}
               last={i === types.length - 1}
               pending={pending}
+              teams={teams}
               onSave={(change, done) => save(t.code, change, done)}
               onMove={(by) => move(i, by)}
               onDeleted={() => router.refresh()}
@@ -107,6 +110,7 @@ function TypeRow({
   first,
   last,
   pending,
+  teams,
   onSave,
   onMove,
   onDeleted,
@@ -115,6 +119,7 @@ function TypeRow({
   first: boolean;
   last: boolean;
   pending: boolean;
+  teams: TeamName[];
   onSave: (change: CustomerTypeChange, done: string) => void;
   onMove: (by: -1 | 1) => void;
   onDeleted: () => void;
@@ -123,12 +128,12 @@ function TypeRow({
   return (
     <li className={`flex flex-wrap items-center gap-3 px-5 py-3 ${type.isActive ? "" : "bg-bench/50"}`}>
       <span className="flex flex-col">
-        <button type="button" disabled={first || pending} onClick={() => onMove(-1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${type.name} up`}>
+        <IconButton disabled={first || pending} onClick={() => onMove(-1)} size="sm" label={`Move ${type.name} up`}>
           <ArrowUp className="size-3.5" aria-hidden />
-        </button>
-        <button type="button" disabled={last || pending} onClick={() => onMove(1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${type.name} down`}>
+        </IconButton>
+        <IconButton disabled={last || pending} onClick={() => onMove(1)} size="sm" label={`Move ${type.name} down`}>
           <ArrowDown className="size-3.5" aria-hidden />
-        </button>
+        </IconButton>
       </span>
       <span className="w-32">
         <StatusTag status={type.code} types={[type]} />
@@ -140,7 +145,7 @@ function TypeRow({
         onBlur={() => name.trim() && name.trim() !== type.name && onSave({ name: name.trim() }, "Renamed")}
         className="h-9 min-w-40 flex-1 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none"
       />
-      <select
+      <Select
         aria-label={`Colour of ${type.name}`}
         value={type.color}
         onChange={(e) => onSave({ color: e.target.value as CustomerTypeColor }, "Colour changed")}
@@ -151,12 +156,34 @@ function TypeRow({
             {c.label}
           </option>
         ))}
-      </select>
+      </Select>
       <span className="w-28 text-meta text-ink-3">
         {type.companies} {type.companies === 1 ? "customer" : "customers"}
       </span>
-      <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !type.isActive }, type.isActive ? `${type.name} switched off` : `${type.name} switched on`)}>
-        {type.isActive ? "Switch off" : "Switch on"}
+      {teams.length > 0 && (
+        <Popover
+          trigger="click"
+          placement="bottomRight"
+          title={`Teams with access: ${type.name}`}
+          content={
+            <div className="w-72">
+              <TeamsFor
+                teams={teams}
+                only={type.onlyTeams}
+                except={type.exceptTeams}
+                what="this type"
+                onChange={(onlyTeams, exceptTeams) => onSave({ onlyTeams, exceptTeams }, `${type.name}: ${teamsSummary(teams, onlyTeams, exceptTeams).toLowerCase()}`)}
+              />
+            </div>
+          }
+        >
+          <Button size="sm" icon={<Users className="size-3.5" aria-hidden />} disabled={pending}>
+            <span className="max-w-48 truncate">{teamsSummary(teams, type.onlyTeams, type.exceptTeams)}</span>
+          </Button>
+        </Popover>
+      )}
+      <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !type.isActive }, type.isActive ? `${type.name} deactivated` : `${type.name} activated`)}>
+        {type.isActive ? "Deactivate" : "Activate"}
       </Button>
       {type.companies === 0 && (
         <ConfirmButton

@@ -24,7 +24,7 @@ How stock is kept:
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
 from sqlalchemy.orm import Mapped, aliased, column_property, mapped_column, relationship
 
 from app.db import Base
@@ -69,10 +69,23 @@ class RolePermission(Base):
 
 class User(Base):
     __tablename__ = "nbin_users"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbin_users_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
+    # Their name in parts, as they keep it on their profile; full_name is made
+    # from these (app/routers/profile.py), and is what everything else reads.
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
     password_hash: Mapped[str] = mapped_column(String(255))
     role_id: Mapped[str] = mapped_column(ForeignKey("nbin_roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -180,12 +193,16 @@ PRODUCT_STATUSES = ("active", "inactive", "discontinued")
 
 class Product(Stamped, Base):
     __tablename__ = "nbin_products"
+    __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         CheckConstraint("product_type IN ('stock', 'consumable', 'asset', 'service')", name="product_type"),
         CheckConstraint("status IN ('active', 'inactive', 'discontinued')", name="product_status"),
+        Index("nbin_products_no", "no", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     sku: Mapped[str] = mapped_column(String(40), unique=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     description: Mapped[str | None] = mapped_column(Text, default=None)
@@ -240,8 +257,12 @@ class ProductImage(Base):
 
 class Supplier(Stamped, Base):
     __tablename__ = "nbin_suppliers"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbin_suppliers_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     contact_person: Mapped[str | None] = mapped_column(String(120), default=None)
@@ -277,11 +298,18 @@ class SupplierProduct(Base):
 
 class Warehouse(Stamped, Base):
     __tablename__ = "nbin_warehouses"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbin_warehouses_no", "no", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     address: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Where it is on the map, for drawing transfers as routes. Empty until set or found.
+    latitude: Mapped[float | None] = mapped_column(Float, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
@@ -735,3 +763,9 @@ _variant = aliased(Product)
 Product.variant_count = column_property(
     select(func.count(_variant.id)).where(_variant.parent_id == Product.id).correlate_except(_variant).scalar_subquery()
 )
+
+
+# Numbers on SQLite as records are saved (on Postgres the database gives them).
+from app.numbering import numbered  # noqa: E402  (after the models it names)
+
+numbered(User, Product, Supplier, Warehouse)

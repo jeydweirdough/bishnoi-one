@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import desc, func, or_, select
 
+from app.routers.profile import split_name
 from app.access import (
     access_of,
     allowed,
@@ -61,6 +62,7 @@ def serialize_permit(p: ComplianceRecord, settings: Settings) -> dict[str, Any]:
     days = calculate_days_remaining(p.expiration_date, settings)
     return {
         "id": p.id,
+        "no": p.no,
         "title": p.title,
         "category": p.category,
         "agency": p.agency,
@@ -83,6 +85,7 @@ def serialize_immigration(im: ImmigrationRecord, settings: Settings) -> dict[str
     days = calculate_days_remaining(im.expiration_date, settings)
     return {
         "id": im.id,
+        "no": im.no,
         "individualName": im.individual_name,
         "designation": im.designation,
         "nationality": im.nationality,
@@ -106,6 +109,7 @@ def serialize_document(d: CorporateDocument, settings: Settings) -> dict[str, An
     days = calculate_days_remaining(d.expiration_date, settings)
     return {
         "id": d.id,
+        "no": d.no,
         "title": d.title,
         "category": d.category,
         "counterparty": d.counterparty,
@@ -129,6 +133,7 @@ def serialize_property(pr: PropertyRecord, settings: Settings) -> dict[str, Any]
     days = calculate_days_remaining(pr.lease_end, settings)
     return {
         "id": pr.id,
+        "no": pr.no,
         "name": pr.name,
         "propertyType": pr.property_type,
         "address": pr.address,
@@ -359,6 +364,35 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
                     }
                 )
 
+    # Fleet and travel: a car's dates within 60 days, a trip within 14 that isn't approved or booked.
+    from app.routers.operations import summary as fleet_summary, vehicle_dues
+
+    fleet = fleet_summary(db, settings)
+    for v in fleet["vehicles"]:
+        car = " ".join(x for x in (v.name, v.plate) if x)
+        for due in vehicle_dues(v, today):
+            if due["daysRemaining"] <= 60:
+                highlights.append({
+                    "entityType": f"vehicle_{due['what']}", "entityId": v.id, "title": car, "subtitle": due["label"],
+                    "reference": v.owner_name or "Company vehicle", "dueDate": due["date"],
+                    "daysRemaining": due["daysRemaining"], "urgencyTier": due["urgencyTier"], "actionPath": f"/vehicles/{v.id}",
+                })
+    for t in fleet["trips"]:
+        if t.starts_on and t.status in ("for_approval", "for_processing"):
+            days = (t.starts_on - today).days
+            if days <= 14:
+                highlights.append({
+                    "entityType": "travel", "entityId": t.id, "title": t.doctor_name,
+                    "subtitle": f"{'Hotel' if t.kind == 'hotel' else 'Flight'} not settled · asked by {t.rep_name}",
+                    "reference": t.travel_dates or "", "dueDate": t.starts_on.isoformat(),
+                    "daysRemaining": days, "urgencyTier": urgency_tier(days), "actionPath": f"/travel/{t.id}",
+                })
+
+    # Promotional materials needed soon and not yet in stock (app/routers/materials.py).
+    from app.routers.materials import highlights as material_highlights
+
+    highlights.extend(material_highlights(db, today))
+
     # Sort countdown highlights by urgency (most overdue first, then fewest days remaining)
     highlights.sort(key=lambda x: x["daysRemaining"])
 
@@ -369,6 +403,7 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
         "expatriates": ("Expatriates", "/immigration", 60, [im.expiration_date.date() for im in all_immig]),
         "documents": ("Documents", "/documents", 60, [d.expiration_date.date() for d in all_docs if d.expiration_date]),
         "properties": ("Leases", "/properties", 90, [pr.lease_end.date() for pr in all_props]),
+        "vehicles": ("Vehicles", "/vehicles", 30, [d for v in fleet["vehicles"] for d in (v.registration_due, v.insurance_due, v.pms_due) if d]),
     }
     health = []
     for key, (label, href, window, dates) in dated.items():
@@ -422,13 +457,14 @@ def executive_dashboard(user: permitted("dashboard.view"), db: DB, settings: Set
                 "totalOpen": tickets_open,
                 "urgent": tickets_urgent,
             },
+            **fleet["stats"],
             "notifications": {
                 "totalActive": len(active_notifs),
                 "unread": notifs_unread,
                 "critical": notifs_critical,
             },
         },
-        "countdownHighlights": highlights[:10],
+        "countdownHighlights": highlights,
     }
 
 
@@ -1117,6 +1153,7 @@ class PasswordIn(Api):
 def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
     return {
         "id": user.id,
+        "no": user.no,
         "email": user.email,
         "fullName": user.full_name,
         "isActive": user.is_active,
@@ -1167,9 +1204,12 @@ def create_user(_: UsersPerm, me: CurrentUser, db: DB, body: UserIn) -> dict:
     if email_taken(db, body.email):
         raise field_error("email", "Someone here already has that email.")
     check_role(db, body.role_id)
+    first, last = split_name(body.full_name)
     user = User(
         email=body.email,
         full_name=body.full_name,
+        first_name=first or None,
+        last_name=last or None,
         role_id=body.role_id,
         password_hash=hash_password(body.password),
     )
@@ -1197,6 +1237,10 @@ def update_user(_: UsersPerm, me: CurrentUser, db: DB, user_id: str, body: UserP
     fields = [k for k, v in wanted.items() if getattr(user, k) != v]
     for key in fields:
         setattr(user, key, wanted[key])
+    if "full_name" in fields:
+        # Typed in one piece here: its parts follow (the person can tidy them on their profile).
+        user.first_name, user.last_name = split_name(user.full_name)
+        user.middle_initial = user.suffix = None
     if not fields:
         return user_out(user)
     keep_an_administrator(db)

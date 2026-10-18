@@ -16,6 +16,7 @@ export type ProductInput = {
   form: string | null;
   unit: string;
   vatCategory?: "standard" | "zero_rated" | "exempt";
+  needsPrescription?: boolean;
   isActive: boolean;
   /** price type code -> centavos; null clears that price. */
   prices: Record<string, number | null>;
@@ -112,5 +113,14 @@ export async function saveSalesSettings(input: Partial<SalesRules["settings"]>):
     const rules = await api.patch<SalesRules>("/pricing/settings", input);
     refresh();
     return rules;
+  });
+}
+
+/** A product's prices at its price types (not the SRP), sent to Finance: reps see them once approved. */
+export async function proposePrices(id: string, prices: Record<string, number | null>): Promise<Result<CatalogueProduct>> {
+  return attempt(async () => {
+    const saved = await api.put<CatalogueProduct>(`/products/${enc(id)}/prices`, { prices });
+    refresh();
+    return saved;
   });
 }

@@ -44,7 +44,40 @@ def make_engine(url: str) -> Engine:
         # connection may be dead by the next one. Connect per request; the
         # database's pooler does the pooling on its side.
         return create_engine(url, poolclass=NullPool, connect_args=connect_args)
-    return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+    # With every pooled connection busy, a request waits at most 10 seconds for one,
+    # then answers 503 (app/guard.py), rather than piling up behind the others.
+    engine = create_engine(url, connect_args=connect_args, pool_timeout=10)
+    _ping_when_idle(engine)
+    return engine
+
+
+# A pooled connection is tested only when it has sat unused a while: the
+# database (Neon) may have dropped it while asleep. Testing it on every request
+# cost a round trip each time (about 0.1 s from this computer).
+IDLE_BEFORE_PING = 60  # seconds
+
+
+def _ping_when_idle(engine: Engine) -> None:
+    import time
+
+    from sqlalchemy import exc
+
+    @event.listens_for(engine, "checkin")
+    def _back(dbapi_connection, record) -> None:
+        record.info["back_at"] = time.monotonic()
+
+    @event.listens_for(engine, "checkout")
+    def _out(dbapi_connection, record, proxy) -> None:
+        back = record.info.get("back_at")
+        if back is None or time.monotonic() - back < IDLE_BEFORE_PING:
+            return
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+        except Exception as e:
+            # The pool drops this connection and hands out a fresh one.
+            raise exc.DisconnectionError() from e
 
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:

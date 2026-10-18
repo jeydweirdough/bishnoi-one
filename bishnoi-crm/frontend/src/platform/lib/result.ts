@@ -44,7 +44,7 @@ export function toFailure(error: unknown): Failure {
       if (field && !fields[field]) fields[field] = message;
       else if (!field) general ||= message;
     }
-    return { ok: false, error: general || "Some fields need a look.", fields };
+    return { ok: false, error: general || "Some fields need attention.", fields };
   }
   if (detail && typeof detail === "object" && "duplicates" in detail) {
     const d = detail as { message: string; duplicates: Duplicate[] };

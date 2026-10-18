@@ -8,7 +8,7 @@ export function Figure({ label, value, href, flag }: { label: string; value: num
   return (
     <div className="min-w-0 px-5 py-4">
       {href ? (
-        <Link href={href} className="block hover:[&>span:first-child]:text-hema">
+        <Link href={href} className="block hover:[&>span:first-child]:text-ink">
           {figure}
         </Link>
       ) : (

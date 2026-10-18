@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.access import CurrentAccess
-from app.deps import DB
+from app.deps import DB, SettingsDep
 from app.ledger import settings as posting_settings
 from app.models import Account, ExpenseCategory, TaxProfile
 from app.routers.invoices import issued_to_nobody
@@ -49,3 +49,18 @@ def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
     if access.can("tax.manage"):
         counts["taxProfile"] = 0 if profile_complete(db.get(TaxProfile, 1)) else 1
     return {k: v for k, v in counts.items() if v}
+
+
+@router.get("/frame")
+def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
+    """What every signed-in screen needs around its own content, in one request:
+    the same answers as /auth/me, /finance/unset and /finance/funds/counts
+    (that one only for a role that may see fund requests; null otherwise)."""
+    from app.identity import me_out
+    from app.routers.funds import waiting
+
+    return {
+        "me": me_out(access.user, settings),
+        "unset": unset(access, db),
+        "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
+    }

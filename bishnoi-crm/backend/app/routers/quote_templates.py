@@ -1,7 +1,8 @@
 """Quotation templates (app/quote_templates.py): the admin sets them up under
 Settings; anyone who can see a quote prints or downloads it with one.
 
-- /admin/quote-templates: list, add, change, remove (admin.settings).
+- /admin/quote-templates: list, add, change, remove (admin.settings), or a
+  manager's for their own departments' templates (department.manage).
 - /admin/quote-templates/{id}/images/logo, /images/signature: an image, PNG or JPG (a drawn
   signature arrives as a PNG). /excel: the Excel form itself.
 - /quote-templates/{id}/images/logo, /images/signature: the images, for the print page.
@@ -19,7 +20,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.access import Access, require
+from app.access import DEPARTMENT, Access, require
 from app.api import Api, changed, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -39,11 +40,12 @@ from app.quote_templates import (
     sheet_of,
     stored,
 )
+from app.quote_code import FIELDS, MAX_HTML, STARTER, render, sample_doc
 from app.routers.quotes import get_quote
 
 router = APIRouter(tags=["quote templates"])
 
-Manage = Annotated[Access, Depends(require("admin.settings"))]
+Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
 View = Annotated[Access, Depends(require("quotes.view"))]
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -77,18 +79,20 @@ def template_out(db: Session, t: QuoteTemplate) -> dict:
     }
 
 
-def get_template(db: Session, template_id: str) -> QuoteTemplate:
+def get_template(db: Session, template_id: str, access: Access | None = None) -> QuoteTemplate:
+    """A template; given who's setting it up, only one of theirs (another
+    department's isn't there for a manager). Printing reads any."""
     t = db.get(QuoteTemplate, template_id)
-    if t is None:
+    if t is None or (access is not None and not access.runs(t.team_id)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That template isn't here any more.")
     return t
 
 
 @router.get("/admin/quote-templates")
 def list_templates(access: Manage, db: DB) -> dict:
-    rows = db.scalars(select(QuoteTemplate).order_by(QuoteTemplate.name)).all()
+    rows = [t for t in db.scalars(select(QuoteTemplate).order_by(QuoteTemplate.name)) if access.runs(t.team_id)]
     issuers = db.scalars(select(Issuer).where(Issuer.is_active).order_by(Issuer.name)).all()
-    teams = db.scalars(select(Team).order_by(Team.name)).all()
+    teams = [t for t in db.scalars(select(Team).order_by(Team.name)) if access.runs(t.id)]
     return {
         "items": [template_out(db, t) for t in rows],
         "issuers": [{"code": i.code, "name": i.name} for i in issuers],
@@ -100,7 +104,7 @@ def list_templates(access: Manage, db: DB) -> dict:
 
 @router.get("/admin/quote-templates/{template_id}")
 def read_template(access: Manage, db: DB, template_id: str) -> dict:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     if t.kind == "excel" and t.excel_ref:
         # what was found, as the form is read now (the reading improves; the form doesn't change)
         before = t.excel_map
@@ -125,11 +129,13 @@ class DesignIn(Api):
     signatory_name: str | None = Field(None, max_length=120)
     signatory_title: str | None = Field(None, max_length=120)
     signatory_contact: str | None = Field(None, max_length=120)
+    # A "code" template's own HTML, with %fields% (app/quote_code.py).
+    html: str | None = Field(None, max_length=MAX_HTML)
 
 
 class TemplateIn(Api):
     name: str | None = Field(None, min_length=2, max_length=120)
-    kind: Literal["form", "excel"] | None = None
+    kind: Literal["form", "excel", "code"] | None = None
     payer: str | None = Field(None, max_length=40)
     team_id: str | None = None
     is_active: bool | None = None
@@ -138,6 +144,12 @@ class TemplateIn(Api):
     control_digits: int | None = Field(None, ge=1, le=8)
     design: DesignIn | None = None
     excel_sheet: str | None = Field(None, max_length=120)
+
+
+def check_team(access: Access, team_id: str | None) -> None:
+    """A manager's templates are for their own departments; one for every team is an administrator's."""
+    if not access.runs(team_id):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick one of your own teams.")
 
 
 def check_refs(db: Session, body: TemplateIn) -> None:
@@ -167,6 +179,7 @@ def create_template(access: Manage, me: CurrentUser, db: DB, body: TemplateIn) -
     if not body.name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the template a name.")
     check_refs(db, body)
+    check_team(access, body.team_id)
     t = QuoteTemplate(id=new_id(), name=body.name, kind=body.kind or "form", design={}, is_active=True, control_next=1, control_digits=4)
     apply(t, body, changed(body))
     db.add(t)
@@ -188,9 +201,11 @@ def remap(db: Session, t: QuoteTemplate) -> None:
 
 @router.patch("/admin/quote-templates/{template_id}")
 def update_template(access: Manage, me: CurrentUser, db: DB, template_id: str, body: TemplateIn) -> dict:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     check_refs(db, body)
     fields = changed(body)
+    if "team_id" in fields:
+        check_team(access, fields["team_id"])
     done = apply(t, body, fields)
     if "excel_sheet" in fields and fields["excel_sheet"] != t.excel_sheet:
         t.excel_sheet = fields["excel_sheet"]
@@ -204,7 +219,7 @@ def update_template(access: Manage, me: CurrentUser, db: DB, template_id: str, b
 
 @router.delete("/admin/quote-templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_template(access: Manage, me: CurrentUser, db: DB, template_id: str) -> Response:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     for ref in (t.logo_ref, t.signature_ref, t.excel_ref):
         if f := stored(db, ref):
             db.delete(f)
@@ -227,7 +242,7 @@ Image = Literal["logo", "signature"]
 
 @router.post("/admin/quote-templates/{template_id}/images/{which}")
 async def upload_image(access: Manage, me: CurrentUser, db: DB, template_id: str, which: Image, file: Annotated[UploadFile, File()]) -> dict:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     data = await file.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The image is over 2 MB. Use a smaller one.")
@@ -243,7 +258,7 @@ async def upload_image(access: Manage, me: CurrentUser, db: DB, template_id: str
 
 @router.delete("/admin/quote-templates/{template_id}/images/{which}")
 def remove_image(access: Manage, me: CurrentUser, db: DB, template_id: str, which: Image) -> dict:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     if f := stored(db, getattr(t, f"{which}_ref")):
         db.delete(f)
     setattr(t, f"{which}_ref", None)
@@ -254,7 +269,7 @@ def remove_image(access: Manage, me: CurrentUser, db: DB, template_id: str, whic
 
 @router.post("/admin/quote-templates/{template_id}/excel")
 async def upload_excel(access: Manage, me: CurrentUser, db: DB, template_id: str, file: Annotated[UploadFile, File()]) -> dict:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     data = await file.read(MAX_EXCEL_BYTES + 1)
     if len(data) > MAX_EXCEL_BYTES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The file is over 5 MB. Keep only the quotation sheet, or remove pictures.")
@@ -277,7 +292,7 @@ async def upload_excel(access: Manage, me: CurrentUser, db: DB, template_id: str
 
 @router.get("/admin/quote-templates/{template_id}/excel")
 def download_form(access: Manage, db: DB, template_id: str) -> Response:
-    t = get_template(db, template_id)
+    t = get_template(db, template_id, access)
     f = stored(db, t.excel_ref)
     if f is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No Excel form is uploaded on this template.")
@@ -300,7 +315,7 @@ def fitting(db: Session, quote: Quote) -> list[QuoteTemplate]:
     """Active templates for this quote's payer and team, the most specific first."""
     rows = db.scalars(select(QuoteTemplate).where(QuoteTemplate.is_active)).all()
     fits = [t for t in rows if t.payer in (None, quote.payer) and t.team_id in (None, quote.team_id)]
-    fits = [t for t in fits if t.kind == "form" or t.excel_ref]
+    fits = [t for t in fits if t.kind == "form" or (t.kind == "excel" and t.excel_ref) or (t.kind == "code" and (t.design or {}).get("html"))]
     return sorted(fits, key=lambda t: (t.payer is None, t.team_id is None, t.name.lower()))
 
 
@@ -326,7 +341,45 @@ def chosen(db: Session, quote: Quote, template_id: str | None) -> QuoteTemplate:
 def quote_document(access: View, db: DB, settings: SettingsDep, quote_id: str, template: str | None = Query(None)) -> dict[str, Any]:
     quote = get_quote(db, access, quote_id)
     t = chosen(db, quote, template)
-    return {"template": template_out(db, t), **document(db, quote, t, settings)}
+    doc = document(db, quote, t, settings)
+    # Written as code: the page itself, filled in and cleaned, to print as it is.
+    return {"template": template_out(db, t), **doc, **({"html": code_html(db, t, doc)} if t.kind == "code" else {})}
+
+
+def code_html(db: Session, t: QuoteTemplate, doc: dict, source: str | None = None) -> str:
+    logo, sign = stored(db, t.logo_ref), stored(db, t.signature_ref)
+    return render(source if source is not None else (t.design or {}).get("html") or "", doc, logo.data if logo else None, logo.content_type if logo else None, sign.data if sign else None, sign.content_type if sign else None)
+
+
+@router.get("/admin/quote-template-fields")
+def code_fields(access: Manage) -> dict:
+    """The fields a template written as code can use, by group; and a layout to start from."""
+    groups: dict[str, list[dict]] = {}
+    for group, field, label in FIELDS:
+        groups.setdefault(group, []).append({"field": f"%{field}%", "label": label})
+    return {"groups": [{"name": g, "fields": f} for g, f in groups.items()], "loop": ["%lines_start%", "%lines_end%"], "starter": STARTER}
+
+
+class PreviewIn(Api):
+    html: str = Field(max_length=MAX_HTML)
+
+
+@router.post("/admin/quote-templates/{template_id}/preview")
+def preview_code(access: Manage, db: DB, settings: SettingsDep, template_id: str, body: PreviewIn) -> dict:
+    """The code as it would print, before it's saved: with this template's most recent
+    quote (no control number is used up), or made-up values when there's none yet."""
+    t = get_template(db, template_id, access)
+    query = select(Quote).order_by(Quote.created_at.desc()).limit(1)
+    if t.payer:
+        query = query.where(Quote.payer == t.payer)
+    if t.team_id:
+        query = query.where(Quote.team_id == t.team_id)
+    quote = db.scalar(query)
+    if quote is not None:
+        doc, using = document(db, quote, t, settings, preview=True), f"Quote {quote.number}, {quote.customer_name}"
+    else:
+        doc, using = sample_doc({**DESIGN_DEFAULTS, **(t.design or {})}, settings.org_name), "Made-up values: there's no quote for this template yet"
+    return {"html": code_html(db, t, doc, body.html), "using": using}
 
 
 @router.get("/quotes/{quote_id}/document.xlsx")

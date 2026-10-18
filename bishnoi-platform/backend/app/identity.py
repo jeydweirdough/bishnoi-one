@@ -26,7 +26,7 @@ def org_out(settings: Settings) -> dict:
 
 def me_out(user: User, settings: Settings) -> dict:
     return {
-        "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
+        "user": {"id": user.id, "no": user.no, "email": user.email, "fullName": user.full_name, "photoAt": None},
         "org": None,
         "canManageSettings": False,
         "canRecover": True,

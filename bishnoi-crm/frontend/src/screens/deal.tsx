@@ -1,15 +1,17 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
-import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader, Particulars, SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Deal, DealLists, DealStage } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
+import { AssociationsPanel } from "../components/crm/associations-panel";
 import { EditRecord } from "../components/crm/list-controls";
 import { DealClose } from "../components/deals/deal-close";
-import { CATEGORY_LABELS, StageTag, closeLabel } from "../components/deals/words";
+import { AppliedPromo } from "../components/catalogue/promo-tag";
+import { PriorityFlag, CATEGORY_LABELS, StageTag, closeLabel } from "../components/deals/words";
 
 type Params = Promise<{ id: string }>;
 
@@ -54,7 +56,7 @@ export default async function DealPage({ params }: { params: Params }) {
           )
         }
       >
-        <Link href={`/companies/${deal.company.id}`} className="text-hema hover:underline">
+        <Link href={`/companies/${deal.company.id}`} className="text-ink hover:underline">
           {deal.company.name}
         </Link>
         {deal.contact && <> · {deal.contact.name}</>}
@@ -92,7 +94,7 @@ export default async function DealPage({ params }: { params: Params }) {
                   Won{wonWith ? (
                     <>
                       {" "}with quote{" "}
-                      <Link href={`/quotes/${wonWith.id}`} className="text-hema hover:underline">
+                      <Link href={`/quotes/${wonWith.id}`} className="text-ink hover:underline">
                         {wonWith.number}
                       </Link>
                     </>
@@ -112,8 +114,15 @@ export default async function DealPage({ params }: { params: Params }) {
 
           <Sheet className="px-5 pt-4 pb-3">
             <SectionTitle icon="products">Products</SectionTitle>
+            {(deal.clidpWarnings ?? []).length > 0 && (
+              <ul className="mt-2 space-y-1 rounded-sheet bg-danger-tint px-3 py-2 text-meta text-ink">
+                {deal.clidpWarnings!.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
             {deal.lines.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">No products on it: its value was typed in.{deal.can.edit ? " Edit the deal to value it by products." : ""}</p>
+              <Empty compact icon="products" title="No products on it">Its value was typed in.{deal.can.edit ? " Edit the deal to value it by products." : ""}</Empty>
             ) : (
               <table className="mt-2 w-full text-sm">
                 <thead>
@@ -129,6 +138,12 @@ export default async function DealPage({ params }: { params: Params }) {
                     <tr key={l.productId}>
                       <td className="py-2">
                         {l.productName} <span className="text-meta text-ink-3">{l.productCode}</span>
+                        {/* Sold under a promo: it goes on to the deal's quote with the product. */}
+                        {l.promoName && (
+                          <span className="mt-1 block">
+                            <AppliedPromo name={l.promoName} discountCentavos={l.promoDiscountCentavos} freeQuantity={l.freeQuantity} fmt={fmt} />
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 text-right">
                         {fmt.count(l.quantity)} {l.unit}
@@ -156,12 +171,12 @@ export default async function DealPage({ params }: { params: Params }) {
               Quotes
             </SectionTitle>
             {deal.quotes.length === 0 ? (
-              <p className="py-2 text-meta text-ink-3">No quotes yet. A quote made with New quote here is linked to this deal, and can be what wins it.</p>
+              <Empty compact icon="quotes" title="No quotes yet">A quote made with New quote here is linked to this deal, and can be what wins it.</Empty>
             ) : (
               <ul className="mt-1 divide-y divide-rule">
                 {deal.quotes.map((q) => (
                   <li key={q.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
-                    <Link href={`/quotes/${q.id}`} className="font-medium text-hema hover:underline">
+                    <Link href={`/quotes/${q.id}`} className="font-medium text-ink hover:underline">
                       {q.number}
                     </Link>
                     <span className="text-meta text-ink-3">
@@ -174,6 +189,7 @@ export default async function DealPage({ params }: { params: Params }) {
           </Sheet>
         </div>
 
+        <div className="space-y-5">
         <Sheet className="px-5 pt-4 pb-5">
           <SectionTitle icon="particulars">Details</SectionTitle>
           <div className="mt-3">
@@ -182,6 +198,7 @@ export default async function DealPage({ params }: { params: Params }) {
                 ["Stage", deal.stage.name],
                 ["Forecast", CATEGORY_LABELS[deal.forecastCategory]],
                 ["Close", closeLabel(deal, today, fmt.dateLabel)],
+                ["Priority", deal.priority ? <PriorityFlag key="priority" priority={deal.priority} /> : null],
                 ["Lead source", deal.leadSource],
                 ["Owner", deal.owner ? (deal.owner.id === me.user.id ? "You" : deal.owner.name) : null],
                 ["Added", fmt.whenLabel(deal.createdAt)],
@@ -190,6 +207,8 @@ export default async function DealPage({ params }: { params: Params }) {
             {deal.notes && <p className="mt-4 border-t border-rule pt-3 text-sm whitespace-pre-line text-ink-2">{deal.notes}</p>}
           </div>
         </Sheet>
+        <AssociationsPanel kind="deal" id={deal.id} />
+        </div>
       </div>
     </>
   );

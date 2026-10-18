@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomerSharingButton } from "../crm/customer-sharing";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -7,18 +8,24 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { createTeam, deleteTeam, updateTeam } from "../../actions/admin";
 import type { TeamRow } from "@/src/platform/lib/types";
 import { Chip, ChipsInput } from "./chips-input";
 import { OffTag } from "./words";
 
-/** Teams: add one, change its name, description or headquarters, switch it off, or delete it while nobody's in it. */
-export function TeamsEditor({ teams }: { teams: TeamRow[] }) {
+/** Who can be a team's manager: people whose role manages teams. */
+export type ManagerOption = { id: string; name: string };
+
+/** Teams: add one, change its name, description, manager or headquarters, switch it off, or delete it while nobody's in it. */
+export function TeamsEditor({ teams, managers = [] }: { teams: TeamRow[]; managers?: ManagerOption[] }) {
   return (
     <div className="space-y-5">
-      <AddTeam />
+      <div className="flex flex-wrap items-center gap-2">
+        <AddTeam />
+        <CustomerSharingButton />
+      </div>
       <Sheet>
         {teams.length === 0 ? (
           <Empty icon="teams" title="No teams yet">
@@ -27,7 +34,7 @@ export function TeamsEditor({ teams }: { teams: TeamRow[] }) {
         ) : (
           <ul className="divide-y divide-rule">
             {teams.map((t) => (
-              <TeamLine key={t.id} team={t} />
+              <TeamLine key={t.id} team={t} managers={managers} />
             ))}
           </ul>
         )}
@@ -77,7 +84,7 @@ function AddTeam() {
         <Field label="Name" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}
         </Field>
-        <Field label="What it does" optional error={fields.description}>
+        <Field label="Description" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
         </Field>
         <div className="sm:order-last sm:col-span-3">
@@ -96,9 +103,10 @@ function AddTeam() {
   );
 }
 
-function TeamLine({ team }: { team: TeamRow }) {
+function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [managerId, setManagerId] = useState(team.manager?.id ?? "");
   const [name, setName] = useState(team.name);
   const [description, setDescription] = useState(team.description ?? "");
   const [headquarters, setHeadquarters] = useState<string[]>(team.headquarters);
@@ -108,7 +116,7 @@ function TeamLine({ team }: { team: TeamRow }) {
 
   function save() {
     start(async () => {
-      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null, headquarters });
+      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null, headquarters, managerId: managerId || null });
       if (!result.ok) {
         setError(result.fields ? null : result.error);
         setFields(result.fields ?? {});
@@ -128,7 +136,7 @@ function TeamLine({ team }: { team: TeamRow }) {
       toast.error(result.error);
       return false;
     }
-    toast.success(team.isActive ? "Team switched off" : "Team switched back on", { description: team.name });
+    toast.success(team.isActive ? "Team deactivated" : "Team reactivated", { description: team.name });
     router.refresh();
     return true;
   }
@@ -158,9 +166,28 @@ function TeamLine({ team }: { team: TeamRow }) {
           <Field label="Name" error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}
           </Field>
-          <Field label="What it does" optional error={fields.description}>
+          <Field label="Description" optional error={fields.description}>
             {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
           </Field>
+          <div className="sm:col-span-3">
+            <Field
+              label="Manager"
+              optional
+              error={fields.managerId}
+              hint={managers.length ? "Above the team lead: reaches this team and every other team they manage." : "Give someone the Manager role first (People and access → Users)."}
+            >
+              {(p) => (
+                <Select {...p} value={managerId} onChange={(e) => setManagerId(e.target.value)} disabled={!managers.length && !managerId}>
+                  <option value="">No manager</option>
+                  {[...managers, ...(team.manager && !managers.some((m) => m.id === team.manager!.id) ? [team.manager] : [])].map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
           <div className="sm:order-last sm:col-span-3">
             <ChipsInput label="Headquarters" value={headquarters} onChange={setHeadquarters} placeholder="e.g. Makati office" error={fields.headquarters} />
           </div>
@@ -172,6 +199,7 @@ function TeamLine({ team }: { team: TeamRow }) {
                 setName(team.name);
                 setDescription(team.description ?? "");
                 setHeadquarters(team.headquarters);
+                setManagerId(team.manager?.id ?? "");
                 setFields({});
                 setError(null);
               }}
@@ -203,10 +231,11 @@ function TeamLine({ team }: { team: TeamRow }) {
           {team.memberCount === 0 ? (
             "Nobody yet"
           ) : (
-            <Link href={`/admin/users?team=${encodeURIComponent(team.id)}`} className="text-ink-2 hover:text-hema hover:underline">
+            <Link href={`/admin/users?team=${encodeURIComponent(team.id)}`} className="text-ink-2 hover:text-ink hover:underline">
               {team.memberCount} {team.memberCount === 1 ? "person" : "people"}
             </Link>
           )}
+          {team.manager && <> · Manager: {team.manager.name}</>}
           {team.description && <> · {team.description}</>}
         </p>
         {team.headquarters.length > 0 && (
@@ -223,14 +252,14 @@ function TeamLine({ team }: { team: TeamRow }) {
           Edit
         </Button>
         <ConfirmButton
-          label={team.isActive ? "Switch off" : "Switch on"}
+          label={team.isActive ? "Deactivate" : "Activate"}
           title={team.isActive ? `Switch ${team.name} off?` : `Switch ${team.name} back on?`}
           body={
             team.isActive
               ? "People already in it stay, but nobody new can be put in it. Switch it back on any time."
               : "People can be put in it again."
           }
-          confirmLabel={team.isActive ? "Switch off" : "Switch on"}
+          confirmLabel={team.isActive ? "Deactivate" : "Activate"}
           danger={team.isActive}
           triggerSize="sm"
           triggerVariant="quiet"

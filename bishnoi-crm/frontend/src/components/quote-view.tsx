@@ -1,3 +1,4 @@
+import { Avatar } from "@/src/platform/ui/avatar";
 import { FileText } from "lucide-react";
 import { PriceSource, RuleAdjustments, TaxSummary } from "./tax-summary";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { orgFormat } from "@/src/platform/lib/org";
 import { APPROVAL_STATUSES, LETTER_STATUSES, PAYMENT_STATUSES, approvalReason } from "@/src/platform/lib/labels";
 import type { CustomField, Quote, QuoteLine } from "@/src/platform/lib/types";
 import { extraItems } from "./extra/extra-values";
+import { AppliedPromo } from "./catalogue/promo-tag";
 
 function discountLabel(fmt: Format, line: QuoteLine) {
   if (!line.discountKind || !line.discountValue) return null;
@@ -63,8 +65,8 @@ export async function QuoteView({
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                   <th scope="col" className="py-2 pr-3 font-semibold">Product</th>
                   <th scope="col" className="px-3 py-2 text-right font-semibold">Qty</th>
-                  <th scope="col" className="px-3 py-2 text-right font-semibold">Each</th>
-                  <th scope="col" className="px-3 py-2 font-semibold">Promo / discount</th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">Unit price</th>
+                  <th scope="col" className="px-3 py-2 font-semibold">Promo or discount</th>
                   <th scope="col" className="py-2 pl-3 text-right font-semibold">Total</th>
                 </tr>
               </thead>
@@ -89,9 +91,8 @@ export async function QuoteView({
                     </td>
                     <td className="px-3 py-2.5 text-meta text-ink-2">
                       {line.promoName && (
-                        <span className="block">
-                          {line.promoName}
-                          {line.promoDiscountCentavos > 0 && ` (−${fmt.peso(line.promoDiscountCentavos)})`}
+                        <span className="mb-1 block">
+                          <AppliedPromo name={line.promoName} discountCentavos={line.promoDiscountCentavos} fmt={fmt} />
                         </span>
                       )}
                       {discountLabel(fmt, line) && (
@@ -115,7 +116,7 @@ export async function QuoteView({
           </div>
           <div className="mt-3 ml-auto max-w-xs space-y-1 text-sm">
             <p className="flex justify-between text-ink-2">
-              <span>List value</span>
+              <span>Total value</span>
               <span className="tabular-nums">{fmt.peso(quote.grossCentavos)}</span>
             </p>
             {quote.promoDiscountCentavos > 0 && (
@@ -146,7 +147,7 @@ export async function QuoteView({
                 [
                   "Customer",
                   customerHref ? (
-                    <Link href={customerHref} className="text-hema hover:underline">
+                    <Link href={customerHref} className="text-ink hover:underline">
                       {quote.customerName}
                     </Link>
                   ) : (
@@ -222,7 +223,7 @@ export async function QuoteView({
             ) : (
               <>
                 {approval.status === "pending" ? (
-                  <Flag letter="!">Waiting for an approver</Flag>
+                  <Waiting approvers={approval.approvers ?? []} />
                 ) : (
                   <Decision fmt={fmt} label={APPROVAL_STATUSES[approval.status]} by={approval.by} at={approval.at} note={approval.note} />
                 )}
@@ -236,6 +237,38 @@ export async function QuoteView({
             )}
           </section>
 
+          {(quote.prescriptions?.length ?? 0) > 0 && (
+            <section className="py-3" aria-label="Prescription">
+              <h3 className="text-meta text-ink-3">Prescription, from the customer</h3>
+              <ul className="mt-1 space-y-1">
+                {quote.prescriptions!.map((f) => (
+                  <li key={f.n}>
+                    <a href={`/quotes/${quote.id}/prescriptions/${f.n}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink hover:underline">
+                      <FileText className="size-4" aria-hidden />
+                      {f.name} <span className="text-meta text-ink-3">({Math.ceil(f.size / 1024)} KB)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {(quote.documents?.length ?? 0) > 0 && (
+            <section className="py-3" aria-label="Documents">
+              <h3 className="text-meta text-ink-3">Documents, from the customer</h3>
+              <ul className="mt-1 space-y-1">
+                {quote.documents!.map((f) => (
+                  <li key={f.n}>
+                    <a href={`/quotes/${quote.id}/documents/${f.n}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink hover:underline">
+                      <FileText className="size-4" aria-hidden />
+                      {f.label ?? f.name} <span className="text-meta text-ink-3">({f.name}, {Math.ceil(f.size / 1024)} KB)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {letter && (
             <section className="py-3" aria-label="Guarantee letter">
               <h3 className="text-meta text-ink-3">{quote.payerName} guarantee letter</h3>
@@ -244,7 +277,7 @@ export async function QuoteView({
                 {fmt.dateLabel(letter.issuedOn)} · covers {fmt.peso(letter.amountCentavos)}
               </p>
               {letter.file && (
-                <a href={letterHref} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 text-hema hover:underline">
+                <a href={letterHref} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 text-ink hover:underline">
                   <FileText className="size-4" aria-hidden />
                   Open the letter <span className="text-meta text-ink-3">({Math.ceil(letter.file.size / 1024)} KB)</span>
                 </a>
@@ -283,5 +316,40 @@ export async function QuoteView({
         </div>
       </Sheet>
     </div>
+  );
+}
+
+/** Who a quote waits on: "your approval" when it's you (the buttons follow), else the approvers by name. */
+function Waiting({ approvers }: { approvers: { id: string; name: string; role: string; isMe?: boolean }[] }) {
+  const mine = approvers.some((a) => a.isMe);
+  const others = approvers.filter((a) => !a.isMe);
+  const names = (list: typeof approvers) => (list.length === 1 ? list[0].name : list.length === 2 ? `${list[0].name} or ${list[1].name}` : `${list[0].name} or ${list.length - 1} others`);
+  if (!approvers.length) {
+    return (
+      <>
+        <Flag letter="!">Waiting for an approver</Flag>
+        <p className="mt-1 text-meta text-ink-3">Nobody who can approve quotes reaches this team yet. An administrator gives a role Quotes → Approve.</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <Flag letter="!">{mine ? "Waiting for your approval" : `Waiting for ${names(approvers)}`}</Flag>
+      {mine ? (
+        others.length > 0 && <p className="mt-1 text-meta text-ink-3">Also: {others.map((a) => a.name).join(", ")} can approve it.</p>
+      ) : (
+        <ul className="mt-1.5 space-y-1">
+          {approvers.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 text-sm text-ink">
+              <Avatar name={a.name} id={a.id} size="sm" />
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{a.name}</span>
+                <span className="block text-meta text-ink-3">{a.role} · can approve this quote</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

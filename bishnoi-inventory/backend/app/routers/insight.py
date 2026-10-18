@@ -39,7 +39,7 @@ from app.out import day, today, warehouse_ref
 from app.routers.adjustments import REASON_LABELS
 from app.routers.catalog import category_path
 from app.routers.orders import order_brief
-from app.routers.purchasing import performance, receipt_brief
+from app.routers.purchasing import performance, po_brief, receipt_brief
 from app.routers.stock import movement_out
 
 router = APIRouter(prefix="/inventory", tags=["insight"])
@@ -141,7 +141,48 @@ def dashboard(_: allowed("dashboard.view"), access: CurrentAccess, db: DB, setti
         "recentMovements": [movement_out(m) for m in db.scalars(select(Movement).where(Movement.kind.not_in(("reserve", "release"))).order_by(Movement.id.desc()).limit(10))] if see("stock.view") else [],
         "recentReceipts": [receipt_brief(r) for r in db.scalars(select(Receipt).order_by(Receipt.received_at.desc()).limit(5))] if see("receiving.view") else [],
         "recentIssues": [order_brief(o) for o in db.scalars(select(Order).where(Order.status == "issued").order_by(Order.issued_at.desc()).limit(5))] if see("orders.view") else [],
+        "openOrders": db.scalar(select(func.count()).select_from(Order).where(Order.status.in_(("confirmed", "picking")))) or 0 if see("orders.view") else 0,
+        "trend": monthly(db, settings),
+        "upcoming": [purchase_brief(po) for po in db.scalars(
+            select(PurchaseOrder).where(PurchaseOrder.status.in_(("ordered", "partial"))).order_by(PurchaseOrder.expected_on.is_(None), PurchaseOrder.expected_on).limit(6)
+        )] if see("purchasing.view") else [],
+        "recentPurchases": [purchase_brief(po) for po in db.scalars(select(PurchaseOrder).order_by(PurchaseOrder.created_at.desc()).limit(5))] if see("purchasing.view") else [],
     }
+
+
+MONTHS = 12
+
+
+def monthly(db: DB, settings: Settings) -> list[dict]:
+    """The last twelve months, the company's own months: units received and units
+    issued, and how many orders were made. For the home page's chart and trends."""
+    zone = ZoneInfo(settings.org_timezone)
+    now = datetime.now(zone)
+    keys: list[str] = []
+    y, m = now.year, now.month
+    for _ in range(MONTHS):
+        keys.append(f"{y:04d}-{m:02d}")
+        y, m = (y, m - 1) if m > 1 else (y - 1, 12)
+    keys.reverse()
+    first = datetime(int(keys[0][:4]), int(keys[0][5:]), 1, tzinfo=zone)
+    rows = {k: {"month": k, "received": 0, "issued": 0, "orders": 0} for k in keys}
+    for at, kind, change in db.execute(
+        select(Movement.at, Movement.kind, Movement.on_hand_change).where(Movement.kind.in_(("receive", "issue")), Movement.at >= first)
+    ):
+        key = (at if at.tzinfo else at.replace(tzinfo=UTC)).astimezone(zone).strftime("%Y-%m")
+        if key in rows:
+            rows[key]["received" if kind == "receive" else "issued"] += abs(change)
+    for (created,) in db.execute(select(Order.created_at).where(Order.created_at >= first)):
+        key = (created if created.tzinfo else created.replace(tzinfo=UTC)).astimezone(zone).strftime("%Y-%m")
+        if key in rows:
+            rows[key]["orders"] += 1
+    return list(rows.values())
+
+
+def purchase_brief(po: PurchaseOrder) -> dict:
+    """A purchase order as the home page lists it: its first product, and how many more."""
+    first = po.lines[0].product if po.lines else None
+    return {**po_brief(po), "firstItem": first.name if first else None, "moreItems": max(0, len(po.lines) - 1)}
 
 
 # --- reports ---------------------------------------------------------------------------

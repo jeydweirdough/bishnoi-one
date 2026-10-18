@@ -1,42 +1,42 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { deleteDocument } from "@/src/actions/executive";
 import { ExportButton, ImportButton } from "@/src/components/sheet-actions";
-import { CountdownBadge } from "@/src/components/countdown-badge";
 import { DocumentModal } from "@/src/components/executive-modals";
+import { DueCell, NameCell, RecordTable, Tag } from "@/src/components/record-table";
 import type { CorporateDocument } from "@/src/platform/lib/types";
 import { Button } from "@/src/platform/ui/button";
-import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { HealthStrip, healthOf } from "@/src/components/overview-charts";
 import { Icon } from "@/src/platform/ui/icons";
-import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
+import { PageHeader } from "@/src/platform/ui/sheet";
 
 /** What this person's role lets them do here; the API checks the same. */
 type Can = { create: boolean; edit: boolean; delete: boolean };
 const ALL: Can = { create: true, edit: true, delete: true };
 
-export function DocumentsScreen({ documents: initialDocuments, canImport = false, can = ALL }: { documents: CorporateDocument[]; canImport?: boolean; can?: Can }) {
-  const [documents, setDocuments] = useState<CorporateDocument[]>(initialDocuments);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  // The sidebar's red count on Documents: in force, not renewing by itself, and no expiry date.
-  const [onlyNoExpiry, setOnlyNoExpiry] = useState(false);
-  const noExpiry = documents.filter((d) => d.expirationDate === null && !d.autoRenews && d.status !== "terminated");
-  const [modalDocument, setModalDocument] = useState<CorporateDocument | null | "new">(null);
+const CATEGORIES: Record<string, string> = { insurance: "Insurance", commercial_contract: "Contract", nda: "NDA", board_resolution: "Board resolution", legal_retainer: "Legal retainer" };
+const STATUS: Record<string, string> = { active: "Active", in_review: "In review", renewed: "Renewed", terminated: "Terminated" };
+const peso = (n: number | null) => (n == null ? null : `₱${n.toLocaleString("en-PH", { maximumFractionDigits: 0 })}`);
 
-  const categories = [
-    { key: "all", label: "All" },
-    { key: "insurance", label: "Insurance" },
-    { key: "commercial_contract", label: "Contracts" },
-    { key: "nda", label: "NDAs" },
-    { key: "board_resolution", label: "Board resolutions" },
-    { key: "legal_retainer", label: "Legal retainers" },
-  ];
+/** A document with no expiry date and no automatic renewal can't raise a renewal alert. */
+const noExpiry = (d: CorporateDocument) => d.expirationDate === null && !d.autoRenews && d.status !== "terminated";
 
-  const filtered = (onlyNoExpiry ? noExpiry : documents).filter(
-    (d) => selectedCategory === "all" || d.category === selectedCategory
-  );
+function standing(d: CorporateDocument): { text: string; tone: "good" | "warn" | "bad" | "info" | "mute" } {
+  if (d.status === "terminated") return { text: "Terminated", tone: "mute" };
+  if (noExpiry(d)) return { text: "No expiry date", tone: "warn" };
+  if (d.expirationDate && (d.daysRemaining ?? 0) < 0) return { text: "Expired", tone: "bad" };
+  if (d.expirationDate && (d.daysRemaining ?? 999) <= 60) return { text: "Due soon", tone: "warn" };
+  if (d.status === "in_review") return { text: "In review", tone: "info" };
+  return { text: d.autoRenews ? "Renews itself" : "Current", tone: "good" };
+}
+
+/** Contracts, insurance and other corporate documents, as the CRM's list. */
+export function DocumentsScreen({ documents, canImport = false, can = ALL }: { documents: CorporateDocument[]; canImport?: boolean; can?: Can }) {
+  const [gone, setGone] = useState<string[]>([]);
+  const [modal, setModal] = useState<CorporateDocument | null | "new">(null);
+  const rows = documents.filter((d) => !gone.includes(d.id));
+  const missing = rows.filter(noExpiry).length;
 
   return (
     <>
@@ -47,149 +47,70 @@ export function DocumentsScreen({ documents: initialDocuments, canImport = false
             <ExportButton kind="documents" />
             {canImport && <ImportButton href="/documents/import" />}
             {can.create && (
-              <Button variant="primary" onClick={() => setModalDocument("new")}>
-                <Icon name="documents" className="mr-1.5 size-4" />
+              <Button variant="primary" onClick={() => setModal("new")}>
+                <Icon name="documents" className="size-4" />
                 New document
               </Button>
             )}
           </>
         }
       >
-        Insurance policies, contracts, NDAs, board resolutions and legal retainers, with their renewal and cancellation dates.
-        {(noExpiry.length > 0 || onlyNoExpiry) && (
-          <span className="mt-1 block text-danger">
-            {onlyNoExpiry
-              ? "Showing the documents with no expiry date."
-              : `${noExpiry.length} ${noExpiry.length === 1 ? "document has" : "documents have"} no expiry date, so no renewal alert can be sent.`}{" "}
-            <button type="button" onClick={() => setOnlyNoExpiry(!onlyNoExpiry)} className="font-semibold underline">
-              {onlyNoExpiry ? "Show every document" : `Show ${noExpiry.length === 1 ? "it" : "them"}`}
-            </button>
+        {rows.length} documents · contracts, insurance, NDAs, board resolutions and retainers
+        {missing > 0 && (
+          <span className="mt-1 block font-medium text-[#8a5a00]">
+            {missing} {missing === 1 ? "document has" : "documents have"} no expiry date, so no renewal alert can be sent. Pick &quot;No expiry date&quot; below to see {missing === 1 ? "it" : "them"}.
           </span>
         )}
       </PageHeader>
 
-      <HealthStrip label="documents with an expiry date" {...healthOf(documents.map((d) => d.daysRemaining), 60)} />
+      <RecordTable
+        rows={rows}
+        searchLabel={`Search ${rows.length} documents`}
+        search={(d) => [d.title, d.counterparty, d.referenceNumber, d.custodian].join(" ")}
+        filter={{
+          label: "Show",
+          options: { insurance: "Insurance", commercial_contract: "Contracts", nda: "NDAs", none: "No expiry date" },
+          matches: (d, key) => (key === "none" ? noExpiry(d) : d.category === key),
+        }}
+        emptyIcon="documents"
+        empty={{ title: "No documents yet", body: can.create ? "Add the first document, or import them from a spreadsheet." : "They appear here once they're added." }}
+        rowTone={(d) => (d.expirationDate && (d.daysRemaining ?? 0) < 0 && d.status !== "terminated" ? "bad" : null)}
+        columns={[
+          {
+            key: "name",
+            label: "Document",
+            render: (d) => (
+              <NameCell
+                name={d.title}
+                sub={[d.referenceNumber, d.custodian].filter(Boolean).join(" · ")}
+                filled={standing(d).tone === "warn" || standing(d).tone === "bad"}
+                what="document"
+                onEdit={can.edit ? () => setModal(d) : undefined}
+                onDelete={
+                  can.delete
+                    ? async () => {
+                        const r = await deleteDocument(d.id);
+                        if (!r.ok) {
+                          toast.error(r.error);
+                          return false;
+                        }
+                        setGone((g) => [...g, d.id]);
+                        toast.success("Document deleted", { description: d.title });
+                      }
+                    : undefined
+                }
+              />
+            ),
+          },
+          { key: "with", label: "With", kind: "hide-sm", render: (d) => d.counterparty },
+          { key: "type", label: "Type", kind: "hide-sm", render: (d) => <Tag>{CATEGORIES[d.category] ?? d.category}</Tag> },
+          { key: "expires", label: "Expires", render: (d) => (d.expirationDate ? <DueCell date={d.expirationDate} days={d.daysRemaining} note={STATUS[d.status]} /> : <span className="text-ink-3">{d.autoRenews ? "Renews itself" : "No date"}</span>) },
+          { key: "value", label: "A year", kind: "num", render: (d) => peso(d.annualValue) ?? <span className="text-ink-3">—</span> },
+          { key: "status", label: "Status", render: (d) => <Tag tone={standing(d).tone} dot>{standing(d).text}</Tag> },
+        ]}
+      />
 
-      {/* Filter Tabs */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <div className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
-          {categories.map((cat) => (
-            <button
-              key={cat.key}
-              type="button"
-              onClick={() => setSelectedCategory(cat.key)}
-              className={`rounded-[2px] px-3 py-1 text-meta transition-colors ${
-                selectedCategory === cat.key
-                  ? "bg-hema-tint font-semibold text-hema"
-                  : "text-ink-2 hover:text-ink"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Sheet>
-        {filtered.length === 0 ? (
-          <Empty title="No documents here" icon="documents">
-            Choose another category, or add a document.
-          </Empty>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {filtered.map((d) => (
-              <li
-                key={d.id}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3.5 transition-colors hover:bg-bench/40"
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <div className="mt-0.5 shrink-0">
-                    {d.expirationDate ? (
-                      <CountdownBadge daysRemaining={d.daysRemaining} urgencyTier={d.urgencyTier} />
-                    ) : (
-                      <span className="inline-flex items-center rounded-[2px] border border-rule px-1.5 py-0.5 text-meta font-medium text-ink-3">
-                        Active
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-semibold text-sm text-ink">{d.title}</span>
-                      {/* Edit and delete sit with the record they act on. */}
-                      <span className="inline-flex items-center">
-                        {can.edit && (
-                          <button
-                            type="button"
-                            onClick={() => setModalDocument(d)}
-                            aria-label="Edit document"
-                            title="Edit document"
-                            className="inline-flex size-7 items-center justify-center rounded-[3px] text-ink-3 hover:bg-hema-tint hover:text-hema"
-                          >
-                            <Pencil className="size-3.5" aria-hidden />
-                          </button>
-                        )}
-                        {can.delete && (
-                          <ConfirmButton
-                            label={<span className="sr-only">Delete document</span>}
-                            icon={<Trash2 className="size-3.5" aria-hidden />}
-                            triggerTitle="Delete document"
-                            triggerClassName="!size-7 !px-0 !text-ink-3 hover:!bg-danger/10 hover:!text-danger"
-                                                  title={`Delete ${d.title}?`}
-                            body="This document and its renewal alerts are deleted. This cannot be undone."
-                            confirmLabel="Delete document"
-                            danger
-                            triggerVariant="quiet"
-                            triggerSize="sm"
-                            onConfirm={async () => {
-                            await deleteDocument(d.id);
-                            setDocuments((prev) => prev.filter((item) => item.id !== d.id));
-                            }}
-                            
-                          />
-                        )}
-                      </span>
-                      <span className="text-meta text-ink-2">· {d.counterparty}</span>
-                      {d.autoRenews && (
-                        <span className="rounded-[2px] bg-hema-tint px-1.5 py-0.2 text-meta font-semibold text-hema">
-                          Auto-renews ({d.noticePeriodDays}d notice)
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="mt-0.5 text-meta text-ink-3">
-                      Category: <span className="capitalize text-ink-2">{d.category.replace("_", " ")}</span>
-                      {d.referenceNumber && <> · Ref: <span className="font-mono text-ink-2">{d.referenceNumber}</span></>}
-                      {d.annualValue ? <> · Value: <span className="font-medium text-ink tabular-nums">PHP {d.annualValue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></> : null}
-                      {d.custodian && <> · Custodian: <span className="text-ink-2">{d.custodian}</span></>}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <span className="block text-meta font-medium text-ink tabular-nums">
-                      {d.expirationDate
-                        ? new Date(d.expirationDate).toLocaleDateString("en-PH", { dateStyle: "medium" })
-                        : "Ongoing"}
-                    </span>
-                    <span className="inline-block rounded-[2px] border border-rule px-1.5 py-0.5 text-meta text-ink-3 first-letter:uppercase">
-                      {d.status.replace("_", " ")}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Sheet>
-
-      {modalDocument !== null && (
-        <DocumentModal
-          document={modalDocument === "new" ? null : modalDocument}
-          onClose={() => setModalDocument(null)}
-        />
-      )}
+      {modal !== null && <DocumentModal document={modal === "new" ? null : modal} onClose={() => setModal(null)} />}
     </>
   );
 }

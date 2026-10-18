@@ -51,7 +51,7 @@ export function RulesEditor({ rules }: { rules: SalesRules }) {
               <div className="min-w-0">
                 <p className="font-medium">
                   {t.name} <span className="text-meta text-ink-3">{t.code}</span>
-                  {!t.isActive && <span className="ml-2 rounded-full bg-bench px-2 py-0.5 text-meta">Off</span>}
+                  {!t.isActive && <span className="ml-2 rounded-md bg-bench px-2 py-0.5 text-meta">Off</span>}
                 </p>
                 <p className="text-meta text-ink-3">{describe(t)}</p>
               </div>
@@ -115,7 +115,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
         e.preventDefault();
         submit();
       }}
-      className="mt-3 space-y-4 rounded-[3px] bg-bench px-4 py-4"
+      className="mt-3 space-y-4 rounded-xl bg-bench px-4 py-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {!kind && (
@@ -138,7 +138,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
           {(p) => (
             <Select {...p} value={rule} onChange={(e) => setRule(e.target.value as PriceRule)}>
               <option value="always">On every quote</option>
-              <option value="with_rx">Only with a prescription</option>
+              <option value="with_rx">With a prescription only</option>
             </Select>
           )}
         </Field>
@@ -146,7 +146,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         {box("Needs notes", requiresNotes, setNotes)}
         {box("Needs approval", needsApproval, setApproval)}
-        {box("Switched on", isActive, setActive)}
+        {box("Active", isActive, setActive)}
       </div>
       <FormError message={error} />
       <div className="flex gap-2">
@@ -270,8 +270,8 @@ function Issuers({ rules }: { rules: SalesRules }) {
               {i.name} <span className="text-meta text-ink-3">{i.code}</span>
             </span>
             {rules.can.edit && (
-              <Button size="sm" variant="quiet" disabled={pending} onClick={() => run(() => saveIssuer(i.code, { isActive: !i.isActive }), i.isActive ? `${i.name} switched off` : `${i.name} switched on`)}>
-                {i.isActive ? "Switch off" : "Switch on"}
+              <Button size="sm" variant="quiet" disabled={pending} onClick={() => run(() => saveIssuer(i.code, { isActive: !i.isActive }), i.isActive ? `${i.name} deactivated` : `${i.name} activated`)}>
+                {i.isActive ? "Deactivate" : "Activate"}
               </Button>
             )}
           </li>

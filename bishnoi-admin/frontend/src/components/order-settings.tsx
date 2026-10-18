@@ -191,7 +191,7 @@ function FieldsEditor({
       {rows.length === 0 && <p className="mt-4 text-sm text-ink-2">No extra fields. Every order asks only the usual questions.</p>}
       <ol className="mt-3 space-y-3">
         {rows.map((row, i) => (
-          <li key={row.id} className="rounded-[3px] border border-rule px-4 pt-3 pb-4">
+          <li key={row.id} className="rounded-[12px] border border-rule px-4 pt-3 pb-4">
             <div className="flex items-start gap-3">
               <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <Field label="Question" error={errors[`fields.${i}.label`]}>

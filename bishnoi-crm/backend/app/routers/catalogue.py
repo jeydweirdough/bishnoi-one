@@ -5,6 +5,8 @@ rules for quotes.
 Reading any of it needs products.view. Adding products needs
 products.create, deleting them products.delete, and everything else here
 (changing products, prices, promos, bundles and the rules) products.edit.
+A manager's department.manage also adds, changes and deletes promos and
+bundles, for their own departments only (check_teams, reachable).
 The catalogue is the company's, so a role's scope doesn't narrow it, except
 for promos and bundles: those belong to divisions (teams). Someone who reaches
 every record sees them all; anyone else sees, and quotes, only their own
@@ -12,7 +14,7 @@ division's.
 """
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -27,6 +29,7 @@ from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import check_extra, check_required
 from app.inventory import SRP, Unreachable, link_out, linked_codes, stock, sync_if_stale, try_sync
 from app.models import Bundle, Issuer, PriceType, Product, ProductPrice, Promo, Team
+from app.routers.prices import is_finance_user
 from app.pricing import FULL, promo_terms, sales_settings, state_of, today
 
 router = APIRouter(tags=["catalogue"])
@@ -34,6 +37,11 @@ router = APIRouter(tags=["catalogue"])
 View = Annotated[Access, Depends(require("products.view"))]
 Create = Annotated[Access, Depends(require("products.create"))]
 Edit = Annotated[Access, Depends(require("products.edit"))]
+# Proposing a product's prices (a manager's Doctor's, Patient's, Drugstore/Hospital
+# price...): products.prices is enough; Finance approves before reps see them.
+Propose = Annotated[Access, Depends(require("products.edit", "products.prices"))]
+# Promos and bundles: the catalogue's editors, or a manager for their departments.
+EditOffers = Annotated[Access, Depends(require("products.edit", "department.manage"))]
 Delete = Annotated[Access, Depends(require("products.delete"))]
 
 CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]*")
@@ -200,8 +208,20 @@ def update_settings(access: Edit, me: CurrentUser, db: DB, body: SettingsPatch) 
 
 
 def product_out(p: Product, access: Access) -> dict:
+    # Who sees prices waiting for Finance (and what was proposed): whoever sets or decides them.
+    is_editor = access.can("products.edit") or access.can("products.approve") or access.can("products.prices")
+    visible_prices = {
+        pp.price_type_code: pp.amount_centavos
+        for pp in p.prices
+        if pp.approval_status == "approved" and pp.amount_centavos > 0
+    }
+    has_approved_srp = any(
+        pp.price_type_code == "SRP" and pp.approval_status == "approved" and pp.amount_centavos > 0
+        for pp in p.prices
+    )
     return {
         "id": p.id,
+        "no": p.no,
         "code": p.code,
         "name": p.name,
         "genericName": p.generic_name,
@@ -209,23 +229,51 @@ def product_out(p: Product, access: Access) -> dict:
         "form": p.form,
         "unit": p.unit,
         "vatCategory": p.vat_category,
+        "needsPrescription": p.needs_prescription,
         "isActive": p.is_active,
         # Its code, name, unit, state and SRP are Inventory's, changed there.
         "fromInventory": p.inventory_id is not None,
-        "prices": {pp.price_type_code: pp.amount_centavos for pp in p.prices},
+        "hasApprovedSrp": has_approved_srp,
+        "prices": visible_prices if not is_editor else {
+            pp.price_type_code: (pp.amount_centavos if pp.approval_status == "approved" else (pp.proposed_amount_centavos or pp.amount_centavos))
+            for pp in p.prices
+        },
+        "priceApprovals": {
+            pp.price_type_code: {
+                "status": pp.approval_status,
+                "amount": pp.amount_centavos,
+                "proposedAmount": pp.proposed_amount_centavos,
+                "submittedById": pp.submitted_by_id,
+                "submittedAt": iso(pp.submitted_at),
+                "approvedById": pp.approved_by_id,
+                "approvedAt": iso(pp.approved_at),
+                "rejectionReason": pp.rejection_reason,
+            }
+            for pp in p.prices
+        } if is_editor else {},
         "extra": p.extra or {},
         "updatedAt": iso(p.updated_at),
-        "can": {"edit": access.can("products.edit"), "delete": access.can("products.delete")},
+        "can": {
+            "edit": access.can("products.edit"),
+            "delete": access.can("products.delete"),
+            "approve": access.can("products.approve"),
+            # Prices only, sent to Finance (the SRP is Finance's and Inventory's).
+            "propose": access.can("products.edit") or access.can("products.prices"),
+        },
     }
 
 
 def missing_a_price():
-    """On sale, but with no price at one of the listed price types, so it can't
+    """On sale, but with no approved price at one of the listed price types, so it can't
     be quoted at that type. Entered types are typed on the quote, so they never count."""
-    # Two levels down, so the product and the price type are both named as the ones outside.
     priced = (
         select(ProductPrice.product_id)
-        .where(ProductPrice.product_id == Product.id, ProductPrice.price_type_code == PriceType.code)
+        .where(
+            ProductPrice.product_id == Product.id,
+            ProductPrice.price_type_code == PriceType.code,
+            ProductPrice.approval_status == "approved",
+            ProductPrice.amount_centavos > 0,
+        )
         .correlate_except(ProductPrice)
         .exists()
     )
@@ -269,7 +317,7 @@ def list_products(
 def sync_products(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep) -> dict:
     """Bring the product list over from Inventory now."""
     if not settings.inventory_linked:
-        raise HTTPException(status.HTTP_409_CONFLICT, "The CRM isn't linked to Inventory (INVENTORY_API_URL, INVENTORY_API_KEY).")
+        raise HTTPException(status.HTTP_409_CONFLICT, "The CRM is not connected to Inventory. Please contact your system administrator.")
     result = try_sync(db, settings)
     if result is None:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, link_out(db, settings)["error"])
@@ -300,6 +348,8 @@ class ProductFields(Api):
     unit: str | None = Field(None, min_length=1, max_length=30)
     # For VAT, as Finance's tax pack names it (the price rules' tax step).
     vat_category: Literal["standard", "zero_rated", "exempt"] | None = None
+    # Sold only on a prescription (Rx): ordering it needs the prescription attached.
+    needs_prescription: bool | None = None
     is_active: bool | None = None
     # price type code -> centavos; null clears that price.
     prices: dict[str, int | None] | None = None
@@ -324,25 +374,79 @@ class ProductIn(ProductFields):
     name: str = Field(min_length=1, max_length=160)
 
 
-def set_prices(db: Session, product: Product, prices: dict[str, int | None]) -> list[str]:
+
+
+def set_prices(db: Session, product: Product, prices: dict[str, int | None], me: CurrentUser, is_finance: bool) -> tuple[list[str], list[str]]:
     known = {t.code for t in db.scalars(select(PriceType))}
     unknown = [c for c in prices if c not in known]
     if unknown:
         raise field_error("prices", f"There's no price type {unknown[0]}.")
     current = {pp.price_type_code: pp for pp in product.prices}
     touched = []
+    pending_approvals = []
+    now = datetime.now(UTC)
     for code, amount in prices.items():
         there = current.get(code)
-        if amount is None and there:
-            product.prices.remove(there)
-        elif amount is not None and there is None:
-            product.prices.append(ProductPrice(price_type_code=code, amount_centavos=amount))
-        elif amount is not None and there.amount_centavos != amount:
-            there.amount_centavos = amount
+        if is_finance:
+            # Finance curates directly
+            if amount is None and there:
+                product.prices.remove(there)
+                touched.append(code)
+            elif amount is not None and there is None:
+                product.prices.append(ProductPrice(
+                    price_type_code=code,
+                    amount_centavos=amount,
+                    approval_status="approved",
+                    approved_by_id=me.id,
+                    approved_at=now,
+                ))
+                touched.append(code)
+            elif amount is not None and (there.amount_centavos != amount or there.approval_status != "approved"):
+                there.amount_centavos = amount
+                there.proposed_amount_centavos = None
+                there.approval_status = "approved"
+                there.approved_by_id = me.id
+                there.approved_at = now
+                there.rejection_reason = None
+                touched.append(code)
         else:
-            continue
-        touched.append(code)
-    return touched
+            # Manager setting prices (DOCTOR, PATIENT, SPECIAL, etc.)
+            # Requires Finance approval before becoming visible to salespersons!
+            if amount is None:
+                if there and there.approval_status == "pending":
+                    if there.amount_centavos == 0:
+                        product.prices.remove(there)
+                    else:
+                        there.approval_status = "approved"
+                        there.proposed_amount_centavos = None
+                    touched.append(code)
+                elif there:
+                    there.proposed_amount_centavos = 0
+                    there.approval_status = "pending"
+                    there.submitted_by_id = me.id
+                    there.submitted_at = now
+                    there.rejection_reason = None
+                    pending_approvals.append(code)
+                    touched.append(code)
+            else:
+                if there is None:
+                    product.prices.append(ProductPrice(
+                        price_type_code=code,
+                        amount_centavos=0,
+                        approval_status="pending",
+                        proposed_amount_centavos=amount,
+                        submitted_by_id=me.id,
+                        submitted_at=now,
+                    ))
+                else:
+                    there.proposed_amount_centavos = amount
+                    there.approval_status = "pending"
+                    there.submitted_by_id = me.id
+                    there.submitted_at = now
+                    there.rejection_reason = None
+                pending_approvals.append(code)
+                touched.append(code)
+    return touched, pending_approvals
 
 
 def code_taken(db: Session, model, code: str, not_id: str | None = None) -> bool:
@@ -361,7 +465,8 @@ def create_product(access: Create, me: CurrentUser, db: DB, settings: SettingsDe
     product = Product(**body.model_dump(exclude={"prices", "extra"}, exclude_none=True), extra=check_extra(db, "product", body.extra))
     check_required(db, "product", product)
     db.add(product)
-    set_prices(db, product, body.prices or {})
+    is_finance = is_finance_user(access, me)
+    set_prices(db, product, body.prices or {}, me, is_finance)
     db.flush()
     audit(db, me, "product.created", target=product.name, target_type="product", target_id=product.id)
     db.commit()
@@ -379,12 +484,13 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
     product = get_product(db, product_id)
     wanted = changed(body)
     prices = wanted.pop("prices", None)
+    is_finance = is_finance_user(access, me)
     if product.inventory_id:
         for k in ("code", "name", "unit", "is_active"):
             if k in wanted and wanted[k] != getattr(product, k):
                 raise field_error(camel([k])[0], "This comes from Inventory: change it there.")
-        if prices and SRP in prices:
-            raise field_error("prices", "The SRP comes from Inventory: change it there, or give a team its own price.")
+        if prices and SRP in prices and not is_finance:
+            raise field_error("prices", "The SRP is curated by Finance / Inventory: change it there, or give a team its own price.")
     for required in ("code", "name", "unit", "is_active", "vat_category"):
         if required in wanted and wanted[required] is None:
             raise field_error(camel([required])[0], "This is required.")
@@ -395,10 +501,41 @@ def update_product(access: Edit, me: CurrentUser, db: DB, product_id: str, body:
     fields = [k for k, v in wanted.items() if getattr(product, k) != v]
     for k in fields:
         setattr(product, k, wanted[k])
-    touched = set_prices(db, product, prices) if prices else []
+    touched, pending = set_prices(db, product, prices, me, is_finance) if prices else ([], [])
     check_required(db, "product", product)
     if fields or touched:
-        audit(db, me, "product.updated", target=product.name, target_type="product", target_id=product.id, fields=camel(fields) + (["prices"] if touched else []))
+        action = "product.prices_submitted_for_approval" if (pending and not is_finance) else "product.updated"
+        audit(db, me, action, target=product.name, target_type="product", target_id=product.id, fields=camel(fields) + (["prices"] if touched else []))
+        db.commit()
+        db.refresh(product)
+    return product_out(product, access)
+
+
+class PricesIn(Api):
+    # Each price type's amount in centavos; null takes the price away (once Finance agrees).
+    prices: dict[str, int | None] = Field(max_length=30)
+
+    @field_validator("prices")
+    @classmethod
+    def _prices(cls, value: dict) -> dict:
+        if any(v is not None and not 0 < v < 10**11 for v in value.values()):
+            raise ValueError("Prices are amounts above zero.")
+        return value
+
+
+@router.put("/products/{product_id}/prices")
+def propose_prices(access: Propose, me: CurrentUser, db: DB, product_id: str, body: PricesIn) -> dict:
+    """A product's prices at its price types, by a manager (or anyone who edits
+    products): each waits for Finance's approval before salespeople see it. The
+    SRP isn't among them: it's curated by Finance and Inventory."""
+    product = get_product(db, product_id)
+    is_finance = is_finance_user(access, me)
+    if SRP in body.prices and not is_finance:
+        raise field_error("prices", "The SRP is curated by Finance and Inventory: change it there.")
+    touched, pending = set_prices(db, product, body.prices, me, is_finance)
+    if touched:
+        action = "product.prices_submitted_for_approval" if (pending and not is_finance) else "product.updated"
+        audit(db, me, action, target=product.name, target_type="product", target_id=product.id, fields=["prices"])
         db.commit()
         db.refresh(product)
     return product_out(product, access)
@@ -426,7 +563,7 @@ def reach_of(access: Access) -> set[str] | None:
     """The divisions this person's promos and bundles come from. None: every one."""
     if access.scope == "all":
         return None
-    return {access.team_id} if access.team_id else set()
+    return set(access.team_ids) or ({access.team_id} if access.team_id else set())
 
 
 def sees(record: Promo | Bundle, access: Access) -> bool:
@@ -440,6 +577,17 @@ def reachable(db: Session, model, record_id: str, what: str, access: Access):
     if record is None or not sees(record, access):
         raise not_found(what)
     return record
+
+
+def changeable(record: Promo | Bundle, access: Access) -> None:
+    """A manager (department.manage, not products.edit) changes only what is
+    wholly their departments': one shared with another department is the
+    catalogue editors'."""
+    reach = reach_of(access)
+    if access.can("products.edit") or reach is None:
+        return
+    if not set(record.team_ids or []) <= reach:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This one is shared with another department, so an administrator changes it.")
 
 
 def team_names(db: Session) -> dict[str, str]:
@@ -542,11 +690,11 @@ def promo_values(db: Session, access: Access, body: PromoIn, current: list[str] 
 def list_promos(access: View, db: DB, settings: SettingsDep) -> dict:
     on, names = today(settings.org_timezone), team_names(db)
     promos = [p for p in db.scalars(select(Promo).order_by(Promo.created_at.desc())) if sees(p, access)]
-    return {"items": [promo_out(p, on, names) for p in promos], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
+    return {"items": [promo_out(p, on, names) for p in promos], "teams": team_options(db, access), "can": {"edit": access.can_any("products.edit", "department.manage")}}
 
 
 @router.post("/promos", status_code=status.HTTP_201_CREATED)
-def create_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: PromoIn) -> dict:
+def create_promo(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, body: PromoIn) -> dict:
     promo = Promo(**promo_values(db, access, body))
     db.add(promo)
     db.flush()
@@ -556,8 +704,9 @@ def create_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, b
 
 
 @router.put("/promos/{promo_id}")
-def replace_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, promo_id: str, body: PromoIn) -> dict:
+def replace_promo(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, promo_id: str, body: PromoIn) -> dict:
     promo = reachable(db, Promo, promo_id, "promo", access)
+    changeable(promo, access)
     values = promo_values(db, access, body, promo.team_ids)
     fields = [k for k, v in values.items() if getattr(promo, k) != v]
     for k in fields:
@@ -569,8 +718,9 @@ def replace_promo(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, 
 
 
 @router.delete("/promos/{promo_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_promo(access: Edit, me: CurrentUser, db: DB, promo_id: str) -> Response:
+def delete_promo(access: EditOffers, me: CurrentUser, db: DB, promo_id: str) -> Response:
     promo = reachable(db, Promo, promo_id, "promo", access)
+    changeable(promo, access)
     audit(db, me, "promo.deleted", target=promo.name, target_type="promo", target_id=promo.id)
     db.delete(promo)
     db.commit()
@@ -645,11 +795,11 @@ def bundle_values(db: Session, access: Access, body: BundleIn, not_id: str | Non
 def list_bundles(access: View, db: DB, settings: SettingsDep) -> dict:
     on, names = today(settings.org_timezone), team_names(db)
     bundles = [b for b in db.scalars(select(Bundle).order_by(func.lower(Bundle.name))) if sees(b, access)]
-    return {"items": [bundle_out(b, on, names) for b in bundles], "teams": team_options(db, access), "can": {"edit": access.can("products.edit")}}
+    return {"items": [bundle_out(b, on, names) for b in bundles], "teams": team_options(db, access), "can": {"edit": access.can_any("products.edit", "department.manage")}}
 
 
 @router.post("/bundles", status_code=status.HTTP_201_CREATED)
-def create_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: BundleIn) -> dict:
+def create_bundle(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, body: BundleIn) -> dict:
     bundle = Bundle(**bundle_values(db, access, body))
     db.add(bundle)
     db.flush()
@@ -659,8 +809,9 @@ def create_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, 
 
 
 @router.put("/bundles/{bundle_id}")
-def replace_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, bundle_id: str, body: BundleIn) -> dict:
+def replace_bundle(access: EditOffers, me: CurrentUser, db: DB, settings: SettingsDep, bundle_id: str, body: BundleIn) -> dict:
     bundle = reachable(db, Bundle, bundle_id, "bundle", access)
+    changeable(bundle, access)
     values = bundle_values(db, access, body, bundle.id, bundle.team_ids)
     fields = [k for k, v in values.items() if getattr(bundle, k) != v]
     for k in fields:
@@ -672,8 +823,9 @@ def replace_bundle(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep,
 
 
 @router.delete("/bundles/{bundle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_bundle(access: Edit, me: CurrentUser, db: DB, bundle_id: str) -> Response:
+def delete_bundle(access: EditOffers, me: CurrentUser, db: DB, bundle_id: str) -> Response:
     bundle = reachable(db, Bundle, bundle_id, "bundle", access)
+    changeable(bundle, access)
     audit(db, me, "bundle.deleted", target=bundle.name, target_type="bundle", target_id=bundle.id)
     db.delete(bundle)
     db.commit()

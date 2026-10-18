@@ -1,9 +1,6 @@
 import {
   Boxes,
-  HeartPulse,
-  LifeBuoy,
-  Megaphone,
-  Siren,
+  Handshake,
   Activity,
   ArrowUpRight,
   BadgePercent,
@@ -58,12 +55,21 @@ import {
   Mail,
   SquareCheckBig,
   type LucideIcon,
+  HeartPulse,
+  Siren,
+  LifeBuoy,
+  Megaphone,
 } from "lucide-react";
 
 // Every icon in the app, by what it means. One library (Lucide) at one stroke,
 // so the same thing always wears the same picture: a page's tab, its sidebar
 // link and its section heading agree. Pick by meaning, never by looks.
 export const ICONS = {
+  // The platform's own (bishnoi-platform).
+  monitoring: HeartPulse, // whether the applications are up, and the traffic
+  incidents: Siren, // something broken for many, now
+  support: LifeBuoy, // complaints, bugs, requests: one person's report
+  communications: Megaphone, // what the platform tells people
   // places
   home: House,
   salesDivision: Briefcase, // every sales division: the name says which one
@@ -89,16 +95,12 @@ export const ICONS = {
   lists: ListChecks, // the company's own words for its records
   retention: Repeat,
   goals: Target,
+  deals: Handshake,
   company: Building,
   apps: LayoutGrid, // the other applications this company reaches from Bishnoi One
   companies: Globe, // every company on the platform, for a Developer Admin
   headquarters: MapPinHouse, // a team's office: a place with a building
   auditLog: ScrollText,
-  // the platform console's own places
-  monitoring: HeartPulse, // whether the applications are up, and the traffic
-  incidents: Siren, // something broken for many, now
-  support: LifeBuoy, // complaints, bugs, requests: one person's report
-  communications: Megaphone, // what the platform tells people
 
   // a module's sections
   overview: LayoutDashboard,

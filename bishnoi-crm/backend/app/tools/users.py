@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
+from app.tenants import for_tool
 from app.demo import (
     DEMO_ACCOUNTS,
     DEMO_ACTIVITIES,
@@ -110,6 +111,22 @@ def make_demo(db: Session) -> None:
                 for model in (Company, Contact, Activity, Quote):
                     db.execute(update(model).where(model.owner_id == user.id).values(team_id=user.team_id))
             updated += 1
+    # A demo manager manages their divisions (a team that has its own manager keeps them).
+    for d in DEMO_ACCOUNTS:
+        user = db.scalar(select(User).where(func.lower(User.email) == d.email))
+        for name in d.manages:
+            team = team_named(db, name, make=True)
+            if user is not None and team.manager_id is None:
+                team.manager_id = user.id
+                audit(db, TOOL, "team.updated", target=team.name, target_type="team", target_id=team.id, fields=["managerId"])
+    db.flush()
+    # Demo employee IDs (EMP-0001 on), for the customer transfer. Ones already set stay.
+    for number, d in enumerate(DEMO_ACCOUNTS, 1):
+        user = db.scalar(select(User).where(func.lower(User.email) == d.email))
+        code = f"EMP-{number:04d}"
+        if user is not None and user.employee_id is None and db.scalar(select(User.id).where(User.employee_id == code)) is None:
+            user.employee_id = code
+            db.flush()
     db.commit()
     print(f"Demo accounts: {made} made, {updated} given their role and team, {len(DEMO_ACCOUNTS) - made - updated} already set. Password: {DEMO_PASSWORD}")
     make_demo_records(db)
@@ -156,12 +173,14 @@ def make_demo_catalogue(db: Session) -> None:
         if db.get(Issuer, code) is None:
             db.add(Issuer(code=code, name=name))
     db.flush()
-    listed = [t[0] for t in DEMO_PRICE_TYPES if t[2] == "list"]
+    # The demo's prices are PATIENT, TRADE, DOCTOR; each product's SRP, as Finance sets it, is its Patient price.
+    listed = [t[0] for t in DEMO_PRICE_TYPES if t[2] == "list" and t[0] != "SRP"]
     products: dict[str, Product] = {}
     for code, name, generic, strength, form, unit, pesos in DEMO_PRODUCTS:
         products[code] = Product(
             code=code, name=name, generic_name=generic, strength=strength or None, form=form, unit=unit,
-            prices=[ProductPrice(price_type_code=t, amount_centavos=p * 100) for t, p in zip(listed, pesos, strict=True)],
+            prices=[ProductPrice(price_type_code=t, amount_centavos=p * 100) for t, p in zip(listed, pesos, strict=True)]
+            + [ProductPrice(price_type_code="SRP", amount_centavos=pesos[0] * 100)],
         )
     db.add_all(products.values())
     db.flush()
@@ -224,6 +243,7 @@ def make_demo_records(db: Session) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage the CRM's accounts.")
+    parser.add_argument("--company", help="the company's short name on Bishnoi One Platform (on this computer: DEFAULT_COMPANY)")
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("add", help="make an account")
     add.add_argument("--email", required=True)
@@ -237,7 +257,9 @@ def main() -> int:
         sub.add_parser(name).add_argument("--email", required=True)
     args = parser.parse_args()
 
-    engine = make_engine(get_settings().database_url)
+    company, url = for_tool(sys.argv)
+    engine = make_engine(url)
+    print(f"Company: {company}")
     upgrade(engine)
     with make_sessions(engine)() as db:
         if args.command == "list":

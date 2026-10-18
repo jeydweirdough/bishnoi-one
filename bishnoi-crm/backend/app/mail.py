@@ -119,7 +119,7 @@ def link(settings: Settings, path: str) -> tuple[str, str] | None:
 # --- what's sent ----------------------------------------------------------------------------
 
 # Why a quote waits for approval (app/pricing.py), in words.
-REASONS = {"discount": "a discount above the limit", "price": "a price type that needs approval"}
+REASONS = {"discount": "a discount above the limit", "price": "a price type that needs approval", "asked": "the customer asking for another price"}
 
 
 def approvers_of(db: Session, quote: Quote) -> list[User]:
@@ -127,8 +127,10 @@ def approvers_of(db: Session, quote: Quote) -> list[User]:
     team, with Quotes → Approve); with none in the team, those who reach every
     team. Never the person who made it."""
     people = [u for u in db.scalars(select(User).where(User.is_active)) if "quotes.approve" in permissions_of(u.role) and u.id != quote.owner_id]
-    team = [u for u in people if u.role.scope == "team" and quote.team_id and u.team_id == quote.team_id]
-    return team or [u for u in people if u.role.scope == "all"]
+    team = [u for u in people if u.role.scope == "team" and quote.team_id and quote.team_id in u.all_team_ids]
+    # No team lead to decide: the team's manager, then those who reach every team.
+    managers = [u for u in people if u.role.scope == "managed" and quote.team_id in {t.id for t in u.managed_teams} | (u.all_team_ids)]
+    return team or managers or [u for u in people if u.role.scope == "all"]
 
 
 def quote_waiting(db: Session, settings: Settings, quote: Quote, maker: User) -> None:
@@ -143,12 +145,13 @@ def quote_waiting(db: Session, settings: Settings, quote: Quote, maker: User) ->
     )
 
 
-def quote_decided(db: Session, settings: Settings, quote: Quote, decider: User) -> None:
+def quote_decided(db: Session, settings: Settings, quote: Quote, decider_name: str, decider_id: str | None = None) -> None:
+    """decider_id: None when Finance decided, in its own app."""
     owner = db.get(User, quote.owner_id)
-    if owner is None or owner.id == decider.id or not owner.is_active:
+    if owner is None or owner.id == decider_id or not owner.is_active:
         return
     approved = quote.approval_status == "approved"
-    lines = [f"{decider.full_name} {'approved' if approved else 'rejected'} your quote for {quote_for(quote)}."]
+    lines = [f"{decider_name} {'approved' if approved else 'rejected'} your quote for {quote_for(quote)}."]
     if quote.approval_note:
         lines.append(f"{'Their note' if approved else 'Why'}: {quote.approval_note}")
     send(

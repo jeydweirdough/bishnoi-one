@@ -12,7 +12,7 @@ export default async function BalancesImportPage() {
   return (
     <>
       <PageHeader title="Upload balances" crumbs={[{ href: "/field", label: "Field work" }]}>
-        What each doctor owes, from accounting&apos;s spreadsheet: one row per doctor, their name and their balance.
+        What each customer owes, from accounting&apos;s spreadsheet: one row per customer, their name and their balance.
       </PageHeader>
       <ImportWizard kind="balances" back="/field/doctors" />
     </>

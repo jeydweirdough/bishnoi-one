@@ -81,13 +81,13 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
     e.preventDefault();
     const used = lines.filter((l) => l.description.trim() || l.price.trim());
     const problems: Record<string, string> = {};
-    if (!customer.name.trim()) problems.customerName = "Enter who the invoice is for.";
+    if (!customer.name.trim()) problems.customerName = "Enter the customer name.";
     if (!used.length) problems.lines = "Add at least one line.";
     used.forEach((l, i) => {
       if (!(Number(l.quantity) >= 1)) problems[`lines.${i}.quantity`] = "At least 1.";
       if (fmt.toCentavos(l.price) === null) problems[`lines.${i}.unitPriceCentavos`] = "Enter a price.";
     });
-    if (needsId && !idNumber.trim()) problems.buyerIdNumber = "Their ID number goes on the invoice.";
+    if (needsId && !idNumber.trim()) problems.buyerIdNumber = "Enter the buyer's ID number.";
     if (Object.keys(problems).length) {
       setFields(problems);
       setError(problems.lines ?? "Please review the highlighted fields.");
@@ -175,7 +175,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
           <Field label="Address" optional error={fields.customerAddress} className="sm:col-span-2">
             {(p) => <Input {...p} value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} maxLength={300} />}
           </Field>
-          <Field label="Buyer" error={fields.treatment}>
+          <Field label="Buyer type" error={fields.treatment}>
             {(p) => (
               <Select {...p} value={treatment} onChange={(e) => setTreatment(e.target.value)}>
                 {choices.treatments.map((t) => (
@@ -295,7 +295,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
       <FormError message={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          {invoice ? "Save the draft" : "Save as draft"}
+          {invoice ? "Save draft" : "Save as draft"}
         </Button>
         <Button type="button" onClick={() => router.back()}>
           Cancel

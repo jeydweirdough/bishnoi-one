@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, load } from "@/src/platform/lib/api";
+import { DeleteRecord } from "@/src/components/delete-record";
 import { getStaff } from "@/src/components/gate";
 import { ActivityList } from "@/src/components/activity-list";
 import { HealthMark, IncidentSeverityMark, IncidentStatusMark, KindMark, SeverityMark, Tabs, TicketStatusMark } from "@/src/components/marks";
@@ -11,6 +12,7 @@ import { AddIntegration, EditIntegration, RecordDeployment, RemoveIntegration } 
 import { CheckStrip } from "@/src/components/applications/check-strip";
 import { EnvironmentMark } from "@/src/components/applications/marks";
 import { checkLine, uptimeText } from "@/src/components/applications/words";
+import { AnswerGauge, UptimeGauge } from "@/src/components/health-gauges";
 import type { ApplicationDetail, AuditEntry } from "@/src/lib/types";
 import { HEALTH, ago, plural, when } from "@/src/lib/words";
 
@@ -58,22 +60,31 @@ export default async function ApplicationPage({ params, searchParams }: { params
             <>
               <EditApplication app={app} />
               <RetireApplication app={app} />
+              <DeleteRecord
+                kind="application"
+                id={app.id}
+                name={app.name}
+                after="/applications"
+                done="Application deleted"
+                body={`${app.name} goes from the registry, with its deployments, integrations and links. Only once no company has it: the applications sign in through it. To keep its history, retire it instead.`}
+              />
             </>
           )
         }
         actions={admin && app.isActive && <DeclareStatus app={app} />}
       >
+        {app.no && <span className="text-meta tabular-nums">No. {app.no} · </span>}
         <span className="font-mono text-meta">{app.key}</span>
         {app.version && <span> · version {app.version}</span>}
-        {!app.isActive && <span> · retired, so not checked</span>}
+        {!app.isActive && <span> · retired, not monitored</span>}
       </PageHeader>
 
       {app.statusOverride && (
-        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[3px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
+        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
           <p>
             <b className="font-semibold">Declared: {DECLARED[app.statusOverride]}.</b>{" "}
             {app.statusNote && <span className="text-ink-2">{app.statusNote} </span>}
-            <span className="text-ink-3">Every screen shows this over what the health check says.</span>
+            <span className="text-ink-3">Shown on every screen in place of the health check result.</span>
           </p>
           {admin && <BackToCheck app={app} />}
         </div>
@@ -106,23 +117,30 @@ function Overview({ app }: { app: ApplicationDetail }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
       <Sheet className="px-5 pt-4 pb-5">
-        <SectionTitle icon="particulars">About it</SectionTitle>
+        <SectionTitle icon="particulars">Details</SectionTitle>
         <div className="mt-3">
           <Particulars
             items={[
-              ["What it's for", app.description],
+              ["Description", app.description],
               [
-                "Where people open it",
+                "App URL",
                 app.appUrl ? (
                   <a href={app.appUrl} target="_blank" rel="noopener noreferrer" className="text-hema hover:underline">
                     {app.appUrl.replace(/^https?:\/\//, "")}
                   </a>
                 ) : null,
               ],
-              ["Health address", app.healthUrl ? <span className="font-mono text-meta break-all">{app.healthUrl}</span> : "None, so it isn't checked"],
+              ["API URL", app.apiUrl ? <span className="font-mono text-meta break-all">{app.apiUrl}</span> : "None (not available to other applications)"],
+              [
+                "Connected",
+                <Link key="c" href="/connections" className="text-hema hover:underline">
+                  {app.connected ? (app.connectedAt ? `Yes, last contact ${ago(app.connectedAt)}` : "Key created, not connected yet") : "No"}
+                </Link>,
+              ],
+              ["Health check URL", app.healthUrl ? <span className="font-mono text-meta break-all">{app.healthUrl}</span> : "None (not monitored)"],
               ["Version", app.version],
               ["Users", plural(app.userCount, "person", "people")],
-              ["Registered", when(app.createdAt)],
+              ["Created on", when(app.createdAt)],
             ]}
           />
         </div>
@@ -131,11 +149,17 @@ function Overview({ app }: { app: ApplicationDetail }) {
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="monitoring">Health</SectionTitle>
         <div className="mt-3 space-y-4">
+          {monitored && app.isActive && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <UptimeGauge value={app.uptime} />
+              <AnswerGauge value={app.lastCheck?.ms ?? null} slowMs={app.slowMs ?? 1500} label="Last response time" />
+            </div>
+          )}
           <Particulars
             items={[
-              ["Now", <HealthMark key="s" status={app.status} />],
-              ["Last check", app.isActive ? checkLine(app.lastCheck, monitored) : "Retired, so not checked."],
-              ["Up, last 24 h", uptimeText(app.uptime)],
+              ["Current status", <HealthMark key="s" status={app.status} />],
+              ["Last check", app.isActive ? checkLine(app.lastCheck, monitored) : "Retired, not monitored."],
+              ["Uptime, last 24 hours", uptimeText(app.uptime)],
             ]}
           />
           <CheckStrip checks={app.history} />
@@ -152,8 +176,8 @@ function Companies({ app }: { app: ApplicationDetail }) {
   return (
     <Sheet className="overflow-hidden">
       {app.companies.length === 0 ? (
-        <Empty icon="companies" title="No company has it yet.">
-          Give it to a company from that company&apos;s page; then its people can be given access.
+        <Empty icon="companies" title="Not assigned to any company yet.">
+          Assign it from the company&apos;s page; then its users can be given access.
         </Empty>
       ) : (
         <ul className="divide-y divide-rule">
@@ -191,7 +215,7 @@ function Deployments({ app, admin }: { app: ApplicationDetail; admin: boolean })
               <div className="min-w-0">
                 <p className="font-semibold tabular-nums">
                   {d.version}
-                  {d.environment === "production" && d.version === app.version && <span className="ml-2 text-meta font-normal text-ink-3">live now</span>}
+                  {d.environment === "production" && d.version === app.version && <span className="ml-2 text-meta font-normal text-ink-3">live</span>}
                 </p>
                 {d.notes && <p className="mt-0.5 text-sm whitespace-pre-line text-ink-2">{d.notes}</p>}
                 <p className="text-meta text-ink-3">Recorded by {d.recordedBy}</p>
@@ -217,7 +241,7 @@ function Integrations({ app, admin }: { app: ApplicationDetail; admin: boolean }
         Integrations
       </SectionTitle>
       {app.integrations.length === 0 ? (
-        <Empty icon="teams" title="Nothing recorded that it connects to.">
+        <Empty icon="teams" title="No integrations recorded.">
           {admin ? "Add its payments, messaging or other systems, so their state sits with the application's." : "A Platform Admin records them."}
         </Empty>
       ) : (
@@ -230,7 +254,7 @@ function Integrations({ app, admin }: { app: ApplicationDetail; admin: boolean }
                   <HealthMark status={i.status} label={HEALTH[i.status]} />
                 </p>
                 <p className="text-meta text-ink-3">
-                  {[i.target, i.healthUrl ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set by hand"].filter(Boolean).join(" · ")}
+                  {[i.target, i.healthUrl ? `Checked automatically. ${checkLine(i.lastCheck, true)}` : "Status set manually"].filter(Boolean).join(" · ")}
                 </p>
                 {i.notes && <p className="mt-0.5 text-sm whitespace-pre-line text-ink-2">{i.notes}</p>}
               </div>
@@ -256,7 +280,7 @@ function Issues({ app }: { app: ApplicationDetail }) {
           icon="support"
           action={
             <Link href={`/support?application=${app.id}&state=all`} className="text-meta text-hema hover:underline">
-              All its tickets
+              All tickets
             </Link>
           }
         >
@@ -326,7 +350,7 @@ async function Activity({ app }: { app: ApplicationDetail }) {
   return (
     <Sheet className="px-5 pt-4 pb-2">
       <SectionTitle icon="auditLog">Activity</SectionTitle>
-      <ActivityList entries={entries} showCategory empty={`Nothing done to ${app.name} yet.`} />
+      <ActivityList entries={entries} showCategory empty={`No activity for ${app.name} yet.`} />
     </Sheet>
   );
 }

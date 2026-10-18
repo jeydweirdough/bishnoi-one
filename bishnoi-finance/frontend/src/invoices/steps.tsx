@@ -25,7 +25,7 @@ export function IssueInvoice({ id, series }: { id: string; series: Series[] }) {
   return (
     <div className="space-y-3">
       {usable.length > 1 && (
-        <Field label="Number from">
+        <Field label="Invoice series">
           {(p) => (
             <Select {...p} value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
               {usable.map((s) => (
@@ -53,7 +53,7 @@ export function IssueInvoice({ id, series }: { id: string; series: Series[] }) {
           })
         }
       >
-        Issue the invoice
+        Issue invoice
       </Button>
     </div>
   );
@@ -93,7 +93,7 @@ export function VoidInvoice({ id, number }: { id: string; number: string }) {
         Void <span className="font-mono font-semibold">{number}</span>? The number stays used and the sale is reversed in the books. Keep the voided
         copies, as the BIR expects every number accounted for.
       </p>
-      <Field label="Why" error={error ?? undefined}>
+      <Field label="Reason for voiding" error={error ?? undefined}>
         {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Wrong customer" />}
       </Field>
       <div className="flex gap-2">
@@ -102,7 +102,7 @@ export function VoidInvoice({ id, number }: { id: string; number: string }) {
           loading={pending}
           onClick={() =>
             start(async () => {
-              if (reason.trim().length < 3) return setError("Say why it's voided.");
+              if (reason.trim().length < 3) return setError("Enter the reason for voiding.");
               const result = await voidInvoice(id, reason.trim());
               if (!result.ok) return setError(result.error);
               toast.success(`${number} voided`);
@@ -110,9 +110,9 @@ export function VoidInvoice({ id, number }: { id: string; number: string }) {
             })
           }
         >
-          Void the invoice
+          Void invoice
         </Button>
-        <Button onClick={() => setOpen(false)}>Keep it</Button>
+        <Button onClick={() => setOpen(false)}>Cancel</Button>
       </div>
     </div>
   );
@@ -137,7 +137,7 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  if (!open) return <Button variant="primary" onClick={() => setOpen(true)}>Record a payment</Button>;
+  if (!open) return <Button variant="primary" onClick={() => setOpen(true)}>Record payment</Button>;
   return (
     <form
       noValidate
@@ -161,13 +161,13 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
       }}
     >
       <div className="grid gap-4 sm:grid-cols-4">
-        <Field label="Received on" error={fields.paidOn}>
+        <Field label="Payment date" error={fields.paidOn}>
           {(p) => <Input {...p} type="date" max={today} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />}
         </Field>
-        <Field label="Amount" error={fields.amountCentavos} hint={`${fmt.peso(owed)} still owed`}>
+        <Field label="Amount" error={fields.amountCentavos} hint={`Outstanding: ${fmt.peso(owed)}.`}>
           {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />}
         </Field>
-        <Field label="How" error={fields.method}>
+        <Field label="Payment method" error={fields.method}>
           {(p) => (
             <Select {...p} value={method} onChange={(e) => setMethod(e.target.value)}>
               {methods.map((m) => (
@@ -185,7 +185,7 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
       <FormError message={error} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          Record the payment
+          Record payment
         </Button>
         <Button type="button" onClick={() => setOpen(false)}>
           Cancel
@@ -198,12 +198,12 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
 export function RemovePayment({ id, paymentId }: { id: string; paymentId: string }) {
   return (
     <ConfirmButton
-      label="Take off"
+      label="Reverse"
       triggerVariant="quiet"
       triggerSize="sm"
-      title="Take this payment off?"
-      body="Its entry is reversed in the books, and the invoice is owed again. The line stays, marked as taken off."
-      confirmLabel="Take it off"
+      title="Reverse this payment?"
+      body="Its entry is reversed in the books, and the invoice is owed again. The line stays, marked as reversed."
+      confirmLabel="Reverse payment"
       onConfirm={async () => {
         const result = await removePayment(id, paymentId);
         if (!result.ok) {

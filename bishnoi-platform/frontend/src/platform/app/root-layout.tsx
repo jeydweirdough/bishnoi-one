@@ -3,6 +3,8 @@ import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { APP_NAME } from "../lib/labels";
+import { Addresses } from "./addresses";
+import { AntTheme } from "./ant-theme";
 
 // Poppins has no variable version, so each weight in use is loaded by name.
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -10,10 +12,10 @@ const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight
 /** What every Bishnoi One app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
-  description: "Customers, quotes, activities and products for every team.",
+  description: "Companies, applications and the people who use them, across Bishnoi One.",
 };
 
-export const viewport: Viewport = { themeColor: "#eceef2" };
+export const viewport: Viewport = { themeColor: "#f5f5f5" };
 
 /**
  * The frame round every Bishnoi One app — the shell and each module alike.
@@ -25,12 +27,13 @@ export function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${poppins.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
-        {children}
+        <Addresses />
+        <AntTheme>{children}</AntTheme>
         <Toaster
           position="top-center"
           toastOptions={{
             classNames: {
-              toast: "!rounded-[3px] !border-0 !shadow-overlay !font-sans !text-sm !text-ink",
+              toast: "!rounded-[22px] !border-0 !shadow-overlay !font-sans !text-sm !text-ink",
               description: "!text-ink-2",
             },
           }}

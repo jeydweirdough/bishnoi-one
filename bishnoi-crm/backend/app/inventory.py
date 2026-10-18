@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import PriceType, Product, ProductPrice
 from app.pricing import sales_settings
 
@@ -44,13 +45,13 @@ def call(settings: Settings, path: str, params: dict | None = None) -> dict:
     url = f"{settings.inventory_api_url}/integration/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json"})
+    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise Unreachable("Inventory refused the CRM's key: check INVENTORY_API_KEY here and INTEGRATION_KEYS there.") from e
+            raise Unreachable("Unable to sync with Inventory: connection could not be verified. Please contact your system administrator.") from e
         raise Unreachable(f"Inventory answered with an error ({e.code}).") from e
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
         raise Unreachable("Inventory can't be reached right now.") from e
@@ -123,10 +124,11 @@ def sync(db: Session, settings: Settings) -> dict:
         srp = item.get("sellingPrice") or 0
         there = next((pp for pp in product.prices if pp.price_type_code == SRP), None)
         if srp > 0 and there is None:
-            product.prices.append(ProductPrice(price_type_code=SRP, amount_centavos=srp))
+            product.prices.append(ProductPrice(price_type_code=SRP, amount_centavos=srp, approval_status="approved"))
             changed = True
         elif srp > 0 and there.amount_centavos != srp:
             there.amount_centavos = srp
+            there.approval_status = "approved"
             changed = True
         elif srp <= 0 and there is not None:
             product.prices.remove(there)

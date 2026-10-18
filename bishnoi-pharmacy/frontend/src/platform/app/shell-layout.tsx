@@ -1,10 +1,13 @@
 import { Nav, type Unset } from "../shell/nav";
+import { TopActions } from "../shell/topbar";
 import { Suspense } from "react";
 import { NavProgress } from "../shell/nav-progress";
 import { Notices } from "./notices";
 import { ViewingBanner } from "../shell/viewing-banner";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getMe } from "../lib/api";
+import { loadAddresses } from "../lib/addresses";
 import { THIS_APP, canUseThisApp, platformHome, thisAppLabel } from "../lib/apps";
 import { LinkButton } from "../ui/button";
 import { Sheet } from "../ui/sheet";
@@ -34,6 +37,7 @@ function NoCompany() {
 
 /** `unset`: how many things aren't set up yet, by kind, for the sidebar's red counts. */
 export async function ShellLayout({ children, unset }: { children: React.ReactNode; unset?: Unset }) {
+  await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
   // the cookie is shared — so somebody signed in to an app that is theirs
@@ -43,6 +47,10 @@ export async function ShellLayout({ children, unset }: { children: React.ReactNo
   // The shell serves the companies list itself, and the Platform app is that
   // list, so neither of them is stranded by having no company open.
   const stranded = me.org === null && Boolean(THIS_APP) && THIS_APP !== "platform";
+  // The sidebar as it was left: full, or collapsed to its icons.
+  const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
+  // Who you are (after the app's bell, if it has one): the top right of every page.
+  const actions = <TopActions me={me} />;
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}
@@ -51,10 +59,12 @@ export async function ShellLayout({ children, unset }: { children: React.ReactNo
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
-      <div className="min-h-dvh lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">
-        <Nav me={me} unset={unset} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-8">
-          <div className="mx-auto max-w-[70rem]">
+      <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
+        <Nav me={me} unset={unset} rail={rail} actions={actions} />
+        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
+          {/* Wider screens: the profile at the top right (on a phone, in the top bar). */}
+          <header className="mb-4 hidden justify-end lg:flex print:hidden">{actions}</header>
+          <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             {/* Announcements from Bishnoi One Platform (kept in Discord), for this app and for everyone. */}
             <Notices timeZone={me.org?.timezone} />
             {stranded ? <NoCompany /> : children}

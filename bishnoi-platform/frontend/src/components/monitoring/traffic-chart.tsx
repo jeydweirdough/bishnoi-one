@@ -62,7 +62,7 @@ export function TrafficChart({ traffic, now }: { traffic: Traffic; now: number }
             const hf = (b.failed / top) * 200;
             return (
               <g key={b.at}>
-                <title>{`${full.format(new Date(b.at))}: ${b.requests} requests, ${b.failed} failed, ${b.refused} refused${b.averageMs != null ? `, ${b.averageMs} ms on average` : ""}`}</title>
+                <title>{`${full.format(new Date(b.at))}: ${b.requests} requests, ${b.failed} failed, ${b.refused} rejected${b.averageMs != null ? `, ${b.averageMs} ms on average` : ""}`}</title>
                 <rect x={x} y={200 - h} width={w} height={h} fill="var(--color-hema)" />
                 {b.failed > 0 && <rect x={x} y={200 - h} width={w} height={Math.max(hf, 2)} fill="url(#failed-hatch)" />}
               </g>
@@ -95,16 +95,16 @@ export function TrafficChart({ traffic, now }: { traffic: Traffic; now: number }
       </figcaption>
       {bars.length > 0 && (
         <details className="mt-3 text-meta">
-          <summary className="cursor-pointer text-hema">Show the figures as a table</summary>
+          <summary className="cursor-pointer text-hema">Show as table</summary>
           <div className="mt-2 max-h-72 overflow-auto">
             <table className="w-full text-left tabular-nums">
               <thead className="sticky top-0 bg-sheet text-ink-3">
                 <tr>
-                  <th className="py-1 pr-4 font-medium">From</th>
+                  <th className="py-1 pr-4 font-medium">Time</th>
                   <th className="py-1 pr-4 text-right font-medium">Requests</th>
                   <th className="py-1 pr-4 text-right font-medium">Failed</th>
-                  <th className="py-1 pr-4 text-right font-medium">Refused</th>
-                  <th className="py-1 text-right font-medium">Average</th>
+                  <th className="py-1 pr-4 text-right font-medium">Rejected</th>
+                  <th className="py-1 text-right font-medium">Average response</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">

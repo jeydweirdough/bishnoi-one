@@ -23,7 +23,7 @@ export function StockBadge({ level }: { level: StockLevel | null | undefined }) 
   if (!level.state) return <span className="text-meta text-ink-3">Not counted</span>;
   const s = STATE[level.state];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-meta font-medium whitespace-nowrap ${s.className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-meta font-medium whitespace-nowrap ${s.className}`}>
       {s.label}
       {level.state !== "out" && <span className="tabular-nums">· {level.available.toLocaleString()}</span>}
     </span>
@@ -59,7 +59,7 @@ export function SyncNow() {
             return;
           }
           const { added, updated, switchedOff } = result.data;
-          const said = [added && `${added} added`, updated && `${updated} changed`, switchedOff && `${switchedOff} switched off`].filter(Boolean).join(", ");
+          const said = [added && `${added} added`, updated && `${updated} changed`, switchedOff && `${switchedOff} deactivated`].filter(Boolean).join(", ");
           toast.success("Products are up to date with Inventory", { description: said || "Nothing had changed." });
         })
       }

@@ -27,7 +27,7 @@ export function WinBackBulk({ org }: { org: Org }) {
         const title = String(form.get("title") ?? "").trim();
         const dueOn = String(form.get("dueOn") ?? "");
         if (title.length < 2 || !dueOn) {
-          toast.error("Give the task a title and a date.");
+          toast.error("Enter a title and a date.");
           return false;
         }
         await run({ doing: "Adding win-back calls", did: (n) => `Win-back task added for ${plural(n, ...NOUN)}` }, (ids) =>
@@ -35,7 +35,7 @@ export function WinBackBulk({ org }: { org: Org }) {
         );
       }}
     >
-      <Field label="Task, for each customer's owner" className="w-64">
+      <Field label="Task for each customer owner" className="w-64">
         {(p) => <Input {...p} name="title" defaultValue="Win back: no quote lately" required minLength={2} maxLength={160} autoFocus />}
       </Field>
       <Field label="Due" className="w-36">

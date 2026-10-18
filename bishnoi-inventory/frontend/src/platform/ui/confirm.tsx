@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef, useTransition, type ReactNode } from "react";
+import { Modal } from "antd";
+import { useState, useTransition, type ReactNode } from "react";
 import { Button } from "./button";
 
 type Props = {
@@ -36,23 +37,13 @@ export function ConfirmButton({
   disabled,
   onConfirm,
 }: Props) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
-  const titleId = useId();
-
-  function show() {
-    dialog.current?.showModal();
-  }
-
-  function close() {
-    if (pending) return;
-    dialog.current?.close();
-  }
 
   function confirm() {
     start(async () => {
       const outcome = await onConfirm().catch(() => false);
-      if (outcome !== false) dialog.current?.close();
+      if (outcome !== false) setOpen(false);
     });
   }
 
@@ -64,33 +55,30 @@ export function ConfirmButton({
         icon={icon}
         className={triggerClassName}
         title={triggerTitle}
-        onClick={show}
+        onClick={() => setOpen(true)}
         disabled={disabled}
         aria-haspopup="dialog"
       >
         {label}
       </Button>
-      <dialog
-        ref={dialog}
-        onCancel={(e) => pending && e.preventDefault()}
-        aria-labelledby={titleId}
-        className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay"
+      {/* Ant Design's modal: it can't be closed while the action runs. */}
+      <Modal
+        open={open}
+        title={title}
+        onCancel={() => !pending && setOpen(false)}
+        onOk={confirm}
+        okText={confirmLabel}
+        cancelText="Cancel"
+        confirmLoading={pending}
+        okButtonProps={{ danger }}
+        cancelButtonProps={{ disabled: pending }}
+        closable={!pending}
+        mask={{ closable: !pending }}
+        width={420}
+        destroyOnHidden
       >
-        <div className="p-5">
-          <h2 id={titleId} className="text-heading">
-            {title}
-          </h2>
-          {body && <div className="mt-2 text-sm text-ink-2">{body}</div>}
-          <div className="mt-5 flex justify-end gap-2">
-            <Button onClick={close} disabled={pending} autoFocus>
-              Cancel
-            </Button>
-            <Button variant={danger ? "danger" : "primary"} loading={pending} onClick={confirm}>
-              {confirmLabel}
-            </Button>
-          </div>
-        </div>
-      </dialog>
+        {body && <div className="text-sm text-ink-2">{body}</div>}
+      </Modal>
     </>
   );
 }

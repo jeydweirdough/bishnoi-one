@@ -5,6 +5,7 @@
   "description": "What you have, where it is, how much, what is moving, and what needs attention.",
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -12,6 +13,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@ant-design/nextjs-registry": "^1.3.0",
+    "antd": "^6.6.5",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.47.0",
     "next": "16.3.5",
     "react": "19.2.8",

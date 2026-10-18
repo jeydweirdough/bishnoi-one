@@ -1,6 +1,8 @@
 "use client";
 
+import { JoinLink } from "./join-link";
 import { Trash2 } from "lucide-react";
+import { CallOutcome } from "./new-call";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -42,9 +44,13 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
   const kind = kindOf(a.kind);
   const [done, setDone] = useState(a.isDone);
   const [saving, start] = useTransition();
+  const [asking, setAsking] = useState(false);
+  // A planned call with an objective asks how it went when it's ticked off.
+  const isCall = Boolean(a.objective);
 
   function toggle() {
     const next = !done;
+    if (next && isCall) return setAsking(true);
     setDone(next); // at once; put back if the API says no
     start(async () => {
       const result = await updateActivity(a.id, { done: next });
@@ -52,6 +58,15 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
         setDone(!next);
         toast.error(result.error);
       }
+    });
+  }
+
+  function finish(outcome: string, discussed: string[]) {
+    start(async () => {
+      const result = await updateActivity(a.id, { done: true, outcome: outcome || null, discussed });
+      if (!result.ok) return void toast.error(result.error);
+      setDone(true);
+      setAsking(false);
     });
   }
 
@@ -89,16 +104,45 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
         </p>
         <p className={`mt-0.5 text-ink ${done && a.isPlanned ? "text-ink-3 line-through decoration-ink-3/60" : ""}`}>{a.subject}</p>
         {a.body && <p className="mt-0.5 whitespace-pre-line text-meta text-ink-2">{a.body}</p>}
+        {a.meetingLink && !done && (
+          <div className="mt-1.5">
+            <JoinLink link={a.meetingLink} size="sm" />
+          </div>
+        )}
+        {/* Sent from their own email app: the screenshot it was logged with. */}
+        {a.hasProof && (
+          <a href={`/activities/${a.id}/proof`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint">
+            <Icon name="email" className="size-3.5" />
+            See the screenshot
+          </a>
+        )}
+        {(a.products?.length ?? 0) > 0 && !done && <p className="mt-0.5 text-meta text-ink-2">To discuss: {a.products!.map((p) => p.name).join(", ")}</p>}
+        {a.outcome && <p className="mt-0.5 whitespace-pre-line text-meta text-ink-2">Outcome: {a.outcome}</p>}
+        {(a.discussed?.length ?? 0) > 0 && <p className="mt-0.5 text-meta text-ink-2">Discussed: {a.discussed!.map((p) => p.name).join(", ")}</p>}
+        {(a.alsoOn?.length ?? 0) > 0 && (
+          <p className="mt-0.5 text-meta text-ink-3">
+            Also on:{" "}
+            {a.alsoOn!.map((c, n) => (
+              <span key={c.id}>
+                {n > 0 && ", "}
+                <Link href={`/companies/${c.id}`} className="text-ink hover:underline">
+                  {c.name}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
+        {isCall && <CallOutcome open={asking} planned={a.products ?? []} onCancel={() => setAsking(false)} onSave={finish} saving={saving} />}
         {(a.company && !hide.includes("company")) || (a.contact && !hide.includes("contact")) ? (
           <p className="mt-0.5 text-meta">
             {a.contact && !hide.includes("contact") && (
-              <Link href={`/contacts/${a.contact.id}`} className="text-hema hover:underline">
+              <Link href={`/contacts/${a.contact.id}`} className="text-ink hover:underline">
                 {a.contact.name}
               </Link>
             )}
             {a.contact && !hide.includes("contact") && a.company && !hide.includes("company") && <span className="text-ink-3"> at </span>}
             {a.company && !hide.includes("company") && (
-              <Link href={`/companies/${a.company.id}`} className="text-hema hover:underline">
+              <Link href={`/companies/${a.company.id}`} className="text-ink hover:underline">
                 {a.company.name}
               </Link>
             )}

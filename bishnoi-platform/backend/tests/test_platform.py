@@ -281,3 +281,22 @@ def test_dashboard(client, ana):
     assert d["recent"][0]["action"] == "user.created"
     options = client.get("/platform/options", headers=ana).json()
     assert len(options["applications"]) == 8 and len(options["staff"]) == 2
+
+
+def test_every_app_reads_the_addresses_from_here(client, ana):
+    """Applications holds each app's screens address; the apps read it without signing in."""
+    addresses = client.get("/public/applications").json()["addresses"]
+    assert addresses["crm"] == "http://localhost:4302" and "platform" in addresses
+    crm = next(a for a in client.get("/platform/applications", headers=ana).json()["applications"] if a["key"] == "crm")
+    r = client.patch(f"/platform/applications/{crm['id']}", json={"appUrl": "https://crm.getmeds.ph/"}, headers=ana)
+    assert r.status_code == 200, r.text
+    assert client.get("/public/applications").json()["addresses"]["crm"] == "https://crm.getmeds.ph"
+
+
+def test_one_request_for_the_frame(client, ana):
+    """The frame of every page is one request: the same as its three parts."""
+    frame = client.get("/platform/frame", headers=ana).json()
+    assert frame["me"] == client.get("/auth/me", headers=ana).json()
+    assert frame["banner"] == client.get("/platform/banner", headers=ana).json()
+    assert frame["unset"] == client.get("/platform/unset", headers=ana).json()
+    assert client.get("/platform/frame").status_code == 401

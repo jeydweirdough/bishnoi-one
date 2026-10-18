@@ -231,7 +231,7 @@ export function BulkBar({
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-[3px] bg-sheet px-4 py-3 shadow-overlay"
+      className="sticky bottom-3 z-20 mt-3 flex animate-rise flex-wrap items-center gap-x-4 gap-y-3 rounded-xl bg-sheet px-4 py-3 shadow-overlay"
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <p aria-live="polite" className="font-semibold">
@@ -355,7 +355,7 @@ export function useBulkRun() {
         );
         if (queued) router.refresh();
         if (!job) {
-          toast.info("Still working on it in the background", {
+          toast.info("Processing in the background", {
             id: toastId,
             description: "Reload in a minute to see the changes.",
           });
@@ -382,12 +382,12 @@ function report(job: Job, wording: Wording, names: ReadonlyMap<string, string>, 
     toast.success(wording.did(job.succeeded), { id: toastId });
     return;
   }
-  const shown = job.failures.slice(0, 3).map((f) => `${names.get(f.id) ?? "One of them"}: ${f.error}`);
+  const shown = job.failures.slice(0, 3).map((f) => `${names.get(f.id) ?? "An item"}: ${f.error}`);
   const more = job.failed - shown.length;
-  const title = job.succeeded ? `${wording.did(job.succeeded)}. ${job.failed} couldn't be.` : `None could be done.`;
+  const title = job.succeeded ? `${wording.did(job.succeeded)}. ${job.failed} failed.` : `No items were processed.`;
   toast.warning(title, {
     id: toastId,
-    description: [...shown, more > 0 ? `…and ${more} more. They're still ticked.` : "They're still ticked."].join("\n"),
+    description: [...shown, more > 0 ? `…and ${more} more. They remain selected.` : "They remain selected."].join("\n"),
     duration: 12_000,
     classNames: { description: "whitespace-pre-line" },
   });

@@ -5,9 +5,10 @@ import { Check, Minus } from "lucide-react";
 import Link from "next/link";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
-import { getMe, load } from "@/src/platform/lib/api";
+import { load } from "@/src/platform/lib/api";
 import { Decide } from "@/src/components/access/decide";
-import { StaffControls } from "@/src/components/access/staff-controls";
+import { DeleteRecord } from "@/src/components/delete-record";
+import { StaffAccounts } from "@/src/components/access/staff-accounts";
 import { getStaff } from "@/src/components/gate";
 import { Count, Tabs } from "@/src/components/marks";
 import { SuspendedTag } from "@/src/components/organizations/record-tools";
@@ -35,7 +36,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Searc
           { key: "requests", label: "Requests", href: "/access", count: pending },
           { key: "organizations", label: "Organization access", href: "/access?tab=organizations" },
           { key: "applications", label: "Application access", href: "/access?tab=applications" },
-          { key: "roles", label: "Roles & permissions", href: "/access?tab=roles" },
+          { key: "roles", label: "Roles and permissions", href: "/access?tab=roles" },
         ]}
       />
       {tab === "requests" && <Requests status={typeof params.status === "string" ? params.status : "pending"} canDecide={staff.canAdminister} />}
@@ -47,7 +48,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Searc
 }
 
 const REQUEST_STATES: { value: RequestStatus | "all"; label: string }[] = [
-  { value: "pending", label: "Waiting" },
+  { value: "pending", label: "Pending" },
   { value: "approved", label: "Approved" },
   { value: "declined", label: "Declined" },
   { value: "all", label: "All" },
@@ -70,7 +71,7 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
       </div>
       <Sheet>
         {sorted.length === 0 ? (
-          <Empty icon="approvals" title={status === "pending" ? "Nobody is waiting" : "No requests here"}>
+          <Empty icon="approvals" title={status === "pending" ? "No pending requests" : "No requests here"}>
             {status === "pending"
               ? "When somebody asks for an application, log it from their page under Users and it waits here for a Platform Admin."
               : "Try another filter."}
@@ -93,7 +94,7 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
                   </p>
                   {r.reason && <p className="mt-0.5 text-sm whitespace-pre-line text-ink-2">“{r.reason}”</p>}
                   <p className="mt-0.5 text-meta text-ink-3">
-                    Asked{" "}
+                    Requested{" "}
                     <time dateTime={r.createdAt} title={when(r.createdAt)}>
                       {ago(r.createdAt)}
                     </time>
@@ -110,13 +111,22 @@ async function Requests({ status: asked, canDecide }: { status: string; canDecid
                     <p className="mt-1.5 text-meta text-ink-2">
                       {r.company.name} doesn&apos;t have {r.application.name}, so this can&apos;t be approved yet.{" "}
                       <Link href={`/companies/${r.company.id}?tab=applications`} className="font-semibold text-hema hover:underline">
-                        Give {r.application.name} to {r.company.name} first
+                        Assign {r.application.name} to {r.company.name} first
                       </Link>
                       , then come back.
                     </p>
                   )}
                 </div>
                 {r.status === "pending" && canDecide && <Decide request={r} canApprove={r.companyHasApp} />}
+                {canDecide && (
+                  <DeleteRecord
+                    kind="request"
+                    id={r.id}
+                    name={`${r.user.name}'s request for ${r.application.name}`}
+                    done="Request deleted"
+                    body="It goes from the list, decided or not. Access already given stays; take it away on the person's page."
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -192,11 +202,11 @@ async function Organizations() {
                     <td key={cell.applicationId} className="px-3 py-2.5 text-center">
                       {cell.enabled ? (
                         <span className="inline-flex items-center gap-1 text-hema" title={`${c.name} has ${app?.name}: ${plural(cell.userCount, "user")}`}>
-                          <Check className="size-4" aria-label="Has it" />
+                          <Check className="size-4" aria-label="Assigned" />
                           <span className="text-meta text-ink-2 tabular-nums">{cell.userCount}</span>
                         </span>
                       ) : (
-                        <Minus className="mx-auto size-4 text-rule-strong" aria-label="Doesn't have it" />
+                        <Minus className="mx-auto size-4 text-rule-strong" aria-label="Not assigned" />
                       )}
                     </td>
                   );
@@ -230,7 +240,7 @@ async function Applications() {
               {a.name}
               <Count n={a.userCount} />
             </SectionTitle>
-            <p className="text-meta text-ink-3">{a.userCount === 0 ? "Nobody uses it yet." : `${plural(a.userCount, "person", "people")} may use it.`}</p>
+            <p className="text-meta text-ink-3">{a.userCount === 0 ? "No users yet." : `${plural(a.userCount, "person", "people")} may use it.`}</p>
           </div>
           {a.roles.length > 0 && (
             <ul className="divide-y divide-rule border-t border-rule" role="list">
@@ -268,7 +278,7 @@ async function Applications() {
 }
 
 async function RolesTab({ canChange }: { canChange: boolean }) {
-  const [roles, me] = await Promise.all([load<Roles>("/platform/access/roles"), getMe()]);
+  const roles = await load<Roles>("/platform/access/roles");
   const holders = roles.staffRoles.reduce((n, r) => n + r.holders.length, 0);
   const levels = [
     {
@@ -307,7 +317,7 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Sheet className="self-start overflow-x-auto">
           <div className="px-5 pt-4 pb-2">
-            <SectionTitle icon="roles">What each role may do here</SectionTitle>
+            <SectionTitle icon="roles">Role permissions</SectionTitle>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -342,50 +352,7 @@ async function RolesTab({ canChange }: { canChange: boolean }) {
           </table>
         </Sheet>
 
-        <div className="space-y-5">
-          {roles.staffRoles.map((r) => (
-            <Sheet key={r.role}>
-              <div className="px-5 pt-4 pb-2">
-                <SectionTitle icon={r.role === "admin" ? "roles" : "support"}>
-                  {r.role === "admin" ? "Platform Admins" : "Support"}
-                  <Count n={r.holders.length} />
-                </SectionTitle>
-              </div>
-              {r.holders.length === 0 ? (
-                <Empty title={`Nobody is ${r.name} yet`} icon="person">
-                  {r.role === "admin" ? "Make a Support member a Platform Admin below." : "Staff accounts are made with the platform's users tool."}
-                </Empty>
-              ) : (
-                <ul className="divide-y divide-rule border-t border-rule" role="list">
-                  {r.holders.map((s) => {
-                    const self = s.id === me.user.id;
-                    return (
-                      <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-                        <span className="min-w-0 flex-1 basis-56">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className={`font-semibold ${s.isActive ? "text-ink" : "text-ink-3"}`}>{s.fullName}</span>
-                            {self && <span className="rounded-[2px] bg-hema-tint px-1.5 text-stamp text-hema uppercase">You</span>}
-                            {!s.isActive && <SuspendedTag label="Switched off" />}
-                          </span>
-                          <span className="block truncate text-meta text-ink-3">
-                            {s.email} · last signed in {ago(s.lastSignInAt)}
-                            {s.activeSessions > 0 && ` · ${plural(s.activeSessions, "session")} open`}
-                          </span>
-                        </span>
-                        {canChange &&
-                          (self ? (
-                            <span className="text-meta text-ink-3">Another Platform Admin changes your account.</span>
-                          ) : (
-                            <StaffControls person={s} />
-                          ))}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Sheet>
-          ))}
-        </div>
+        <StaffAccounts canChange={canChange} />
       </div>
     </div>
   );

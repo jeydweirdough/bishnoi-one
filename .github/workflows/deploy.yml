@@ -1,203 +1,148 @@
-# Deploys to Vercel only when you ask: Actions → Deploy → Run workflow, then
-# tick the apps to put online. Nothing deploys on a push.
+# Puts the apps you tick on Vercel, only when you ask:
+# Actions > Deploy > Run workflow, tick the apps, pick screens and/or API.
 #
-# Vercel's own Git builds are off too (every vercel.json: git.deploymentEnabled
-# false), so a push, a sync or a merge never starts a deployment anywhere.
-#
-# Which folder goes to which Vercel project: .github/deploy.json. An app with
-# no line there isn't on Vercel yet; ticking it only says so in the run's
-# summary. When an app gets its Vercel projects, add them to deploy.json and
-# change its "(not on Vercel yet)" below.
-#
-# For each project it remembers the last commit it deployed, as a tag
-# (deployed/<project>: the repo's Tags say what's live), so "Only what changed"
-# can skip a project whose folder hasn't changed since.
+# The Platform goes first (every other app checks companies and sign-in there);
+# the rest follow once it's done, side by side. An app whose Platform deploy
+# failed in the same run isn't deployed. For each app it checks first that
+# everything is set up (the Vercel token, its Vercel projects, their settings,
+# the apps it needs online) and stops with what to do next when something
+# isn't; then tests, deploys the API, then the screens, and checks each
+# answers. The steps are in deploy-app.yml; what each app needs is under
+# "apps" in .github/deploy.json.
 name: Deploy
 
 on:
   workflow_dispatch:
     inputs:
-      bishnoi-admin:
-        description: "Admin (on Vercel: screens + API)"
+      platform:
+        description: "Platform"
         type: boolean
         default: false
-      bishnoi-crm:
-        description: "CRM (on Vercel: screens + API)"
+      crm:
+        description: "CRM"
         type: boolean
         default: false
-      bishnoi-finance:
-        description: "Finance (on Vercel: screens + API)"
+      inventory:
+        description: "Inventory"
         type: boolean
         default: false
-      bishnoi-in-licensing:
-        description: "In-Licensing (not on Vercel yet)"
+      admin:
+        description: "Executive Admin"
         type: boolean
         default: false
-      bishnoi-inventory:
-        description: "Inventory (on Vercel: screens + API)"
+      finance:
+        description: "Finance"
         type: boolean
         default: false
-      bishnoi-pharmacy:
-        description: "Pharmacy (on Vercel: screens + API)"
+      pharmacy:
+        description: "Pharmacy"
         type: boolean
         default: false
-      bishnoi-platform:
-        description: "Platform (on Vercel: screens + API)"
+      in_licensing:
+        description: "In-Licensing"
         type: boolean
         default: false
-      bishnoi-regulatory:
-        description: "Regulatory (not on Vercel yet)"
+      regulatory:
+        description: "Regulatory"
         type: boolean
         default: false
       part:
-        description: "Which part of each app"
+        description: "What to deploy of each ticked app"
         type: choice
         options:
           - screens and API
-          - screens only
           - API only
+          - screens only
         default: screens and API
-      only_changed:
-        description: "Skip a part that hasn't changed since its last deploy"
+      run_tests:
+        description: "Run each API's tests first (a failure stops that app)"
         type: boolean
-        default: false
+        default: true
 
-# One run at a time; a second one waits, then deploys what it was asked to.
+# One deploy run at a time; a second waits for the first.
 concurrency:
   group: deploy
   cancel-in-progress: false
 
 permissions:
-  contents: write # move the deployed/<project> tag on after a deploy
+  contents: write # the refs/deployed/<project> markers
 
 jobs:
-  plan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      any: ${{ steps.plan.outputs.any }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
+  platform:
+    if: ${{ inputs.platform }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-platform
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-      - name: What to deploy
-        id: plan
-        env:
-          ASKED: ${{ toJSON(inputs) }}
-        run: |
-          git fetch -q --force origin 'refs/tags/deployed/*:refs/tags/deployed/*' || true
-          python3 - <<'PY'
-          import json, os, subprocess
+  crm:
+    needs: platform
+    if: ${{ inputs.crm && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-crm
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-          cfg = json.load(open(".github/deploy.json"))
-          asked = json.loads(os.environ["ASKED"])
-          part = asked.get("part", "screens and API")
-          only_changed = str(asked.get("only_changed")).lower() == "true"
-          head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-          apps = sorted(d for d in os.listdir(".") if d.startswith("bishnoi-") and os.path.isdir(d))
-          wanted_side = {"screens and API": ("frontend", "backend"), "screens only": ("frontend",), "API only": ("backend",)}[part]
+  inventory:
+    needs: platform
+    if: ${{ inputs.inventory && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-inventory
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-          todo, rows = [], []
-          for app in apps:
-              ticked = str(asked.get(app)).lower() == "true"
-              projects = {folder: name for folder, name in cfg["projects"].items() if folder.split("/")[0] == app}
-              on_vercel = ", ".join(f"{'screens' if f.endswith('frontend') else 'API'} → `{n}`" for f, n in sorted(projects.items())) or "not on Vercel yet"
-              result = ""
-              if ticked and not projects:
-                  result = "skipped: not on Vercel yet (add it to .github/deploy.json)"
-              elif ticked:
-                  done = []
-                  for folder, project in sorted(projects.items()):
-                      if folder.split("/")[1] not in wanted_side:
-                          continue
-                      last = subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/deployed/{project}^{{commit}}"],
-                                            capture_output=True, text=True).stdout.strip()
-                      if only_changed and last and subprocess.run(["git", "diff", "--quiet", last, head, "--", folder]).returncode == 0:
-                          done.append(f"`{project}` unchanged, skipped")
-                          continue
-                      todo.append({"project": project, "folder": folder})
-                      done.append(f"`{project}` deploying")
-                  result = "; ".join(done) or f"nothing: no {part.replace(' only', '')} on Vercel"
-              rows.append(f"| {app} | {'✅' if ticked else ''} | {on_vercel} | {result} |")
-              print(f"{app}: {'ticked' if ticked else '-'} | {on_vercel} | {result}")
+  admin:
+    needs: platform
+    if: ${{ inputs.admin && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-admin
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
-              out.write(f"matrix={json.dumps({'include': todo})}\n")
-              out.write(f"any={'true' if todo else 'false'}\n")
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
-              s.write(f"### Deploy: {part}{' (only what changed)' if only_changed else ''}\n\n")
-              s.write("| App | Asked | On Vercel | This run |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")
-              if not todo:
-                  s.write("\nNothing to deploy: tick an app that's on Vercel.\n")
-          PY
+  finance:
+    needs: platform
+    if: ${{ inputs.finance && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-finance
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-  deploy:
-    needs: plan
-    if: needs.plan.outputs.any == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    name: ${{ matrix.project }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
+  pharmacy:
+    needs: platform
+    if: ${{ inputs.pharmacy && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-pharmacy
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-      - name: Deploy ${{ matrix.project }} to production
-        # bash (-eo pipefail): a failed deploy fails the step, so it isn't marked deployed.
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          # Where the projects are: empty (deploy.json's "scope": "") means the
-          # token owner's own account, not a team. A repo variable VERCEL_SCOPE
-          # (Settings > Secrets and variables > Actions > Variables) overrides
-          # deploy.json, so a wrong scope is fixed without a commit.
-          VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::Add the VERCEL_TOKEN secret (Settings > Secrets and variables > Actions). See MAINTAINING.md."
-            exit 1
-          fi
-          scope="${VERCEL_SCOPE:-$(python3 -c 'import json; print(json.load(open(".github/deploy.json")).get("scope", ""))')}"
+  in_licensing:
+    needs: platform
+    if: ${{ inputs.in_licensing && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-in-licensing
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit
 
-          # Check the token first, and say what it can see when it can't
-          # (Vercel itself only says "The specified scope does not exist").
-          api() { curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1"; }
-          user="$(api /v2/user | python3 -c 'import json,sys; print(json.load(sys.stdin)["user"]["username"])')" || {
-            echo "::error::Vercel refused VERCEL_TOKEN: it's wrong or has expired. Make a new one (MAINTAINING.md) and replace the secret."
-            exit 1
-          }
-          flags=()
-          if [ -n "$scope" ] && [ "$scope" != "$user" ]; then
-            teams="$(api '/v2/teams?limit=100' | python3 -c 'import json,sys; print(" ".join(t["slug"] for t in json.load(sys.stdin).get("teams", [])))' || true)"
-            case " $teams " in
-              *" $scope "*) flags=(--scope "$scope") ;;
-              *)
-                echo "::error::VERCEL_TOKEN (account '$user') can't see '$scope'. It can see: your own account${teams:+, and the teams $teams}. If the projects are on your own account, set \"scope\" to \"\" in .github/deploy.json (or the repo variable VERCEL_SCOPE to $user)."
-                exit 1
-                ;;
-            esac
-          fi
-          echo "Deploying as $user${flags[1]:+ to team ${flags[1]}}"
-
-          # The project must exist, with its Root Directory, before its first deploy:
-          # linking a name Vercel doesn't know would make a new project at the repo's root.
-          team=""; [ ${#flags[@]} -gt 0 ] && team="?slug=${flags[1]}"
-          if ! api "/v9/projects/${{ matrix.project }}${team}" > /dev/null; then
-            echo "::error::There's no Vercel project called ${{ matrix.project }} yet. Make it first (Root Directory: ${{ matrix.folder }}), then run this again. See MAINTAINING.md, Putting an app online."
-            exit 1
-          fi
-          # From the repo's root: the project's own Root Directory (on Vercel)
-          # says which folder it builds, as it did when Vercel built it itself.
-          npx --yes vercel@latest link --yes --project "${{ matrix.project }}" "${flags[@]}" --token "$VERCEL_TOKEN"
-          npx --yes vercel@latest deploy --prod --yes "${flags[@]}" --token "$VERCEL_TOKEN" | tee deploy.log
-          echo "Deployed: $(tail -n 1 deploy.log)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remember this commit as deployed
-        run: git push -f origin "HEAD:refs/tags/deployed/${{ matrix.project }}"
+  regulatory:
+    needs: platform
+    if: ${{ inputs.regulatory && !cancelled() && needs.platform.result != 'failure' }}
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      app: bishnoi-regulatory
+      part: ${{ inputs.part }}
+      run_tests: ${{ inputs.run_tests }}
+    secrets: inherit

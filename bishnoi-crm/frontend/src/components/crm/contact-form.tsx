@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
@@ -33,14 +34,26 @@ export function ContactForm({
   companyId?: string;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const {
+    pending,
+    shakeClass,
+    anticipateClass,
+    execute,
+    error,
+    fieldErrors: fields,
+    setError,
+    setFieldErrors: setFields,
+  } = useAnticipation<{
+    values: Record<Text, string>;
+    company: string;
+    ownerId: string;
+    extra: ExtraDraft;
+  }>();
   const [values, setValues] = useState<Record<Text, string>>(() =>
     Object.fromEntries(TEXT.map((k) => [k, (contact?.[k] as string | null) ?? ""])) as Record<Text, string>,
   );
   const [company, setCompany] = useState(contact?.company?.id ?? companyId ?? "");
   const [ownerId, setOwnerId] = useState(contact?.owner.id ?? people.find((p) => p.isMe)?.id ?? people[0]?.id ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [dupMessage, setDupMessage] = useState("");
   const allFields = layout.sections.flatMap((s) => s.fields);
@@ -63,41 +76,59 @@ export function ContactForm({
       ownerId: ownerId || null,
       extra: extraChanges(allFields, extra),
     };
-    start(async () => {
-      let result;
-      if (contact) {
-        const change: Partial<ContactInput> = {};
-        for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (contact[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
-        if ((company || null) !== (contact.company?.id ?? null)) change.companyId = company || null;
-        if (ownerId !== contact.owner.id) change.ownerId = ownerId;
-        const extraChange = extraChanges(allFields, extra, contact.extra);
-        if (extraChange) change.extra = extraChange;
-        if (Object.keys(change).length === 0) {
-          router.push(`/contacts/${contact.id}`);
-          return;
+
+    execute({
+      anticipate: () => ({
+        values: { ...values },
+        company,
+        ownerId,
+        extra: { ...extra },
+      }),
+      rollback: (prev) => {
+        setValues(prev.values);
+        setCompany(prev.company);
+        setOwnerId(prev.ownerId);
+        setExtra(prev.extra);
+      },
+      request: async () => {
+        if (contact) {
+          const change: Partial<ContactInput> = {};
+          for (const k of TEXT) if (shown.has(k) && (input[k] ?? null) !== (contact[k] ?? null)) (change as Record<string, unknown>)[k] = input[k];
+          if ((company || null) !== (contact.company?.id ?? null)) change.companyId = company || null;
+          if (ownerId !== contact.owner.id) change.ownerId = ownerId;
+          const extraChange = extraChanges(allFields, extra, contact.extra);
+          if (extraChange) change.extra = extraChange;
+          if (Object.keys(change).length === 0) {
+            router.push(`/contacts/${contact.id}`);
+            return { ok: true, data: contact };
+          }
+          return await updateContact(contact.id, change);
+        } else {
+          return await createContact({ ...input, allowDuplicate });
         }
-        result = await updateContact(contact.id, change);
-      } else {
-        result = await createContact({ ...input, allowDuplicate });
-      }
-      if (result.ok) {
-        toast.success(contact ? "Changes saved" : "Customer added", { description: result.data.name });
-        router.push(`/contacts/${result.data.id}`);
+      },
+      successMessage: (data) => ({
+        title: contact ? "Changes saved" : "Customer added",
+        description: data.name,
+      }),
+      onSuccess: (data) => {
+        router.push(`/contacts/${data.id}`);
         router.refresh();
-        return;
-      }
-      // "Looks like one already here" is a question, not an error: it gets its own panel.
-      const found = result.duplicates ?? [];
-      setDuplicates(found);
-      setDupMessage(found.length ? result.error : "");
-      setError(found.length ? null : result.error);
-      setFields(result.fields ?? {});
+      },
+      onError: (err, _errFields, dups) => {
+        const found = (dups as Duplicate[]) ?? [];
+        setDuplicates(found);
+        setDupMessage(found.length ? err : "");
+        if (found.length) {
+          setError(null);
+        }
+      },
     });
   }
 
   /** A built-in field, drawn with the label and hints the admin gave it. */
   function standard(f: FormFieldDef) {
-    if (f.key === "ownerId") return <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} />;
+    if (f.key === "ownerId") return people.length > 1 ? <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} label={f.label} /> : null;
     if (f.key === "companyId") {
       return (
         <div>
@@ -154,7 +185,7 @@ export function ContactForm({
         e.preventDefault();
         submit();
       }}
-      className="space-y-7"
+      className={`space-y-7 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}
     >
       <LayoutForm layout={layout} standard={standard} draft={extra} onChange={setExtra} errors={fields} />
 

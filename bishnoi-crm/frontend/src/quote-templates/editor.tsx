@@ -1,17 +1,20 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { FileDrop } from "@/src/platform/ui/file-drop";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveTemplate, uploadTemplateFile } from "@/src/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { CodeTemplate } from "./code-editor";
 import { TemplateImage } from "./images";
 import type { QuoteTemplate, TemplateDesign, TemplateList } from "./types";
 
-type Props = { initial: QuoteTemplate; options: Pick<TemplateList, "issuers" | "teams" | "placeholders"> };
+/** anyTeam: false for a manager, whose templates are for one of their own departments. */
+type Props = { initial: QuoteTemplate; options: Pick<TemplateList, "issuers" | "teams" | "placeholders"> & { anyTeam?: boolean } };
 
 /** One quotation template: who it's for, its control numbers, and its form
  *  (an uploaded Excel sheet, or fields designed here), logo and e-signature. */
@@ -91,7 +94,7 @@ export function TemplateEditor({ initial, options }: Props) {
             <Field label="Team" hint="For example, a Getmeds team and a 2MG team with their own forms.">
               {(p) => (
                 <Select {...p} value={v.teamId} onChange={set("teamId")}>
-                  <option value="">Any team</option>
+                  {options.anyTeam !== false && <option value="">Any team</option>}
                   {options.teams.map((tm) => (
                     <option key={tm.id} value={tm.id}>
                       {tm.name}
@@ -103,12 +106,13 @@ export function TemplateEditor({ initial, options }: Props) {
             <div className="sm:col-span-2">
               <Choice
                 name="kind"
-                legend="How it is made"
+                legend="Template type"
                 value={v.kind}
                 onChange={(kind) => setV({ ...v, kind })}
                 options={[
                   { value: "excel", label: "Uploaded Excel form" },
                   { value: "form", label: "Designed here" },
+                  { value: "code", label: "Written as code" },
                 ]}
               />
             </div>
@@ -146,6 +150,7 @@ export function TemplateEditor({ initial, options }: Props) {
             <p className="text-meta text-ink-3">
               Left blank, the company name, address, TIN and contact come from Settings, Company and quotes. Write {"{issuer}"} where the issuer&apos;s
               name goes.
+              {v.kind === "code" ? " Your code shows these where it has their fields, for example %company_name% and %certification%." : ""}
             </p>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <Field label="Company name" optional>
@@ -221,6 +226,12 @@ export function TemplateEditor({ initial, options }: Props) {
         </Sheet>
       </div>
 
+      {v.kind === "code" && (
+        <div className="lg:col-span-2">
+          <CodeTemplate templateId={t.id} html={d.html ?? ""} onChange={(html) => setD({ ...d, html })} />
+        </div>
+      )}
+
       <div className="lg:col-span-2">
         <FormError message={error} />
         <Button type="submit" variant="primary" loading={pending} className="mt-2">
@@ -233,7 +244,6 @@ export function TemplateEditor({ initial, options }: Props) {
 
 /** The uploaded Excel form: which sheet, and what the CRM found on it. */
 function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplate; onSaved: (t: QuoteTemplate) => void; placeholders: { key: string; label: string }[] }) {
-  const file = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const excel = template.excel;
 
@@ -262,7 +272,7 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
         icon="lists"
         action={
           excel && (
-            <a href={`/admin/settings/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-hema hover:underline">
+            <a href={`/admin/settings/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-ink hover:underline">
               <Download className="size-3.5" aria-hidden />
               Download the form
             </a>
@@ -275,26 +285,15 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
         Upload your quotation sheet as it is. The CRM finds the patient name, contact number, address, hospital, date issued, control number, the
         products table, the grand total and the signature line by their labels, and fills them in for each quote.
       </p>
-      <input
-        ref={file}
-        type="file"
-        accept=".xlsx,.xlsm"
-        className="sr-only"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) upload(f);
-          e.target.value = "";
-        }}
-      />
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <Button loading={pending} icon={<FileSpreadsheet className="size-4" aria-hidden />} onClick={() => file.current?.click()}>
-          {excel ? "Replace the form" : "Upload the form"}
-        </Button>
-        {excel && (
-          <p className="text-sm text-ink-2">
-            <strong>{excel.name}</strong>
-          </p>
-        )}
+      <div className="mt-3">
+        <FileDrop
+          accept=".xlsx,.xlsm"
+          note={excel ? "Drop another to replace it. Excel (.xlsx)" : "Your quotation sheet in Excel (.xlsx)"}
+          busy={pending}
+          keep
+          current={excel ? { name: excel.name } : null}
+          onFile={(f) => f && upload(f)}
+        />
       </div>
 
       {excel && (
@@ -333,7 +332,7 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
       )}
 
       <details className="mt-4 border-t border-rule pt-3">
-        <summary className="cursor-pointer text-meta font-medium text-hema">Placeholders, for cells the labels don&apos;t cover</summary>
+        <summary className="cursor-pointer text-meta font-medium text-ink">Placeholders, for cells the labels don&apos;t cover</summary>
         <p className="mt-2 text-meta text-ink-3">
           Type one in a cell of the form to say exactly what goes there, for example {"{{customer}}"}. For the products table, put the line placeholders in
           one row; it repeats for each product.

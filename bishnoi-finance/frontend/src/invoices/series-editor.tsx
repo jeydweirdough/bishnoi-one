@@ -45,7 +45,7 @@ export function AddSeries({ today }: { today: string }) {
   const put = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value });
   return (
     <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
-      <p className="text-sm font-semibold">New series, from the Authority to Print</p>
+      <p className="text-sm font-semibold">New series from the Authority to Print</p>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Name" error={fields.name}>
           {(p) => <Input {...p} value={v.name} onChange={put("name")} maxLength={80} />}
@@ -63,7 +63,7 @@ export function AddSeries({ today }: { today: string }) {
           {(p) => <Input {...p} inputMode="numeric" value={v.last} onChange={put("last")} placeholder="5000" />}
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Printed before it" optional error={fields.prefix}>
+          <Field label="Prefix" optional error={fields.prefix}>
             {(p) => <Input {...p} value={v.prefix} onChange={put("prefix")} maxLength={10} placeholder="SI-" />}
           </Field>
           <Field label="Digits" error={fields.digits}>
@@ -74,7 +74,7 @@ export function AddSeries({ today }: { today: string }) {
       <FormError message={error} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          Add the series
+          Add series
         </Button>
         <Button type="button" onClick={() => setOpen(false)}>
           Cancel
@@ -97,7 +97,7 @@ export function SwitchSeries({ id, isActive }: { id: string; isActive: boolean }
         })
       }
     >
-      {isActive ? "Switch off" : "Switch on"}
+      {isActive ? "Deactivate" : "Activate"}
     </Button>
   );
 }

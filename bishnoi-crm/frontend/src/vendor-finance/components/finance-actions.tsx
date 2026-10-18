@@ -19,20 +19,21 @@ type Decide = (id: string, input: Decision) => Promise<{ ok: true } | { ok: fals
 function DecisionButtons({ quote, what, yes, decide, org }: { quote: Quote; what: string; yes: string; decide: Decide; org: Org }) {
   const fmt = makeFormat(org);
   const [note, setNote] = useState("");
-  const noteField = (placeholder: string) => (
-    <Textarea
-      aria-label="Note"
-      value={note}
-      onChange={(e) => setNote(e.target.value)}
-      rows={3}
-      maxLength={1000}
-      placeholder={placeholder}
-      className="mt-3"
-    />
+  const noteField = (label: string, placeholder: string) => (
+    <label className="mt-5 block">
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
+      <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000} placeholder={placeholder} />
+    </label>
+  );
+  // What it is, under the title: the customer, the amount, and why it's here.
+  const about = (
+    <p className="text-sm text-ink-2">
+      {quote.customerName} · <span className="font-medium text-ink tabular-nums">{fmt.peso(quote.totalCentavos)}</span> · {what}
+    </p>
   );
   const run = async (decision: Decision["decision"]) => {
     if (decision === "reject" && !note.trim()) {
-      toast.error("Say why, so the rep knows what to fix.");
+      toast.error("Enter a reason so the rep knows what to fix.");
       return false;
     }
     const result = await decide(quote.id, { decision, note: note.trim() || null });
@@ -48,13 +49,11 @@ function DecisionButtons({ quote, what, yes, decide, org }: { quote: Quote; what
       <ConfirmButton
         label={yes}
         triggerVariant="primary"
-        title={`${yes}: ${what}?`}
+        title={`${yes} ${quote.number}?`}
         body={
           <>
-            <p>
-              {quote.customerName} · {fmt.peso(quote.totalCentavos)}
-            </p>
-            {noteField("Note for the rep (optional)")}
+            {about}
+            {noteField("Note for the rep (optional)", "e.g. Approved for this order only")}
           </>
         }
         confirmLabel={yes}
@@ -64,11 +63,12 @@ function DecisionButtons({ quote, what, yes, decide, org }: { quote: Quote; what
       <ConfirmButton
         label="Reject"
         triggerVariant="quiet"
-        title={`Reject ${what}?`}
+        title={`Reject ${quote.number}?`}
         body={
           <>
-            <p>The rep sees your reason on the quote.</p>
-            {noteField("Why? e.g. the discount is too deep; 10% at most")}
+            {about}
+            {noteField("Why", "e.g. The discount is too deep; 10% at most")}
+            <p className="mt-1.5 text-meta text-ink-3">The rep sees your reason on the quote.</p>
           </>
         }
         confirmLabel="Reject"
@@ -148,10 +148,10 @@ function PaymentFields({ quote, org }: { quote: Quote; org: Org }) {
 
 export function ApprovalActions({ quote, org }: { quote: Quote; org: Org }) {
   if (!quote.can.approve) return null;
-  return <DecisionButtons quote={quote} org={org} what={`${quote.priceTypeName} quote ${quote.number}`} yes="Approve" decide={decideApproval} />;
+  return <DecisionButtons quote={quote} org={org} what={`${quote.priceTypeName} quote`} yes="Approve" decide={decideApproval} />;
 }
 
 export function LetterActions({ quote, org }: { quote: Quote; org: Org }) {
   if (!quote.can.checkLetter) return null;
-  return <DecisionButtons quote={quote} org={org} what={`the letter on ${quote.number}`} yes="Verify" decide={checkLetter} />;
+  return <DecisionButtons quote={quote} org={org} what={`${quote.payerName ?? "Guarantee"} letter`} yes="Verify" decide={checkLetter} />;
 }

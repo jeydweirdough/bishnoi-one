@@ -60,6 +60,7 @@ def contact_row(contact: Contact, access: Access, last_activity=None) -> dict:
     inside = reaches(contact, access)
     return {
         "id": contact.id,
+        "no": contact.no,
         "firstName": contact.first_name,
         "lastName": contact.last_name,
         "name": contact.full_name,

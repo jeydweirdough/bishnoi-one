@@ -11,7 +11,7 @@ const MARK: Record<Alert["tone"], string> = {
 /** What needs someone, worst first: a count, a few examples, and where to go. */
 export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compact?: boolean }) {
   if (alerts.length === 0) {
-    return <p className="py-4 text-sm text-ink-2">Nothing needs attention. Stock is above its reorder points, nothing is expiring soon, and nothing is waiting on anyone.</p>;
+    return <p className="py-4 text-sm text-ink-2">No alerts. Stock is above reorder levels, no batches are expiring soon, and no documents are pending.</p>;
   }
   const order = { critical: 0, warning: 1, info: 2 };
   return (
@@ -20,8 +20,8 @@ export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compac
         .sort((a, b) => order[a.tone] - order[b.tone])
         .map((a) => (
           <li key={a.key} className="relative py-2.5">
-            <Link href={a.href} className="flex items-start gap-3 after:absolute after:inset-0 hover:[&_span.title]:text-hema">
-              <span className={`mt-0.5 inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-[2px] border px-1.5 text-meta font-semibold tabular-nums ${MARK[a.tone]}`}>
+            <Link href={a.href} className="flex items-start gap-3 after:absolute after:inset-0 hover:[&_span.title]:text-ink">
+              <span className={`mt-0.5 inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-md border px-1.5 text-meta font-semibold tabular-nums ${MARK[a.tone]}`}>
                 {a.count}
               </span>
               <span className="min-w-0 flex-1">

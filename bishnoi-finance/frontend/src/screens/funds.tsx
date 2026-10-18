@@ -36,7 +36,7 @@ const TASKS: Record<FundTask, { path: string; title: string; intro: string; empt
     path: "/funds/settlement",
     title: "For settlement",
     intro: "Reviewed liquidations with a balance: a refund due from the employee, or a reimbursement due to them.",
-    empty: "Nothing for settlement.",
+    empty: "No liquidations for settlement.",
   },
   to_liquidate: {
     path: "/funds/outstanding",

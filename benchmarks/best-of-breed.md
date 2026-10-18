@@ -3,6 +3,7 @@
 Reference notes only. Nothing here is ADOPT until it has a row decision in
 [benchmark-matrix.md](benchmark-matrix.md). Veeva is the fifth benchmark,
 since Bishnoi One is built for pharma distribution first; see the note at the end.
+HubSpot is the sixth, added on 2026-10-03 for how a CRM links records and lays out a record's page.
 
 ## Salesforce: the metadata platform
 
@@ -87,3 +88,25 @@ At first Veeva was only a reference, for its four transferable ideas. On
 [decisions.md](decisions.md)), so Veeva is now a full benchmark: a matrix row
 may name it as its reference, and pharma field work comes first. What's listed
 above as not transferable stays out of scope.
+
+## HubSpot: associations and the everyday CRM
+
+Added as a benchmark on 2026-10-03 (decisions.md). Not in the brief's lists:
+what it has is our own review of its hubs (sales, marketing, service, content,
+operations, commerce).
+
+### Transferable (promoted to [patterns-to-adopt.md](patterns-to-adopt.md))
+
+| Feature | What it actually does | Why it matters here |
+|---|---|---|
+| Associations with labels | Any record links to any other (a contact to companies, deals, tickets), each link with a label an admin defines ("Decision maker", "Works at"), both ways. A company can be the parent of another. | **Strongest HubSpot idea.** A hospital's doctors, a hospital group's hospitals and a deal's decision maker are all one mechanism, not a column each. |
+| Activities on several records | A note, email, call or meeting is logged once and associated with the contact, their company and the deal at the same time. | A visit note belongs on the doctor *and* the hospital; today it can sit on one customer. |
+| The record page in three columns | Left: who it is and quick actions (Note, Email, Call, Task, Meeting) under the name, then "About". Middle: Overview and an Activities tab with search and filters. Right: associations, each with + Add. | Everything about one customer on one screen; the next action is always one click from the name. |
+| Connected inboxes | Each rep connects their own Gmail or Outlook; emails sent from the CRM go out from their address and are logged on the record, with replies read back in. | Approved emails (Veeva) need a mailbox to send from; this is how. |
+| Sequences | A series of emails and tasks to a contact, stopped when they reply or book a meeting. | Later: follow-up after a first visit. |
+
+### Not transferable: out of scope for now
+
+Marketing email at scale, landing pages, ads and social publishing (the
+marketing hub); the service hub's tickets and customer portal; Breeze AI
+(AI out, per the project's rules, until lead sources and integrations, g-integrations).

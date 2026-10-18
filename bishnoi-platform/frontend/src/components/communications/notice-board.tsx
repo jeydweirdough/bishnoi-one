@@ -57,7 +57,7 @@ export function NoticeBoard({
         !writing && (
           <div className="mb-4">
             <Button variant="primary" onClick={() => setWriting(true)}>
-              Write a {words.one.toLowerCase()}
+              New {words.one.toLowerCase()}
             </Button>
           </div>
         )
@@ -67,7 +67,7 @@ export function NoticeBoard({
 
       {writing && (
         <Sheet className="mb-5 px-5 pt-4 pb-5">
-          <SectionTitle icon="communications">Write a notice</SectionTitle>
+          <SectionTitle icon="communications">New notice</SectionTitle>
           <NoticeForm kind={kind} companies={companies} applications={applications} onDone={() => setWriting(false)} />
         </Sheet>
       )}
@@ -75,14 +75,14 @@ export function NoticeBoard({
       <Sheet className="px-5 pt-2 pb-2">
         {notices.length === 0 ? (
           <Empty title={`No ${words.many.toLowerCase()} yet`} icon="communications">
-            {EMPTY_WORDS[kind]} {canAdminister ? `Use “Write a ${words.one.toLowerCase()}” above.` : "A Platform Admin writes them."}
+            {EMPTY_WORDS[kind]} {canAdminister ? `Use “New ${words.one.toLowerCase()}” above.` : "A Platform Admin writes them."}
           </Empty>
         ) : (
           <ul className="divide-y divide-rule" role="list">
             {notices.map((n) =>
               editing === n.id ? (
                 <li key={n.id} className="py-4">
-                  <p className="mb-2 text-sm font-semibold text-ink">Changing “{n.title}”</p>
+                  <p className="mb-2 text-sm font-semibold text-ink">Editing “{n.title}”</p>
                   <NoticeForm
                     kind={n.kind}
                     notice={n}
@@ -127,14 +127,14 @@ function NoticeRow({ notice: n, canAdminister, onEdit }: { notice: Notice; canAd
           <h3 className="mt-1 text-sm font-semibold text-ink">{n.title}</h3>
           {n.body && <p className="mt-0.5 line-clamp-3 text-sm whitespace-pre-line text-ink-2">{n.body}</p>}
           <p className="mt-1 text-meta text-ink-3">
-            For {audience(n).replace(/^Everyone/, "everyone")} · {noticeWindow(n)} · written by {n.createdBy}
+            For {audience(n).replace(/^Everyone/, "everyone")} · {noticeWindow(n)} · created by {n.createdBy}
           </p>
         </div>
         {canAdminister && (
           <div className="flex flex-wrap items-center gap-1">
             {n.state !== "ended" && (
               <Button size="sm" variant={published ? "default" : "primary"} loading={pending} onClick={togglePublished}>
-                {published ? "Withdraw this notice" : "Publish this notice"}
+                {published ? "Withdraw" : "Publish"}
               </Button>
             )}
             <Button size="sm" variant="quiet" onClick={onEdit}>
@@ -147,10 +147,10 @@ function NoticeRow({ notice: n, canAdminister, onEdit }: { notice: Notice; canAd
               title={`Delete “${n.title}”?`}
               body={
                 n.state === "showing"
-                  ? "It's showing now: the applications stop showing it straight away, and it can't be brought back. To take it down for now, withdraw it instead."
-                  : "It's gone for good and can't be brought back. The activity log keeps a line saying you deleted it."
+                  ? "It is active now: the applications stop showing it immediately, and it can't be restored. To hide it temporarily, withdraw it instead."
+                  : "It is deleted permanently. The activity log records the deletion."
               }
-              confirmLabel="Delete it"
+              confirmLabel="Delete"
               onConfirm={async () => {
                 const r = await deleteNotice(n.id);
                 if (!r.ok) {
@@ -216,7 +216,7 @@ function NoticeForm({ kind: initialKind, notice, companies, applications, onDone
       toast.success(notice ? "Notice saved" : publish ? "Published" : "Saved as a draft", {
         description: notice
           ? undefined
-          : (publish ? "The applications show it from its start." : "Nobody sees it until you publish it.") + elsewhere,
+          : (publish ? "The applications show it from its start." : "Not visible until published.") + elsewhere,
       });
       onDone();
     });
@@ -245,7 +245,7 @@ function NoticeForm({ kind: initialKind, notice, companies, applications, onDone
       <div className="sm:col-span-2">
         <Choice
           name="level"
-          legend="How serious"
+          legend="Severity"
           value={level}
           onChange={setLevel}
           options={(Object.keys(NOTICE_LEVELS) as NoticeLevel[]).map((l) => ({ value: l, label: NOTICE_LEVELS[l] }))}
@@ -255,13 +255,13 @@ function NoticeForm({ kind: initialKind, notice, companies, applications, onDone
       <Field label="Title" error={fields.title} className="sm:col-span-2">
         {(p) => <Input {...p} value={v.title} onChange={set("title")} maxLength={200} />}
       </Field>
-      <Field label="What it says" optional error={fields.body} className="sm:col-span-2" hint="Plain words: what's happening, who it affects, what to do.">
+      <Field label="Message" optional error={fields.body} className="sm:col-span-2" hint="What is happening, who is affected and what to do.">
         {(p) => <Textarea {...p} rows={4} value={v.body} onChange={set("body")} maxLength={10000} />}
       </Field>
-      <Field label="Company" error={fields.companyId} hint="Leave it on every company to tell everyone.">
+      <Field label="Company" error={fields.companyId} hint="Leave as All companies to notify everyone.">
         {(p) => (
           <Select {...p} value={v.companyId} onChange={set("companyId")}>
-            <option value="">Every company</option>
+            <option value="">All companies</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -274,7 +274,7 @@ function NoticeForm({ kind: initialKind, notice, companies, applications, onDone
       <Field label="Application" error={fields.applicationId} hint="Only that application's users see it.">
         {(p) => (
           <Select {...p} value={v.applicationId} onChange={set("applicationId")}>
-            <option value="">Every application</option>
+            <option value="">All applications</option>
             {applications.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -284,18 +284,18 @@ function NoticeForm({ kind: initialKind, notice, companies, applications, onDone
         )}
       </Field>
       <Field
-        label="Starts"
+        label="Start"
         optional={!maintenance}
         error={fields.startsAt}
-        hint={maintenance ? "When the work begins. Your computer's time zone." : notice ? "Your computer's time zone." : "Blank: as soon as it's published. Your computer's time zone."}
+        hint={maintenance ? "When the work begins, in local time." : notice ? "Local time." : "Leave blank to start when published. Local time."}
       >
         {(p) => <Input {...p} type="datetime-local" value={v.startsAt} onChange={set("startsAt")} />}
       </Field>
       <Field
-        label="Ends"
+        label="End"
         optional={!maintenance}
         error={fields.endsAt}
-        hint={maintenance ? "When the work should be over." : "Blank: it shows until it's withdrawn."}
+        hint={maintenance ? "When the work is expected to finish." : "Leave blank to show until withdrawn."}
       >
         {(p) => <Input {...p} type="datetime-local" value={v.endsAt} onChange={set("endsAt")} />}
       </Field>

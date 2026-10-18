@@ -28,5 +28,8 @@ if __name__ == "__main__":
         host=args.host,
         port=args.port,
         reload=True,
+        # A reload doesn't wait on connections the screens keep open (they never
+        # close on their own, so it waited for ever and served the old code).
+        timeout_graceful_shutdown=2,
         reload_dirs=[str(API_DIR / "app")],
     )

@@ -10,14 +10,15 @@ import re
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api import SLUG, Api, camel, changed, check_email, conflict, field_error, iso, not_found, now
 from app.audit import audit
-from app.deps import DB, AdminUser, CurrentUser
+from app.deps import DB, AdminUser, CurrentUser, SettingsDep
+from app import company_push
 from app.models import (
     TICKET_STATUSES,
     Application,
@@ -125,6 +126,7 @@ class UnitPatch(Api):
 def company_out(c: Company, **extra) -> dict:
     return {
         "id": c.id,
+        "no": c.no,
         "name": c.name,
         "slug": c.slug,
         "status": c.status,
@@ -192,8 +194,6 @@ def add_company(body: CompanyIn, db: DB, me: AdminUser) -> dict:
         raise field_error("slug" if body.slug else "name", f"The address {slug} is taken. Give it another.")
     if (body.admin_name is None) != (body.admin_email is None):
         raise field_error("adminEmail" if body.admin_email is None else "adminName", "Give both their name and their email, or neither.")
-    if body.admin_email and db.scalar(select(Identity).where(func.lower(Identity.email) == body.admin_email)):
-        raise field_error("adminEmail", "Somebody on the platform already has that email.")
     apps = _apps(db, body.application_ids)
     c = Company(name=body.name, slug=slug, currency=body.currency, timezone=body.timezone, contact_email=body.contact_email, notes=body.notes)
     db.add(c)
@@ -203,6 +203,10 @@ def add_company(body: CompanyIn, db: DB, me: AdminUser) -> dict:
     audit(db, me, "company.created", target=c.name, target_type="company", target_id=c.id, company_id=c.id)
     if body.admin_email:
         person = Identity(company_id=c.id, full_name=body.admin_name, email=body.admin_email, is_company_admin=True)
+        # Already at another company: the same person, with the password they have.
+        elsewhere = db.scalar(select(Identity).where(func.lower(Identity.email) == body.admin_email.lower(), Identity.password_hash.is_not(None)))
+        if elsewhere is not None:
+            person.password_hash, person.password_changed_at = elsewhere.password_hash, elsewhere.password_changed_at
         db.add(person)
         db.flush()
         audit(db, me, "user.created", target=person.email, target_type="user", target_id=person.id, company_id=c.id, fields=["isCompanyAdmin"])
@@ -255,7 +259,7 @@ def get_company(company_id: str, db: DB, _: CurrentUser) -> dict:
 
 
 @router.patch("/{company_id}")
-def update_company(company_id: str, body: CompanyPatch, db: DB, me: AdminUser) -> dict:
+def update_company(company_id: str, body: CompanyPatch, db: DB, me: AdminUser, request: Request, settings: SettingsDep) -> dict:
     c = _company(db, company_id)
     fields = changed(body)
     for required in ("name", "slug", "currency", "timezone", "status"):
@@ -273,11 +277,14 @@ def update_company(company_id: str, body: CompanyPatch, db: DB, me: AdminUser) -
     action = {"suspended": "company.suspended", "active": "company.reactivated"}.get(fields.get("status"), "company.updated")
     audit(db, me, action, target=c.name, target_type="company", target_id=c.id, company_id=c.id, fields=camel(fields))
     db.commit()
+    if fields.keys() & {"status", "name", "slug"}:
+        # What its applications hold about it changed: tell them now, not at their next renewal.
+        company_push.push(request.app.state.sessions, settings, c.id, company_push.apps_of(db, c.id))
     return {"company": company_out(c)}
 
 
 @router.put("/{company_id}/applications")
-def set_applications(company_id: str, body: AppsIn, db: DB, me: AdminUser) -> dict:
+def set_applications(company_id: str, body: AppsIn, db: DB, me: AdminUser, request: Request, settings: SettingsDep) -> dict:
     """Which applications the company may use. Taking one away also takes it
     from each of its people: nobody keeps access their company hasn't got."""
     c = _company(db, company_id)
@@ -301,6 +308,8 @@ def set_applications(company_id: str, body: AppsIn, db: DB, me: AdminUser) -> di
         audit(db, me, "company.app_withdrawn", target=f"{c.name} · {names[app_id]}", target_type="company", target_id=c.id,
               company_id=c.id, application_id=app_id)
     db.commit()
+    # Given: it may be used there at once. Taken away: it stops at once.
+    company_push.push(request.app.state.sessions, settings, c.id, added | removed)
     return {"added": len(added), "removed": len(removed), "withdrawnFromPeople": withdrawn}
 
 
@@ -373,3 +382,20 @@ def reaches(incident: Incident, company_id: str, app_ids: set[str]) -> bool:
     if incident.company_ids:
         return company_id in incident.company_ids
     return incident.application_id in app_ids
+
+
+@router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company(company_id: str, db: DB, me: AdminUser, request: Request, settings: SettingsDep) -> Response:
+    """Gone from the platform: its people, their access, its structure, its
+    applications and connections. Tickets it raised stay, with no company on them.
+    What it keeps in each application (the CRM's customers...) isn't touched here."""
+    c = _company(db, company_id)
+    people = db.scalar(select(func.count()).select_from(Identity).where(Identity.company_id == c.id)) or 0
+    audit(db, me, "company.deleted", category="security", target=c.name, target_type="company", target_id=c.id, fields=[f"{people} people"] if people else ())
+    had, gone = company_push.apps_of(db, c.id), {"id": c.id, "slug": c.slug, "name": c.name}
+    db.execute(delete(Identity).where(Identity.company_id == c.id))
+    db.delete(c)
+    db.commit()
+    # Each application it had is told it's gone, with a pass saying so.
+    company_push.push(request.app.state.sessions, settings, gone["id"], had, gone=gone)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -20,7 +20,7 @@ export function Decide({ request, canApprove }: { request: AccessRequest; canApp
       toast.error(result.error);
       return false;
     }
-    toast.success(approve ? "Access given" : "Request declined", { description: `${request.application.name} · ${who}` });
+    toast.success(approve ? "Access granted" : "Request declined", { description: `${request.application.name} · ${who}` });
     setNote("");
   }
 
@@ -31,14 +31,14 @@ export function Decide({ request, canApprove }: { request: AccessRequest; canApp
           label="Approve"
           triggerVariant="primary"
           triggerSize="sm"
-          triggerTitle={`Give ${request.application.name} to ${who}`}
+          triggerTitle={`Grant ${who} access to ${request.application.name}`}
           danger={false}
-          title={`Give ${request.application.name} to ${who}?`}
+          title={`Grant ${who} access to ${request.application.name}?`}
           body={
             <>
               <p>
                 {first} can use {request.application.name}
-                {request.role ? ` as ${request.role}` : ""} from now on. You can change their role or withdraw it from their page.
+                {request.role ? ` as ${request.role}` : ""} from now on. Change their role or revoke access from their page.
               </p>
               {noteField}
             </>

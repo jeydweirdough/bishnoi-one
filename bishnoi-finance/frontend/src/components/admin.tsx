@@ -75,7 +75,7 @@ export function UsersEditor({
     <div className="space-y-5">
       {adding ? (
         <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="addRole">Add a person</SectionTitle>
+          <SectionTitle icon="addRole">Add user</SectionTitle>
           <form
             noValidate
             className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
@@ -127,9 +127,9 @@ export function UsersEditor({
               )}
             </Field>
             <Field
-              label="First password"
+              label="Initial password"
               error={fields.password}
-              hint="At least 8 characters. Give it to them yourself."
+              hint="At least 8 characters. Share it with the user directly."
             >
               {(p) => (
                 <Input
@@ -143,7 +143,7 @@ export function UsersEditor({
             </Field>
             <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
               <Button type="submit" variant="primary" loading={saving}>
-                Add person
+                Add user
               </Button>
               <Button variant="quiet" onClick={() => setAdding(false)}>
                 Cancel
@@ -162,7 +162,7 @@ export function UsersEditor({
           icon={<Plus className="size-4" aria-hidden />}
           onClick={() => setAdding(true)}
         >
-          Add a person
+          Add user
         </Button>
       )}
 
@@ -180,7 +180,7 @@ export function UsersEditor({
                 {u.id === meId && <span className="ml-2 text-meta text-hema font-semibold">You</span>}
                 <span className="block text-meta text-ink-3">
                   {u.email} · {u.lastSignInAt ? `last signed in ${when[u.id]}` : "never signed in"}
-                  {!u.isActive && " · switched off"}
+                  {!u.isActive && " · inactive"}
                 </span>
               </span>
               <Select
@@ -212,11 +212,11 @@ export function UsersEditor({
                       change(
                         u.id,
                         { isActive: !u.isActive },
-                        u.isActive ? `${u.fullName} switched off` : `${u.fullName} switched back on`,
+                        u.isActive ? `${u.fullName} deactivated` : `${u.fullName} reactivated`,
                       )
                     }
                   >
-                    {u.isActive ? "Switch off" : "Switch on"}
+                    {u.isActive ? "Deactivate" : "Activate"}
                   </Button>
                 )}
               </span>
@@ -331,7 +331,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
       setDrafts(next);
       setSelected(result.data.id);
       toast.success(role ? `${input.name} saved` : `${input.name} added`, {
-        description: role ? "People with this role get the change on their next click." : undefined,
+        description: role ? "Applies to users with this role right away." : undefined,
       });
       router.refresh();
     });
@@ -429,7 +429,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
                   />
                 )}
               </Field>
-              <Field label="What it's for" optional error={errors.fields.description}>
+              <Field label="Description" optional error={errors.fields.description}>
                 {(p) => (
                   <Textarea
                     {...p}

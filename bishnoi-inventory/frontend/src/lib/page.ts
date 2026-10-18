@@ -1,6 +1,8 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { getCompanyMe } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
+import { PAGE_SIZE, pageOf, withPage } from "@/src/platform/ui/paging";
 
 export type Search = Promise<Record<string, string | string[] | undefined>>;
 export type Params<T> = Promise<T>;
@@ -27,4 +29,18 @@ export function canAddFrom(may: (permission: string) => boolean) {
     warehouse: may("warehouses.manage"),
     location: may("warehouses.manage"),
   };
+}
+
+/**
+ * The page of a list asked for in the address (?page=), and what to ask the
+ * API for: `limit` and `offset`, so the database cuts the page.
+ */
+export function paging(search: Record<string, string | string[] | undefined>, size = PAGE_SIZE) {
+  const page = pageOf(search.page);
+  return { page, size, vars: { limit: size, offset: (page - 1) * size } };
+}
+
+/** A page past the end (rows removed since, or a typed address) goes to the last page there is. */
+export function keepInRange(rows: number, total: number, page: number, base: string, size = PAGE_SIZE) {
+  if (rows === 0 && total > 0 && page > 1) redirect(withPage(base, Math.ceil(total / size)));
 }

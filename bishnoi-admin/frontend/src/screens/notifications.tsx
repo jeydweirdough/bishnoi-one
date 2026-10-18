@@ -52,6 +52,12 @@ export function NotificationsScreen({
         return "/properties";
       case "ticket":
         return "/tickets";
+      case "vehicle_registration":
+      case "vehicle_insurance":
+      case "vehicle_pms":
+        return "/vehicles";
+      case "travel":
+        return "/travel";
       default:
         return "/";
     }
@@ -102,13 +108,13 @@ export function NotificationsScreen({
 
       {/* Filter Tabs */}
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <div className="inline-flex flex-wrap rounded-[3px] border border-rule-strong bg-sheet p-0.5">
+        <div className="inline-flex flex-wrap rounded-[12px] border border-rule-strong bg-sheet p-0.5">
           {severities.map((s) => (
             <button
               key={s.key}
               type="button"
               onClick={() => setSelectedSeverity(s.key)}
-              className={`rounded-[2px] px-3 py-1 text-meta transition-colors ${
+              className={`rounded-full px-3 py-1 text-meta transition-colors ${
                 selectedSeverity === s.key
                   ? "bg-hema-tint font-semibold text-hema"
                   : "text-ink-2 hover:text-ink"
@@ -142,14 +148,14 @@ export function NotificationsScreen({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-semibold text-sm text-ink">{n.title}</span>
-                      <span className={`inline-block rounded-[2px] px-1.5 py-0.2 text-meta first-letter:uppercase ${severityBadge(n.severity)}`}>
+                      <span className={`inline-block rounded-full px-1.5 py-0.2 text-meta first-letter:uppercase ${severityBadge(n.severity)}`}>
                         {n.severity}
                       </span>
-                      <span className="rounded-[2px] border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3">
+                      <span className="rounded-full border border-rule px-1.5 py-0.2 text-meta font-medium text-ink-3">
                         {n.entityType}
                       </span>
                       {n.isAcknowledged && (
-                        <span className="rounded-[2px] bg-bench px-1.5 py-0.2 text-meta text-ink-3">
+                        <span className="rounded-full bg-bench px-1.5 py-0.2 text-meta text-ink-3">
                           Acknowledged
                         </span>
                       )}
@@ -173,7 +179,7 @@ export function NotificationsScreen({
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <Link
                     href={entityPath(n.entityType)}
-                    className="rounded-[3px] border border-rule-strong bg-sheet px-2.5 py-1 text-meta font-medium text-ink hover:border-control"
+                    className="rounded-[12px] border border-rule-strong bg-sheet px-2.5 py-1 text-meta font-medium text-ink hover:border-control"
                   >
                     Open Record &rarr;
                   </Link>

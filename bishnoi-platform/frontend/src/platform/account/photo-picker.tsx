@@ -71,7 +71,7 @@ export function PhotoPicker({
             loading={saving}
             onClick={() => input.current?.click()}
           >
-            {photoAt ? "Change picture" : "Add a picture"}
+            {photoAt ? "Change picture" : "Add picture"}
           </Button>
           {photoAt && (
             <ConfirmButton
@@ -80,7 +80,7 @@ export function PhotoPicker({
               triggerVariant="quiet"
               icon={<Trash2 className="size-4" aria-hidden />}
               title={`Remove ${whose} picture?`}
-              body="Initials take its place. A new one can be added any time."
+              body="Initials are shown instead. A new picture can be added at any time."
               confirmLabel="Remove"
               onConfirm={async () => {
                 const result = await onRemove();
@@ -101,7 +101,7 @@ export function PhotoPicker({
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="sr-only"
-        aria-label={`Pick ${whose} picture`}
+        aria-label={`Choose ${whose} picture`}
         onChange={(e) => choose(e.target.files?.[0])}
       />
     </div>

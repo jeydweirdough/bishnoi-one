@@ -24,6 +24,7 @@ import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
+from app.terms import terms_of
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
@@ -35,7 +36,8 @@ from app.api import Api, as_utc, field_error, iso, not_found, person_out, team_o
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, FieldGoal, Product, RouteDay, TrailBatch, User, Visit
+from app.kpis import by_code, person_targets, set_person_target
+from app.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, PlanStop, Product, RouteDay, TrailBatch, User, Visit
 from app.scope import reachable_people, reaches, within
 from app.trail import Point, decode, encode, metres, path_metres
 
@@ -47,9 +49,9 @@ Edit = Annotated[Access, Depends(require("visits.edit"))]
 Delete = Annotated[Access, Depends(require("visits.delete"))]
 Manage = Annotated[Access, Depends(require("goals.manage"))]
 
-Outcome = Literal["collected", "promised", "not_in", "updated", "other"]
+Outcome = Literal["detailed", "collected", "promised", "not_in", "updated", "other"]
+CareGroup = Literal["enrolled", "followed_up", "not_now"]
 MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
-DOCTOR = "doctor"
 # When locations are taken (hours, the company's own time): 6:00 to 20:00.
 WORK_HOURS = (6, 20)
 # A visit this close to its clinic's pin (less the phone's own uncertainty) was there.
@@ -111,6 +113,7 @@ class VisitFields(Api):
     # The products detailed, in the order they were (P6). At most ten.
     detailing: list[DetailIn] | None = Field(None, max_length=10)
     next_objective: str | None = Field(None, max_length=300)
+    care_group: CareGroup | None = None
 
 
 def check_detailing(db: Session, items: list[DetailIn] | None) -> list[dict]:
@@ -150,6 +153,7 @@ def visit_out(visit: Visit, access: Access) -> dict:
         "notes": visit.notes,
         "detailing": visit.detailing or [],
         "nextObjective": visit.next_objective,
+        "careGroup": visit.care_group,
         "owner": person_out(visit.owner),
         "createdAt": iso(visit.created_at),
         "location": (
@@ -221,7 +225,7 @@ def list_visits(
 def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: VisitIn) -> dict:
     doctor = db.get(Company, body.company_id)
     if doctor is None or not reaches(doctor, access):
-        raise field_error("companyId", "Pick a doctor you can see.")
+        raise field_error("companyId", "Pick someone you can see.")
     visited_at = to_utc(body.visited_at, settings) if body.visited_at else datetime.now(UTC)
     if visited_at > datetime.now(UTC) + timedelta(minutes=5):
         raise field_error("visitedAt", "A visit is logged once it's happened, so not in the future.")
@@ -242,6 +246,7 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
         notes=(body.notes or "").strip() or None,
         detailing=check_detailing(db, body.detailing),
         next_objective=(body.next_objective or "").strip() or None,
+        care_group=body.care_group,
         owner_id=me.id,
         team_id=me.team_id,
         created_by_id=me.id,
@@ -254,6 +259,8 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
             else None
         ),
     )
+    if body.care_group == "enrolled" and doctor.care_group_at is None:
+        doctor.care_group_at = visited_at
     db.add(visit)
     db.flush()
     audit(db, me, "visit.created", target=doctor.name, target_type="visit", target_id=visit.id)
@@ -280,6 +287,10 @@ def update_visit(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, v
         visit.detailing = check_detailing(db, body.detailing)
     if "next_objective" in sent:
         visit.next_objective = (body.next_objective or "").strip() or None
+    if "care_group" in sent:
+        visit.care_group = body.care_group
+        if body.care_group == "enrolled" and visit.company.care_group_at is None:
+            visit.company.care_group_at = visit.visited_at
     if visit.outcome != "collected":
         visit.amount_centavos, visit.receipt_no = 0, None
     check_collection(visit.outcome, visit.amount_centavos, visit.receipt_no)
@@ -381,6 +392,49 @@ def last_visits(db: Session, company_ids: list[str]) -> dict[str, datetime]:
     return {company_id: at for company_id, at in rows}
 
 
+# The plan, from the Rx CHC playbook: how many times a month each tier is
+# visited, the zones in the order a day is routed (red mornings, yellow
+# midday, green afternoons), and the share of the list a month must reach.
+TIER_VISITS = {1: 4, 2: 2, 3: 1}
+ZONES = ("red", "yellow", "green")
+COVERAGE_GOAL = 80
+
+Zone = Literal["red", "yellow", "green"]
+
+
+def doctors_in_reach(access: Access, settings: Settings, search: str | None = None):
+    """The doctors on someone's list: the customer type field agents visit
+    (Settings → Terms), or anyone with a balance on file; any customer when no type is set."""
+    with_balance = select(Balance.company_id)
+    visited_type = terms_of(settings.terms)["visited_type"]
+    who = or_(Company.status == visited_type, Company.id.in_(with_balance)) if visited_type else True
+    query = within(select(Company), Company, access).where(who)
+    if search:
+        query = query.where(func.lower(Company.name).contains(search.strip().lower()))
+    return query
+
+
+def visits_in(db: Session, company_ids: list[str], start: datetime, end: datetime) -> dict[str, int]:
+    """How many visits each doctor had between two moments."""
+    if not company_ids:
+        return {}
+    rows = db.execute(
+        select(Visit.company_id, func.count()).where(Visit.company_id.in_(company_ids), Visit.visited_at >= start, Visit.visited_at < end).group_by(Visit.company_id)
+    ).all()
+    return {company_id: n for company_id, n in rows}
+
+
+def plan_out(company: Company, visits: int) -> dict:
+    return {
+        "tier": company.field_tier,
+        "zone": company.field_zone,
+        "zoneSetAt": iso(company.zone_set_at),
+        "careGroupAt": iso(company.care_group_at),
+        "visitsThisMonth": visits,
+        "visitsNeeded": TIER_VISITS.get(company.field_tier) if company.field_tier else None,
+    }
+
+
 @router.get("/field/doctors")
 def list_doctors(
     access: View,
@@ -388,17 +442,26 @@ def list_doctors(
     settings: SettingsDep,
     search: str | None = Query(None, max_length=100),
     owed: bool = False,
+    zone: Literal["red", "yellow", "green", "none"] | None = None,
+    tier: int | None = Query(None, ge=1, le=3),
+    sort: Literal["owed", "plan"] = "owed",
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:
     """Doctors within reach (the Doctor type, or anyone with a balance on file),
-    most owed first."""
-    with_balance = select(Balance.company_id)
-    query = within(select(Company), Company, access).where(or_(Company.status == DOCTOR, Company.id.in_(with_balance)))
-    if search:
-        query = query.where(func.lower(Company.name).contains(search.strip().lower()))
+    most owed first, or by the plan (zone, then tier); each with their tier,
+    zone and visits this month."""
+    query = doctors_in_reach(access, settings, search)
+    if zone == "none":
+        query = query.where(Company.field_zone.is_(None))
+    elif zone:
+        query = query.where(Company.field_zone == zone)
+    if tier:
+        query = query.where(Company.field_tier == tier)
     doctors = db.scalars(query.order_by(Company.name)).unique().all()
     ids = [d.id for d in doctors]
     balances, seen = owed_of(db, ids, settings), last_visits(db, ids)
+    start, end = month_bounds(this_month(settings), settings)
+    month_visits = visits_in(db, ids, start, end)
     rows = []
     for d in doctors:
         b = balances.get(d.id)
@@ -411,9 +474,70 @@ def list_doctors(
             "owner": person_out(d.owner),
             "balance": b,
             "lastVisitAt": iso(seen.get(d.id)),
+            # The clinic's pin, for the visit form's map.
+            "pin": pin_out(d),
+            **plan_out(d, month_visits.get(d.id, 0)),
         })
-    rows.sort(key=lambda r: (-(r["balance"] or {}).get("owedCentavos", 0), r["name"].lower()))
+    if sort == "plan":
+        rank = {z: i for i, z in enumerate(ZONES)}
+        rows.sort(key=lambda r: (rank.get(r["zone"], len(ZONES)), r["tier"] or 4, r["name"].lower()))
+    else:
+        rows.sort(key=lambda r: (-(r["balance"] or {}).get("owedCentavos", 0), r["name"].lower()))
     return {"items": rows[:limit], "total": len(rows), "owedCentavos": sum((r["balance"] or {}).get("owedCentavos", 0) for r in rows)}
+
+
+class PlanIn(Api):
+    tier: int | None = Field(None, ge=1, le=3)
+    zone: Zone | None = None
+
+
+@router.put("/field/doctors/{company_id}/plan")
+def set_plan(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, company_id: str, body: PlanIn) -> dict:
+    """A doctor's tier and zone, set by whoever visits them (or their lead). Either may be cleared (null)."""
+    doctor = db.get(Company, company_id)
+    if doctor is None or not reaches(doctor, access):
+        raise not_found("customer")
+    fields = []
+    if "tier" in body.model_fields_set and body.tier != doctor.field_tier:
+        doctor.field_tier = body.tier
+        fields.append("tier")
+    if "zone" in body.model_fields_set and body.zone != doctor.field_zone:
+        doctor.field_zone = body.zone
+        doctor.zone_set_at = datetime.now(UTC) if body.zone else None
+        fields.append("zone")
+    if fields:
+        audit(db, me, "company.plan_changed", target=doctor.name, target_type="company", target_id=doctor.id, fields=fields)
+        db.commit()
+    start, end = month_bounds(this_month(settings), settings)
+    return plan_out(doctor, visits_in(db, [doctor.id], start, end).get(doctor.id, 0))
+
+
+@router.get("/field/coverage")
+def coverage(access: View, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
+    """How much of the list a month reached: the share of doctors visited at
+    least once (the playbook's gate is 80%), each tier against its visits a
+    month, and how many doctors are in each zone."""
+    month = month_or_now(month, settings)
+    start, end = month_bounds(month, settings)
+    doctors = db.scalars(doctors_in_reach(access, settings)).unique().all()
+    counts = visits_in(db, [d.id for d in doctors], start, end)
+    visited = sum(1 for d in doctors if counts.get(d.id))
+    tiers = []
+    for tier, needed in TIER_VISITS.items():
+        mine = [d for d in doctors if d.field_tier == tier]
+        tiers.append({"tier": tier, "visitsNeeded": needed, "doctors": len(mine), "onPlan": sum(1 for d in mine if counts.get(d.id, 0) >= needed)})
+    zones = {z: sum(1 for d in doctors if d.field_zone == z) for z in ZONES}
+    return {
+        "month": month,
+        "thisMonth": this_month(settings),
+        "doctors": len(doctors),
+        "visited": visited,
+        "coveragePct": round(100 * visited / len(doctors)) if doctors else None,
+        "goalPct": COVERAGE_GOAL,
+        "tiers": tiers,
+        "untiered": sum(1 for d in doctors if d.field_tier is None),
+        "zones": {**zones, "none": len(doctors) - sum(zones.values())},
+    }
 
 
 @router.get("/field/doctors/{company_id}")
@@ -475,15 +599,15 @@ def is_field_person(user: User) -> bool:
     return not user.role.is_system and "visits.create" in granted and "goals.view" not in granted
 
 
-def goal_out(goal: FieldGoal | None) -> dict | None:
-    if goal is None:
-        return None
-    return {
-        "doctorsVisited": goal.doctors_visited,
-        "doctorsUpdated": goal.doctors_updated,
-        "amountCentavos": goal.amount_centavos,
-        "collectionVisits": goal.collection_visits,
-    }
+# The four field goals are built-in KPIs (Settings → KPIs), by their codes.
+FIELD_KPIS = {"doctorsVisited": "doctors_visited", "doctorsUpdated": "doctors_updated", "amountCentavos": "amount_collected", "collectionVisits": "collection_visits"}
+
+
+def field_goals(db: Session, month: str) -> dict[str, dict]:
+    """Each person with a field goal this month: all four, a missing one as 0."""
+    per_key = {key: person_targets(db, by_code(db, code), [month]) for key, code in FIELD_KPIS.items()}
+    people = {u for targets in per_key.values() for u in targets}
+    return {u: {key: per_key[key].get(u, 0) for key in FIELD_KPIS} for u in people}
 
 
 def actuals(db: Session, user_ids: list[str], start: datetime, end: datetime) -> dict[str, dict]:
@@ -517,14 +641,14 @@ def actuals(db: Session, user_ids: list[str], start: datetime, end: datetime) ->
 def performance(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
     start, end = month_bounds(month, settings)
-    goals = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
+    goals = field_goals(db, month)
     if access.can("goals.view"):
         people = [u for u in reachable_people(db, access) if is_field_person(u) or u.id in goals]
     else:
         people = [me]
     done = actuals(db, [p.id for p in people], start, end)
     rows = [
-        {"person": person_out(p), "team": team_out(p.team), "goal": goal_out(goals.get(p.id)), "actual": done[p.id]}
+        {"person": person_out(p), "team": team_out(p.team), "goal": goals.get(p.id), "actual": done[p.id]}
         for p in sorted(people, key=lambda u: u.full_name.lower())
     ]
     totals = {k: sum(r["actual"][k] for r in rows) for k in ("doctorsVisited", "doctorsUpdated", "amountCentavos", "collectionVisits")}
@@ -548,26 +672,28 @@ def read_goals(access: Manage, db: DB, settings: SettingsDep, month: str | None 
     """Everyone who can be given goals (field people, and anyone already given
     some that month), with the month's goals."""
     month = month_or_now(month, settings)
-    goals = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
-    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if is_field_person(u) or u.id in goals]
+    goals = field_goals(db, month)
+    # A manager's: their own departments' people (access.runs).
+    people = [u for u in db.scalars(select(User).where(User.is_active).order_by(User.full_name)) if (is_field_person(u) or u.id in goals) and access.runs(u.team_id)]
     return {
         "month": month,
-        "people": [{"person": person_out(p), "team": team_out(p.team), "goal": goal_out(goals.get(p.id))} for p in people],
+        "people": [{"person": person_out(p), "team": team_out(p.team), "goal": goals.get(p.id)} for p in people],
     }
 
 
 @router.put("/field/goals")
 def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: GoalsIn, month: str | None = Query(None, max_length=7)) -> dict:
     month = month_or_now(month, settings)
-    users = set(db.scalars(select(User.id).where(User.id.in_([g.user_id for g in body.goals]))))
+    users = {u.id for u in db.scalars(select(User).where(User.id.in_([g.user_id for g in body.goals]))) if access.runs(u.team_id)}
     if missing := [g.user_id for g in body.goals if g.user_id not in users]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such person: {missing[0]}.")
-    existing = {g.user_id: g for g in db.scalars(select(FieldGoal).where(FieldGoal.month == month))}
+    kpis = {key: by_code(db, code) for key, code in FIELD_KPIS.items()}
     for g in body.goals:
-        goal = existing.get(g.user_id) or FieldGoal(user_id=g.user_id, month=month)
-        goal.doctors_visited, goal.doctors_updated = g.doctors_visited, g.doctors_updated
-        goal.amount_centavos, goal.collection_visits = g.amount_centavos, g.collection_visits
-        db.add(goal)
+        given = {"doctorsVisited": g.doctors_visited, "doctorsUpdated": g.doctors_updated, "amountCentavos": g.amount_centavos, "collectionVisits": g.collection_visits}
+        for key, kpi in kpis.items():
+            if kpi is not None:
+                # 0 here has always meant "no goal".
+                set_person_target(db, kpi, month, g.user_id, given[key] or None)
     audit(db, me, "goals.updated", target=f"Goals for {month} ({len(body.goals)} people)", target_type="goals")
     db.commit()
     return read_goals(access, db, settings, month)
@@ -684,7 +810,12 @@ def read_route(
     start, end = start_local.astimezone(UTC), (start_local + timedelta(days=1)).astimezone(UTC)
     visits = db.scalars(select(Visit).where(Visit.owner_id == user.id, Visit.visited_at >= start, Visit.visited_at < end).order_by(Visit.visited_at)).unique().all()
     summary = db.scalar(select(RouteDay).where(RouteDay.user_id == user.id, RouteDay.day == day))
+    # The day's plan (app/routers/field_plan.py) beside what happened: each planned doctor, visited or not.
+    seen = {v.company_id for v in visits}
+    order = {"morning": 0, "midday": 1, "afternoon": 2}
+    planned = sorted(db.scalars(select(PlanStop).where(PlanStop.user_id == user.id, PlanStop.day == day)).unique().all(), key=lambda p: order.get(p.slot, 3))
     return {
+        "planned": [{"id": p.id, "slot": p.slot, "doctor": {"id": p.company.id, "name": p.company.name, "zone": p.company.field_zone, "tier": p.company.field_tier}, "visited": p.company_id in seen} for p in planned],
         "person": person_out(user),
         "day": day,
         "today": local_day(datetime.now(UTC), settings),

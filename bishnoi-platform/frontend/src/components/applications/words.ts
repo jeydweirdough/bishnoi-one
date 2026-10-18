@@ -5,9 +5,9 @@ import { ago } from "@/src/lib/words";
 
 /** "Answered in 120 ms · 3 min ago", or what went wrong and when. */
 export function checkLine(check: Check | null | undefined, monitored: boolean): string {
-  if (!monitored) return "No health address, so the platform can't ask it.";
-  if (!check) return "Not asked yet.";
-  const said = check.detail ?? (check.ms != null ? `Answered in ${check.ms} ms` : "Answered");
+  if (!monitored) return "No health check URL, so it is not monitored.";
+  if (!check) return "Not checked yet.";
+  const said = check.detail ?? (check.ms != null ? `Responded in ${check.ms} ms` : "Responded");
   return `${said.replace(/\.$/, "")} · ${ago(check.checkedAt)}`;
 }
 

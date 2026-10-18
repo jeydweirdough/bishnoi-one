@@ -50,3 +50,66 @@ From the "100 GitHub Repos for Lead Generation" list. Small libraries go in the 
 | OpenRefine | For staff, outside the app: cleaning a spreadsheet before importing it. |
 
 Not used: Google Maps, LinkedIn and review scrapers, OSINT tools, and anything for getting around site blocking (against the sites' terms, and building profiles of doctors without consent runs against the Data Privacy Act); WhatsApp Web automation (against WhatsApp's terms; use the official Business API); whole CRMs and ERPs under GPL or AGPL (looking at them for ideas is fine, copying their code into a licensed product isn't); self-hosted mail servers.
+
+## KPI management, decided on 2026-10-02
+
+The fixed field goals (four measures) and revenue targets became **KPIs an administrator defines** (Settings → KPIs), with monthly targets per person and per team and a scorecard. A KPI counts one of the measures the CRM knows (app/kpis.py), perhaps narrowed, or is entered by hand; a formula language was not built (safer, and enough for now). The five old goals are built-in KPIs that keep what they measure; their saved targets moved over (migration 0031).
+
+New goal, same day: **lead sources and integrations** (checklist g-lead-sources, g-integrations): leads from LinkedIn, Facebook and Google lead forms and AI research through official APIs only, and webhooks, a public API, an MCP server and connectors, with every app and AI call logged. Not started; the first sources are the user's to pick.
+
+## Ant Design for the CRM's screens, decided on 2026-10-02
+
+The CRM's screens use **Ant Design 6** (antd), set in **Poppins** (the font it already had). The theme is set once (`src/platform/app/ant-theme.tsx`: Ant's blue `#1677ff`, radius 6, the registry for server rendering). The shared pieces became Ant's: buttons and link buttons (`ui/ant-button.tsx`), text inputs, text areas and table-cell inputs, choices (radio buttons), form errors (Alert), view switches (Segmented, still links), confirmations (Modal). The design tokens in `globals.css` carry Ant's palette, so what's drawn with Tailwind matches; every table gets Ant's header row. Kept native, drawn like Ant: dropdowns (their change events differ from antd's Select, used in dozens of forms) and toasts (sonner). Other apps keep their look until moved the same way.
+
+## HubSpot as a benchmark, decided on 2026-10-03
+
+**HubSpot** joins the benchmarks (best-of-breed.md), for how a CRM links its
+records and lays out a record's page. Adopted from it: **associations with
+labels** between any records, and one activity on several records (A10, C6,
+P13); the **record page in three columns** (I1, P14); and **emails from each
+rep's own connected mailbox** (C7): Gmail, Outlook, Zoho Mail, or any provider
+by SMTP, set up in Settings → Connections. Order: associations, the record
+page, email connections, then Veeva's approved emails. On the Desktop feature
+benchmark page HubSpot has its own column, from our own review (it isn't in
+the brief's lists).
+
+## Several companies on one deployment, decided on 2026-10-05
+
+No software license: a **company is registered on Bishnoi One Platform**
+first, active and given the app, and only then can its people use it. One CRM
+and one Inventory serve **five to ten companies**, and **each company has a
+database of its own** (`neondb_getmeds`, `crm-getmeds.db`), rather than a
+company column on every row or a schema each: nothing one company keeps can
+reach another's screens, a company's data can be backed up or moved on its
+own, and it works the same behind Neon's connection pooler. The sign-in page
+asks for the company; a session belongs to one company. **A person can work
+for two companies**: one Platform password, a standing (title, apps, role) at
+each, and **Switch company** in the apps' menu. Today's data became GetMeds's.
+
+## Promotional materials reviewed before use, decided on 2026-10-15
+
+The ICP decision (2026-09-25) left Veeva's **MLR review** out. On 2026-10-15
+the user asked for its core: promotional materials (leaflets, posters,
+giveaways) are **approved by a pharmacist before they're produced**, and **a
+department's manager approves each distribution**. Built across three apps,
+linked through the Platform (Connections: Admin → Pharmacy, Admin → CRM):
+the marketing assistant designs in **Admin** (role Marketing Assistant), the
+pharmacist approves, returns with comments, or rejects each version in
+**Pharmacy**, the executive office produces them into stock in Admin, and the
+team's manager (or an administrator) approves each request in the **CRM**.
+Still out: legal and medical reviewers beside the pharmacist, e-signatures,
+and expiry dates on approved materials.
+
+## The page first, its records after, decided on 2026-10-16
+
+The loading screens of 2026-10-15 drew a grey copy of the whole page (title,
+toolbar, cards) while it loaded. The user set the rule instead: **render the
+interface before the data**. The sidebar, top bar, the page's real title, its
+search and filters and its cards with their headings show at once; only the
+records arrive afterward. A server screen awaits only who is signed in (for
+permissions) and the address, starts its data request without waiting, and
+wraps what depends on it in `Later` (`src/platform/ui/later.tsx`) with an
+in-card placeholder from `skeleton.tsx` (`ListRows`, `Figures`, `Lines`,
+`Pairs`, `Chart`; `FigureCardLoading` keeps a figure card's label). Each
+`loading.tsx` passes the page's real `title`. A record's name is data, so a
+record page keeps its loading screen until the record arrives.

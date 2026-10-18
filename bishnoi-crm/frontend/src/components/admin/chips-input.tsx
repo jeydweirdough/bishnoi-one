@@ -1,17 +1,18 @@
 "use client";
 
+import { IconButton } from "@/src/platform/ui/button";
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 
 /** One chip: a word in a small square-cornered box, with × when it can be removed. */
 export function Chip({ children, onRemove, removeLabel }: { children: string; onRemove?: () => void; removeLabel?: string }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1 rounded-[3px] border border-rule-strong bg-sheet pr-1 pl-2.5 text-sm text-ink">
+    <span className="inline-flex h-7 items-center gap-1 rounded-md border border-rule-strong bg-sheet pr-1 pl-2.5 text-sm text-ink">
       {children}
       {onRemove ? (
-        <button type="button" onClick={onRemove} className="rounded-[2px] p-1 text-ink-3 hover:bg-bench hover:text-danger" aria-label={removeLabel ?? `Remove ${children}`}>
+        <IconButton onClick={onRemove} tone="danger" size="sm" label={removeLabel ?? `Remove ${children}`}>
           <X className="size-3" aria-hidden />
-        </button>
+        </IconButton>
       ) : (
         <span className="w-2" />
       )}
@@ -86,7 +87,7 @@ export function ChipsInput({
             type="button"
             onClick={add}
             disabled={!text.trim()}
-            className="inline-flex h-7 items-center gap-1 rounded-[3px] border border-dashed border-rule-strong px-2.5 text-meta text-ink-2 hover:border-hema hover:text-hema disabled:opacity-40"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-rule-strong px-2.5 text-meta text-ink-2 hover:border-hema hover:text-ink disabled:opacity-40"
           >
             <Plus className="size-3" aria-hidden />
             Add

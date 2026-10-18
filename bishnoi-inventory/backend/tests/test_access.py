@@ -3,6 +3,7 @@
 from sqlalchemy import text
 
 from app.db import make_engine
+from app.tenants import database_url
 from app.main import create_app
 from app.models import User
 from tests.conftest import Api, receive, settings_for
@@ -66,7 +67,8 @@ def test_nobody_can_lock_everyone_out(client, people, ana):
 def test_accounts_from_before_migrations_carry_over(tmp_path):
     """The first inventory had plain users/sessions tables; its people keep their accounts."""
     settings = settings_for(tmp_path)
-    engine = make_engine(settings.database_url)
+    # The default company's database, beside DATABASE_URL (app/tenants.py).
+    engine = make_engine(database_url(settings.database_url, "getmeds"))
     with engine.begin() as c:
         c.execute(text("CREATE TABLE users (id VARCHAR(36) PRIMARY KEY, email VARCHAR(254), full_name VARCHAR(120), password_hash VARCHAR(255), role VARCHAR(16), is_active BOOLEAN, created_at DATETIME, password_changed_at DATETIME)"))
         c.execute(text("CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, token_hash VARCHAR(64), user_id VARCHAR(36), created_at DATETIME, expires_at DATETIME, revoked_at DATETIME)"))
@@ -80,4 +82,4 @@ def test_accounts_from_before_migrations_carry_over(tmp_path):
     assert people == {"old@example.com": "Administrator", "staff@example.com": "Warehouse"}
     assert "users" not in tables and "nbin_users" in tables
     assert all(t.startswith("nbin_") for t in tables)
-    app.state.sessions.kw["bind"].dispose()
+    app.state.tenants.close()

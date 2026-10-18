@@ -10,7 +10,7 @@ from fastapi import APIRouter
 from sqlalchemy import func, select
 
 from app.access import CurrentAccess
-from app.deps import DB
+from app.deps import DB, SettingsDep
 from app.models import Medicine
 from app.routers.medicines import missing_a_price
 
@@ -25,3 +25,12 @@ def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
     if access.can("medicines.edit"):
         counts["medicinePrices"] = db.scalar(select(func.count()).select_from(Medicine).where(missing_a_price())) or 0
     return {k: v for k, v in counts.items() if v}
+
+
+@router.get("/frame")
+def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
+    """What every signed-in screen needs around its own content, in one request:
+    the same answers as /auth/me and /unset."""
+    from app.identity import me_out
+
+    return {"me": me_out(access.user, settings), "unset": unset(access, db)}

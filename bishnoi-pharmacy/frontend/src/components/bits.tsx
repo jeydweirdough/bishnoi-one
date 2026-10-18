@@ -6,7 +6,7 @@ import { Input } from "@/src/platform/ui/field";
 import { Flag } from "@/src/platform/ui/marks";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { BATCH_STATUSES, MEDICINE_STATUSES, PRESCRIPTION_STATUSES, RX_CLASSES } from "../lib/words";
-import type { BatchStatus, DispenseState, MedicineStatus, PrescriptionStatus, RxClass, RxSource } from "../lib/types";
+import type { BatchStatus, DispenseState, MaterialReviewStatus, MedicineStatus, PrescriptionStatus, RxClass, RxSource } from "../lib/types";
 
 // The small pieces every Pharmacy screen shares. Status is printed in ink,
 // never coloured: solid for the settled state, dashed for waiting, outlined
@@ -27,6 +27,20 @@ export function RxStatusMark({ status }: { status: PrescriptionStatus }) {
   return <Stamp style={dashed}>{PRESCRIPTION_STATUSES[status]}</Stamp>;
 }
 
+export const MATERIAL_REVIEW_STATUSES: Record<MaterialReviewStatus, string> = {
+  waiting: "For review",
+  approved: "Approved",
+  returned: "Returned for changes",
+  rejected: "Rejected",
+};
+
+export function MaterialReviewMark({ status }: { status: MaterialReviewStatus }) {
+  if (status === "returned") return <Flag letter="?">{MATERIAL_REVIEW_STATUSES[status]}</Flag>;
+  if (status === "approved") return <Stamp style={solid}>{MATERIAL_REVIEW_STATUSES[status]}</Stamp>;
+  if (status === "rejected") return <Stamp style={outlined}>{MATERIAL_REVIEW_STATUSES[status]}</Stamp>;
+  return <Stamp style={dashed}>{MATERIAL_REVIEW_STATUSES[status]}</Stamp>;
+}
+
 export function DispenseMark({ state }: { state: DispenseState }) {
   if (state === "full") return <Stamp style={solid}>Dispensed</Stamp>;
   if (state === "partial") return <Stamp style={dashed}>Partly dispensed</Stamp>;
@@ -35,7 +49,7 @@ export function DispenseMark({ state }: { state: DispenseState }) {
 
 /** The Bishnoi One app that sent a prescription in for checking, by the name people know it by. */
 export function sourceName(app: string): string {
-  return ({ crm: "Bishnoi One CRM", orders: "Bishnoi One Order" } as Record<string, string>)[app] ?? app.toUpperCase();
+  return ({ crm: "Bishnoi One CRM", orders: "Bishnoi One Order", exec: "Bishnoi One Admin" } as Record<string, string>)[app] ?? app.toUpperCase();
 }
 
 /** Where a sent-in prescription came from: "From Bishnoi One CRM · Q-2026-00042 · sent by Rico Padilla". */

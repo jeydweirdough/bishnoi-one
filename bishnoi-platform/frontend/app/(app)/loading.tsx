@@ -1,7 +1,7 @@
-// Shown in the page's place the moment a link is clicked, while the next page
-// loads. The sidebar and everything around the page stay as they are.
-import { PageSkeleton } from "@/src/platform/ui/skeleton";
+// Shown in Home's place the moment a link to it is clicked: the shape of the
+// page it opens, so the data fills in where the eye already is.
+import { DashboardSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <PageSkeleton />;
+  return <DashboardSkeleton title="Dashboard" />;
 }

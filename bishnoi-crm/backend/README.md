@@ -141,7 +141,7 @@ apart from any other app's.
    | Name | Value |
    |---|---|
    | `ENVIRONMENT` | `production` (hides `/docs`) |
-   | `ALLOWED_HOSTS` | the API's address, as JSON: `["nabhi-crm-backend.vercel.app"]` |
+   | `ALLOWED_HOSTS` | the API's address, as JSON: `["bishnoi-one-crm-backend.vercel.app"]` |
 
 4. **Redeploy.** The first request builds the tables (migrations run at start,
    one copy at a time).

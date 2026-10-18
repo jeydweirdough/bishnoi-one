@@ -67,6 +67,26 @@ def test_products_on_a_deal_are_priced_by_the_price_rules(client, crew, ids):
     assert r.status_code == 422 and "priceType" in errors(r)
 
 
+def test_a_deal_keeps_the_promo_its_products_are_sold_under(client, crew, ids):
+    acme = company(client, crew["ria"])
+    promo = ids["Flu season 10% off"]
+    d = deal(client, crew["ria"], acme, priceType="PATIENT", lines=[line(ids["CTZ-10"], 2, promoId=promo), line(ids["AMX-500"], 1)])
+    first, second = d["lines"]
+    assert (first["promoId"], first["promoName"]) == (promo, "Flu season 10% off")
+    assert (first["grossCentavos"], first["promoDiscountCentavos"], first["totalCentavos"]) == (196000, 19600, 176400)
+    assert second["promoId"] is None and second["promoDiscountCentavos"] == 0
+    assert d["valueCentavos"] == 176400 + 145000  # after the promo
+    # A promo that isn't for the product is refused, as on a quote.
+    r = client.patch(f"/deals/{d['id']}", json={"lines": [line(ids["ALP-5"], 1, promoId=promo)]}, headers=crew["ria"])
+    assert r.status_code == 422 and "lines.0.promoId" in errors(r)
+
+
+def test_the_price_list_says_when_each_promo_ends(client, crew, ids):
+    acme = company(client, crew["ria"])
+    offered = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()["promos"]
+    assert offered and all("endsOn" in p for p in offered)
+
+
 def test_losing_needs_a_reason_from_the_list(client, ben):
     d = deal(client, ben, company(client, ben))
     r = client.post(f"/deals/{d['id']}/lose", json={"reason": "Bad vibes"}, headers=ben)
@@ -216,3 +236,77 @@ def test_a_customer_has_a_lead_source_from_the_deals_list_and_deals_start_with_i
     body = {"sections": [{"id": s["id"], "title": s["title"], "columns": s["columns"], "fields": [{"id": f["id"], "label": f["label"], "type": f["type"], "required": f["required"], "hidden": f["hidden"], "inList": f["inList"], "options": f["options"], "helpText": f["helpText"], "placeholder": f["placeholder"]} for f in s["fields"]]} for s in editor["sections"]]}
     assert client.put("/admin/forms/company", json=body, headers=ana).status_code == 200, "the form saves"
     assert client.patch(f"/companies/{acme['id']}", json={"leadSource": "Trade show"}, headers=ria).json()["leadSource"] == "Trade show"
+
+
+# --- the deals page: priority, the table's columns, and the summary charts ---
+
+
+def test_priority_sorting_and_the_next_step_with_the_customer(client, crew):
+    from tests.test_customers import activity
+
+    ria = crew["ria"]
+    acme, beta = company(client, ria, "Acme"), company(client, ria, "Beta")
+    low = deal(client, ria, acme, name="Small", priority="low", valueCentavos=100)
+    urgent = deal(client, ria, beta, name="Big", priority="urgent", valueCentavos=900)
+    plain = deal(client, ria, acme, name="Plain", valueCentavos=500)
+    assert (urgent["priority"], plain["priority"], urgent["createdBy"]["name"]) == ("urgent", None, "Ria")
+    assert client.post("/deals", json={"name": "x", "companyId": acme["id"], "expectedCloseOn": "2026-12-01", "priority": "asap"}, headers=ria).status_code == 422
+    names = lambda q: [d["name"] for d in client.get(f"/deals?{q}", headers=ria).json()["items"]]  # noqa: E731
+    assert names("sort=priority") == ["Big", "Small", "Plain"]
+    assert names("sort=value&desc=true") == ["Big", "Plain", "Small"]
+    assert names("priority=none") == ["Plain"] and names("priority=urgent") == ["Big"]
+    # The next step: the soonest meeting or task still to do with that customer.
+    activity(client, ria, kind="task", subject="Send the price list", companyId=acme["id"], at="2030-01-05T02:00:00Z")
+    activity(client, ria, kind="meeting", subject="Visit", companyId=acme["id"], at="2030-01-02T02:00:00Z")
+    rows = {d["name"]: d for d in client.get("/deals", headers=ria).json()["items"]}
+    assert rows["Small"]["nextStep"]["subject"] == "Visit" and rows["Big"]["nextStep"] is None
+    assert client.patch(f"/deals/{low['id']}", json={"priority": "high"}, headers=ria).json()["priority"] == "high"
+
+
+def test_the_summary_for_the_charts(client, crew):
+    ria = crew["ria"]
+    acme = company(client, ria, "Acme")
+    deal(client, ria, acme, name="A", priority="urgent", valueCentavos=1000, probability=90)
+    deal(client, ria, acme, name="B", priority="urgent", valueCentavos=2000, probability=60)
+    c = deal(client, ria, acme, name="C", valueCentavos=4000, probability=10)
+    s = client.get("/deals-summary?owner=me", headers=ria).json()
+    assert (s["count"], s["valueCentavos"], s["weightedCentavos"]) == (3, 7000, 900 + 1200 + 400)
+    assert [b["count"] for b in s["byProbability"]] == [1, 1, 1]
+    assert {p["priority"]: p["count"] for p in s["byPriority"]} == {"urgent": 2, "high": 0, "normal": 0, "low": 0, None: 1}
+    assert sum(st["count"] for st in s["byStage"]) == 3
+    # Closed deals: won and lost.
+    client.post(f"/deals/{c['id']}/lose", json={"reason": "Price"}, headers=ria)
+    closed = client.get("/deals-summary?state=closed&owner=me", headers=ria).json()
+    assert (closed["count"], closed["wonCount"], closed["lostCount"]) == (1, 0, 1)
+    assert [d["name"] for d in client.get("/deals?state=closed", headers=ria).json()["items"]] == ["C"]
+
+
+
+def test_a_deal_fills_in_what_the_rep_doesnt_decide(client, crew):
+    """Only the customer is needed: the name, close date, probability, forecast
+    and lead source come from the customer, the stage and today."""
+    from tests.test_customers import company
+
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    r = client.post("/deals", json={"companyId": acme["id"]}, headers=crew["ria"])
+    assert r.status_code == 201, r.text
+    deal = r.json()
+    assert deal["name"].startswith("Acme Pharmacy · ")
+    assert deal["expectedCloseOn"] > deal.get("createdAt", "")[:10]
+    stage = next(x for x in client.get("/deal-stages", headers=crew["ria"]).json() if x["code"] == deal["stage"]["code"])
+    assert deal["probability"] == stage["probability"]  # the stage's own
+
+
+
+def test_how_likely_is_worked_out_from_the_record(client, crew, monkeypatch):
+    """The stage's own with nothing to go by; higher for a rep who wins more than everyone."""
+    from app import likely as how
+
+    stages = client.get("/deal-stages", headers=crew["ria"]).json()
+    first = next(s for s in stages if s.get("outcome", "open") == "open")
+    r = client.get("/deals/likely", params={"stage": first["code"]}, headers=crew["ria"]).json()
+    assert r["probability"] == first["probability"] and "not enough" in r["why"]
+    # Ria wins 8 of 10 (80%); everyone 10 of 20 (50%): 1.6 times the stage's own, within 1 to 99.
+    monkeypatch.setattr(how, "_record", lambda db, owner_id, on: (8, 10) if owner_id else (10, 20))
+    r = client.get("/deals/likely", params={"stage": first["code"]}, headers=crew["ria"]).json()
+    assert r["probability"] == max(1, min(99, round(first["probability"] * 1.6))) and "8 of 10" in r["why"]

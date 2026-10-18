@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: import.meta.dirname,
   poweredByHeader: false,
+  // forbidden(): a page the person's role doesn't reach shows app/forbidden.tsx.
+  experimental: { authInterrupts: true },
   // Which app this is, for the sidebar. Built into the screens, so it is set
   // here and not left to each machine's .env.local or the host's settings.
   env: {

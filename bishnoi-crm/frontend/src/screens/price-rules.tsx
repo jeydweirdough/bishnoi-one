@@ -28,7 +28,7 @@ export default async function PriceRulesPage() {
       <PageHeader title="Settings">How every quote line is priced, in order. New quotes follow it; quotes already made keep their prices.</PageHeader>
       <div className="space-y-6">
         <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="pricing">How a line is priced</SectionTitle>
+          <SectionTitle icon="pricing">Line pricing order</SectionTitle>
           <div className="mt-3">
             <ProcedureEditor key={JSON.stringify(rules.procedure) + rules.pricesIncludeTax} rules={rules} />
           </div>

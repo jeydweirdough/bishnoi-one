@@ -12,14 +12,14 @@ export const KINDS: { kind: CrmKind; label: string; icon: IconName; planned: boo
 export const kindOf = (kind: CrmKind) => KINDS.find((k) => k.kind === kind) ?? KINDS[0];
 
 export const TYPE_COLORS: Record<CustomerTypeColor, { label: string; style: string }> = {
-  gray: { label: "Gray", style: "border-rule-strong text-ink-2" },
-  brand: { label: "Indigo", style: "border-hema bg-hema-tint text-hema" },
-  green: { label: "Green", style: "border-filed text-filed" },
-  blue: { label: "Blue", style: "border-sky-700 text-sky-700" },
-  amber: { label: "Amber", style: "border-amber-600 text-amber-700" },
-  red: { label: "Red", style: "border-danger text-danger" },
-  purple: { label: "Purple", style: "border-purple-700 text-purple-700" },
-  muted: { label: "Faded", style: "border-rule text-ink-3" },
+  gray: { label: "Gray", style: "border-transparent bg-[#f0f0ee] text-ink-2" },
+  brand: { label: "Ink", style: "border-ink bg-sheet text-ink" },
+  green: { label: "Green", style: "border-transparent bg-[#e6f2e1] text-[#3f6f35]" },
+  blue: { label: "Blue", style: "border-transparent bg-[#e7eef8] text-[#1f4f8a]" },
+  amber: { label: "Amber", style: "border-transparent bg-[#fbf0d9] text-[#8a5a00]" },
+  red: { label: "Red", style: "border-transparent bg-danger-tint text-danger" },
+  purple: { label: "Purple", style: "border-transparent bg-[#f1eaf8] text-[#5b3a8a]" },
+  muted: { label: "Faded", style: "border-dashed border-rule-strong text-ink-3" },
 };
 
 /** The customer types to pick from: those switched on, plus the one a company already has. */
@@ -28,9 +28,11 @@ export const typeOptions = (types: CustomerType[], current?: string) =>
 
 export function StatusTag({ status, types }: { status: CompanyStatus; types: CustomerType[] }) {
   const type = types.find((t) => t.code === status);
+  const name = type?.name ?? status;
+  // Shrinks to its column and ends in "…" when the name is too long; the full name shows on hover.
   return (
-    <span className={`inline-flex h-5 items-center rounded-[2px] border px-1.5 text-stamp uppercase ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
-      {type?.name ?? status}
+    <span title={name} className={`inline-flex h-6 max-w-full items-center rounded-md border px-2.5 text-meta font-medium whitespace-nowrap ${TYPE_COLORS[type?.color ?? "gray"].style}`}>
+      <span className="truncate">{name}</span>
     </span>
   );
 }

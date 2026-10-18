@@ -45,9 +45,9 @@ export function Bars({ rows, unit }: { rows: Bar[]; unit?: string }) {
             </div>
             {/* Hidden from screen readers on purpose: the number above it is the
                 same fact in words, and a bar read aloud is noise. */}
-            <div aria-hidden className="mt-1 h-1.5 overflow-hidden rounded-full bg-rule">
+            <div aria-hidden className="mt-1 h-1.5 overflow-hidden rounded-full bg-mint-2">
               <div
-                className={`h-full rounded-full ${flagged ? "bg-eosin" : "bg-hema"}`}
+                className={`h-full rounded-full ${flagged ? "bg-eosin" : "bg-sage-deep"}`}
                 style={{ width: `${(share * 100).toFixed(1)}%` }}
               />
             </div>

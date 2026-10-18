@@ -24,14 +24,20 @@ There is no sign-up page. Accounts are made from the command line:
 
 | Command | Does |
 |---|---|
-| `uv run python -m app.tools.users add --email … --name "…" [--admin]` | Makes an account; asks for its password |
+| `uv run python -m app.tools.users add --email … --name "…" [--role "…" \| --admin]` | Makes an account (Executive Assistant unless told otherwise); asks for its password |
 | `uv run python -m app.tools.users list` | Lists accounts |
-| `uv run python -m app.tools.users demo` | Makes this app's demo accounts, password `demo1234` (development only; listed in `app/demo.py`) |
+| `uv run python -m app.tools.users roles` | Lists roles and how many people have each |
+| `uv run python -m app.tools.users role --email … --role "…"` | Changes someone's role (never the last administrator's) |
+| `uv run python -m app.tools.users demo` | Makes this app's demo accounts, one per role, password `demo1234`, and seeds sample records (development only; listed in `app/demo.py`) |
 | `uv run python -m app.tools.users password --email …` | Sets a new password; ends that person's sessions |
 | `uv run python -m app.tools.users disable --email …` | Switches the account off; ends its sessions |
 | `uv run python -m app.tools.users enable --email …` | Switches it back on |
 
-`--admin` accounts can run this app's settings; the rest just use it.
+The roles start as Administrator (everything, can't be changed), Executive
+Assistant, Compliance Officer, Auditor (read-only) and Marketing Assistant
+(promotional materials only). What each may do is in
+`app/permissions.py`; administrators can change that from the app. `--admin`
+is short for `--role Administrator`.
 
 ## Sign-in endpoints
 
@@ -45,6 +51,22 @@ There is no sign-up page. Accounts are made from the command line:
 Send the token as `Authorization: Bearer <token>`. The database keeps only a
 hash of each token. Passwords are hashed with scrypt. Five wrong passwords for
 one email make it wait 15 minutes (`LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`).
+
+## Promotional materials
+
+`app/routers/materials.py`. The marketing assistant adds a material (type,
+product, quantity needed, size and specifications, date needed, budget) and
+uploads its design (PDF or picture, up to 3 MB, kept in the database); **Submit for
+review** sends it to Pharmacy, where the pharmacist approves it, returns it with
+comments (a new version is uploaded and submitted again) or rejects it. The
+Executive Assistant (`materials.produce`) orders production and marks it
+received into stock, with a photo of the delivery as proof. **Request distribution** asks the CRM: the team's manager
+approves or rejects it there, and Admin records it as distributed, with a photo of the hand-over or the
+signed receipt as proof. Admin asks
+Pharmacy and the CRM for their answer when someone opens the material
+(`app/linked.py`). Both links are made on the Platform's Connections page
+(Admin → Pharmacy, Admin → CRM); without them the screens say Admin isn't
+connected yet.
 
 ## Settings (`.env`)
 

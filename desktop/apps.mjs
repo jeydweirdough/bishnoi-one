@@ -23,6 +23,14 @@ const KNOWN = {
   "bishnoi-platform": { name: "Bishnoi One Platform", mark: "P", color: "#414d60" },
 };
 
+// The app's API port, from its backend/main.py (--port's default), as scripts/run-app.mjs reads it.
+function apiPort(folder) {
+  const file = join(ROOT, folder, "backend", "main.py");
+  if (!existsSync(file)) return null;
+  const found = readFileSync(file, "utf8").match(/"--port",[^)]*default=(\d+)/)?.[1];
+  return found ? Number(found) : null;
+}
+
 function port(folder) {
   const file = join(ROOT, folder, "frontend", "package.json");
   if (!existsSync(file)) return null;
@@ -32,7 +40,7 @@ function port(folder) {
 
 export const APPS = Object.fromEntries(
   Object.entries(KNOWN)
-    .map(([folder, app]) => [folder, { ...app, port: port(folder) }])
+    .map(([folder, app]) => [folder, { ...app, port: port(folder), apiPort: apiPort(folder) }])
     .filter(([, app]) => app.port),
 );
 

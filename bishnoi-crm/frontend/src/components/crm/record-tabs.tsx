@@ -10,7 +10,7 @@ export function RecordTabs({ base, current, tabs }: { base: string; current: str
           href={t.key === tabs[0].key ? base : `${base}?tab=${t.key}`}
           scroll={false}
           aria-current={t.key === current ? "page" : undefined}
-          className={`-mb-px border-b-2 pt-3 pb-2 text-sm ${t.key === current ? "border-hema font-semibold text-hema" : "border-transparent text-ink-2 hover:text-ink"}`}
+          className={`-mb-px border-b-2 pt-3 pb-2 text-sm ${t.key === current ? "border-hema font-semibold text-ink" : "border-transparent text-ink-2 hover:text-ink"}`}
         >
           {t.label}
           {t.count ? <span className="ml-1 text-meta font-normal text-ink-3">{t.count}</span> : null}

@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
+import { Button, IconButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
@@ -135,12 +135,12 @@ function StageRow({
     <li className={`flex flex-wrap items-center gap-3 px-5 py-3 ${stage.isActive ? "" : "bg-bench/50"}`}>
       {isOpen && (
         <span className="flex flex-col">
-          <button type="button" disabled={first || pending} onClick={() => onMove(-1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${stage.name} up`}>
+          <IconButton disabled={first || pending} onClick={() => onMove(-1)} size="sm" label={`Move ${stage.name} up`}>
             <ArrowUp className="size-3.5" aria-hidden />
-          </button>
-          <button type="button" disabled={last || pending} onClick={() => onMove(1)} className="text-ink-3 hover:text-hema disabled:opacity-30" aria-label={`Move ${stage.name} down`}>
+          </IconButton>
+          <IconButton disabled={last || pending} onClick={() => onMove(1)} size="sm" label={`Move ${stage.name} down`}>
             <ArrowDown className="size-3.5" aria-hidden />
-          </button>
+          </IconButton>
         </span>
       )}
       <input
@@ -167,7 +167,7 @@ function StageRow({
             />
             %
           </label>
-          <select
+          <Select
             aria-label={`Forecast of ${stage.name}`}
             value={stage.forecastCategory}
             onChange={(e) => onSave({ forecastCategory: e.target.value as OpenCategory }, "Forecast changed")}
@@ -178,7 +178,7 @@ function StageRow({
                 {c.label}
               </option>
             ))}
-          </select>
+          </Select>
         </>
       ) : (
         <span className="text-meta text-ink-3">
@@ -187,8 +187,8 @@ function StageRow({
       )}
       <span className="w-20 text-meta text-ink-3">{stage.deals === 1 ? "1 deal" : `${stage.deals} deals`}</span>
       {isOpen && (
-        <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !stage.isActive }, stage.isActive ? `${stage.name} switched off` : `${stage.name} switched on`)}>
-          {stage.isActive ? "Switch off" : "Switch on"}
+        <Button size="sm" variant="quiet" disabled={pending} onClick={() => onSave({ isActive: !stage.isActive }, stage.isActive ? `${stage.name} deactivated` : `${stage.name} activated`)}>
+          {stage.isActive ? "Deactivate" : "Activate"}
         </Button>
       )}
       {isOpen && stage.deals === 0 && (

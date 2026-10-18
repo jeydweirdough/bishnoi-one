@@ -74,9 +74,13 @@ class PriceBook:
     # The customer's price group, and its name for the screens.
     group: str | None = None
     group_name: str | None = None
+    approved_srp: dict[str, bool] = field(default_factory=dict)
 
     def price_type(self, code: str) -> PriceType | None:
         return next((t for t in self.price_types if t.code == code), None)
+
+    def has_approved_srp(self, product_id: str) -> bool:
+        return self.approved_srp.get(product_id, False)
 
 
 def team_price_types(db: Session, team_id: str | None) -> list[PriceType]:
@@ -101,14 +105,19 @@ def price_book(db: Session, team_id: str | None, on: str, group: str | None = No
     products = {p.id: p for p in db.scalars(select(Product).where(Product.is_active).order_by(Product.name))}
     by_source: dict[str, dict[str, dict[str, int]]] = {
         "list_price": {
-            p.id: {pp.price_type_code: pp.amount_centavos for pp in p.prices if pp.price_type_code in listed} for p in products.values()
+            p.id: {
+                pp.price_type_code: pp.amount_centavos
+                for pp in p.prices
+                if pp.price_type_code in listed and pp.approval_status == "approved" and pp.amount_centavos > 0
+            }
+            for p in products.values()
         },
         "team_price": {p: {} for p in products},
         "group_price": {p: {} for p in products},
     }
     if team_id:
         for own in db.scalars(select(TeamPrice).where(TeamPrice.team_id == team_id)):
-            if own.product_id in products and own.price_type_code in listed:
+            if own.product_id in products and own.price_type_code in listed and own.approval_status == "approved" and own.amount_centavos > 0:
                 by_source["team_price"][own.product_id][own.price_type_code] = own.amount_centavos
     if group:
         for product_id in products:
@@ -125,6 +134,15 @@ def price_book(db: Session, team_id: str | None, on: str, group: str | None = No
                 if amount is not None:
                     prices[product_id][code], sources[product_id][code] = amount, source
                     break
+
+    approved_srp = {
+        p.id: any(
+            pp.price_type_code == "SRP" and pp.approval_status == "approved" and pp.amount_centavos > 0
+            for pp in p.prices
+        )
+        for p in products.values()
+    }
+
     promos = {
         p.id: p
         for p in db.scalars(select(Promo).where(Promo.is_active).order_by(Promo.name))
@@ -142,6 +160,7 @@ def price_book(db: Session, team_id: str | None, on: str, group: str | None = No
         settings, types, products, prices, promos, bundles, issuers,
         sources=sources, conditions=conditions, procedure=procedure,
         group=group if group_row else None, group_name=group_row.name if group_row else None,
+        approved_srp=approved_srp,
     )
 
 
@@ -156,6 +175,8 @@ def promo_terms(p: Promo) -> dict:
         "freeQty": p.free_qty,
         "tiers": p.tiers or [],
         "productIds": p.product_ids,
+        # Its last day, for the tag's "ends in 3 days". None: no end set.
+        "endsOn": p.ends_on,
     }
 
 
@@ -180,15 +201,16 @@ def price_list_out(book: PriceBook) -> dict:
                 "strength": p.strength,
                 "form": p.form,
                 "unit": p.unit,
+                "hasApprovedSrp": book.has_approved_srp(p.id),
                 "prices": book.prices[p.id],
                 # Where each price comes from: "group_price", "team_price" or "list_price".
                 "priceSources": book.sources.get(p.id, {}),
             }
             for p in book.products.values()
         ],
-        "promos": [promo_terms(p) for p in book.promos.values()],
+        "promos": [promo_terms(p) for p in book.promos.values()] if "promo" in book.procedure.get("adjust", []) else [],
         "bundles": [
-            {"id": b.id, "code": b.code, "name": b.name, "priceCentavos": b.price_centavos, "asOneLine": b.as_one_line, "items": b.items}
+            {"id": b.id, "code": b.code, "name": b.name, "priceCentavos": b.price_centavos, "asOneLine": b.as_one_line, "items": b.items, "endsOn": b.ends_on}
             for b in book.bundles.values()
         ],
     }
@@ -271,6 +293,8 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
     entered = kind.entry == "entered"
     limit = book.settings.discount_approval_bp
     over_limit = False
+    under_margin = False
+    MARGIN_FLOOR_BP = 4800  # 48% Gross Margin floor per sales playbook
     out: list[dict] = []
 
     for i, raw in enumerate(lines):
@@ -342,6 +366,9 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
         if product is None:
             problems.add(["lines", i, "productId"], "Pick a product from the list.")
             continue
+        if not book.has_approved_srp(product.id):
+            problems.add(["lines", i, "productId"], f"{product.name} cannot be quoted: its SRP has not been curated and approved by Finance.")
+            continue
         if entered:
             unit = raw.get("unitPriceCentavos")
             if not unit or unit < 1:
@@ -350,7 +377,7 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
         else:
             unit = book.prices[product.id].get(kind.code)
             if unit is None:
-                problems.add(["lines", i, "productId"], f"{product.name} has no {kind.name}.")
+                problems.add(["lines", i, "productId"], f"{product.name} has no approved {kind.name}.")
                 continue
         gross = unit * quantity
         line = blank_line() | {
@@ -421,10 +448,28 @@ def price_lines(book: PriceBook, price_type_code: str, rx: bool, lines: list[dic
         if broken:
             continue
         line["totalCentavos"] = amount
+        # 48% Gross Margin floor check (Playbook guardrail)
+        cost_unit = product.extra.get("cost_centavos") if product.extra else None
+        if cost_unit is not None and cost_unit > 0 and amount > 0:
+            if (amount - cost_unit * quantity) * FULL < MARGIN_FLOOR_BP * amount:
+                under_margin = True
+        elif entered:
+            srp = book.prices.get(product.id, {}).get("SRP") or book.prices.get(product.id, {}).get("TRADE")
+            if srp and srp > 0 and unit < share(srp, FULL - MARGIN_FLOOR_BP):
+                under_margin = True
+        if discount:
+            if discount["kind"] == "percent" and discount["value"] > MARGIN_FLOOR_BP:
+                under_margin = True
+            elif discount["kind"] == "amount" and gross > 0 and discount["value"] * FULL > MARGIN_FLOOR_BP * gross:
+                under_margin = True
         out.append(line)
 
     problems.raise_if_any()
-    reasons = (["price"] if kind.needs_approval else []) + (["discount"] if over_limit else [])
+    reasons = (
+        (["price"] if kind.needs_approval or entered else [])
+        + (["discount"] if over_limit else [])
+        + (["margin"] if under_margin else [])
+    )
     return {
         "priceType": kind.code,
         "priceTypeName": kind.name,

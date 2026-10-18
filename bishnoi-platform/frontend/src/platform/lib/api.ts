@@ -1,7 +1,9 @@
 import "server-only";
+import { sendToErrorPage } from "./fail";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
+import { loadAddresses } from "./addresses";
 import { platformHome } from "./apps";
 import { SESSION_COOKIE } from "./session-cookie";
 import type { Me, Org } from "./types";
@@ -47,7 +49,7 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
       cache: "no-store",
     });
   } catch {
-    throw new ApiError(503, "Can't reach the Platform server. Check that the API is running.");
+    throw new ApiError(503, "Can't reach the server just now. Try again in a moment.");
   }
 }
 
@@ -116,14 +118,17 @@ export async function load<T>(path: string): Promise<T> {
   try {
     return await api.get<T>(path);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) redirect("/login?expired=1");
-    if (error instanceof ApiError && error.status === 404) notFound();
+    if (error instanceof ApiError) sendToErrorPage(error.status);
     throw error;
   }
 }
 
-/** Who is signed in and what they can reach. Fetched once per request, however many layouts ask. */
-export const getMe = cache(() => load<Me>("/auth/me"));
+/** Around every signed-in page: who is signed in, the banner's incidents, what isn't set up. One request (GET /platform/frame), once per page. */
+export type Frame = { me: Me; banner: { incidents: unknown[] }; unset: Record<string, number> };
+export const getFrame = cache(() => load<Frame>("/platform/frame"));
+
+/** Who is signed in and what they can reach: from the frame, so it costs no request of its own. */
+export const getMe = cache(async () => (await getFrame()).me);
 
 /**
  * `getMe()` for a page that belongs to a company.
@@ -138,7 +143,10 @@ export async function getCompanyMe(): Promise<Me & { org: Org }> {
   // The companies list is the Platform app's. Only the shell serves it at
   // "/platform", so this asks where it actually is rather than sending a
   // module app to a path it has never had.
-  if (me.org === null) redirect(platformHome());
+  if (me.org === null) {
+    await loadAddresses();
+    redirect(platformHome());
+  }
   return me as Me & { org: Org };
 }
 

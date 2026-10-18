@@ -48,7 +48,7 @@ export const SEVERITIES: Record<Severity, string> = { critical: "Critical", high
 export const INCIDENT_KINDS: Record<IncidentKind, string> = {
   disruption: "Service disruption",
   application: "Application issue",
-  performance: "Slowdown",
+  performance: "Performance issue",
   security: "Security",
 };
 
@@ -68,7 +68,7 @@ export const NOTICE_KINDS: Record<NoticeKind, { one: string; many: string }> = {
   maintenance: { one: "Maintenance notice", many: "Maintenance notices" },
 };
 
-export const NOTICE_STATES: Record<NoticeState, string> = { draft: "Draft", scheduled: "Scheduled", showing: "Showing", ended: "Ended" };
+export const NOTICE_STATES: Record<NoticeState, string> = { draft: "Draft", scheduled: "Scheduled", showing: "Active", ended: "Ended" };
 
 export const AUDIT_CATEGORIES: Record<AuditCategory, string> = {
   admin: "Administrative",
@@ -85,17 +85,19 @@ const ACTIONS: Record<string, string> = {
   "auth.sign_in_failed": "failed to sign in",
   "auth.password_changed": "changed their password",
   "auth.session_ended": "ended a session of",
-  "staff.created": "made a staff account for",
+  "staff.created": "created a staff account for",
   "staff.role_changed": "changed the role of",
-  "staff.enabled": "switched on",
-  "staff.disabled": "switched off",
+  "staff.enabled": "activated",
+  "staff.disabled": "deactivated",
   "staff.password_reset": "reset the password of",
+  "staff.updated": "changed the account of",
+  "staff.profile_changed": "updated their profile",
   "company.created": "added the company",
   "company.updated": "changed the company",
   "company.suspended": "suspended",
   "company.reactivated": "reactivated",
-  "company.app_granted": "gave an application:",
-  "company.app_withdrawn": "withdrew an application:",
+  "company.app_granted": "assigned an application:",
+  "company.app_withdrawn": "removed an application:",
   "department.created": "added the department",
   "department.updated": "changed the department",
   "department.deleted": "removed the department",
@@ -113,10 +115,10 @@ const ACTIONS: Record<string, string> = {
   "user.updated": "changed",
   "user.suspended": "suspended",
   "user.reactivated": "reactivated",
-  "access.granted": "gave access:",
+  "access.granted": "granted access:",
   "access.changed": "changed access:",
-  "access.withdrawn": "withdrew access:",
-  "access.requested": "logged an access request:",
+  "access.withdrawn": "revoked access:",
+  "access.requested": "submitted an access request:",
   "access.request_approved": "approved access:",
   "access.request_declined": "declined access:",
   "ticket.created": "logged",
@@ -124,6 +126,11 @@ const ACTIONS: Record<string, string> = {
   "incident.declared": "declared",
   "incident.updated": "changed",
 };
+
+/** The same, as a line of its own ("Signed in", "Created a staff account for"): your profile's recent activity. */
+export const ACTION_LINES: Record<string, string> = Object.fromEntries(
+  Object.entries(ACTIONS).map(([code, words]) => [code, words.replace(/:$/, "").replace(/^\w/, (c) => c.toUpperCase())]),
+);
 
 export function actionWords(e: Pick<AuditEntry, "action">): string {
   if (ACTIONS[e.action]) return ACTIONS[e.action];

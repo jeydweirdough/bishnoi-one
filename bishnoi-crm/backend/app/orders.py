@@ -39,6 +39,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.tenants import company_header
 from app.models import Company, Contact, Product, Quote, Team, User
 
 TIMEOUT = 15  # seconds
@@ -141,6 +142,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
             "Idempotency-Key": quote_id,
             "Content-Type": "application/json",
             "Accept": "application/json",
+            **company_header(settings),
         },
     )
     try:
@@ -148,7 +150,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
             made = json.loads(response.read() or b"{}")
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise OrdersUnavailable("Bishnoi One Order refused the CRM's key: check ORDERS_API_KEY.") from e
+            raise OrdersUnavailable("Order service connection could not be authenticated. Please contact your system administrator.") from e
         detail = ""
         try:
             detail = json.loads(e.read() or b"{}").get("detail") or ""

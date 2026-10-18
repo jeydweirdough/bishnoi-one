@@ -355,7 +355,7 @@ export function useBulkRun() {
         );
         if (queued) router.refresh();
         if (!job) {
-          toast.info("Still working on it in the background", {
+          toast.info("Processing in the background", {
             id: toastId,
             description: "Reload in a minute to see the changes.",
           });
@@ -387,7 +387,7 @@ function report(job: Job, wording: Wording, names: ReadonlyMap<string, string>, 
   const title = job.succeeded ? `${wording.did(job.succeeded)}. ${job.failed} couldn't be.` : `None could be done.`;
   toast.warning(title, {
     id: toastId,
-    description: [...shown, more > 0 ? `…and ${more} more. They're still ticked.` : "They're still ticked."].join("\n"),
+    description: [...shown, more > 0 ? `…and ${more} more. They remain selected.` : "They remain selected."].join("\n"),
     duration: 12_000,
     classNames: { description: "whitespace-pre-line" },
   });

@@ -19,7 +19,7 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Dashboard">
-        {greeting()}, {firstName}. You&apos;re signed in as {staff.platformRoleName}. Here&apos;s the whole platform, right now.
+        {greeting()}, {firstName}. You&apos;re signed in as {staff.platformRoleName}. Here is the current status of the platform.
       </PageHeader>
 
       <Counts counts={data.counts} />
@@ -47,7 +47,7 @@ export default async function Page() {
         >
           Recent activity
         </SectionTitle>
-        <ActivityList entries={data.recent} showCategory empty="Nothing done on the platform yet." />
+        <ActivityList entries={data.recent} showCategory empty="No activity on the platform yet." />
       </Sheet>
     </>
   );

@@ -159,7 +159,7 @@ export function ListEditor({
     const seen = new Set<string>();
     rows.forEach((r, i) => {
       const name = r.name.trim().toLowerCase();
-      if (!name) found[`items.${i}.name`] = "Give it a name, or remove it.";
+      if (!name) found[`items.${i}.name`] = "Enter a name, or remove the item.";
       else if (seen.has(name)) found[`items.${i}.name`] = "Already in the list.";
       seen.add(name);
     });
@@ -188,7 +188,7 @@ export function ListEditor({
         {hint} {note}
       </p>
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-ink-2">Nothing here yet. Add the first choice below.</p>
+        <p className="mt-4 text-sm text-ink-2">No choices yet. Add the first one below.</p>
       ) : (
         <ol className="mt-3 divide-y divide-rule border-y border-rule">
           {rows.map((row, i) => {
@@ -257,7 +257,7 @@ export function ListEditor({
           add();
         }}
       >
-        <Field label="Add a choice" className="flex-1" error={errors.adding}>
+        <Field label="New choice" className="flex-1" error={errors.adding}>
           {(p) => <Input {...p} value={adding} maxLength={120} onChange={(e) => setAdding(e.target.value)} />}
         </Field>
         <Button type="submit" size="sm" icon={<Plus className="size-4" aria-hidden />} disabled={!adding.trim()}>

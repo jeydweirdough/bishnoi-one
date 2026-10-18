@@ -1,19 +1,21 @@
 """Retention: whether customers keep coming back for quotes.
 
 A customer here is a company; a quote made for one of its contacts counts for
-it too. A quote counts unless it was rejected. With the windows from the CRM's
-rules (Products → Pricing rules):
+it too. A quote counts unless it was rejected. With the windows of the
+customer's department (its team's, set by its manager under /retention/windows),
+else the company's (Products → Pricing rules):
 
 - healthy:   a quote in the last `at_risk_days`;
 - at risk:   none since, but one in the last `lost_days`;
 - lost:      none in `lost_days` (or the company is marked inactive);
 - no quotes: never had one.
 
-The rate compares two windows of `lost_days`: of the customers quoted in the
-earlier one, how many were quoted again in the latest.
+The rate compares two windows of `lost_days` (each customer's own): of the
+customers quoted in the earlier one, how many were quoted again in the latest.
 
 Needs customers.view. "mine" is the person's own companies; "team" is every
-company their role reaches (needs a scope wider than own).
+company their role reaches (needs a scope wider than own). Setting a
+department's windows needs admin.settings, or department.manage for one's own.
 """
 
 import csv
@@ -24,11 +26,14 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.access import Access, require
-from app.deps import DB, SettingsDep
+from app.access import DEPARTMENT, Access, require
+from app.api import Api, field_error
+from app.audit import audit
+from app.deps import DB, CurrentUser, SettingsDep
 from app.models import Activity, Company, Quote, Team, User
 from app.pricing import sales_settings
 from app.scope import within
@@ -36,6 +41,7 @@ from app.scope import within
 router = APIRouter(prefix="/retention", tags=["retention"])
 
 View = Annotated[Access, Depends(require("customers.view"))]
+Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
 Which = Literal["mine", "team"]
 MONTHS = 6
 
@@ -76,6 +82,37 @@ class Book:
         return before[-1] if before else None
 
 
+class Windows:
+    """The retention windows (at risk, lost) of each customer's department:
+    its team's own, else the company's."""
+
+    def __init__(self, db: Session):
+        s = sales_settings(db)
+        self.company = (s.at_risk_days, s.lost_days)
+        self.teams = {t.id: t for t in db.scalars(select(Team))}
+
+    def of_team(self, team_id: str | None) -> tuple[int, int]:
+        t = self.teams.get(team_id) if team_id else None
+        if t is None or t.at_risk_days is None or t.lost_days is None:
+            return self.company
+        return (t.at_risk_days, t.lost_days)
+
+    def of(self, company: Company) -> tuple[int, int]:
+        return self.of_team(company.team_id)
+
+    def rules(self, companies: list[Company]) -> list[dict]:
+        """The windows in play: the company's first, then each department's own."""
+        out = [{"atRiskDays": self.company[0], "lostDays": self.company[1], "division": "", "divisionName": "Sales"}]
+        for team_id in sorted({c.team_id for c in companies if c.team_id}, key=lambda t: self.teams[t].name if t in self.teams else ""):
+            t = self.teams.get(team_id)
+            if t is not None and self.of_team(team_id) != self.company:
+                out.append({"atRiskDays": t.at_risk_days, "lostDays": t.lost_days, "division": t.id, "divisionName": t.name})
+        # When every customer in view is judged by one department's windows, those lead (the page words itself by the first).
+        if len({self.of(c) for c in companies}) == 1 and len(out) == 2:
+            out.reverse()
+        return out
+
+
 def health(company: Company, last: date | None, on: date, at_risk: int, lost: int) -> str:
     if company.status == "inactive":
         return "lost"
@@ -85,11 +122,12 @@ def health(company: Company, last: date | None, on: date, at_risk: int, lost: in
     return "healthy" if days < at_risk else "at_risk" if days < lost else "lost"
 
 
-def summary(book: Book, companies: list[Company], on: date, at_risk: int, lost: int) -> dict:
-    window = timedelta(days=lost)
+def summary(book: Book, companies: list[Company], on: date, windows: Windows) -> dict:
     base = kept = new = 0
     counts = {"healthy": 0, "at_risk": 0, "lost": 0, "no_quotes": 0}
     for c in companies:
+        at_risk, lost = windows.of(c)
+        window = timedelta(days=lost)
         earlier = book.quoted_between(c.id, on - 2 * window, on - window)
         latest = book.quoted_between(c.id, on - window, on)
         base += earlier
@@ -111,16 +149,16 @@ def summary(book: Book, companies: list[Company], on: date, at_risk: int, lost: 
     }
 
 
-def trend(book: Book, on: date, lost: int) -> list[dict]:
+def trend(book: Book, on: date, windows: Windows) -> list[dict]:
     points = []
     first = on.replace(day=1)
     for back in range(MONTHS - 1, -1, -1):
         y, m = divmod(first.month - 1 - back, 12)
         start = date(first.year + y, m + 1, 1)
         end = min(on, (start + timedelta(days=32)).replace(day=1) - timedelta(days=1))
-        window = timedelta(days=lost)
         base = kept = 0
         for c in book.companies:
+            window = timedelta(days=windows.of(c)[1])
             earlier = book.quoted_between(c.id, end - 2 * window, end - window)
             base += earlier
             kept += earlier and book.quoted_between(c.id, end - window, end)
@@ -139,12 +177,13 @@ def next_follow_ups(db: Session, ids: list[str]) -> dict[str, dict]:
     return found
 
 
-def rows(db: Session, access: Access, book: Book, on: date, at_risk: int, lost: int, *, only_slipping: bool) -> list[dict]:
+def rows(db: Session, access: Access, book: Book, on: date, windows: Windows, *, only_slipping: bool) -> list[dict]:
     follow = next_follow_ups(db, [c.id for c in book.companies])
     teams = {t.id: t.name for t in db.scalars(select(Team))}
     out = []
     for c in book.companies:
         last = book.last(c.id, on)
+        at_risk, lost = windows.of(c)
         h = health(c, last, on, at_risk, lost)
         days = (on - last).days if last else 0
         # Worth a call: at risk, or lost lately enough to be winnable (within another window).
@@ -170,18 +209,17 @@ def rows(db: Session, access: Access, book: Book, on: date, at_risk: int, lost: 
     return out
 
 
-def load_book(db: Session, access: Access, settings, view: str, team: str | None) -> tuple[Book, date, int, int]:
+def load_book(db: Session, access: Access, settings, view: str, team: str | None) -> tuple[Book, date, Windows]:
     if view == "team" and access.scope == "own":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role sees only your own customers.")
     tz = settings.org_timezone
-    s = sales_settings(db)
     on = datetime.now(ZoneInfo(tz)).date()
-    return Book(db, access, view, team if view == "team" else None, tz), on, s.at_risk_days, s.lost_days
+    return Book(db, access, view, team if view == "team" else None, tz), on, Windows(db)
 
 
 @router.get("")
 def read_retention(access: View, db: DB, settings: SettingsDep, view: Which = "mine", team: str | None = Query(None, max_length=36)) -> dict:
-    book, on, at_risk, lost = load_book(db, access, settings, view, team)
+    book, on, windows = load_book(db, access, settings, view, team)
     reps = []
     if view == "team":
         by_owner: dict[str, list[Company]] = defaultdict(list)
@@ -189,23 +227,23 @@ def read_retention(access: View, db: DB, settings: SettingsDep, view: Which = "m
             by_owner[c.owner_id].append(c)
         names = {u.id: u.full_name for u in db.scalars(select(User).where(User.id.in_(list(by_owner))))}
         reps = sorted(
-            ({"id": o, "name": names.get(o), **summary(book, cs, on, at_risk, lost)} for o, cs in by_owner.items()),
+            ({"id": o, "name": names.get(o), **summary(book, cs, on, windows)} for o, cs in by_owner.items()),
             key=lambda r: (-r["atRisk"], r["name"] or ""),
         )
     team_query = select(Team).where(Team.is_active).order_by(Team.name)
-    if access.scope == "team":
-        team_query = team_query.where(Team.id == (access.team_id or ""))
+    if access.scope in ("team", "managed"):
+        team_query = team_query.where(Team.id.in_(access.team_ids or {""}))
     return {
         "view": view,
         "canSeeTeam": access.scope != "own",
-        "teams": [{"id": t.id, "name": t.name} for t in db.scalars(team_query)] if access.scope == "all" else [],
+        "teams": [{"id": t.id, "name": t.name} for t in db.scalars(team_query)] if access.scope in ("all", "managed") else [],
         "team": team if view == "team" else None,
         "asOf": on.isoformat(),
-        "rules": [{"atRiskDays": at_risk, "lostDays": lost, "division": "", "divisionName": "Sales"}],
-        "summary": summary(book, book.companies, on, at_risk, lost),
-        "trend": trend(book, on, lost),
+        "rules": windows.rules(book.companies),
+        "summary": summary(book, book.companies, on, windows),
+        "trend": trend(book, on, windows),
         "reps": reps,
-        "watch": rows(db, access, book, on, at_risk, lost, only_slipping=True)[:100],
+        "watch": rows(db, access, book, on, windows, only_slipping=True)[:100],
     }
 
 
@@ -216,11 +254,11 @@ HEALTH_WORDS = {"healthy": "Healthy", "at_risk": "At risk", "lost": "Lost", "no_
 def export_retention(access: View, db: DB, settings: SettingsDep, view: Which = "mine", team: str | None = Query(None, max_length=36)) -> Response:
     if view == "team":
         access.require("reports.export")
-    book, on, at_risk, lost = load_book(db, access, settings, view, team)
+    book, on, windows = load_book(db, access, settings, view, team)
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["Customer", "Team", "Owner", "Standing", "Type", "Last quote", "Days since", "Next task", "Task due"])
-    for r in rows(db, access, book, on, at_risk, lost, only_slipping=False):
+    for r in rows(db, access, book, on, windows, only_slipping=False):
         f = r["followUp"] or {}
         w.writerow([r["name"], r["teamName"], r["owner"]["name"] or "", HEALTH_WORDS[r["health"]], r["status"], r["lastQuoteOn"] or "", r["daysSince"] if r["lastQuoteOn"] else "", f.get("title", ""), f.get("dueOn", "")])
     return Response(
@@ -229,3 +267,45 @@ def export_retention(access: View, db: DB, settings: SettingsDep, view: Which = 
         headers={"Content-Disposition": f'attachment; filename="retention-{view}-{on.isoformat()}.csv"'},
     )
 
+
+
+# --- a department's own windows ------------------------------------------------------------
+
+
+def windows_out(db: Session, access: Access) -> dict:
+    s = sales_settings(db)
+    teams = [t for t in db.scalars(select(Team).where(Team.is_active).order_by(Team.name)) if access.runs(t.id)]
+    return {
+        "company": {"atRiskDays": s.at_risk_days, "lostDays": s.lost_days},
+        "teams": [
+            {"id": t.id, "name": t.name, "atRiskDays": t.at_risk_days, "lostDays": t.lost_days, "own": t.at_risk_days is not None and t.lost_days is not None}
+            for t in teams
+        ],
+    }
+
+
+@router.get("/windows")
+def read_windows(access: Manage, db: DB) -> dict:
+    """The company's windows, and each department's own (a manager's: theirs)."""
+    return windows_out(db, access)
+
+
+class WindowsIn(Api):
+    # Both None: back to the company's.
+    at_risk_days: int | None = Field(None, ge=1, le=3650)
+    lost_days: int | None = Field(None, ge=1, le=3650)
+
+
+@router.put("/windows/{team_id}")
+def set_windows(access: Manage, me: CurrentUser, db: DB, team_id: str, body: WindowsIn) -> dict:
+    team = db.get(Team, team_id)
+    if team is None or not access.runs(team.id):
+        raise field_error("teamId", "Pick one of your own teams.")
+    if (body.at_risk_days is None) != (body.lost_days is None):
+        raise field_error("lostDays", "Give both, or neither to use the company's.")
+    if body.at_risk_days is not None and body.lost_days is not None and body.at_risk_days >= body.lost_days:
+        raise field_error("lostDays", "Lost comes after at risk: make it more days.")
+    team.at_risk_days, team.lost_days = body.at_risk_days, body.lost_days
+    audit(db, me, "team.updated", target=team.name, target_type="team", target_id=team.id, fields=["atRiskDays", "lostDays"])
+    db.commit()
+    return windows_out(db, access)

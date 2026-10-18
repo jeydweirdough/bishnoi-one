@@ -24,6 +24,7 @@ from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.db import make_engine, make_sessions
+from app.tenants import for_tool
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD, seed
 from app.migrate import upgrade
 from app.models import Role, User
@@ -53,6 +54,7 @@ def role_named(db, name: str) -> Role:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage Inventory's accounts.")
+    parser.add_argument("--company", help="the company's short name on Bishnoi One Platform (on this computer: DEFAULT_COMPANY)")
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("add", help="make an account")
     add.add_argument("--email", required=True)
@@ -64,7 +66,9 @@ def main() -> int:
         sub.add_parser(name).add_argument("--email", required=True)
     args = parser.parse_args()
 
-    engine = make_engine(get_settings().database_url)
+    company, url = for_tool(sys.argv)
+    engine = make_engine(url)
+    print(f"Company: {company}")
     upgrade(engine)
     with make_sessions(engine)() as db:
         if args.command == "list":

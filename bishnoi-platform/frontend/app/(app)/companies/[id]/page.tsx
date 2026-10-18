@@ -11,6 +11,9 @@ import { ActivityList } from "@/src/components/activity-list";
 import { getStaff } from "@/src/components/gate";
 import { Count, IncidentSeverityMark, IncidentStatusMark, KindMark, SeverityMark, Tabs, TicketStatusMark } from "@/src/components/marks";
 import { CompanyApps } from "@/src/components/organizations/company-apps";
+import { ServiceCard } from "@/src/components/organizations/service-card";
+import type { ServiceInfo } from "@/src/actions/services";
+import { DeleteRecord } from "@/src/components/delete-record";
 import { SuspendCompany } from "@/src/components/organizations/company-tools";
 import { EditLink, SuspendedTag } from "@/src/components/organizations/record-tools";
 import { Structure } from "@/src/components/organizations/structure";
@@ -20,7 +23,7 @@ import { ago, plural, when } from "@/src/lib/words";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-const TABS = ["overview", "applications", "structure", "users", "issues", "activity"] as const;
+const TABS = ["overview", "applications", "connections", "structure", "users", "issues", "activity"] as const;
 type Tab = (typeof TABS)[number];
 
 const getCompany = (id: string) => load<{ company: CompanyDetail }>(`/platform/companies/${enc(id)}`).then((b) => b.company);
@@ -49,6 +52,14 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               <>
                 <EditLink href={`/companies/${company.id}/edit`} what={company.name} />
                 <SuspendCompany id={company.id} name={company.name} status={company.status} people={company.userCount} />
+                <DeleteRecord
+                  kind="company"
+                  id={company.id}
+                  name={company.name}
+                  after="/companies"
+                  done="Company deleted"
+                  body={`${company.name} is removed from the platform with its ${company.userCount === 1 ? "1 person" : `${company.userCount} people`}, their access, its structure and connections. Tickets it raised stay. Its data inside each application (the CRM's customers, Inventory's stock) isn't touched. It can't be undone; to keep it, suspend it instead.`}
+                />
               </>
             )}
           </>
@@ -60,6 +71,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           </span>
         ) : (
           <>
+            {company.no && <span className="tabular-nums">No. {company.no} · </span>}
             {company.slug} · {plural(company.userCount, "user")} · {plural(company.appCount, "application")}
           </>
         )}
@@ -70,6 +82,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         tabs={[
           { key: "overview", label: "Overview", href: href("overview") },
           { key: "applications", label: "Applications", href: href("applications"), count: company.applications.length },
+          { key: "connections", label: "Connections", href: href("connections") },
           { key: "structure", label: "Structure", href: href("structure"), count: company.units.length },
           { key: "users", label: "Users", href: href("users"), count: company.userCount },
           { key: "issues", label: "Issues", href: href("issues"), count: company.openTickets + company.activeIncidents.length },
@@ -79,11 +92,36 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
       {tab === "overview" && <Overview company={company} />}
       {tab === "applications" && <Applications company={company} canChange={staff.canAdminister} />}
+      {tab === "connections" && <Connections company={company} canChange={staff.canAdminister} />}
       {tab === "structure" && <Structure companyId={company.id} companyName={company.name} units={company.units} canChange={staff.canAdminister} />}
       {tab === "users" && <People company={company} canAdd={staff.canAdminister} />}
       {tab === "issues" && <Issues company={company} />}
       {tab === "activity" && <Activity company={company} />}
     </>
+  );
+}
+
+/** The outside services this company's applications use: filled in here, given to each application that uses them. */
+async function Connections({ company, canChange }: { company: CompanyDetail; canChange: boolean }) {
+  const { services } = await load<{ services: ServiceInfo[] }>(`/platform/companies/${enc(company.id)}/services`);
+  return (
+    <div className="max-w-3xl space-y-4">
+      <p className="text-meta text-ink-3">
+        The details {company.name}&apos;s applications need to reach outside services. Secrets are kept encrypted and never shown again once saved; only the
+        applications that use a service are given it, so nothing is kept on their servers.
+      </p>
+      {services.map((s) => (
+        <ServiceCard
+          key={s.key}
+          companyId={company.id}
+          service={s}
+          canChange={canChange}
+          checkedWhen={s.check ? ago(s.check.at) : null}
+          updatedWhen={s.updatedAt ? ago(s.updatedAt) : null}
+        />
+      ))}
+      {!canChange && <p className="text-meta text-ink-3">A Platform Admin changes these.</p>}
+    </div>
   );
 }
 
@@ -93,23 +131,23 @@ function Overview({ company }: { company: CompanyDetail }) {
       <div className="space-y-5">
         <Sheet className="grid grid-cols-2 divide-rule sm:grid-cols-4 sm:divide-x">
           <Figure label="Users" value={company.userCount} href={`/companies/${company.id}?tab=users`} />
-          <Figure label="Able to work" value={company.status === "suspended" ? 0 : company.activeUserCount} />
+          <Figure label="Active users" value={company.status === "suspended" ? 0 : company.activeUserCount} />
           <Figure label="Applications" value={company.appCount} href={`/companies/${company.id}?tab=applications`} />
           <Figure label="Open tickets" value={company.openTickets} href={`/companies/${company.id}?tab=issues`} />
         </Sheet>
         <Sheet className="px-5 py-4">
-          <SectionTitle icon="particulars">Particulars</SectionTitle>
+          <SectionTitle icon="particulars">Details</SectionTitle>
           <div className="mt-3">
             <Particulars
               items={[
-                ["Address", company.slug],
+                ["Company code", company.slug],
                 ["Status", company.status === "suspended" ? `Suspended since ${when(company.suspendedAt)}` : "Active"],
                 ["Currency", company.currency],
                 ["Time zone", company.timezone],
                 ["Contact email", company.contactEmail ? <a href={`mailto:${company.contactEmail}`} className="text-hema hover:underline">{company.contactEmail}</a> : null],
                 ["Departments", company.units.filter((u) => u.kind === "department").length],
                 ["Branches", company.units.filter((u) => u.kind === "branch").length],
-                ["On the platform since", when(company.createdAt)],
+                ["Created on", when(company.createdAt)],
                 ["Notes", company.notes ? <span className="whitespace-pre-line">{company.notes}</span> : null],
               ]}
             />
@@ -125,8 +163,8 @@ function Overview({ company }: { company: CompanyDetail }) {
             </SectionTitle>
           </div>
           {company.admins.length === 0 ? (
-            <Empty title="Nobody runs it yet" icon="person">
-              Make one of its people a company admin from their page (Edit, then “Company admin”).
+            <Empty title="No company admins yet" icon="person">
+              Make one of its users a company admin from their page (Edit, then “Company admin”).
             </Empty>
           ) : (
             <ul className="divide-y divide-rule border-t border-rule" role="list">
@@ -152,13 +190,13 @@ function IncidentsSheet({ company }: { company: CompanyDetail }) {
     <Sheet>
       <div className="px-5 pt-4 pb-2">
         <SectionTitle icon="incidents">
-          Active incidents reaching it
+          Active incidents affecting it
           <Count n={company.activeIncidents.length} />
         </SectionTitle>
       </div>
       {company.activeIncidents.length === 0 ? (
-        <Empty title="None right now" icon="incidents">
-          An incident reaches {company.name} when it names the company, or names none and is on an application it uses.
+        <Empty title="No active incidents" icon="incidents">
+          An incident affects {company.name} when it names the company, or names no company and is on an application it uses.
         </Empty>
       ) : (
         <ul className="divide-y divide-rule border-t border-rule" role="list">
@@ -186,15 +224,15 @@ async function Applications({ company, canChange }: { company: CompanyDetail; ca
   return (
     <Sheet className="max-w-3xl">
       <div className="px-5 pt-4 pb-2">
-        <SectionTitle icon="apps">Applications {company.name} may use</SectionTitle>
+        <SectionTitle icon="apps">Assigned applications</SectionTitle>
         <p className="text-meta text-ink-3">
-          {canChange ? "Tick what it gets. Its people can only be given these." : "Its people can only be given these. A Platform Admin changes them."}
+          {canChange ? "Select the applications this company subscribes to. Its users can only be given access to these." : "Its users can only be given access to these. A Platform Admin changes them."}
         </p>
       </div>
       <div className="border-t border-rule">
         {!canChange && company.applications.length === 0 ? (
           <Empty title="No applications yet" icon="apps">
-            A Platform Admin gives a company its applications here.
+            A Platform Admin assigns applications here.
           </Empty>
         ) : (
           <CompanyApps company={company} applications={options?.applications ?? []} canChange={canChange} />
@@ -214,19 +252,19 @@ async function People({ company, canAdd }: { company: CompanyDetail; canAdd: boo
           action={
             canAdd && (
               <LinkButton href={`/users/new?company=${company.id}`} size="sm" variant="quiet" icon={<UserPlus className="size-4" aria-hidden />}>
-                Add a user
+                Add user
               </LinkButton>
             )
           }
         >
-          People at {company.name}
+          Users at {company.name}
           <Count n={users.length} />
         </SectionTitle>
       </div>
       <div className="border-t border-rule">
         {users.length === 0 ? (
-          <Empty title="Nobody here yet" icon="people">
-            {canAdd ? "Add the people who work here with “Add a user”, then give them its applications." : "A Platform Admin adds its people."}
+          <Empty title="No users yet" icon="people">
+            {canAdd ? "Add users with “Add user”, then grant them access to its applications." : "A Platform Admin adds its users."}
           </Empty>
         ) : (
           <UserRows users={users} showCompany={false} />
@@ -248,7 +286,7 @@ async function Issues({ company }: { company: CompanyDetail }) {
           </SectionTitle>
         </div>
         {tickets.length === 0 ? (
-          <Empty title="Nothing open" icon="support">
+          <Empty title="No open tickets" icon="support">
             When {company.name} reports a complaint, a bug or a question, it shows here until it&apos;s closed.
           </Empty>
         ) : (
@@ -282,9 +320,9 @@ async function Activity({ company }: { company: CompanyDetail }) {
   const { entries } = await load<{ entries: AuditEntry[] }>(`/platform/activity?company_id=${enc(company.id)}`);
   return (
     <Sheet className="px-5 py-4">
-      <SectionTitle icon="auditLog">What was done here</SectionTitle>
+      <SectionTitle icon="auditLog">Activity</SectionTitle>
       <div className="mt-2">
-        <ActivityList entries={entries} empty={`Nothing has been done to ${company.name} yet.`} />
+        <ActivityList entries={entries} empty={`No activity for ${company.name} yet.`} />
       </div>
     </Sheet>
   );

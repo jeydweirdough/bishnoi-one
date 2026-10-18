@@ -28,7 +28,7 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
     <>
       <PageHeader title="Communications">
         What the platform tells the people using it. The applications show whatever is showing by asking{" "}
-        <code className="rounded-[2px] bg-bench px-1 text-meta">/public/notices?app=&lt;key&gt;&amp;company=&lt;slug&gt;</code>, so a notice
+        <code className="rounded-md bg-bench px-1 text-meta">/public/notices?app=&lt;key&gt;&amp;company=&lt;slug&gt;</code>, so a notice
         reaches exactly the people it&apos;s for.
       </PageHeader>
 

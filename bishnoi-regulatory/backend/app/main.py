@@ -14,6 +14,7 @@ from app.db import make_engine, make_sessions
 from app.discord import log_requests, logs_for
 from app.migrate import upgrade
 from app.routers import auth, regulatory
+from app.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
 SECURITY_HEADERS = {
@@ -32,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The interactive docs map every endpoint; nobody outside development needs them.
     docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="Bishnoi One Regulatory API", version="0.1.0", **docs)
+    # Rate limits, request size, and errors in plain words (app/guard.py).
+    install_guard(app, "Regulatory")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     # Every change and sign-in goes to Discord as a line, a thread a day (app/discord.py).

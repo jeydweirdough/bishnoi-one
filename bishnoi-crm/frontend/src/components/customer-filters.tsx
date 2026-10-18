@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/src/platform/ui/field";
 import { ChevronDown, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -10,14 +11,14 @@ import type { ListItem } from "@/src/platform/lib/types";
 function FilterSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
   return (
     <span className="relative">
-      <select
+      <Select
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 min-w-0 appearance-none rounded-[3px] border border-rule-strong bg-sheet pr-8 pl-2.5 text-sm text-ink hover:border-control focus:border-hema focus:outline-none"
+        className="h-9 min-w-0 appearance-none rounded-lg border border-rule-strong bg-sheet pr-8 pl-2.5 text-sm text-ink hover:border-control focus:border-hema focus:outline-none"
       >
         {children}
-      </select>
+      </Select>
       <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-ink-3" />
     </span>
   );
@@ -75,7 +76,7 @@ export function CustomerFilters({
           value={q}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Name, city, specialty or phone"
-          className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet pr-3 pl-8 text-sm placeholder:text-ink-3/80 hover:border-control focus:border-hema focus:outline-none"
+          className="h-9 w-full rounded-lg border border-rule-strong bg-sheet pr-3 pl-8 text-sm placeholder:text-ink-3/80 hover:border-control focus:border-hema focus:outline-none"
         />
       </label>
       {divisions.length > 1 && (

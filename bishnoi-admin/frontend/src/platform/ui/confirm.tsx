@@ -74,7 +74,7 @@ export function ConfirmButton({
         ref={dialog}
         onCancel={(e) => pending && e.preventDefault()}
         aria-labelledby={titleId}
-        className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-ink shadow-overlay"
+        className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-[12px] bg-sheet p-0 text-ink shadow-overlay"
       >
         <div className="p-5">
           <h2 id={titleId} className="text-heading">

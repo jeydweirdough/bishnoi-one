@@ -4,7 +4,8 @@
 #
 # For each app folder (bishnoi-*) it checks that:
 # - the name is bishnoi-<name>: small letters, digits and dashes
-# - it has frontend/, backend/, .gitignore and GIT-GUIDE.md
+# - it has frontend/, backend/, .gitignore, README.md (its branch's front
+#   page on GitHub) and GIT-GUIDE.md
 # - its .github/workflows/sync-branches.yml is the same as main's, without
 #   which pushes to its branch wouldn't sync
 # - no secrets (.env, .env.local, keys) or local data (.data/) are committed
@@ -40,7 +41,7 @@ jobs:
             for part in frontend backend; do
               [ -d "$app/$part" ] || fail "$app: the $part/ folder is missing"
             done
-            for file in .gitignore GIT-GUIDE.md; do
+            for file in .gitignore README.md GIT-GUIDE.md; do
               [ -f "$app/$file" ] || fail "$app: $file is missing (copy it from another app and adjust it)"
             done
             copy="$app/.github/workflows/sync-branches.yml"

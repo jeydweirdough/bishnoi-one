@@ -1,5 +1,9 @@
 import {
   Boxes,
+  Car,
+  Fuel,
+  Laptop,
+  Plane,
   Activity,
   ArrowUpRight,
   BadgePercent,
@@ -80,6 +84,10 @@ export const ICONS = {
   regulatory: Scale,
   inlicensing: FileSignature,
   dispatch: Truck,
+  vehicles: Car,
+  fuelCards: Fuel,
+  travel: Plane,
+  devices: Laptop,
   exec: Building2,
   orders: ShoppingCart,
   external: ArrowUpRight, // opens another app, in a new tab

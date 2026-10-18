@@ -119,7 +119,7 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
               >
                 {(v, set, error) => (
                   <>
-                    <Field label="Move it to" hint="Any step; steps can be skipped, and a done ticket can be reopened." error={error}>
+                    <Field label="New status" hint="Any status; steps can be skipped, and a closed ticket can be reopened." error={error}>
                       {(p) => (
                         <Select {...p} value={v.status} onChange={(e) => set({ ...v, status: e.target.value as TicketStatus })} autoFocus>
                           {STATUS_LIST.map((s) => (
@@ -131,7 +131,7 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
                         </Select>
                       )}
                     </Field>
-                    <Field label="Why" optional hint="Kept on the ticket beside the move.">
+                    <Field label="Reason" optional hint="Saved on the ticket with the status change.">
                       {(p) => <Textarea {...p} rows={3} value={v.note} onChange={(e) => set({ ...v, note: e.target.value })} />}
                     </Field>
                   </>
@@ -154,15 +154,15 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
                     value={v}
                     set={set}
                     list={withCurrent(options.staff, ticket.assignee)}
-                    none="Nobody"
+                    none="Unassigned"
                     error={error}
-                    hint={ticket.status === "reported" || ticket.status === "triaged" ? "Giving it to somebody marks it Assigned." : undefined}
+                    hint={ticket.status === "reported" || ticket.status === "triaged" ? "Assigning it sets the status to Assigned." : undefined}
                   />
                 )}
               </Change>
             }
           >
-            {ticket.assignee?.name ?? <span className="text-ink-3">Nobody yet</span>}
+            {ticket.assignee?.name ?? <span className="text-ink-3">Unassigned</span>}
           </Row>,
         ],
         [
@@ -179,12 +179,12 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
           </Row>,
         ],
         [
-          "Kind",
+          "Type",
           <Row
             key="kind"
             editor={
               <Change<TicketKind> ticketId={id} what={`what kind of ticket ${n} is`} initial={ticket.kind} patch={(v) => ({ kind: v })}>
-                {(v, set) => <Choice name="kind" legend="Kind" value={v} onChange={set} options={KIND_OPTIONS} />}
+                {(v, set) => <Choice name="kind" legend="Type" value={v} onChange={set} options={KIND_OPTIONS} />}
               </Change>
             }
           >
@@ -211,16 +211,16 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
             editor={
               <Change<string> ticketId={id} what={`the application on ${n}`} initial={ticket.application?.id ?? ""} patch={(v) => ({ applicationId: v || null })}>
                 {(v, set, error) => (
-                  <RefSelect label="Application" value={v} set={set} list={withCurrent(options.applications, ticket.application)} none="None in particular" error={error} />
+                  <RefSelect label="Application" value={v} set={set} list={withCurrent(options.applications, ticket.application)} none="None" error={error} />
                 )}
               </Change>
             }
           >
-            {ticket.application ? link(`/applications/${ticket.application.id}`, ticket.application.name) : <span className="text-ink-3">None in particular</span>}
+            {ticket.application ? link(`/applications/${ticket.application.id}`, ticket.application.name) : <span className="text-ink-3">None</span>}
           </Row>,
         ],
         [
-          "People affected",
+          "Affected users",
           <Row
             key="affected"
             editor={
@@ -231,14 +231,14 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
                 patch={(v) => ({ affectedUsers: v.trim() === "" ? null : Number(v) })}
               >
                 {(v, set, error) => (
-                  <Field label="People affected" optional hint="Leave empty if nobody knows." error={error}>
+                  <Field label="Affected users" optional hint="Leave blank if unknown." error={error}>
                     {(p) => <Input {...p} type="number" inputMode="numeric" min={0} value={v} onChange={(e) => set(e.target.value)} autoFocus />}
                   </Field>
                 )}
               </Change>
             }
           >
-            {ticket.affectedUsers == null ? <span className="text-ink-3">Not known</span> : ticket.affectedUsers.toLocaleString("en-PH")}
+            {ticket.affectedUsers == null ? <span className="text-ink-3">Unknown</span> : ticket.affectedUsers.toLocaleString("en-PH")}
           </Row>,
         ],
         [
@@ -249,13 +249,13 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
               <Change<string> ticketId={id} what={`the incident ${n} belongs to`} initial={ticket.incident?.id ?? ""} patch={(v) => ({ incidentId: v || null })}>
                 {(v, set, error) => (
                   <RefSelect
-                    label="Part of the incident"
+                    label="Linked incident"
                     value={v}
                     set={set}
                     list={withCurrent(options.incidents, ticket.incident)}
                     none="None"
                     error={error}
-                    hint="When many people report the same breakage, link their tickets to one incident."
+                    hint="When many users report the same issue, link their tickets to one incident."
                   />
                 )}
               </Change>
@@ -271,9 +271,9 @@ export function TicketFields({ ticket, options }: { ticket: TicketDetail; option
             {ticket.reporter.name && ticket.reporter.email && <span className="block text-meta text-ink-3">{ticket.reporter.email}</span>}
           </span>,
         ],
-        ["Logged", <span key="created" title={when(ticket.createdAt)}>{`${when(ticket.createdAt)} · ${ago(ticket.createdAt)}`}</span>],
+        ["Created on", <span key="created" title={when(ticket.createdAt)}>{`${when(ticket.createdAt)} · ${ago(ticket.createdAt)}`}</span>],
         [
-          ticket.isOpen ? "Due" : "Done",
+          ticket.isOpen ? "Due" : "Closed",
           ticket.isOpen ? (
             ticket.isOverdue ? (
               <span key="due">

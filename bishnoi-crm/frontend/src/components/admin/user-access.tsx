@@ -22,7 +22,7 @@ export function UserAccess({ user, isMe }: { user: AdminUserRow; isMe: boolean }
       toast.error(result.error);
       return false;
     }
-    toast.success(user.isActive ? "Switched off" : "Switched back on", { description: user.fullName });
+    toast.success(user.isActive ? "Deactivated" : "Reactivated", { description: user.fullName });
     router.refresh();
     return true;
   }
@@ -62,23 +62,23 @@ export function UserAccess({ user, isMe }: { user: AdminUserRow; isMe: boolean }
       <div className="border-t border-rule pt-5">
         {user.isActive ? (
           isMe ? (
-            <p className="text-meta text-ink-3">You can't switch yourself off. Another administrator can.</p>
+            <p className="text-meta text-ink-3">You can't deactivate your own account. Another administrator can.</p>
           ) : (
             <ConfirmButton
-              label="Switch off"
-              title={`Switch ${user.fullName} off?`}
-              body="They're signed out at once and can't sign in again until someone switches them back on. Their history stays."
-              confirmLabel="Switch off"
+              label="Deactivate"
+              title={`Deactivate ${user.fullName}?`}
+              body="They're signed out at once and can't sign in again until the account is reactivated. Their history stays."
+              confirmLabel="Deactivate"
               triggerSize="sm"
               onConfirm={toggle}
             />
           )
         ) : (
           <ConfirmButton
-            label="Switch back on"
-            title={`Switch ${user.fullName} back on?`}
+            label="Reactivate"
+            title={`Reactivate ${user.fullName}?`}
             body="They can sign in again with their last password."
-            confirmLabel="Switch on"
+            confirmLabel="Reactivate"
             danger={false}
             triggerSize="sm"
             onConfirm={toggle}

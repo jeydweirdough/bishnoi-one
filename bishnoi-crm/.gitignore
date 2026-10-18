@@ -60,3 +60,5 @@ env/
 *.db-wal
 *.sqlite3
 *.key
+
+data/

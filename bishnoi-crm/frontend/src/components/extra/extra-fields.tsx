@@ -1,9 +1,12 @@
 "use client";
 
+import { AutoComplete } from "antd";
+import { Combobox } from "@/src/platform/ui/pickers";
 import type { ReactNode } from "react";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { FormEntityProvider } from "../quick-add/can";
 import { ChoiceAdd } from "../quick-add/choice-add";
+import { CustomerPick } from "./customer-pick";
 import type { ExtraValues, FormFieldDef, FormLayout } from "@/src/platform/lib/types";
 
 // A record's form, drawn from its layout (Administration → Settings → Forms):
@@ -24,7 +27,7 @@ export function toDraft(fields: FormFieldDef[], values: ExtraValues | undefined)
     added(fields).map((f) => {
       const v = values?.[f.key];
       if (f.type === "yes_no") return [f.key, v === true];
-      if (f.type === "multi_choice") return [f.key, Array.isArray(v) ? v : []];
+      if (f.type === "multi_choice" || f.type === "products") return [f.key, Array.isArray(v) ? v : []];
       return [f.key, v == null ? "" : String(v)];
     }),
   );
@@ -48,9 +51,67 @@ export function extraChanges(fields: FormFieldDef[], draft: ExtraDraft, before?:
   return Object.keys(out).length ? out : undefined;
 }
 
+/** A pick-list long enough to search, or whose choices are short codes with full names. */
+const searchable = (f: FormFieldDef) => Object.keys(f.optionNames ?? {}).length > 0 || f.options.length > 7;
+
+/**
+ * A searchable pick-list. Short codes stay short ("MED ONCO"), with the full
+ * name beside them in the list, and typing either finds it.
+ */
+export function SearchChoice({ field, value, onChange, error }: { field: FormFieldDef; value: string; onChange: (v: string) => void; error?: string }) {
+  const names = field.optionNames ?? {};
+  const options = [...field.options, ...(value && !field.options.includes(value) ? [value] : [])].map((o) => ({
+    value: o,
+    label: o,
+    search: `${o} ${names[o] ?? ""}`.toLowerCase(),
+    full: names[o] ?? "",
+  }));
+  return (
+    <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
+      {(p) => (
+        <Combobox
+          id={p.id}
+          aria-describedby={p["aria-describedby"]}
+          status={error ? "error" : undefined}
+          className="w-full"
+          allowClear
+          value={value || undefined}
+          onChange={(v) => onChange(v ?? "")}
+          placeholder={field.placeholder ?? "Type to search"}
+          options={options}
+          showSearch={{ filterOption: (input, option) => (option?.search ?? "").includes(input.trim().toLowerCase()) }}
+          optionRender={(o) => (
+            <span className="flex items-baseline justify-between gap-3">
+              <span>{o.data.label}</span>
+              {o.data.full && <span className="truncate text-meta text-ink-3">{o.data.full}</span>}
+            </span>
+          )}
+          notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">Not one of the choices. An administrator adds choices under Settings → Forms.</p>}
+        />
+      )}
+    </Field>
+  );
+}
+
 /** One added field's input, by its kind. */
-export function FieldInput({ field, value, onChange, error }: { field: FormFieldDef; value: string | boolean | string[]; onChange: (v: string | boolean | string[]) => void; error?: string }) {
+export function FieldInput({
+  field,
+  value,
+  onChange,
+  error,
+  linkName,
+}: {
+  field: FormFieldDef;
+  value: string | boolean | string[];
+  onChange: (v: string | boolean | string[]) => void;
+  error?: string;
+  /** For a customer field: the name of the customer already picked. */
+  linkName?: string;
+}) {
   const f = field;
+  if (f.type === "customer") {
+    return <CustomerPick field={f} value={typeof value === "string" ? value : ""} initialName={linkName} onChange={onChange} error={error} />;
+  }
   if (f.type === "yes_no") {
     return (
       <div className="self-end pb-2">
@@ -88,7 +149,63 @@ export function FieldInput({ field, value, onChange, error }: { field: FormField
       </fieldset>
     );
   }
+  if (f.type === "products") {
+    const picked = Array.isArray(value) ? value : [];
+    // Ours, less those left out of this field (anaesthesia isn't promoted); one already picked stays.
+    const offered = (f.picks ?? []).filter((p) => !f.options.includes(p.value) || picked.includes(p.value));
+    return (
+      <Field label={f.label} optional={!f.required} error={error} hint={f.helpText ?? undefined}>
+        {(p) => (
+          <Combobox
+            id={p.id}
+            mode="multiple"
+            className="w-full"
+            status={error ? "error" : undefined}
+            value={picked}
+            onChange={(v) => onChange(v)}
+            placeholder={f.placeholder ?? "Type a product or its generic name"}
+            options={offered.map((o) => ({ value: o.value, label: o.label, search: `${o.label} ${o.hint} ${o.value}`.toLowerCase(), hint: o.hint }))}
+            showSearch={{ filterOption: (input, option) => (option?.search ?? "").includes(input.trim().toLowerCase()) }}
+            optionRender={(o) => (
+              <span className="flex items-baseline justify-between gap-3">
+                <span>{o.data.label}</span>
+                {o.data.hint && <span className="truncate text-meta text-ink-3">{o.data.hint}</span>}
+              </span>
+            )}
+            notFoundContent={<p className="px-1 py-3 text-center text-meta text-ink-3">Not one of the choices. An administrator adds choices under Settings → Forms.</p>}
+          />
+        )}
+      </Field>
+    );
+  }
   const text = String(value ?? "");
+  if (f.type === "molecule") {
+    const q = text.trim().toLowerCase();
+    return (
+      <Field label={f.label} optional={!f.required} error={error} hint={f.helpText ?? undefined}>
+        {(p) => (
+          <AutoComplete
+            id={p.id}
+            className="w-full"
+            status={error ? "error" : undefined}
+            value={text}
+            onChange={(v) => onChange(v)}
+            options={(f.picks ?? []).filter((o) => !q || o.value.toLowerCase().includes(q)).map((o) => ({ value: o.value }))}
+            placeholder={f.placeholder ?? "Type a generic name"}
+            maxLength={120}
+          />
+        )}
+      </Field>
+    );
+  }
+  if (f.type === "choice" && searchable(f)) {
+    return (
+      <>
+        <SearchChoice field={f} value={text} onChange={onChange} error={error} />
+        <ChoiceAdd field={f} onAdded={onChange} />
+      </>
+    );
+  }
   return (
     <>
     <Field label={f.label} optional={!f.required} error={error} hint={f.helpText ?? undefined}>
@@ -125,6 +242,14 @@ export function FieldInput({ field, value, onChange, error }: { field: FormField
 /** A dropdown for a built-in pick-list field (Industry, Form, Unit). A value the
  *  record already had stays offered even if it's no longer an option. */
 export function ChoiceSelect({ field, value, onChange, error }: { field: FormFieldDef; value: string; onChange: (v: string) => void; error?: string }) {
+  if (searchable(field)) {
+    return (
+      <>
+        <SearchChoice field={field} value={value} onChange={onChange} error={error} />
+        <ChoiceAdd field={field} onAdded={onChange} />
+      </>
+    );
+  }
   return (
     <>
     <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
@@ -155,33 +280,49 @@ export function LayoutForm({
   draft,
   onChange,
   errors,
+  linkNames = {},
 }: {
   layout: FormLayout;
   standard: (field: FormFieldDef) => ReactNode;
   draft: ExtraDraft;
   onChange: (next: ExtraDraft) => void;
   errors: Record<string, string>;
+  /** The names of customers its customer fields already point at, by field key. */
+  linkNames?: Record<string, string>;
 }) {
   return (
     <FormEntityProvider entity={layout.entity}>
-      {layout.sections.map((s) => (
+      {layout.sections.map((s) => {
+        // A built-in field with nothing to ask (no one else to assign to) takes no
+        // space, and a section left with nothing to ask isn't shown at all.
+        const asked = s.fields.filter((f) => !f.standard || standard(f) != null);
+        if (asked.length === 0) return null;
+        return (
         <fieldset key={s.id} className={`grid gap-5 ${s.columns === 2 ? "sm:grid-cols-2" : ""}`}>
           <legend className="mb-3 text-sm font-semibold text-ink">{s.title}</legend>
-          {s.fields.map((f) => {
-            const wide = f.type === "long_text" || f.type === "multi_choice" || f.type === "status";
+          {asked.map((f) => {
+            const wide = f.type === "long_text" || f.type === "multi_choice" || f.type === "products" || f.type === "status";
             const cell = s.columns === 2 && wide ? "sm:col-span-2" : "";
+            const built = f.standard ? standard(f) : null;
             return (
               <div key={f.key} className={`min-w-0 ${cell}`}>
                 {f.standard ? (
-                  standard(f)
+                  built
                 ) : (
-                  <FieldInput field={f} value={draft[f.key] ?? ""} onChange={(v) => onChange({ ...draft, [f.key]: v })} error={errors[f.key]} />
+                  <FieldInput
+                    field={f}
+                    value={draft[f.key] ?? ""}
+                    onChange={(v) => onChange({ ...draft, [f.key]: v })}
+                    error={errors[f.key]}
+                    linkName={linkNames[f.key]}
+                  />
                 )}
               </div>
             );
           })}
         </fieldset>
-      ))}
+        );
+      })}
     </FormEntityProvider>
   );
 }

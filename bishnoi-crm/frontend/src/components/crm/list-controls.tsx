@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { LinkButton } from "@/src/platform/ui/button";
+import { Pager as SharedPager } from "@/src/platform/ui/pager";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Select } from "@/src/platform/ui/field";
 import { deleteCompany, deleteContact } from "../../actions/crm";
@@ -43,13 +43,13 @@ export function Filters({ search, selects }: { search?: string; selects: { name:
       {search && (
       <label className="relative min-w-[14rem] flex-1">
         <span className="sr-only">Search</span>
-        <Search className="pointer-events-none absolute top-1/2 left-0 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+        <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={search}
-          className="block h-9 w-full border-0 border-b border-control bg-transparent pl-6 text-sm text-ink placeholder:text-ink-3/80 focus:border-hema focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:outline-none"
+          className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
         />
       </label>
       )}
@@ -69,40 +69,18 @@ export function Filters({ search, selects }: { search?: string; selects: { name:
   );
 }
 
-/** "1–50 of 132" and the way to the next and previous pages. */
+/** "1–50 of 132", the page numbers, and the next and previous pages (the shared pager, by address). */
 export function Pager({ total, page, size, base }: { total: number; page: number; size: number; base: string }) {
-  if (total <= size) return null;
-  const from = (page - 1) * size + 1;
-  const to = Math.min(total, page * size);
-  const link = (n: number) => `${base}${base.includes("?") ? "&" : "?"}page=${n}`;
-  return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-meta text-ink-3">
-      <span>
-        {from}–{to} of {total}
-      </span>
-      <span className="flex gap-2">
-        {page > 1 && (
-          <LinkButton href={link(page - 1)} size="sm" variant="quiet">
-            Previous
-          </LinkButton>
-        )}
-        {to < total && (
-          <LinkButton href={link(page + 1)} size="sm">
-            Next
-          </LinkButton>
-        )}
-      </span>
-    </div>
-  );
+  return <SharedPager total={total} page={page} size={size} base={base} />;
 }
 
 /** Deleting a company or a contact, from its own page. */
 /** What a record page's name can do to the record itself, as icons beside the name. */
-const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[3px] text-ink-3 transition-colors";
+const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-3 transition-colors";
 
 export function EditRecord({ href, what }: { href: string; what: string }) {
   return (
-    <Link href={href} aria-label={`Edit ${what}`} title={`Edit ${what}`} className={`${ICON} hover:bg-hema-tint hover:text-hema`}>
+    <Link href={href} aria-label={`Edit ${what}`} title={`Edit ${what}`} className={`${ICON} hover:bg-hema-tint hover:text-ink`}>
       <Pencil className="size-4" aria-hidden />
     </Link>
   );
