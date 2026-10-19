@@ -210,3 +210,63 @@ def cancel(caller: Caller, db: DB, settings: SettingsDep, source_id: str, body: 
     event(r, "cancelled", body.by, f"Request cancelled by the requester: {r.cancel_reason}")
     db.commit()
     return request_out(r, today(settings))
+
+
+# --- customers: what the CRM shows of a customer's standing ---------------------------------
+#
+# The CRM works out each B2B customer's credit status, yearly contribution and
+# the products they carry from what Finance billed them (decided 2026-10-19).
+# It asks by its own customer ids, which Finance keeps on each invoice.
+
+customers_router = APIRouter(prefix="/integration/customers", tags=["integration"], dependencies=[Depends(calling_app)])
+
+# An open invoice due within this many days counts as approaching its due date.
+APPROACHING_DAYS = 5
+YEAR_DAYS = 365
+
+
+@customers_router.get("")
+def standing(db: DB, settings: SettingsDep, ids: str = Query(..., max_length=20000)) -> dict:
+    """For each of these customers (the CRM's ids): what's still owed and how
+    late, when the next open invoice falls due, what was billed over the last
+    12 months, and what was billed, by line. A customer with no invoices is left out."""
+    from datetime import timedelta
+
+    from app.models import Invoice
+
+    wanted = list(dict.fromkeys(i.strip() for i in ids.split(",") if i.strip()))[:500]
+    on = today(settings)
+    since = on - timedelta(days=YEAR_DAYS)
+    out: dict[str, dict] = {}
+    rows = db.scalars(select(Invoice).where(Invoice.customer_id.in_(wanted), Invoice.status == "issued")) if wanted else []
+    for inv in rows:
+        c = out.setdefault(inv.customer_id, {
+            "owedCentavos": 0, "overdueCentavos": 0, "oldestDaysLate": 0, "openInvoices": 0, "nextDueOn": None,
+            "billedYearCentavos": 0, "invoicesYear": 0, "lines": {},
+        })
+        due = inv.invoice_date + timedelta(days=inv.terms_days)
+        owed = max(0, inv.total_centavos - inv.paid_centavos)
+        if owed:
+            late = (on - due).days
+            c["owedCentavos"] += owed
+            c["openInvoices"] += 1
+            if late > 0:
+                c["overdueCentavos"] += owed
+                c["oldestDaysLate"] = max(c["oldestDaysLate"], late)
+            elif c["nextDueOn"] is None or due.isoformat() < c["nextDueOn"]:
+                c["nextDueOn"] = due.isoformat()
+        if inv.invoice_date >= since:
+            c["billedYearCentavos"] += inv.total_centavos
+            c["invoicesYear"] += 1
+            for line in inv.lines or []:
+                key = (str(line.get("ref") or "").strip() or str(line.get("description") or "").strip())[:120]
+                if not key:
+                    continue
+                seen = c["lines"].setdefault(key, {"ref": line.get("ref"), "description": line.get("description"), "invoices": 0, "lastOn": None})
+                seen["invoices"] += 1
+                if seen["lastOn"] is None or inv.invoice_date.isoformat() > seen["lastOn"]:
+                    seen["lastOn"] = inv.invoice_date.isoformat()
+    for c in out.values():
+        c["lines"] = sorted(c["lines"].values(), key=lambda x: (-x["invoices"], x["description"] or ""))
+        c["approaching"] = c["nextDueOn"] is not None and c["nextDueOn"] <= (on + timedelta(days=APPROACHING_DAYS)).isoformat()
+    return {"on": on.isoformat(), "customers": out}

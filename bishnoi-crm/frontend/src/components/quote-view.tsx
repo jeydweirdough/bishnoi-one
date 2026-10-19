@@ -4,6 +4,8 @@ import { PriceSource, RuleAdjustments, TaxSummary } from "./tax-summary";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Flag } from "@/src/platform/ui/marks";
+import { Pill } from "@/src/platform/ui/figures";
+import { CREDIT_TONES } from "./crm/credit-tones";
 import { Particulars, SectionTitle, Subheading, Sheet } from "@/src/platform/ui/sheet";
 import { percent, type Format } from "@/src/platform/lib/format";
 import { orgFormat } from "@/src/platform/lib/org";
@@ -50,7 +52,7 @@ export async function QuoteView({
   fields?: CustomField[];
   letterHref: string;
   customerHref?: string;
-  actions?: { approval?: ReactNode; letter?: ReactNode; payment?: ReactNode; pharmacy?: ReactNode };
+  actions?: { approval?: ReactNode; letter?: ReactNode; payment?: ReactNode; pharmacy?: ReactNode; credit?: ReactNode };
 }) {
   const fmt = await orgFormat();
   const { approval, letter, payment, pharmacy } = quote;
@@ -236,6 +238,30 @@ export async function QuoteView({
               </>
             )}
           </section>
+          {quote.credit && (
+            <section className="py-3" aria-label="Credit status">
+              <h3 className="text-meta text-ink-3">Credit status, for Finance to confirm</h3>
+              <p className="mt-0.5 flex flex-wrap items-center gap-2">
+                <Pill tone={quote.credit.status ? CREDIT_TONES[quote.credit.status] : "plain"}>{quote.credit.label}</Pill>
+                <span className="text-meta text-ink-3">checked {fmt.whenLabel(quote.credit.checkedAt)}</span>
+              </p>
+              <p className="mt-1 text-meta text-ink-2">
+                {quote.credit.detail}
+                {quote.credit.owedCentavos > 0 ? ` ${fmt.peso(quote.credit.owedCentavos)} owed${quote.credit.overdueCentavos > 0 ? `, ${fmt.peso(quote.credit.overdueCentavos)} past due` : ""}.` : ""}
+              </p>
+              {quote.credit.decision ? (
+                <p className={`mt-1 text-sm ${quote.credit.decision === "hold" ? "font-medium text-danger" : "text-ink"}`}>
+                  {quote.credit.decision === "hold" ? "On hold" : "Confirmed"} by {quote.credit.byName}
+                  {quote.credit.decidedAt ? `, ${fmt.whenLabel(quote.credit.decidedAt)}` : ""}
+                  {quote.credit.note ? `: ${quote.credit.note}` : ""}
+                  {quote.credit.decision === "hold" ? " It's ordered once Finance confirms it." : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-meta text-ink-3">Waiting for Finance to confirm.</p>
+              )}
+              {actions?.credit}
+            </section>
+          )}
 
           {(quote.prescriptions?.length ?? 0) > 0 && (
             <section className="py-3" aria-label="Prescription">

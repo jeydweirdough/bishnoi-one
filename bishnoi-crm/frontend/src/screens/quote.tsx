@@ -1,5 +1,5 @@
 import { Printer } from "lucide-react";
-import { ApprovalActions, LetterActions, PaymentForm } from "@/src/vendor-finance/components/finance-actions";
+import { ApprovalActions, CreditActions, LetterActions, PaymentForm } from "@/src/vendor-finance/components/finance-actions";
 import { DeleteQuote } from "../components/delete-quote";
 import { PharmacyCheckForm } from "../components/pharmacy-check";
 import { RaiseOrder } from "../components/raise-order";
@@ -79,6 +79,7 @@ export default async function QuotePage({ params, searchParams }: { params: Para
         fields={fields}
         actions={{
           approval: <ApprovalActions quote={quote} org={me.org} />,
+          credit: <CreditActions quote={quote} org={me.org} />,
           letter: <LetterActions quote={quote} org={me.org} />,
           payment: <PaymentForm quote={quote} org={me.org} />,
           pharmacy: <PharmacyCheckForm quote={quote} org={me.org} linked={!!me.pharmacyLinked} />,

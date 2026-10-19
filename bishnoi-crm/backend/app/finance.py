@@ -12,6 +12,7 @@ can't be reached, saving waits, rather than a quote going out without it.
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from app.config import Settings
@@ -107,3 +108,26 @@ def add_tax(settings: Settings, priced: dict, products: dict[str, Product], bund
         "on": answer["on"],
     }
     return priced
+
+
+def customer_standing(settings: Settings, ids: list[str]) -> dict[str, dict] | None:
+    """What Finance billed these customers (by the CRM's ids): owed and how late,
+    the next due date, the year's billings and lines (Finance's
+    /integration/customers). None when Finance isn't linked or can't be reached:
+    the CRM then says so rather than guessing. A customer with no invoices is
+    left out of the answer."""
+    if not settings.finance_linked or not ids:
+        return None
+    out: dict[str, dict] = {}
+    for start in range(0, len(ids), 300):
+        chunk = ",".join(ids[start:start + 300])
+        request = urllib.request.Request(
+            f"{settings.finance_api_url}/integration/customers?ids={urllib.parse.quote(chunk, safe=',')}",
+            headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+                out.update(json.loads(response.read()).get("customers") or {})
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            return None
+    return out

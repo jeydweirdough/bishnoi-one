@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from app.access import Access, require
 from app.api import Api, camel, changed, check_email, digits, field_error, iso, not_found, person_out, team_out
 from app.audit import audit
-from app.deps import DB, CurrentUser
+from app.deps import DB, CurrentUser, SettingsDep
+from app import trade
 from app.extra import check_extra, check_required, fields_for
 from app.access import permissions_of
 from app.models import Activity, ActivityLink, Company, Contact, Deal, FormField, PriceGroup, User
@@ -296,6 +297,12 @@ def read_company(access: View, db: DB, company_id: str) -> dict:
     return company_detail(db, access, get_company(db, access, company_id))
 
 
+@router.get("/{company_id}/trade")
+def read_trade(access: View, db: DB, settings: SettingsDep, company_id: str) -> dict:
+    """A B2B customer's credit status, profile and the products they carry, worked out (app/trade.py)."""
+    return trade.trade_out(db, settings, get_company(db, access, company_id))
+
+
 @router.patch("/{company_id}")
 def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body: CompanyPatch) -> dict:
     company = get_company(db, access, company_id)
@@ -329,6 +336,8 @@ def update_company(access: Edit, me: CurrentUser, db: DB, company_id: str, body:
         audit(db, me, "company.updated", target=company.name, target_type="company", target_id=company.id, fields=camel([f for f in fields if f != "team_id"]))
         db.commit()
         db.refresh(company)  # its owner and team may be new
+        if "extra" in fields:
+            trade.forget_ranks()  # a 2MG figure moves the B2B profile
     return company_detail(db, access, company)
 
 

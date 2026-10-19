@@ -4,11 +4,12 @@ import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { can } from "@/src/platform/lib/access";
-import { api, enc, getCompanyMe, query } from "@/src/platform/lib/api";
+import { api, enc, getCompanyMe, load, query } from "@/src/platform/lib/api";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { makeFormat } from "@/src/platform/lib/format";
-import type { Assignable, CustomerType, DealList, FormLayout, Paged, Quote, CompanyDetail } from "@/src/platform/lib/types";
+import type { Assignable, CustomerType, DealList, FormLayout, Paged, Quote, CompanyDetail, TradeProfile } from "@/src/platform/lib/types";
+import { TradeProfileCard } from "../components/crm/trade-profile";
 import { NoAccess } from "../components/admin/words";
 import { AssociationsPanel } from "../components/crm/associations-panel";
 import { QuotesPanel } from "../components/quotes-panel";
@@ -128,6 +129,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
     return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
   }).length;
   const profile = { total: profileFields.length, pct: profileFields.length ? Math.round((100 * profileFilled) / profileFields.length) : 0 };
+  // A B2B customer (its form has Credit terms): its trade profile, asked for now and drawn as it lands.
+  const isTrade = ownForm.sections.some((s) => s.fields.some((f) => f.key === "x_credit_terms"));
+  const trade = isTrade ? load<TradeProfile>(`/companies/${enc(company.id)}/trade`) : null;
 
   // How built-in details read on this page: links, and Transfer beside who it's assigned to.
   const shownDetails: Record<string, ReactNode> = {
@@ -362,6 +366,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
         </div>
 
         <div className="space-y-5">
+          {trade && <TradeProfileCard trade={trade} fmt={fmt} />}
           <Sheet className="px-5 pt-4 pb-5">
             <SectionTitle icon="particulars">Details</SectionTitle>
             <div className="mt-2">
