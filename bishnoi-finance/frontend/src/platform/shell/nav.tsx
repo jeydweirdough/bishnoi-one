@@ -835,7 +835,7 @@ function placeOf(pathname: string, me: Me): string | null {
 }
 
 /** `actions`: the profile (and an app's bell), which sit at the top right; on a phone, beside the menu button. */
-export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, actions }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean; actions?: ReactNode }) {
+export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, actions, footer }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean; actions?: ReactNode; footer?: ReactNode }) {
   const pathname = usePathname();
   const [rail, setRail] = useState(railAtFirst);
   function toggleRail() {
@@ -886,6 +886,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
             </div>
             <Links me={me} waiting={waiting} unset={unset} />
           </div>
+          {footer && <div className="mt-6">{footer}</div>}
         </RailContext.Provider>
       </aside>
 
@@ -911,6 +912,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
             <Links me={me} waiting={waiting} unset={unset} />
+            {footer && <div className="mt-4 border-t border-rule pt-3">{footer}</div>}
           </div>
         )}
       </div>

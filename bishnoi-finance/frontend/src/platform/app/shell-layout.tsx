@@ -36,8 +36,9 @@ function NoCompany() {
 }
 
 /** `waiting`: how many things wait on this person, by kind, for the sidebar's counts.
- *  `unset`: how many things aren't set up yet, for its red counts. */
-export async function ShellLayout({ children, waiting, unset }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset }) {
+ *  `unset`: how many things aren't set up yet, for its red counts.
+ *  `footer`: what the app shows at the bottom of its sidebar (Finance: its version). */
+export async function ShellLayout({ children, waiting, unset, footer }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; footer?: React.ReactNode }) {
   await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
@@ -61,7 +62,7 @@ export async function ShellLayout({ children, waiting, unset }: { children: Reac
         <NavProgress />
       </Suspense>
       <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[auto_minmax(0,1fr)] print:block">
-        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} />
+        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} footer={footer} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
           {/* Wider screens: the profile at the top right (on a phone, in the top bar). */}
           <header className="mb-4 hidden justify-end lg:flex print:hidden">{actions}</header>

@@ -55,7 +55,9 @@ def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
 def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     """What every signed-in screen needs around its own content, in one request:
     the same answers as /auth/me, /finance/unset and /finance/funds/counts
-    (that one only for a role that may see fund requests; null otherwise)."""
+    (that one only for a role that may see fund requests; null otherwise), and
+    the commit this API runs, for the sidebar's version line."""
+    from app.build import COMMIT
     from app.identity import me_out
     from app.routers.funds import waiting
 
@@ -63,4 +65,5 @@ def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
         "me": me_out(access.user, settings),
         "unset": unset(access, db),
         "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
+        "build": COMMIT,
     }
