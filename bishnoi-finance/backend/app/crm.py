@@ -30,6 +30,12 @@ def _call(settings: Settings, path: str, body: dict | None = None, *, missing: s
     if not settings.crm_linked:
         raise CrmUnavailable("Finance is not connected to the CRM. Please contact your system administrator.")
     headers = {"X-Bishnoi-Key": settings.crm_api_key.get_secret_value(), "Accept": "application/json"}
+    # The CRM keeps one database per company, so each call names Finance's
+    # (CRM_COMPANY). In production the CRM won't guess, so don't ask unnamed.
+    if settings.crm_company:
+        headers["X-Bishnoi-Company"] = settings.crm_company
+    elif settings.is_production:
+        raise CrmUnavailable("Finance is not connected to a CRM company (CRM_COMPANY isn't set). Please contact your system administrator.")
     data = None
     if body is not None:
         data, headers["Content-Type"] = json.dumps(body).encode(), "application/json"

@@ -11,6 +11,13 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.2.1",
+    date: "2026-10-20",
+    changes: [
+      "Finance tells the CRM which company it works for (2MG), so the customer list and price approvals keep working once Finance is live. If that isn't set up, Finance says so plainly.",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-10-20",
     changes: [
