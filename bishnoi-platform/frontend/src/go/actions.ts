@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { SECURE_COOKIE } from "@/src/platform/lib/session-cookie";
 import { redirect } from "next/navigation";
 import { ACCOUNT_COOKIE, AccountError, accountCall, accountToken, goLink, withPass, type AccountMe } from "./account";
 
@@ -23,7 +24,7 @@ export async function signInAccount(_previous: GoState, form: FormData): Promise
   (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: SECURE_COOKIE,
     path: "/",
     maxAge: session.expiresIn,
   });
