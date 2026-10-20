@@ -34,7 +34,7 @@ export function TeamsEditor({ teams, managers = [] }: { teams: TeamRow[]; manage
         ) : (
           <ul className="divide-y divide-rule">
             {teams.map((t) => (
-              <TeamLine key={t.id} team={t} managers={managers} />
+              <TeamLine key={t.id} team={t} managers={managers} teams={teams} />
             ))}
           </ul>
         )}
@@ -103,9 +103,14 @@ function AddTeam() {
   );
 }
 
-function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[] }) {
+function TeamLine({ team, managers, teams }: { team: TeamRow; managers: ManagerOption[]; teams: TeamRow[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [parentId, setParentId] = useState(team.parentId ?? "");
+  // A branch is under a division; a team with branches of its own stays a division.
+  const divisions = teams.filter((t) => !t.parentId && t.id !== team.id && t.isActive);
+  const hasBranches = teams.some((t) => t.parentId === team.id);
+  const parent = teams.find((t) => t.id === team.parentId);
   const [managerId, setManagerId] = useState(team.manager?.id ?? "");
   const [name, setName] = useState(team.name);
   const [description, setDescription] = useState(team.description ?? "");
@@ -116,7 +121,7 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
 
   function save() {
     start(async () => {
-      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null, headquarters, managerId: managerId || null });
+      const result = await updateTeam(team.id, { name: name.trim(), description: description.trim() || null, headquarters, managerId: managerId || null, parentId: parentId || null });
       if (!result.ok) {
         setError(result.fields ? null : result.error);
         setFields(result.fields ?? {});
@@ -188,6 +193,22 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
               )}
             </Field>
           </div>
+          {!hasBranches && (
+            <div className="sm:col-span-3">
+              <Field label="Part of" optional error={fields.parentId} hint="A branch of a division (NBD and CRR in B2B; TeleSales and the field areas in HOS). Leave empty for a division.">
+                {(p) => (
+                  <Select {...p} value={parentId} onChange={(e) => setParentId(e.target.value)}>
+                    <option value="">None: a division</option>
+                    {divisions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </div>
+          )}
           <div className="sm:order-last sm:col-span-3">
             <ChipsInput label="Headquarters" value={headquarters} onChange={setHeadquarters} placeholder="e.g. Makati office" error={fields.headquarters} />
           </div>
@@ -200,6 +221,7 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
                 setDescription(team.description ?? "");
                 setHeadquarters(team.headquarters);
                 setManagerId(team.manager?.id ?? "");
+                setParentId(team.parentId ?? "");
                 setFields({});
                 setError(null);
               }}
@@ -221,10 +243,12 @@ function TeamLine({ team, managers }: { team: TeamRow; managers: ManagerOption[]
   }
 
   return (
-    <li className="grid gap-2 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <li className={`grid gap-2 py-3 pr-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${parent ? "border-l-2 border-l-mint-2 bg-bench/40 pl-10" : "pl-5"}`}>
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-2 text-sm">
+          {parent && <span className="text-meta text-ink-3">{parent.name} ·</span>}
           <span className={`font-semibold ${team.isActive ? "text-ink" : "text-ink-3"}`}>{team.name}</span>
+          {hasBranches && <span className="rounded-md bg-mint px-2 text-meta text-sage-deep">Division</span>}
           {!team.isActive && <OffTag />}
         </p>
         <p className="text-meta text-ink-3">

@@ -38,7 +38,7 @@ function NoCompany() {
 /** `waiting`: how many things wait on this person, by kind, for the sidebar's counts.
  *  `unset`: how many things aren't set up yet, for its red counts.
  *  `notifications`: the app's own, for the bell (left out: no bell), and `allHref` where they're all listed. */
-export async function ShellLayout({ children, waiting, unset, notifications, allHref }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; notifications?: Promise<Notification[]>; allHref?: string }) {
+export async function ShellLayout({ children, waiting, unset, notifications, allHref, search }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; notifications?: Promise<Notification[]>; allHref?: string; search?: React.ReactNode }) {
   await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
@@ -52,7 +52,7 @@ export async function ShellLayout({ children, waiting, unset, notifications, all
   // The sidebar as it was left: full, or collapsed to its icons.
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   // The bell, then who you are: the top right of every page.
-  const actions = <TopActions me={me} notifications={stranded ? undefined : notifications} allHref={allHref} />;
+  const actions = <TopActions me={me} notifications={stranded ? undefined : notifications} allHref={allHref} search={stranded ? undefined : search} />;
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}

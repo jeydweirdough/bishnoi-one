@@ -963,6 +963,8 @@ export type TeamRow = {
   memberCount: number;
   /** The manager over it (above its team lead). */
   manager: { id: string; name: string } | null;
+  /** The division it's a branch of (B2B → NBD, CRR); null: a division itself. */
+  parentId?: string | null;
 };
 
 export type AuditItem = {

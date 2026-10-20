@@ -61,7 +61,7 @@ export async function deleteRole(id: string): Promise<Result> {
   });
 }
 
-export type TeamInput = { name: string; description: string | null; headquarters: string[] ; managerId?: string | null };
+export type TeamInput = { name: string; description: string | null; headquarters: string[]; managerId?: string | null; parentId?: string | null };
 
 export async function createTeam(input: TeamInput): Promise<Result<TeamRow>> {
   return attempt(async () => {

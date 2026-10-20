@@ -44,6 +44,12 @@ SERVICES: tuple[Service, ...] = (
     Service("gmail", "Gmail (Google Workspace)", "Each person sends from their own Gmail address, and every email sent is kept on the customer."),
     Service("outlook", "Outlook (Microsoft 365)", "Each person sends from their own Outlook address, and every email sent is kept on the customer."),
     Service("zoho_mail", "Zoho Mail", "Each person sends from their own Zoho Mail address, and every email sent is kept on the customer."),
+    # The lead inbox's channels (app/routers/inbox.py): each calls the CRM's /hooks/<channel>.
+    Service("facebook", "Facebook (lead forms and Messenger)", "Answers to the page's lead forms, and Messenger messages to the page, arrive in the lead inbox."),
+    Service("whatsapp", "WhatsApp Business", "Messages to the company's WhatsApp number arrive in the lead inbox."),
+    Service("viber", "Viber", "Messages to the company's Viber bot arrive in the lead inbox."),
+    Service("tawkto", "Tawk.to", "Chats and tickets from the website's Tawk.to box arrive in the lead inbox."),
+    Service("web_forms", "Website forms, Make and Zapier", "Enquiries sent by the website's own forms, or by Make or Zapier, arrive in the lead inbox."),
 )
 BY_KEY = {s.key: s for s in SERVICES}
 MAIL_PROVIDERS = ("gmail", "outlook", "zoho_mail")

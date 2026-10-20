@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Download, Target } from "lucide-react";
+import { ListViews } from "../components/crm/list-views";
 import Link from "next/link";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
 import { Suspense } from "react";
@@ -96,6 +97,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Search
       >
         Business expected from customers: how much, by when, and how likely.
       </PageHeader>
+      <ListViews list="deals" />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <ToggleLinks
