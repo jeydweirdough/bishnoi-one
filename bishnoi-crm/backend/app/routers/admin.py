@@ -487,6 +487,8 @@ class TeamIn(Api):
     headquarters: Headquarters = []
     # The manager over it (above its team lead).
     manager_id: str | None = Field(None, max_length=36)
+    # The division it's a branch of; none: a division itself.
+    parent_id: str | None = Field(None, max_length=36)
 
 
 class TeamPatch(Api):
@@ -495,6 +497,7 @@ class TeamPatch(Api):
     headquarters: Headquarters | None = None
     is_active: bool | None = None
     manager_id: str | None = Field(None, max_length=36)
+    parent_id: str | None = Field(None, max_length=36)
 
 
 def team_out(team: Team, members: int = 0, db: DB | None = None) -> dict:
@@ -509,6 +512,7 @@ def team_out(team: Team, members: int = 0, db: DB | None = None) -> dict:
         "memberCount": members,
         "manager": {"id": manager.id, "name": manager.full_name} if manager else None,
         "shareCustomers": team.share_customers,
+        "parentId": team.parent_id,
     }
 
 
@@ -520,6 +524,21 @@ def check_manager(db: DB, manager_id: str | None) -> str | None:
     if person is None or not person.is_active or person.role.scope != "managed":
         raise field_error("managerId", "Pick someone whose role manages teams (scope: the teams they manage).")
     return person.id
+
+
+def check_parent(db: DB, team: Team | None, parent_id: str | None) -> str | None:
+    """A division to be a branch of: one that is itself a division (one level), never the team itself,
+    and not for a team that has branches of its own."""
+    if parent_id is None:
+        return None
+    parent = db.get(Team, parent_id)
+    if parent is None or (team is not None and parent.id == team.id):
+        raise field_error("parentId", "Pick another division.")
+    if parent.parent_id is not None:
+        raise field_error("parentId", f"{parent.name} is a branch itself: pick its division.")
+    if team is not None and db.scalar(select(func.count()).select_from(Team).where(Team.parent_id == team.id)):
+        raise field_error("parentId", "This team has branches of its own, so it stays a division.")
+    return parent.id
 
 
 def team_members(db: DB) -> dict[str, int]:
@@ -541,8 +560,14 @@ def get_team(db: DB, team_id: str) -> Team:
 @router.get("/teams")
 def list_teams(_: Teams, db: DB) -> list[dict]:
     counts = team_members(db)
-    teams = db.scalars(select(Team).order_by(Team.is_active.desc(), func.lower(Team.name)))
-    return [team_out(t, counts.get(t.id, 0), db) for t in teams]
+    teams = list(db.scalars(select(Team).order_by(Team.is_active.desc(), func.lower(Team.name))))
+    # Each division, then its branches under it.
+    ordered = []
+    for t in teams:
+        if t.parent_id is None or t.parent_id not in {x.id for x in teams}:
+            ordered.append(t)
+            ordered.extend(b for b in teams if b.parent_id == t.id)
+    return [team_out(t, counts.get(t.id, 0), db) for t in ordered]
 
 
 @router.get("/teams/managers")
@@ -556,7 +581,7 @@ def team_managers(_: Teams, db: DB) -> list[dict]:
 def create_team(_: Teams, me: CurrentUser, db: DB, body: TeamIn) -> dict:
     if name_taken(db, Team, body.name):
         raise field_error("name", "There's already a team with that name.")
-    team = Team(name=body.name, description=body.description, headquarters=body.headquarters, manager_id=check_manager(db, body.manager_id))
+    team = Team(name=body.name, description=body.description, headquarters=body.headquarters, manager_id=check_manager(db, body.manager_id), parent_id=check_parent(db, None, body.parent_id))
     db.add(team)
     db.flush()
     audit(db, me, "team.created", target=team.name, target_type="team", target_id=team.id)
@@ -576,7 +601,9 @@ def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch
         wanted["headquarters"] = []
     if "manager_id" in wanted:
         wanted["manager_id"] = check_manager(db, wanted["manager_id"])
-    fields = [k for k in ("name", "description", "headquarters", "is_active", "manager_id") if k in wanted and getattr(team, k) != wanted[k]]
+    if "parent_id" in wanted:
+        wanted["parent_id"] = check_parent(db, team, wanted["parent_id"])
+    fields = [k for k in ("name", "description", "headquarters", "is_active", "manager_id", "parent_id") if k in wanted and getattr(team, k) != wanted[k]]
     for key in fields:
         setattr(team, key, wanted[key])
     if fields:

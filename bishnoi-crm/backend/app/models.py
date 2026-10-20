@@ -41,6 +41,9 @@ class Team(Base):
     # The manager over the team (above its team lead): with a role whose scope
     # is "managed", they reach every team they manage, and its people.
     manager_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), index=True, default=None)
+    # The division this team is a branch of (B2B → NBD and CRR; HOS → TeleSales
+    # and its field areas). None: a division itself. One level only.
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="SET NULL"), index=True, default=None)
     # Its customers named to other divisions (look-alikes, customer fields): app/routers/sharing.py.
     share_customers: Mapped[bool] = mapped_column(default=True, server_default="1")
     # The department's own retention windows (app/routers/retention.py); None:
@@ -1463,3 +1466,73 @@ class AssistanceApplication(Owned, Base):
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="AssistanceApplication.owner_id", lazy="joined")
+
+
+SAVED_VIEW_LISTS = ("companies", "contacts", "deals", "quotes", "activities")
+
+
+class SavedView(Base):
+    """A list as someone left it, kept by name (benchmark E2, after Twenty's
+    views): its filters, search and sort, as the list's own address keeps them.
+    One person's own, or shared with everyone who sees that list."""
+
+    __tablename__ = "nbcm_saved_views"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "list", "name", name="saved_view_name_once"),
+        CheckConstraint("list IN ('companies', 'contacts', 'deals', 'quotes', 'activities')", name="saved_view_list"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    list: Mapped[str] = mapped_column(String(20), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    # The list's address after "?", without the page: "status=customer&owner=me".
+    query: Mapped[str] = mapped_column(String(1000), default="")
+    shared: Mapped[bool] = mapped_column(default=False)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    owner: Mapped[User] = relationship(lazy="joined")
+
+
+INBOX_CHANNELS = ("facebook", "messenger", "whatsapp", "viber", "tawkto", "form")
+INBOX_STATES = ("new", "added", "dismissed")
+
+
+class InboxLead(Base):
+    """Someone who reached the company on its own channels (decided 2026-10-19):
+    a Facebook lead form, a Messenger, WhatsApp or Viber message, a Tawk.to chat
+    on the website, or a form sent by the website or a tool like Make. It waits
+    in the lead inbox until someone adds it to the customers (or finds it's one
+    already) or dismisses it. More messages from the same sender while it waits
+    join it, newest last. What came in is data: only the known fields are kept."""
+
+    __tablename__ = "nbcm_inbox_leads"
+    __table_args__ = (
+        CheckConstraint("channel IN ('facebook', 'messenger', 'whatsapp', 'viber', 'tawkto', 'form')", name="inbox_channel"),
+        CheckConstraint("status IN ('new', 'added', 'dismissed')", name="inbox_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    channel: Mapped[str] = mapped_column(String(12), index=True)
+    # Who sent it on that channel (a phone number, a Messenger or Viber id, a
+    # visitor's email): more messages from them join this lead while it's open.
+    sender: Mapped[str | None] = mapped_column(String(120), index=True, default=None)
+    status: Mapped[str] = mapped_column(String(10), index=True, default="new")
+    name: Mapped[str] = mapped_column(String(160))
+    business: Mapped[str | None] = mapped_column(String(160), default=None)
+    phone: Mapped[str | None] = mapped_column(String(40), default=None)
+    email: Mapped[str | None] = mapped_column(String(254), default=None)
+    city: Mapped[str | None] = mapped_column(String(80), default=None)
+    # [{"at": iso, "text": "..."}], newest last, at most 30.
+    messages: Mapped[list] = mapped_column(JSON, default=list)
+    # What else the channel said, by label: the form's name, the ad, the page.
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), index=True, default=None)
+    handled_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    company: Mapped[Company | None] = relationship(lazy="joined")
+    handled_by: Mapped[User | None] = relationship(lazy="joined")

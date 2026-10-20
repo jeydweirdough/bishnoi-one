@@ -49,7 +49,7 @@ def test_only_administrators_see_connections(client, ana, ben):
 
 def test_the_platform_says_which_services_are_on(client, ana, platform):
     page = client.get("/admin/connections", headers=ana).json()
-    assert page["connected"] is True and {s["key"]: s["on"] for s in page["services"]} == {"zoho_books": False, "gmail": True, "outlook": False, "zoho_mail": False}
+    assert page["connected"] is True and {s["key"]: s["on"] for s in page["services"]} == {"zoho_books": False, "gmail": True, "outlook": False, "zoho_mail": False, "facebook": False, "whatsapp": False, "viber": False, "tawkto": False, "web_forms": False}
     # Asked once, then the answer is kept; while the platform is down, the last answer stands.
     client.get("/admin/connections", headers=ana)
     assert platform["asked"] == 1

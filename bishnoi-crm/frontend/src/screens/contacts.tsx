@@ -1,4 +1,5 @@
 import { Copy, Plus } from "lucide-react";
+import { ListViews } from "../components/crm/list-views";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
@@ -67,6 +68,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
           )}
         </Later>
       </PageHeader>
+      <ListViews list="contacts" />
 
       <Filters
         search="Search by name, email or customer"

@@ -19,9 +19,10 @@ export type Notification = { key: string; title: string; reason?: string; href: 
 /** `notifications`: the app's own (the CRM's are its attention prompts), still
  *  loading when the page is drawn so nothing waits for them. Left out, no bell:
  *  a bell that never rings is only noise. */
-export function TopActions({ me, notifications, allHref }: { me: Me; notifications?: Promise<Notification[]>; allHref?: string }) {
+export function TopActions({ me, notifications, allHref, search }: { me: Me; notifications?: Promise<Notification[]>; allHref?: string; search?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-1">
+      {search}
       {notifications && (
         <Suspense fallback={<BellButton count={0} />}>
           <LoadedBell notifications={notifications} allHref={allHref} />

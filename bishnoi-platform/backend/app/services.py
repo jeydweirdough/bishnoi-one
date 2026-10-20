@@ -122,6 +122,64 @@ SERVICES: tuple[Service, ...] = (
             Detail("client_secret", "Client secret", "Shown beside the Client ID.", secret=True),
         ),
     ),
+    # The CRM's lead inbox: each channel calls the CRM's address for it,
+    # <CRM API address>/hooks/<channel>?company=<this company's short name>
+    # (the CRM's Lead inbox page shows each one, ready to copy).
+    Service(
+        key="facebook",
+        name="Facebook (lead forms and Messenger)",
+        purpose="Answers to the page's lead forms, and Messenger messages to the page, arrive in the CRM's lead inbox.",
+        help_url="https://developers.facebook.com/docs/graph-api/webhooks/getting-started",
+        apps=("crm",),
+        details=(
+            Detail("page_id", "Page ID", "The Facebook page's ID: the page → About → Page transparency, or Meta Business Suite → Settings."),
+            Detail("app_secret", "App secret", "developers.facebook.com → your app → App settings → Basic. Facebook signs each call with it.", secret=True),
+            Detail("verify_token", "Verify token", "Any long random text. Type the same in the app's Webhooks settings (product Page, fields leadgen and messages), with the CRM's address /hooks/facebook.", secret=True),
+            Detail("page_access_token", "Page access token", "A long-lived page token with leads_retrieval, pages_messaging and pages_manage_metadata, so the CRM can read each form's answers.", secret=True),
+        ),
+    ),
+    Service(
+        key="whatsapp",
+        name="WhatsApp Business",
+        purpose="Messages to the company's WhatsApp number arrive in the CRM's lead inbox.",
+        help_url="https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks",
+        apps=("crm",),
+        details=(
+            Detail("phone_number_id", "Phone number ID", "developers.facebook.com → your app → WhatsApp → API setup: the ID under the number."),
+            Detail("app_secret", "App secret", "App settings → Basic. Meta signs each call with it.", secret=True),
+            Detail("verify_token", "Verify token", "Any long random text. Type the same in WhatsApp → Configuration → Webhook, with the CRM's address /hooks/whatsapp, and subscribe to messages.", secret=True),
+        ),
+    ),
+    Service(
+        key="viber",
+        name="Viber",
+        purpose="Messages to the company's Viber bot arrive in the CRM's lead inbox.",
+        help_url="https://developers.viber.com/docs/api/rest-bot-api/",
+        apps=("crm",),
+        details=(
+            Detail("auth_token", "Authentication token", "partners.viber.com → your bot account → Info. Then set the webhook to the CRM's address /hooks/viber.", secret=True),
+        ),
+    ),
+    Service(
+        key="tawkto",
+        name="Tawk.to",
+        purpose="Chats and tickets from the website's Tawk.to box arrive in the CRM's lead inbox.",
+        help_url="https://help.tawk.to/article/using-webhooks",
+        apps=("crm",),
+        details=(
+            Detail("webhook_secret", "Webhook secret", "Tawk.to → Administration → Settings → Webhooks → Create: the CRM's address /hooks/tawkto, events Chat start and New ticket. Copy its secret key here.", secret=True),
+        ),
+    ),
+    Service(
+        key="web_forms",
+        name="Website forms, Make and Zapier",
+        purpose="Enquiries sent by the website's own forms, or by Make or Zapier, arrive in the CRM's lead inbox.",
+        help_url="https://www.make.com/en/help/tools/http",
+        apps=("crm",),
+        details=(
+            Detail("form_key", "Form key", "Any long random text. The website or tool sends it in the X-Bishnoi-Key header with each enquiry (name, business, phone, email, city, message) to the CRM's address /hooks/form.", secret=True),
+        ),
+    ),
 )
 
 BY_KEY = {s.key: s for s in SERVICES}

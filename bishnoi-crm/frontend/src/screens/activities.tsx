@@ -1,4 +1,5 @@
 import { SelectAllBox, SelectToggle, SelectionProvider } from "@/src/platform/bulk/selection";
+import { ListViews } from "../components/crm/list-views";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { can } from "@/src/platform/lib/access";
@@ -95,6 +96,7 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
       >
         {view === "calendar" ? "Your calls and visits by day. Plan one with New call; tick it off afterwards to say how it went." : "Calls, meetings, emails, notes and tasks. What's still to do comes first."}
       </PageHeader>
+      <ListViews list="activities" />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <ToggleLinks

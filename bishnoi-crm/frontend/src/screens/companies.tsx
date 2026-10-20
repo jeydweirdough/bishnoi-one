@@ -1,5 +1,9 @@
 import { CustomerSharingButton } from "../components/crm/customer-sharing";
-import { Copy, Download, Upload } from "lucide-react";
+import { Board as KanbanBoard } from "@/src/platform/ui/board";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { moveCustomerType } from "../actions/boards";
+import { ListViews } from "../components/crm/list-views";
+import { Copy, Download, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { NewCustomerButton } from "../components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -21,6 +25,7 @@ import { extraText } from "../components/extra/extra-values";
 export const metadata = { title: "Customers" };
 
 const SIZE = 50;
+const BOARD_SIZE = 200;
 
 // The list's one request: the customers with only what a row shows, the types,
 // the form's added fields, and the people (only when bulk changes are offered).
@@ -44,17 +49,24 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const params = await searchParams;
   const [q, status, owner] = [one(params.q), one(params.status), one(params.owner)];
   const page = Math.max(1, Number(one(params.page)) || 1);
+  // As a table (paged), or as a board by type (benchmark E1): the board shows the first BOARD_SIZE.
+  const layout = one(params.layout) === "board" ? "board" : "table";
   const bulk = { followUp: can(me, "activities.create"), edit: can(me, "customers.edit"), delete: can(me, "customers.delete") };
   const bulkAllowed = bulk.followUp || bulk.edit || bulk.delete;
   // Asked for, not waited on: the title, filters and list card are drawn now and the rows fill in.
   const answer = loadQuery<Answer>(
     CUSTOMERS,
-    { q: q || null, status: status || null, owner: owner || null, limit: SIZE, offset: (page - 1) * SIZE, withPeople: bulkAllowed },
+    { q: q || null, status: status || null, owner: owner || null, limit: layout === "board" ? BOARD_SIZE : SIZE, offset: layout === "board" ? 0 : (page - 1) * SIZE, withPeople: bulkAllowed },
     ["companies"],
   );
   const fmt = makeFormat(me.org);
   const filtered = Boolean(q || status || owner);
   const here = new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(owner && { owner }) });
+  const layoutHref = (l: string) => {
+    const next = new URLSearchParams(here);
+    if (l === "board") next.set("layout", "board");
+    return `/companies${next.size ? `?${next}` : ""}`;
+  };
   const filters = (types: CustomerType[]) => (
     <Filters
       search="Search by name, code, city or industry"
@@ -75,6 +87,11 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           <>
             {/* Whether a division's customers show to the others: the administrator's, and a manager's for their divisions. */}
             {(can(me, "admin.teams") || me.role?.scope === "managed") && <CustomerSharingButton />}
+            {can(me, "customers.create") && (
+              <LinkButton href="/companies/find" icon={<Sparkles className="size-4" aria-hidden />}>
+                Find leads with AI
+              </LinkButton>
+            )}
             {can(me, "customers.edit") && (
               <LinkButton href="/companies/duplicates" icon={<Copy className="size-4" aria-hidden />}>
                 Possible duplicates
@@ -106,10 +123,21 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           )}
         </Later>
       </PageHeader>
+      <ListViews list="companies" />
 
       <Later data={answer} fallback={filters([])}>
         {(a) => filters(a.customerTypes ?? [])}
       </Later>
+
+      <div className="mb-3">
+        <ToggleLinks
+          current={layout}
+          options={[
+            { value: "table", label: "Table", href: layoutHref("table") },
+            { value: "board", label: "Board", href: layoutHref("board") },
+          ]}
+        />
+      </div>
 
       <Later
         data={answer}
@@ -123,6 +151,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           const list = answer.companies!;
           const people = answer.people ?? [];
           const types = answer.customerTypes ?? [];
+          if (layout === "board") return <CustomersBoard me={me} list={list} types={types} fmt={fmt} />;
           const fields = answer.form ? layoutFields(answer.form).filter((f) => !f.standard) : [];
           // Fields an admin added and chose to show in the list: under each name, after the industry.
           const inList = fields.filter((f) => f.inList);
@@ -203,6 +232,51 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
           );
         }}
       </Later>
+    </>
+  );
+}
+
+
+/**
+ * Customers as a board by type (benchmark E1, after Twenty): a column for each
+ * type offered to this person, and any type a customer here already has.
+ * Dragging a card to another column gives the customer that type, for those
+ * who may edit it.
+ */
+function CustomersBoard({ me, list, types, fmt }: { me: Awaited<ReturnType<typeof getCompanyMe>>; list: { total: number; items: Row[] }; types: CustomerType[]; fmt: ReturnType<typeof makeFormat> }) {
+  const team = me.team?.id ?? null;
+  const offered = types.filter(
+    (t) => t.isActive && (!t.onlyTeams?.length || (team && t.onlyTeams.includes(team))) && !(team && t.exceptTeams?.includes(team)),
+  );
+  const present = new Set(list.items.map((c) => c.status));
+  const columns = [...offered, ...types.filter((t) => present.has(t.code) && !offered.includes(t))];
+  return (
+    <>
+      {list.total > list.items.length && (
+        <p className="mb-2 text-meta text-ink-3">
+          The first {list.items.length} of {list.total}. Search or filter to narrow it down.
+        </p>
+      )}
+      <KanbanBoard
+        columns={columns.map((t) => ({
+          key: t.code,
+          label: t.name,
+          note: fmt.plural(list.items.filter((c) => c.status === t.code).length, "customer"),
+          hint: `No ${t.name.toLowerCase()} customers`,
+        }))}
+        cards={list.items.map((c) => ({
+          id: c.id,
+          column: c.status,
+          href: `/companies/${c.id}`,
+          title: c.name,
+          sub: [c.city, c.industry].filter(Boolean).join(" · ") || undefined,
+          when: c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity",
+          meta: c.owner.id === me.user.id ? "You" : c.owner.name,
+          movable: c.can.edit,
+        }))}
+        moves={can(me, "customers.edit") ? [{ from: "*", to: "*", step: "{to}", label: "Change type to {to}" }] : []}
+        run={moveCustomerType}
+      />
     </>
   );
 }

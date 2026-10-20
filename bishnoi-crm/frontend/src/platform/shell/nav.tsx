@@ -116,14 +116,17 @@ function crmGroups(me: Me, waiting: Waiting = {}): { label: string; pages: CrmPa
           href: "/companies",
           label: "Customers",
           icon: "customers",
-          also: ["/contacts", "/customers", "/order-links"],
+          also: ["/contacts", "/customers", "/order-links", "/inbox"],
           subpages: [
             { href: "/companies", label: "Customers", also: ["/customers"] },
             { href: "/contacts", label: "Contacts" },
+            // What came in on the company's own channels (Facebook, WhatsApp, Viber, Tawk.to, the website).
+            ...(may("customers.inbox") ? [{ href: "/inbox", label: "Lead inbox" }] : []),
             // Links a customer, or someone who becomes one, orders their medicines from.
             ...(may("quotes.view") ? [{ href: "/order-links", label: "Order links" }] : []),
           ],
         }),
+        ...only(admin && may("customers.inbox"), { href: "/inbox", label: "Lead inbox", icon: "email" }),
         ...only((selling || admin) && may("deals.view"), { href: "/deals", label: "Deals", icon: "deals" }),
         ...only(selling && may("quotes.view"), { href: "/quotes", label: "Quotes", icon: "quotes" }),
         ...only(!admin && may("activities.view"), { href: "/calendar", label: "Calendar", icon: "calendar" }),

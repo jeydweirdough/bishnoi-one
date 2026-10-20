@@ -1,4 +1,7 @@
 import { Users } from "lucide-react";
+import { Board as KanbanBoard } from "@/src/platform/ui/board";
+import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { ListViews } from "../components/crm/list-views";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { QuoteStateMark } from "@/src/platform/ui/marks";
@@ -16,6 +19,7 @@ import { Filters, Pager } from "../components/crm/list-controls";
 export const metadata = { title: "Quotes" };
 
 const SIZE = 50;
+const BOARD_SIZE = 200;
 // What's waiting on an approver, or on Finance's credit confirmation: each a list of its own, for those who decide it.
 const TASKS = [
   { key: "credit", label: "Credit to confirm", empty: "No B2B quotes waiting for a credit confirmation.", permission: "orders.credit" },
@@ -38,7 +42,9 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   const task = tasks.find((t) => t.key === one(params.task));
   const [q, state, owner] = [one(params.q), one(params.state), one(params.owner)];
   const page = Math.max(1, Number(one(params.page)) || 1);
-  const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
+  // As a table (paged), or as a board by state (benchmark E1): the board shows the newest BOARD_SIZE.
+  const layout = one(params.layout) === "board" ? "board" : "table";
+  const query = new URLSearchParams(layout === "board" ? { limit: String(BOARD_SIZE), offset: "0" } : { limit: String(SIZE), offset: String((page - 1) * SIZE) });
   for (const [k, v] of Object.entries({ task: task?.key ?? "", q, state, owner })) if (v) query.set(k, v);
 
   const quotes = can(me, "quotes.create");
@@ -64,6 +70,11 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
     );
   };
   const here = new URLSearchParams(Object.entries({ task: task?.key ?? "", q, state, owner }).filter(([, v]) => v));
+  const layoutHref = (l: string) => {
+    const next = new URLSearchParams(here);
+    if (l === "board") next.set("layout", "board");
+    return `/quotes${next.size ? `?${next}` : ""}`;
+  };
   const pickerOf = (c: Paged<CompanyRow>) => (quotes ? c.items.map((x) => ({ id: x.id, name: x.name })) : null);
   const chips = (counts: Paged<Quote>[]) => (
     <nav aria-label="Show" className="mb-4 flex flex-wrap gap-1.5">
@@ -86,6 +97,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
       >
         {task ? (task.key === "credit" ? "B2B quotes waiting for you to confirm the customer's credit status." : "Waiting on you as an approver.") : "Every quote you can see, newest first."}
       </PageHeader>
+      <ListViews list="quotes" />
 
       {approver && (
         <Later data={waiting} fallback={chips([])}>
@@ -116,6 +128,16 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
         ]}
       />
 
+      <div className="mb-3">
+        <ToggleLinks
+          current={layout}
+          options={[
+            { value: "table", label: "Table", href: layoutHref("table") },
+            { value: "board", label: "Board", href: layoutHref("board") },
+          ]}
+        />
+      </div>
+
       <Later
         data={Promise.all([listing, customers])}
         fallback={
@@ -125,6 +147,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
         }
       >
         {([list, c]) => {
+          if (layout === "board") return <QuotesBoard list={list} fmt={fmt} task={task?.key} />;
           const picker = pickerOf(c);
           return (
             <>
@@ -193,6 +216,52 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
           );
         }}
       </Later>
+    </>
+  );
+}
+
+
+// Where a quote stands, left to right: waiting on someone, ready to order, ordered, rejected.
+const QUOTE_COLUMNS = [
+  { key: "waiting", label: "Waiting for approval", hint: "Nothing waiting" },
+  { key: "ready", label: "Ready", hint: "Nothing ready to order" },
+  { key: "ordered", label: "Ordered", hint: "Nothing ordered yet" },
+  { key: "rejected", label: "Rejected", hint: "Nothing rejected" },
+];
+
+/**
+ * Quotes as a board by where they stand (benchmark E1, after Twenty). Read-only:
+ * approving, checking a letter and ordering each have their own step on the
+ * quote, so a card opens the quote rather than being dragged.
+ */
+function QuotesBoard({ list, fmt, task }: { list: Paged<Quote>; fmt: ReturnType<typeof makeFormat>; task?: string }) {
+  const columnOf = (x: Quote) => (x.order ? "ordered" : x.state);
+  return (
+    <>
+      {list.total > list.items.length && (
+        <p className="mb-2 text-meta text-ink-3">
+          The newest {list.items.length} of {list.total}. Search or filter to narrow it down.
+        </p>
+      )}
+      <KanbanBoard
+        columns={QUOTE_COLUMNS.map((col) => {
+          const here = list.items.filter((x) => columnOf(x) === col.key);
+          return { ...col, note: `${fmt.plural(here.length, "quote")} · ${fmt.pesoCompact(here.reduce((n, x) => n + x.totalCentavos, 0))}` };
+        })}
+        cards={list.items.map((x) => ({
+          id: x.id,
+          column: columnOf(x),
+          href: `/quotes/${x.id}${task ? `?from=${task}` : ""}`,
+          title: x.number,
+          sub: x.customerName ?? undefined,
+          value: fmt.peso(x.totalCentavos),
+          when: fmt.whenLabel(x.createdAt),
+          meta: [x.priceTypeName, x.credit?.decision === "hold" ? "Credit on hold" : null, x.createdBy.name].filter(Boolean).join(" · "),
+          movable: false,
+        }))}
+        moves={[]}
+        run={async () => ({ ok: false as const, error: "Open the quote to move it on." })}
+      />
     </>
   );
 }

@@ -32,6 +32,7 @@ ACTION_LABELS = {
     "audit": "Audit logs",
     "import": "Upload",
     "credit": "Confirm credit status",
+    "inbox": "Lead inbox",
 }
 
 
@@ -48,7 +49,8 @@ class Area:
 
 AREAS: tuple[Area, ...] = (
     Area("dashboard", "Dashboard", "CRM", ("view",)),
-    Area("customers", "Customers & contacts", "CRM", CRUD),
+    # customers.inbox: the lead inbox, what came in on the company's own channels (Facebook, WhatsApp, Tawk.to, the website).
+    Area("customers", "Customers & contacts", "CRM", (*CRUD, "inbox")),
     Area("deals", "Deals", "CRM", CRUD),
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "CRM", CRUD),
     Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices", "approve")),
@@ -118,6 +120,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         "team",
         frozenset(
             _grant("customers", "deals", "activities", "quotes", "orders")
+            | _grant("customers", actions=("inbox",))
             | _grant("quotes", "orders", actions=("approve",))
             | _grant("dashboard", "products", actions=("view",))
             | _grant("products", actions=("prices",))

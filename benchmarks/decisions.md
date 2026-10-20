@@ -125,3 +125,30 @@ Wholesaler retired). Three of the B2B notes' fields are worked out, never typed
 for Finance to confirm; the products they carry from their orders; and the
 Priority / High priority profile from the year's GetMeds and 2MG sales, by
 share (top 20%, next 30%) so it needs no peso threshold agreed first.
+
+## Divisions with branches, from the 2026 org chart, decided on 2026-10-19
+
+The CRM's teams follow the org chart (HR, 10 October 2026) for structure and
+the sales structure workbook for who sells where. A team can be a branch of a
+division (`nbcm_teams.parent_id`, one level). HOS: TeleSales, Field NCR 1, NCR 2,
+North and Central Luzon, South Luzon, Visayas, Mindanao, Government Account,
+Patient Assistance Program; district coaches lead their area (role District
+coach). Prescription Business: STC, URO, B&B, its territory leads in all three.
+B2C: MD Telesales. B2B: NBD and CRR. Government Bidding, CLIDP and Modern Trade
+stay divisions; 2MG SCM is off (not sales). Applied with
+`app/tools/consolidate_divisions.py`.
+
+## Leads from AI and from the company's own channels, decided on 2026-10-19
+
+**Find leads with AI** works with each person's own chatbot, not a company AI
+account: claude.ai and ChatGPT subscriptions can't be used by another app, so
+the CRM writes the prompt, opens it in ChatGPT, Claude or DeepSeek, and reads
+back what's pasted. Nothing is saved until the person ticks it (benchmark F10).
+
+**The lead inbox** takes what comes in on the company's own channels: Facebook
+lead forms and Messenger, WhatsApp Business, Viber, Tawk.to and the website's
+forms (or Make and Zapier). Like Zoho Books and the mail providers, each
+channel's secrets are kept on Platform (Companies → Connections), never on the
+CRM's server; the CRM shows each channel's address to give it. Handling the
+inbox is its own permission (customers.inbox), given to roles wider than their
+own records (benchmark C8). Replying from the CRM comes later.
