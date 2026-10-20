@@ -43,11 +43,11 @@ def finish(client, who, request_id):
     return r.json()
 
 
-def test_nothing_spent_comes_back_in_full(client, ben):
+def test_nothing_spent_comes_back_in_full(client, ana, ben):
     req = release(client, ben, approved(client)["id"])  # 5,000 in cash
     sent = submit(client)
     assert sent["status"] == "to_check" and sent["expenses"] == []
-    done = finish(client, ben, req["id"])
+    done = finish(client, ana, req["id"])
     assert done["status"] == "to_return" and done["returnDueCentavos"] == 500000
     # No receipts, so nothing is expensed: the release is the only entry so far.
     assert len(done["entries"]) == 1
@@ -56,38 +56,38 @@ def test_nothing_spent_comes_back_in_full(client, ben):
     assert balances(client, ben) == {"1000": 0, "1200": 0}
 
 
-def test_spent_to_the_centavo_closes_at_the_check(client, ben):
+def test_spent_to_the_centavo_closes_at_the_check(client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     spend(client, 500000, categories(client)["Transportation"])
-    accept_all(client, ben, submit(client))
-    done = finish(client, ben, req["id"])
+    accept_all(client, ana, submit(client))
+    done = finish(client, ana, req["id"])
     assert done["status"] == "closed" and done["returnDueCentavos"] == 0 and done["reimburseDueCentavos"] == 0
     assert balances(client, ben) == {"1000": -500000, "1200": 0, "6200": 500000}
 
 
-def test_only_what_was_released_counts(client, ben):
+def test_only_what_was_released_counts(client, ana, ben):
     req = release(client, ben, approved(client)["id"], amount=300000)  # 3,000 of the 5,000 approved
     assert req["release"]["amountCentavos"] == 300000 and req["approvedCentavos"] == 500000
     spend(client, 350000, categories(client)["Transportation"])
-    accept_all(client, ben, submit(client))
-    done = finish(client, ben, req["id"])
+    accept_all(client, ana, submit(client))
+    done = finish(client, ana, req["id"])
     assert done["status"] == "to_reimburse" and done["reimburseDueCentavos"] == 50000
 
 
-def test_finance_can_re_sort_a_receipt_while_reviewing(client, ben):
+def test_finance_can_re_sort_a_receipt_while_reviewing(client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     cats = categories(client)
     # Filed as the person's own; Finance sees it was a taxi to the client.
     taxi = spend(client, 100000, cats["Personal"])["expenses"][0]
     assert taxi["covered"] is False
     submit(client)
-    bad = client.patch(f"/finance/funds/{req['id']}/expenses/{taxi['id']}", json={"categoryId": "no-such-category"}, headers=ben)
+    bad = client.patch(f"/finance/funds/{req['id']}/expenses/{taxi['id']}", json={"categoryId": "no-such-category"}, headers=ana)
     assert bad.status_code == 422
     moved = client.patch(
-        f"/finance/funds/{req['id']}/expenses/{taxi['id']}", json={"categoryId": cats["Transportation"]["id"], "accepted": True}, headers=ben
+        f"/finance/funds/{req['id']}/expenses/{taxi['id']}", json={"categoryId": cats["Transportation"]["id"], "accepted": True}, headers=ana
     ).json()
     assert moved["expenses"][0]["category"]["name"] == "Transportation" and moved["expenses"][0]["covered"] is True
-    done = finish(client, ben, req["id"])
+    done = finish(client, ana, req["id"])
     assert done["tally"]["coveredCentavos"] == 100000 and done["returnDueCentavos"] == 400000
 
 
@@ -110,11 +110,11 @@ def test_a_category_without_an_account_holds_the_review(app, client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     transport = categories(client)["Transportation"]
     spend(client, 100000, transport)
-    accept_all(client, ben, submit(client))
+    accept_all(client, ana, submit(client))
     with app.state.sessions() as db:
         db.get(ExpenseCategory, transport["id"]).account_id = None
         db.commit()
-    assert client.post(f"/finance/funds/{req['id']}/finish-check", headers=ben).status_code == 409
+    assert client.post(f"/finance/funds/{req['id']}/finish-check", headers=ana).status_code == 409
     assert client.get(f"/finance/funds/{req['id']}", headers=ben).json()["status"] == "to_check"
     # An admin gives it its account back, and the review completes.
     account = next(a for a in client.get("/finance/ledger/accounts", headers=ana).json()["items"] if a["code"] == "6200")
@@ -124,14 +124,15 @@ def test_a_category_without_an_account_holds_the_review(app, client, ana, ben):
         headers=ana,
     )
     assert fixed.status_code == 200, fixed.text
-    assert finish(client, ben, req["id"])["status"] == "to_return"
+    assert finish(client, ana, req["id"])["status"] == "to_return"
 
 
 def test_liquidation_is_due_in_a_week_and_late_ones_are_flagged(app, client, ben):
     req = release(client, ben, approved(client)["id"])
     assert req["release"]["liquidateBy"] == (manila_today() + timedelta(days=7)).isoformat()
     assert req["overdue"] is False
-    other = approved(client, "req-2")
+    # Someone else's, so it's only the date that's wrong (Rico has req-1 to liquidate).
+    other = approved(client, "req-2", requester=("Lia Cruz", "lia@example.com"))
     past = client.post(
         f"/finance/funds/{other['id']}/release",
         json={"amountCentavos": 500000, "method": "cash", "liquidateBy": (manila_today() - timedelta(days=2)).isoformat()},

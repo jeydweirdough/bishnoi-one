@@ -49,13 +49,13 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
         {r.status === "to_release" && may("funds.release") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="payments">Release cash advance</SectionTitle>
-            <Release request={r} org={me.org} today={fmt.todayKey()} />
+            {r.holds?.release ? <p className="text-sm text-ink-2">{r.holds.release}</p> : <Release request={r} org={me.org} today={fmt.todayKey()} />}
           </Sheet>
         )}
         {r.status === "to_check" && may("funds.check") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="approvals">Liquidation review</SectionTitle>
-            <CheckLiquidation request={r} categories={categories} org={me.org} />
+            {r.holds?.check ? <p className="text-sm text-ink-2">{r.holds.check}</p> : <CheckLiquidation request={r} categories={categories} org={me.org} />}
           </Sheet>
         )}
         {(r.status === "to_return" || r.status === "to_reimburse") && may("funds.settle") && (

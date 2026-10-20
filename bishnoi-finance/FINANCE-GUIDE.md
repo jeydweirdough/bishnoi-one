@@ -88,6 +88,12 @@ by whom, the purpose, the customer, and the date it's needed.
 - **Decline release…:** give the reason. The employee sees it in the CRM, and the
   request moves to History as cancelled.
 
+**One cash advance at a time.** While the employee still has an earlier cash
+advance to liquidate (including one returned to them for correction), their
+next one can't be released. The request says which one they still owe and when
+it's due. Once they send that liquidation in, the next one can go, even while
+Finance is still reviewing it.
+
 Some requests are marked **"Not subject to liquidation"**. These are settled the
 moment the money is released, and no receipts come back.
 
@@ -106,6 +112,10 @@ they must say why. Spending nothing is a liquidation too: all the money then
 comes back as a refund.
 
 ### Step 3: For review
+
+**Someone other than the person who released the money reviews it.** If you
+released this cash advance, the request tells you so and doesn't offer you the
+review.
 
 Go through the expenses one by one:
 
@@ -354,15 +364,12 @@ connected.
 
 Some choices are built in today but can change. Please tell us:
 
-1. **Who may do what.** Finance Staff can release money, review the same
-   liquidation and record its refund. Roles can split these between people
-   (a Cashier who only releases, say). Should they be split, and how?
-2. **The liquidation period.** Receipts are due one week after release unless
-   you pick another date. Is one week right?
-3. **Accounts and categories.** Do the starting accounts, codes and expense
+1. **Accounts and categories.** Do the starting accounts, codes and expense
    categories above match your own chart of accounts?
-4. **Reversing automatic entries.** Today an entry a marketing request made
-   can be reversed from the journal, like any other. Should those only change
-   through the request itself?
-5. **Anything you do outside Bishnoi One today** (spreadsheets, forms, reports) that
+2. **Anything you do outside Bishnoi One today** (spreadsheets, forms, reports) that
    you would like it to do instead.
+
+Already answered in the October questionnaire: releasing and reviewing are done
+by different people; receipts are due in one week, and an employee liquidates
+before the next release; entries a marketing request made can still be reversed
+from the journal.

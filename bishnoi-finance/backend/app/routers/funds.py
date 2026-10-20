@@ -68,6 +68,29 @@ def step(db: DB, user: User, r: FundRequest, action: str) -> None:
     audit(db, user, f"fund.{action}", target=r.number, target_type="fund_request", target_id=r.id)
 
 
+def release_hold(db: DB, r: FundRequest) -> str | None:
+    """Why this can't be released yet: its requester still has an earlier cash
+    advance to liquidate (sent back for correction counts). One waiting on
+    Finance's review doesn't hold it: the requester has done their part."""
+    earlier = db.scalar(
+        select(FundRequest)
+        .where(func.lower(FundRequest.requester_email) == r.requester_email.lower(), FundRequest.status == "to_liquidate", FundRequest.id != r.id)
+        .order_by(FundRequest.released_at)
+        .limit(1)
+    )
+    if earlier is None:
+        return None
+    due = f", due {earlier.liquidate_by:%d %b %Y}" if earlier.liquidate_by else ""
+    return f"{r.requester_name} still has {earlier.number} to liquidate{due}. Release this one after that's liquidated."
+
+
+def check_hold(r: FundRequest, user: User) -> str | None:
+    """Why this person can't review the liquidation: whoever released the money doesn't check how it was spent."""
+    if r.released_by_id is not None and r.released_by_id == user.id:
+        return "You released this cash advance, so someone else reviews its liquidation."
+    return None
+
+
 # --- the lists --------------------------------------------------------------------------------
 
 
@@ -200,7 +223,14 @@ def change_category(user: permitted("categories.manage"), db: DB, category_id: s
 
 @router.get("/{request_id}")
 def read_request(user: permitted("funds.view"), db: DB, settings: SettingsDep, request_id: str) -> dict:
-    return request_out(found(db, request_id), today(settings))
+    r = found(db, request_id)
+    # Why the step at hand is held for this person, so the page can say so
+    # instead of offering it. Finance's page only: the CRM reads request_out.
+    holds = {
+        "release": release_hold(db, r) if r.status == "to_release" else None,
+        "check": check_hold(r, user) if r.status == "to_check" else None,
+    }
+    return request_out(r, today(settings)) | {"holds": holds}
 
 
 @router.get("/{request_id}/expenses/{expense_id}/receipt")
@@ -232,6 +262,8 @@ class ReleaseIn(Api):
 def release(user: permitted("funds.release"), db: DB, settings: SettingsDep, request_id: str, body: ReleaseIn) -> dict:
     r = found(db, request_id)
     must_be(r, "to_release")
+    if hold := release_hold(db, r):
+        raise conflict(hold)
     if body.amount_centavos > r.approved_centavos:
         raise field_error("amountCentavos", f"The amount exceeds the approved amount ({peso(r.approved_centavos)}).")
     on = today(settings)
@@ -279,6 +311,8 @@ class ExpenseCheck(Api):
 def check_expense(user: permitted("funds.check"), db: DB, settings: SettingsDep, request_id: str, expense_id: str, body: ExpenseCheck) -> dict:
     r = found(db, request_id)
     must_be(r, "to_check")
+    if hold := check_hold(r, user):
+        raise conflict(hold)
     e = next((x for x in r.expenses if x.id == expense_id), None)
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such receipt on this request.")
@@ -308,6 +342,8 @@ def send_back(user: permitted("funds.check"), db: DB, settings: SettingsDep, req
     """Back to the requester to fix: a missing receipt, a wrong amount."""
     r = found(db, request_id)
     must_be(r, "to_check")
+    if hold := check_hold(r, user):
+        raise conflict(hold)
     r.status, r.sent_back_note = "to_liquidate", body.note
     event(r, "sent_back", user.full_name, f"Liquidation returned for correction: {body.note}")
     step(db, user, r, "sent_back")
@@ -319,6 +355,8 @@ def send_back(user: permitted("funds.check"), db: DB, settings: SettingsDep, req
 def finish_check(user: permitted("funds.check"), db: DB, settings: SettingsDep, request_id: str) -> dict:
     r = found(db, request_id)
     must_be(r, "to_check")
+    if hold := check_hold(r, user):
+        raise conflict(hold)
     if any(e.accepted is None for e in r.expenses):
         raise conflict("Accept or reject every expense before completing the review.")
     if any(e.category is None for e in r.expenses):
