@@ -35,7 +35,7 @@ from app.extra import check_extra
 from app.inventory import sync_if_stale
 from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
-from app import mail, pharmacy
+from app import mail, pharmacy, trade
 from app.orders import OrdersUnavailable
 from app.orders import payload as order_payload
 from app.orders import send as send_order
@@ -185,6 +185,11 @@ def deal_ref(db: Session, deal_id: str | None) -> dict | None:
     return {"id": deal.id, "name": deal.name} if deal else None
 
 
+def on_hold(q: Quote) -> bool:
+    """Finance put the customer's credit on hold for this quote: it isn't ordered until that's lifted."""
+    return bool(q.credit_check) and q.credit_check.get("decision") == "hold"
+
+
 def quote_out(db: Session, q: Quote, access: Access, approvers: bool = True) -> dict:
     team = db.get(Team, q.team_id) if q.team_id else None
     company = db.get(Company, q.company_id) if q.company_id else None
@@ -248,6 +253,8 @@ def quote_out(db: Session, q: Quote, access: Access, approvers: bool = True) -> 
         "prescriptions": [{"n": n, "name": f["name"], "contentType": f["contentType"], "size": f["size"]} for n, f in enumerate(q.prescriptions or [])],
         "documents": [{"n": n, "label": f.get("label"), "name": f["name"], "contentType": f["contentType"], "size": f["size"]} for n, f in enumerate(q.documents or [])],
         "payment": {"status": q.payment_status, "paidCentavos": q.paid_centavos, "payments": q.payments},
+        # A B2B customer's credit status when it was made, and Finance's word on it (app/trade.py).
+        "credit": q.credit_check,
         "validUntil": q.valid_until,
         "terms": q.terms,
         "extra": q.extra or {},
@@ -263,7 +270,8 @@ def quote_out(db: Session, q: Quote, access: Access, approvers: bool = True) -> 
             "approve": approver and q.approval_status == "pending",
             "checkLetter": approver and q.letter_status == "pending",
             "recordPayment": approver and q.letter_status == "verified" and q.payment_status in ("unpaid", "partial") and ready,
-            "order": ready and access.can("orders.create") and q.sales_order is None and (not q.rx or pharmacy.outcome(q) == "verified"),
+            "order": ready and access.can("orders.create") and q.sales_order is None and (not q.rx or pharmacy.outcome(q) == "verified") and not on_hold(q),
+            "confirmCredit": bool(q.credit_check) and access.can("orders.credit") and q.sales_order is None,
             # Sent, or sent again with corrections, while the pharmacist hasn't settled it.
             "sendToPharmacy": q.rx and access.can("quotes.create") and q.sales_order is None and pharmacy.outcome(q) not in pharmacy.SETTLED,
         },
@@ -424,6 +432,9 @@ def save_quote(
         team_id=me.team_id,
         created_by_id=me.id,
     )
+    # A B2B customer's credit status as Finance has it now, for Finance to confirm.
+    if trade.is_trade(db, customer):
+        record.credit_check = trade.credit_check(db, settings, customer)
     db.add(record)
     try:
         db.flush()
@@ -520,7 +531,7 @@ def list_quotes(
     company: str | None = Query(None, max_length=36),
     contact: str | None = Query(None, max_length=36),
     owner: str | None = Query(None, max_length=36, description="'me', or a person's id"),
-    task: Literal["approvals", "letters", "payments"] | None = Query(None, description="what's waiting on an approver"),
+    task: Literal["approvals", "letters", "payments", "credit"] | None = Query(None, description="what's waiting on an approver, or on Finance's credit confirmation"),
     state: Literal["waiting", "ready", "rejected"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(50, ge=1, le=200),
@@ -540,6 +551,9 @@ def list_quotes(
         query = query.where(Quote.letter_status == "pending")
     elif task == "payments":
         query = query.where(Quote.letter_status == "verified", Quote.payment_status.in_(("unpaid", "partial")), Quote.approval_status.in_(("none", "approved")))
+    elif task == "credit":
+        # B2B quotes whose credit status Finance hasn't confirmed or put on hold yet, not ordered.
+        query = query.where(Quote.credit_check.is_not(None), cast(Quote.credit_check, String).like('%"decision": null%'), Quote.sales_order.is_(None))
     if state == "rejected":
         query = query.where(or_(Quote.approval_status == "rejected", Quote.letter_status == "rejected"))
     elif state == "waiting":
@@ -680,6 +694,8 @@ def orderable(quote: Quote, access: Access) -> None:
         raise HTTPException(status.HTTP_409_CONFLICT, "An order is raised once the quote is approved and its letter is checked.")
     if quote.rx and pharmacy.outcome(quote) != "verified":
         raise HTTPException(status.HTTP_409_CONFLICT, "This quote has prescription medicines: a pharmacist must verify it in Pharmacy before it's ordered.")
+    if on_hold(quote):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Finance put this customer's credit on hold for this quote: it's ordered once Finance confirms it.")
 
 
 @router.get("/quotes/{quote_id}/order-payload")
@@ -765,6 +781,44 @@ def apply_decision(quote: Quote, body: Decision, *, by_id: str | None, by_name: 
     """The approval decided, the rep told: by the team lead here, or by Finance in its own app."""
     quote.approval_status = "approved" if body.decision == "approve" else "rejected"
     quote.approval_note, quote.approval_by_id, quote.approval_by_name, quote.approval_at = body.note, by_id, by_name, datetime.now(UTC)
+
+
+class CreditDecision(Api):
+    decision: Literal["confirm", "hold", "recheck"]
+    note: str | None = Field(None, max_length=500)
+
+
+Credit = Annotated[Access, Depends(require("orders.credit"))]
+
+
+@router.post("/quotes/{quote_id}/credit")
+def decide_credit(access: Credit, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str, body: CreditDecision) -> dict:
+    """Finance's word on a B2B quote's credit status: confirmed (it goes ahead),
+    on hold (it isn't ordered until confirmed), or checked again against
+    Finance's invoices now. A hold needs a reason: the rep sees it."""
+    quote = get_quote(db, access, quote_id)
+    if not quote.credit_check:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This quote's customer isn't credit-checked.")
+    if quote.sales_order is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "It's ordered already.")
+    if body.decision == "hold" and not (body.note or "").strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Say why it's on hold: the rep sees your reason on the quote.")
+    customer = db.get(Company, quote.company_id) if quote.company_id else (db.get(Contact, quote.contact_id).company if quote.contact_id else None)
+    if body.decision == "recheck":
+        if customer is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "The quote's customer is gone.")
+        quote.credit_check = trade.credit_check(db, settings, customer)
+    else:
+        quote.credit_check = {
+            **quote.credit_check,
+            "decision": "confirmed" if body.decision == "confirm" else "hold",
+            "note": (body.note or "").strip() or None,
+            "byName": me.full_name,
+            "decidedAt": datetime.now(UTC).isoformat(),
+        }
+    audit(db, me, f"quote.credit_{body.decision}", target=quote.number, target_type="quote", target_id=quote.id)
+    db.commit()
+    return quote_out(db, quote, access)
 
 
 @router.post("/quotes/{quote_id}/approval")

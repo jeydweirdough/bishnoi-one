@@ -31,6 +31,7 @@ ACTION_LABELS = {
     "settings": "Settings",
     "audit": "Audit logs",
     "import": "Upload",
+    "credit": "Confirm credit status",
 }
 
 
@@ -52,7 +53,8 @@ AREAS: tuple[Area, ...] = (
     Area("activities", "Activities (calls, meetings, emails, notes, tasks)", "CRM", CRUD),
     Area("products", "Products & services", "Catalogue & paperwork", (*CRUD, "prices", "approve")),
     Area("quotes", "Quotes", "Catalogue & paperwork", (*CRUD, "approve")),
-    Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve")),
+    # orders.credit: Finance confirms a B2B customer's credit status on a quote before it's ordered.
+    Area("orders", "Sales orders", "Catalogue & paperwork", (*CRUD, "approve", "credit")),
     Area("visits", "Visits & collections", "Field work", CRUD),
     # goals.view: the tracker for everyone within reach; goals.manage: setting
     # goals; goals.import: uploading what doctors owe.

@@ -113,3 +113,15 @@ in-card placeholder from `skeleton.tsx` (`ListRows`, `Figures`, `Lines`,
 `Pairs`, `Chart`; `FigureCardLoading` keeps a figure card's label). Each
 `loading.tsx` passes the page's real `title`. A record's name is data, so a
 record page keeps its loading screen until the record arrives.
+
+## B2B split in two, and its automatic fields, decided on 2026-10-19
+
+B2B is two teams: **B2B NBD** (new business: new customers, inactive for 2-3
+months, dormant after one order and 6 months) and **B2B CRR** (existing
+customers, retention), each with the same B2B settings (`app/tools/split_b2b.py`).
+Their customer types are Distributor, Drugstore and Clinic (Drugstore chain and
+Wholesaler retired). Three of the B2B notes' fields are worked out, never typed
+(benchmark E6): credit status from Finance's invoices, checked on each quote
+for Finance to confirm; the products they carry from their orders; and the
+Priority / High priority profile from the year's GetMeds and 2MG sales, by
+share (top 20%, next 30%) so it needs no peso threshold agreed first.

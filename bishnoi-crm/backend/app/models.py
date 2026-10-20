@@ -621,6 +621,11 @@ class Quote(Owned, Base):
     prescriptions: Mapped[list | None] = mapped_column(JSON, default=None)
     # Other documents the link asked for (a valid ID...): [{label, store, key or ref, name, contentType, size}].
     documents: Mapped[list | None] = mapped_column(JSON, default=None)
+    # A B2B customer's credit status when the quote was made (app/trade.py), and
+    # Finance's word on it: {"status", "label", "owedCentavos", "overdueCentavos",
+    # "oldestDaysLate", "checkedAt", "decision": None | "confirmed" | "hold",
+    # "note", "byName", "decidedAt"}. None: not a credit-checked customer.
+    credit_check: Mapped[dict | None] = mapped_column(JSON, default=None)
     pharmacy_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     pharmacy_error: Mapped[str | None] = mapped_column(String(300), default=None)
 

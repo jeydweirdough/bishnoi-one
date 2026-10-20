@@ -548,6 +548,46 @@ export type Payment = {
 
 export type QuoteOrder = { id: string; number: string; url: string | null; status: string | null; by: { id: string; name: string }; at: string };
 
+/** Credit status, as Finance's invoices have it (app/trade.py). Null status: Finance couldn't be asked. */
+export type CreditStatus = "good" | "approaching" | "overdue" | "suspended";
+
+export type CreditCheck = {
+  status: CreditStatus | null;
+  label: string;
+  detail: string;
+  owedCentavos: number;
+  overdueCentavos: number;
+  oldestDaysLate: number;
+  checkedAt: string;
+  decision: "confirmed" | "hold" | null;
+  note?: string | null;
+  byName?: string;
+  decidedAt?: string;
+};
+
+/** A B2B customer's trade profile, worked out (GET /companies/{id}/trade). */
+export type TradeProfile =
+  | { applies: false }
+  | {
+      applies: true;
+      credit: Omit<CreditCheck, "checkedAt" | "decision"> & { nextDueOn: string | null; openInvoices: number };
+      profile: {
+        level: "high" | "priority" | "regular" | null;
+        label: string;
+        rank: number | null;
+        of: number;
+        getmedsCentavos: number;
+        twoMgCentavos: number;
+        totalCentavos: number;
+        source: "finance" | "deals";
+        highShare: number;
+        priorityShare: number;
+      };
+      carried: { id: string | null; name: string; code: string | null; times: number; lastOn: string | null; from: ("order" | "deal" | "invoice")[] }[];
+      financeLinked: boolean;
+      asOf: string;
+    };
+
 export type Quote = {
   id: string;
   rev: string | null;
@@ -600,6 +640,8 @@ export type Quote = {
     at: string | null;
   } | null;
   payment: { status: "none" | "unpaid" | "partial" | "paid"; paidCentavos: number; payments: Payment[] };
+  /** A B2B customer's credit status when it was made, and Finance's word on it. Null: not credit-checked. */
+  credit?: CreditCheck | null;
   /** From the quote settings when it was made. */
   validUntil: string | null;
   terms: string | null;
@@ -607,7 +649,7 @@ export type Quote = {
   createdAt: string;
   createdBy: Person;
   owner: Person | null;
-  can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean; sendToPharmacy?: boolean };
+  can: { delete?: boolean; approve?: boolean; checkLetter?: boolean; recordPayment?: boolean; order?: boolean; sendToPharmacy?: boolean; confirmCredit?: boolean };
   /** The pharmacist's check in Bishnoi One Pharmacy; null when the quote isn't Rx. */
   pharmacy?: PharmacyCheck | null;
   /** The order raised from it in Bishnoi One Order; null until then. */

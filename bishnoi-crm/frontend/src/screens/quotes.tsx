@@ -16,8 +16,9 @@ import { Filters, Pager } from "../components/crm/list-controls";
 export const metadata = { title: "Quotes" };
 
 const SIZE = 50;
-// What's waiting on an approver: each a list of its own, for those who approve.
+// What's waiting on an approver, or on Finance's credit confirmation: each a list of its own, for those who decide it.
 const TASKS = [
+  { key: "credit", label: "Credit to confirm", empty: "No B2B quotes waiting for a credit confirmation.", permission: "orders.credit" },
   { key: "approvals", label: "To approve", empty: "Nothing waiting for approval." },
   { key: "letters", label: "Letters to check", empty: "No guarantee letters waiting to be checked." },
   { key: "payments", label: "Letter payments", empty: "No verified letters waiting on payment." },
@@ -31,8 +32,10 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   if (!can(me, "quotes.view")) return <NoAccess what="quotes" />;
   const fmt = makeFormat(me.org);
   const params = await searchParams;
-  const approver = can(me, "quotes.approve");
-  const task = approver ? TASKS.find((t) => t.key === one(params.task)) : undefined;
+  // The lists this person decides: approvals, letters and payments for an approver; credit for Finance.
+  const tasks = TASKS.filter((t) => ("permission" in t ? can(me, t.permission) : can(me, "quotes.approve")));
+  const approver = tasks.length > 0;
+  const task = tasks.find((t) => t.key === one(params.task));
   const [q, state, owner] = [one(params.q), one(params.state), one(params.owner)];
   const page = Math.max(1, Number(one(params.page)) || 1);
   const query = new URLSearchParams({ limit: String(SIZE), offset: String((page - 1) * SIZE) });
@@ -42,7 +45,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   // Asked for, not waited on: the title, tabs, filters and list card are drawn now and the rest fills in.
   const listing = load<Paged<Quote>>(`/quotes?${query}`);
   const customers = quotes && can(me, "customers.view") ? load<Paged<CompanyRow>>("/companies?limit=200") : Promise.resolve({ items: [], total: 0 } as Paged<CompanyRow>);
-  const waiting = Promise.all(approver ? TASKS.map((t) => load<Paged<Quote>>(`/quotes?task=${t.key}&limit=1`)) : []);
+  const waiting = Promise.all(approver ? tasks.map((t) => load<Paged<Quote>>(`/quotes?task=${t.key}&limit=1`)) : []);
   const tab = (key: string) => (key ? `/quotes?task=${key}` : "/quotes");
   const chip = (key: string, label: string, count?: number) => {
     const current = (task?.key ?? "") === key;
@@ -65,7 +68,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   const chips = (counts: Paged<Quote>[]) => (
     <nav aria-label="Show" className="mb-4 flex flex-wrap gap-1.5">
       {chip("", "All quotes")}
-      {TASKS.map((t, i) => chip(t.key, t.label, counts[i]?.total))}
+      {tasks.map((t, i) => chip(t.key, t.label, counts[i]?.total))}
     </nav>
   );
 
@@ -81,7 +84,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
           )
         }
       >
-        {task ? "Waiting on you as an approver." : "Every quote you can see, newest first."}
+        {task ? (task.key === "credit" ? "B2B quotes waiting for you to confirm the customer's credit status." : "Waiting on you as an approver.") : "Every quote you can see, newest first."}
       </PageHeader>
 
       {approver && (
