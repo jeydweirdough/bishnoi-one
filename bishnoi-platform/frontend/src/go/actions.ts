@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { SECURE_COOKIE } from "@/src/platform/lib/session-cookie";
 import { redirect } from "next/navigation";
-import { ACCOUNT_COOKIE, AccountError, accountCall, accountToken, goLink, withPass, type AccountMe } from "./account";
+import { ACCOUNT_COOKIE, HOLDER_COOKIE, HOLDER_DOMAIN, AccountError, accountCall, accountToken, goLink, withPass, type AccountMe } from "./account";
 
 export type GoState = { error?: string; email?: string } | null;
 
@@ -40,7 +40,8 @@ export async function signInAccount(_previous: GoState, form: FormData): Promise
   } catch (e) {
     return { error: e instanceof AccountError ? e.message : "Opening the application didn't work. Try again.", email };
   }
-  redirect(target);
+  // Through /go/hold, which marks this browser with who is signed in now (one person per browser).
+  redirect(`/go/hold?to=${encodeURIComponent(target)}`);
 }
 
 /** Signs out of the Bishnoi One account on this browser, to sign in as someone else. */
@@ -48,6 +49,7 @@ export async function signOutAccount(form: FormData): Promise<void> {
   const token = await accountToken();
   if (token) await accountCall("/identity/logout", {}, token).catch(() => undefined);
   (await cookies()).delete(ACCOUNT_COOKIE);
+  (await cookies()).set(HOLDER_COOKIE, "", { path: "/", domain: HOLDER_DOMAIN, maxAge: 0 });
   const app = String(form.get("app") ?? "");
   const returnTo = String(form.get("return") ?? "");
   redirect(goLink(app, returnTo));

@@ -10,6 +10,7 @@ import { BatchStatusMark, FilterInput, Head, NoAccess, Tabs } from "../component
 import { pageFor, param, type Search } from "../lib/page";
 import { PAYMENT_METHODS, PRESCRIPTION_STATUSES } from "../lib/words";
 import type { BatchStatus, PaymentMethod, PrescriptionStatus } from "../lib/types";
+import { Amount } from "@/src/platform/ui/amount";
 
 export const metadata = { title: "Reports" };
 
@@ -58,7 +59,7 @@ function Numbers({ items }: { items: [string, ReactNode][] }) {
     <div className="grid grid-cols-2 divide-rule sm:grid-cols-4 sm:divide-x">
       {items.map(([label, value]) => (
         <div key={label} className="px-5 py-4">
-          <span className="block text-figure text-ink">{value}</span>
+          <span className="block text-figure text-ink">{typeof value === "string" || typeof value === "number" ? <Amount text={typeof value === "number" ? value.toLocaleString("en") : value} /> : value}</span>
           <span className="mt-0.5 block text-meta text-ink-3">{label}</span>
         </div>
       ))}

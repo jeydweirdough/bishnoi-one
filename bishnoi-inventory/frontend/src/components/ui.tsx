@@ -5,6 +5,7 @@ import { Button } from "@/src/platform/ui/button";
 import { Select } from "@/src/platform/ui/field";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { Flag } from "@/src/platform/ui/marks";
+import { Amount } from "@/src/platform/ui/amount";
 import type { Expiry, StockState } from "../lib/types";
 import { STOCK_STATES } from "../lib/labels";
 
@@ -145,8 +146,10 @@ export function Figures({ items }: { items: { label: string; value: ReactNode; f
           <dd className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
             {f.href ? (
               <Link href={f.href} className="hover:text-ink">
-                {f.value}
+                {typeof f.value === "string" ? <Amount text={f.value} /> : f.value}
               </Link>
+            ) : typeof f.value === "string" ? (
+              <Amount text={f.value} />
             ) : (
               f.value
             )}

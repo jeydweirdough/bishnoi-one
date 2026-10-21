@@ -9,6 +9,7 @@ import { Avatar } from "../ui/avatar";
 import { signOut } from "../actions/session";
 import { addressKnown, THIS_APP, appUrl } from "../lib/apps";
 import type { Me } from "../lib/types";
+import { AppLauncher } from "./app-launcher";
 
 // The top right of every page: the notification bell, then who you are.
 // The same two on a phone, beside the menu button.
@@ -22,6 +23,7 @@ export type Notification = { key: string; title: string; reason?: string; href: 
 export function TopActions({ me, notifications, allHref, bell }: { me: Me; notifications?: Promise<Notification[]>; allHref?: string; bell?: ReactNode }) {
   return (
     <div className="flex items-center gap-1">
+      <AppLauncher />
       {/* An app's own bell (Inventory's alerts), or the shared one fed its notifications. */}
       {bell}
       {!bell && notifications && (

@@ -6,6 +6,15 @@ import { cookies } from "next/headers";
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
 export const ACCOUNT_COOKIE = "bishnoi_account";
 
+// One person per browser (decided 2026-10-21): whoever is signed in to Bishnoi
+// One here, by their account's id, for every app to compare its own session
+// with (their lib/session-cookie.ts). It has to reach the apps' addresses, so
+// online it's set on their common parent domain, COOKIE_DOMAIN (for example
+// .bishnoi-one.cloud-ip.cc); unset, it's this address's own, which on this
+// computer is every app's too (localhost, whatever the port).
+export const HOLDER_COOKIE = "bishnoi_holder";
+export const HOLDER_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
+
 export class AccountError extends Error {
   constructor(
     readonly status: number,
@@ -44,7 +53,13 @@ export async function accountToken(): Promise<string | null> {
 }
 
 /** Who is signed in, as far as choosing a company goes. */
-export type AccountMe = { company: { slug: string; name: string } | null; companies: { slug: string; name: string; current: boolean }[] };
+export type AccountMe = {
+  email?: string;
+  company: { slug: string; name: string } | null;
+  companies: { slug: string; name: string; current: boolean }[];
+  /** The applications they may open (given to them, and their company has it). */
+  apps: { key: string; name: string; appUrl: string | null }[];
+};
 
 /** This page again, for one application and (when known) one company. */
 export function goLink(app: string, returnTo: string, company?: string): string {

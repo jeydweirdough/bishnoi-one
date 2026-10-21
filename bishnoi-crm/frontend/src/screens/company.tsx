@@ -36,6 +36,7 @@ import type { DoctorBalance, Visit } from "../components/field/types";
 import { VisitList } from "../components/field/visit-list";
 import { isFieldAgent } from "../components/field/words";
 import { lower, termsOf } from "../components/terms/terms";
+import { Amount } from "@/src/platform/ui/amount";
 
 type Params = Promise<{ id: string }>;
 
@@ -469,7 +470,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
           {owed && isDoctor && owed.balance && (
             <Sheet className="px-5 pt-4 pb-5">
               <SectionTitle icon="money">Outstanding balance</SectionTitle>
-              <p className="mt-2 text-figure text-ink">{fmt.peso(owed.balance.owedCentavos)}</p>
+              <p className="mt-2 text-figure text-ink"><Amount text={fmt.peso(owed.balance.owedCentavos)} /></p>
               <p className="mt-1 text-meta text-ink-3">
                 {fmt.peso(owed.balance.balanceCentavos)} as of {fmt.dateLabel(owed.balance.asOf)}
                 {owed.balance.collectedSinceCentavos > 0 && <>, less {fmt.peso(owed.balance.collectedSinceCentavos)} collected since</>}

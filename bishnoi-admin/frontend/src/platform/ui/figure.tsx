@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Flag } from "./marks";
+import { Amount } from "./amount";
 
 /** One number on an overview, under a word for what it counts. A link when
  *  there is a list behind it; a flag when a number above zero wants attention. */
 export function Figure({ label, value, href, flag }: { label: string; value: number; href?: string; flag?: boolean }) {
-  const figure = <span className="block text-figure text-ink">{value}</span>;
+  const figure = <span className="block text-figure text-ink"><Amount text={value.toLocaleString("en")} /></span>;
   return (
     <div className="min-w-0 px-5 py-4">
       {href ? (
