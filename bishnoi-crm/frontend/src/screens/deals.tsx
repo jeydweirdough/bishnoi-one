@@ -22,6 +22,7 @@ import { Donut, RAMP, SERIES } from "../components/deals/donut";
 import { Breakdown, FigureCard, type Figure } from "../components/deals/figure-card";
 import { CATEGORY_LABELS, PRIORITIES, PriorityFlag, StageTag, closeLabel, periodsFrom } from "../components/deals/words";
 import { shiftMonth } from "../components/field/words";
+import { Amount, Amounts } from "@/src/platform/ui/amount";
 
 export const metadata = { title: "Deals" };
 
@@ -533,7 +534,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
               <span className={`size-2.5 rounded-full ${b.style}`} aria-hidden />
               {b.label}
             </p>
-            <p className="mt-1 text-figure text-ink">{fmt.peso(t[b.key] as number)}</p>
+            <p className="mt-1 text-figure text-ink"><Amount text={fmt.peso(t[b.key] as number)} /></p>
           </Sheet>
         ))}
       </div>
@@ -798,8 +799,13 @@ function Ranked({ fmt, rows, empty }: { fmt: Format; rows: { key: string; name: 
               <span className="truncate text-ink">{x.name}</span>
             )}
             <span className="shrink-0 whitespace-nowrap text-ink">
-              {fmt.peso(x.value)}
-              {x.note && <span className="text-meta text-ink-3"> · {x.note}</span>}
+              <Amount text={fmt.peso(x.value)} />
+              {x.note && (
+                <span className="text-meta text-ink-3">
+                  {" · "}
+                  <Amounts text={x.note} />
+                </span>
+              )}
             </span>
           </p>
           <div className="mt-1 h-1.5 rounded-full bg-bench" aria-hidden>

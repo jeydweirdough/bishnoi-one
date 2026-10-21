@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { api, ApiError, SESSION_COOKIE } from "../lib/api";
-import { COMPANY_COOKIE, companyOfToken } from "../lib/session-cookie";
+import { COMPANY_COOKIE, companyOfToken, HOLDER_COOKIE, NOT_SHARED, SECURE_COOKIE, WHO_COOKIE } from "../lib/session-cookie";
 
 // Back from the platform with a pass (/auth/platform?pass=...): this app's API
 // checks it (app/platform_pass.py) and opens a session, kept in the same cookie
@@ -29,15 +29,33 @@ export async function GET(request: NextRequest) {
   response.cookies.set(SESSION_COOKIE, session.accessToken, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: SECURE_COOKIE,
     path: "/",
     maxAge: session.expiresIn,
   });
+  // Whose session this is (lib/session-cookie.ts): their Bishnoi One account. When the
+  // platform's mark can't be seen from here, there's nothing to compare it with later.
+  const sub = accountOf(pass);
+  if (sub) {
+    const seen = request.cookies.has(HOLDER_COOKIE);
+    response.cookies.set(WHO_COOKIE, seen ? sub : `${sub}${NOT_SHARED}`, { httpOnly: true, sameSite: "lax", secure: SECURE_COOKIE, path: "/", maxAge: session.expiresIn });
+  }
   // The company the pass was for, for the sign-in page next time.
   const company = companyOfToken(session.accessToken);
   if (company) {
-    response.cookies.set(COMPANY_COOKIE, company, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 400 * 24 * 3600 });
+    response.cookies.set(COMPANY_COOKIE, company, { httpOnly: true, sameSite: "lax", secure: SECURE_COOKIE, path: "/", maxAge: 400 * 24 * 3600 });
   }
   response.headers.set("Cache-Control", "no-store");
   return response;
+}
+
+/** The Bishnoi One account a pass is for (its "sub"). Read only to label the session: the API has already checked the pass. */
+function accountOf(pass: string): string | null {
+  try {
+    const payload = pass.split(".")[1] ?? "";
+    const claims = JSON.parse(Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")) as { sub?: unknown };
+    return typeof claims.sub === "string" ? claims.sub.slice(0, 64) : null;
+  } catch {
+    return null;
+  }
 }

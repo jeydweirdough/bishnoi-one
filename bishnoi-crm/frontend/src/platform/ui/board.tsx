@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Dropdown, Modal } from "antd";
 import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import { Amount } from "./amount";
 
 // A board: a column for each stage, a card for each record, in the order work
 // moves. The cards read as the CRM's deal cards do: the name, who it's with,
@@ -228,7 +229,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                         )}
                         {(c.value || c.when) && (
                           <p className="mt-1.5 flex items-center justify-between gap-2 text-meta">
-                            <span className="truncate font-semibold text-ink">{c.value}</span>
+                            <span className="truncate font-semibold text-ink">{typeof c.value === "string" ? <Amount text={c.value} /> : c.value}</span>
                             {c.when && (
                               <span className={`flex shrink-0 items-center gap-1 ${c.late ? "font-semibold text-danger" : "text-ink-3"}`}>
                                 <CalendarClock className="size-3.5" aria-hidden />

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { Bone, Chart } from "@/src/platform/ui/skeleton";
+import { Amount } from "@/src/platform/ui/amount";
 
 // The figure cards and breakdowns of the Deals page, shared with the dashboard
 // so both read the same way: the figure first, large; what it is under it;
@@ -57,7 +58,7 @@ export function Breakdown({
       ) : (
         <>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[1.5rem] leading-tight font-semibold text-ink tabular-nums">{value}</span>
+            <span className="text-[1.5rem] leading-tight font-semibold text-ink tabular-nums"><Amount text={value} /></span>
             <span className="text-sm text-ink-2">{label}</span>
           </p>
           <div className="mt-4">{children}</div>

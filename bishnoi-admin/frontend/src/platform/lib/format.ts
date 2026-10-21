@@ -96,7 +96,7 @@ export function makeFormat(company: Company) {
   const hour = dates("en-GB", timeZone, { hour: "numeric", hourCycle: "h23" });
 
   const amount = amounts(locale, currency, { minimumFractionDigits: minorUnits, maximumFractionDigits: minorUnits });
-  const amountShort = amounts(locale, currency, { notation: "compact", maximumFractionDigits: 1 });
+  const amountShort = amounts(locale, currency, { notation: "compact", maximumFractionDigits: 2 });
   const grouped = counts(locale);
   const decimals = new RegExp(`^(\\d{1,12})(?:\\.(\\d{0,${minorUnits}}))?$`);
 
@@ -164,7 +164,7 @@ export function makeFormat(company: Company) {
       return amount.format(minor / whole);
     },
 
-    /** 1.2M, 48K: for figures where the exact minor unit doesn't matter. */
+    /** ₱1.25M, ₱48K: charts and board notes, the same short form as the figure cards (ui/amount.tsx). */
     pesoCompact(minor: number): string {
       return amountShort.format(minor / whole);
     },

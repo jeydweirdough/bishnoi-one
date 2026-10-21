@@ -8,6 +8,7 @@ import { InvoiceEditor } from "../invoices/editor";
 import { AddSeries, SwitchSeries } from "../invoices/series-editor";
 import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, RemovePayment, VoidInvoice } from "../invoices/steps";
 import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "../invoices/types";
+import { Amount } from "@/src/platform/ui/amount";
 
 // Sales invoices (app/routers/invoices.py): drafts, issued with the next
 // number of the BIR's series, and voided rather than changed once issued.
@@ -407,7 +408,7 @@ export async function ReceivablesPage() {
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Sheet className="px-4 py-3 lg:col-span-1">
           <p className="text-meta text-ink-3">Total outstanding</p>
-          <p className="text-figure tabular-nums">{fmt.peso(age.totalCentavos)}</p>
+          <p className="text-figure tabular-nums"><Amount text={fmt.peso(age.totalCentavos)} /></p>
           <p className={`text-meta ${late ? "text-danger" : "text-ink-3"}`}>{late ? `${fmt.peso(late)} past due` : "Nothing past due"}</p>
         </Sheet>
         {age.buckets.map((b) => (

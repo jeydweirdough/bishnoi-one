@@ -8,6 +8,7 @@ import { Modal } from "../ui/modal";
 import { signOut } from "../actions/session";
 import { addressKnown, THIS_APP, appUrl } from "../lib/apps";
 import type { Me } from "../lib/types";
+import { AppLauncher } from "./app-launcher";
 
 // The top right of every page: the app's bell, if it has one, then who you are.
 // The same on a phone, beside the menu button.
@@ -16,6 +17,7 @@ import type { Me } from "../lib/types";
 export function TopActions({ me, bell }: { me: Me; bell?: ReactNode }) {
   return (
     <div className="flex items-center gap-1">
+      <AppLauncher />
       {bell}
       <Profile me={me} />
     </div>
@@ -43,7 +45,7 @@ function Profile({ me }: { me: Me }) {
   }, [open]);
   const switchHref =
     THIS_APP && THIS_APP !== "platform" && addressKnown("platform")
-      ? `${appUrl("platform")}/go?app=${THIS_APP}&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
+      ? `${appUrl("platform")}/go?app=${THIS_APP}&choose=1&return=${encodeURIComponent(`${appUrl(THIS_APP)}/auth/platform`)}`
       : null;
   function pick(key: string) {
     setOpenOn(null);

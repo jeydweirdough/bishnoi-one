@@ -3,6 +3,7 @@ import { ProgressRing } from "../progress-ring";
 import { Pill } from "@/src/platform/ui/figures";
 import type { Format } from "@/src/platform/lib/format";
 import type { SalesFigures } from "@/src/platform/lib/types";
+import { Amount } from "@/src/platform/ui/amount";
 
 /** How far into [start, end) today is, from 0 to 1. */
 export function elapsed(start: string, end: string, today: string): number {
@@ -54,8 +55,8 @@ export function TargetProgress({
         <div className="mt-1">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink">{fmt.peso(won)}</p>
-              <p className="text-meta text-ink-3">of {fmt.peso(target)}</p>
+              <p className="text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink"><Amount text={fmt.peso(won)} /></p>
+              <p className="text-meta text-ink-3">of <Amount text={fmt.peso(target)} /></p>
             </div>
             <ProgressRing
               size="sm"
@@ -75,13 +76,13 @@ export function TargetProgress({
             {marker !== null && <span className="absolute -top-1 -bottom-1 w-0.5 rounded-full bg-ink" style={{ left: `${marker}%` }} />}
           </div>
           <p className="mt-2 text-meta text-ink-3">
-            {fmt.peso(pace)} expected by today
+            <Amount text={fmt.peso(pace)} /> expected by today
             {withWinRate && figures.winRate !== null && <> · {figures.winRate}% win rate</>}
           </p>
         </div>
       ) : (
         <>
-          <p className="mt-1 text-figure text-ink">{fmt.peso(won)}</p>
+          <p className="mt-1 text-figure text-ink"><Amount text={fmt.peso(won)} /></p>
           <p className="mt-1 text-meta text-ink-3">
             {fmt.plural(figures.wonCount, "deal")} won. No revenue target set for this period
             {href ? (

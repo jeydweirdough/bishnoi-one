@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { loadAddresses } from "../lib/addresses";
 import { addressKnown, appUrl, THIS_APP, thisAppLabel } from "../lib/apps";
 import { buttonClass } from "../ui/button";
@@ -43,6 +44,13 @@ export async function LoginPage({ searchParams }: { searchParams: Promise<Record
   const expired = params.expired === "1";
   const denied = params.denied === "1";
   const refused = typeof params.platform === "string" ? params.platform.slice(0, 300) : null;
+  // One sign-in (decided 2026-10-21): once the Platform is known, everyone signs
+  // in with their Bishnoi One account there (email and password, nothing else)
+  // and comes back signed in, at the company they last used. A refusal from it
+  // is shown here instead, so this can't loop. This app's own form stays for
+  // when the Platform can't be reached: /login?local=1.
+  const oneSignIn = platformSignIn();
+  if (oneSignIn && !refused && params.local !== "1") redirect(oneSignIn);
   const bishnoiAccount = platformSignIn();
   const demo = await demoAccounts();
   const app = thisAppLabel();

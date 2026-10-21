@@ -7,6 +7,7 @@ import { Bone } from "@/src/platform/ui/skeleton";
 import type { Figure } from "../deals/figure-card";
 import { FollowUpItem, type FollowUpRow } from "../follow-up-item";
 import type { Org } from "@/src/platform/lib/types";
+import { Amount, Amounts } from "@/src/platform/ui/amount";
 
 /** How many items a dashboard list shows before "and N more". */
 export const LIST_ROWS = 4;
@@ -74,7 +75,7 @@ function StatBody({ icon, label, value, note, pill }: Omit<Stat, "href">) {
       <div className="min-w-0">
         <p className="text-meta font-medium text-ink-2">{label}</p>
         <p className="mt-0.5 flex min-w-0 items-center gap-2">
-          <span className="truncate text-[1.5rem] leading-tight font-semibold tracking-[-0.015em] text-ink tabular-nums">{value}</span>
+          <span className="truncate text-[1.5rem] leading-tight font-semibold tracking-[-0.015em] text-ink tabular-nums"><Amount text={value} /></span>
           {mark && pill && (
             <span className={`inline-flex shrink-0 ${mark.tone}`} title={pill.text}>
               <mark.Icon className="size-5" strokeWidth={2.25} aria-hidden />
@@ -82,7 +83,7 @@ function StatBody({ icon, label, value, note, pill }: Omit<Stat, "href">) {
             </span>
           )}
         </p>
-        <div className="mt-1 text-meta text-ink-3">{note}</div>
+        <div className="mt-1 text-meta text-ink-3">{typeof note === "string" ? <Amounts text={note} /> : note}</div>
       </div>
     </div>
   );
