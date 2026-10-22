@@ -10,6 +10,7 @@ import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/fie
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { deleteRole, saveRole, saveUser, setUserPassword } from "../actions/admin";
+import { removeUserSignature } from "../signature/actions";
 import type { AdminUsers, PermissionArea, RolesData } from "@/src/lib/types";
 
 
@@ -219,6 +220,25 @@ export function UsersEditor({
                 >
                   {u.calendarOn ? "Calendar on" : "Calendar off"}
                 </Button>
+                {u.hasSignature && (
+                  <ConfirmButton
+                    label="Remove signature"
+                    triggerVariant="quiet"
+                    triggerSize="sm"
+                    title={`Remove ${u.fullName}'s e-signature?`}
+                    body="Documents they already signed keep it. Only they can set a new one, on their account page."
+                    confirmLabel="Remove"
+                    onConfirm={async () => {
+                      const r = await removeUserSignature(u.id);
+                      if (!r.ok) {
+                        toast.error(r.error);
+                        return false;
+                      }
+                      toast.success(`${u.fullName}'s signature removed`);
+                      router.refresh();
+                    }}
+                  />
+                )}
                 <NewPassword id={u.id} name={u.fullName} />
                 {u.id !== meId && (
                   <Button

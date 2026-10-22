@@ -12,6 +12,14 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.1",
+    date: "2026-10-22",
+    changes: [
+      "E-signatures: set yours on your account page, drawn or uploaded (a photo on white paper is cleaned on your computer: the paper made transparent, the ink black). Finance places it on what you prepare, approve, review or settle, with your name, the date and a reference.",
+      "Journal vouchers and liquidation reports to print or save as PDF, with Prepared by / Approved by and Reviewed by / Settled by signed.",
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-10-22",
     changes: [

@@ -33,6 +33,7 @@ from app.ledger import settings as posting_settings
 from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
 from app.notify import done, holders, tell
 from app.routers.funds import today
+from app.signatures import journal_content, sign
 from app.routers.tax import Api, field_error
 from app.workdays import one_workday_later
 
@@ -272,6 +273,7 @@ def add_entry(user: permitted("journal.post"), db: DB, settings: SettingsDep, bo
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "lines", i, "accountId"], "msg": "Select an active account."}])
         legs.append(Leg(a, debit=line.debit_centavos, credit=line.credit_centavos, description=line.description))
     e = post(db, body.entry_date, body.memo, legs, user.full_name, reference=body.reference, waits=True, by_id=user.id)
+    sign(db, user, "journal_entry", e.id, "prepared", journal_content(e))
     audit(db, user, "entry.posted", target=e.number, target_type="journal_entry", target_id=e.id)
     waiting_for_approval(db, e, user)
     db.commit()
@@ -298,6 +300,7 @@ def reverse(user: permitted("journal.reverse"), db: DB, settings: SettingsDep, e
     back = post(db, on, f"Reversal of {e.number}: {e.memo}", legs, user.full_name, reference=e.reference, source=e.source, reverses=e,
                 waits=True, by_id=user.id)
     back.fund_request_id = e.fund_request_id
+    sign(db, user, "journal_entry", back.id, "prepared", journal_content(back))
     audit(db, user, "entry.reversed", target=e.number, target_type="journal_entry", target_id=e.id, fields=[back.number])
     waiting_for_approval(db, back, user)
     db.commit()
@@ -347,6 +350,9 @@ def decide(db: DB, settings: Settings, user: User, entry_id: str, to: Literal["a
         original = db.get(JournalEntry, e.reverses_id)
         if original is not None and original.reversed_by_id == e.id:
             original.reversed_by_id = None
+    if to == "approved":
+        # The approver's signature, on what they approved (decided 2026-10-22: placed by their own step).
+        sign(db, user, "journal_entry", e.id, "approved", journal_content(e))
     audit(db, user, f"entry.{to}", target=e.number, target_type="journal_entry", target_id=e.id, fields=["reason"] if reason else ())
     said = f"{user.full_name} approved {e.number}: it now counts in the books." if to == "approved" else f"{user.full_name} rejected {e.number}: {reason}"
     tell(db, [e.posted_by_id], f"entry.{to}", said, link=entry_link(e), not_to=[user.id])

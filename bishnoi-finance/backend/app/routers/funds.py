@@ -44,6 +44,7 @@ from app.models import (
 )
 from app.notify import done, tell_holders
 from app.routers.tax import Api, field_error
+from app.signatures import fund_content, sign
 
 router = APIRouter(prefix="/finance/funds", tags=["funds"])
 
@@ -374,6 +375,7 @@ def finish_check(user: permitted("funds.check"), db: DB, settings: SettingsDep, 
     settle(r, user.full_name)
     post_check(db, r, today(settings), user.full_name)
     step(db, user, r, "checked")
+    sign(db, user, "fund_request", r.id, "reviewed", fund_content(r))
     if r.status == "to_return":
         tell_holders(db, "funds.settle", "fund.to_settle", f"{r.number}: {peso(r.return_due_centavos)} of unused funds to collect from {r.requester_name}.",
                      link=f"/funds/{r.id}", not_to=[user.id])
@@ -404,6 +406,7 @@ def returned(user: permitted("funds.settle"), db: DB, settings: SettingsDep, req
     post_returned(db, r, body.amount_centavos, body.method, body.reference, today(settings), user.full_name)
     if r.returned_centavos >= r.return_due_centavos:
         close(r, user.full_name, "Refund received in full. Settled.")
+        sign(db, user, "fund_request", r.id, "settled", fund_content(r))
     step(db, user, r, "returned")
     db.commit()
     return request_out(r, today(settings))
@@ -422,6 +425,7 @@ def reimbursed(user: permitted("funds.settle"), db: DB, settings: SettingsDep, r
     post_reimbursed(db, r, body.amount_centavos, body.method, body.reference, today(settings), user.full_name)
     if r.reimbursed_centavos >= r.reimburse_due_centavos:
         close(r, user.full_name, "Reimbursement paid in full. Settled.")
+        sign(db, user, "fund_request", r.id, "settled", fund_content(r))
     step(db, user, r, "reimbursed")
     db.commit()
     return request_out(r, today(settings))

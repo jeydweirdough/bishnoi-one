@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -34,6 +35,14 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader
         crumbs={[QUEUE[r.status]]}
+        actions={
+          // The signed report, once the liquidation is reviewed (decided 2026-10-22: e-signatures).
+          r.checkedAt ? (
+            <LinkButton href={`/funds/${r.id}/report`} icon={<FileText className="size-4" aria-hidden />}>
+              Liquidation report
+            </LinkButton>
+          ) : undefined
+        }
         title={
           <>
             {r.requester.name} · {r.purpose} <span className="text-ink-3">{r.number}</span>

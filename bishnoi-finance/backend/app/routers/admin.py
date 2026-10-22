@@ -100,11 +100,14 @@ def email_taken(db: DB, email: str, but: str | None = None) -> bool:
 
 @router.get("/users")
 def list_users(_: Users, db: DB) -> dict:
+    from app.models import Signature
+
     last = dict(db.execute(select(SignInSession.user_id, func.max(SignInSession.created_at)).group_by(SignInSession.user_id)).all())
     users = db.scalars(select(User).order_by(User.is_active.desc(), func.lower(User.full_name)))
     roles = db.scalars(select(Role).order_by(Role.is_system.desc(), func.lower(Role.name)))
+    signed = set(db.scalars(select(Signature.user_id).where(Signature.replaced_at.is_(None))))
     return {
-        "items": [user_out(u, last.get(u.id)) for u in users],
+        "items": [user_out(u, last.get(u.id)) | {"hasSignature": u.id in signed} for u in users],
         # The roles a person can be given, for whoever manages users (who may not manage roles).
         "roles": [{"id": r.id, "name": r.name, "description": r.description} for r in roles],
     }
@@ -161,6 +164,23 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
     db.commit()
     db.refresh(user)
     return user_out(user)
+
+
+@router.delete("/users/{user_id}/signature", status_code=status.HTTP_204_NO_CONTENT)
+def remove_user_signature(_: Users, me: CurrentUser, db: DB, user_id: str) -> Response:
+    """Takes away someone's e-signature (e.g. they left). An administrator can only
+    remove one, never set or change it: that's the person's own. Documents already
+    signed keep it."""
+    from app.notify import tell
+    from app.signatures import retire
+
+    user = get_user(db, user_id)
+    if retire(db, user.id, removed_by=me.full_name):
+        audit(db, me, "signature.removed", target=user.email, target_type="user", target_id=user.id)
+        if user.id != me.id:
+            tell(db, [user], "signature.removed", f"{me.full_name} removed your e-signature. Set a new one on your account page if you need it.", link="/account")
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)

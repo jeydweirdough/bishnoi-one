@@ -335,6 +335,28 @@ def read_notifications(user: CurrentUser, db: DB, settings: SettingsDep, body: R
     return my_notifications(user, db, settings)
 
 
+# --- e-signatures on documents (app/signatures.py) -------------------------------------------
+
+SIGNED_RECORDS = {"journal_entry": ("journal.view", JournalEntry), "fund_request": ("funds.view", FundRequest)}
+
+
+@router.get("/signatures/{record_type}/{record_id}")
+def document_signatures(access: CurrentAccess, db: DB, record_type: str, record_id: str) -> dict:
+    """Who signed which step of a document, with their signature as it was when
+    they signed. Only for someone who may see that kind of document."""
+    from fastapi import HTTPException, status
+
+    from app.signatures import steps_out
+
+    if record_type not in SIGNED_RECORDS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such document.")
+    permission, model = SIGNED_RECORDS[record_type]
+    access.require(permission)
+    if db.get(model, record_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such document.")
+    return {"steps": steps_out(db, record_type, record_id)}
+
+
 # --- the calendar (app/routers/calendar.py), under /finance/calendar ----------------------------
 # Included here, after this router's own endpoints, so main.py needn't change.
 from app.routers.calendar import router as calendar_router  # noqa: E402

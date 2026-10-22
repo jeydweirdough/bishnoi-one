@@ -150,6 +150,9 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                     Marketing request
                   </Link>
                 )}
+                <Link href={`/ledger/voucher/${e.id}`} className="text-meta text-hema hover:underline">
+                  Voucher
+                </Link>
                 {e.reversedById && (
                   <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">
                     {e.reversalStatus === "waiting" ? "Reversal waiting for approval" : "Reversed"}

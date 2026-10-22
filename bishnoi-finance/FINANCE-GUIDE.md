@@ -369,6 +369,39 @@ without going online, and they're updated once a year. *For example, an entry
 posted Thursday 11 June 2026 reaches the Deputy on Saturday the 13th if it's still
 waiting: the 12th is Independence Day.*
 
+### E-signatures, and documents to print
+
+**Your e-signature** is set on your account page (your name at the top right →
+Your profile → **Your e-signature**). Only you can set it.
+
+- **Draw it** in the box with a mouse, finger or pen, or **upload** a photo or
+  scan. A photo of a signature on plain white paper is cleaned on your own
+  computer: the paper is made transparent and the ink black, even where a
+  shadow falls. Move the **Keep more / Cleaner** slider until it looks right. A
+  picture that's already transparent is only trimmed. The photo itself is never
+  sent.
+- You confirm it's you with your **password** (or, if you sign in with your
+  Bishnoi One account, by having signed in within the last 15 minutes).
+- Finance places it **only by your own step**: on a journal entry you post
+  (Prepared by) or approve (Approved by), and on a liquidation you review
+  (Reviewed by) or settle (Settled by). Each comes with your name, role, date and
+  time, "Signed electronically" and a reference to exactly what you signed.
+- **Changing or removing it** doesn't change documents you already signed. An
+  Administrator can remove someone's signature (e.g. when they leave), but never
+  set or change it.
+
+**Documents to print or save as PDF** (Print, then "Save as PDF"):
+
+- **Journal voucher**: the **Voucher** link on any journal entry. Prepared by /
+  Approved by. An entry made automatically by a marketing request or an invoice
+  says so; its signatures are on that document.
+- **Liquidation report**: the **Liquidation report** button on a marketing
+  request once its liquidation is reviewed. The receipts, what they came to, and
+  Reviewed by / Settled by.
+
+*Whether BIR and the external auditors accept e-signed documents is being
+confirmed with Sir Rommel; meanwhile everyone, Sir Rommel included, can sign.*
+
 ### Calendar
 
 **Calendar** in the sidebar is for your deadlines, cut-offs and monthly tasks:

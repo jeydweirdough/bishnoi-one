@@ -645,6 +645,47 @@ class CalendarDone(Base):
     done_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class Signature(Base):
+    """A person's e-signature (app/signatures.py): set by them on their account page,
+    drawn or uploaded, black on transparent. Replaced or removed ones are kept, so
+    documents signed with them still show them. Decided 2026-10-22 (Plans/Plan - E-signatures)."""
+
+    __tablename__ = "nbfi_signatures"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id", ondelete="CASCADE"), index=True)
+    # The cleaned image: a PNG, black ink on transparent.
+    image: Mapped[bytes] = mapped_column(LargeBinary)
+    # drawn or uploaded
+    method: Mapped[str] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # No longer the person's signature (replaced, or removed): kept for what it signed.
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+
+class SignedStep(Base):
+    """A step someone did on a document, signed: who, which step, when, with which
+    signature (none if they hadn't set one), and a fingerprint of the document's
+    content at that moment (SHA-256)."""
+
+    __tablename__ = "nbfi_signed_steps"
+    __table_args__ = (Index("nbfi_signed_steps_record", "record_type", "record_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # journal_entry, fund_request
+    record_type: Mapped[str] = mapped_column(String(20))
+    record_id: Mapped[str] = mapped_column(String(36))
+    # prepared, approved (journal); reviewed, settled (liquidation)
+    step: Mapped[str] = mapped_column(String(20))
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    signature_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_signatures.id", ondelete="SET NULL"), default=None)
+    signer_name: Mapped[str] = mapped_column(String(120))
+    signer_role: Mapped[str] = mapped_column(String(80))
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
