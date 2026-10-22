@@ -71,6 +71,48 @@ export const appUrl = (app: AppName): string => (LIVE[app] || FROM_ENV[app] || D
 /** Whether an app's address is known for real (the Platform says, or it's set), not only the local default. */
 export const addressKnown = (app: AppName): boolean => Boolean(LIVE[app] || FROM_ENV[app]);
 
+// The label each app uses in its host name — "admin" for exec, the key itself
+// for the rest. Lets one app work out another's address from the domain it is
+// being served on, so the apps follow whatever URL is in use.
+const HOST_TOKEN: Record<AppName, string> = {
+  exec: "admin",
+  crm: "crm",
+  finance: "finance",
+  inventory: "inventory",
+  platform: "platform",
+  inlicensing: "inlicensing",
+  pharmacy: "pharmacy",
+  regulatory: "regulatory",
+};
+
+/** A host that isn't a public domain: localhost, an IP, or empty (development). */
+const privateHost = (host: string): boolean => {
+  const h = (host || "").split(":")[0];
+  return !h || h === "localhost" || h.endsWith(".localhost") || h === "::1" || /^\d{1,3}(\.\d{1,3}){3}$/.test(h);
+};
+
+/**
+ * Every app's screens address worked out from the domain THIS app is served on,
+ * by swapping this app's label for each other app's: crm.example.com ->
+ * platform.example.com, crm-bishnoi.local -> platform-bishnoi.local. Empty on
+ * localhost, an IP, or when the host doesn't start with this app's label; the
+ * stored addresses (Platform) or the local ports then stand. This is what lets a
+ * new domain work with nothing configured — the apps follow the URL in use,
+ * over any stale address the Platform still holds (loadAddresses applies it).
+ */
+export function derivedAddresses(host: string, proto: string): Partial<Record<AppName, string>> {
+  host = (host || "").toLowerCase().split(",")[0].trim();
+  if (!THIS_APP || privateHost(host)) return {};
+  const mine = HOST_TOKEN[THIS_APP];
+  const sep = host.startsWith(`${mine}.`) ? "." : host.startsWith(`${mine}-`) ? "-" : "";
+  if (!sep) return {};
+  const rest = host.slice(mine.length); // the separator and everything after this app's label
+  const scheme = proto === "http" ? "http" : "https";
+  const out: Partial<Record<AppName, string>> = {};
+  for (const app of Object.keys(HOST_TOKEN) as AppName[]) out[app] = `${scheme}://${HOST_TOKEN[app]}${rest}`;
+  return out;
+}
+
 /**
  * A link to a screen, wherever it lives.
  *
