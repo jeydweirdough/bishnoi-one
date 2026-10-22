@@ -51,7 +51,27 @@ or the tax registration). Until it's set, the step that needs it can't be done.
 
 ## 2. The Overview page
 
-The first page shows what is waiting on Finance today:
+**What you see depends on your role.** A role made for your work shows the
+sections that work calls for, and nothing else:
+
+- **Waiting for you:** prices and quotes waiting for your approval (asked of
+  the CRM; it fills in a moment after the page opens, and says so if the CRM
+  can't be reached), liquidations to review (not ones you released), and
+  overdue liquidations.
+- **Receivables:** what customers owe, how late, and the most overdue.
+- **Sales invoiced in the Hub:** this month and this year.
+- **Marketing spending by team:** accepted receipts from reviewed liquidations.
+- **Journal:** the latest entries and who posted them, and whether the books balance.
+- **Tax and setup:** output tax on this quarter's invoices, and anything not yet
+  set up, with a link to fix it.
+- **Balances** (below).
+
+Sales, receivables and output tax count **only invoices issued in the Hub**.
+2MG's official invoices are still printed from Oojeema, so those figures stay
+low until the Hub issues them.
+
+The **Administrator, Finance Staff and Auditor** roles keep the page as it was:
+what is waiting on Finance today:
 
 - **For release:** approved requests waiting for the money to go out.
 - **For review:** liquidations sent in and waiting to be checked.

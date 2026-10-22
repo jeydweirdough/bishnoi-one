@@ -11,6 +11,15 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.3.0",
+    date: "2026-10-22",
+    changes: [
+      "The Overview shows what your role's work calls for: what's waiting for you, receivables, sales invoiced in the Hub, marketing spending by team, the journal, tax and setup, and balances. Ms. Malou's and Sir Rommel's roles first; the Administrator, Finance Staff and Auditor keep the Overview as it was.",
+      "Prices waiting for approval fill in a moment after the page opens, so a slow CRM never holds up the Overview.",
+      "Figures that count only invoices issued in the Hub say so.",
+    ],
+  },
+  {
     version: "0.2.1",
     date: "2026-10-20",
     changes: [
