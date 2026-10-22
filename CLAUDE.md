@@ -62,7 +62,7 @@ The `frontend/AGENTS.md` note applies: this Next.js version differs from trainin
 ## Repo workflow
 
 - `main` holds every app; `bishnoi-<app>` branches hold one app each and are kept in sync by the **Sync branches** action. Don't create branches starting with `bishnoi-`, and don't PR an app branch into `main`.
-- Pushing doesn't deploy. Deploys run by hand from **Actions → Deploy** (Platform first); `.github/deploy.json` maps folders to Vercel projects and required env vars.
+- Pushing doesn't deploy. Deployment is by hand (the self-hosted Coolify server, Platform first; or the Vercel CLI per app) — the automated Deploy workflow was removed 2026-10-22.
 - A new app is `bishnoi-<name>/` with `frontend/`, `backend/`, `.gitignore`, `README.md`, `GIT-GUIDE.md` and an unchanged copy of `.github/workflows/sync-branches.yml`; **Check apps** verifies this on PRs.
 - `README.md` (setup, every `.env` setting per app) and `MAINTAINING.md` (actions, Vercel, linking apps, Discord) are the full references.
 

@@ -93,10 +93,9 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy → Run workflow**, ticking this app. Any time.
+Deploy it by hand, the usual way: on the office Coolify server open this app and press **Redeploy**; or run `vercel --prod` in `bishnoi-pharmacy/backend` then `bishnoi-pharmacy/frontend`. Any time, after the Platform.
 
-It checks everything is set up first, and stops with what to do next when
-something isn't. Nothing goes online until someone runs it.
+Pushing doesn't deploy; nothing goes online until you deploy it yourself (MAINTAINING.md has the steps).
 
 ## 6. Never
 

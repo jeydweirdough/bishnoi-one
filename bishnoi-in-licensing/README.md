@@ -84,10 +84,9 @@ one place only, never to both.
 
 ## 5. Put it online
 
-On GitHub: **Actions → Deploy → Run workflow**, ticking this app. Not ready for Vercel yet: the run says what's missing.
+Deploy it by hand, the usual way: on the office Coolify server open this app and press **Redeploy**; or run `vercel --prod` in `bishnoi-in-licensing/backend` then `bishnoi-in-licensing/frontend`. API only; no screens yet.
 
-It checks everything is set up first, and stops with what to do next when
-something isn't. Nothing goes online until someone runs it.
+Pushing doesn't deploy; nothing goes online until you deploy it yourself (MAINTAINING.md has the steps).
 
 ## 6. Never
 

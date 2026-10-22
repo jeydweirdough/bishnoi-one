@@ -462,11 +462,10 @@ Use the addresses Vercel actually gives your projects (e.g.
 `bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
 screens' `API_URL` must both name it.
 
-**Pushing doesn't deploy.** To put an app online, the repo owner opens
-**Actions → Deploy → Run workflow** on GitHub, ticking the apps to deploy
-(the Platform goes first). It checks each app is set up first and, when one
-isn't, stops before deploying it and says what to do next (MAINTAINING.md,
-"Deployments on Vercel").
+**Pushing doesn't deploy.** To put an app online, deploy it by hand, the
+Platform first: on the office Coolify server press **Redeploy**, or run
+`vercel --prod` in the app's `backend` then `frontend` folder (MAINTAINING.md,
+"Deploying by hand").
 
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
