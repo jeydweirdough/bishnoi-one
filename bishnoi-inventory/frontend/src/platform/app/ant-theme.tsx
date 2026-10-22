@@ -52,11 +52,23 @@ export const ANT_THEME = {
     boxShadowSecondary: "0 10px 30px rgba(20, 20, 20, 0.12)",
   },
   components: {
-    Button: { primaryShadow: "none", defaultShadow: "none", dangerShadow: "none", defaultBorderColor: INK, defaultHoverBg: MINT, defaultHoverBorderColor: INK, defaultHoverColor: INK, fontWeight: 500 },
+    // Buttons in the UI kit's shape (decided 2026-10-22): 40 px tall with room at the
+    // sides, small 34, large 48; a light outline that greys on hover; text fields stay 36.
+    Button: {
+      controlHeight: 40, controlHeightSM: 34, controlHeightLG: 48,
+      paddingInline: 18, paddingInlineSM: 14, paddingInlineLG: 24,
+      contentFontSize: 14, contentFontSizeSM: 13, contentFontSizeLG: 15,
+      borderRadius: 9, borderRadiusSM: 8, borderRadiusLG: 10,
+      primaryShadow: "none", defaultShadow: "0 1px 2px rgba(20, 20, 20, 0.05)", dangerShadow: "none",
+      defaultBorderColor: "#dededa", defaultHoverBg: "#f4f4f2", defaultHoverBorderColor: "#c9c9c5", defaultHoverColor: INK, defaultActiveBg: MINT,
+      fontWeight: 500,
+    },
     // Text sits clear of the edges: room at the sides.
     Input: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, paddingInline: 14, paddingInlineLG: 16, paddingInlineSM: 10, paddingBlock: 6 },
     InputNumber: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK },
-    Select: { activeOutlineColor: "rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, optionSelectedBg: MINT, optionSelectedColor: INK, optionActiveBg: "#f4f4f2", optionSelectedFontWeight: 500 },
+    Select: { activeOutlineColor: "rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, optionSelectedBg: MINT, optionSelectedColor: INK, optionActiveBg: "#f4f4f2", optionSelectedFontWeight: 600,
+      // The UI kit's menus: roomier rows, picked ones as mint chips in the field.
+      optionHeight: 34, optionPadding: "6px 10px", multipleItemBg: MINT, multipleItemBorderColor: "#e3eedf" },
     DatePicker: { activeShadow: "0 0 0 3px rgba(168, 214, 155, 0.45)", hoverBorderColor: "#6a6a6a", activeBorderColor: INK, cellActiveWithRangeBg: MINT },
     // The selected filter is ink, as on the components page.
     Segmented: { itemSelectedBg: INK, itemSelectedColor: "#ffffff", trackBg: "#ffffff", trackPadding: 3, borderRadius: 8, borderRadiusSM: 6 },

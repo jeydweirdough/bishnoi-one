@@ -120,17 +120,21 @@ export async function GoPage({ searchParams }: { searchParams: Search }) {
           </>
         ) : refused ? (
           <>
-            {/* The "no" is an alert over the page; the page is where to go instead. */}
-            <GoNotice text={refused} />
-            <h1 className="mt-6 text-title">Choose an app</h1>
-            <p className="mt-1 text-ink-2">
-              Signed in as <span className="font-medium text-ink">{me?.email ?? "your Bishnoi One account"}</span>
-              {me?.company ? ` at ${me.company.name}` : ""}.
+            {/* Not a "no access" (that one signs out and asks again): something is set up wrong or can't be reached. Said plainly, and it stays. */}
+            <h1 className="mt-6 text-title">Can&apos;t open {name}</h1>
+            <p role="alert" className="mt-2 rounded-[14px] bg-danger-tint px-3 py-2 text-sm text-danger">
+              {refused}
             </p>
-            {me && me.apps.some((x) => x.key !== key && tileOf(x.key)) ? (
+            {/address/i.test(refused) && (
+              <p className="mt-3 text-sm text-ink-2">
+                {name}&apos;s address on Bishnoi One doesn&apos;t match the one you came from. A Platform administrator sets each app&apos;s address in Applications (App URL).
+              </p>
+            )}
+            <a href={goLink(key, returnTo, company || undefined)} className="mt-4 inline-flex h-10 items-center rounded-[12px] border border-rule-strong px-4 text-sm font-medium text-ink hover:border-ink">
+              Try again
+            </a>
+            {me && me.apps.some((x) => x.key !== key && tileOf(x.key)) && (
               <OtherApps title="Apps you can open" apps={me.apps.filter((x) => x.key !== key).map((x) => ({ key: x.key, url: x.appUrl }))} />
-            ) : (
-              <p className="mt-4 rounded-[14px] bg-bench px-3 py-2.5 text-sm text-ink-2">No apps are given to your account yet. Ask your company&apos;s administrator for access.</p>
             )}
           </>
         ) : (

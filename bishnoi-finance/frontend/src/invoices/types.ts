@@ -42,6 +42,8 @@ export type InvoiceSummary = {
   status: InvoiceStatus;
   number: string | null;
   customer: { id: string | null; name: string; tin: string | null; address: string | null };
+  /** Whose sale it is: the CRM customer's owner when picked from the CRM. */
+  salesperson: { id: string | null; name: string | null } | null;
   treatment: string;
   buyerIdNumber: string | null;
   date: string;
@@ -114,7 +116,16 @@ export type Series = {
   isActive: boolean;
 };
 
-export type Customer = { id: string; name: string; status: string; address: string | null; email: string | null; phone: string | null; tin: string | null };
+export type Customer = {
+  id: string;
+  name: string;
+  status: string;
+  address: string | null;
+  email: string | null;
+  phone: string | null;
+  tin: string | null;
+  owner?: { id: string; name: string } | null;
+};
 
 /** What the invoice form picks from: the tax pack's VAT categories and kinds of buyer. */
 export type TaxChoices = {

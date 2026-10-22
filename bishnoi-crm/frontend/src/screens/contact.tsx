@@ -16,6 +16,7 @@ import { ActivityList } from "../components/crm/activity-list";
 import { DeleteRecord, EditRecord } from "../components/crm/list-controls";
 import { LogActivityButton } from "../components/crm/log-activity-button";
 import { RecordTabs } from "../components/crm/record-tabs";
+import { CopyButton } from "@/src/platform/ui/copy-button";
 
 type Params = Promise<{ id: string }>;
 
@@ -43,9 +44,12 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
   const mayLog = can(me, "activities.create") && contact.can.edit;
   const tab = (await searchParams).tab === "quotes" && quotes ? "quotes" : "activity";
   const link = (href: string, text: string) => (
-    <a href={href} className="text-ink hover:underline">
-      {text}
-    </a>
+    <span className="inline-flex min-w-0 items-center gap-1">
+      <a href={href} className="truncate text-ink hover:underline">
+        {text}
+      </a>
+      <CopyButton text={text} what={href.startsWith("mailto:") ? "Email" : "Phone number"} />
+    </span>
   );
 
   return (

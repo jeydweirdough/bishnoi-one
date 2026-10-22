@@ -503,6 +503,10 @@ class Invoice(Base):
     customer_name: Mapped[str] = mapped_column(String(200))
     customer_tin: Mapped[str | None] = mapped_column(String(20), default=None)
     customer_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Whose sale it is: the CRM's salesperson (the customer's owner when picked from the CRM).
+    # The CRM scores its people from these; none: it counts for nobody.
+    salesperson_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    salesperson_name: Mapped[str | None] = mapped_column(String(120), default=None)
     # Who is buying, as the tax engine reads it: regular, senior citizen, PWD...
     treatment: Mapped[str] = mapped_column(String(20), default="regular")
     buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)

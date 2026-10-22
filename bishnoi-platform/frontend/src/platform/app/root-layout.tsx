@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
+import { ToastIcon } from "../ui/toast-icon";
 import { APP_NAME } from "../lib/labels";
 import { Addresses } from "./addresses";
 import { AntTheme } from "./ant-theme";
@@ -31,10 +32,21 @@ export function RootLayout({ children }: { children: ReactNode }) {
         <AntTheme>{children}</AntTheme>
         <Toaster
           position="top-center"
+          // The UI kit's light toasts (decided 2026-10-22): white, a thin line, its round icon, closing after 4 seconds.
+          duration={4000}
+          icons={{
+            success: <ToastIcon tone="ok" />,
+            info: <ToastIcon tone="info" />,
+            warning: <ToastIcon tone="warn" />,
+            error: <ToastIcon tone="bad" />,
+          }}
           toastOptions={{
             classNames: {
-              toast: "!rounded-[22px] !border-0 !shadow-overlay !font-sans !text-sm !text-ink",
+              toast: "!rounded-[12px] !border !border-rule !bg-sheet !py-2.5 !pr-3 !pl-3.5 !shadow-[0_10px_30px_rgba(20,20,20,0.12)] !font-sans !text-[0.84375rem] !text-ink",
+              title: "!font-medium",
               description: "!text-ink-2",
+              actionButton: "!bg-transparent !px-1 !font-semibold !text-ink !underline !underline-offset-[3px]",
+              cancelButton: "!bg-transparent !text-ink-2",
             },
           }}
         />

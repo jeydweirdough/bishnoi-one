@@ -18,6 +18,15 @@ table by table. A target that already has people in it is left alone unless
 
 Only this app's own tables (its prefix) are touched, so several apps can share
 one database.
+
+--setup copies only how the app is set up: people, roles, teams, settings,
+products, prices, KPIs and their targets, taxes, warehouses and stock. Records
+of the work itself (customers, contacts, deals, quotes, activities, visits,
+orders, invoices, journal entries), the audit log and sign-ins stay behind;
+the target starts with none. A link from a setup row to a record left behind
+is cleared.
+
+    uv run python -m app.tools.copy_database --setup --to "postgresql://..." [--company getmeds]
 """
 
 import argparse
@@ -36,6 +45,29 @@ from app.tenants import database_url, known_at
 
 KEEP_BACKUPS = 30
 CHUNK = 1000
+
+# Never copied by --setup, in any app: sign-ins, passes, the audit log, and the
+# key this copy uses to reach the Platform (the target has its own).
+NOT_SETUP = ("sessions", "platform_passes", "audit_log", "platform_connection")
+# The records of the work itself, by app (table prefix): left behind by --setup.
+RECORDS = {
+    "nbcm_": (
+        "companies", "contacts", "deals", "quotes", "quote_links", "activities", "activity_links", "visits", "balances",
+        "assistance", "associations", "attention_dismissals", "plan_stops", "route_days", "week_plans", "trail_batches",
+        "inbox_leads", "fund_requests", "material_requests", "media_views", "merged_records", "not_duplicates",
+        "kpi_entries", "mail_accounts", "connections",
+    ),
+    "nbin_": ("orders", "order_lines"),
+    "nbfi_": (
+        "invoices", "invoice_payments", "journal_entries", "journal_lines", "fund_requests", "fund_events",
+        "fund_expenses", "stored_files",
+    ),
+}
+
+
+def left_behind(prefix: str) -> set[str]:
+    """The tables --setup doesn't copy."""
+    return {prefix + name for name in (*NOT_SETUP, *RECORDS.get(prefix, ()))}
 
 
 def prefix_of(engine: Engine) -> str:
@@ -83,8 +115,8 @@ def empty(engine: Engine, meta: MetaData) -> None:
                 c.execute(text(f'DELETE FROM "{n}"'))
 
 
-def copy(source_url: str, target_url: str, *, replace: bool = False) -> dict[str, int]:
-    """Copies every row of this app's tables; answers the rows copied, by table."""
+def copy(source_url: str, target_url: str, *, replace: bool = False, setup: bool = False) -> dict[str, int]:
+    """Copies every row of this app's tables (with setup, only the setup's); answers the rows copied, by table."""
     source, target = make_engine(source_url), make_engine(target_url)
     prefix = prefix_of(source)
     print(f"From {describe(source_url)}\nTo   {describe(target_url)}")
@@ -97,22 +129,32 @@ def copy(source_url: str, target_url: str, *, replace: bool = False) -> dict[str
     if has_people(target, prefix) and not replace:
         raise SystemExit("The target already has people in it. Run again with --replace to overwrite it with the source's data.")
     src, dst = tables_of(source, prefix), tables_of(target, prefix)
-    missing = sorted(set(src.tables) - set(dst.tables))
+    skip = left_behind(prefix) if setup else set()
+    missing = sorted(set(src.tables) - set(dst.tables) - skip)
     if missing:
         raise SystemExit(f"The target has no {', '.join(missing)}: is it the same app?")
+    if setup:
+        print("Setup only: customers, deals, quotes, activities, orders, invoices, the audit log and sign-ins stay behind.")
     empty(target, dst)
     copied: dict[str, int] = {}
     with source.connect() as read, target.begin() as write:
         if target.dialect.name == "sqlite":
             write.execute(text("PRAGMA foreign_keys=OFF"))
         for table in dst.sorted_tables:  # parents first
-            if table.name not in src.tables:
+            if table.name not in src.tables or table.name in skip:
                 continue
             columns = [c.name for c in src.tables[table.name].columns if c.name in table.columns]
+            # Links to records left behind: cleared, or the row left out when the link can't be empty.
+            cleared = {c.name: c.nullable for c in table.columns if c.name in columns and any(fk.column.table.name in skip for fk in c.foreign_keys)}
             rows = read.execute(select(*(src.tables[table.name].c[n] for n in columns))).mappings()
             count, batch = 0, []
             for row in rows:
-                batch.append(dict(row))
+                row = dict(row)
+                if any(row[name] is not None and not nullable for name, nullable in cleared.items()):
+                    continue
+                for name in cleared:
+                    row[name] = None
+                batch.append(row)
                 if len(batch) == CHUNK:
                     write.execute(insert(table), batch)
                     count, batch = count + len(batch), []
@@ -132,11 +174,14 @@ def copy(source_url: str, target_url: str, *, replace: bool = False) -> dict[str
 
 
 def check(source: Engine, target: Engine, src: MetaData, copied: dict[str, int]) -> None:
-    """Every table has as many rows on both sides, or the copy says which don't."""
+    """Every table has as many rows on both sides (as many as were sent, for setup's), or the copy says which don't."""
     wrong = []
     with source.connect() as a, target.connect() as b:
-        for name in copied:
+        for name, sent in copied.items():
             left = a.execute(select(func.count()).select_from(src.tables[name])).scalar()
+            if sent != left:
+                print(f"  {name}: {left - sent} left out (they belong to records that stay behind)")
+                left = sent
             right = b.execute(text(f'SELECT count(*) FROM "{name}"')).scalar()
             if left != right:
                 wrong.append(f"{name}: {left} here, {right} there")
@@ -169,6 +214,7 @@ def main() -> None:
     parser.add_argument("--from", dest="source", help="Where to copy from (default: DATABASE_URL, else this computer's SQLite file).")
     parser.add_argument("--to", dest="target", help="Where to copy to (for copy).")
     parser.add_argument("--replace", action="store_true", help="Overwrite a target that already has data.")
+    parser.add_argument("--setup", action="store_true", help="Copy only the setup (people, settings, products, prices, KPIs, taxes, stock), not customers, deals, quotes or other records.")
     parser.add_argument("--company", help="Copy this company's database (its short name): added to --from and --to.")
     args = parser.parse_args()
     settings = get_settings()
@@ -188,9 +234,9 @@ def main() -> None:
         source, target = database_url(source, args.company), database_url(args.target, args.company)
         if not target.startswith("sqlite"):
             create_postgres_database(args.target, make_url(target).database)
-        copy(source, target, replace=args.replace)
+        copy(source, target, replace=args.replace, setup=args.setup)
         return
-    copy(source, args.target, replace=args.replace)
+    copy(source, args.target, replace=args.replace, setup=args.setup)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { CellInput, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { QuantityStepper } from "@/src/platform/ui/quantity-stepper";
 import { FileDrop } from "@/src/platform/ui/file-drop";
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "../actions/customers";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
@@ -443,12 +444,11 @@ export function QuoteForm({
 
                 <div>
                   <span className={mobileLabel}>Quantity</span>
-                  <CellInput
+                  <QuantityStepper
                     aria-label={`Line ${i + 1}: quantity`}
                     aria-invalid={errorFor(`${at}.quantity`) ? true : undefined}
-                    inputMode="numeric"
                     value={l.quantity}
-                    onChange={(e) => setLine(l.key, { quantity: e.target.value })}
+                    onChange={(quantity) => setLine(l.key, { quantity })}
                   />
                   {rows.some((r) => r.freeQuantity > 0) && (
                     <p className="mt-0.5 text-meta text-ink-2 sm:text-right">+{rows.reduce((n, r) => n + r.freeQuantity, 0)} free</p>

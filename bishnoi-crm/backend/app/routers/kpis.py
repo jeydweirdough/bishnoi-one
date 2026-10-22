@@ -10,8 +10,7 @@
   reports.view, with a scope wider than own) everyone one's role reaches.
 """
 
-from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date
 from typing import Annotated, Literal
 from app.pricing import sales_settings
 from app.terms import terms_of
@@ -19,7 +18,7 @@ from app.terms import terms_of
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.access import Access, CurrentAccess, require
 from app.api import Api, camel, changed, field_error, not_found, person_out, team_out
@@ -27,7 +26,8 @@ from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
 from app.kpis import FILTER_CHOICES, MEASURES, UNITS, Period, combine, elapsed_in, figures, judged, unit_of, value_of
-from app.models import KPI_BETTER, Activity, Company, Kpi, KpiEntry, KpiTarget, Product, Quote, Role, Team, User, Visit
+from app.models import KPI_BETTER, Kpi, KpiEntry, KpiTarget, Product, Role, Scorecard, Team, User
+from app.scorecards import Context, card_of, score
 from app.pricing import today
 from app.routers.field import month_bounds, month_or_now, this_month
 from app.scope import reachable_people
@@ -42,7 +42,7 @@ def period_of(month: str, settings: Settings) -> Period:
     start, end = month_bounds(month, settings)
     y, m = int(month[:4]), int(month[5:])
     after = date(y + m // 12, m % 12 + 1, 1)
-    return Period(month=month, start=start, end=end, first_day=f"{month}-01", next_first_day=after.isoformat())
+    return Period(month=month, start=start, end=end, first_day=f"{month}-01", next_first_day=after.isoformat(), today=today(settings.org_timezone), settings=settings)
 
 
 def worded(db: Session, text: str) -> str:
@@ -57,6 +57,8 @@ def kpi_out(db: Session, k: Kpi, roles: dict[str, str]) -> dict:
     if flt and flt[0] == "productId":
         product = db.get(Product, flt[1])
         flt_label = product.name if product else "A product no longer listed"
+    elif flt and flt[0] == "minCentavos":
+        flt_label = f"Invoices of ₱{int(flt[1]) / 100:,.0f} or more"
     elif flt:
         flt_label = str(flt[1]).replace("_", " ").capitalize()
     else:
@@ -91,7 +93,29 @@ def role_names(db: Session) -> dict[str, str]:
 
 
 def applies(k: Kpi, person: User) -> bool:
-    return not k.roles or person.role_id in k.roles
+    """Whether a KPI is the person's: their role's, and, for a KPI a scorecard
+    scores, on the person's own scorecard (a Hospital rep's IST, DSO, HRR and
+    NZSD; not B2C's cancellation rate). Worked out once per request."""
+    if k.roles and person.role_id not in k.roles:
+        return False
+    db = object_session(person)
+    if db is None or not k.code:
+        return True
+    seen = db.info.get("kpi_cards")
+    if seen is None:
+        cards = list(db.scalars(select(Scorecard).where(Scorecard.is_active)))
+        seen = db.info["kpi_cards"] = {
+            "cards": cards,
+            "teams": {t.id: t for t in db.scalars(select(Team))},
+            "scored": {i["kpi"] for c in cards for i in c.items or []},
+            "people": {},
+        }
+    if k.code not in seen["scored"]:
+        return True
+    if person.id not in seen["people"]:
+        card = card_of(person, seen["cards"], seen["teams"])
+        seen["people"][person.id] = {i["kpi"] for i in card.items or []} if card else set()
+    return k.code in seen["people"][person.id]
 
 
 @router.get("/kpis")
@@ -457,235 +481,52 @@ def scorecard(
     }
 
 
-@router.get("/playbook-scorecard")
-def playbook_scorecard(
+@router.get("/scorecards")
+def scorecards(
     access: CurrentAccess,
     me: CurrentUser,
     db: DB,
     settings: SettingsDep,
     month: str | None = Query(None, max_length=7),
-    team: str | None = Query(None, max_length=36),
+    card: str | None = Query(None, max_length=40, description="a scorecard's code; the first one with people in reach when not given"),
 ) -> dict:
-    """100-Point Composite Scorecard aligned with Bishnoi Sales Playbooks.
-
-    Weights:
-    - IST (Individual Sales Target): 40 pts. Hard floor: <60% attainment = 0 pts + mandatory PIP!
-    - DSO / Collections Efficiency: 20 pts (>=95%: 20, 85-94%: 15, 75-84%: 10, <75%: 0).
-    - CRR / HRR Retention Rate: 20 pts (>=90%: 20, 80-89%: 15, 70-79%: 10, <70%: 0).
-    - NZSD (Net Zero-Sales Days): 20 pts (<=3 days: 20, 4-5 days: 15, 6-8 days: 10, >8 days: 0).
-
-    Performance Bands:
-    - 95-100: Distinguished (+10% to +15% annual merit increment)
-    - 85-94: High Performer (+6% to +8% increment)
-    - 70-84: Core Performer (+3% to +5% increment)
-    - 60-69: PIP Candidate (0% increment, 30-day coaching)
-    - <60: Critical Action (0% increment, immediate PIP/escalation)
-    """
+    """Each division's playbook scorecard for the month (app/scorecards.py):
+    the people in reach on the one asked for, with their points per KPI, total,
+    caps and band, best first; and who has no sales at all this month."""
     month = month_or_now(month, settings)
     period = period_of(month, settings)
-    now_day = today(settings.org_timezone)
-    elapsed = elapsed_in(period, now_day)
-
-    # Determine people in scope
-    if access.scope == "own":
-        people = [me]
-    else:
-        people = [
-            u for u in reachable_people(db, access)
-            if (not team or u.team_id == team) and not u.role.is_system
-        ]
-
-    ids = [p.id for p in people]
-
-    # Target values for revenue_won and amount_collected
-    rev_kpi = db.scalar(select(Kpi).where(Kpi.code == "revenue_won"))
-    col_kpi = db.scalar(select(Kpi).where(Kpi.code == "amount_collected"))
-
-    rev_targets: dict[str, int] = {}
-    col_targets: dict[str, int] = {}
-    if rev_kpi:
-        for t in db.scalars(select(KpiTarget).where(KpiTarget.month == month, KpiTarget.kpi_id == rev_kpi.id, KpiTarget.user_id.in_(ids))):
-            if t.user_id:
-                rev_targets[t.user_id] = t.value
-    if col_kpi:
-        for t in db.scalars(select(KpiTarget).where(KpiTarget.month == month, KpiTarget.kpi_id == col_kpi.id, KpiTarget.user_id.in_(ids))):
-            if t.user_id:
-                col_targets[t.user_id] = t.value
-
-    # Actual figures
-    rev_actuals = MEASURES["deals_won_value"].count(db, ids, period, {}) if "deals_won_value" in MEASURES else {}
-    col_actuals = MEASURES["collections_amount"].count(db, ids, period, {}) if "collections_amount" in MEASURES else {}
-
-    # Activity days for NZSD (days where rep logged a visit or created a quote)
-    activity_days_by_user: dict[str, set[str]] = defaultdict(set)
-    for owner_id, v_at in db.execute(select(Visit.owner_id, Visit.visited_at).where(Visit.owner_id.in_(ids), Visit.visited_at >= period.start, Visit.visited_at < period.end)):
-        if v_at:
-            activity_days_by_user[owner_id].add(v_at.date().isoformat())
-    for owner_id, q_at in db.execute(select(Quote.owner_id, Quote.created_at).where(Quote.owner_id.in_(ids), Quote.created_at >= period.start, Quote.created_at < period.end)):
-        if q_at:
-            activity_days_by_user[owner_id].add(q_at.date().isoformat())
-
-    # Elapsed days in the month so far
-    start_d = date.fromisoformat(period.first_day)
-    end_d = min(date.fromisoformat(now_day), date.fromisoformat(period.next_first_day) - timedelta(days=1))
-    elapsed_days = max(1, (end_d - start_d).days + 1)
-    # Approximate business days (weekdays)
-    biz_days = sum(1 for i in range(elapsed_days) if (start_d + timedelta(days=i)).weekday() < 5)
-
-    scorecards = []
-    for p in people:
-        # 1. IST Quota Achievement (40 pts)
-        ist_target = rev_targets.get(p.id) or 0
-        ist_actual = rev_actuals.get(p.id, (0, None))[0]
-        if ist_target > 0:
-            ist_attainment = round((ist_actual / ist_target) * 100, 1)
-        else:
-            ist_attainment = 100.0 if ist_actual > 0 else 0.0
-
-        if ist_target > 0 and ist_attainment < 60.0:
-            ist_pts = 0.0
-            hard_floor_penalty = True
-        else:
-            ist_pts = round(min(40.0, (ist_attainment / 100.0) * 40.0), 1)
-            hard_floor_penalty = False
-
-        # 2. DSO / Collections Efficiency (20 pts)
-        col_target = col_targets.get(p.id) or 0
-        col_actual = col_actuals.get(p.id, (0, None))[0]
-        if col_target > 0:
-            col_attainment = round((col_actual / col_target) * 100, 1)
-            if col_attainment >= 95.0:
-                dso_pts = 20.0
-            elif col_attainment >= 85.0:
-                dso_pts = 15.0
-            elif col_attainment >= 75.0:
-                dso_pts = 10.0
-            else:
-                dso_pts = 0.0
-        else:
-            col_attainment = 100.0 if col_actual > 0 else None
-            dso_pts = 20.0 if col_actual > 0 else 15.0
-
-        # 3. CRR / Retention Rate (20 pts)
-        total_accounts = db.scalar(select(func.count(Company.id)).where(Company.owner_id == p.id, Company.status != "inactive")) or 0
-        visited_accounts = len({
-            cid for cid, in db.execute(
-                select(Visit.company_id).where(Visit.owner_id == p.id, Visit.visited_at >= period.start, Visit.visited_at < period.end, Visit.company_id.isnot(None))
-            )
-        })
-        if total_accounts > 0:
-            retention_rate = round(min(100.0, (visited_accounts / total_accounts) * 100), 1)
-        else:
-            retention_rate = 95.0 if visited_accounts > 0 else 85.0
-
-        if retention_rate >= 90.0:
-            crr_pts = 20.0
-        elif retention_rate >= 80.0:
-            crr_pts = 15.0
-        elif retention_rate >= 70.0:
-            crr_pts = 10.0
-        else:
-            crr_pts = 0.0
-
-        # 4. NZSD (Net Zero-Sales Days) (20 pts)
-        active_days_count = len(activity_days_by_user.get(p.id, set()))
-        zero_days = max(0, biz_days - active_days_count)
-        if zero_days <= 3:
-            nzsd_pts = 20.0
-        elif zero_days <= 5:
-            nzsd_pts = 15.0
-        elif zero_days <= 8:
-            nzsd_pts = 10.0
-        else:
-            nzsd_pts = 0.0
-
-        # Total Composite Score
-        total_score = round(ist_pts + dso_pts + crr_pts + nzsd_pts, 1)
-
-        # Performance Band & Governance
-        if hard_floor_penalty or total_score < 60.0:
-            band = "Critical Action"
-            status_tag = "critical"
-            pip_required = True
-            merit_increment = "0%"
-            action_plan = "Immediate 30-Day PIP or Escalation to Division Head"
-        elif total_score < 70.0:
-            band = "PIP Candidate"
-            status_tag = "warning"
-            pip_required = True
-            merit_increment = "0%"
-            action_plan = "Structured 30-Day PIP & Weekly One-on-One Coaching"
-        elif total_score < 85.0:
-            band = "Core Performer"
-            status_tag = "good"
-            pip_required = False
-            merit_increment = "+3% to +5%"
-            action_plan = "Standard Coaching & Target Alignment"
-        elif total_score < 95.0:
-            band = "High Performer"
-            status_tag = "good"
-            pip_required = False
-            merit_increment = "+6% to +8%"
-            action_plan = "Leadership Track & Key Account Expansion"
-        else:
-            band = "Distinguished"
-            status_tag = "excellent"
-            pip_required = False
-            merit_increment = "+10% to +15%"
-            action_plan = "President's Club & Strategic Mentorship"
-
-        scorecards.append({
-            "person": person_out(p),
-            "team": team_out(p.team),
-            "role": p.role.name,
-            "totalScore": total_score,
-            "band": band,
-            "status": status_tag,
-            "pipRequired": pip_required,
-            "hardFloorPenalty": hard_floor_penalty,
-            "meritIncrement": merit_increment,
-            "actionPlan": action_plan,
-            "breakdown": {
-                "ist": {
-                    "points": ist_pts,
-                    "maxPoints": 40.0,
-                    "targetCentavos": ist_target,
-                    "actualCentavos": ist_actual,
-                    "attainmentPct": ist_attainment,
-                    "floorPenalty": hard_floor_penalty,
-                },
-                "dso": {
-                    "points": dso_pts,
-                    "maxPoints": 20.0,
-                    "targetCentavos": col_target,
-                    "actualCentavos": col_actual,
-                    "attainmentPct": col_attainment,
-                },
-                "crr": {
-                    "points": crr_pts,
-                    "maxPoints": 20.0,
-                    "retentionRatePct": retention_rate,
-                    "visitedAccounts": visited_accounts,
-                    "totalAccounts": total_accounts,
-                },
-                "nzsd": {
-                    "points": nzsd_pts,
-                    "maxPoints": 20.0,
-                    "zeroDays": zero_days,
-                    "activeDays": active_days_count,
-                    "businessDays": biz_days,
-                },
-            },
-        })
-
-    avg_score = round(sum(s["totalScore"] for s in scorecards) / len(scorecards), 1) if scorecards else 0.0
-    pip_count = sum(1 for s in scorecards if s["pipRequired"])
-
+    teams = {t.id: t for t in db.scalars(select(Team))}
+    everyone = [u for u in db.scalars(select(User).where(User.is_active)) if not u.role.is_system]
+    reach = {u.id for u in ([me] if access.scope == "own" or not (access.can("goals.view") or access.can("reports.view")) else reachable_people(db, access))}
+    cards = list(db.scalars(select(Scorecard).where(Scorecard.is_active).order_by(Scorecard.sort_order, Scorecard.name)))
+    ctx = Context(db=db, period=period, people=everyone, teams=teams, kpis={k.code: k for k in db.scalars(select(Kpi).where(Kpi.is_active, Kpi.code.is_not(None)))})
+    whose: dict[str, list[User]] = {}
+    for u in everyone:
+        if u.id in reach:
+            c = card_of(u, cards, teams)
+            if c:
+                whose.setdefault(c.code, []).append(u)
+    shown = [c for c in cards if c.code in whose]
+    chosen = next((c for c in shown if c.code == card), shown[0] if shown else None)
+    people = []
+    if chosen:
+        for u in whose[chosen.code]:
+            people.append({"person": person_out(u), "team": team_out(u.team), "role": u.role.name, **score(chosen, u, ctx)})
+        people.sort(key=lambda r: (-(r["percent"] or 0), r["person"]["name"].lower()))
+    # Who sold nothing this month (no invoice in their name), of the people in reach with a scorecard.
+    sales = ctx.kpis.get("ist")
+    sold = ctx.figures(sales) if sales and period.sales() is not None else None
+    no_sales = (
+        [person_out(u) for c in shown for u in whose[c.code] if not (sold.get(u.id) or (0, None))[0]]
+        if sold is not None
+        else None
+    )
     return {
         "month": month,
-        "elapsed": round(elapsed, 3),
-        "totalPeople": len(scorecards),
-        "averageScore": avg_score,
-        "pipCount": pip_count,
-        "scorecards": scorecards,
+        "thisMonth": this_month(settings),
+        "financeLinked": period.sales() is not None,
+        "cards": [{"code": c.code, "name": c.name, "description": c.description, "people": len(whose[c.code])} for c in shown],
+        "card": {"code": chosen.code, "name": chosen.name, "description": chosen.description, "items": chosen.items, "bands": chosen.bands} if chosen else None,
+        "people": people,
+        "noSales": sorted(no_sales, key=lambda p: p["name"].lower()) if no_sales is not None else None,
     }

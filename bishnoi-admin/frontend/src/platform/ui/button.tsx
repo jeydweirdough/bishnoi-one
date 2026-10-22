@@ -2,21 +2,23 @@ import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
 type Variant = "primary" | "default" | "quiet" | "danger";
-type Size = "md" | "sm";
+type Size = "md" | "sm" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
 
 const variants: Record<Variant, string> = {
   primary: "bg-hema text-white hover:bg-hema-hover",
-  default: "bg-sheet text-ink border border-ink hover:bg-mint",
-  quiet: "text-ink hover:bg-mint",
-  danger: "bg-danger text-white hover:brightness-95",
+  default: "border border-[#dededa] bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:border-[#c9c9c5] hover:bg-[#f4f4f2]",
+  quiet: "text-ink-2 hover:bg-[#f4f4f2] hover:text-ink",
+  danger: "border border-danger/45 bg-sheet text-danger hover:bg-danger-tint",
 };
 
+// The UI kit's sizes (decided 2026-10-22): 40 px, small 34, large 48.
 const sizes: Record<Size, string> = {
-  md: "h-10 px-5 text-sm",
-  sm: "h-8 px-3.5 text-meta",
+  md: "h-10 px-[18px] text-sm",
+  sm: "h-[34px] gap-1.5 px-3.5 text-[13px]",
+  lg: "h-12 gap-2.5 px-6 text-[15px]",
 };
 
 export function buttonClass(variant: Variant = "default", size: Size = "md", extra = "") {

@@ -5,8 +5,9 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 
 // Underlined fields: transparent, a control-grey rule underneath, the rule
 // thickens to ink on focus. The label always sits above, never inside.
+// The UI kit's fields (decided 2026-10-22): boxed, 36 px, a light line that darkens on hover, a sage glow when in use.
 const control =
-  "block w-full min-w-0 bg-sheet border border-rule-strong px-4 text-sm text-ink placeholder:text-ink-3/80 hover:border-control focus:outline-none focus:border-ink focus:ring-3 focus:ring-mint-2 aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
+  "block w-full min-w-0 rounded-lg border border-[#dededa] bg-sheet px-3 text-sm text-ink placeholder:text-ink-3/80 hover:border-[#c9c9c5] focus:border-ink focus:shadow-[0_0_0_3px_rgba(168,214,155,0.45)] focus:outline-none aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
 
 type FieldProps = {
   label: string;
@@ -38,7 +39,7 @@ export function Field({ label, hint, error, optional, className = "", children }
 }
 
 export function Input({ className = "", ...rest }: ComponentProps<"input">) {
-  return <input suppressHydrationWarning className={`h-10 rounded-full ${control} ${className}`} {...rest} />;
+  return <input suppressHydrationWarning className={`h-9 ${control} ${className}`} {...rest} />;
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
@@ -73,10 +74,10 @@ export function Textarea({ className = "", ...rest }: ComponentProps<"textarea">
 export function Select({ className = "", children, ...rest }: ComponentProps<"select">) {
   return (
     <div className="relative">
-      <select suppressHydrationWarning className={`h-10 appearance-none rounded-full pr-9 ${control} ${className}`} {...rest}>
+      <select suppressHydrationWarning className={`h-9 appearance-none pr-8 ${control} ${className}`} {...rest}>
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-ink-3" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-ink-3" />
     </div>
   );
 }

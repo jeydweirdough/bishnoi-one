@@ -270,3 +270,55 @@ def standing(db: DB, settings: SettingsDep, ids: str = Query(..., max_length=200
         c["lines"] = sorted(c["lines"].values(), key=lambda x: (-x["invoices"], x["description"] or ""))
         c["approaching"] = c["nextDueOn"] is not None and c["nextDueOn"] <= (on + timedelta(days=APPROACHING_DAYS)).isoformat()
     return {"on": on.isoformat(), "customers": out}
+
+
+# --- sales: issued invoices, for the CRM's scorecards -----------------------------------------
+#
+# The playbooks score a salesperson's month from invoices sent or paid (IST,
+# sales days, customers kept, new accounts, DSO, cancellations). Finance keeps
+# the invoices; the CRM reads them here and does the scoring.
+
+sales_router = APIRouter(prefix="/integration/sales", tags=["integration"], dependencies=[Depends(calling_app)])
+
+
+@sales_router.get("")
+def sales(db: DB, settings: SettingsDep, from_: date = Query(..., alias="from"), to: date = Query(...)) -> dict:
+    """Invoices dated from `from` to before `to` (issued, and voided ones for
+    cancellations), each customer's first issued invoice ever (for new
+    accounts), and what each salesperson's customers still owe (for DSO)."""
+    from sqlalchemy import func
+
+    from app.models import Invoice
+
+    if to <= from_:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "`to` comes after `from`.")
+    rows = db.scalars(select(Invoice).where(Invoice.status.in_(("issued", "void")), Invoice.invoice_date >= from_, Invoice.invoice_date < to)).all()
+    customers = {i.customer_id for i in rows if i.customer_id}
+    first = (
+        dict(db.execute(select(Invoice.customer_id, func.min(Invoice.invoice_date)).where(Invoice.status == "issued", Invoice.customer_id.in_(customers)).group_by(Invoice.customer_id)).all())
+        if customers
+        else {}
+    )
+    owed = db.execute(
+        select(Invoice.salesperson_id, func.sum(Invoice.total_centavos - Invoice.paid_centavos))
+        .where(Invoice.status == "issued", Invoice.salesperson_id.is_not(None), Invoice.invoice_date < to)
+        .group_by(Invoice.salesperson_id)
+    ).all()
+    return {
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "invoices": [
+            {
+                "id": i.id,
+                "status": i.status,
+                "date": i.invoice_date.isoformat(),
+                "customerId": i.customer_id,
+                "salespersonId": i.salesperson_id,
+                "totalCentavos": i.total_centavos,
+                "termsDays": i.terms_days,
+            }
+            for i in rows
+        ],
+        "firstSale": {c: d.isoformat() for c, d in first.items()},
+        "owed": {s: int(v or 0) for s, v in owed},
+    }

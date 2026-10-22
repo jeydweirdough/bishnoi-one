@@ -3,6 +3,7 @@ import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { getCompanyMe } from "@/src/platform/lib/api";
 import KpiTargetsPage from "./kpi-targets";
 import PerformancePage, { IN_MENU, type Place } from "./performance";
+import ScorecardsPage from "./scorecards";
 
 // An administrator's Performance is in Settings: what is measured, the
 // month's targets, and everyone's results, a tab each.
@@ -10,7 +11,7 @@ import PerformancePage, { IN_MENU, type Place } from "./performance";
 const BASE = "/admin/settings/performance";
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
-export function PerformanceTabs({ current }: { current: "measures" | "targets" | "results" }) {
+export function PerformanceTabs({ current }: { current: "measures" | "targets" | "results" | "scorecards" }) {
   return (
     <div className="mb-4">
       <ToggleLinks
@@ -19,6 +20,7 @@ export function PerformanceTabs({ current }: { current: "measures" | "targets" |
           { value: "measures", label: "Measures", href: BASE },
           { value: "targets", label: "Targets", href: `${BASE}/targets` },
           { value: "results", label: "Results", href: `${BASE}/results` },
+          { value: "scorecards", label: "Scorecards", href: `${BASE}/scorecards` },
         ]}
       />
     </div>
@@ -29,6 +31,10 @@ const inSettings = (current: "targets" | "results"): Place => ({ results: `${BAS
 
 export function SettingsResults({ searchParams }: { searchParams: Search }) {
   return <PerformancePage searchParams={searchParams} place={inSettings("results")} />;
+}
+
+export function SettingsScorecards({ searchParams }: { searchParams: Search }) {
+  return <ScorecardsPage searchParams={searchParams} base={`${BASE}/scorecards`} tabs={<PerformanceTabs current="scorecards" />} />;
 }
 
 export function SettingsTargets({ searchParams }: { searchParams: Search }) {

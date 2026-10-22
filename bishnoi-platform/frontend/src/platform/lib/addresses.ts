@@ -28,3 +28,8 @@ export async function loadAddresses(): Promise<Partial<Record<AppName, string>>>
   setAddresses(map);
   return map;
 }
+
+/** Asks the Platform again on the next page (its addresses just changed). */
+export function forgetAddresses(): void {
+  had = null;
+}

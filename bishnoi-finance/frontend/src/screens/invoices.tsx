@@ -224,6 +224,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
               ["Sold to", inv.customer.name],
               ["TIN", inv.customer.tin],
               ["Address", inv.customer.address],
+              ["Salesperson", inv.salesperson?.name ?? null],
               ...(inv.buyerIdNumber ? ([[c?.treatment.name ?? "ID number", inv.buyerIdNumber]] as [string, string][]) : []),
             ]}
           />

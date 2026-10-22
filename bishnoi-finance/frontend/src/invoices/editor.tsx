@@ -29,6 +29,8 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
     tin: invoice?.customer.tin ?? "",
     address: invoice?.customer.address ?? "",
   });
+  // Whose sale it is (the CRM scores it): the CRM customer's owner.
+  const [salesperson, setSalesperson] = useState(invoice?.salesperson ?? null);
   const [treatment, setTreatment] = useState(invoice?.treatment ?? "regular");
   const [idNumber, setIdNumber] = useState(invoice?.buyerIdNumber ?? "");
   const [date, setDate] = useState(invoice?.date ?? today);
@@ -73,6 +75,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
   }
   function pick(c: Customer) {
     setCustomer({ id: c.id, name: c.name, tin: c.tin ?? "", address: c.address ?? "" });
+    setSalesperson(c.owner ?? null);
     setFound(null);
     setQ("");
   }
@@ -99,6 +102,8 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         customerName: customer.name.trim(),
         customerTin: customer.tin.trim() || null,
         customerAddress: customer.address.trim() || null,
+        salespersonId: salesperson?.id ?? null,
+        salespersonName: salesperson?.name ?? null,
         treatment,
         buyerIdNumber: idNumber.trim() || null,
         invoiceDate: date,
@@ -163,6 +168,12 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
               </ul>
             )}
             {customer.id && <p className="mt-1 text-meta text-ink-3">From the CRM. Changing the details below changes this invoice only.</p>}
+            {customer.id && (
+              <p className="mt-1 text-meta text-ink-2">
+                Salesperson: <span className="font-medium text-ink">{salesperson?.name ?? "None"}</span>
+                {!salesperson?.name && " (assign the customer to someone in the CRM, or this sale counts for nobody)"}
+              </p>
+            )}
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">

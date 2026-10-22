@@ -1115,6 +1115,33 @@ class KpiTarget(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+
+class Scorecard(Base):
+    """A division's monthly scorecard from its sales playbook, for its reps,
+    coaches or mentor (app/scorecards.py scores it).
+
+    items: [{"kpi": <Kpi.code>, "points": 50, "on": "attainment" | "value",
+             "scope": "own" | "team" | "team_average",
+             "bands": [{"min": 91, "points": 50}, ...] (first that fits wins; "max" for lower is better),
+             "cap": {"below": 60, "total": 40} (under this, the month's total is no more than that)}]
+    bands: [{"min": 95, "label": "Elite", "raise": "20%", "pip": false}, ...] (highest first).
+    """
+
+    __tablename__ = "nbcm_scorecards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Whose it is: people in these teams (or their branches) with these roles. The nearest team wins.
+    teams: Mapped[list] = mapped_column(JSON, default=list)
+    roles: Mapped[list] = mapped_column(JSON, default=list)
+    items: Mapped[list] = mapped_column(JSON, default=list)
+    bands: Mapped[list] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 class KpiEntry(Base):
     """A manual KPI's result for a person and a month, entered by hand."""
 

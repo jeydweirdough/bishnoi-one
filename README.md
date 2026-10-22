@@ -410,6 +410,10 @@ FIRST_ADMIN_PASSWORD=<at least 8 characters>
    `uv run python -m app.tools.copy_database --to "<the pooled address>"`.
    It makes the tables, copies every row, and checks every table matches. A
    database that already has people in it is refused unless `--replace`.
+   `--setup` copies only the setup (people, roles, teams, settings, products,
+   prices, KPIs, taxes, warehouses, stock) and leaves customers, deals,
+   quotes, activities, visits, orders, invoices, the audit log and sign-ins
+   behind (CRM, Inventory and Finance).
 4. Backups: put the same address in the app's `backend/.env` as `BACKUP_FROM`
    (this computer keeps its own SQLite file for trying things), and run
    `scripts/backup-online-databases.cmd` by hand or nightly with Task

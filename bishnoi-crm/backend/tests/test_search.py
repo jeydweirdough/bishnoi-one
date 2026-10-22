@@ -26,4 +26,9 @@ def test_names_starting_with_the_search_come_first(client, crew):  # noqa: F811
     company(client, crew["ria"], "Big Mercury Store")
     company(client, crew["ria"], "Mercury Express")
     assert groups(client, crew["ria"], "mercury")["customers"] == ["Mercury Express", "Big Mercury Store"]
+    # How many match in all (the menu's scope tabs), past what one page shows, and the preview's facts and steps.
+    first = client.get("/search?q=mercury&limit=1", headers=crew["ria"]).json()["groups"][0]
+    assert first["total"] == 2 and len(first["items"]) == 1
+    assert first["items"][0]["facts"][-1]["label"] == "Assigned to"
+    assert first["items"][0]["actions"][0] == {"label": "Open customer", "href": first["items"][0]["href"]}
     assert client.get("/search?q=", headers=crew["ria"]).status_code == 422

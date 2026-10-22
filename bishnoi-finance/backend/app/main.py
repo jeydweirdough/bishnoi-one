@@ -85,4 +85,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(unset.router)
     app.include_router(integration.funds_router)
     app.include_router(integration.customers_router)
+    app.include_router(integration.sales_router)
     return app

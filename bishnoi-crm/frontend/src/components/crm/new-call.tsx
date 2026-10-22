@@ -5,7 +5,7 @@ import { Combobox } from "@/src/platform/ui/pickers";
 import { DateTimeField } from "@/src/platform/ui/pickers";
 import dayjs, { type Dayjs } from "dayjs";
 import { PhoneCall } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { FieldRow } from "@/src/platform/ui/dialog";
@@ -33,6 +33,17 @@ export function NewCallButton({ customer, variant = "primary" }: { customer?: { 
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [typed, setTyped] = useState("");
+
+  // The calendar asks to plan one at a day and hour it was clicked on (activity-calendar.tsx).
+  useEffect(() => {
+    const open = (e: Event) => {
+      const at = (e as CustomEvent<{ at: string }>).detail?.at;
+      if (at) setWhen(dayjs(at));
+      show();
+    };
+    window.addEventListener("bishnoi:new-call", open);
+    return () => window.removeEventListener("bishnoi:new-call", open);
+  });
 
   function show() {
     setOpen(true);
