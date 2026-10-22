@@ -1,6 +1,7 @@
 // What's new in Finance, newest first, in the finance team's words. The first
-// entry's number is the version the sidebar shows: add an entry (and raise the
-// number) with each change that ships. Finance's own file: no other app reads it.
+// entry's number is the version the sidebar shows. Numbering (decided 2026-10-22):
+// everything done on 22 October 2026 is 0.4.0; from then on, each change raises
+// the last number only (0.4.1, 0.4.2, ...). Finance's own file: no other app reads it.
 
 export type Release = {
   version: string;
@@ -14,17 +15,12 @@ export const RELEASES: Release[] = [
     version: "0.4.0",
     date: "2026-10-22",
     changes: [
-      "BIR sales DAT: the monthly Summary List of Sales from Oojeema's exports, with the corrections Sir Rommel confirmed and a check against the Income Statement. It replaces the converter page and gives the same files. Only a role allowed to prepare BIR files sees it.",
-      "Ready for Getmeds Philippines too: the page asks for its RDO and year-end month until they are set.",
-    ],
-  },
-  {
-    version: "0.3.0",
-    date: "2026-10-22",
-    changes: [
       "The Overview shows what your role's work calls for: what's waiting for you, receivables, sales invoiced in the Hub, marketing spending by team, the journal, tax and setup, and balances. Ms. Malou's and Sir Rommel's roles first; the Administrator, Finance Staff and Auditor keep the Overview as it was.",
       "Prices waiting for approval fill in a moment after the page opens, so a slow CRM never holds up the Overview.",
       "Figures that count only invoices issued in the Hub say so.",
+      "BIR sales DAT: the monthly Summary List of Sales from Oojeema's exports, with the corrections Sir Rommel confirmed and a check against the Income Statement. It replaces the converter page and gives the same files. Only a role allowed to prepare BIR files sees it.",
+      "Ready for Getmeds Philippines too: the page asks for its RDO and year-end month until they are set.",
+      "The Overview for a role that releases cash advances and settles refunds and reimbursements (Ms. Cristal's) shows how many are waiting for each, with a link to the list.",
     ],
   },
   {

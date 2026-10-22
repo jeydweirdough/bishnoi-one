@@ -11,7 +11,7 @@ from app.crm import CrmUnavailable
 from app.routers import finance
 
 from .test_auth import PASSWORD, bearer, sign_in
-from .test_funds import KEY, approved, categories, release, spend
+from .test_funds import KEY, approved, categories, check_all, release, spend
 from .test_invoices import issued, ready
 from .test_tax_api import app, ana, ben, client  # noqa: F401 (fixtures)
 
@@ -21,6 +21,8 @@ HEAD = VIEW + ["funds.check", "funds.cancel", "categories.manage", "invoices.cre
                "invoices.void", "invoices.setup", "journal.post", "journal.reverse", "accounts.manage", "tax.manage",
                "prices.approve", "admin.audit"]
 BIR = VIEW + ["journal.post", "accounts.manage", "tax.manage", "admin.audit"]
+# Ms. Cristal: the Head's, but releasing and settling instead of reviewing (Malou Q11).
+DEPUTY = [p for p in HEAD if p != "funds.check"] + ["funds.release", "funds.settle"]
 
 
 def person(client, ana, name: str, permissions: list[str]) -> dict:
@@ -43,6 +45,11 @@ def rommel(client, ana):
     return person(client, ana, "BIR and Compliance", BIR)
 
 
+@pytest.fixture
+def cristal(client, ana):
+    return person(client, ana, "Finance Deputy", DEPUTY)
+
+
 @pytest.fixture(autouse=True)
 def nothing_kept():
     finance.forget_waiting_prices()
@@ -63,9 +70,27 @@ def test_the_starting_roles_keep_the_overview(client, ana, ben):
         assert client.get("/finance/dashboard", headers=who).json() == {"kept": True, "sections": []}
 
 
-def test_each_role_gets_the_sections_its_work_calls_for(client, malou, rommel):
+def test_each_role_gets_the_sections_its_work_calls_for(client, malou, rommel, cristal):
     assert keys(client, malou) == ["waiting", "receivables", "sales", "spending", "journal", "tax", "cash"]
     assert keys(client, rommel) == ["journal", "tax", "cash"]
+    assert keys(client, cristal) == ["waiting", "receivables", "sales", "spending", "journal", "tax", "cash"]
+
+
+def test_the_deputy_waits_on_releases_and_settlements(client, malou, cristal):
+    req = approved(client)
+    waiting = section(client, cristal, "waiting")
+    assert (waiting["canRelease"], waiting["canSettle"], waiting["canReview"]) == (True, True, False)
+    assert waiting["toRelease"] == 1 and waiting["toSettle"] == 0
+    # The head reviews, so she isn't asked to release or settle.
+    head = section(client, malou, "waiting")
+    assert (head["canRelease"], head["canSettle"], head["canReview"]) == (False, False, True)
+
+    release(client, cristal, req["id"])
+    spend(client, 320000, categories(client)["Food"])
+    sent = client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico Santos"}, headers=KEY).json()
+    assert check_all(client, malou, sent)["status"] == "to_return"  # less was spent: the rest comes back
+    waiting = section(client, cristal, "waiting")
+    assert waiting["toRelease"] == 0 and waiting["toSettle"] == 1
 
 
 def test_waiting_counts_reviews_but_not_ones_you_released(client, ana, ben, malou):

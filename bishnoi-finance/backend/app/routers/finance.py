@@ -38,7 +38,7 @@ def section_keys(access: CurrentAccess) -> list[str]:
     """The sections this person's work calls for, in the order they're shown."""
     can = access.can
     keys = []
-    if can("prices.approve") or can("funds.check"):
+    if can("prices.approve") or can("funds.check") or can("funds.release") or can("funds.settle"):
         keys.append("waiting")
     if can("invoices.collect"):
         keys.append("receivables")
@@ -56,8 +56,10 @@ def section_keys(access: CurrentAccess) -> list[str]:
 
 
 def waiting_section(access: CurrentAccess, db: DB, on: date) -> dict:
-    """Liquidations to review (not ones this person released: someone else
-    reviews those) and late ones. The CRM's prices come separately."""
+    """Cash advances to release, liquidations to review (not ones this person
+    released: someone else reviews those), refunds and reimbursements to settle,
+    and late liquidations. The CRM's prices come separately."""
+    by = dict(db.execute(select(FundRequest.status, func.count()).group_by(FundRequest.status)).all())
     review = db.scalar(
         select(func.count()).where(
             FundRequest.status == "to_check",
@@ -67,8 +69,12 @@ def waiting_section(access: CurrentAccess, db: DB, on: date) -> dict:
     overdue = db.scalar(select(func.count()).where(FundRequest.status == "to_liquidate", FundRequest.liquidate_by < on))
     return {
         "canApprovePrices": access.can("prices.approve"),
+        "canRelease": access.can("funds.release"),
+        "toRelease": by.get("to_release", 0),
         "canReview": access.can("funds.check"),
         "toReview": review or 0,
+        "canSettle": access.can("funds.settle"),
+        "toSettle": by.get("to_return", 0) + by.get("to_reimburse", 0),
         "overdueLiquidations": overdue or 0,
     }
 

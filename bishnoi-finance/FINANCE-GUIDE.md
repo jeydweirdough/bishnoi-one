@@ -54,10 +54,12 @@ or the tax registration). Until it's set, the step that needs it can't be done.
 **What you see depends on your role.** A role made for your work shows the
 sections that work calls for, and nothing else:
 
-- **Waiting for you:** prices and quotes waiting for your approval (asked of
-  the CRM; it fills in a moment after the page opens, and says so if the CRM
-  can't be reached), liquidations to review (not ones you released), and
-  overdue liquidations.
+- **Waiting for you:** cash advances to release, prices and quotes waiting for
+  your approval (asked of the CRM; it fills in a moment after the page opens,
+  and says so if the CRM can't be reached), liquidations to review (not ones
+  you released), refunds and reimbursements to settle, and overdue
+  liquidations. Each shows only if your role does that step: for example, the
+  Finance Head reviews liquidations, and the Finance Deputy releases and settles.
 - **Receivables:** what customers owe, how late, and the most overdue.
 - **Sales invoiced in the Hub:** this month and this year.
 - **Marketing spending by team:** accepted receipts from reviewed liquidations.

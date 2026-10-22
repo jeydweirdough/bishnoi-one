@@ -65,12 +65,14 @@ function Waiting({ s }: { s: Extract<Section, { key: "waiting" }> }) {
         <SectionTitle icon="approvals">Waiting for you</SectionTitle>
       </div>
       <Grid>
+        {s.canRelease && <Figure label="Cash advances to release" value={s.toRelease} href="/funds" flag />}
         {s.canApprovePrices && (
           <Suspense fallback={<Asking />}>
             <PricesWaiting />
           </Suspense>
         )}
         {s.canReview && <Figure label="Liquidations to review" value={s.toReview} href="/funds/review" flag />}
+        {s.canSettle && <Figure label="Refunds and reimbursements to settle" value={s.toSettle} href="/funds/settlement" flag />}
         <Figure label="Overdue liquidations" value={s.overdueLiquidations} href="/funds/outstanding" flag />
       </Grid>
     </Sheet>

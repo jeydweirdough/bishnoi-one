@@ -5,7 +5,17 @@ export type Bucket = { key: string; label: string; amountCentavos: number };
 export type Invoiced = { count: number; totalCentavos: number; taxCentavos: number };
 
 export type Section =
-  | { key: "waiting"; canApprovePrices: boolean; canReview: boolean; toReview: number; overdueLiquidations: number }
+  | {
+      key: "waiting";
+      canApprovePrices: boolean;
+      canRelease: boolean;
+      toRelease: number;
+      canReview: boolean;
+      toReview: number;
+      canSettle: boolean;
+      toSettle: number;
+      overdueLiquidations: number;
+    }
   | { key: "receivables"; totalCentavos: number; buckets: Bucket[]; customers: number; mostOverdue: { name: string; owedCentavos: number; oldestDaysLate: number }[] }
   | { key: "sales"; month: Invoiced; year: Invoiced }
   | { key: "spending"; teams: { team: string; yearCentavos: number; monthCentavos: number }[] }
