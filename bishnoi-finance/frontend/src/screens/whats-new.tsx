@@ -11,7 +11,8 @@ export default async function WhatsNew() {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
   // The API's commit rides on the frame every page already asked for.
-  const apiBuild = ((await getFrame()) as { build?: string | null }).build ?? null;
+  const frame = (await getFrame()) as { build?: string | null; buildSource?: string | null };
+  const apiBuild = frame.build ?? null;
 
   return (
     <>
@@ -39,10 +40,11 @@ export default async function WhatsNew() {
             <dt className="text-ink-2">API</dt>
             <dd>{apiBuild ?? "Not known"}</dd>
           </dl>
-          {buildsDiffer(apiBuild) && (
+          {buildsDiffer(apiBuild, frame.buildSource) && (
             <p className="mt-3 text-meta text-danger">The screens and the API were built from different code: an update may have reached only one of them.</p>
           )}
           <p className="mt-3 text-meta text-ink-3">&quot;-dirty&quot; means it was built with changes not yet saved to the code history (on a developer&apos;s computer).</p>
+          <p className="mt-1 text-meta text-ink-3">The two are compared only once deployed: on a developer&apos;s computer the API restarts by itself when its code changes and the screens don&apos;t, so they often differ there without anything being wrong.</p>
         </Sheet>
       </div>
     </>

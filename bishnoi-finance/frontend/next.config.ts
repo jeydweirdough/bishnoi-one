@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BISHNOI_APP: (process.env.NEXT_PUBLIC_BISHNOI_APP ?? process.env.NEXT_PUBLIC_NABHI_APP) ?? "finance",
     NEXT_PUBLIC_FINANCE_BUILD: builtFrom(),
+    // Where that came from: only two deployed (Vercel) builds are compared (src/version/build.ts).
+    NEXT_PUBLIC_FINANCE_BUILD_SOURCE: process.env.VERCEL_GIT_COMMIT_SHA ? "vercel" : "local",
     NEXT_PUBLIC_FINANCE_BUILT_AT: new Date().toISOString(),
   },
 };

@@ -4,8 +4,8 @@ import { VERSION } from "./changes";
 
 /** The bottom of Finance's sidebar: the version, and which code the screens and
  *  the API run, linking to what's new. Collapsed to icons, only the number. */
-export function VersionFooter({ apiBuild }: { apiBuild: string | null | undefined }) {
-  const differ = buildsDiffer(apiBuild);
+export function VersionFooter({ apiBuild, apiBuildSource }: { apiBuild: string | null | undefined; apiBuildSource?: string | null }) {
+  const differ = buildsDiffer(apiBuild, apiBuildSource);
   const builds = [SCREENS_BUILD && `Screens ${SCREENS_BUILD}`, apiBuild && `API ${apiBuild}`].filter(Boolean).join(" · ");
   return (
     <Link href="/whats-new" className="block rounded-[3px] px-3 py-2 text-meta text-ink-3 hover:bg-sheet hover:text-ink" title="What's new in Finance">

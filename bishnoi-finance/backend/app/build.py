@@ -32,3 +32,7 @@ def _commit() -> str | None:
 
 
 COMMIT = _commit()
+# Where COMMIT came from. Only two deployed builds are worth comparing: on this
+# computer the API restarts by itself when its files change and the screens don't,
+# so after a commit the two differ without anything being wrong.
+SOURCE = "vercel" if os.environ.get("VERCEL_GIT_COMMIT_SHA") else "local"

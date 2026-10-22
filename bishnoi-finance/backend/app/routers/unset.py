@@ -58,7 +58,7 @@ def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     (that one only for a role that may see fund requests; null otherwise), the
     commit this API runs, for the sidebar's version line, and how many of this
     person's notifications are unread, for the bell."""
-    from app.build import COMMIT
+    from app.build import COMMIT, SOURCE
     from app.identity import me_out
     from app.notify import unread_count
     from app.routers.funds import waiting
@@ -75,5 +75,6 @@ def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
         "unset": unset(access, db),
         "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
         "build": COMMIT,
+        "buildSource": SOURCE,
         "unreadNotifications": unread_count(db, access.user.id),
     }

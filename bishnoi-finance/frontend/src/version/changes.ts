@@ -12,6 +12,13 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.2",
+    date: "2026-10-22",
+    changes: [
+      "The sidebar no longer warns that the screens and the API are on different builds on a developer's computer, where that happens with nothing wrong. Once deployed, it still warns when an update reached only one of them.",
+    ],
+  },
+  {
     version: "0.4.1",
     date: "2026-10-22",
     changes: [

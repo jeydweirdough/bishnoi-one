@@ -16,3 +16,10 @@ def test_the_frame_carries_the_apis_build(client, ana, monkeypatch):
     assert client.get("/finance/frame", headers=ana).json()["build"] == "c6705e1"
     monkeypatch.setattr(build, "COMMIT", None)
     assert client.get("/finance/frame", headers=ana).json()["build"] is None
+
+
+def test_the_frame_says_where_the_build_came_from(client, ana, monkeypatch):
+    # Only two deployed builds are compared by the screens (fixed 2026-10-22: false warning on dev machines).
+    assert client.get("/finance/frame", headers=ana).json()["buildSource"] == "local"
+    monkeypatch.setattr(build, "SOURCE", "vercel")
+    assert client.get("/finance/frame", headers=ana).json()["buildSource"] == "vercel"
