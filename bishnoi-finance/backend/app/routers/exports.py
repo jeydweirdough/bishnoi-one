@@ -35,6 +35,8 @@ MAX_ROWS = 50_000
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 # Where an entry came from, as the journal's filters name it.
 SOURCE_LABELS = {"manual": "Manual", "fund": "Marketing request", "invoice": "Invoice"}
+# Only approved entries count in the books; the others are listed so nothing is hidden.
+STATUS_LABELS = {"approved": "Approved", "waiting": "Waiting for approval", "rejected": "Rejected"}
 
 
 def text(value: object) -> str:
@@ -92,9 +94,10 @@ def journal(
     until: date | None = Query(None, alias="to"),
     source: Literal["manual", "fund", "invoice"] | None = None,
     q: str | None = Query(None, max_length=100),
+    state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> Response:
     """Every line of every entry asked for, oldest first: the general journal."""
-    entries = list(reversed(list_entries(user=user, db=db, since=since, until=until, source=source, q=q, limit=MAX_ROWS)["items"]))
+    entries = list(reversed(list_entries(user=user, db=db, since=since, until=until, source=source, q=q, limit=MAX_ROWS, state=state)["items"]))
     reversed_by = {e["reversedById"] for e in entries if e["reversedById"]}
     numbers = dict(db.execute(select(JournalEntry.id, JournalEntry.number).where(JournalEntry.id.in_(reversed_by))).all()) if reversed_by else {}
     rows = (
@@ -102,12 +105,12 @@ def journal(
             e["date"], e["number"], text(e["memo"]), text(e["reference"]), SOURCE_LABELS.get(e["source"], e["source"]),
             text(ln["account"]["code"]), text(ln["account"]["name"]), text(ln["description"]),
             side(settings, ln["debitCentavos"]), side(settings, ln["creditCentavos"]),
-            text(e["postedBy"]), numbers.get(e["reversedById"], ""),
+            text(e["postedBy"]), numbers.get(e["reversedById"], ""), STATUS_LABELS.get(e["status"], e["status"]),
         ]
         for e in entries
         for ln in e["lines"]
     )
-    header = ["Date", "Entry", "Memo", "Reference", "Source", "Account code", "Account", "Line description", "Debit", "Credit", "Posted by", "Reversed by"]
+    header = ["Date", "Entry", "Memo", "Reference", "Source", "Account code", "Account", "Line description", "Debit", "Credit", "Posted by", "Reversed by", "Status"]
     return csv_file(f"journal-{span(since, until or today(settings))}.csv", header, rows)
 
 

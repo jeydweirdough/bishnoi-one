@@ -153,7 +153,11 @@ def test_journal_shows_the_latest_and_who_posted_them(client, ana, rommel):
     assert posted.status_code == 201, posted.text
     journal = section(client, rommel, "journal")
     assert journal["latest"][0]["memo"] == "Bank charges" and journal["latest"][0]["postedBy"] == "BIR and Compliance"
-    assert journal["balanced"] is True and journal["thisMonth"] >= 1
+    # Typed by hand, it waits for approval: shown on his side, not counted yet.
+    assert journal["latest"][0]["status"] == "waiting" and journal["myWaiting"] == 1 and journal["thisMonth"] == 0
+    assert client.post(f"/finance/ledger/entries/{posted.json()['id']}/approve", headers=ana).status_code == 200
+    journal = section(client, rommel, "journal")
+    assert journal["balanced"] is True and journal["thisMonth"] == 1 and journal["myWaiting"] == 0
 
 
 def test_waiting_prices_are_kept_a_minute_and_a_failure_is_not(client, malou, rommel, monkeypatch):

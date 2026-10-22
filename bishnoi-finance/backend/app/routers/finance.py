@@ -17,13 +17,15 @@ import time
 from datetime import date
 
 from fastapi import APIRouter
-from sqlalchemy import func, select
+from pydantic import Field
+from sqlalchemy import func, select, update
 
 from app.access import CurrentAccess, permitted
 from app.crm import CrmUnavailable, waiting_prices
-from app.deps import DB, SettingsDep
-from app.models import FundRequest, Invoice, JournalEntry, JournalLine
+from app.deps import DB, CurrentUser, SettingsDep
+from app.models import FundRequest, Invoice, JournalEntry, JournalLine, Notification, utcnow
 from app.permissions import ROLE_ADMIN_ID, ROLE_AUDITOR_ID, ROLE_STAFF_ID
+from app.routers.tax import Api
 
 router = APIRouter(prefix="/finance", tags=["finance"])
 
@@ -38,7 +40,7 @@ def section_keys(access: CurrentAccess) -> list[str]:
     """The sections this person's work calls for, in the order they're shown."""
     can = access.can
     keys = []
-    if can("prices.approve") or can("funds.check") or can("funds.release") or can("funds.settle"):
+    if can("prices.approve") or can("funds.check") or can("funds.release") or can("funds.settle") or can("journal.approve"):
         keys.append("waiting")
     if can("invoices.collect"):
         keys.append("receivables")
@@ -67,7 +69,16 @@ def waiting_section(access: CurrentAccess, db: DB, on: date) -> dict:
         )
     )
     overdue = db.scalar(select(func.count()).where(FundRequest.status == "to_liquidate", FundRequest.liquidate_by < on))
+    # Journal entries this person may approve: waiting, and not their own.
+    entries = db.scalar(
+        select(func.count()).where(
+            JournalEntry.status == "waiting",
+            (JournalEntry.posted_by_id.is_(None)) | (JournalEntry.posted_by_id != access.user.id),
+        )
+    )
     return {
+        "canApproveEntries": access.can("journal.approve"),
+        "entriesToApprove": entries or 0,
         "canApprovePrices": access.can("prices.approve"),
         "canRelease": access.can("funds.release"),
         "toRelease": by.get("to_release", 0),
@@ -129,13 +140,21 @@ def spending_section(db: DB, on: date) -> dict:
     return {"teams": sorted(teams.values(), key=lambda t: -t["yearCentavos"])}
 
 
-def journal_section(db: DB, on: date) -> dict:
+def journal_section(access: CurrentAccess, db: DB, on: date) -> dict:
     latest = db.scalars(select(JournalEntry).order_by(JournalEntry.created_at.desc()).limit(LATEST_ENTRIES)).all()
+    # Only approved entries count in the books.
     debits, credits = db.execute(
         select(func.coalesce(func.sum(JournalLine.debit_centavos), 0), func.coalesce(func.sum(JournalLine.credit_centavos), 0))
+        .join(JournalEntry, JournalEntry.id == JournalLine.entry_id)
+        .where(JournalEntry.status == "approved")
     ).one()
-    this_month = db.scalar(select(func.count()).where(JournalEntry.entry_date >= on.replace(day=1), JournalEntry.entry_date <= on))
+    this_month = db.scalar(
+        select(func.count()).where(JournalEntry.status == "approved", JournalEntry.entry_date >= on.replace(day=1), JournalEntry.entry_date <= on)
+    )
+    # The sender's side of the hand-off: what this person posted that's still waiting on someone else.
+    mine_waiting = db.scalar(select(func.count()).where(JournalEntry.status == "waiting", JournalEntry.posted_by_id == access.user.id))
     return {
+        "myWaiting": mine_waiting or 0,
         "latest": [
             {
                 "id": e.id,
@@ -144,6 +163,7 @@ def journal_section(db: DB, on: date) -> dict:
                 "memo": e.memo,
                 "postedBy": e.posted_by,
                 "source": e.source,
+                "status": e.status,
                 "totalCentavos": sum(ln.debit_centavos for ln in e.lines),
             }
             for e in latest
@@ -180,7 +200,7 @@ def dashboard(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
         "receivables": lambda: receivables_section(db, settings, on),
         "sales": lambda: sales_section(db, on),
         "spending": lambda: spending_section(db, on),
-        "journal": lambda: journal_section(db, on),
+        "journal": lambda: journal_section(access, db, on),
         "tax": lambda: tax_section(access, db, on),
         "cash": lambda: {},
     }
@@ -226,3 +246,37 @@ def dashboard_waiting_prices(user: permitted("prices.approve"), settings: Settin
     answer = {"available": True, "prices": len(found.get("prices", [])), "quotes": len(found.get("quotes", []))}
     _kept.update(at=now, answer=answer)
     return answer
+
+
+# --- notifications: the bell (app/notify.py makes them) -----------------------------------------
+
+SHOWN = 30
+
+
+def notification_out(n: Notification) -> dict:
+    return {"id": n.id, "kind": n.kind, "text": n.text, "link": n.link, "at": n.created_at.isoformat(), "read": n.read_at is not None}
+
+
+@router.get("/notifications")
+def my_notifications(user: CurrentUser, db: DB) -> dict:
+    """The latest of this person's notifications, newest first, and how many are unread."""
+    mine = Notification.user_id == user.id
+    unread = db.scalar(select(func.count()).where(mine, Notification.read_at.is_(None))) or 0
+    latest = db.scalars(select(Notification).where(mine).order_by(Notification.created_at.desc(), Notification.id).limit(SHOWN)).all()
+    return {"unread": unread, "items": [notification_out(n) for n in latest]}
+
+
+class ReadIn(Api):
+    # Leave out to mark them all.
+    ids: list[str] | None = Field(None, max_length=200)
+
+
+@router.post("/notifications/read")
+def read_notifications(user: CurrentUser, db: DB, body: ReadIn) -> dict:
+    """Marks some (or all) of this person's notifications as read. Someone else's are never touched."""
+    which = update(Notification).where(Notification.user_id == user.id, Notification.read_at.is_(None))
+    if body.ids is not None:
+        which = which.where(Notification.id.in_(body.ids))
+    db.execute(which.values(read_at=utcnow()).execution_options(synchronize_session=False))
+    db.commit()
+    return my_notifications(user, db)

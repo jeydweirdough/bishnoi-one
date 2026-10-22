@@ -28,7 +28,8 @@ Everyone who uses Finance has a **role**. Finance starts with three:
 | See every page, request, invoice and entry; download spreadsheets | ✓ | ✓ | ✓ |
 | Release or decline a cash advance | | ✓ | ✓ |
 | Review liquidations, record refunds and reimbursements | | ✓ | ✓ |
-| Post a manual journal entry, or reverse an entry | | ✓ | ✓ |
+| Post a manual journal entry, or reverse an entry (both wait for approval) | | ✓ | ✓ |
+| Approve or reject journal entries (not their own) | | | ✓ |
 | Make and issue sales invoices, record their payments | | ✓ | ✓ |
 | Void an invoice, set up invoice numbers | | | ✓ |
 | Add or change accounts, default accounts and expense categories | | | ✓ |
@@ -54,7 +55,8 @@ or the tax registration). Until it's set, the step that needs it can't be done.
 **What you see depends on your role.** A role made for your work shows the
 sections that work calls for, and nothing else:
 
-- **Waiting for you:** cash advances to release, prices and quotes waiting for
+- **Waiting for you:** cash advances to release, journal entries to approve
+  (not your own), prices and quotes waiting for
   your approval (asked of the CRM; it fills in a moment after the page opens,
   and says so if the CRM can't be reached), liquidations to review (not ones
   you released), refunds and reimbursements to settle, and overdue
@@ -63,7 +65,8 @@ sections that work calls for, and nothing else:
 - **Receivables:** what customers owe, how late, and the most overdue.
 - **Sales invoiced in the Hub:** this month and this year.
 - **Marketing spending by team:** accepted receipts from reviewed liquidations.
-- **Journal:** the latest entries and who posted them, and whether the books balance.
+- **Journal:** the latest entries and who posted them, whether the books
+  balance, and how many of your own entries are still waiting for approval.
 - **Tax and setup:** output tax on this quarter's invoices, and anything not yet
   set up, with a link to fix it.
 - **Balances** (below).
@@ -308,11 +311,41 @@ detail and follow their category's account and rule.
 - **Manual journal:** debits must equal credits. Each line is either a debit or
   a credit. The date can't be in the future, and only active accounts can be
   used.
-- **Posted entries are never edited or deleted.** To fix a mistake, **reverse**
+- **Entries are never edited or deleted.** To fix a mistake, **reverse**
   the entry (a new entry with the sides swapped), then post the correct one.
-- Filter by **All / Manual journals / Marketing requests / Invoices**, pick a **From / To** date,
-  or **Search** by entry number, memo or reference. The page shows the newest
-  200 entries; the download has all of them.
+- **An entry typed by hand waits for approval.** A manual journal, or a
+  reversal, shows **Waiting for approval** and doesn't count anywhere (balances,
+  the trial balance, account ledgers, the Overview) until someone whose role may
+  **Approve journal entries** approves it. Nobody approves their own entry: the
+  Finance Head's entries go to the Finance Deputy. *For example, Sir Rommel posts
+  ₱12,000.00 of depreciation; Ms. Malou or Ms. Cristal sees it under the bell
+  and on the Overview, and once one of them approves it, it counts.*
+  - **Reject** needs a reason. A rejected entry stays in the journal, marked,
+    and never counts; whoever posted it is told why, and posts a corrected one.
+  - If two people decide the same entry at nearly the same moment, the first
+    decision stands and the second person is told who decided and when. Nothing
+    else changes.
+  - Entries a marketing request or an invoice makes count at once: those steps
+    are approved where they happen.
+- Filter by **All / Waiting for approval / Manual journals / Marketing requests /
+  Invoices / Rejected**, pick a **From / To** date, or **Search** by entry
+  number, memo or reference. The page shows the newest 200 entries; the
+  download has all of them, with each one's status.
+
+### Notifications (the bell)
+
+The bell at the top right shows what's waiting on you, or was done to your
+work, with a red count of the unread ones. Click one to open what it's about.
+They go to whoever does the next step, by what their role may do, and never to
+the person who did it:
+
+| When | Who is told |
+|---|---|
+| A journal entry is waiting | everyone who may approve entries, except who posted it |
+| An entry is approved or rejected | whoever posted it |
+| A marketing request arrives for release | everyone who may release |
+| A liquidation is sent in | everyone who may review, except who released it |
+| A liquidation is reviewed and a refund or reimbursement is due | everyone who may settle |
 
 ### Account ledgers and the trial balance
 

@@ -21,6 +21,10 @@ export const RELEASES: Release[] = [
       "BIR sales DAT: the monthly Summary List of Sales from Oojeema's exports, with the corrections Sir Rommel confirmed and a check against the Income Statement. It replaces the converter page and gives the same files. Only a role allowed to prepare BIR files sees it.",
       "Ready for Getmeds Philippines too: the page asks for its RDO and year-end month until they are set.",
       "The Overview for a role that releases cash advances and settles refunds and reimbursements (Ms. Cristal's) shows how many are waiting for each, with a link to the list.",
+      "Journal entries typed by hand, and reversals, wait for approval and count in the books only once someone else approves them. Nobody approves their own; a rejection says why. Entries from marketing requests and invoices count at once, as before.",
+      "If two people decide the same entry at nearly the same moment, the first decision stands and the other person is told who decided and when.",
+      "A bell at the top right: entries waiting for your approval, decisions on your entries, cash advances to release, liquidations to review, and refunds and reimbursements to settle.",
+      "The Overview shows journal entries waiting for your approval, and your own still waiting on someone else.",
     ],
   },
   {

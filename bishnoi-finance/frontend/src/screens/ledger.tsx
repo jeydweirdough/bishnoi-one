@@ -4,6 +4,7 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { DownloadLink } from "../exports/download-link";
+import { DecideEntry } from "../ledger/decide";
 import { ChartEditor, JournalForm, PostingEditor, ReverseButton } from "../ledger/forms";
 import { TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
 
@@ -27,34 +28,42 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
   const source = one(sp.source);
+  const state = one(sp.status);
   const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
   // What the page is showing: kept by the source links, the search form and the download.
   const shown = new URLSearchParams();
   if (source === "manual" || source === "fund" || source === "invoice") shown.set("source", source);
+  if (state === "waiting" || state === "rejected") shown.set("status", state);
   if (isDate(from)) shown.set("from", from);
   if (isDate(to)) shown.set("to", to);
   if (q) shown.set("q", q);
   const query = new URLSearchParams(shown);
   query.set("limit", String(JOURNAL_LIMIT));
   const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
+  // One row of links: where entries came from, or where they stand in approval.
   const filters = [
     { value: "", label: "All" },
-    { value: "manual", label: "Manual journals" },
-    { value: "fund", label: "Marketing requests" },
-    { value: "invoice", label: "Invoices" },
+    { value: "waiting", label: "Waiting for approval", by: "status" },
+    { value: "manual", label: "Manual journals", by: "source" },
+    { value: "fund", label: "Marketing requests", by: "source" },
+    { value: "invoice", label: "Invoices", by: "source" },
+    { value: "rejected", label: "Rejected", by: "status" },
   ];
-  const sourceHref = (value: string) => {
+  const current = shown.get("status") ?? shown.get("source") ?? "";
+  const filterHref = (f: (typeof filters)[number]) => {
     const next = new URLSearchParams(shown);
-    if (value) next.set("source", value);
-    else next.delete("source");
+    next.delete("source");
+    next.delete("status");
+    if (f.by) next.set(f.by, f.value);
     return withQuery("/ledger", next);
   };
   const searching = shown.has("from") || shown.has("to") || shown.has("q");
   return (
     <>
       <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/ledger/export", shown)} />}>
-        All posted entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided. Posted entries
-        are never edited: reverse an entry and post the correction.
+        All entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided:
+        those count at once. An entry typed by hand, or a reversal, waits until someone who may approve entries, not whoever posted it, approves it; only then does it count.
+        Entries are never edited: reverse an entry and post the correction.
       </PageHeader>
       {me.permissions?.includes("journal.post") && (
         <div className="mb-4">
@@ -65,9 +74,9 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         {filters.map((f) => (
           <Link
             key={f.value}
-            href={sourceHref(f.value)}
-            aria-current={source === f.value ? "page" : undefined}
-            className={`rounded-[3px] border px-3 py-1 text-meta ${source === f.value ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+            href={filterHref(f)}
+            aria-current={current === f.value ? "page" : undefined}
+            className={`rounded-[3px] border px-3 py-1 text-meta ${current === f.value ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
           >
             {f.label}
           </Link>
@@ -75,6 +84,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
       </nav>
       <form className="mb-4 flex flex-wrap items-end gap-3" action="/ledger" role="search">
         {shown.has("source") && <input type="hidden" name="source" value={source} />}
+        {shown.has("status") && <input type="hidden" name="status" value={state} />}
         <label className="text-meta text-ink-2">
           From
           <input type="date" name="from" defaultValue={from} className={inputClass} />
@@ -91,14 +101,21 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           Show
         </button>
         {searching && (
-          <Link href={withQuery("/ledger", new URLSearchParams(shown.has("source") ? { source } : {}))} className="text-meta text-hema hover:underline">
+          <Link
+            href={withQuery("/ledger", new URLSearchParams([...shown].filter(([k]) => k === "source" || k === "status")))}
+            className="text-meta text-hema hover:underline"
+          >
             Clear
           </Link>
         )}
       </form>
       {entries.items.length === 0 ? (
         <Sheet>
-          {searching ? (
+          {state === "waiting" && !searching ? (
+            <Empty title="Nothing waiting for approval" icon="lists">
+              Entries typed by hand wait here until someone who may approve entries approves them.
+            </Empty>
+          ) : searching || shown.has("status") ? (
             <Empty title="No entries match" icon="lists">
               Try other dates or words, or clear the search.
             </Empty>
@@ -111,22 +128,24 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
       ) : (
         <div className="space-y-3">
           {entries.items.map((e) => (
-            <Sheet key={e.id} className="scroll-mt-4 px-5 py-3">
+            <Sheet key={e.id} className={`scroll-mt-4 px-5 py-3 ${e.status === "rejected" ? "opacity-75" : ""}`}>
               <span id={e.number} />
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p className="font-mono text-meta font-semibold">{e.number}</p>
+                <p className={`font-mono text-meta font-semibold ${e.status === "rejected" ? "line-through" : ""}`}>{e.number}</p>
                 <p className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</p>
                 <p className="min-w-0 flex-1 text-sm">
                   {e.memo}
                   {e.reference && <span className="text-ink-3"> · Ref. {e.reference}</span>}
                 </p>
+                {e.status === "waiting" && <span className="rounded-full bg-hema-tint px-2 py-0.5 text-meta font-semibold text-hema">Waiting for approval</span>}
+                {e.status === "rejected" && <span className="rounded-full bg-danger-tint px-2 py-0.5 text-meta font-semibold text-danger">Rejected</span>}
                 {e.fundRequestId && (
                   <Link href={`/funds/${e.fundRequestId}`} className="text-meta text-hema hover:underline">
                     Marketing request
                   </Link>
                 )}
                 {e.reversedById && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">Reversed</span>}
-                {!e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
+                {e.status === "approved" && !e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
               </div>
               <table className="mt-2 w-full text-sm">
                 <tbody>
@@ -144,7 +163,21 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                   ))}
                 </tbody>
               </table>
-              <p className="mt-1 text-meta text-ink-3">Posted by {e.postedBy}</p>
+              <p className="mt-1 text-meta text-ink-3">
+                Posted by {e.postedBy}
+                {e.status === "approved" && e.decidedBy && <> · approved by {e.decidedBy}</>}
+                {e.status === "waiting" && !e.canDecide && <> · not in the books until someone else approves it</>}
+              </p>
+              {e.status === "rejected" && (
+                <p className="mt-1 text-meta text-danger">
+                  Rejected by {e.decidedBy}: {e.rejectedReason}. It doesn&apos;t count in the books.
+                </p>
+              )}
+              {e.canDecide && (
+                <div className="mt-2">
+                  <DecideEntry id={e.id} number={e.number} />
+                </div>
+              )}
             </Sheet>
           ))}
           {entries.items.length === JOURNAL_LIMIT && (
@@ -265,6 +298,15 @@ export async function TrialBalancePage({ searchParams }: { searchParams: Search 
     <>
       <PageHeader title="Trial balance" actions={<DownloadLink href={`/ledger/trial-balance/export?to=${tb.to}`} />}>
         As of {fmt.dateLabel(tb.to)}. {balanced ? "Debits and credits are equal." : "Debits and credits do not agree: review the journal entries."}
+        {tb.waiting > 0 && (
+          <>
+            {" "}
+            <Link href="/ledger?status=waiting" className="text-hema hover:underline">
+              {tb.waiting} {tb.waiting === 1 ? "entry is" : "entries are"} waiting for approval
+            </Link>{" "}
+            and not in these figures yet.
+          </>
+        )}
       </PageHeader>
       <form className="mb-4 flex items-end gap-3" action="/ledger/trial-balance">
         <label className="text-meta text-ink-2">

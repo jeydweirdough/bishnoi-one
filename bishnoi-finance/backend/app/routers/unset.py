@@ -55,15 +55,19 @@ def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
 def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     """What every signed-in screen needs around its own content, in one request:
     the same answers as /auth/me, /finance/unset and /finance/funds/counts
-    (that one only for a role that may see fund requests; null otherwise), and
-    the commit this API runs, for the sidebar's version line."""
+    (that one only for a role that may see fund requests; null otherwise), the
+    commit this API runs, for the sidebar's version line, and how many of this
+    person's notifications are unread, for the bell."""
     from app.build import COMMIT
     from app.identity import me_out
+    from app.models import Notification
     from app.routers.funds import waiting
 
+    unread = select(func.count()).where(Notification.user_id == access.user.id, Notification.read_at.is_(None))
     return {
         "me": me_out(access.user, settings),
         "unset": unset(access, db),
         "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
         "build": COMMIT,
+        "unreadNotifications": db.scalar(unread) or 0,
     }

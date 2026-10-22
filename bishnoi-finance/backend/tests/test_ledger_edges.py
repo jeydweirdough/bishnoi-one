@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .test_funds import approved, release
-from .test_ledger import accounts, balances
+from .test_ledger import accounts, approve, balances
 from .test_tax_api import app, ana, ben, client  # noqa: F401 (fixtures)
 
 
@@ -19,7 +19,10 @@ def journal(client, who, on: date, amount: int, debit: dict, credit: dict, memo:
         {"accountId": debit["id"], "debitCentavos": amount},
         {"accountId": credit["id"], "creditCentavos": amount},
     ]}
-    return client.post("/finance/ledger/entries", json=body, headers=who)
+    r = client.post("/finance/ledger/entries", json=body, headers=who)
+    if r.status_code == 201:
+        approve(client, r.json())  # so it counts (entries typed by hand wait, 2026-10-22)
+    return r
 
 
 def test_entries_are_numbered_by_the_month_of_their_date(client, ben):
@@ -58,6 +61,7 @@ def test_a_reversal_cannot_itself_be_reversed(client, ben):
     entry = journal(client, ben, manila_today(), 5000, acc["1010"], acc["3000"]).json()
     back = client.post(f"/finance/ledger/entries/{entry['id']}/reverse", json={}, headers=ben).json()
     assert back["memo"] == f"Reversal of {entry['number']}: Owner puts in capital"
+    approve(client, back)
     assert client.post(f"/finance/ledger/entries/{back['id']}/reverse", json={}, headers=ben).status_code == 409
 
 

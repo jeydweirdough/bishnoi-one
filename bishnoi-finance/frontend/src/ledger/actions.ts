@@ -41,6 +41,19 @@ export async function reverseEntry(id: string): Promise<Result<Entry>> {
   });
 }
 
+/** Approve or reject an entry waiting for approval. If someone else decided it a moment
+ *  earlier, the API says who and when; the page is redrawn either way, so it shows the
+ *  entry as it now stands. */
+export async function decideEntry(id: string, decision: "approve" | "reject", reason: string | null): Promise<Result<Entry>> {
+  const result = await attempt(() =>
+    decision === "approve"
+      ? api.post<Entry>(`/finance/ledger/entries/${enc(id)}/approve`, {})
+      : api.post<Entry>(`/finance/ledger/entries/${enc(id)}/reject`, { reason }),
+  );
+  refresh();
+  return result;
+}
+
 export async function savePosting(accounts: Record<string, string | null>): Promise<Result<Posting>> {
   return attempt(async () => {
     const saved = await api.put<Posting>("/finance/ledger/posting", { accounts });

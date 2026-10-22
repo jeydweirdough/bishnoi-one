@@ -81,7 +81,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
         setFields(result.fields ?? {});
         return;
       }
-      toast.success(`${result.data.number} posted`);
+      toast.success(`${result.data.number} posted`, { description: "Waiting for approval: it counts in the books once someone else approves it." });
       setOpen(false);
       setMemo("");
       setReference("");
@@ -195,7 +195,7 @@ export function ReverseButton({ id, number }: { id: string; number: string }) {
       triggerVariant="quiet"
       triggerSize="sm"
       title={`Reverse ${number}?`}
-      body="A reversing entry dated today is posted with every debit and credit swapped. The original entry remains in the journal; posted entries are never edited or deleted."
+      body="A reversing entry dated today is posted with every debit and credit swapped. Like any entry typed by hand, it counts once someone else approves it. The original entry remains in the journal; entries are never edited or deleted."
       confirmLabel="Post reversal"
       onConfirm={async () => {
         const result = await reverseEntry(id);
@@ -203,7 +203,7 @@ export function ReverseButton({ id, number }: { id: string; number: string }) {
           toast.error(result.error);
           return false;
         }
-        toast.success(`${result.data.number} posted`, { description: `Reverses ${number}.` });
+        toast.success(`${result.data.number} posted`, { description: `Reverses ${number} once it's approved.` });
       }}
     />
   );

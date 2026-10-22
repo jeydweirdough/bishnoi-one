@@ -313,6 +313,15 @@ class JournalEntry(Base):
     reversed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
     posted_by: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Approved entries count in the books; one typed by hand waits for someone who
+    # may approve entries (not whoever posted it), and a rejected one never counts
+    # (migration 0012). Entries a fund step or an invoice makes are approved as posted.
+    status: Mapped[str] = mapped_column(String(10), default="approved", index=True)
+    posted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    decided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    rejected_reason: Mapped[str | None] = mapped_column(String(300), default=None)
 
     lines: Mapped[list["JournalLine"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="JournalLine.position")
 
@@ -554,6 +563,24 @@ class InvoicePayment(Base):
     removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
 
     invoice: Mapped[Invoice] = relationship(back_populates="payments")
+
+
+class Notification(Base):
+    """Something waiting on one person, or done to their work: shown under the
+    bell until they've read it (app/notify.py)."""
+
+    __tablename__ = "nbfi_notifications"
+    __table_args__ = (Index("nbfi_notifications_inbox", "user_id", "read_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id", ondelete="CASCADE"))
+    # What happened, e.g. "entry.waiting", "fund.to_release": for icons and tests.
+    kind: Mapped[str] = mapped_column(String(40))
+    text: Mapped[str] = mapped_column(String(300))
+    # The page it's about, inside Finance (e.g. /ledger/entries/<id>).
+    link: Mapped[str | None] = mapped_column(String(200), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 # Numbers on SQLite as records are saved (on Postgres the database gives them).

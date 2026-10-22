@@ -25,9 +25,18 @@ export type Entry = {
   reversesId: string | null;
   reversedById: string | null;
   postedBy: string;
+  /** Typed by hand, an entry waits until someone else approves it; only approved ones count (2026-10-22). */
+  status: EntryStatus;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  rejectedReason: string | null;
+  /** Whether the person looking may approve or reject it now (not their own, and still waiting). */
+  canDecide: boolean;
   lines: EntryLine[];
   totalCentavos: number;
 };
+
+export type EntryStatus = "approved" | "waiting" | "rejected";
 
 export type AccountLedger = {
   account: Account;
@@ -38,6 +47,8 @@ export type AccountLedger = {
 
 export type TrialBalance = {
   to: string;
+  /** Entries up to that day still waiting for approval: not in these figures yet. */
+  waiting: number;
   rows: { account: Account; debitCentavos: number; creditCentavos: number; balanceCentavos: number }[];
   debitCentavos: number;
   creditCentavos: number;

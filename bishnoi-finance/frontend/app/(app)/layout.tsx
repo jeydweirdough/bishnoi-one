@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/platform/app/shell-layout";
 import { getFrame } from "@/src/platform/lib/api";
+import { Bell } from "@/src/notifications/bell";
 import { VersionFooter } from "@/src/version/version-footer";
 
 export default async function Layout({ children }: { children: ReactNode }) {
@@ -11,8 +12,10 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const waiting = frame.waiting ?? undefined;
   const unset = frame.unset;
   const apiBuild = (frame as { build?: string | null }).build;
+  // Finance's own field on the frame (the shared kit's Frame type stays as it is).
+  const unread = (frame as { unreadNotifications?: number }).unreadNotifications ?? 0;
   return (
-    <ShellLayout waiting={waiting} unset={unset} footer={<VersionFooter apiBuild={apiBuild} />}>
+    <ShellLayout waiting={waiting} unset={unset} footer={<VersionFooter apiBuild={apiBuild} />} bell={<Bell unread={unread} />}>
       {children}
     </ShellLayout>
   );

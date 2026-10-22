@@ -7,6 +7,8 @@ export type Invoiced = { count: number; totalCentavos: number; taxCentavos: numb
 export type Section =
   | {
       key: "waiting";
+      canApproveEntries: boolean;
+      entriesToApprove: number;
       canApprovePrices: boolean;
       canRelease: boolean;
       toRelease: number;
@@ -21,8 +23,10 @@ export type Section =
   | { key: "spending"; teams: { team: string; yearCentavos: number; monthCentavos: number }[] }
   | {
       key: "journal";
-      latest: { id: string; number: string; date: string; memo: string; postedBy: string; source: string; totalCentavos: number }[];
+      latest: { id: string; number: string; date: string; memo: string; postedBy: string; source: string; status: string; totalCentavos: number }[];
       thisMonth: number;
+      /** This person's own entries still waiting for someone else's approval. */
+      myWaiting: number;
       balanced: boolean;
     }
   | { key: "tax"; notSetUp: Record<string, number>; quarter: string; quarterInvoices: number; quarterTaxCentavos: number }

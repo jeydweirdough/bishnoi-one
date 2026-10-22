@@ -3,8 +3,16 @@ reversals, and what the accounts add up to."""
 
 from datetime import date
 
+from .test_auth import bearer, sign_in
 from .test_funds import KEY, approved, categories, release, spend
 from .test_tax_api import app, ana, ben, client  # noqa: F401 (fixtures)
+
+
+def approve(client, entry: dict) -> dict:
+    """An entry typed by hand waits for approval (2026-10-22): Ana, the Administrator, approves it."""
+    r = client.post(f"/finance/ledger/entries/{entry['id']}/approve", headers=bearer(sign_in(client)))
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 def accounts(client, who) -> dict[str, dict]:
@@ -58,11 +66,13 @@ def test_manual_journals_balance_and_are_reversed_not_edited(client, ana, ben):
     body["lines"][1]["creditCentavos"] = 10000000
     entry = client.post("/finance/ledger/entries", json=body, headers=ben).json()
     assert entry["number"].startswith("JE-") and entry["totalCentavos"] == 10000000
+    approve(client, entry)
     both = {**body, "lines": [{"accountId": acc["1010"]["id"], "debitCentavos": 5, "creditCentavos": 5}, body["lines"][1]]}
     assert client.post("/finance/ledger/entries", json=both, headers=ben).status_code == 422
     back = client.post(f"/finance/ledger/entries/{entry['id']}/reverse", json={}, headers=ben).json()
     assert back["reversesId"] == entry["id"] and back["lines"][0]["creditCentavos"] == 10000000
     assert client.post(f"/finance/ledger/entries/{entry['id']}/reverse", json={}, headers=ben).status_code == 409
+    approve(client, back)
     assert balances(client, ben) == {"1010": 0, "3000": 0}
     ledger = client.get(f"/finance/ledger/accounts/{acc['1010']['id']}", headers=ben).json()
     assert [ln["balanceCentavos"] for ln in ledger["lines"]] == [10000000, 0]

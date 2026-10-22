@@ -42,6 +42,7 @@ from app.models import (
     StoredFile,
     User,
 )
+from app.notify import tell_holders
 from app.routers.tax import Api, field_error
 
 router = APIRouter(prefix="/finance/funds", tags=["funds"])
@@ -365,6 +366,12 @@ def finish_check(user: permitted("funds.check"), db: DB, settings: SettingsDep, 
     settle(r, user.full_name)
     post_check(db, r, today(settings), user.full_name)
     step(db, user, r, "checked")
+    if r.status == "to_return":
+        tell_holders(db, "funds.settle", "fund.to_settle", f"{r.number}: {peso(r.return_due_centavos)} of unused funds to collect from {r.requester_name}.",
+                     link=f"/funds/{r.id}", not_to=[user.id])
+    elif r.status == "to_reimburse":
+        tell_holders(db, "funds.settle", "fund.to_settle", f"{r.number}: {peso(r.reimburse_due_centavos)} to reimburse to {r.requester_name}.",
+                     link=f"/funds/{r.id}", not_to=[user.id])
     db.commit()
     return request_out(r, today(settings))
 

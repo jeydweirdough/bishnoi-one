@@ -37,8 +37,21 @@ function NoCompany() {
 
 /** `waiting`: how many things wait on this person, by kind, for the sidebar's counts.
  *  `unset`: how many things aren't set up yet, for its red counts.
- *  `footer`: what the app shows at the bottom of its sidebar (Finance: its version). */
-export async function ShellLayout({ children, waiting, unset, footer }: { children: React.ReactNode; waiting?: Waiting; unset?: Unset; footer?: React.ReactNode }) {
+ *  `footer`: what the app shows at the bottom of its sidebar (Finance: its version).
+ *  `bell`: the app's notifications button, if it has one (Finance: src/notifications). */
+export async function ShellLayout({
+  children,
+  waiting,
+  unset,
+  footer,
+  bell,
+}: {
+  children: React.ReactNode;
+  waiting?: Waiting;
+  unset?: Unset;
+  footer?: React.ReactNode;
+  bell?: React.ReactNode;
+}) {
   await loadAddresses();
   const me = await getMe();
   // Every page, not only the sign-in. One session opens every Bishnoi One app —
@@ -52,7 +65,7 @@ export async function ShellLayout({ children, waiting, unset, footer }: { childr
   // The sidebar as it was left: full, or collapsed to its icons.
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   // Who you are (after the app's bell, if it has one): the top right of every page.
-  const actions = <TopActions me={me} />;
+  const actions = <TopActions me={me} bell={bell} />;
   return (
     <>
       {/* Above everything, on every page: these are somebody else's screens. */}

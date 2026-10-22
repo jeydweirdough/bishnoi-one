@@ -45,7 +45,8 @@ AREAS: tuple[Area, ...] = (
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
-    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse")),
+    # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
+    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse", "approve")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.

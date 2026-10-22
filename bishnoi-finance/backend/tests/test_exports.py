@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .test_funds import KEY, approved, categories, release, spend
-from .test_ledger import accounts
+from .test_ledger import accounts, approve
 from .test_roles import auditor
 from .test_tax_api import app, ana, ben, bearer, client, sign_in  # noqa: F401 (fixtures)
 
@@ -33,7 +33,7 @@ def capital(client, who, on: date, amount: int, memo: str = "Owner puts in capit
     ]}
     r = client.post("/finance/ledger/entries", json=body, headers=who)
     assert r.status_code == 201, r.text
-    return r.json()
+    return approve(client, r.json())  # so it counts (entries typed by hand wait, 2026-10-22)
 
 
 def test_only_finance_downloads_the_books(client):
@@ -68,10 +68,12 @@ def test_the_journal_one_line_per_row_oldest_first(client, ben):
     capital(client, ben, manila_today(), 5000, memo="=HYPERLINK(\"http://example.com\")")
     back = client.post(f"/finance/ledger/entries/{first['id']}/reverse", json={}, headers=ben).json()
     rows = sheet(client.get("/finance/exports/journal.csv", headers=ben))
-    assert rows[0][:3] == ["Date", "Entry", "Memo"] and rows[0][-1] == "Reversed by"
+    assert rows[0][:3] == ["Date", "Entry", "Memo"] and rows[0][-2:] == ["Reversed by", "Status"]
     assert len(rows) == 1 + 6  # three entries, two lines each
     assert rows[1][1] == first["number"] and rows[1][8:10] == ["1234.56", ""] and rows[2][8:10] == ["", "1234.56"]
-    assert rows[1][-1] == back["number"]  # says which entry reversed it
+    assert rows[1][-2] == back["number"]  # says which entry reversed it
+    # Listed whatever their status, and saying it: the reversal still waits for approval.
+    assert rows[1][-1] == "Approved" and next(r for r in rows if r[1] == back["number"])[-1] == "Waiting for approval"
     # A memo that would run as a formula is shown as typed.
     formula = next(r for r in rows if "HYPERLINK" in r[2])
     assert formula[2].startswith("'=")

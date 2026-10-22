@@ -66,6 +66,7 @@ function Waiting({ s }: { s: Extract<Section, { key: "waiting" }> }) {
       </div>
       <Grid>
         {s.canRelease && <Figure label="Cash advances to release" value={s.toRelease} href="/funds" flag />}
+        {s.canApproveEntries && <Figure label="Journal entries to approve" value={s.entriesToApprove} href="/ledger?status=waiting" flag />}
         {s.canApprovePrices && (
           <Suspense fallback={<Asking />}>
             <PricesWaiting />
@@ -169,6 +170,14 @@ function Journal({ s, fmt }: { s: Extract<Section, { key: "journal" }>; fmt: Fmt
       <p className={`mb-2 text-sm ${s.balanced ? "text-ink-2" : "text-danger"}`}>
         {s.balanced ? "The books balance." : "Debits and credits don't match. Check the trial balance."} {s.thisMonth} {s.thisMonth === 1 ? "entry" : "entries"} this month.
       </p>
+      {s.myWaiting > 0 && (
+        <p className="mb-2 text-sm text-ink-2">
+          <Link href="/ledger?status=waiting" className="font-semibold text-hema hover:underline">
+            {s.myWaiting} of yours {s.myWaiting === 1 ? "is" : "are"} waiting for approval
+          </Link>
+          : not in the books until someone else approves {s.myWaiting === 1 ? "it" : "them"}.
+        </p>
+      )}
       {s.latest.length === 0 ? (
         <p className="text-sm text-ink-2">No journal entries yet.</p>
       ) : (
@@ -180,6 +189,7 @@ function Journal({ s, fmt }: { s: Extract<Section, { key: "journal" }>; fmt: Fmt
                 <span className="block text-meta text-ink-3">
                   {fmt.dateLabel(e.date)} · posted by {e.postedBy}
                   {e.source === "fund" ? " (from a marketing request)" : ""}
+                  {e.status === "waiting" ? " · waiting for approval" : e.status === "rejected" ? " · rejected" : ""}
                 </span>
               </span>
               <span className="shrink-0 tabular-nums">{fmt.peso(e.totalCentavos)}</span>
