@@ -135,6 +135,8 @@ class InvoiceIn(Api):
     customer_name: str = Field(min_length=1, max_length=200)
     customer_tin: str | None = Field(None, max_length=20)
     customer_address: str | None = Field(None, max_length=300)
+    salesperson_id: str | None = Field(None, max_length=36)
+    salesperson_name: str | None = Field(None, max_length=120)
     treatment: str = Field("regular", max_length=20)
     buyer_id_number: str | None = Field(None, max_length=40)
     invoice_date: date
@@ -164,6 +166,7 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True) -> di
     out = {
         "id": inv.id, "status": inv.status, "number": inv.number,
         "customer": {"id": inv.customer_id, "name": inv.customer_name, "tin": inv.customer_tin, "address": inv.customer_address},
+        "salesperson": {"id": inv.salesperson_id, "name": inv.salesperson_name} if inv.salesperson_id or inv.salesperson_name else None,
         "treatment": inv.treatment, "buyerIdNumber": inv.buyer_id_number,
         "date": inv.invoice_date.isoformat(), "termsDays": inv.terms_days, "dueDate": due.isoformat(),
         "reference": inv.reference, "notes": inv.notes, "pricesIncludeTax": inv.prices_include_tax,

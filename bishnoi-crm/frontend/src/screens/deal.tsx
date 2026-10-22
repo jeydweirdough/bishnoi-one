@@ -12,6 +12,7 @@ import { EditRecord } from "../components/crm/list-controls";
 import { DealClose } from "../components/deals/deal-close";
 import { AppliedPromo } from "../components/catalogue/promo-tag";
 import { PriorityFlag, CATEGORY_LABELS, StageTag, closeLabel } from "../components/deals/words";
+import { StageTrack } from "../components/deals/stage-track";
 
 type Params = Promise<{ id: string }>;
 
@@ -60,6 +61,7 @@ export default async function DealPage({ params }: { params: Params }) {
           {deal.company.name}
         </Link>
         {deal.contact && <> · {deal.contact.name}</>}
+        <StageTrack dealId={deal.id} current={deal.stage.code} state={deal.state} stages={stages} canMove={deal.can.edit} />
       </PageHeader>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">

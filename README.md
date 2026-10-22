@@ -410,6 +410,10 @@ FIRST_ADMIN_PASSWORD=<at least 8 characters>
    `uv run python -m app.tools.copy_database --to "<the pooled address>"`.
    It makes the tables, copies every row, and checks every table matches. A
    database that already has people in it is refused unless `--replace`.
+   `--setup` copies only the setup (people, roles, teams, settings, products,
+   prices, KPIs, taxes, warehouses, stock) and leaves customers, deals,
+   quotes, activities, visits, orders, invoices, the audit log and sign-ins
+   behind (CRM, Inventory and Finance).
 4. Backups: put the same address in the app's `backend/.env` as `BACKUP_FROM`
    (this computer keeps its own SQLite file for trying things), and run
    `scripts/backup-online-databases.cmd` by hand or nightly with Task
@@ -458,11 +462,10 @@ Use the addresses Vercel actually gives your projects (e.g.
 `bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
 screens' `API_URL` must both name it.
 
-**Pushing doesn't deploy.** To put an app online, the repo owner opens
-**Actions → Deploy → Run workflow** on GitHub, ticking the apps to deploy
-(the Platform goes first). It checks each app is set up first and, when one
-isn't, stops before deploying it and says what to do next (MAINTAINING.md,
-"Deployments on Vercel").
+**Pushing doesn't deploy.** To put an app online, deploy it by hand, the
+Platform first: on the office Coolify server press **Redeploy**, or run
+`vercel --prod` in the app's `backend` then `frontend` folder (MAINTAINING.md,
+"Deploying by hand").
 
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The

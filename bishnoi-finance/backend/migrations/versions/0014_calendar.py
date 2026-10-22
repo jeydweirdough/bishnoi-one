@@ -7,17 +7,18 @@
 - nbfi_calendar_shares: who else sees an event (and may mark it done).
 - nbfi_calendar_done: which dates of an event are done.
 
-Decided 2026-10-22 (Plans/Plan - Finance calendar).
+Decided 2026-10-22 (Plans/Plan - Finance calendar). Written as 0013 on our
+branch; renumbered 0014 after main's 0012 (invoice salesperson).
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0014
+Revises: 0013
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0013"
-down_revision = "0012"
+revision = "0014"
+down_revision = "0013"
 branch_labels = None
 depends_on = None
 

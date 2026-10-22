@@ -131,3 +131,23 @@ def customer_standing(settings: Settings, ids: list[str]) -> dict[str, dict] | N
         except (urllib.error.URLError, TimeoutError, ValueError):
             return None
     return out
+
+
+def sales_feed(settings: Settings, first_day: str, next_first_day: str) -> dict | None:
+    """Finance's invoices from first_day to before next_first_day (issued, and
+    voided ones), each customer's first sale ever and what each salesperson's
+    customers owe (Finance's /integration/sales): what the scorecards count as
+    sales, as the playbooks say. None when Finance isn't linked or can't be
+    reached: those measures then show nothing rather than a guess."""
+    if not settings.finance_linked:
+        return None
+    query = urllib.parse.urlencode({"from": first_day, "to": next_first_day})
+    request = urllib.request.Request(
+        f"{settings.finance_api_url}/integration/sales?{query}",
+        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+            return json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        return None

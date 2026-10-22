@@ -7,17 +7,19 @@
 - journal.approve isn't given to any starting role: the Administrator holds
   every permission already; other roles get it when it's ticked.
 
-Decided 2026-10-22 (Plans/Plan - Journal approval and notifications).
+Decided 2026-10-22 (Plans/Plan - Journal approval and notifications). Written
+as 0012 on our branch; renumbered 0013 when main's 0012 (invoice salesperson)
+arrived the same day, so it runs after it.
 
-Revision ID: 0012
-Revises: 0011
+Revision ID: 0013
+Revises: 0012
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0012"
-down_revision = "0011"
+revision = "0013"
+down_revision = "0012"
 branch_labels = None
 depends_on = None
 

@@ -49,6 +49,8 @@ def customer_out(c: Company) -> dict:
         "email": c.email,
         "phone": c.phone,
         "tin": tin if isinstance(tin, str) and tin.strip() else None,
+        # Whose customer it is: Finance puts them on the invoice as the salesperson, whose sale it scores.
+        "owner": {"id": c.owner_id, "name": c.owner.full_name} if c.owner else None,
     }
 
 

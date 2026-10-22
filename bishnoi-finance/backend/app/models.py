@@ -92,7 +92,7 @@ class User(Base):
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
-    # The calendar, switched on for this person by an Administrator (migration 0013).
+    # The calendar, switched on for this person by an Administrator (migration 0014).
     calendar_on: Mapped[bool] = mapped_column(default=False)
 
     role: Mapped[Role] = relationship(lazy="joined")
@@ -317,7 +317,7 @@ class JournalEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Approved entries count in the books; one typed by hand waits for someone who
     # may approve entries (not whoever posted it), and a rejected one never counts
-    # (migration 0012). Entries a fund step or an invoice makes are approved as posted.
+    # (migration 0013). Entries a fund step or an invoice makes are approved as posted.
     status: Mapped[str] = mapped_column(String(10), default="approved", index=True)
     posted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
     decided_by: Mapped[str | None] = mapped_column(String(120), default=None)
@@ -514,6 +514,10 @@ class Invoice(Base):
     customer_name: Mapped[str] = mapped_column(String(200))
     customer_tin: Mapped[str | None] = mapped_column(String(20), default=None)
     customer_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Whose sale it is: the CRM's salesperson (the customer's owner when picked from the CRM).
+    # The CRM scores its people from these; none: it counts for nobody.
+    salesperson_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    salesperson_name: Mapped[str | None] = mapped_column(String(120), default=None)
     # Who is buying, as the tax engine reads it: regular, senior citizen, PWD...
     treatment: Mapped[str] = mapped_column(String(20), default="regular")
     buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)

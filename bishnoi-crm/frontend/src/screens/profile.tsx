@@ -1,4 +1,4 @@
-import { Activity, BadgeCheck, CalendarDays, CircleCheck, Phone, Target, Users } from "lucide-react";
+import { Activity, BadgeCheck, CalendarDays, CircleCheck, Gauge, Phone, Target, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
@@ -234,8 +234,11 @@ async function Overview({
               {month === thisMonth && <p className="text-meta text-ink-3">{fmt.plural(daysLeft(today), "day")} left</p>}
             </div>
           </div>
+          <LinkButton href={`/performance/scorecards?month=${month}`} icon={<Gauge className="size-4" aria-hidden />} className="mt-4 w-full">
+            Your scorecard
+          </LinkButton>
           {card.canSetTargets && (
-            <LinkButton href={`/performance/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />} className="mt-4 w-full">
+            <LinkButton href={`/performance/targets?month=${month}`} icon={<Target className="size-4" aria-hidden />} className="mt-2 w-full">
               Set targets
             </LinkButton>
           )}
@@ -371,6 +374,9 @@ async function TeamTab({ params, month, fmt }: { params: Record<string, string |
               {fmt.monthLabel(shiftMonth(card.month, 1))} ›
             </a>
           )}
+          <LinkButton href={`/performance/scorecards?month=${card.month}`} size="sm" icon={<Gauge className="size-4" aria-hidden />}>
+            Scorecards
+          </LinkButton>
           {card.canSetTargets && (
             <LinkButton href={targets} size="sm" icon={<Target className="size-4" aria-hidden />}>
               Set targets

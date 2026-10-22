@@ -212,9 +212,11 @@ def check_return(app: Application, return_to: str, settings) -> str:
         target = None
     if target is None or target.path != RETURN_PATH or target.query or target.fragment or target.username or target.password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That return address isn't one this application uses.")
-    origin = f"{target.scheme}://{target.netloc}"
     registered = urlsplit(app.app_url) if app.app_url else None
-    if registered and origin == f"{registered.scheme}://{registered.netloc}":
+    # The application's own host and port. The scheme may differ from what's
+    # registered — an office .local address is served over http while it was
+    # stored as https — so the host has to match, not the scheme.
+    if registered and target.netloc and target.netloc == registered.netloc:
         return return_to
     if target.scheme == "http" and target.hostname in ("127.0.0.1", "localhost") and target.port:
         if target.port in DESKTOP_PORTS or settings.environment != "production":

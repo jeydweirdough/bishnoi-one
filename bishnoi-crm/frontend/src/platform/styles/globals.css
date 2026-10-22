@@ -244,3 +244,8 @@ table > thead > tr {
     animation: none !important;
   }
 }
+
+/* Buttons: the UI kit's icon gap (8 px, small 6, large 10), whatever icon library sits inside. */
+.ant-btn { gap: 8px; }
+.ant-btn.ant-btn-sm { gap: 6px; }
+.ant-btn.ant-btn-lg { gap: 10px; }

@@ -6,8 +6,10 @@ each one whether it is up (app/monitor.py). What a screen shows as an app's
 status comes from one place, `statuses`, so every screen agrees.
 """
 
+import ipaddress
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -269,6 +271,69 @@ def get_application(app_id: str, db: DB, settings: SettingsDep, _: CurrentUser) 
             ],
         )
     }
+
+
+# --- Addresses that follow the platform's (decided 2026-10-22) -------------
+# When a Platform administrator opens the platform at an address that names it
+# (platform-bishnoi.local, platform.bishnoi-one.cloud-ip.cc), every app is taken
+# to be at the same address with its own name in place of "platform"
+# (crm-bishnoi.local, crm.bishnoi-one.cloud-ip.cc), and its App URL is set so.
+# Only from an administrator's own visit: an address a request merely claims
+# can't move where people are sent to sign in. An App URL set by hand to an
+# address of its own (not this computer's, not the old pattern) is left alone.
+
+# An app's name in its address, where it isn't its key.
+ADDRESS_NAME = {"exec": "admin"}
+
+
+class AdoptIn(Api):
+    platform_url: str = Field(min_length=8, max_length=300)
+
+
+def _is_local(host: str | None) -> bool:
+    if not host or host in ("localhost",) or host.endswith(".localhost"):
+        return True
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+
+def _pattern(url: str | None) -> tuple[str, str, str] | None:
+    """(scheme, host with {app} for "platform", ":port" or ""), or None when the address doesn't name the platform."""
+    if not url:
+        return None
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or _is_local(host) or "platform" not in host:
+        return None
+    return parts.scheme, host.replace("platform", "{app}", 1), f":{parts.port}" if parts.port else ""
+
+
+@router.post("/applications/adopt-address")
+def adopt_address(body: AdoptIn, db: DB, me: AdminUser) -> dict:
+    new = _pattern(body.platform_url)
+    if new is None:
+        return {"changed": []}
+    scheme, host, port = new
+    apps = list(db.scalars(select(Application)))
+    platform = next((a for a in apps if a.key == "platform"), None)
+    old = _pattern(platform.app_url) if platform else None
+    changed_apps = []
+    for a in apps:
+        target = f"{scheme}://{host.format(app=ADDRESS_NAME.get(a.key, a.key))}{port}"
+        if a.app_url == target:
+            continue
+        current = urlsplit(a.app_url or "")
+        follows_old = bool(old) and (current.hostname or "") == old[1].format(app=ADDRESS_NAME.get(a.key, a.key))
+        if a.app_url and not _is_local(current.hostname) and not follows_old:
+            continue  # an address of its own, set by hand
+        audit(db, me, "application.address_followed", target=a.name, target_type="application", target_id=a.id, application_id=a.id, fields=["appUrl"])
+        a.app_url = target
+        changed_apps.append({"key": a.key, "appUrl": target})
+    db.commit()
+    return {"changed": changed_apps}
 
 
 @router.patch("/applications/{app_id}")

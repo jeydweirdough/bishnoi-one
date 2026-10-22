@@ -2,6 +2,7 @@
 
 import { DatePicker, Select as AntSelect, TimePicker, type SelectProps as AntSelectProps } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
+import { Check } from "lucide-react";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { Children, isValidElement, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
 
@@ -108,6 +109,11 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
   const single = rest.mode !== "multiple" && rest.mode !== "tags";
   const hasEmpty = single && (options ?? []).some((o) => (o as { value?: unknown }).value === "");
   const mapped = hasEmpty ? (options ?? []).map((o) => ((o as { value?: unknown }).value === "" ? { ...o, value: EMPTY } : o)) : options;
+  // Several picks (the UI kit's multi-select, decided 2026-10-22): a tick on each
+  // picked one, and Clear / Done under the list, so it stays open while picking.
+  const [open, setOpen] = useState(false);
+  const many = !single && rest.open === undefined;
+  const picked = Array.isArray(value) ? value.length : 0;
   return (
     <AntSelect<V>
       className={`w-full ${className}`}
@@ -117,6 +123,37 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
       showSearch={showSearch ?? { optionFilterProp: "label" }}
       placeholder={placeholder ?? "Select"}
       popupMatchSelectWidth
+      menuItemSelectedIcon={single ? undefined : <Check className="size-4" aria-hidden />}
+      {...(many
+        ? {
+            open,
+            onOpenChange: (o: boolean) => setOpen(o),
+            popupRender: (menu: ReactElement) => (
+              <>
+                {menu}
+                <div className="mt-1 flex items-center justify-between gap-2 border-t border-rule px-2 pt-2 pb-1">
+                  <button
+                    type="button"
+                    disabled={picked === 0}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => onChange?.([] as unknown as V, [])}
+                    className="text-meta font-medium text-ink-2 hover:text-ink disabled:opacity-40"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setOpen(false)}
+                    className="h-[30px] rounded-[8px] bg-ink px-3 text-meta font-medium text-white hover:bg-[#2b2b2b]"
+                  >
+                    {picked ? `Done · ${picked}` : "Done"}
+                  </button>
+                </div>
+              </>
+            ),
+          }
+        : {})}
       {...rest}
     />
   );

@@ -37,6 +37,7 @@ import { VisitList } from "../components/field/visit-list";
 import { isFieldAgent } from "../components/field/words";
 import { lower, termsOf } from "../components/terms/terms";
 import { Amount } from "@/src/platform/ui/amount";
+import { CopyButton } from "@/src/platform/ui/copy-button";
 
 type Params = Promise<{ id: string }>;
 
@@ -158,8 +159,18 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
         {company.can.edit && <TransferCustomer companyId={company.id} companyName={company.name} />}
       </span>
     ),
-    phone: company.phone ? <a href={`tel:${company.phone}`} className="text-ink hover:underline">{company.phone}</a> : null,
-    email: company.email ? <a href={`mailto:${company.email}`} className="text-ink hover:underline">{company.email}</a> : null,
+    phone: company.phone ? (
+      <span className="inline-flex items-center gap-1">
+        <a href={`tel:${company.phone}`} className="text-ink hover:underline">{company.phone}</a>
+        <CopyButton text={company.phone} what="Phone number" />
+      </span>
+    ) : null,
+    email: company.email ? (
+      <span className="inline-flex min-w-0 items-center gap-1">
+        <a href={`mailto:${company.email}`} className="truncate text-ink hover:underline">{company.email}</a>
+        <CopyButton text={company.email} what="Email" />
+      </span>
+    ) : null,
     website: company.website ? (
       <a href={siteHref(company.website)} target="_blank" rel="noopener noreferrer" className="text-ink hover:underline">
         {siteLabel(company.website)}

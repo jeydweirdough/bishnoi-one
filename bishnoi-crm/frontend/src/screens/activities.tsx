@@ -4,10 +4,10 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { can } from "@/src/platform/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
-import { buttonClass } from "@/src/platform/ui/button";
 import type { ActivityItem, ActivitySummary, Assignable, Bucket, CompanyRow, Paged } from "@/src/platform/lib/types";
 import { NoAccess } from "../components/admin/words";
-import { ActivityCalendar, monthRange } from "../components/crm/activity-calendar";
+import { ActivityCalendar } from "../components/crm/activity-calendar";
+import { monthRange, weekRange } from "../components/crm/calendar-range";
 import { NewCallButton } from "../components/crm/new-call";
 import { ActivityList } from "../components/crm/activity-list";
 import { dayOf, followUpRow } from "../components/crm/follow-up-rows";
@@ -55,11 +55,15 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
 
   const today = dayOf(new Date().toISOString(), me.org.timezone);
   const month = /^\d{4}-\d{2}$/.test(one(params.month)) ? one(params.month) : today.slice(0, 7);
+  // The calendar: a month, or a week (?mode=week&week=<a day in it>).
+  const calMode: "month" | "week" = one(params.mode) === "week" ? "week" : "month";
+  const weekDay = /^\d{4}-\d{2}-\d{2}$/.test(one(params.week)) ? one(params.week) : today;
+  const week = weekRange(weekDay);
   const query =
     view === "todo"
       ? new URLSearchParams({ state: "open", limit: "200" })
       : view === "calendar"
-        ? new URLSearchParams({ ...monthRange(month), limit: "500" })
+        ? new URLSearchParams({ ...(calMode === "week" ? week : monthRange(month)), limit: "500" })
         : new URLSearchParams({ state: "done", limit: String(SIZE), offset: String((page - 1) * SIZE), ...(kind && { kind }) });
   if (who === "me") query.set("owner", "me");
   else if (person) query.set("owner", person);
@@ -69,7 +73,12 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
     load<Assignable[]>("/people/assignable"),
     can(me, "customers.view") ? load<Paged<CompanyRow>>("/companies?limit=200") : Promise.resolve({ items: [], total: 0 }),
   ]);
-  const monthHref = (m: string) => `${href("calendar")}${href("calendar").includes("?") ? "&" : "?"}month=${m}`;
+  const calHref = (set: Record<string, string>) => {
+    const q = new URLSearchParams(href("calendar").split("?")[1] ?? "");
+    for (const k of ["month", "mode", "week"]) q.delete(k);
+    for (const [k, v] of Object.entries(set)) q.set(k, v);
+    return `/calendar${q.size ? `?${q}` : ""}`;
+  };
   const monthName = new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T00:00:00Z`));
   const rows = view === "todo" ? list.items.map((a) => followUpRow(a, today, me.org.timezone, { place: who === "team" && !person ? a.owner.name : undefined })) : [];
   const personName = person ? people.find((p) => p.id === person)?.name : undefined;
@@ -137,29 +146,40 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
       )}
 
       {view === "calendar" ? (
-        <Sheet className="px-5 pt-3 pb-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="text-heading text-ink">{monthName}</h2>
-            <span className="ml-auto flex gap-1">
-              <a href={monthHref(shiftMonth(month, -1))} className={buttonClass("quiet", "sm")} aria-label="Previous month">
-                ‹ Before
-              </a>
-              {month !== today.slice(0, 7) && (
-                <a href={monthHref(today.slice(0, 7))} className={buttonClass("quiet", "sm")}>
-                  This month
-                </a>
-              )}
-              <a href={monthHref(shiftMonth(month, 1))} className={buttonClass("quiet", "sm")} aria-label="Next month">
-                After ›
-              </a>
-            </span>
-          </div>
+        <Sheet className="px-5 pt-4 pb-4">
           {list.total > list.items.length && (
             <p className="mb-2 text-meta text-ink-3">
               Showing the first {list.items.length} of {list.total}. Pick one person to see all of theirs.
             </p>
           )}
-          <ActivityCalendar items={list.items} month={month} today={today} timeZone={me.org.timezone} showOwner={who === "team" && !person} />
+          <ActivityCalendar
+            items={list.items}
+            mode={calMode}
+            month={month}
+            weekFrom={week.from}
+            title={calMode === "month" ? monthName : weekTitle(week.from)}
+            today={today}
+            timeZone={me.org.timezone}
+            showOwner={who === "team" && !person}
+            canPlan={can(me, "activities.create")}
+            links={
+              calMode === "month"
+                ? {
+                    previous: calHref({ month: shiftMonth(month, -1) }),
+                    next: calHref({ month: shiftMonth(month, 1) }),
+                    today: month !== today.slice(0, 7) ? calHref({}) : null,
+                    month: calHref({ month }),
+                    week: calHref({ mode: "week", week: month === today.slice(0, 7) ? today : `${month}-01` }),
+                  }
+                : {
+                    previous: calHref({ mode: "week", week: shiftDays(week.from, -7) }),
+                    next: calHref({ mode: "week", week: shiftDays(week.from, 7) }),
+                    today: today >= week.from && today < week.to ? null : calHref({ mode: "week" }),
+                    month: calHref({ month: week.from.slice(0, 7) }),
+                    week: calHref({ mode: "week", week: week.from }),
+                  }
+            }
+          />
         </Sheet>
       ) : view === "todo" ? (
         <Sheet className="px-5 pt-2 pb-2">
@@ -208,4 +228,21 @@ export default async function ActivitiesPage({ searchParams, calendar = false }:
       {view === "todo" && <FollowUpsBulk people={people} state="open" org={me.org} />}
     </SelectionProvider>
   );
+}
+
+/** A day moved by some days (YYYY-MM-DD). */
+function shiftDays(day: string, by: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + by);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "19 – 25 Oct 2026" (or "29 Sep – 5 Oct 2026") for the week starting on a Monday. */
+function weekTitle(from: string): string {
+  const a = new Date(`${from}T00:00:00Z`);
+  const b = new Date(`${shiftDays(from, 6)}T00:00:00Z`);
+  const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { ...o, timeZone: "UTC" });
+  const end = fmt({ day: "numeric", month: "short", year: "numeric" }).format(b);
+  const start = a.getUTCMonth() === b.getUTCMonth() ? fmt({ day: "numeric" }).format(a) : fmt({ day: "numeric", month: "short" }).format(a);
+  return `${start} – ${end}`;
 }

@@ -6,11 +6,12 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 // Ant Design's button, with the props every screen already passes.
 export type Variant = "primary" | "default" | "quiet" | "danger";
-export type Size = "md" | "sm";
+export type Size = "md" | "sm" | "lg";
 
 function look(variant: Variant): Pick<ComponentProps<typeof AntButton>, "type" | "danger" | "color" | "variant"> {
   if (variant === "primary") return { type: "primary" };
-  if (variant === "danger") return { type: "primary", danger: true };
+  // Red outline, as the UI kit's; a dialog's final "Delete" stays solid red (ui/confirm.tsx).
+  if (variant === "danger") return { type: "default", danger: true };
   if (variant === "quiet") return { type: "text" };
   return { type: "default" };
 }
@@ -26,7 +27,7 @@ type ButtonProps = Omit<ComponentProps<"button">, "type" | "color"> & {
 
 export function Button({ variant = "default", size = "md", loading = false, icon, type = "button", children, ...rest }: ButtonProps) {
   return (
-    <AntButton suppressHydrationWarning {...look(variant)} size={size === "sm" ? "small" : "middle"} htmlType={type} loading={loading} icon={icon} {...rest}>
+    <AntButton suppressHydrationWarning {...look(variant)} size={size === "sm" ? "small" : size === "lg" ? "large" : "middle"} htmlType={type} loading={loading} icon={icon} {...rest}>
       {children}
     </AntButton>
   );
@@ -56,7 +57,7 @@ export function LinkButton({ href, variant = "default", size = "md", icon, child
   return (
     <AntButton suppressHydrationWarning
       {...look(variant)}
-      size={size === "sm" ? "small" : "middle"}
+      size={size === "sm" ? "small" : size === "lg" ? "large" : "middle"}
       href={href}
       icon={icon}
       onClick={go as unknown as ComponentProps<typeof AntButton>["onClick"]}
