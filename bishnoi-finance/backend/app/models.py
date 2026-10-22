@@ -92,6 +92,8 @@ class User(Base):
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+    # The calendar, switched on for this person by an Administrator (migration 0013).
+    calendar_on: Mapped[bool] = mapped_column(default=False)
 
     role: Mapped[Role] = relationship(lazy="joined")
 
@@ -581,6 +583,62 @@ class Notification(Base):
     link: Mapped[str | None] = mapped_column(String(200), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+REPEATS = ("none", "monthly", "quarterly", "yearly", "twice_monthly")
+
+
+class CalendarEvent(Base):
+    """Something on one person's calendar (app/calendar_events.py): a deadline, a cut-off, a
+    monthly chore. Theirs alone unless shared; it can repeat, and remind them some
+    working days before. Decided 2026-10-22 (Plans/Plan - Finance calendar)."""
+
+    __tablename__ = "nbfi_calendar_events"
+    __table_args__ = (CheckConstraint(f"repeat IN {REPEATS}", name="calendar_repeat"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(160))
+    notes: Mapped[str | None] = mapped_column(String(1000), default=None)
+    starts_on: Mapped[date] = mapped_column(Date)
+    # "14:30"; none: all day.
+    at_time: Mapped[str | None] = mapped_column(String(5), default=None)
+    # none, monthly (same day), quarterly, yearly, twice_monthly (the 15th and the last day).
+    repeat: Mapped[str] = mapped_column(String(16), default="none")
+    until: Mapped[date | None] = mapped_column(Date, default=None)
+    # Working days before each date to remind (0: on the day); none: no reminder.
+    remind_days: Mapped[int | None] = mapped_column(Integer, default=None)
+    # A page inside Finance it's about, e.g. /bir/sales-dat.
+    link: Mapped[str | None] = mapped_column(String(200), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    owner: Mapped[User] = relationship(lazy="joined")
+    shares: Mapped[list["CalendarShare"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+    done: Mapped[list["CalendarDone"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+
+
+class CalendarShare(Base):
+    """Someone else who sees an event (and can mark it done); only the owner edits it."""
+
+    __tablename__ = "nbfi_calendar_shares"
+
+    event_id: Mapped[str] = mapped_column(ForeignKey("nbfi_calendar_events.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+    user: Mapped[User] = relationship(lazy="joined")
+
+
+class CalendarDone(Base):
+    """One date of an event, marked done: it stops reminding."""
+
+    __tablename__ = "nbfi_calendar_done"
+
+    event_id: Mapped[str] = mapped_column(ForeignKey("nbfi_calendar_events.id", ondelete="CASCADE"), primary_key=True)
+    occurs_on: Mapped[date] = mapped_column(Date, primary_key=True)
+    done_by: Mapped[str] = mapped_column(String(120))
+    done_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    done_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 # Numbers on SQLite as records are saved (on Postgres the database gives them).

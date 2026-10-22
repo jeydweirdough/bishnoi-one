@@ -30,7 +30,13 @@ export type Section =
       balanced: boolean;
     }
   | { key: "tax"; notSetUp: Record<string, number>; quarter: string; quarterInvoices: number; quarterTaxCentavos: number }
-  | { key: "cash" };
+  | { key: "cash" }
+  | {
+      key: "coming";
+      /** The next week of this person's calendar, not yet done. */
+      items: { on: string; title: string; atTime: string | null; sharedBy: string | null; link: string }[];
+      holidays: { on: string; name: string }[];
+    };
 
 export type Dashboard = { kept: true; sections: [] } | { kept: false; on: string; sections: Section[] };
 

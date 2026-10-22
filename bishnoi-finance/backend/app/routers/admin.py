@@ -19,7 +19,7 @@ from app.api import Api, changed, check_email, field_error, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import AuditEntry, Role, RolePermission, SignInSession, User
-from app.permissions import ALL_PERMISSIONS, catalogue_out
+from app.permissions import ALL_PERMISSIONS, PER_PERSON, catalogue_out
 from app.security import check_password_rules, hash_password
 
 router = APIRouter(prefix="/admin", tags=["administration"])
@@ -51,6 +51,8 @@ class UserPatch(Api):
     full_name: str | None = Field(None, min_length=1, max_length=120)
     role_id: str | None = Field(None, max_length=36)
     is_active: bool | None = None
+    # The calendar, switched on for this person (decided 2026-10-22).
+    calendar_on: bool | None = None
 
     _email = field_validator("email")(check_email)
 
@@ -68,6 +70,7 @@ def user_out(user: User, last_sign_in: datetime | None = None) -> dict:
         "email": user.email,
         "fullName": user.full_name,
         "isActive": user.is_active,
+        "calendarOn": user.calendar_on,
         "role": {"id": user.role.id, "name": user.role.name},
         "createdAt": iso(user.created_at),
         "lastSignInAt": iso(last_sign_in),
@@ -125,7 +128,7 @@ def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
 def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch) -> dict:
     user = get_user(db, user_id)
     wanted = changed(body)
-    for key in ("email", "full_name", "role_id", "is_active"):
+    for key in ("email", "full_name", "role_id", "is_active", "calendar_on"):
         if key in wanted and wanted[key] is None:
             raise field_error(to_camel(key), "This can't be empty.")
     if wanted.get("is_active") is False and user.id == me.id:
@@ -148,6 +151,12 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
     action = "user.updated"
     if fields == ["is_active"]:
         action = "user.switched_on" if user.is_active else "user.switched_off"
+    if fields == ["calendar_on"]:
+        action = "user.calendar_on" if user.calendar_on else "user.calendar_off"
+        if user.calendar_on and user.id != me.id:
+            from app.notify import tell
+
+            tell(db, [user], "calendar.on", f"{me.full_name} switched on your calendar: plot your deadlines and Finance will remind you.", link="/calendar")
     audit(db, me, action, target=user.email, target_type="user", target_id=user.id, fields=[to_camel(f) for f in fields])
     db.commit()
     db.refresh(user)
@@ -171,7 +180,8 @@ def set_password(_: Users, me: CurrentUser, db: DB, user_id: str, body: Password
 def valid_permissions(value: list[str] | None) -> list[str] | None:
     if value is None:
         return None
-    unknown = sorted(set(value) - ALL_PERMISSIONS)
+    # What's switched on per person (the calendar) isn't given with a role.
+    unknown = sorted(set(value) - (ALL_PERMISSIONS - PER_PERSON))
     if unknown:
         raise ValueError(f"Unknown permission: {', '.join(unknown)}.")
     return sorted(set(value))

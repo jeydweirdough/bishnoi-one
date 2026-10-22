@@ -264,5 +264,41 @@ export function DashboardSection({ section, org }: { section: Section; org: Org 
       return <Tax s={section} fmt={fmt} />;
     case "cash":
       return <CashBalances org={org} />;
+    case "coming":
+      return <Coming s={section} fmt={fmt} />;
   }
+}
+
+/** The next week of the person's calendar (switched on for them), and any days off in it. */
+function Coming({ s, fmt }: { s: Extract<Section, { key: "coming" }>; fmt: Fmt }) {
+  const rows = [
+    ...s.items.map((i) => ({ on: i.on, key: i.link, body: (
+      <Link href={i.link} className="hover:text-hema hover:underline">
+        {i.atTime && <span className="tabular-nums">{i.atTime} </span>}
+        {i.title}
+        {i.sharedBy && <span className="text-meta text-ink-3"> · shared by {i.sharedBy}</span>}
+      </Link>
+    ) })),
+    ...s.holidays.map((h) => ({ on: h.on, key: `holiday-${h.on}`, body: <span className="text-ink-3 italic">{h.name} (day off)</span> })),
+  ].sort((a, b) => a.on.localeCompare(b.on));
+  return (
+    <Sheet className="px-5 py-4">
+      <SectionTitle icon="calendar">Coming up</SectionTitle>
+      {rows.length === 0 ? (
+        <p className="text-sm text-ink-2">Nothing on your calendar this week.</p>
+      ) : (
+        <ul className="divide-y divide-rule text-sm">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-baseline gap-3 py-1.5">
+              <span className="w-28 shrink-0 text-meta text-ink-3">{fmt.dateLabel(r.on)}</span>
+              <span className="min-w-0">{r.body}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-3 text-meta text-ink-3">
+        <Link href="/calendar" className="text-hema hover:underline">Your calendar</Link>
+      </p>
+    </Sheet>
+  );
 }

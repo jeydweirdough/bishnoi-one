@@ -369,6 +369,29 @@ without going online, and they're updated once a year. *For example, an entry
 posted Thursday 11 June 2026 reaches the Deputy on Saturday the 13th if it's still
 waiting: the 12th is Independence Day.*
 
+### Calendar
+
+**Calendar** in the sidebar is for your deadlines, cut-offs and monthly tasks:
+BIR filings, ER cut-offs, the bank reconciliation, card statements. It's
+**switched on per person** by an Administrator (Administration → Users,
+**Calendar on/off**), not given with a role.
+
+- **Add an event:** what, the date (and a time if you like), whether it repeats
+  (every month, every 3 months, every year, or twice a month on the 15th and the
+  last day), and when to **remind** you: on the day, or 1, 3 or 7 working days
+  before. You can point it to a Finance page (e.g. BIR sales DAT).
+- **Your calendar is yours.** Nobody else sees your events unless you **share**
+  one with them (with people who also have the calendar). They're told, they see
+  it, and they can mark it done; only you can change or delete it.
+- **Reminders** come in the bell and in **Coming up** on the Overview, when you
+  open Finance (there's no email). *For example, an event due Monday 9 November 2026,
+  set to remind 3 working days before, reminds you on Thursday the 5th
+  (Saturday the 7th counts as a working day).*
+- **Mark done** stops the reminder for that date, for you and everyone it's
+  shared with. **Not done** undoes it.
+- Shown by themselves: Philippine **holidays** and Sundays (shaded), and
+  **liquidations falling due**, for whoever releases or reviews them.
+
 ### Account ledgers and the trial balance
 
 - Click any account to see its **ledger**: every line, with the balance after

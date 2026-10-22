@@ -59,7 +59,12 @@ AREAS: tuple[Area, ...] = (
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
 
-ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
+# Switched on for one person, not given with a role (decided 2026-10-22): an
+# Administrator turns it on under Administration → Users. Not in AREAS, so the
+# Roles screen never offers it, and no role holds it, the Administrator included.
+PER_PERSON: frozenset[str] = frozenset({"calendar.use"})
+
+ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions()) | PER_PERSON
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
 

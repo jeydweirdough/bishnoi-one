@@ -202,6 +202,23 @@ export function UsersEditor({
                 ))}
               </Select>
               <span className="flex items-center gap-1 justify-self-end">
+                {/* The calendar is switched on per person, not given with a role. */}
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  disabled={pending || !u.isActive}
+                  aria-pressed={u.calendarOn}
+                  title={u.calendarOn ? "Their calendar is on: click to switch it off" : "Switch on their calendar (deadlines and reminders)"}
+                  onClick={() =>
+                    change(
+                      u.id,
+                      { calendarOn: !u.calendarOn },
+                      u.calendarOn ? `${u.fullName}'s calendar switched off` : `${u.fullName}'s calendar switched on`,
+                    )
+                  }
+                >
+                  {u.calendarOn ? "Calendar on" : "Calendar off"}
+                </Button>
                 <NewPassword id={u.id} name={u.fullName} />
                 {u.id !== meId && (
                   <Button

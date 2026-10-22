@@ -29,6 +29,7 @@ export const RELEASES: Release[] = [
       "The Finance Head is told first of entries waiting; the Finance Deputy is told of the Head's own entries, and of any still waiting after a working day (Monday to Saturday, not counting Philippine holidays).",
       "Approve several journal entries at once: tick them and choose Approve selected. Any someone else had just decided are named.",
       "An entry whose reversal still waits for approval says so, instead of \"Reversed\". The journal form explains that a line is either a debit or a credit.",
+      "A calendar, switched on per person by an Administrator: your deadlines, cut-offs and monthly tasks, repeating if you like, with reminders in the bell and a \"Coming up\" section on the Overview. Your events are yours unless you share them. Philippine holidays and liquidations falling due show on it too.",
     ],
   },
   {

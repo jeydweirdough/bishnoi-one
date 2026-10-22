@@ -23,7 +23,8 @@ from app.access import permissions_of
 from app.models import Notification, User, utcnow
 
 # What asks something of the person: these count in the bell's red number.
-ACTIONABLE = ("entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle")
+# (News, not counted: entry.approved, calendar.on, calendar.shared, calendar.done.)
+ACTIONABLE = ("entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle", "calendar.reminder")
 
 # Several unread of one of these kinds show as one line, linking to the list.
 GROUPS = {
@@ -31,6 +32,7 @@ GROUPS = {
     "fund.to_release": ("{n} cash advances are ready for release.", "/funds"),
     "fund.to_check": ("{n} liquidations are waiting for review.", "/funds/review"),
     "fund.to_settle": ("{n} refunds and reimbursements are waiting to be settled.", "/funds/settlement"),
+    "calendar.reminder": ("{n} reminders from your calendar.", "/calendar"),
 }
 
 

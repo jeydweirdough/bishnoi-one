@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import CurrentUser
 from app.models import Role, RolePermission, User
-from app.permissions import ALL_PERMISSIONS, KEYS_TO_ADMINISTRATION
+from app.permissions import ALL_PERMISSIONS, KEYS_TO_ADMINISTRATION, PER_PERSON
 
 
 @dataclass(frozen=True)
@@ -33,12 +33,14 @@ class Access:
 
 def permissions_of(role: Role) -> frozenset[str]:
     # The system role holds everything there is, including permissions added
-    # after it was made.
-    return ALL_PERMISSIONS if role.is_system else frozenset(role.permissions) & ALL_PERMISSIONS
+    # after it was made, except what's switched on per person.
+    return (ALL_PERMISSIONS if role.is_system else frozenset(role.permissions) & ALL_PERMISSIONS) - PER_PERSON
 
 
 def access_of(user: User) -> Access:
-    return Access(user=user, permissions=permissions_of(user.role))
+    # The role's permissions, and what's switched on for this person (the calendar).
+    own = {"calendar.use"} if user.calendar_on else set()
+    return Access(user=user, permissions=permissions_of(user.role) | own)
 
 
 def current_access(user: CurrentUser) -> Access:

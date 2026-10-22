@@ -153,6 +153,8 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
       // The Sales DAT from Oojeema's exports (src/bir/sales-dat): only for a role that prepares BIR files.
       { href: `${base}/bir/sales-dat`, label: "BIR sales DAT", icon: "regulatory" },
+      // The calendar (src/calendar): switched on per person by an Administrator.
+      { href: `${base}/calendar`, label: "Calendar", icon: "calendar" },
     ];
   }
   if (m.key === "inventory") {
@@ -621,6 +623,7 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/ledger/categories", "categories.view"],
   ["/ledger", "journal.view"],
   ["/bir", "bir.prepare"],
+  ["/calendar", "calendar.use"],
   ["/tax", "tax.view"],
   ["/", "dashboard.view"],
 ];

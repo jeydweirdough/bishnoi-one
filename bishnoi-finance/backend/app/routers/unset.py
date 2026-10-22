@@ -64,8 +64,12 @@ def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     from app.routers.funds import waiting
     from app.routers.ledger import remind_backup
 
-    # A backup approver learns of entries waiting a working day as they open any page (no timers).
+    from app.calendar_events import remind
+
+    # Worked out as they open any page (Finance has no timers): a backup approver
+    # learns of entries waiting a working day; calendar reminders fall due.
     remind_backup(db, access.user, settings)
+    remind(db, access.user, settings)
     return {
         "me": me_out(access.user, settings),
         "unset": unset(access, db),

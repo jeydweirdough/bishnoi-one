@@ -43,6 +43,8 @@ def section_keys(access: CurrentAccess) -> list[str]:
     keys = []
     if can("prices.approve") or can("funds.check") or can("funds.release") or can("funds.settle") or can("journal.approve"):
         keys.append("waiting")
+    if can("calendar.use"):  # switched on for the person, not the role
+        keys.append("coming")
     if can("invoices.collect"):
         keys.append("receivables")
     if can("invoices.issue"):
@@ -89,6 +91,29 @@ def waiting_section(access: CurrentAccess, db: DB, on: date) -> dict:
         "toSettle": by.get("to_return", 0) + by.get("to_reimburse", 0),
         "overdueLiquidations": overdue or 0,
     }
+
+
+COMING_DAYS = 7
+
+
+def coming_section(access: CurrentAccess, db: DB, on: date) -> dict:
+    """The next week of this person's calendar (their events and those shared with
+    them, not yet done) and any days off in it."""
+    from datetime import timedelta
+
+    from app.calendar_events import is_done, occurrence_link, occurrences, visible
+    from app.workdays import holidays_between
+
+    until = on + timedelta(days=COMING_DAYS)
+    items = [
+        {"on": d.isoformat(), "title": e.title, "atTime": e.at_time, "sharedBy": None if e.owner_id == access.user.id else e.owner.full_name,
+         "link": occurrence_link(e, d)}
+        for e in visible(db, access.user)
+        for d in occurrences(e, on, until)
+        if not is_done(e, d)
+    ]
+    items.sort(key=lambda i: (i["on"], i["atTime"] or ""))
+    return {"items": items, "holidays": [{"on": d.isoformat(), "name": n} for d, n in holidays_between(on, until)]}
 
 
 def receivables_section(db: DB, settings, on: date) -> dict:
@@ -198,6 +223,7 @@ def dashboard(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     on = today(settings)
     build = {
         "waiting": lambda: waiting_section(access, db, on),
+        "coming": lambda: coming_section(access, db, on),
         "receivables": lambda: receivables_section(db, settings, on),
         "sales": lambda: sales_section(db, on),
         "spending": lambda: spending_section(db, on),
@@ -284,9 +310,11 @@ def grouped(latest: list[Notification]) -> list[dict]:
 def my_notifications(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
     """This person's latest notifications, newest first, several unread of a kind as
     one line, and how many need them (the bell's red number: news isn't counted)."""
+    from app.calendar_events import remind
     from app.routers.ledger import remind_backup
 
     remind_backup(db, user, settings)
+    remind(db, user, settings)
     latest = db.scalars(select(Notification).where(Notification.user_id == user.id).order_by(Notification.created_at.desc(), Notification.id).limit(SHOWN)).all()
     return {"unread": unread_count(db, user.id), "items": grouped(latest)}
 
@@ -305,3 +333,10 @@ def read_notifications(user: CurrentUser, db: DB, settings: SettingsDep, body: R
     db.execute(which.values(read_at=utcnow()).execution_options(synchronize_session=False))
     db.commit()
     return my_notifications(user, db, settings)
+
+
+# --- the calendar (app/routers/calendar.py), under /finance/calendar ----------------------------
+# Included here, after this router's own endpoints, so main.py needn't change.
+from app.routers.calendar import router as calendar_router  # noqa: E402
+
+router.include_router(calendar_router)
