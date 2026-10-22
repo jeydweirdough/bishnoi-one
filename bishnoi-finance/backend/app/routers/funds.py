@@ -42,7 +42,7 @@ from app.models import (
     StoredFile,
     User,
 )
-from app.notify import tell_holders
+from app.notify import done, tell_holders
 from app.routers.tax import Api, field_error
 
 router = APIRouter(prefix="/finance/funds", tags=["funds"])
@@ -64,9 +64,17 @@ def found(db: DB, request_id: str) -> FundRequest:
     return r
 
 
+# Which notification a step answers: once it's done, nobody needs asking any more (2026-10-22).
+ANSWERS = {"released": "fund.to_release", "cancelled": "fund.to_release", "sent_back": "fund.to_check", "checked": "fund.to_check"}
+
+
 def step(db: DB, user: User, r: FundRequest, action: str) -> None:
-    """The activity log's line for a fund step. The request keeps the full story as its events."""
+    """The activity log's line for a fund step. The request keeps the full story as its events.
+    Also clears everyone's notification the step answers (a refund or reimbursement's once settled in full)."""
     audit(db, user, f"fund.{action}", target=r.number, target_type="fund_request", target_id=r.id)
+    answered = ANSWERS.get(action) or ("fund.to_settle" if action in ("returned", "reimbursed") and r.status == "closed" else None)
+    if answered:
+        done(db, answered, f"/funds/{r.id}")
 
 
 def release_hold(db: DB, r: FundRequest) -> str | None:

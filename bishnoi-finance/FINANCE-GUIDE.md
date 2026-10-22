@@ -327,6 +327,12 @@ detail and follow their category's account and rule.
     else changes.
   - Entries a marketing request or an invoice makes count at once: those steps
     are approved where they happen.
+  - **Approve several at once:** when two or more are yours to approve, tick
+    them (or **Select all shown**) and choose **Approve selected**. Any that
+    someone else had just decided, or that are your own, are named and left as
+    they are. Rejecting is one at a time, each with its reason.
+  - An entry whose reversal still waits shows **Reversal waiting for approval**;
+    until the reversal is approved, the entry still counts.
 - Filter by **All / Waiting for approval / Manual journals / Marketing requests /
   Invoices / Rejected**, pick a **From / To** date, or **Search** by entry
   number, memo or reference. The page shows the newest 200 entries; the
@@ -335,17 +341,33 @@ detail and follow their category's account and rule.
 ### Notifications (the bell)
 
 The bell at the top right shows what's waiting on you, or was done to your
-work, with a red count of the unread ones. Click one to open what it's about.
+work. Click one to open what it's about. It's kept short:
+
+- **The red number counts only what needs you** (something to approve, release,
+  review or settle, or an entry of yours sent back). News such as "your entry
+  was approved" is listed but not counted.
+- **Several of a kind show as one line**, e.g. "4 journal entries are waiting
+  for your approval", linking to the list.
+- **Once someone acts, it leaves everyone's bell.** If Ms. Malou approves an
+  entry, nobody else is still asked about it.
+
 They go to whoever does the next step, by what their role may do, and never to
 the person who did it:
 
 | When | Who is told |
 |---|---|
-| A journal entry is waiting | everyone who may approve entries, except who posted it |
+| A journal entry is waiting | the role ticked **Told first about entries waiting** (the Finance Head). The other approvers (the Finance Deputy) are told of the Head's own entries, and of any still waiting **one working day** later. If no role has the tick, every approver is told at once |
 | An entry is approved or rejected | whoever posted it |
 | A marketing request arrives for release | everyone who may release |
 | A liquidation is sent in | everyone who may review, except who released it |
 | A liquidation is reviewed and a refund or reimbursement is due | everyone who may settle |
+
+**Working days** are Monday to Saturday. Philippine regular holidays and special
+non-working days are days off; special working days (e.g. the EDSA anniversary)
+are worked. Finance knows the holidays from the government's proclamations,
+without going online, and they're updated once a year. *For example, an entry
+posted Thursday 11 June 2026 reaches the Deputy on Saturday the 13th if it's still
+waiting: the 12th is Independence Day.*
 
 ### Account ledgers and the trial balance
 

@@ -32,11 +32,16 @@ export type Entry = {
   rejectedReason: string | null;
   /** Whether the person looking may approve or reject it now (not their own, and still waiting). */
   canDecide: boolean;
+  /** Where the entry that reverses this one stands: until it's approved, this one still counts. */
+  reversalStatus: EntryStatus | null;
   lines: EntryLine[];
   totalCentavos: number;
 };
 
 export type EntryStatus = "approved" | "waiting" | "rejected";
+
+/** Ties each entry's tick box on the journal page to the "Approve selected" bar (decide.tsx). */
+export const BULK_FORM = "approve-several";
 
 export type AccountLedger = {
   account: Account;

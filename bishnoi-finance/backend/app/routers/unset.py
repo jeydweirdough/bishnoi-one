@@ -60,14 +60,16 @@ def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     person's notifications are unread, for the bell."""
     from app.build import COMMIT
     from app.identity import me_out
-    from app.models import Notification
+    from app.notify import unread_count
     from app.routers.funds import waiting
+    from app.routers.ledger import remind_backup
 
-    unread = select(func.count()).where(Notification.user_id == access.user.id, Notification.read_at.is_(None))
+    # A backup approver learns of entries waiting a working day as they open any page (no timers).
+    remind_backup(db, access.user, settings)
     return {
         "me": me_out(access.user, settings),
         "unset": unset(access, db),
         "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
         "build": COMMIT,
-        "unreadNotifications": db.scalar(unread) or 0,
+        "unreadNotifications": unread_count(db, access.user.id),
     }

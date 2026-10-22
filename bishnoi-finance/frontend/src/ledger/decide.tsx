@@ -1,11 +1,63 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { useState, useTransition } from "react";
+import { Check, CheckCheck, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Textarea } from "@/src/platform/ui/field";
-import { decideEntry } from "./actions";
+import { approveEntries, decideEntry } from "./actions";
+import { BULK_FORM } from "./types";
+
+/** Approve several entries at once (decided 2026-10-22). Each entry's tick box sits on
+ *  its card (`form={BULK_FORM}`); this bar counts them, selects all shown, and sends
+ *  them. Each is still checked as if alone: never your own, and not one someone else
+ *  has just decided, which come back named. Rejecting stays one at a time. */
+export function ApproveSeveral() {
+  const form = useRef<HTMLFormElement>(null);
+  const [count, setCount] = useState(0);
+  const [pending, start] = useTransition();
+  const boxes = () => Array.from(form.current?.elements ?? []).filter((el): el is HTMLInputElement => el instanceof HTMLInputElement && el.name === "ids");
+  const recount = () => setCount(boxes().filter((b) => b.checked).length);
+
+  useEffect(() => {
+    const changed = (e: Event) => (e.target as HTMLInputElement | null)?.form === form.current && recount();
+    document.addEventListener("change", changed);
+    return () => document.removeEventListener("change", changed);
+  }, []);
+
+  function all() {
+    const every = boxes();
+    const on = every.some((b) => !b.checked);
+    every.forEach((b) => (b.checked = on));
+    recount();
+  }
+
+  function send() {
+    const ids = boxes().filter((b) => b.checked).map((b) => b.value);
+    start(async () => {
+      const r = await approveEntries(ids);
+      if (!r.ok) return void toast.error(r.error);
+      const { approved, skipped } = r.data;
+      const done = `${approved.length} ${approved.length === 1 ? "entry" : "entries"} approved`;
+      if (skipped.length) toast.warning(done, { description: skipped.map((s) => `${s.number ?? "An entry"}: ${s.reason}`).join(" "), duration: 12000 });
+      else toast.success(done, { description: "They now count in the books." });
+      boxes().forEach((b) => (b.checked = false));
+      setCount(0);
+    });
+  }
+
+  return (
+    <form ref={form} id={BULK_FORM} onSubmit={(e) => (e.preventDefault(), send())} className="mb-3 flex flex-wrap items-center gap-2 rounded-[3px] border border-rule bg-sheet px-4 py-2.5">
+      <span className="text-meta text-ink-2">Tick the entries to approve, or</span>
+      <Button type="button" size="sm" variant="quiet" onClick={all}>
+        Select all shown
+      </Button>
+      <Button type="submit" size="sm" variant="primary" loading={pending} disabled={count === 0} icon={<CheckCheck className="size-4" aria-hidden />}>
+        Approve selected{count ? ` (${count})` : ""}
+      </Button>
+    </form>
+  );
+}
 
 /** Approve a journal entry waiting for approval, or reject it with a reason the
  *  person who posted it is told. If someone else decided it a moment earlier, the

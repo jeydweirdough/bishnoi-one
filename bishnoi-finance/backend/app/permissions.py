@@ -26,6 +26,7 @@ ACTION_LABELS = {
     "audit": "Activity log",
     "approve": "Approve and reject",
     "prepare": "Prepare BIR files",
+    "first": "Told first about entries waiting",
 }
 
 
@@ -46,7 +47,9 @@ AREAS: tuple[Area, ...] = (
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
     # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
-    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse", "approve")),
+    # first: the main approver (the Finance Head), told of every entry at once; other approvers are
+    # backup, told only of the main approver's own entries and of ones waiting over a working day.
+    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse", "approve", "first")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.

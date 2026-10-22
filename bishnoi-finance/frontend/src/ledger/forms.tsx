@@ -172,6 +172,8 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
           </tfoot>
         </table>
       </div>
+      {/* Typing in one side clears the other on purpose: a line is one side of the entry (found confusing in testing, 2026-10-22). */}
+      <p className="text-meta text-ink-3">Each line is either a debit or a credit: typing in one clears the other. Pick an account on every line.</p>
       {debits !== credits && debits + credits > 0 && <p className="text-meta text-due-today">Out of balance by {fmt.peso(Math.abs(debits - credits))}.</p>}
       <FormError message={error} />
       <div className="flex gap-2">

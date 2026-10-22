@@ -10,6 +10,8 @@ import type { Inbox, Notice } from "./types";
 // Finance's bell, at the top right beside the profile (the shared shell's `bell`
 // slot). What's waiting on you, or was done to your work: made by the API as it
 // happens (app/notify.py), never for what you did yourself. Planned 2026-10-22.
+// The API keeps it short: what someone else already acted on is gone, several of
+// a kind come as one line, and the red number counts only what needs you.
 
 /** "just now", "5 min ago", "3 h ago", then the date. */
 function ago(iso: string): string {
@@ -64,7 +66,7 @@ export function Bell({ unread }: { unread: number }) {
 
   function opened(n: Notice) {
     setOpenOn(null);
-    if (!n.read) read([n.id]);
+    if (!n.read) read(n.ids);
   }
 
   return (

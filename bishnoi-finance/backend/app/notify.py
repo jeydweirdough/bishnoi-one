@@ -2,17 +2,36 @@
 
 Made in the same request as what they're about (Finance has no background jobs),
 and sent by what a role may do, not by name, so they follow role changes. Never
-to the person who did it. Shown under the bell (app/routers/notifications.py).
-Decided 2026-10-22 (Plans/Plan - Journal approval and notifications).
+to the person who did it. Shown under the bell (/finance/notifications in
+app/routers/finance.py). Decided 2026-10-22 (Plans/Plan - Journal approval and
+notifications; Plans/Plan - Fewer notifications and approvals):
+
+- Once someone acts on an item, everyone's notification about it is done
+  (`done`), so the bell only lists what still waits.
+- Only what needs the person counts in the red number (ACTIONABLE); news such as
+  "your entry was approved" is listed but not counted.
+- Several of a kind show as one line ("4 journal entries are waiting for your
+  approval": GROUPS).
 """
 
 from collections.abc import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.access import permissions_of
-from app.models import Notification, User
+from app.models import Notification, User, utcnow
+
+# What asks something of the person: these count in the bell's red number.
+ACTIONABLE = ("entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle")
+
+# Several unread of one of these kinds show as one line, linking to the list.
+GROUPS = {
+    "entry.waiting": ("{n} journal entries are waiting for your approval.", "/ledger?status=waiting"),
+    "fund.to_release": ("{n} cash advances are ready for release.", "/funds"),
+    "fund.to_check": ("{n} liquidations are waiting for review.", "/funds/review"),
+    "fund.to_settle": ("{n} refunds and reimbursements are waiting to be settled.", "/funds/settlement"),
+}
 
 
 def holders(db: Session, permission: str) -> list[User]:
@@ -35,3 +54,20 @@ def tell(db: Session, people: Iterable[User | str | None], kind: str, text: str,
 
 def tell_holders(db: Session, permission: str, kind: str, text: str, link: str | None = None, *, not_to: Iterable[str | None] = ()) -> int:
     return tell(db, holders(db, permission), kind, text, link, not_to=not_to)
+
+
+def done(db: Session, kind: str, link: str) -> None:
+    """Someone acted on the item at `link`: everyone's unread notification of this kind about it is done."""
+    db.execute(
+        update(Notification)
+        .where(Notification.kind == kind, Notification.link == link, Notification.read_at.is_(None))
+        .values(read_at=utcnow())
+        .execution_options(synchronize_session=False)
+    )
+
+
+def unread_count(db: Session, user_id: str) -> int:
+    """For the bell's red number: what needs this person and they haven't read."""
+    return db.scalar(
+        select(func.count()).where(Notification.user_id == user_id, Notification.read_at.is_(None), Notification.kind.in_(ACTIONABLE))
+    ) or 0

@@ -4,9 +4,9 @@ import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { DownloadLink } from "../exports/download-link";
-import { DecideEntry } from "../ledger/decide";
+import { ApproveSeveral, DecideEntry } from "../ledger/decide";
 import { ChartEditor, JournalForm, PostingEditor, ReverseButton } from "../ledger/forms";
-import { TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
+import { BULK_FORM, TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
 
 // The ledger: the journal, the chart of accounts, each account's ledger, the
 // trial balance, and the accounts marketing requests post to. Each a sub-page of
@@ -58,6 +58,8 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     return withQuery("/ledger", next);
   };
   const searching = shown.has("from") || shown.has("to") || shown.has("q");
+  // Two or more this person may approve: tick boxes and "Approve selected".
+  const several = entries.items.filter((e) => e.canDecide).length > 1;
   return (
     <>
       <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/ledger/export", shown)} />}>
@@ -127,10 +129,14 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         </Sheet>
       ) : (
         <div className="space-y-3">
+          {several && <ApproveSeveral />}
           {entries.items.map((e) => (
             <Sheet key={e.id} className={`scroll-mt-4 px-5 py-3 ${e.status === "rejected" ? "opacity-75" : ""}`}>
               <span id={e.number} />
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {several && e.canDecide && (
+                  <input type="checkbox" name="ids" value={e.id} form={BULK_FORM} aria-label={`Select ${e.number} to approve`} className="size-4 self-center accent-[var(--color-hema)]" />
+                )}
                 <p className={`font-mono text-meta font-semibold ${e.status === "rejected" ? "line-through" : ""}`}>{e.number}</p>
                 <p className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</p>
                 <p className="min-w-0 flex-1 text-sm">
@@ -144,7 +150,11 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                     Marketing request
                   </Link>
                 )}
-                {e.reversedById && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">Reversed</span>}
+                {e.reversedById && (
+                  <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">
+                    {e.reversalStatus === "waiting" ? "Reversal waiting for approval" : "Reversed"}
+                  </span>
+                )}
                 {e.status === "approved" && !e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
               </div>
               <table className="mt-2 w-full text-sm">

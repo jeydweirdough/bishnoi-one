@@ -16,7 +16,7 @@ from sqlalchemy import select
 from app.deps import DB, SettingsDep
 from app.funds import category_out, decode, event, must_be, peso, request_out, store_receipt, utcnow
 from app.models import ExpenseCategory, FundExpense, FundRequest, StoredFile
-from app.notify import tell_holders
+from app.notify import done, tell_holders
 from app.routers.funds import ordered_categories, receipt_of, today
 from app.routers.tax import Api, SaleBody, field_error, setup_out, work_out
 
@@ -216,6 +216,7 @@ def cancel(caller: Caller, db: DB, settings: SettingsDep, source_id: str, body: 
     must_be(r, "to_release")
     r.status, r.cancel_reason, r.closed_at = "cancelled", body.reason or "Cancelled by the requester.", utcnow()
     event(r, "cancelled", body.by, f"Request cancelled by the requester: {r.cancel_reason}")
+    done(db, "fund.to_release", f"/funds/{r.id}")  # nothing to release any more
     db.commit()
     return request_out(r, today(settings))
 

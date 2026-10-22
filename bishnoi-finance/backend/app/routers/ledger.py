@@ -16,7 +16,7 @@ Balances are on each type's normal side: assets and expenses grow with
 debits; liabilities, equity and income with credits.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -24,16 +24,17 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import Field
 from sqlalchemy import func, or_, select, update
 
-from app.access import access_of, permitted
+from app.access import access_of, permissions_of, permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
 from app.ledger import Leg, account_out, entry_out, post
 from app.ledger import settings as posting_settings
-from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, User
-from app.notify import tell, tell_holders
+from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
+from app.notify import done, holders, tell
 from app.routers.funds import today
 from app.routers.tax import Api, field_error
+from app.workdays import one_workday_later
 
 router = APIRouter(prefix="/finance/ledger", tags=["ledger"])
 
@@ -168,13 +169,16 @@ def list_entries(
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(JournalEntry.number).like(like), func.lower(JournalEntry.memo).like(like), func.lower(JournalEntry.reference).like(like)))
     items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc()).limit(limit)).all()
-    return {"items": [entry_for(user, e) for e in items]}
+    # Where each reversal stands, so an entry whose reversal still waits isn't shown as reversed.
+    reversals = [e.reversed_by_id for e in items if e.reversed_by_id]
+    standing = dict(db.execute(select(JournalEntry.id, JournalEntry.status).where(JournalEntry.id.in_(reversals))).all()) if reversals else {}
+    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items]}
 
 
-def entry_for(user: User, e: JournalEntry) -> dict:
-    """The entry, and whether this person may approve or reject it now."""
+def entry_for(user: User, e: JournalEntry, reversal_status: str | None = None) -> dict:
+    """The entry, whether this person may approve or reject it now, and where its reversal stands."""
     may = e.status == "waiting" and e.posted_by_id != user.id and access_of(user).can("journal.approve")
-    return entry_out(e) | {"canDecide": may}
+    return entry_out(e) | {"canDecide": may, "reversalStatus": reversal_status}
 
 
 @router.get("/entries/{entry_id}")
@@ -182,18 +186,58 @@ def read_entry(user: permitted("journal.view"), db: DB, entry_id: str) -> dict:
     e = db.get(JournalEntry, entry_id)
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such entry.")
-    return entry_for(user, e)
+    reversal = db.get(JournalEntry, e.reversed_by_id) if e.reversed_by_id else None
+    return entry_for(user, e, reversal.status if reversal else None)
 
 
 def peso(centavos: int) -> str:
     return f"₱{centavos / 100:,.2f}"
 
 
-def waiting_for_approval(db: DB, e: JournalEntry, user: User) -> None:
-    """Tell everyone who may approve it, except whoever posted it."""
+def waiting_text(e: JournalEntry, who: str, late: bool = False) -> str:
     total = sum(ln.debit_centavos for ln in e.lines)
-    tell_holders(db, "journal.approve", "entry.waiting", f"{user.full_name} posted {e.number}, {peso(total)}: {e.memo}. Waiting for your approval.",
-                 link=entry_link(e), not_to=[user.id])
+    still = " Still waiting after a working day:" if late else ""
+    return f"{still} {who} posted {e.number}, {peso(total)}: {e.memo}. Waiting for your approval.".strip()
+
+
+def waiting_for_approval(db: DB, e: JournalEntry, user: User) -> None:
+    """Tell whoever approves first (decided 2026-10-22: the Finance Head, by the
+    journal.first tick), not whoever posted it. If that leaves nobody (none hold
+    the tick, or the one who does posted it), every approver is told, so nothing
+    goes unseen. The other approvers are backup: remind_backup tells them once an
+    entry has waited a working day."""
+    approvers = [u for u in holders(db, "journal.approve") if u.id != user.id]
+    # Ticked on the role itself: the Administrator holds every permission without ticks, and isn't anyone's first approver.
+    first = [u for u in approvers if not u.role.is_system and "journal.first" in permissions_of(u.role)]
+    tell(db, first or approvers, "entry.waiting", waiting_text(e, user.full_name), link=entry_link(e))
+
+
+def remind_backup(db: DB, user: User, settings: Settings) -> None:
+    """For a backup approver (may approve, isn't told first), when they open a page:
+    entries still waiting one working day after they were posted (Monday to
+    Saturday, not counting Philippine holidays: app/workdays.py), that they weren't
+    told of yet. Finance has no timers, so this is where the waiting time is checked."""
+    can = permissions_of(user.role)
+    # The Administrator (IT) holds every permission but isn't a backup approver to remind.
+    if "journal.approve" not in can or "journal.first" in can or user.role.is_system:
+        return
+    now = datetime.now(UTC)
+    # A working day is never shorter than a day: only those can be due.
+    due = db.scalars(
+        select(JournalEntry).where(
+            JournalEntry.status == "waiting",
+            JournalEntry.created_at <= now - timedelta(days=1),
+            or_(JournalEntry.posted_by_id.is_(None), JournalEntry.posted_by_id != user.id),
+        )
+    ).all()
+    if not due:
+        return
+    told = set(db.scalars(select(Notification.link).where(Notification.user_id == user.id, Notification.kind == "entry.waiting")))
+    for e in due:
+        posted = e.created_at if e.created_at.tzinfo else e.created_at.replace(tzinfo=UTC)
+        if entry_link(e) not in told and one_workday_later(posted, settings.org_timezone) <= now:
+            tell(db, [user], "entry.waiting", waiting_text(e, e.posted_by, late=True), link=entry_link(e))
+    db.commit()
 
 
 def entry_link(e: JournalEntry) -> str:
@@ -306,8 +350,29 @@ def decide(db: DB, settings: Settings, user: User, entry_id: str, to: Literal["a
     audit(db, user, f"entry.{to}", target=e.number, target_type="journal_entry", target_id=e.id, fields=["reason"] if reason else ())
     said = f"{user.full_name} approved {e.number}: it now counts in the books." if to == "approved" else f"{user.full_name} rejected {e.number}: {reason}"
     tell(db, [e.posted_by_id], f"entry.{to}", said, link=entry_link(e), not_to=[user.id])
+    # Decided: nobody else needs to be asked about it any more.
+    done(db, "entry.waiting", entry_link(e))
     db.commit()
     return e
+
+
+class ManyIn(Api):
+    ids: list[str] = Field(min_length=1, max_length=100)
+
+
+@router.post("/entries/approve")
+def approve_many(user: permitted("journal.approve"), db: DB, settings: SettingsDep, body: ManyIn) -> dict:
+    """Approves several waiting entries (decided 2026-10-22). Each goes through the
+    same check as one at a time: still waiting when saved, and never this person's
+    own. Any that couldn't be approved are named, with why."""
+    approved, skipped = [], []
+    for entry_id in dict.fromkeys(body.ids):
+        try:
+            approved.append(decide(db, settings, user, entry_id, "approved").number)
+        except HTTPException as refused:
+            found = db.get(JournalEntry, entry_id)
+            skipped.append({"number": found.number if found else None, "reason": refused.detail})
+    return {"approved": approved, "skipped": skipped}
 
 
 @router.post("/entries/{entry_id}/approve")

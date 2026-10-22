@@ -54,6 +54,16 @@ export async function decideEntry(id: string, decision: "approve" | "reject", re
   return result;
 }
 
+export type ManyApproved = { approved: string[]; skipped: { number: string | null; reason: string }[] };
+
+/** Approve several waiting entries at once; any that couldn't be (someone else decided it,
+ *  or it's your own) come back named, with why. */
+export async function approveEntries(ids: string[]): Promise<Result<ManyApproved>> {
+  const result = await attempt(() => api.post<ManyApproved>("/finance/ledger/entries/approve", { ids }));
+  refresh();
+  return result;
+}
+
 export async function savePosting(accounts: Record<string, string | null>): Promise<Result<Posting>> {
   return attempt(async () => {
     const saved = await api.put<Posting>("/finance/ledger/posting", { accounts });

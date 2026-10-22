@@ -180,7 +180,9 @@ def test_each_person_reads_only_their_own_notifications(client, malou, cristal, 
     post(client, rommel, memo="Accrual")
     n = bell(client, malou)
     assert n["unread"] == 2
-    one = n["items"][0]["id"]
+    # Two of a kind show as one line, carrying both notifications.
+    assert len(n["items"]) == 1 and n["items"][0]["text"] == "2 journal entries are waiting for your approval."
+    one = n["items"][0]["ids"][0]
     # Cristal can't mark Malou's as read.
     client.post("/finance/notifications/read", json={"ids": [one]}, headers=cristal)
     assert bell(client, malou)["unread"] == 2

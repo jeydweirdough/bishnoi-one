@@ -24,6 +24,7 @@ from app.access import CurrentAccess, permitted
 from app.crm import CrmUnavailable, waiting_prices
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import FundRequest, Invoice, JournalEntry, JournalLine, Notification, utcnow
+from app.notify import ACTIONABLE, GROUPS, unread_count
 from app.permissions import ROLE_ADMIN_ID, ROLE_AUDITOR_ID, ROLE_STAFF_ID
 from app.routers.tax import Api
 
@@ -254,16 +255,40 @@ SHOWN = 30
 
 
 def notification_out(n: Notification) -> dict:
-    return {"id": n.id, "kind": n.kind, "text": n.text, "link": n.link, "at": n.created_at.isoformat(), "read": n.read_at is not None}
+    return {
+        "id": n.id, "ids": [n.id], "kind": n.kind, "text": n.text, "link": n.link, "at": n.created_at.isoformat(),
+        "read": n.read_at is not None, "counts": n.kind in ACTIONABLE,
+    }
+
+
+def grouped(latest: list[Notification]) -> list[dict]:
+    """Several unread of a kind (app/notify.py GROUPS) become one line, where the newest of them was."""
+    unread: dict[str, list[Notification]] = {}
+    for n in latest:
+        if n.read_at is None and n.kind in GROUPS:
+            unread.setdefault(n.kind, []).append(n)
+    lines, placed = [], set()
+    for n in latest:
+        many = unread.get(n.kind) if n.read_at is None else None
+        if many and len(many) > 1:
+            if n.kind not in placed:
+                text, link = GROUPS[n.kind]
+                lines.append(notification_out(n) | {"id": f"group:{n.kind}", "ids": [m.id for m in many], "text": text.format(n=len(many)), "link": link})
+                placed.add(n.kind)
+            continue
+        lines.append(notification_out(n))
+    return lines
 
 
 @router.get("/notifications")
-def my_notifications(user: CurrentUser, db: DB) -> dict:
-    """The latest of this person's notifications, newest first, and how many are unread."""
-    mine = Notification.user_id == user.id
-    unread = db.scalar(select(func.count()).where(mine, Notification.read_at.is_(None))) or 0
-    latest = db.scalars(select(Notification).where(mine).order_by(Notification.created_at.desc(), Notification.id).limit(SHOWN)).all()
-    return {"unread": unread, "items": [notification_out(n) for n in latest]}
+def my_notifications(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
+    """This person's latest notifications, newest first, several unread of a kind as
+    one line, and how many need them (the bell's red number: news isn't counted)."""
+    from app.routers.ledger import remind_backup
+
+    remind_backup(db, user, settings)
+    latest = db.scalars(select(Notification).where(Notification.user_id == user.id).order_by(Notification.created_at.desc(), Notification.id).limit(SHOWN)).all()
+    return {"unread": unread_count(db, user.id), "items": grouped(latest)}
 
 
 class ReadIn(Api):
@@ -272,11 +297,11 @@ class ReadIn(Api):
 
 
 @router.post("/notifications/read")
-def read_notifications(user: CurrentUser, db: DB, body: ReadIn) -> dict:
+def read_notifications(user: CurrentUser, db: DB, settings: SettingsDep, body: ReadIn) -> dict:
     """Marks some (or all) of this person's notifications as read. Someone else's are never touched."""
     which = update(Notification).where(Notification.user_id == user.id, Notification.read_at.is_(None))
     if body.ids is not None:
         which = which.where(Notification.id.in_(body.ids))
     db.execute(which.values(read_at=utcnow()).execution_options(synchronize_session=False))
     db.commit()
-    return my_notifications(user, db)
+    return my_notifications(user, db, settings)

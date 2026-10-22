@@ -25,6 +25,10 @@ export const RELEASES: Release[] = [
       "If two people decide the same entry at nearly the same moment, the first decision stands and the other person is told who decided and when.",
       "A bell at the top right: entries waiting for your approval, decisions on your entries, cash advances to release, liquidations to review, and refunds and reimbursements to settle.",
       "The Overview shows journal entries waiting for your approval, and your own still waiting on someone else.",
+      "Quieter notifications: once someone acts on something, it leaves everyone's bell; several of a kind show as one line; the red number counts only what needs you.",
+      "The Finance Head is told first of entries waiting; the Finance Deputy is told of the Head's own entries, and of any still waiting after a working day (Monday to Saturday, not counting Philippine holidays).",
+      "Approve several journal entries at once: tick them and choose Approve selected. Any someone else had just decided are named.",
+      "An entry whose reversal still waits for approval says so, instead of \"Reversed\". The journal form explains that a line is either a debit or a credit.",
     ],
   },
   {
