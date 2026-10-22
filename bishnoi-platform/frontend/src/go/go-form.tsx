@@ -12,7 +12,7 @@ export function GoForm({ app, returnTo, company }: { app: string; returnTo: stri
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   return (
-    <form action={action} className="mt-6 space-y-5" noValidate>
+    <form action={action} className="mt-8 space-y-5" noValidate>
       <input type="hidden" name="app" value={app} />
       <input type="hidden" name="return" value={returnTo} />
       <input type="hidden" name="company" value={company} />

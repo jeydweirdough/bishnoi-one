@@ -9,25 +9,21 @@ import { addressKnown, appLabel, appUrl, THIS_APP, type AppName } from "../lib/a
 
 // The app launcher (decided 2026-10-21, after Zoho's): a grid button in the
 // top bar of every app, opening a panel of the Bishnoi One apps as tiles.
-// A tile goes through the Platform's /go, which hands the app a pass, so the
-// person arrives signed in; the Platform also says no, in words, to an app
-// their company doesn't have or they haven't been given: that answer comes
-// back to the page the panel was opened on (&from=, ?appNotice=) as an alert
-// over it, so nobody is left on the Platform's page. The tiles
+// A tile opens that app straight at its address (decided 2026-10-22): each
+// app signs people in on its own page, so there's no round trip through the
+// Platform. An ?appNotice= on the page is still shown as an alert over it. The tiles
 // (icons, colours) are in lib/app-tiles.ts, shared with the sign-in page.
 //
 // Same file in every app's src/platform/shell/: copy it as it is.
 
-/** Where a tile goes: through the Platform, so the app opens signed in; straight there when the Platform isn't known. */
+/** Where a tile goes: straight to that app (it signs the person in on its own page if needed). */
 function linkTo(app: AppName): string {
-  if (app === "platform" || !addressKnown("platform")) return appUrl(app);
-  return `${appUrl("platform")}/go?app=${app}&return=${encodeURIComponent(`${appUrl(app)}/auth/platform`)}`;
+  return appUrl(app);
 }
 
-/** The same, saying which page to come back to if the Platform says no. */
+/** The same from a click (kept for the call sites). */
 function linkFromHere(app: AppName): string {
-  const to = linkTo(app);
-  return to.includes("/go?") ? `${to}&from=${encodeURIComponent(window.location.href)}` : to;
+  return linkTo(app);
 }
 
 /** A refusal from the Platform, back on the page the launcher was opened on: shown over it, then taken out of the address. */

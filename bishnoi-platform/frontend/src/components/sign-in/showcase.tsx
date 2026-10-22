@@ -11,7 +11,7 @@ const INK = "#141414";
 const SAGE = "#a8d69b";
 const LINK = "#7fb070";
 
-type Slide = { title: string; sub: string; value: number; chip: string; says: string };
+export type Slide = { title: string; sub: string; value: number; chip: string; says: string };
 
 const SLIDES: Slide[] = [
   { title: "Applications", sub: "Every one answering", value: 100, chip: "Operational", says: "Watch every application stay up in" },
@@ -21,20 +21,25 @@ const SLIDES: Slide[] = [
 
 const EVERY = 6000;
 
-export function Showcase() {
+/**
+ * The panel beside a sign-in form. The Platform's own sign-in speaks to its
+ * administrators (the default); the Bishnoi One sign-in (/go) passes slides
+ * and a name that speak to everyone who signs in to any application.
+ */
+export function Showcase({ slides = SLIDES, brand = "Bishnoi One Platform", label = "What the Platform looks after" }: { slides?: Slide[]; brand?: string; label?: string } = {}) {
   const [at, setAt] = useState(0);
   const [held, setHeld] = useState(false);
 
   useEffect(() => {
     if (held || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setAt((i) => (i + 1) % SLIDES.length), EVERY);
+    const timer = window.setInterval(() => setAt((i) => (i + 1) % slides.length), EVERY);
     return () => window.clearInterval(timer);
-  }, [held]);
+  }, [held, slides.length]);
 
-  const slide = SLIDES[at];
+  const slide = slides[at % slides.length];
   return (
     <aside
-      aria-label="What the Platform looks after"
+      aria-label={label}
       className="hidden flex-col items-center justify-center rounded-[28px] bg-[#f1f7ee] px-10 py-12 lg:flex"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
@@ -54,7 +59,7 @@ export function Showcase() {
       </div>
 
       <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Pick one">
-        {SLIDES.map((s, i) => (
+        {slides.map((s, i) => (
           <button
             key={s.title}
             type="button"
@@ -67,7 +72,7 @@ export function Showcase() {
         ))}
       </div>
       <p className="mt-6 max-w-[26rem] text-center text-[1.45rem] leading-snug text-[#141414]" aria-live="polite">
-        {slide.says} <span className="font-semibold whitespace-nowrap">Bishnoi One Platform</span>
+        {slide.says} <span className="font-semibold whitespace-nowrap">{brand}</span>
       </p>
     </aside>
   );
