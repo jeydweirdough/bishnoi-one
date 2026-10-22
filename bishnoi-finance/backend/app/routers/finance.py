@@ -181,6 +181,19 @@ def dashboard(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     return {"kept": False, "on": on.isoformat(), "sections": [{"key": k, **build[k]()} for k in section_keys(access)]}
 
 
+# --- BIR files ----------------------------------------------------------------------------------
+
+
+@router.get("/bir/sales-dat")
+def sales_dat_setup(user: permitted("bir.prepare")) -> dict:
+    """What the Sales DAT screen needs from the API: each company's details for the
+    file (app/bir.py). The file itself is made in the browser; asking here is also
+    what keeps the screen to a role that prepares BIR files."""
+    from app.bir import companies_out
+
+    return {"companies": companies_out()}
+
+
 # --- the CRM's waiting prices, asked on their own and kept a minute ---------------------------
 
 KEEP_FOR = 60  # seconds

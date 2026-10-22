@@ -367,6 +367,33 @@ The Philippine rules built in:
 The CRM can use these rules to add tax to its quotes, once the two apps are
 connected.
 
+### BIR sales DAT (Sir Rommel's role only)
+
+**BIR sales DAT** in the sidebar makes the monthly Summary List of Sales file
+(the `.DAT` sent to BIR through RELIEF) from Oojeema's exports. It does what the
+converter page Sir Rommel used before, with the same results, and it opens only
+for a role allowed to **Prepare BIR files** (Administration → Roles).
+
+- **Prepare monthly DAT:** drop the month's exports from Oojeema (the DAT, the
+  Sales Relief or Sales Journal, the General Ledger, the Income Statement). Pick
+  the month. Finance applies the rules Sir Rommel confirmed (listed on the page
+  under **Rules in use**), explains any difference from the Income Statement,
+  and gives the corrected DAT, a CSV and an Excel report to download.
+- **Convert as-is:** Oojeema's Sales Relief CSV into a DAT, with no corrections.
+- **DAT to CSV:** a DAT back into a spreadsheet, for example to check one already filed.
+
+Nothing is uploaded: the files are read on your own computer.
+
+The first line of every DAT names the company's **RDO** (the BIR district office
+it is registered with, a code like `53A`) and the **month its year ends**
+(`12` for a year ending in December). Both are printed on the company's BIR
+Certificate of Registration (Form 2303). For 2MG, Finance uses **53A and
+December**, as in the DATs filed for March to September 2026; please check them
+against 2MG's certificate. Getmeds Philippines has none set yet, so the page asks
+for them before it gives a file.
+
+Before filing, run each DAT through BIR's RELIEF Validation Module, as before.
+
 ---
 
 ## 7. Not in Finance yet

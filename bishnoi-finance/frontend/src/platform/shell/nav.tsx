@@ -151,6 +151,8 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
       },
       // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
+      // The Sales DAT from Oojeema's exports (src/bir/sales-dat): only for a role that prepares BIR files.
+      { href: `${base}/bir/sales-dat`, label: "BIR sales DAT", icon: "regulatory" },
     ];
   }
   if (m.key === "inventory") {
@@ -618,6 +620,7 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/ledger/posting", "accounts.view"],
   ["/ledger/categories", "categories.view"],
   ["/ledger", "journal.view"],
+  ["/bir", "bir.prepare"],
   ["/tax", "tax.view"],
   ["/", "dashboard.view"],
 ];

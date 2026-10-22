@@ -25,6 +25,7 @@ ACTION_LABELS = {
     "roles": "Roles and permissions",
     "audit": "Activity log",
     "approve": "Approve and reject",
+    "prepare": "Prepare BIR files",
 }
 
 
@@ -49,6 +50,8 @@ AREAS: tuple[Area, ...] = (
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.
     Area("prices", "Product prices", "Prices", ("view", "approve")),
+    # BIR files made from Oojeema's exports (the Sales DAT, app/bir.py); no role gets it until it's ticked.
+    Area("bir", "BIR files", "Tax", ("prepare",)),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
 

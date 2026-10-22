@@ -11,6 +11,14 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.0",
+    date: "2026-10-22",
+    changes: [
+      "BIR sales DAT: the monthly Summary List of Sales from Oojeema's exports, with the corrections Sir Rommel confirmed and a check against the Income Statement. It replaces the converter page and gives the same files. Only a role allowed to prepare BIR files sees it.",
+      "Ready for Getmeds Philippines too: the page asks for its RDO and year-end month until they are set.",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-10-22",
     changes: [
