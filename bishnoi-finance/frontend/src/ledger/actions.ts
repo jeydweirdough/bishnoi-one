@@ -3,18 +3,33 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/platform/lib/api";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { Account, AccountType, Entry, Posting } from "./types";
+import type { ChartRow } from "./csv";
+import type { Account, AccountType, Entry, ImportAccount, ImportCheck, Posting } from "./types";
 
 // The ledger. The API checks every entry balances, and that only admins change
 // the chart and the posting accounts.
 
-export type AccountInput = { code: string; name: string; type: AccountType; description: string | null; isActive: boolean };
+export type AccountInput = { code: string; name: string; type: AccountType; description: string | null; isActive: boolean; parentId: string | null };
 
 export async function saveAccount(id: string | null, input: AccountInput): Promise<Result<Account>> {
   return attempt(async () => {
     const saved = id ? await api.put<Account>(`/finance/ledger/accounts/${enc(id)}`, input) : await api.post<Account>("/finance/ledger/accounts", input);
     refresh();
     return saved;
+  });
+}
+
+/** A chart's rows, read from the CSV in the browser, checked by the API: nothing is added yet. */
+export async function checkImport(rows: ChartRow[]): Promise<Result<ImportCheck>> {
+  return attempt(() => api.post<ImportCheck>("/finance/ledger/accounts/import/check", { rows }));
+}
+
+/** The chosen rows, added all or none. */
+export async function importAccounts(accounts: ImportAccount[]): Promise<Result<{ added: number; withParent: number }>> {
+  return attempt(async () => {
+    const done = await api.post<{ added: number; withParent: number }>("/finance/ledger/accounts/import", { accounts });
+    refresh();
+    return done;
   });
 }
 

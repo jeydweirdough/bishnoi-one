@@ -33,9 +33,18 @@ COLUMNS = (
 
 
 def upgrade() -> None:
-    inspector = sa.inspect(op.get_bind())
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
     have = {c["name"] for c in inspector.get_columns("nbfi_journal_entries")}
-    if "status" not in have:
+    if "status" not in have and bind.dialect.name == "sqlite":
+        # In place on SQLite (2026-10-23): rebuilding the table to add the foreign keys drops
+        # the old one, and its ON DELETE CASCADE would delete every journal line. The model
+        # keeps the foreign keys; SQLite adds the columns without them.
+        op.add_column("nbfi_journal_entries", sa.Column("status", sa.String(10), nullable=False, server_default="approved"))
+        for name, kind in COLUMNS:
+            op.add_column("nbfi_journal_entries", sa.Column(name, kind, nullable=True))
+        op.create_index("ix_nbfi_journal_entries_status", "nbfi_journal_entries", ["status"])
+    elif "status" not in have:
         with op.batch_alter_table("nbfi_journal_entries") as batch:
             batch.add_column(sa.Column("status", sa.String(10), nullable=False, server_default="approved"))
             for name, kind in COLUMNS:

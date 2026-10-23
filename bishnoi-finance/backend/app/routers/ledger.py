@@ -16,6 +16,7 @@ Balances are on each type's normal side: assets and expenses grow with
 debits; liabilities, equity and income with credits.
 """
 
+import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -62,12 +63,30 @@ class AccountIn(Api):
     type: Literal["asset", "liability", "equity", "income", "expense"]
     description: str | None = Field(None, max_length=300)
     is_active: bool = True
+    # The account it sits under (migration 0017); none: at the top.
+    parent_id: str | None = None
+
+
+def check_parent(db: DB, account_id: str | None, parent_id: str | None) -> None:
+    """A parent that exists, and isn't the account itself or one of the accounts under it."""
+    if parent_id is None:
+        return
+    seen = {account_id}
+    at = db.get(Account, parent_id)
+    if at is None:
+        raise field_error("parentId", "There's no such account to put it under.")
+    while at is not None:
+        if at.id in seen:
+            raise field_error("parentId", "An account can't sit under itself or under an account that sits under it.")
+        seen.add(at.id)
+        at = db.get(Account, at.parent_id) if at.parent_id else None
 
 
 @router.post("/accounts", status_code=status.HTTP_201_CREATED)
 def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> dict:
     if db.scalar(select(Account.id).where(func.upper(Account.code) == body.code.upper())):
         raise field_error("code", "This account code is already in use.")
+    check_parent(db, None, body.parent_id)
     a = Account(**body.model_dump())
     db.add(a)
     db.flush()
@@ -85,12 +104,158 @@ def change_account(user: permitted("accounts.manage"), db: DB, account_id: str, 
         raise field_error("code", "This account code is already in use.")
     if body.type != a.type and db.scalar(select(JournalLine.id).where(JournalLine.account_id == a.id).limit(1)):
         raise field_error("type", "This account has journal entries, so its type cannot change. Create a new account instead.")
+    check_parent(db, a.id, body.parent_id)
     changes = [k for k, v in body.model_dump().items() if getattr(a, k) != v]
     for k, v in body.model_dump().items():
         setattr(a, k, v)
     audit(db, user, "account.updated", target=f"{a.code} {a.name}", target_type="account", target_id=a.id, fields=changes)
     db.commit()
     return account_out(a)
+
+
+# --- importing a chart (Oojeema's or Zoho's, as CSV) ---------------------------------------------
+#
+# The screen reads the file in the browser and sends its rows; nothing of the file is kept.
+# /check answers what would happen to each row; /import adds the chosen ones, all or none.
+# Existing accounts, entries and default accounts are never changed. Decided 2026-10-23
+# (Plans/Plan - Suppliers, bills and chart import; Plans/Plan - Import chart of accounts).
+
+# A chart's class (Oojeema's "Class", Zoho's "Account Type"), as one of Finance's five types.
+CLASS_TYPES = {
+    **dict.fromkeys(("cash", "bank", "current assets", "current asset", "other current asset", "other current assets", "prepaid and other current assets",
+                     "inventory", "stock", "input vat", "accounts receivable", "fixed assets", "fixed asset", "noncurrent assets", "non-current assets",
+                     "other asset", "other assets", "payment clearing"), "asset"),
+    **dict.fromkeys(("current liabilities", "current liability", "noncurrent liabilities", "non-current liabilities", "accounts payable",
+                     "credit card", "other current liability", "other liability", "long term liability", "long-term liabilities"), "liability"),
+    **dict.fromkeys(("equity",), "equity"),
+    **dict.fromkeys(("revenue", "income", "other income", "sales"), "income"),
+    **dict.fromkeys(("cost of sales", "cost of goods sold", "operating expenses", "other expenses", "other expense", "expense", "expenses"), "expense"),
+}
+CODE = re.compile(r"^[A-Za-z0-9.\-]+$")
+
+
+def type_of(kind: str | None, nature: str | None, statement: str | None) -> str | None:
+    """The class, as a type; failing that, an income-statement account by its normal side."""
+    found = CLASS_TYPES.get((kind or "").strip().lower())
+    if found:
+        return found
+    if (statement or "").strip().lower() == "income statement":
+        side = (nature or "").strip().lower()
+        return "income" if side == "credit" else "expense" if side == "debit" else None
+    return None
+
+
+class ImportRowIn(Api):
+    code: str | None = Field(None, max_length=60)
+    name: str | None = Field(None, max_length=300)
+    kind: str | None = Field(None, max_length=80)
+    nature: str | None = Field(None, max_length=20)
+    statement: str | None = Field(None, max_length=40)
+    parent: str | None = Field(None, max_length=300)
+    description: str | None = Field(None, max_length=500)
+
+
+class ImportCheckIn(Api):
+    rows: list[ImportRowIn] = Field(min_length=1, max_length=3000)
+
+
+@router.post("/accounts/import/check")
+def check_import(user: permitted("accounts.manage"), db: DB, body: ImportCheckIn) -> dict:
+    existing = {a.code.upper(): a for a in db.scalars(select(Account))}
+    names_here = {a.name.strip().lower() for a in existing.values()}
+    codes_in_file: dict[str, int] = {}
+    for r in body.rows:
+        if r.code:
+            codes_in_file[r.code.strip().upper()] = codes_in_file.get(r.code.strip().upper(), 0) + 1
+    names_in_file = {(r.name or "").strip().lower() for r in body.rows if r.name}
+    out = []
+    for i, r in enumerate(body.rows):
+        code, name = (r.code or "").strip(), (r.name or "").strip()
+        kind = (r.kind or "").strip() or None
+        type_ = type_of(kind, r.nature, r.statement)
+        parent = (r.parent or "").strip() or None
+        where = "file" if parent and parent.lower() in names_in_file else "chart" if parent and parent.lower() in names_here else None
+        # (which field, what's wrong): only a missing type can be put right on the screen.
+        problems: list[tuple[str, str]] = []
+        if not code:
+            problems.append(("code", "No code."))
+        elif not CODE.match(code) or len(code) > 20:
+            problems.append(("code", "The code has spaces or symbols, or is over 20 characters."))
+        elif codes_in_file.get(code.upper(), 0) > 1:
+            problems.append(("code", "This code is in the file more than once."))
+        if not name:
+            problems.append(("name", "No name."))
+        elif len(name) > 120:
+            problems.append(("name", "The name is over 120 characters."))
+        if type_ is None:
+            problems.append(("type", f"Finance can't tell the type from “{kind}”: pick one." if kind else "No class: pick a type."))
+        here = existing.get(code.upper()) if code else None
+        status_ = "here" if here else "problem" if problems else "new"
+        note = (f"Already in Finance as {here.code} · {here.name}." if here else " ".join(m for _, m in problems)) or None
+        if status_ == "new" and parent and where is None:
+            note = f"Its parent “{parent}” isn't in the file or the chart: imported without one."
+        out.append({
+            "line": i + 1, "code": code, "name": name, "kind": kind, "type": type_, "parent": parent, "parentFound": where,
+            "description": (r.description or "").strip() or None, "status": status_, "note": note, "problems": [f for f, _ in problems],
+        })
+    counts = {k: sum(1 for x in out if x["status"] == k) for k in ("new", "here", "problem")}
+    return {"rows": out, "counts": counts, "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()]}
+
+
+class ImportAccountIn(Api):
+    code: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+    name: str = Field(min_length=1, max_length=120)
+    type: Literal["asset", "liability", "equity", "income", "expense"]
+    description: str | None = Field(None, max_length=300)
+    parent: str | None = Field(None, max_length=300)
+
+
+class ImportIn(Api):
+    accounts: list[ImportAccountIn] = Field(min_length=1, max_length=3000)
+
+
+@router.post("/accounts/import", status_code=status.HTTP_201_CREATED)
+def run_import(user: permitted("accounts.manage"), db: DB, body: ImportIn) -> dict:
+    """Adds the chosen accounts, all or none: any code already used refuses the lot,
+    naming it. Parents are matched by name, to an account in this import or already here."""
+    existing = {a.code.upper() for a in db.scalars(select(Account))}
+    seen: set[str] = set()
+    for i, row in enumerate(body.accounts):
+        key = row.code.upper()
+        if key in existing or key in seen:
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Line {i + 1}: the code {row.code} is already used. Nothing was imported.")
+        seen.add(key)
+    made = []
+    for row in body.accounts:
+        a = Account(code=row.code, name=row.name, type=row.type, description=row.description, is_active=True)
+        db.add(a)
+        made.append((a, row.parent))
+    db.flush()
+    everything = {a.id: a for a in db.scalars(select(Account))}
+    by_name: dict[str, Account] = {}
+    for a in everything.values():
+        by_name.setdefault(a.name.strip().lower(), a)
+    for a, _ in made:  # this import's own names come first
+        by_name[a.name.strip().lower()] = a
+
+    def above(p: Account, a: Account) -> bool:
+        """Whether a is p, or sits above p: then a can't go under p."""
+        at, steps = p, 0
+        while at is not None and steps < 50:
+            if at.id == a.id:
+                return True
+            at, steps = everything.get(at.parent_id) if at.parent_id else None, steps + 1
+        return steps >= 50
+
+    linked = 0
+    for a, parent in made:
+        p = by_name.get((parent or "").strip().lower()) if parent else None
+        if p is not None and not above(p, a):
+            a.parent_id = p.id
+            linked += 1
+    audit(db, user, "accounts.imported", target=f"{len(made)} accounts", target_type="account")
+    db.commit()
+    return {"added": len(made), "withParent": linked}
 
 
 # --- posting accounts --------------------------------------------------------------------------
@@ -105,6 +270,10 @@ POSTING = {
     "receivables_account_id": ("asset", "What customers owe on invoices"),
     "sales_account_id": ("income", "Sales on invoices"),
     "output_tax_account_id": ("liability", "Tax on invoices (output VAT)"),
+    # Supplier bills (2026-10-23): what's owed suppliers, the VAT on purchases, the tax withheld for the BIR.
+    "payables_account_id": ("liability", "What's owed suppliers on bills"),
+    "input_tax_account_id": ("asset", "VAT on bills (input VAT)"),
+    "withholding_account_id": ("liability", "Tax withheld from suppliers (EWT payable)"),
 }
 
 
@@ -152,7 +321,7 @@ def list_entries(
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),

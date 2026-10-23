@@ -32,7 +32,9 @@ Everyone who uses Finance has a **role**. Finance starts with three:
 | Approve or reject journal entries (not their own) | | | ✓ |
 | Make and issue sales invoices, record their payments | | ✓ | ✓ |
 | Void an invoice, set up invoice numbers | | | ✓ |
-| Add or change accounts, default accounts and expense categories | | | ✓ |
+| Add, edit and switch off suppliers; make supplier bills, attach their invoices, record them | | ✓ | ✓ |
+| Void a supplier bill | | | ✓ |
+| Add or change accounts (or import a chart), default accounts and expense categories | | | ✓ |
 | Change the company's tax registration, or add a new tax rate | | | ✓ |
 | Add people, make roles, read the activity log | Activity log only | | ✓ |
 
@@ -214,11 +216,17 @@ added.
    citizen or PWD, their name and ID number), the items (description, quantity,
    unit price, discount, VAT category), the invoice date and the payment terms
    in days (30 by default; 0 for cash on delivery). If the CRM is linked,
-   **Find** a customer there to copy their name, TIN and address.
-   **Save as draft.** A draft can still be edited or deleted.
+   **Find** a customer there to copy their name, TIN and address. That box only
+   searches the CRM: what's typed in it isn't saved; the invoice's customer is
+   the details below it. For a **TIN**, type the digits only (9, then the branch
+   code if any): the dashes go in by themselves.
+   **Save as draft.** A draft can still be edited or deleted. If something
+   stops it from being issued, Finance says exactly what and where, on the
+   invoice and beside the field when you edit it (e.g. *"Customer's TIN: Enter
+   the TIN as 9 digits…"*, *"Line 2 (VAT): Pick the product's VAT category."*).
 2. **Issue the invoice.** It takes the next number from the series, and its
    amounts and VAT are fixed from then on. An issued invoice is never edited:
-   to correct one, void it and make a new one.
+   to correct one, cancel and reissue it (step 5).
 3. **Record a payment** when the customer pays: the date, amount, how
    (Cash, Bank transfer, E-wallet or Check) and a reference (deposit slip,
    check or OR number). It can be paid in parts, but never more than is owed.
@@ -226,6 +234,15 @@ added.
 4. **Void** (Administrators only), with the reason. A voided invoice keeps its
    number. An invoice with payments can't be voided until they're taken off
    (**Take off**, also Administrators only).
+5. **Cancel and reissue**, to correct an issued invoice (a posted invoice is
+   never edited: cancel and reissue, Sir Rommel's rule). Give the reason (e.g.
+   "Wrong TIN"): the invoice is voided exactly as above, and a **copy opens as a
+   draft**, dated today. Correct it, change the date if needed, and **Issue**
+   it: it takes the next number. Both invoices show they're linked: the new one
+   says *"Replaces SI-000101, cancelled …: Wrong TIN"*, the old one *"Replaced
+   by SI-000102"*, on screen, in the list and in the journal. **The printed
+   invoice stays as standard**, with nothing added. An invoice voided without a
+   replacement can still get one later (**Make its replacement**).
 
 ### Receivables
 
@@ -240,6 +257,63 @@ invoice numbers under each customer.
 | An invoice is issued | 1100 Accounts receivable (the total) | 4000 Sales (before VAT) and 2200 Output VAT payable (the VAT) |
 | A payment is recorded | Cash / Bank / E-wallet (how it was paid) | 1100 Accounts receivable |
 | An invoice is voided, or a payment taken off | The same entry reversed, dated that day | |
+
+### Payables: suppliers and their bills
+
+**Payables** in the sidebar has **Bills** and **Suppliers**.
+
+- **Suppliers**, laid out like Zoho's vendors: the **primary contact** (salutation,
+  first and last name), **company name** (as registered) and **display name** (how
+  they're shown; left empty, the company name), email, work phone and mobile; then the
+  **TIN** (Zoho's *Company ID*; digits only, the dashes go in by themselves), address,
+  whether they're **VAT-registered**, **payment terms**, the **tax usually withheld**
+  from them, picked from the BIR's codes, e.g. *WC158, goods from a company, 1%*;
+  *WC160, services, 2%*; *WC100, rent, 5%*; professional fees 5–15% (the 1% and 2%
+  apply when the company is a top withholding agent; Sir Rommel to confirm), and
+  their own **Accounts payable** if it isn't the default (e.g. *2101-000 AP – Trade*
+  or *2102-000 AP – Non-Trade*): their bills post there. Also **contact persons**,
+  where they're paid, remarks, and **documents** (their BIR 2303, accreditation). The
+  list shows each supplier's **Payables**: what's owed them on recorded bills. The
+  same TIN and branch, or the same name, can't be added twice. A supplier is never
+  deleted: **Switch off** stops them being offered on new bills.
+- **Importing suppliers (Payables → Suppliers → Import from a file):** export the
+  vendors from Zoho as CSV (All Vendors → ⋯ → Export) and pick the file. It's read on
+  your computer and not kept. Each vendor is shown first: **New** (ticked), **Already
+  here** (same name, or same TIN; left as it is) or **Needs a look** (no name, or the
+  same vendor twice in the file). Zoho's *Company ID* becomes the TIN when it is one
+  (otherwise it's kept in the remarks); *Net 30* becomes 30 days; inactive vendors come
+  in switched off. **Import** adds the ticked ones all or none. **Not brought in:**
+  what's owed them (an opening balance, to decide separately), their VAT status and
+  the tax usually withheld: they come in as VAT-registered with nothing withheld, so
+  set those on each supplier.
+- **New bill:** pick the **supplier** (their terms, VAT and usual withholding fill
+  in), type **their invoice number**, the bill date (the due date follows from the
+  terms), the **PO** and **delivery receipt** numbers, and tick **checked against
+  the PO / delivery receipt**. Each line: the **account** (an expense or asset), a
+  description, the **amount**, its **VAT** (12%, zero-rated, exempt, none) and the
+  **tax withheld**. Say whether the amounts **include VAT** (as printed on the
+  invoice). The bill's **Zoho** and **Oojeema** numbers can be kept on it too.
+  **Save as draft.**
+  *Example:* ₱11,200 for goods, VAT included, 1% withheld: ₱10,000 + ₱1,200 VAT;
+  ₱100 withheld (for the supplier's 2307); **₱11,100 to pay the supplier**.
+- **Attach the supplier's invoice** on the bill's page: a photo or PDF, up to 3 MB
+  (photos are made smaller first). A bill without one says **Document missing**;
+  **Bills → Document missing** lists them. Files can be added after recording too.
+- **Record bill** posts it to the books at once. After that it's never changed:
+  **Void** it (with the reason) and enter it again. The same invoice number from the
+  same supplier can't be entered twice (unless the first was voided).
+- **Who:** each step is its own tick on the Roles screen, so any role can have
+  exactly what it needs (e.g. Ms. Cristal's as well as Ms. Aubrey's). **Supplier
+  bills:** View · Make drafts (make, edit, delete drafts and attach files) · Record
+  (post to the books) · Void. **Suppliers:** View · Add · Edit (including their
+  documents) · Switch off.
+- **Not yet:** paying bills (payment vouchers, several bills at once, through the
+  checkers), payables aging, and 2307s. Coming next.
+
+| When | Debit | Credit |
+|---|---|---|
+| A bill is recorded | Each line's account (before VAT) and 1300 Input VAT | 2000 Accounts payable (what's paid the supplier) and 2300 Withholding tax payable – expanded |
+| A bill is voided | The same entry reversed, dated that day | |
 
 ---
 
@@ -270,9 +344,11 @@ has entries keeps its type.
 | 1020 | E-wallet (GCash, Maya) | Asset |
 | 1100 | Accounts receivable | Asset |
 | 1200 | Advances to employees | Asset |
+| 1300 | Input VAT | Asset |
 | 2000 | Accounts payable | Liability |
 | 2100 | Due to employees | Liability |
 | 2200 | Output VAT payable | Liability |
+| 2300 | Withholding tax payable – expanded | Liability |
 | 3000 | Owner's equity | Equity |
 | 4000 | Sales | Income |
 | 6100 | Food | Expense |
@@ -282,12 +358,26 @@ has entries keeps its type.
 | 6500 | Supplies & materials | Expense |
 | 6900 | Other expenses | Expense |
 
+**Importing a chart (Accounting → Chart of accounts → Import from a file):** pick
+the chart as a **CSV**: Oojeema's export (Code, Name, Class, Nature, Parent, FS
+Presentation) or Zoho's (Account Code, Account Name, Account Type, Parent Account).
+The file is read on your computer and not kept. Every row is shown first:
+**New** (ticked), **Already here** (same code; left as it is) or **Needs a look**
+(no code, a code twice, a name too long, or a class Finance can't place: pick its
+type on the row). The type comes from the class (e.g. *Current Liabilities* →
+Liability, *Other Income* → Income). Accounts go **under their parent** by name.
+**Import** adds the ticked rows **all or none**; nothing already here changes. After
+importing Oojeema's chart, point the **Default accounts** at its accounts (e.g.
+Input VAT 1600-000, W/tax Payable – Expanded 2302-000, Accounts Payable – Trade
+2101-000). Accounts can also be put under a parent by hand (**Sits under**).
+
 ### Default accounts (Accounting → Default accounts)
 
 These are the accounts the automatic entries use. At the start: Advances 1200,
 Due to employees 2100, Cash 1000, Bank transfer 1010, E-wallet 1020, and Check
 1010 (checks go through the bank account); for invoices, Receivables 1100, Sales
-4000 and Output VAT 2200.
+4000 and Output VAT 2200; for supplier bills, Accounts payable 2000, Input VAT 1300
+and Withholding tax payable 2300.
 
 ### Expense categories (Accounting → Expense categories)
 
@@ -455,7 +545,15 @@ the first page:
   Certificate of Registration), trade name, TIN with its branch code (00000 for
   the head office), registered address, whether the company is VAT-registered,
   and whether catalogue prices already include VAT. Administrators fill this in once
-  (**Save registration**). Every Sales Invoice needs it.
+  (**Save registration**). Every Sales Invoice needs it. There's one registration
+  per company, changed in place. If the registered name, TIN or registered
+  address is still empty, the top of the page names which one, its box is
+  marked, and saving says "Still missing: …". Invoices can't be issued until
+  all three are filled in, and a draft invoice says the same, with a link here.
+  At the top, **On record** shows the registration as it stands and who changed
+  it last; below the form, **History** lists each change (who, when, and which
+  parts, never the old values). Everyone who can see Tax sees both; only those
+  who can change it see the form.
 - **Rates:** each tax's rate by date. A change in the law is entered as a new
   rate from its first day, with the law or circular behind it. A sale is always
   taxed at the rate of its own day.
@@ -514,9 +612,9 @@ Before filing, run each DAT through BIR's RELIEF Validation Module, as before.
 - **Quote approvals, guarantee letter checks and letter payments** (DSWD, PCSO,
   and others) are done in the **CRM** today, by each team's **Team Lead**, not by
   Finance.
-- **Supplier bills and payments** (accounts payable), **bank reconciliation**, and
-  **separate books for 2mg Incorporated and Getmeds Philippines Inc.**: not
-  started.
+- **Paying supplier bills** (payment vouchers; the bills themselves are in, under
+  Payables), **bank reconciliation**, and **separate books for 2mg Incorporated and
+  Getmeds Philippines Inc.**: not started.
 
 ---
 

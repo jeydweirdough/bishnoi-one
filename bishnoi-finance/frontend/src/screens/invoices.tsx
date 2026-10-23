@@ -6,7 +6,7 @@ import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { InvoiceEditor } from "../invoices/editor";
 import { AddSeries, SwitchSeries } from "../invoices/series-editor";
-import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, RemovePayment, VoidInvoice } from "../invoices/steps";
+import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, ReissueInvoice, RemovePayment, VoidInvoice } from "../invoices/steps";
 import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "../invoices/types";
 import { Amount } from "@/src/platform/ui/amount";
 
@@ -110,6 +110,8 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                     <td className="px-3 py-2.5">
                       {i.customer.name}
                       {i.reference && <span className="text-ink-3"> · Ref. {i.reference}</span>}
+                      {i.replaces && <span className="block text-meta text-ink-3">Replaces {i.replaces.number}</span>}
+                      {i.replacedBy && <span className="block text-meta text-ink-3">Replaced by {i.replacedBy.number ?? "a draft"}</span>}
                     </td>
                     <td className="px-3 py-2.5 text-ink-2">{fmt.dateLabel(i.date)}</td>
                     <td className="px-3 py-2.5 text-ink-2">{i.status === "issued" ? fmt.dateLabel(i.dueDate) : ""}</td>
@@ -177,6 +179,10 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
               )}
               {inv.status !== "draft" && <PrintButton />}
               {inv.status === "issued" && may(me, "invoices.void") && inv.number && <VoidInvoice id={inv.id} number={inv.number} />}
+              {inv.status === "issued" && may(me, "invoices.void") && may(me, "invoices.create") && inv.number && (
+                <ReissueInvoice id={inv.id} number={inv.number} />
+              )}
+              {inv.status === "void" && !inv.replacedBy && may(me, "invoices.create") && inv.number && <ReissueInvoice id={inv.id} number={inv.number} cancelled />}
             </>
           }
         >
@@ -187,13 +193,43 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             </span>
           )}
         </PageHeader>
+        {/* Cancel and reissue: on screen only; the printed invoice stays standard (decided 2026-10-22). */}
+        {(inv.replaces || inv.replacedBy) && (
+          <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+            {inv.replaces && (
+              <>
+                Replaces{" "}
+                <Link href={`/invoices/${inv.replaces.id}`} className="font-mono font-semibold text-hema hover:underline">
+                  {inv.replaces.number}
+                </Link>
+                {inv.replaces.voidedAt ? `, cancelled ${fmt.dateLabel(inv.replaces.voidedAt.slice(0, 10))}` : ""}
+                {inv.replaces.reason ? `: ${inv.replaces.reason}` : ""}.
+              </>
+            )}
+            {inv.replacedBy && (
+              <>
+                Replaced by{" "}
+                <Link href={`/invoices/${inv.replacedBy.id}`} className="font-mono font-semibold text-hema hover:underline">
+                  {inv.replacedBy.number ?? "a draft"}
+                </Link>
+                {inv.replacedBy.status === "draft" ? " (not issued yet)" : ""}.
+              </>
+            )}
+          </p>
+        )}
         {inv.status === "draft" && (
           <Sheet className="mb-5 px-5 py-4">
             <SectionTitle icon="approvals">Issue</SectionTitle>
             {inv.problem ? (
               <p className="text-sm text-danger">{inv.problem} Edit the draft to fix it.</p>
             ) : c?.warnings.length ? (
-              <p className="text-sm text-danger">{c.warnings.join(" ")} Fill them in under Tax before issuing.</p>
+              <p className="text-sm text-danger">
+                {c.warnings.join(" ")}{" "}
+                <Link href="/tax" className="font-semibold underline">
+                  Go to Tax, Registration
+                </Link>
+                , then issue it.
+              </p>
             ) : may(me, "invoices.issue") ? (
               <IssueInvoice id={inv.id} series={series} />
             ) : (
@@ -282,7 +318,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             {c.notice && <p className="mt-4 text-center text-meta font-semibold">{c.notice}</p>}
           </>
         ) : (
-          <p className="mt-5 text-sm text-ink-3">The amounts appear once the lines are fixed.</p>
+          <p className="mt-5 text-sm text-ink-3">The amounts appear once the problem above is fixed.</p>
         )}
         {inv.notes && <p className="mt-4 text-meta text-ink-2">{inv.notes}</p>}
         {inv.series && (

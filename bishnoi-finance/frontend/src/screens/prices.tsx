@@ -1,4 +1,5 @@
 import { ApiError, api, getCompanyMe } from "@/src/platform/lib/api";
+import { sendToErrorPage } from "@/src/platform/lib/fail";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { DecidePrice, DecideQuote } from "../prices/decide";
@@ -107,6 +108,9 @@ export default async function PricesPage() {
     waiting = await api.get<Waiting>("/finance/prices/waiting");
   } catch (e) {
     // The CRM keeps what waits: when it can't be reached, say so here, not on an error page.
+    // Anything else goes to its own page, a role without "Product prices: View" to the
+    // not-allowed one (it was the error-500 page: found 2026-10-23, Aubrey's role).
+    if (e instanceof ApiError && e.status !== 409) sendToErrorPage(e.status);
     if (!(e instanceof ApiError) || e.status !== 409) throw e;
     trouble = e.message;
   }

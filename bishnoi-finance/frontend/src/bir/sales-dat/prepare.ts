@@ -6,7 +6,7 @@
 import {
   C, LISTING_LABEL, MON, addressBook, buildCorrectedDAT, checkDAT, classify, correctListing, entryMonth, fmt, irChecks, isFigures,
   listingFromSR, mergeGLAccounts, parseCSV, parseDATListing, parseGL, parseIS, parseSJ, parseSRGrid, readXlsx, reconcile, sjSales, tinChecks,
-} from "./engine";
+} from "./engine.ts"; // with ".ts": the test runs this file in plain Node, which needs it
 
 /** What a GL account is used for (the converter's step "What each General Ledger account is used for"). */
 export type Role = "sales" | "fee" | "discount" | "deferred" | "ignore";

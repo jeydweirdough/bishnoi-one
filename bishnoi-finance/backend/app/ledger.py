@@ -141,7 +141,7 @@ def post_reimbursed(db: Session, r: FundRequest, amount: int, method: str, refer
 
 
 def account_out(a: Account) -> dict:
-    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active}
+    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id}
 
 
 def entry_out(e: JournalEntry) -> dict:

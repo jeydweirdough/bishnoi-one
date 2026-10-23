@@ -27,6 +27,10 @@ ACTION_LABELS = {
     "approve": "Approve and reject",
     "prepare": "Prepare BIR files",
     "first": "Told first about entries waiting",
+    "record": "Record (post to the books)",
+    "add": "Add",
+    "edit": "Edit",
+    "deactivate": "Switch off",
 }
 
 
@@ -46,6 +50,11 @@ AREAS: tuple[Area, ...] = (
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
+    # Accounts payable (2026-10-23): suppliers, and their bills, each step its own tick so any role
+    # can have exactly what it needs (Aubrey, and Cristal sometimes, make bills). Bills: "create"
+    # makes, edits and deletes drafts and attaches files; "record" posts them (migration 0018 split them).
+    Area("suppliers", "Suppliers", "Payables", ("view", "add", "edit", "deactivate")),
+    Area("bills", "Supplier bills", "Payables", ("view", "create", "record", "void")),
     # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
     # first: the main approver (the Finance Head), told of every entry at once; other approvers are
     # backup, told only of the main approver's own entries and of ones waiting over a working day.
@@ -106,11 +115,13 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     (
         ROLE_STAFF_ID,
         FINANCE_STAFF,
-        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, makes and issues invoices and records their payments, and approves prices.",
+        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, makes and issues invoices and records their payments, keeps suppliers and records their bills, and approves prices.",
         VIEW_ALL
         | _grant("funds", actions=("release", "check", "settle", "cancel"))
         | _grant("journal", actions=("post", "reverse"))
         | _grant("invoices", actions=("create", "issue", "collect"))
+        | _grant("suppliers", actions=("add", "edit", "deactivate"))
+        | _grant("bills", actions=("create", "record"))
         | _grant("prices", actions=("approve",)),
     ),
     (ROLE_AUDITOR_ID, AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"admin.audit"}),

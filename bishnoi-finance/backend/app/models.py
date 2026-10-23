@@ -273,6 +273,9 @@ class Account(Base):
     description: Mapped[str | None] = mapped_column(String(300), default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The account it sits under, as Oojeema's chart groups them (e.g. 6915-001 Provision
+    # for Expired Medicines under 6915-000 Loss on Expired Medicines). Migration 0017.
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class LedgerSettings(Base):
@@ -295,6 +298,11 @@ class LedgerSettings(Base):
     receivables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     sales_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     output_tax_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Where a recorded supplier bill posts (migration 0017): what's owed to suppliers, the VAT
+    # on purchases, and the tax withheld from them for the BIR.
+    payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    input_tax_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    withholding_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class JournalEntry(Base):
@@ -541,6 +549,9 @@ class Invoice(Base):
     voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
     void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+    # The cancelled invoice this one replaces (cancel and reissue: Rommel Q20; migration
+    # 0016). At most one replacement each; a deleted draft frees it. Not printed.
+    replaces_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_invoices.id", ondelete="SET NULL"), unique=True, default=None)
 
     series: Mapped[InvoiceSeries | None] = relationship(lazy="joined")
     payments: Mapped[list["InvoicePayment"]] = relationship(
@@ -686,7 +697,137 @@ class SignedStep(Base):
     fingerprint: Mapped[str] = mapped_column(String(64))
 
 
+# --- payables: suppliers and their bills (app/payables.py, migration 0017) -----------------
+#
+# A bill is a draft until it's recorded: then it posts to the books (the expense and the VAT
+# on it, against what's owed the supplier and the tax withheld for the BIR) and is kept as
+# recorded. A recorded bill is voided, never changed. Decided 2026-10-23 (Aubrey's answers;
+# Plans/Plan - Suppliers, bills and chart import).
+
+BILL_STATUSES = ("draft", "recorded", "void")
+
+
+class Supplier(Base):
+    """Someone the company buys from, with what every bill from them needs: their TIN,
+    whether they charge VAT, and the tax usually withheld from them (Aubrey Q11)."""
+
+    __tablename__ = "nbfi_suppliers"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (Index("nbfi_suppliers_no", "no", unique=True),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    # How the supplier is shown (Zoho's "Display Name"); company_name: as registered (migration 0018).
+    name: Mapped[str] = mapped_column(String(200))
+    company_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    # The primary contact (Zoho's): Mr./Ms., first and last name.
+    salutation: Mapped[str | None] = mapped_column(String(10), default=None)
+    first_name: Mapped[str | None] = mapped_column(String(80), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(80), default=None)
+    mobile: Mapped[str | None] = mapped_column(String(40), default=None)
+    # Their bills post here instead of the default (e.g. 2101-000 AP - Trade vs 2102-000 AP - Non-Trade).
+    payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Other people there: [{salutation, firstName, lastName, email, phone, mobile, designation}].
+    contacts: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # 123-456-789, and the branch code (00000 for the head office). Zoho's "Company ID" (a
+    # government or tax number) is this in the Philippines (decided 2026-10-23).
+    tin: Mapped[str | None] = mapped_column(String(11), default=None)
+    branch_code: Mapped[str | None] = mapped_column(String(5), default=None)
+    address: Mapped[str | None] = mapped_column(String(300), default=None)
+    vat_registered: Mapped[bool] = mapped_column(default=True)
+    # The BIR's code for what's usually withheld (app/payables.py WITHHOLDING); none: nothing.
+    withholding: Mapped[str | None] = mapped_column(String(10), default=None)
+    terms_days: Mapped[int] = mapped_column(Integer, default=30)
+    email: Mapped[str | None] = mapped_column(String(254), default=None)
+    phone: Mapped[str | None] = mapped_column(String(40), default=None)
+    bank_name: Mapped[str | None] = mapped_column(String(80), default=None)
+    bank_account_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    bank_account_number: Mapped[str | None] = mapped_column(String(40), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+
+    files: Mapped[list["SupplierFile"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="SupplierFile.uploaded_at")
+
+
+class SupplierFile(Base):
+    """A supplier's papers, attached: their BIR 2303, accreditation, a contract (migration 0018)."""
+
+    __tablename__ = "nbfi_supplier_files"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    supplier_id: Mapped[str] = mapped_column(ForeignKey("nbfi_suppliers.id", ondelete="CASCADE"), index=True)
+    ref: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(Integer)
+    uploaded_by: Mapped[str] = mapped_column(String(120))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Bill(Base):
+    """A supplier's invoice, as the company owes it."""
+
+    __tablename__ = "nbfi_bills"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint(f"status IN {BILL_STATUSES}", name="bill_status"), Index("nbfi_bills_no", "no", unique=True))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    supplier_id: Mapped[str] = mapped_column(ForeignKey("nbfi_suppliers.id"), index=True)
+    # The supplier's own invoice number, as printed on their invoice.
+    bill_number: Mapped[str] = mapped_column(String(60))
+    bill_date: Mapped[date] = mapped_column(Date)
+    due_date: Mapped[date] = mapped_column(Date)
+    po_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    dr_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    # Checked against the purchase order and the delivery receipt (Aubrey Q7).
+    checked_po: Mapped[bool] = mapped_column(default=False)
+    checked_dr: Mapped[bool] = mapped_column(default=False)
+    amounts_include_vat: Mapped[bool] = mapped_column(default=True)
+    # The same bill in the other systems while they run side by side (Aubrey Q9, Q13).
+    zoho_ref: Mapped[str | None] = mapped_column(String(60), default=None)
+    oojeema_ref: Mapped[str | None] = mapped_column(String(60), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    # [{accountId, description, amountCentavos, vat, withholding}] as entered.
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # Worked out (app/payables.py), and kept as recorded.
+    net_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    vat_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    withheld_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    payable_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    recorded_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    supplier: Mapped[Supplier] = relationship(lazy="joined")
+    files: Mapped[list["BillFile"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="BillFile.uploaded_at")
+
+
+class BillFile(Base):
+    """The supplier's invoice, attached: a photo or a PDF (kept in nbfi_stored_files)."""
+
+    __tablename__ = "nbfi_bill_files"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_bills.id", ondelete="CASCADE"), index=True)
+    ref: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(Integer)
+    uploaded_by: Mapped[str] = mapped_column(String(120))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, Account)
+numbered(User, Account, Supplier, Bill)

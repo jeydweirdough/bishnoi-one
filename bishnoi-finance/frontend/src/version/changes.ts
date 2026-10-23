@@ -12,6 +12,86 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.11",
+    date: "2026-10-23",
+    changes: [
+      "Price approvals shows in the sidebar only for a role with Product prices: View; opened anyway, it says the role doesn't allow it instead of an error page.",
+    ],
+  },
+  {
+    version: "0.4.10",
+    date: "2026-10-23",
+    changes: [
+      "Payables → Suppliers: Import from a file. Pick Zoho's vendor export (CSV); every vendor is shown first as new, already here (same name or TIN), or needing a look. Tick what to import; it's added all or none.",
+      "On the way in: Zoho's Company ID becomes the TIN when it is one (otherwise it's kept in the remarks), \"Net 30\" becomes 30 days, inactive vendors come in switched off, and a vendor billed in another currency gets a remark (Finance keeps pesos for now).",
+      "Not brought in: what's owed each vendor (an opening balance), their VAT status and the tax usually withheld: set those on each supplier after.",
+    ],
+  },
+  {
+    version: "0.4.9",
+    date: "2026-10-23",
+    changes: [
+      "Suppliers like Zoho's vendors: primary contact (salutation, first and last name), company name and display name, work phone and mobile, contact persons, remarks, and the supplier's papers (BIR 2303, accreditation) attached.",
+      "A supplier can have its own Accounts payable (e.g. AP – Trade or AP – Non-Trade from Oojeema's chart); its bills post there instead of the default.",
+      "The supplier list shows Zoho's columns, with Payables: what's owed each on recorded bills.",
+      "Separate ticks on the Roles screen. Suppliers: View, Add, Edit, Switch off. Supplier bills: View, Make drafts, Record (post to the books), Void. Every role keeps what it could do before.",
+      "Payables stays open in the sidebar on the Suppliers pages (Suppliers used to disappear from it there).",
+    ],
+  },
+  {
+    version: "0.4.8",
+    date: "2026-10-23",
+    changes: [
+      "Payables → Suppliers: who the company buys from, with their TIN, whether they charge VAT, payment terms, bank details and the tax usually withheld from them (BIR code and rate).",
+      "Payables → Bills: enter a supplier's invoice the way Zoho's New Bill reads. Picking the supplier fills in their terms, VAT and usual withholding; the VAT and the tax withheld are worked out (withheld on the amount before VAT), down to what's paid the supplier.",
+      "Tick \"checked against the PO\" and \"against the delivery receipt\", and keep the same bill's Zoho and Oojeema numbers on it while all three are used.",
+      "Attach the supplier's invoice as a photo or PDF (photos are made smaller first). A bill without one shows \"Document missing\", and the list can show only those.",
+      "Recording a bill posts it to the books at once: the expense and input VAT, against what's owed the supplier and the tax withheld. A recorded bill is voided with a reason, never changed. The same invoice from a supplier can't be entered twice.",
+      "Making bills is one tick on the Roles screen (Supplier bills: Make and record), so any role can have it on or off.",
+    ],
+  },
+  {
+    version: "0.4.7",
+    date: "2026-10-23",
+    changes: [
+      "Chart of accounts: Import from a file. Pick the CSV (Oojeema's or Zoho's export); every row is shown first as new, already here, or needing a look, with its type worked out from the class. Tick what to import; it's added all or none, and nothing already here changes.",
+      "Accounts can sit under a parent account, as in Oojeema's chart, and are shown indented under it.",
+    ],
+  },
+  {
+    version: "0.4.6",
+    date: "2026-10-22",
+    changes: [
+      "Tax, Registration: an \"On record\" summary of the registration as every invoice will print it, with who changed it last, and a History of changes (who, when and which parts; never the old values).",
+      "Saving the registration without changing anything says \"Nothing changed\" and adds nothing to the history.",
+      "BIR Sales DAT: its check against Sir Rommel's converter runs again (it had stopped loading; the screen itself was fine).",
+    ],
+  },
+  {
+    version: "0.4.5",
+    date: "2026-10-22",
+    changes: [
+      "Tax registration: the page names exactly what an invoice still needs (e.g. \"The company's registered address isn't filled in yet\"), marks that box, and saving says \"Still missing: …\" instead of only \"saved\".",
+      "A draft invoice held up by the registration says what's missing, with a link to Tax, Registration.",
+    ],
+  },
+  {
+    version: "0.4.4",
+    date: "2026-10-22",
+    changes: [
+      "A draft invoice that can't be issued yet says exactly what's wrong and where (e.g. \"Customer's TIN: enter it as 9 digits…\", \"Line 2: pick the VAT category\"), on the invoice and beside the field when you edit it, instead of \"Some lines need fixing\".",
+      "TINs: type the digits only; the dashes go in by themselves.",
+      "The \"Find a customer in the CRM\" box says it only searches the CRM and isn't saved, and says so there when the CRM can't be reached.",
+    ],
+  },
+  {
+    version: "0.4.3",
+    date: "2026-10-22",
+    changes: [
+      "Cancel and reissue an invoice in one step: it's voided as before, and a copy opens as a draft dated today to correct and issue with the next number. Both invoices show they're linked (on screen, in the list and in the journal); the printed invoice stays as standard.",
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-10-22",
     changes: [

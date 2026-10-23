@@ -3,6 +3,7 @@ import { Flag } from "@/src/platform/ui/marks";
 import { PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
+import { OnRecord, RegistrationHistory } from "../tax/on-record";
 import { RateChangeForm } from "../tax/rate-change-form";
 import { RegistrationForm } from "../tax/registration-form";
 import { SaleTryout } from "../tax/sale-tryout";
@@ -35,7 +36,9 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
         {pack.name} · {profile.regimeName}. Every quote, sale and invoice in Bishnoi One is taxed by these rules.
         {!profile.complete && (
           <span className="mt-1 block">
-            <Flag letter="!">Fill in the registration: every {pack.document} needs the registered name, TIN and address.</Flag>
+            <Flag letter="!">
+              {profile.missingSentence || `Fill in the registration: every ${pack.document} needs the registered name, TIN and address.`} {setup.canEdit ? `Fill ${profile.missing?.length === 1 ? "it" : "them"} in under Registration, below.` : "A Finance administrator can fill it in."}
+            </Flag>
           </span>
         )}
       </PageHeader>
@@ -54,9 +57,17 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
       </nav>
 
       {tab === "registration" && (
-        <Sheet className="max-w-[50rem] px-5 py-6 sm:px-8">
-          <RegistrationForm key={profile.updatedAt ?? "new"} setup={setup} />
-        </Sheet>
+        <div className="space-y-5">
+          <OnRecord profile={profile} fmt={fmt} canEdit={setup.canEdit} />
+          {/* The form is for changing it; someone who can't sees the summary above instead. */}
+          {setup.canEdit && (
+            <Sheet className="max-w-[50rem] px-5 py-6 sm:px-8">
+              <SectionTitle>Change the registration</SectionTitle>
+              <RegistrationForm key={profile.updatedAt ?? "new"} setup={setup} />
+            </Sheet>
+          )}
+          <RegistrationHistory history={setup.history ?? []} fmt={fmt} />
+        </div>
       )}
 
       {tab === "rates" && (

@@ -66,15 +66,15 @@ def test_a_reversal_cannot_itself_be_reversed(client, ben):
 
 
 def test_an_account_keeps_its_type_once_it_has_entries(client, ana, ben):
-    made = client.post("/finance/ledger/accounts", json={"code": "1300", "name": "Deposits", "type": "asset"}, headers=ana).json()
-    changed = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1300", "name": "Deposits", "type": "expense"}, headers=ana)
+    made = client.post("/finance/ledger/accounts", json={"code": "1350", "name": "Deposits", "type": "asset"}, headers=ana).json()
+    changed = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1350", "name": "Deposits", "type": "expense"}, headers=ana)
     assert changed.status_code == 200 and changed.json()["type"] == "expense"  # nothing posted to it yet
     acc = accounts(client, ben)
-    journal(client, ben, manila_today(), 1000, acc["1300"], acc["1010"])
-    locked = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1300", "name": "Deposits", "type": "asset"}, headers=ana)
+    journal(client, ben, manila_today(), 1000, acc["1350"], acc["1010"])
+    locked = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1350", "name": "Deposits", "type": "asset"}, headers=ana)
     assert locked.status_code == 422 and locked.json()["detail"][0]["loc"][-1] == "type"
     # Its name can still change.
-    renamed = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1300", "name": "Security deposits", "type": "expense"}, headers=ana)
+    renamed = client.put(f"/finance/ledger/accounts/{made['id']}", json={"code": "1350", "name": "Security deposits", "type": "expense"}, headers=ana)
     assert renamed.status_code == 200
 
 
@@ -121,4 +121,6 @@ def test_only_admins_set_the_default_accounts(client, ana, ben):
         "advances_account_id": "1200", "due_to_employees_account_id": "2100", "cash_account_id": "1000",
         "bank_account_id": "1010", "ewallet_account_id": "1020", "check_account_id": "1010",
         "receivables_account_id": "1100", "sales_account_id": "4000", "output_tax_account_id": "2200",
+        # Supplier bills (migration 0017).
+        "payables_account_id": "2000", "input_tax_account_id": "1300", "withholding_account_id": "2300",
     }

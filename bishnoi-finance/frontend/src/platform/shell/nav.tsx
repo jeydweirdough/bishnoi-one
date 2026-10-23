@@ -135,6 +135,18 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/invoices/series`, label: "Invoice numbers", missing: missingOf(unset, ["invoiceSeries"]) },
         ],
       },
+      // Supplier bills and the suppliers themselves (2026-10-23, from Aubrey's answers).
+      {
+        href: `${base}/bills`,
+        label: "Payables",
+        icon: "orders",
+        // Suppliers sit at their own address, so the section stays open there too (2026-10-23).
+        also: [`${base}/suppliers`],
+        subpages: [
+          { href: `${base}/bills`, label: "Bills" },
+          { href: `${base}/suppliers`, label: "Suppliers" },
+        ],
+      },
       // The books: every entry, the accounts, and what they add up to.
       {
         href: `${base}/ledger`,
@@ -433,7 +445,8 @@ function WaitingMark({ count }: { count?: number }) {
 function WithSubpages({ page }: { page: Page }) {
   const pathname = usePathname();
   const subs = page.subpages ?? [];
-  const open = within(pathname, page.href);
+  // Open on its own address, or one it counts as its own (Payables: /suppliers).
+  const open = within(pathname, page.href) || (page.also ?? []).some((a) => within(pathname, a));
   let here: SubPage | undefined;
   for (const sub of subs) {
     // The section's own address is current only on itself: a request under it
@@ -617,7 +630,11 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
 /** What each of Finance's pages needs, so the sidebar offers only what the role opens (the API checks the same). */
 const FINANCE_NEEDS: [string, string][] = [
   ["/funds", "funds.view"],
+  // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
+  ["/prices", "prices.view"],
   ["/invoices", "invoices.view"],
+  ["/bills", "bills.view"],
+  ["/suppliers", "suppliers.view"],
   ["/ledger/accounts", "accounts.view"],
   ["/ledger/posting", "accounts.view"],
   ["/ledger/categories", "categories.view"],

@@ -6,6 +6,7 @@ import { makeFormat } from "@/src/platform/lib/format";
 import { DownloadLink } from "../exports/download-link";
 import { ApproveSeveral, DecideEntry } from "../ledger/decide";
 import { ChartEditor, JournalForm, PostingEditor, ReverseButton } from "../ledger/forms";
+import { ChartImport } from "../ledger/import";
 import { BULK_FORM, TYPE_LABELS, type AccountLedger, type AccountType, type Chart, type Entry, type Posting, type TrialBalance } from "../ledger/types";
 
 // The ledger: the journal, the chart of accounts, each account's ledger, the
@@ -32,7 +33,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
   // What the page is showing: kept by the source links, the search form and the download.
   const shown = new URLSearchParams();
-  if (source === "manual" || source === "fund" || source === "invoice") shown.set("source", source);
+  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill") shown.set("source", source);
   if (state === "waiting" || state === "rejected") shown.set("status", state);
   if (isDate(from)) shown.set("from", from);
   if (isDate(to)) shown.set("to", to);
@@ -47,6 +48,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     { value: "manual", label: "Manual journals", by: "source" },
     { value: "fund", label: "Marketing requests", by: "source" },
     { value: "invoice", label: "Invoices", by: "source" },
+    { value: "bill", label: "Bills", by: "source" },
     { value: "rejected", label: "Rejected", by: "status" },
   ];
   const current = shown.get("status") ?? shown.get("source") ?? "";
@@ -63,8 +65,8 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   return (
     <>
       <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/ledger/export", shown)} />}>
-        All entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, and invoices when issued or voided:
-        those count at once. An entry typed by hand, or a reversal, waits until someone who may approve entries, not whoever posted it, approves it; only then does it count.
+        All entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, invoices when issued or voided, and supplier
+        bills when recorded or voided: those count at once. An entry typed by hand, or a reversal, waits until someone who may approve entries, not whoever posted it, approves it; only then does it count.
         Entries are never edited: reverse an entry and post the correction.
       </PageHeader>
       {me.permissions?.includes("journal.post") && (
@@ -210,10 +212,10 @@ export async function ChartPage() {
     <>
       <PageHeader title="Chart of accounts">
         The accounts all journal entries post to. An account with entries keeps its type: deactivate it rather than deleting it. Each expense category posts to
-        one of the expense accounts.
+        one of the expense accounts. A chart can be brought in from a CSV (Oojeema&apos;s or Zoho&apos;s export) with Import from a file.
       </PageHeader>
       <Sheet className="px-5 py-4">
-        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} />
+        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport />} />
       </Sheet>
     </>
   );

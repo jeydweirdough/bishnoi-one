@@ -8,6 +8,7 @@ import { Button } from "@/src/platform/ui/button";
 import { CellInput, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
+import { formatTin } from "../lib/tin";
 import { findCustomers, saveInvoice } from "./actions";
 import type { Customer, Invoice, TaxChoices } from "./types";
 
@@ -26,7 +27,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
   const [customer, setCustomer] = useState({
     id: invoice?.customer.id ?? null,
     name: invoice?.customer.name ?? "",
-    tin: invoice?.customer.tin ?? "",
+    tin: formatTin(invoice?.customer.tin ?? ""),
     address: invoice?.customer.address ?? "",
   });
   // Whose sale it is (the CRM scores it): the CRM customer's owner.
@@ -51,8 +52,9 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         }))
       : [blank(0)],
   );
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  // A saved draft the tax step can't work out yet says why, beside the field (2026-10-22).
+  const [fields, setFields] = useState<Record<string, string>>(invoice?.problemFields ?? {});
+  const [error, setError] = useState<string | null>(invoice?.problem ?? null);
   const [pending, start] = useTransition();
   const set = (key: number, patch: Partial<Line>) => setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const needsId = choices.treatments.find((t) => t.key === treatment)?.needsId ?? false;
@@ -60,16 +62,19 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
   // Finding the customer in the CRM.
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Customer[] | null>(null);
+  const [crmProblem, setCrmProblem] = useState<string | null>(null);
   const [searching, search] = useTransition();
   function lookUp() {
     if (!q.trim()) return;
     search(async () => {
       const result = await findCustomers(q.trim());
       if (!result.ok) {
-        toast.error(result.error);
+        // Said beside the box, not only in a toast that goes away.
+        setCrmProblem(result.error);
         setFound(null);
         return;
       }
+      setCrmProblem(null);
       setFound(result.data);
     });
   }
@@ -126,6 +131,14 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         setFields(result.fields ?? {});
         return;
       }
+      if (result.data.problem) {
+        // Saved, but it can't be issued yet: stay on the draft, with what's wrong beside the field.
+        toast.warning("Draft saved, but it needs fixing before it can be issued", { description: result.data.problem, duration: 10000 });
+        setFields(result.data.problemFields ?? {});
+        setError(result.data.problem);
+        router.push(`/invoices/${result.data.id}?edit=1`);
+        return;
+      }
       toast.success("Draft saved");
       router.push(`/invoices/${result.data.id}`);
     });
@@ -154,6 +167,17 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                 Find
               </Button>
             </div>
+            {/* It only searches: what's typed here isn't kept (asked 2026-10-22, when it seemed to vanish on saving). */}
+            {crmProblem ? (
+              <p className="mt-1 text-meta text-danger">{crmProblem} Type the customer&apos;s details below instead.</p>
+            ) : (
+              !found &&
+              !customer.id && (
+                <p className="mt-1 text-meta text-ink-3">
+                  Searches the CRM&apos;s customers so you can pick one; what you type here isn&apos;t saved. The invoice&apos;s customer is the details below.
+                </p>
+              )
+            )}
             {found && (
               <ul className="mt-2 divide-y divide-rule rounded-[3px] border border-rule">
                 {found.length === 0 && <li className="px-3 py-2 text-meta text-ink-3">No customer matches. Type their details below.</li>}
@@ -180,8 +204,17 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
           <Field label="Customer" error={fields.customerName}>
             {(p) => <Input {...p} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} maxLength={200} />}
           </Field>
-          <Field label="TIN" optional error={fields.customerTin} hint="Required on the invoice when the customer is VAT-registered.">
-            {(p) => <Input {...p} value={customer.tin} onChange={(e) => setCustomer({ ...customer, tin: e.target.value })} placeholder="123-456-789-00000" maxLength={20} />}
+          <Field label="TIN" optional error={fields.customerTin} hint="Type the digits only: the dashes go in by themselves. 9 digits, then the branch code if any. Required when the customer is VAT-registered.">
+            {(p) => (
+              <Input
+                {...p}
+                inputMode="numeric"
+                value={customer.tin}
+                onChange={(e) => setCustomer({ ...customer, tin: formatTin(e.target.value) })}
+                placeholder="123-456-789-00000"
+                maxLength={17}
+              />
+            )}
           </Field>
           <Field label="Address" optional error={fields.customerAddress} className="sm:col-span-2">
             {(p) => <Input {...p} value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} maxLength={300} />}

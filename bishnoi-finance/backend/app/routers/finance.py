@@ -362,3 +362,8 @@ def document_signatures(access: CurrentAccess, db: DB, record_type: str, record_
 from app.routers.calendar import router as calendar_router  # noqa: E402
 
 router.include_router(calendar_router)
+
+# --- payables (app/routers/payables.py): /finance/suppliers and /finance/bills, the same way --------
+from app.routers.payables import router as payables_router  # noqa: E402
+
+router.include_router(payables_router)

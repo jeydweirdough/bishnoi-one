@@ -31,7 +31,9 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   // forbidden(): a page the person's role doesn't reach shows app/forbidden.tsx.
-  experimental: { authInterrupts: true },
+  // A bill's attached invoice (up to 3 MB) goes through a page action, whose default cap is
+  // 1 MB (2026-10-23; src/payables/actions.ts attachFile).
+  experimental: { authInterrupts: true, serverActions: { bodySizeLimit: "4mb" } },
   // Which app this is, for the sidebar and the sign-in cookie. Built in, so
   // no .env.local or host setting needs it; one there still wins.
   env: {

@@ -2,7 +2,37 @@
 
 export type AccountType = "asset" | "liability" | "equity" | "income" | "expense";
 
-export type Account = { id: string; code: string; name: string; type: AccountType; description: string | null; isActive: boolean };
+export type Account = {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  description: string | null;
+  isActive: boolean;
+  /** The account it sits under (Oojeema's chart groups them); none: at the top. */
+  parentId: string | null;
+};
+
+/** One row of a chart being imported, as the API would save it (app/routers/ledger.py). */
+export type ImportRow = {
+  line: number;
+  code: string;
+  name: string;
+  kind: string | null;
+  type: AccountType | null;
+  parent: string | null;
+  /** Where the parent was found: in the file, already in the chart, or nowhere. */
+  parentFound: "file" | "chart" | null;
+  description: string | null;
+  status: "new" | "here" | "problem";
+  note: string | null;
+  /** What's wrong: "code", "name", "type". Only a missing type can be put right here. */
+  problems: ("code" | "name" | "type")[];
+};
+
+export type ImportCheck = { rows: ImportRow[]; counts: { new: number; here: number; problem: number }; types: { key: AccountType; label: string }[] };
+
+export type ImportAccount = { code: string; name: string; type: AccountType; description: string | null; parent: string | null };
 
 export type Chart = { items: Account[]; types: { key: AccountType; label: string }[]; canEdit: boolean };
 

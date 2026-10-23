@@ -4,8 +4,15 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { formatTin } from "../lib/tin";
 import { saveTaxProfile } from "./actions";
 import type { TaxSetup } from "./types";
+
+/** The boxes an invoice needs and that are still empty, as field marks. */
+function neededMarks(missing: string[] | undefined): Record<string, string> {
+  const box: Record<string, string> = { "registered name": "registeredName", TIN: "tin", "registered address": "registeredAddress" };
+  return Object.fromEntries((missing ?? []).filter((m) => box[m]).map((m) => [box[m], "Needed on every invoice: fill this in."]));
+}
 
 /** The company's tax registration, as every invoice has to state it. */
 export function RegistrationForm({ setup }: { setup: TaxSetup }) {
@@ -21,7 +28,9 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
     pricesIncludeTax: p.pricesIncludeTax ? "yes" : "no",
   });
   const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
+  // What an invoice needs and isn't filled in yet, marked on its box (2026-10-22: saving
+  // said only "saved", with nothing showing which box was still empty).
+  const [fields, setFields] = useState<Record<string, string>>(neededMarks(p.missing));
   const set = (change: Partial<typeof v>) => setV({ ...v, ...change });
   const locked = !setup.canEdit;
 
@@ -38,9 +47,13 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
         pricesIncludeTax: v.pricesIncludeTax === "yes",
       });
       if (result.ok) {
-        toast.success("Tax registration saved");
+        const missing = result.data.profile.missing ?? [];
+        const unchanged = result.data.profile.updatedAt === p.updatedAt;
+        if (missing.length) toast.warning(unchanged ? "Nothing changed" : "Registration saved", { description: `Still missing: ${missing.join(", ")}. Every invoice needs it before it can be issued.`, duration: 10000 });
+        else if (unchanged) toast.info("Nothing changed", { description: "The registration is already as shown." });
+        else toast.success("Registration saved", { description: "Complete: invoices can be issued." });
         setError(null);
-        setFields({});
+        setFields(neededMarks(missing));
         return;
       }
       setError(result.error);
@@ -72,8 +85,8 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           <Field label="Trade name" optional>
             {(f) => <Input {...f} value={v.tradeName} onChange={(e) => set({ tradeName: e.target.value })} />}
           </Field>
-          <Field label="TIN" error={fields.tin} hint="9 digits, e.g. 123-456-789.">
-            {(f) => <Input {...f} inputMode="numeric" value={v.tin} onChange={(e) => set({ tin: e.target.value })} placeholder="123-456-789" />}
+          <Field label="TIN" error={fields.tin} hint="9 digits; the dashes go in by themselves.">
+            {(f) => <Input {...f} inputMode="numeric" value={v.tin} onChange={(e) => set({ tin: formatTin(e.target.value, false) })} placeholder="123-456-789" maxLength={11} />}
           </Field>
           <Field label="Branch code" error={fields.branchCode} hint="00000 for the head office.">
             {(f) => <Input {...f} inputMode="numeric" value={v.branchCode} onChange={(e) => set({ branchCode: e.target.value.replace(/\D/g, "") })} />}
