@@ -4,29 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Bishnoi One: separate business apps (pharma distribution first; Philippines first) kept in one repo. Each `bishnoi-<app>/` folder is a complete, standalone app with `backend/` (Python 3.13, FastAPI, SQLAlchemy, Alembic, run with `uv`) and `frontend/` (Next.js 16 App Router, React 19, Ant Design 6, Tailwind 4). Apps do not import from each other; each has its own database, sign-in and settings.
+Bishnoi One: business apps (pharma distribution first; Philippines first) kept in one repo. Each `bishnoi-<app>/` folder is one module's API, `backend/` (Python 3.13, FastAPI, SQLAlchemy, Alembic, run with `uv`), with its own database and settings; APIs do not import from each other. **Every module's screens are in one Next.js app, `bishnoi-one-app/frontend`** (Next.js 16 App Router, React 19, Ant Design 6, Tailwind 4; port 4301, one.bishnoi.ai at cutover), each module under its path. The per-app frontends were removed on 2026-10-24.
 
-| App | Screens | API | Table prefix |
+| Module | Path in the one app | API | Table prefix |
 |---|---|---|---|
-| admin | 4300 | 8300 | `nbad_` |
-| crm | 4302 | 8302 | `nbcm_` |
-| finance | 4303 | 8303 | `nbfi_` |
-| inventory | 4304 | 8304 | `nbin_` |
-| platform | 4305 | 8305 | `nbpl_` |
-| in-licensing | (API only) | 8306 | `nbil_` |
-| pharmacy | 4307 | 8307 | `nbph_` |
-| regulatory | (API only) | 8308 | `nbrg_` |
+| admin (Executive Admin) | `/admin` | 8300 | `nbad_` |
+| crm | `/crm` | 8302 | `nbcm_` |
+| finance | `/finance` | 8303 | `nbfi_` |
+| inventory | `/inventory` | 8304 | `nbin_` |
+| platform | `/platform/access` (company admins), `/platform/console` (staff) | 8305 | `nbpl_` |
+| in-licensing | `/in-licensing` (coming soon) | 8306 | `nbil_` |
+| pharmacy | `/pharmacy` | 8307 | `nbph_` |
+| regulatory | `/regulatory` (coming soon) | 8308 | `nbrg_` |
 
-API port = screens port + 4000. Every table name starts with its app's prefix.
+Every table name starts with its app's prefix.
 
 ## Commands
 
 From the repo root (needs only Node and uv):
 
 ```
-npm run bishnoi-crm              # API + screens together (sets up .env, .venv, node_modules if missing)
-npm run bishnoi-crm -- --api     # API only   (--web: screens only, --setup: prepare only)
-npm run bishnoi-crm:app          # in its own desktop window (desktop/ Electron shell)
+npm run one                      # every API + the one app at http://localhost:4301 (sets up what's missing); Ctrl+C stops all
+npm run bishnoi-crm              # one API alone (--setup: prepare only)
+npm run bishnoi-one-app          # the screens only;  bishnoi-one-app:app opens them in a desktop window (desktop/)
 npm run setup                    # prepare every app
 ```
 
@@ -41,7 +41,7 @@ uv run python -m app.tools.users add --email … --name "…" --admin   # also: 
 uv run python -m app.tools.copy_database --to "<url>" [--company getmeds]
 ```
 
-In an app's `frontend/`: `npm run dev`, `npm run build`, `npm run lint`.
+In `bishnoi-one-app/frontend/`: `npm run dev`, `npm run build`, `npx tsc --noEmit -p .`.
 
 Keep the machine light: run one app at a time and only the tests affected by a change; don't run full suites or `tsc` across several apps in parallel.
 
@@ -53,17 +53,19 @@ Keep the machine light: run one app at a time and only the tests affected by a c
 
 **Tests:** `tests/conftest.py` builds a fresh SQLite database per test (`create_app` with test `Settings`) and seeds an Administrator (Ana) and a Salesperson (Ben). `TEST_DATABASE_URL` runs them on Postgres instead (it gets wiped).
 
-**Frontend:** the browser never calls the API. Pages and server actions (`src/actions/*.ts`, `"use server"`) call it from the Next server via `src/platform/lib/api.ts`, with the token in an httpOnly cookie; `proxy.ts` gates pages without a session. Routes in `app/(app)/…/page.tsx` are thin re-exports of screens in `src/screens/`. `src/platform/` is the shared shell, UI kit (`ui/`: dialog, pickers, file-drop, skeleton, field…), session and API client. It is **copied into each app, not shared**, and the copies have drifted; a change meant for every app has to be made in each copy.
+**The one app** (`bishnoi-one-app/frontend`, see its README): the browser never calls an API. `src/platform/lib/modules.ts` lists the modules (path, API setting, Platform key). `proxy.ts` marks each request with its module from the path, so `src/platform/lib/api.ts` talks to that module's API with that module's session cookie (`bishnoi_<module>_session`). One Bishnoi One sign-in (`/login`, Platform `/identity/*`); a module's session is opened on first use from a Platform pass (`app/auth/enter/[module]`); the staff console signs in on its own page. Module code is in `src/modules/<module>/` and pages under `app/(app)/<module>/` (console: `app/(staff)/platform/console/`, public and print pages under `app/(bare)/`); the CRM uses the shared kit `src/platform/` (UI in `ui/`), while Inventory, Finance, Admin, Pharmacy and the console still carry their own kit copy in `src/modules/<module>/platform/` until they're brought onto it. Fix the shared component, not one screen.
 
-The `frontend/AGENTS.md` note applies: this Next.js version differs from training data, so check `node_modules/next/dist/docs/` before using Next APIs.
+**Access (step R1, 2026-10-23):** roles are made once per company on the Platform (`app/access_roles.py`, `/identity/access`, screen `/platform/access`), one per person, with permissions and a scope per module; each API keeps declaring and enforcing its permissions and is sent the roles signed (`app/platform_roles.py`, the same in every API: `GET /platform/catalog`, `POST /platform/roles`).
+
+The `bishnoi-one-app/frontend/AGENTS.md` note applies: this Next.js version differs from training data, so check `node_modules/next/dist/docs/` before using Next APIs.
 
 **Between apps:** Platform is the switchboard: accounts (one Bishnoi One sign-in), company registration, each app's address (Platform > Applications), connection keys and company services. Apps call each other API-to-API with `name:key` pairs (`INTEGRATION_KEYS` on the callee, `<APP>_API_URL`/`_KEY` on the caller); CRM uses Inventory (products, stock), Finance (tax), Pharmacy (Rx quote checks). A missing link degrades the feature, it doesn't break the app.
 
 ## Repo workflow
 
-- `main` holds every app; `bishnoi-<app>` branches hold one app each and are kept in sync by the **Sync branches** action. Don't create branches starting with `bishnoi-`, and don't PR an app branch into `main`.
+- Everyone works on `main`, which holds every app and the one app. The per-app `bishnoi-<app>` branches and the Sync branches action were retired on 2026-10-24; don't create branches starting with `bishnoi-`.
 - Pushing doesn't deploy. Deployment is by hand (the self-hosted Coolify server, Platform first; or the Vercel CLI per app) — the automated Deploy workflow was removed 2026-10-22.
-- A new app is `bishnoi-<name>/` with `frontend/`, `backend/`, `.gitignore`, `README.md`, `GIT-GUIDE.md` and an unchanged copy of `.github/workflows/sync-branches.yml`; **Check apps** verifies this on PRs.
+- A new app is `bishnoi-<name>/` with `backend/` (no `frontend/`: its screens go in the one app as a new module), `.gitignore` and `README.md`; **Check apps** verifies this on PRs.
 - `README.md` (setup, every `.env` setting per app) and `MAINTAINING.md` (actions, Vercel, linking apps, Discord) are the full references.
 
 ## Building features

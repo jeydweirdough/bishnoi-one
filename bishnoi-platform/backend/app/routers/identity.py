@@ -29,9 +29,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api import Api
+from app.access_roles import role_for_pass
 from app.audit import audit
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
-from app.models import Application, Company, CompanyApp, Identity, IdentityApp, IdentitySession
+from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp, IdentitySession
 from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
 from app.routers.auth import Attempts
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
@@ -156,6 +157,7 @@ def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityAp
 def me(signed: Signed, db: DB) -> dict:
     _, person = signed
     company = db.get(Company, person.company_id)
+    role = db.get(AccessRole, person.access_role_id) if person.access_role_id else None
     return {
         "id": person.id,
         "email": person.email,
@@ -168,8 +170,12 @@ def me(signed: Signed, db: DB) -> dict:
             ({"id": c.id, "name": c.name, "slug": c.slug, "current": c.id == person.company_id} for _, c in usable(db, same_person(db, person.email))),
             key=lambda c: c["name"].lower(),
         ),
+        # Their one role at the company (app/access_roles.py), when they have one.
+        "role": role.name if role else None,
         "apps": [
-            {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": g.role, "isAppAdmin": g.is_app_admin}
+            {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": role.name if role else g.role, "isAppAdmin": g.is_app_admin or bool(role and role.is_admin),
+             # When it was given to them: the first one given is where they start (the one app opens it after sign-in).
+             "grantedAt": as_utc(g.granted_at).isoformat() if g.granted_at else None}
             for a, g in granted(db, person)
         ],
     }
@@ -218,6 +224,10 @@ def check_return(app: Application, return_to: str, settings) -> str:
     # stored as https — so the host has to match, not the scheme.
     if registered and target.netloc and target.netloc == registered.netloc:
         return return_to
+    # The one app (ONE_APP_URL): every module's screens on one site, so it is a return for each.
+    one = urlsplit(settings.one_app_url) if settings.one_app_url else None
+    if one and target.netloc and target.netloc == one.netloc:
+        return return_to
     if target.scheme == "http" and target.hostname in ("127.0.0.1", "localhost") and target.port:
         if target.port in DESKTOP_PORTS or settings.environment != "production":
             return return_to
@@ -242,7 +252,7 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
     if grant is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")
     try:
-        token = issue(settings, person, company, app, grant)
+        token = issue(settings, person, company, app, grant, role_for_pass(db, person, app))
     except PassUnavailable as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e
     person.last_active_at = datetime.now(UTC)

@@ -1,4 +1,0 @@
-/* The look is core's. Tailwind is told where this project's own classes are. */
-@import "../src/platform/styles/globals.css";
-
-@source "../src";

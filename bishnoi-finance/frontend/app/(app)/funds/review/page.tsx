@@ -1,7 +1,0 @@
-// The route: one step of Marketing requests (src/screens/funds.tsx).
-import FundsPage from "../../../../src/screens/funds";
-
-export const metadata = { title: "For review" };
-export default function Page() {
-  return <FundsPage task="to_check" />;
-}

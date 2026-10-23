@@ -26,6 +26,7 @@ from app.routers import (
     auth,
     communications,
     companies,
+    company_access,
     connections,
     dashboard,
     identity,
@@ -105,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(profile.router)
     app.include_router(identity.router)
+    app.include_router(company_access.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
     app.include_router(applications.router)

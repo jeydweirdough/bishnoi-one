@@ -28,7 +28,7 @@ from app.config import Settings
 from app.tenants import clean, company_of
 from app.access import access_of
 from app.identity import me_out
-from app import platform_pass
+from app import platform_pass, platform_roles
 from app.models import PlatformPass, Role, SignInSession, User
 from app.permissions import ACTION_LABELS, ADMINISTRATOR, AREAS, NOT_BUILT
 from app.security import DUMMY_HASH, MAX_PASSWORD, hash_password, new_token, token_hash, verify_password
@@ -157,6 +157,9 @@ def _open_platform_session(db, settings: Settings, slug: str, claims: dict, resp
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
 
     email = str(claims["email"]).strip().lower()
+    # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
+    if isinstance(claims.get("roleDef"), dict):
+        platform_roles.keep(db, claims["roleDef"])
     wanted = ADMINISTRATOR if claims.get("appAdmin") else (claims.get("role") or "")
     role = db.scalar(select(Role).where(func.lower(Role.name) == wanted.lower())) if wanted else None
     user = db.scalar(select(User).where(User.platform_identity_id == claims["sub"]))

@@ -1,14 +1,14 @@
-# Checks every pull request into main before it is merged. Its main job is to
-# check a new app's folder: once merged, the Sync branches action makes the
-# app its own branch, named after the folder.
+# Checks every pull request into main before it is merged.
 #
 # For each app folder (bishnoi-*) it checks that:
 # - the name is bishnoi-<name>: small letters, digits and dashes
-# - it has frontend/, backend/, .gitignore, README.md (its branch's front
-#   page on GitHub) and GIT-GUIDE.md
-# - its .github/workflows/sync-branches.yml is the same as main's, without
-#   which pushes to its branch wouldn't sync
+# - it has backend/, .gitignore and README.md, and no frontend/: every
+#   module's screens are in the one app, bishnoi-one-app (decided 2026-10-23;
+#   the app frontends were removed 2026-10-24)
 # - no secrets (.env, .env.local, keys) or local data (.data/) are committed
+#
+# Everyone works on main: the per-app branches and the Sync branches action
+# were retired on 2026-10-24.
 name: Check apps
 
 on:
@@ -38,18 +38,17 @@ jobs:
             if ! [[ "$app" =~ ^bishnoi-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
               fail "$app: name it bishnoi-<name>, in small letters, digits and dashes (e.g. bishnoi-hr)"
             fi
-            for part in frontend backend; do
-              [ -d "$app/$part" ] || fail "$app: the $part/ folder is missing"
-            done
-            for file in .gitignore README.md GIT-GUIDE.md; do
+            # The one app (decided 2026-10-23): every module's screens, no API.
+            if [ "$app" = "bishnoi-one-app" ]; then
+              [ -d "$app/frontend" ] || fail "$app: the frontend/ folder is missing"
+              [ -f "$app/README.md" ] || fail "$app: README.md is missing"
+              continue
+            fi
+            [ -d "$app/backend" ] || fail "$app: the backend/ folder is missing"
+            [ ! -d "$app/frontend" ] || fail "$app: screens go in the one app (bishnoi-one-app/frontend), not $app/frontend"
+            for file in .gitignore README.md; do
               [ -f "$app/$file" ] || fail "$app: $file is missing (copy it from another app and adjust it)"
             done
-            copy="$app/.github/workflows/sync-branches.yml"
-            if [ ! -f "$copy" ]; then
-              fail "$app: $copy is missing (copy .github/workflows/sync-branches.yml there)"
-            elif ! cmp -s "$copy" .github/workflows/sync-branches.yml; then
-              fail "$app: $copy differs from .github/workflows/sync-branches.yml (they must be the same)"
-            fi
           done
 
           secrets="$(git ls-files | grep -E '(^|/)(\.env(\.[^/]*)?|[^/]*\.(pem|key))$|(^|/)\.data/' | grep -vE '(^|/)\.env\.example$' || true)"

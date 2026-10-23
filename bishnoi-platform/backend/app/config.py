@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API directly. None by default.
     cors_origins: list[str] = []
 
+    # Bishnoi One's one app (every module's screens on one site, e.g.
+    # https://one.bishnoi.ai; decided 2026-10-23). Its server asks for a pass to
+    # each module with this address as the return: allowed for every module.
+    one_app_url: str = ""
+
     # Discord (app/discord.py): this app's log goes to a thread per day in the
     # logs channel, and announcements are kept in the announcements channel. Off until DISCORD_ENABLED=true; DISCORD_MODE=live
     # really posts, mock keeps everything on this machine. See .env.example.

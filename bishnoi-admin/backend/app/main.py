@@ -71,11 +71,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(operations.router)
     app.include_router(unset.router)
     app.include_router(graphql_api.router)
-    from app import platform_connect
+    from app import platform_connect, platform_roles
     from app.routers import materials
 
     app.include_router(materials.router)
     app.include_router(platform_connect.router)
+    app.include_router(platform_roles.router)
     # Connected on the Platform as soon as this runs, not when someone first uses it.
     platform_connect.connect_now(settings)
     return app

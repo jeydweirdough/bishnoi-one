@@ -179,3 +179,15 @@ def test_a_platform_admin_deletes_a_user(client, ana, ben):
     assert client.delete(f"/platform/users/{rita}", headers=ana).status_code == 204
     assert client.get(f"/platform/users/{rita}", headers=ana).status_code == 404
     assert client.get("/platform/users", params={"q": "rita"}, headers=ana).json()["total"] == 0
+
+
+def test_the_one_app_may_take_a_pass_for_any_module(app, client, jade):
+    """The one app (every module on one site) asks for each module's pass with its own address."""
+    token = sign_in(client, "jade@getmeds.test", jade["password"]).json()["accessToken"]
+    h = {"Authorization": f"Bearer {token}"}
+    one = "https://one.bishnoi.test/auth/platform"
+    assert client.post("/identity/pass", json={"app": "crm", "returnTo": one}, headers=h).status_code == 400  # not set up: refused
+    app.state.settings.one_app_url = "https://one.bishnoi.test"
+    r = client.post("/identity/pass", json={"app": "crm", "returnTo": one}, headers=h)
+    assert r.status_code == 200, r.text
+    assert client.post("/identity/pass", json={"app": "crm", "returnTo": "https://one.bishnoi.test/elsewhere"}, headers=h).status_code == 400

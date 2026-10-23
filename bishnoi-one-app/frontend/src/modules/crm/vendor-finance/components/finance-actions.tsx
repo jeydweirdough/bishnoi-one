@@ -1,0 +1,225 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/src/platform/ui/button";
+import { ConfirmButton } from "@/src/platform/ui/confirm";
+import { Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { checkLetter, decideApproval, decideCredit, recordPayment, type Decision } from "@/src/modules/crm/vendor-finance/actions";
+import { makeFormat } from "@/src/platform/lib/format";
+import type { Org, Quote } from "@/src/platform/lib/types";
+
+type Decide = (id: string, input: Decision) => Promise<{ ok: true } | { ok: false; error: string }>;
+
+/**
+ * Yes / no on something waiting for Finance. Yes is the one solid button on the
+ * page, so it's found first; no is quieter and needs a reason, so the rep knows
+ * what to fix.
+ */
+function DecisionButtons({ quote, what, yes, decide, org }: { quote: Quote; what: string; yes: string; decide: Decide; org: Org }) {
+  const fmt = makeFormat(org);
+  const [note, setNote] = useState("");
+  const noteField = (label: string, placeholder: string) => (
+    <label className="mt-5 block">
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
+      <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000} placeholder={placeholder} />
+    </label>
+  );
+  // What it is, under the title: the customer, the amount, and why it's here.
+  const about = (
+    <p className="text-sm text-ink-2">
+      {quote.customerName} · <span className="font-medium text-ink tabular-nums">{fmt.peso(quote.totalCentavos)}</span> · {what}
+    </p>
+  );
+  const run = async (decision: Decision["decision"]) => {
+    if (decision === "reject" && !note.trim()) {
+      toast.error("Enter a reason so the rep knows what to fix.");
+      return false;
+    }
+    const result = await decide(quote.id, { decision, note: note.trim() || null });
+    if (!result.ok) {
+      toast.error(result.error);
+      return false;
+    }
+    setNote("");
+    toast.success(decision === "approve" ? `${yes}: ${quote.number}` : `Rejected: ${quote.number}`);
+  };
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <ConfirmButton
+        label={yes}
+        triggerVariant="primary"
+        title={`${yes} ${quote.number}?`}
+        body={
+          <>
+            {about}
+            {noteField("Note for the rep (optional)", "e.g. Approved for this order only")}
+          </>
+        }
+        confirmLabel={yes}
+        danger={false}
+        onConfirm={() => run("approve")}
+      />
+      <ConfirmButton
+        label="Reject"
+        triggerVariant="quiet"
+        title={`Reject ${quote.number}?`}
+        body={
+          <>
+            {about}
+            {noteField("Why", "e.g. The discount is too deep; 10% at most")}
+            <p className="mt-1.5 text-meta text-ink-3">The rep sees your reason on the quote.</p>
+          </>
+        }
+        confirmLabel="Reject"
+        onConfirm={() => run("reject")}
+      />
+    </div>
+  );
+}
+
+/** Record what the issuer paid, right under what's been paid so far. */
+export function PaymentForm({ quote, org }: { quote: Quote; org: Org }) {
+  if (!quote.can.recordPayment) return null;
+  return <PaymentFields quote={quote} org={org} />;
+}
+
+function PaymentFields({ quote, org }: { quote: Quote; org: Org }) {
+  const fmt = makeFormat(org);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const left = (quote.letter?.amountCentavos ?? 0) - quote.payment.paidCentavos;
+  const today = fmt.todayKey();
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    const amountCentavos = fmt.toCentavos(String(data.get("amount") ?? ""));
+    if (!amountCentavos) {
+      setFields({ amountCentavos: "Enter an amount like 1,250.00." });
+      return;
+    }
+    const input = {
+      paidOn: String(data.get("paidOn") ?? ""),
+      amountCentavos,
+      reference: String(data.get("reference") ?? "").trim() || null,
+    };
+    start(async () => {
+      const result = await recordPayment(quote.id, input);
+      if (!result.ok) {
+        setError(result.error);
+        setFields(result.fields ?? {});
+        return;
+      }
+      toast.success(`${fmt.peso(amountCentavos)} recorded on ${quote.number}`);
+      form.reset();
+      setError(null);
+      setFields({});
+    });
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="mt-3 space-y-3">
+      <p className="text-meta font-semibold text-ink-2">
+        Record a payment <span className="font-normal text-ink-3">· {fmt.peso(left)} left on the letter</span>
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Paid on" error={fields.paidOn}>
+          {(p) => <Input {...p} name="paidOn" type="date" defaultValue={today} max={today} />}
+        </Field>
+        <Field label="Amount" error={fields.amountCentavos}>
+          {(p) => <Input {...p} name="amount" inputMode="decimal" defaultValue={(left / 100).toFixed(2)} className="text-right" />}
+        </Field>
+      </div>
+      <Field label="Reference" optional error={fields.reference}>
+        {(p) => <Input {...p} name="reference" maxLength={80} placeholder="Check or OR number" />}
+      </Field>
+      <FormError message={error} />
+      <Button type="submit" size="sm" variant="primary" loading={pending}>
+        Record payment
+      </Button>
+    </form>
+  );
+}
+
+// Each decision sits in the part of the quote it decides; `quote.can` says what the API allows now.
+
+export function ApprovalActions({ quote, org }: { quote: Quote; org: Org }) {
+  if (!quote.can.approve) return null;
+  return <DecisionButtons quote={quote} org={org} what={`${quote.priceTypeName} quote`} yes="Approve" decide={decideApproval} />;
+}
+
+export function LetterActions({ quote, org }: { quote: Quote; org: Org }) {
+  if (!quote.can.checkLetter) return null;
+  return <DecisionButtons quote={quote} org={org} what={`${quote.payerName ?? "Guarantee"} letter`} yes="Verify" decide={checkLetter} />;
+}
+
+/**
+ * Finance's word on a B2B quote's credit status: Confirm (the solid one), Put on
+ * hold (needs a reason: the rep reads it, and the quote isn't ordered until it's
+ * confirmed), or Check again against Finance's invoices now (after a payment).
+ */
+export function CreditActions({ quote, org }: { quote: Quote; org: Org }) {
+  const fmt = makeFormat(org);
+  const [note, setNote] = useState("");
+  const [pending, start] = useTransition();
+  if (!quote.can.confirmCredit || !quote.credit) return null;
+  const credit = quote.credit;
+  const run = async (decision: "confirm" | "hold" | "recheck") => {
+    if (decision === "hold" && !note.trim()) {
+      toast.error("Enter a reason so the rep knows what to settle.");
+      return false;
+    }
+    const result = await decideCredit(quote.id, { decision, note: note.trim() || null });
+    if (!result.ok) {
+      toast.error(result.error);
+      return false;
+    }
+    setNote("");
+    toast.success(decision === "confirm" ? `Credit confirmed: ${quote.number}` : decision === "hold" ? `On hold: ${quote.number}` : "Checked again");
+  };
+  const about = (
+    <p className="text-sm text-ink-2">
+      {quote.customerName} · <span className="font-medium text-ink tabular-nums">{fmt.peso(quote.totalCentavos)}</span> · {credit.label}
+    </p>
+  );
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {credit.decision !== "confirmed" && (
+        <ConfirmButton
+          label="Confirm"
+          triggerVariant="primary"
+          title={`Confirm the credit status on ${quote.number}?`}
+          body={about}
+          confirmLabel="Confirm"
+          danger={false}
+          onConfirm={() => run("confirm")}
+        />
+      )}
+      {credit.decision !== "hold" && (
+        <ConfirmButton
+          label="Put on hold"
+          triggerVariant="quiet"
+          title={`Put ${quote.number} on hold?`}
+          body={
+            <>
+              {about}
+              <label className="mt-5 block">
+                <span className="mb-1.5 block text-sm font-medium text-ink">Why</span>
+                <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={500} placeholder="e.g. Settle the August invoice first" />
+              </label>
+              <p className="mt-1.5 text-meta text-ink-3">The rep sees your reason, and the quote isn&apos;t ordered until you confirm it.</p>
+            </>
+          }
+          confirmLabel="Put on hold"
+          onConfirm={() => run("hold")}
+        />
+      )}
+      <Button variant="quiet" disabled={pending} onClick={() => start(async () => void (await run("recheck")))}>
+        {pending ? "Checking…" : "Check again"}
+      </Button>
+    </div>
+  );
+}

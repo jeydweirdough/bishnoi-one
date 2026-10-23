@@ -1,5 +1,0 @@
-/* Every app wears the same look. Tailwind scans outward from here and skips
-   node_modules, so the source folder is named. */
-@import "../src/platform/styles/globals.css";
-
-@source "../src";

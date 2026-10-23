@@ -33,7 +33,8 @@ const WINDOWS = process.platform === "win32";
 const COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code, text) => (COLOR ? `\x1b[${code}m${text}\x1b[0m` : text);
 
-const apps = readdirSync(ROOT).filter((name) => name.startsWith("bishnoi-") && existsSync(join(ROOT, name, "backend")));
+// An app folder has an API (backend/), screens (frontend/), or both: bishnoi-one-app is screens only.
+const apps = readdirSync(ROOT).filter((name) => name.startsWith("bishnoi-") && (existsSync(join(ROOT, name, "backend")) || existsSync(join(ROOT, name, "frontend"))));
 
 function fail(message) {
   console.error(paint("31", `✗ ${message}`));
@@ -51,7 +52,7 @@ const backend = join(ROOT, app, "backend");
 const frontend = join(ROOT, app, "frontend");
 const frontendPackage = join(frontend, "package.json");
 const devScript = existsSync(frontendPackage) ? JSON.parse(readFileSync(frontendPackage, "utf8")).scripts?.dev : undefined;
-const runApi = !only.web;
+const runApi = !only.web && existsSync(backend);
 const runWeb = !only.api && Boolean(devScript);
 const desktop = join(ROOT, "desktop");
 if (asApp && !devScript) fail(`${app} has no screens yet, so there is no window to open. Its API runs with: npm run ${app}`);
@@ -95,14 +96,14 @@ function packages(dir, what) {
 
 console.log(paint("1", `\n${app}`));
 
-if (runApi || setupOnly) {
+if (runApi || (setupOnly && existsSync(backend) && !only.web)) {
   if (!has("uv")) fail("uv isn't installed. Get it from https://docs.astral.sh/uv/, then run this again.");
   copyExample(backend, ".env.example", ".env");
   // uv sync makes backend/.venv, or brings it up to date with uv.lock. It's quick when nothing changed.
   step(existsSync(join(backend, ".venv")) ? "Checking the API's Python environment (.venv)" : "Making the API's Python environment (.venv)", "uv", ["sync"], backend);
 }
 
-if (runWeb || (setupOnly && devScript)) {
+if (runWeb || (setupOnly && devScript && !only.api)) {
   copyExample(frontend, ".env.example", ".env.local");
   packages(frontend, "Installing the screens' packages (npm install)");
 }
