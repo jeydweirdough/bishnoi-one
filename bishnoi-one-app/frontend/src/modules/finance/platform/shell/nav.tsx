@@ -135,6 +135,19 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/invoices/series`, label: "Invoice numbers", missing: missingOf(unset, ["invoiceSeries"]) },
         ],
       },
+      // Supplier bills and the suppliers themselves (2026-10-23, from Aubrey's answers).
+      {
+        href: `${base}/bills`,
+        label: "Payables",
+        icon: "orders",
+        // Suppliers and vouchers sit at their own addresses, so the section stays open there too (2026-10-23).
+        also: [`${base}/suppliers`, `${base}/vouchers`],
+        subpages: [
+          { href: `${base}/bills`, label: "Bills" },
+          { href: `${base}/vouchers`, label: "Payment vouchers" },
+          { href: `${base}/suppliers`, label: "Suppliers" },
+        ],
+      },
       // The books: every entry, the accounts, and what they add up to.
       {
         href: `${base}/ledger`,
@@ -433,7 +446,8 @@ function WaitingMark({ count }: { count?: number }) {
 function WithSubpages({ page }: { page: Page }) {
   const pathname = usePathname();
   const subs = page.subpages ?? [];
-  const open = within(pathname, page.href);
+  // Open on its own address, or one it counts as its own (Payables: /finance/suppliers, /finance/vouchers).
+  const open = within(pathname, page.href) || (page.also ?? []).some((a) => within(pathname, a));
   let here: SubPage | undefined;
   for (const sub of subs) {
     // The section's own address is current only on itself: a request under it
@@ -625,6 +639,9 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/finance/tax", "tax.view"],
   // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
   ["/finance/prices", "prices.view"],
+  ["/finance/bills", "bills.view"],
+  ["/finance/suppliers", "suppliers.view"],
+  ["/finance/vouchers", "vouchers.view"],
   ["/finance/bir", "bir.prepare"],
   ["/finance/calendar", "calendar.use"],
   ["/", "dashboard.view"],
