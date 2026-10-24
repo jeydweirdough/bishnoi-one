@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
@@ -34,6 +35,14 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader
         crumbs={[QUEUE[r.status]]}
+        actions={
+          // The signed report, once the liquidation is reviewed (decided 2026-10-22: e-signatures).
+          r.checkedAt ? (
+            <LinkButton href={`/finance/funds/${r.id}/report`} icon={<FileText className="size-4" aria-hidden />}>
+              Liquidation report
+            </LinkButton>
+          ) : undefined
+        }
         title={
           <>
             {r.requester.name} · {r.purpose} <span className="text-ink-3">{r.number}</span>
@@ -49,13 +58,13 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
         {r.status === "to_release" && may("funds.release") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="payments">Release cash advance</SectionTitle>
-            <Release request={r} org={me.org} today={fmt.todayKey()} />
+            {r.holds?.release ? <p className="text-sm text-ink-2">{r.holds.release}</p> : <Release request={r} org={me.org} today={fmt.todayKey()} />}
           </Sheet>
         )}
         {r.status === "to_check" && may("funds.check") && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="approvals">Liquidation review</SectionTitle>
-            <CheckLiquidation request={r} categories={categories} org={me.org} />
+            {r.holds?.check ? <p className="text-sm text-ink-2">{r.holds.check}</p> : <CheckLiquidation request={r} categories={categories} org={me.org} />}
           </Sheet>
         )}
         {(r.status === "to_return" || r.status === "to_reimburse") && may("funds.settle") && (
@@ -165,7 +174,8 @@ export default async function FundPage({ params }: { params: Promise<{ id: strin
             <ul className="divide-y divide-rule">
               {r.entries.map((e) => (
                 <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 py-2 text-sm">
-                  <a href={`/finance/ledger?source=fund#${e.number}`} className="font-mono text-meta font-semibold text-hema hover:underline">
+                  {/* Found by its number, so it's there however far back it is (the journal shows the newest 200). */}
+                  <a href={`/finance/ledger?q=${encodeURIComponent(e.number)}#${e.number}`} className="font-mono text-meta font-semibold text-hema hover:underline">
                     {e.number}
                   </a>
                   <span className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</span>

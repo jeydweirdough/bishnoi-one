@@ -9,7 +9,7 @@ import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
 import { Field, FormError, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
-import { deleteInvoice, issueInvoice, recordPayment, removePayment, voidInvoice } from "@/src/modules/finance/invoices/actions";
+import { deleteInvoice, issueInvoice, recordPayment, reissueInvoice, removePayment, voidInvoice } from "@/src/modules/finance/invoices/actions";
 import type { Series } from "@/src/modules/finance/invoices/types";
 
 /** Issuing a draft: it takes the next number of the series picked, and posts. */
@@ -113,6 +113,53 @@ export function VoidInvoice({ id, number }: { id: string; number: string }) {
           Void invoice
         </Button>
         <Button onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Cancel and reissue (Rommel Q20: a posted invoice is never edited). Issued: asks why,
+ *  voids it as Void does, and opens a draft copying it to correct and issue. Already
+ *  cancelled with no replacement: just opens that draft. */
+export function ReissueInvoice({ id, number, cancelled = false }: { id: string; number: string; cancelled?: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function go() {
+    start(async () => {
+      if (!cancelled && reason.trim().length < 3) return setError("Enter the reason for cancelling.");
+      const result = await reissueInvoice(id, cancelled ? null : reason.trim());
+      if (!result.ok) return setError(result.error);
+      toast.success(cancelled ? "Replacement draft made" : `${number} cancelled`, { description: "Correct the draft, then issue it: it takes the next number." });
+      router.push(`/finance/invoices/${result.data.id}?edit=1`);
+    });
+  }
+
+  if (cancelled) {
+    return (
+      <Button loading={pending} onClick={go}>
+        Make its replacement
+      </Button>
+    );
+  }
+  if (!open) return <Button onClick={() => setOpen(true)}>Cancel and reissue</Button>;
+  return (
+    <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+      <p className="text-sm">
+        Cancel <span className="font-mono font-semibold">{number}</span> and reissue it? It&apos;s voided (the number stays used, the sale reversed), and a copy opens as a
+        draft for you to correct and issue with the next number, dated today. Both will show they&apos;re linked; the printed invoice stays as standard.
+      </p>
+      <Field label="Why it's cancelled" error={error ?? undefined}>
+        {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Wrong TIN" />}
+      </Field>
+      <div className="flex gap-2">
+        <Button variant="danger" loading={pending} onClick={go}>
+          Cancel and reissue
+        </Button>
+        <Button onClick={() => setOpen(false)}>Keep it</Button>
       </div>
     </div>
   );

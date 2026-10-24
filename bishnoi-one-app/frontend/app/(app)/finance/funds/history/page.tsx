@@ -2,6 +2,6 @@
 import FundsPage from "@/src/modules/finance/screens/funds";
 
 export const metadata = { title: "Marketing request history" };
-export default function Page() {
-  return <FundsPage task="history" />;
+export default function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  return <FundsPage task="history" searchParams={searchParams} />;
 }

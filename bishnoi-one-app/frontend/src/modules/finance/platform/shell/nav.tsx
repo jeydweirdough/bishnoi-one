@@ -619,6 +619,8 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/finance/ledger/categories", "categories.view"],
   ["/finance/ledger", "journal.view"],
   ["/finance/tax", "tax.view"],
+  // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
+  ["/finance/prices", "prices.view"],
   ["/", "dashboard.view"],
 ];
 
