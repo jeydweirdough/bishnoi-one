@@ -84,7 +84,8 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
     trackSerials: product?.trackSerials ?? false,
     parentId: product?.parentId ?? preset?.parentId ?? "",
     variantLabel: product?.variantLabel ?? "",
-    attributes: product ? Object.entries(product.attributes) : [["", ""]],
+    // Imported products can carry numbers here (a price list's srp_unit): the form edits them as text.
+    attributes: product ? Object.entries(product.attributes).map(([k, v]): [string, string] => [k, v == null ? "" : String(v)]) : [["", ""]],
     cprNumber: product?.cpr.number ?? "",
     cprValidUntil: product?.cpr.validUntil ?? "",
   }));
