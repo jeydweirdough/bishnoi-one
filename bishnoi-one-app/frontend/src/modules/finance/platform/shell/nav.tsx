@@ -151,6 +151,10 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
       },
       // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
+      // The Sales DAT from Oojeema's exports (src/modules/finance/bir/sales-dat): only for a role that prepares BIR files.
+      { href: `${base}/bir/sales-dat`, label: "BIR sales DAT", icon: "regulatory" },
+      // The calendar (src/modules/finance/calendar): switched on per person by an Administrator.
+      { href: `${base}/calendar`, label: "Calendar", icon: "calendar" },
     ];
   }
   if (m.key === "inventory") {
@@ -621,6 +625,8 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/finance/tax", "tax.view"],
   // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
   ["/finance/prices", "prices.view"],
+  ["/finance/bir", "bir.prepare"],
+  ["/finance/calendar", "calendar.use"],
   ["/", "dashboard.view"],
 ];
 
