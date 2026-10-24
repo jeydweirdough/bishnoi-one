@@ -160,10 +160,15 @@ class Query:
         stock: str | None = None,
         parent: str | None = None,
         missing: bool | None = None,
+        cpr: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> JSON | None:
-        return route(catalog.list_products, info, q=q, category=category, brand=brand, supplier=supplier, status_=status, stock=stock, parent=parent, missing=missing, limit=limit, offset=offset)
+        return route(catalog.list_products, info, q=q, category=category, brand=brand, supplier=supplier, status_=status, stock=stock, parent=parent, missing=missing, cpr_state=cpr, limit=limit, offset=offset)
+
+    @strawberry.field
+    def cpr_summary(self, info: strawberry.Info) -> JSON | None:
+        return route(catalog.cpr_summary, info)
 
     @strawberry.field
     def product(self, info: strawberry.Info, id: str) -> JSON | None:

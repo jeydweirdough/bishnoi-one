@@ -392,6 +392,9 @@ class Product(Base):
     # The product in Bishnoi One Inventory this one is, when the list comes from there:
     # then its code, name, unit, state and SRP are Inventory's.
     inventory_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+    # Its FDA Certificate of Product Registration, as Inventory keeps it (migration 0078).
+    cpr_number: Mapped[str | None] = mapped_column(String(40), default=None)
+    cpr_valid_until: Mapped[date | None] = mapped_column(Date, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

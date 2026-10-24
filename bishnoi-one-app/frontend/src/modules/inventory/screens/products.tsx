@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "@/src/modules/inventory/components/ui";
+import { CprMark, FilterSelect, Filters, NoAccess, RowLink, StateMark, Table, Td } from "@/src/modules/inventory/components/ui";
 import { Pager } from "@/src/modules/inventory/platform/ui/pager";
 import { PRODUCT_STATUSES, param, query } from "@/src/modules/inventory/lib/labels";
 import { context, keepInRange, paging, type Search } from "@/src/modules/inventory/lib/page";
@@ -16,12 +16,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const { fmt, may, me } = await context();
   if (!may("products.view")) return <NoAccess what="the product catalog" />;
   const s = await searchParams;
-  const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock"), missing: param(s, "missing") };
+  const f = { q: param(s, "q"), category: param(s, "category"), brand: param(s, "brand"), supplier: param(s, "supplier"), status: param(s, "status") || "active", stock: param(s, "stock"), missing: param(s, "missing"), cpr: param(s, "cpr") };
   const { page, size, vars } = paging(s);
   const base = `/inventory/products${query(f)}`;
   const { products: list, reference: ref } = await loadQuery<{ products: Paged<ProductRow>; reference: Pick<Reference, "categories" | "brands" | "suppliers"> }>(
-    `query Products($q: String, $category: String, $brand: String, $supplier: String, $status: String, $stock: String, $missing: Boolean, $limit: Int, $offset: Int) {
-      products(q: $q, category: $category, brand: $brand, supplier: $supplier, status: $status, stock: $stock, missing: $missing, limit: $limit, offset: $offset)
+    `query Products($q: String, $category: String, $brand: String, $supplier: String, $status: String, $stock: String, $missing: Boolean, $cpr: String, $limit: Int, $offset: Int) {
+      products(q: $q, category: $category, brand: $brand, supplier: $supplier, status: $status, stock: $stock, missing: $missing, cpr: $cpr, limit: $limit, offset: $offset)
       ${referenceOf("categories", "brands", "suppliers")}
     }`,
     { ...given({ ...f, missing: Boolean(f.missing) }), ...vars },
@@ -49,6 +49,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       <Td num>{fmt.peso(p.costPrice)}</Td>
       <Td num>{fmt.peso(p.sellingPrice)}</Td>
       <Td>{p.status === "active" ? <StateMark state={p.state} /> : <span className="text-meta text-ink-3">{PRODUCT_STATUSES[p.status]}</span>}</Td>
+      <Td>
+        <CprMark cpr={p.cpr} />
+        {p.cpr.number && <span className="block font-mono text-meta text-ink-3">{p.cpr.number}</span>}
+      </Td>
     </tr>
   );
 
@@ -57,11 +61,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       <PageHeader
         title="Products"
         actions={
-          may("products.create") && (
-            <LinkButton href="/inventory/products/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add product
-            </LinkButton>
-          )
+          <>
+            {may("products.edit") && <LinkButton href="/inventory/products/cpr">Update CPR numbers</LinkButton>}
+            {may("products.create") && (
+              <LinkButton href="/inventory/products/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                Add product
+              </LinkButton>
+            )}
+          </>
         }
       >
         Product catalog with costs, selling prices and reorder levels.
@@ -73,13 +80,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <FilterSelect name="stock" label="Stock" value={f.stock} options={[{ value: "", label: "Any" }, { value: "low", label: "Low" }, { value: "out", label: "Out of stock" }, { value: "over", label: "Over maximum" }]} />
         {/* The same list as the sidebar's red count on Products. */}
         <FilterSelect name="missing" label="Prices" value={f.missing} options={[{ value: "", label: "Any" }, { value: "true", label: "Missing price" }]} />
+        <FilterSelect name="cpr" label="CPR" value={f.cpr} options={[{ value: "", label: "Any" }, { value: "attention", label: "Needs attention" }, { value: "missing", label: "No CPR" }, { value: "no_date", label: "No validity date" }, { value: "expired", label: "Expired" }, { value: "expiring", label: "Expiring" }, { value: "valid", label: "Valid" }]} />
         <FilterSelect name="status" label="Status" value={f.status} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "discontinued", label: "Discontinued" }, { value: "all", label: "All" }]} />
       </Filters>
       <Sheet>
         {products.length === 0 ? (
-          <FirstStep icon="products" title="No products" body="Add stocked items with their SKU, unit and reorder level." href="/inventory/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.status !== "active")} clear="/inventory/products" may={may} />
+          <FirstStep icon="products" title="No products" body="Add stocked items with their SKU, unit and reorder level." href="/inventory/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.cpr || f.status !== "active")} clear="/inventory/products" may={may} />
         ) : (
-          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock"]} min="52rem">
+          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock", "CPR"]} min="60rem">
             {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}
           </Table>
         )}

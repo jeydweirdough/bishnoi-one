@@ -49,6 +49,10 @@ export type Reference = {
 export type ProductType = "stock" | "consumable" | "asset" | "service";
 export type ProductStatus = "active" | "inactive" | "discontinued";
 
+export type CprState = "missing" | "no_date" | "expired" | "expiring" | "valid" | "not_needed";
+/** A product's FDA Certificate of Product Registration and where it stands (Inventory app/cpr.py). */
+export type Cpr = { number: string | null; validUntil: string | null; daysLeft: number | null; state: CprState; label: string };
+
 export type ProductRow = ProductRef & {
   barcode: string | null;
   category: { id: string; name: string; path: string } | null;
@@ -67,6 +71,7 @@ export type ProductRow = ProductRef & {
   level: Level;
   state: StockState;
   value: number;
+  cpr: Cpr;
 };
 
 export type MovementBrief = {

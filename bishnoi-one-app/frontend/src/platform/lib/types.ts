@@ -432,6 +432,8 @@ export type Product = {
   isActive: boolean;
   /** Its code, name, unit, state and SRP are Bishnoi One Inventory's, changed there. */
   fromInventory?: boolean;
+  /** Its FDA Certificate of Product Registration, from Inventory; null when none is kept. */
+  cpr?: { number: string; validUntil: string | null; state: "valid" | "expiring" | "expired" | "no_date" } | null;
   prices: Record<string, number>;
   extra: ExtraValues;
   updatedAt: string | null;

@@ -232,6 +232,9 @@ class Product(Stamped, Base):
     # A variant (3 mL) of a parent product (BD Syringe): the parent groups them.
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_products.id", ondelete="SET NULL"), index=True, default=None)
     variant_label: Mapped[str | None] = mapped_column(String(80), default=None)
+    # Its Certificate of Product Registration from the FDA, and the day it's valid until (app/cpr.py).
+    cpr_number: Mapped[str | None] = mapped_column(String(40), index=True, default=None)
+    cpr_valid_until: Mapped[date | None] = mapped_column(Date, default=None)
 
     category: Mapped[Category | None] = relationship(lazy="joined")
     brand: Mapped[Brand | None] = relationship(lazy="joined")

@@ -5,12 +5,15 @@ supplier prices), categories, brands and units of measure.
     (category)         (category)  (product)    (variants)
 """
 
+from datetime import date
+
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import cpr
 from app.access import allowed
 from app.api import Api, changed, conflict, field_error, found, iso, not_found
 from app.audit import audit
@@ -33,7 +36,7 @@ from app.models import (
     Unit,
     Warehouse,
 )
-from app.out import batch_ref, product_ref, supplier_ref, warehouse_ref
+from app.out import batch_ref, product_ref, supplier_ref, today, warehouse_ref
 from app.paging import Limit, Offset, cut, total
 
 router = APIRouter(prefix="/inventory", tags=["catalog"])
@@ -415,8 +418,16 @@ class ProductFields(Api):
     attributes: Attributes | None = None
     parent_id: str | None = Field(None, max_length=36)
     variant_label: str | None = Field(None, max_length=80)
+    # The FDA's Certificate of Product Registration (app/cpr.py).
+    cpr_number: str | None = Field(None, max_length=60)
+    cpr_valid_until: date | None = None
 
     _attributes = field_validator("attributes")(clean_attributes)
+
+    @field_validator("cpr_number")
+    @classmethod
+    def _cpr(cls, v: str | None) -> str | None:
+        return cpr.clean(v)
 
     @field_validator("product_type")
     @classmethod
@@ -479,6 +490,8 @@ def check_product(db: DB, product: Product) -> None:
             raise field_error("parentId", f"{parent.name} is itself a variant. Pick the product it's a variant of.")
         if db.scalar(select(func.count()).select_from(Product).where(Product.parent_id == product.id)):
             raise field_error("parentId", "This product has variants of its own, so it can't be a variant.")
+    if product.cpr_valid_until and not product.cpr_number:
+        raise field_error("cprNumber", "Enter the CPR number the validity date belongs to.")
 
 
 def sku_taken(db: DB, sku: str, but: str | None = None) -> bool:
@@ -486,7 +499,7 @@ def sku_taken(db: DB, sku: str, but: str | None = None) -> bool:
     return db.scalar(q.where(Product.id != but) if but else q) is not None
 
 
-def product_row(p: Product, level: dict) -> dict:
+def product_row(p: Product, level: dict, warn_days: int = 90) -> dict:
     return {
         **product_ref(p),
         "barcode": p.barcode,
@@ -506,6 +519,7 @@ def product_row(p: Product, level: dict) -> dict:
         "level": level,
         "state": state(p, level),
         "value": level["onHand"] * p.cost_price,
+        "cpr": cpr.out(p, today(), warn_days),
     }
 
 
@@ -522,6 +536,7 @@ def missing_a_price():
 def list_products(
     _: View,
     db: DB,
+    settings: SettingsDep,
     q: str | None = Query(None, max_length=100),
     category: str | None = Query(None, max_length=36),
     brand: str | None = Query(None, max_length=36),
@@ -530,12 +545,19 @@ def list_products(
     stock: str | None = Query(None, max_length=8, description="low, out, over"),
     parent: str | None = Query(None, max_length=36, description="the variants of this product"),
     missing: bool = Query(False, description="only products on sale with no selling price or cost"),
+    cpr_state: str | None = Query(None, alias="cpr", max_length=12, description="missing, no_date, expired, expiring, valid, or attention (the first four)"),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     query = select(Product).order_by(func.lower(Product.name))
+    warn = settings.expiry_warning_days
     if missing:
         query = query.where(missing_a_price())
+    if cpr_state:
+        wanted = cpr.ATTENTION if cpr_state == "attention" else (cpr_state,)
+        if not set(wanted) <= set(cpr.STATES):
+            raise field_error("cpr", "Pick missing, no_date, expired, expiring, valid or attention.")
+        query = query.where(cpr.state_sql(today(), warn).in_(wanted))
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Product.name).like(like), func.lower(Product.sku).like(like), func.lower(Product.barcode).like(like)))
@@ -562,10 +584,10 @@ def list_products(
             query = query.outerjoin(lv, lv.c.product_id == Product.id).where(state_sql(func.coalesce(lv.c.available, 0), func.coalesce(lv.c.on_hand, 0)) == stock)
         products = db.scalars(cut(query.order_by(Product.id), limit, offset)).all()  # the id keeps pages apart where names tie
         levels = by_product(db, [p.id for p in products])
-        return {"items": [product_row(p, levels.get(p.id, dict(ZERO))) for p in products], "total": total(db, query)}
+        return {"items": [product_row(p, levels.get(p.id, dict(ZERO)), warn) for p in products], "total": total(db, query)}
     products = db.scalars(query).all()
     levels = by_product(db, [p.id for p in products])
-    rows = [product_row(p, levels.get(p.id, dict(ZERO))) for p in products]
+    rows = [product_row(p, levels.get(p.id, dict(ZERO)), warn) for p in products]
     if stock:
         rows = [r for r in rows if r["state"] == stock]
     return rows
@@ -608,7 +630,7 @@ def read_product(_: View, db: DB, settings: SettingsDep, product_id: str) -> dic
     images = db.scalars(select(ProductImage.id).where(ProductImage.product_id == p.id).order_by(ProductImage.created_at)).all()
     movements = db.scalars(select(Movement).where(Movement.product_id == p.id).order_by(Movement.id.desc()).limit(15)).all()
     return {
-        **product_row(p, level),
+        **product_row(p, level, warn),
         "description": p.description,
         "unitName": p.unit.name,
         "taxRateBp": p.tax_rate_bp,
@@ -699,6 +721,103 @@ def delete_product(_: Delete, me: CurrentUser, db: DB, product_id: str) -> Respo
         db.rollback()
         raise conflict("This product is on a purchase order, order or transfer. Mark it discontinued instead.") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- CPR numbers, many at once ------------------------------------------------------------
+
+
+class CprRow(Api):
+    sku: str = Field(max_length=60)
+    cpr_number: str | None = Field(None, max_length=80)
+    valid_until: str | None = Field(None, max_length=20)
+
+
+class CprImport(Api):
+    rows: list[CprRow] = Field(max_length=5000)
+    # False: only check each row and say what would change. True: save the rows that are right.
+    apply: bool = False
+
+
+def read_day(text: str | None) -> date | None:
+    """A day as a spreadsheet gives it: 2027-03-31, 31/03/2027 or 03/31/2027 (when the first part can't be a month)."""
+    if text is None or not text.strip():
+        return None
+    t = text.strip()
+    try:
+        return date.fromisoformat(t[:10])
+    except ValueError:
+        pass
+    parts = t.replace("-", "/").replace(".", "/").split("/")
+    if len(parts) == 3 and all(x.isdigit() for x in parts):
+        a, b, y = (int(x) for x in parts)
+        if y < 100:
+            y += 2000
+        day, month = (a, b) if a > 12 else (b, a) if b > 12 else (a, b)  # day first, as in the Philippines, unless it can't be
+        try:
+            return date(y, month, day)
+        except ValueError:
+            pass
+    raise ValueError("Write the date as 2027-03-31 or 31/03/2027.")
+
+
+@router.post("/products/cpr")
+def import_cpr(_: Edit, me: CurrentUser, db: DB, settings: SettingsDep, body: CprImport) -> dict:
+    """Many products' CPR numbers and validity dates at once, by SKU, from a spreadsheet.
+    A blank date leaves the one kept; a blank number leaves the product as it is."""
+    by_sku = {x.sku.lower(): x for x in db.scalars(select(Product))}
+    seen: set[str] = set()
+    rows, saved = [], 0
+    for n, row in enumerate(body.rows, start=1):
+        out: dict = {"line": n, "sku": row.sku.strip(), "problems": [], "changes": []}
+        product = by_sku.get(row.sku.strip().lower())
+        if not row.sku.strip():
+            out["problems"].append("No SKU.")
+        elif product is None:
+            out["problems"].append("No product has this SKU.")
+        elif product.sku.lower() in seen:
+            out["problems"].append("This SKU is on an earlier line too.")
+        try:
+            number = cpr.clean(row.cpr_number)
+        except ValueError as e:
+            number = None
+            out["problems"].append(str(e))
+        try:
+            until = read_day(row.valid_until)
+        except ValueError as e:
+            until = None
+            out["problems"].append(str(e))
+        if not number and not out["problems"]:
+            out["problems"].append("No CPR number.")
+        if product is not None:
+            seen.add(product.sku.lower())
+            out["product"] = {"id": product.id, "sku": product.sku, "name": product.name}
+            if not out["problems"]:
+                if number != product.cpr_number:
+                    out["changes"].append("CPR number")
+                if until is not None and until != product.cpr_valid_until:
+                    out["changes"].append("valid until")
+                if body.apply and out["changes"]:
+                    product.cpr_number = number
+                    if until is not None:
+                        product.cpr_valid_until = until
+                    audit(db, me, "product.updated", target=f"{product.sku} {product.name}", target_type="product", target_id=product.id,
+                          fields=["cpr_number"] * ("CPR number" in out["changes"]) + ["cpr_valid_until"] * ("valid until" in out["changes"]))
+                    saved += 1
+        out["cprNumber"], out["validUntil"] = number, until.isoformat() if until else None
+        out["result"] = "problem" if out["problems"] else ("change" if out["changes"] else "same")
+        rows.append(out)
+    if body.apply and saved:
+        db.commit()
+    count = lambda r: sum(1 for x in rows if x["result"] == r)  # noqa: E731
+    return {"rows": rows, "changes": count("change"), "same": count("same"), "problems": count("problem"), "saved": saved if body.apply else 0}
+
+
+@router.get("/products/cpr/summary")
+def cpr_summary(_: View, db: DB, settings: SettingsDep) -> dict:
+    """How many products are in each CPR state, for the product list's tabs and the dashboard."""
+    state = cpr.state_sql(today(), settings.expiry_warning_days)
+    counts = dict(db.execute(select(state, func.count()).select_from(Product).group_by(state)).all())
+    return {"counts": {s: counts.get(s, 0) for s in cpr.STATES}, "attention": sum(counts.get(s, 0) for s in cpr.ATTENTION), "warningDays": settings.expiry_warning_days}
 
 
 # --- pictures ---------------------------------------------------------------------------

@@ -26,6 +26,18 @@ type Numbered = { id: string; number: string };
 export async function saveProduct(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("patch", `/inventory/products/${enc(id)}`, input) : send<Id>("post", "/inventory/products", input);
 }
+export type CprLine = { sku: string; cprNumber: string | null; validUntil: string | null };
+export type CprCheck = {
+  rows: { line: number; sku: string; product?: { id: string; sku: string; name: string }; cprNumber: string | null; validUntil: string | null; problems: string[]; changes: string[]; result: "change" | "same" | "problem" }[];
+  changes: number;
+  same: number;
+  problems: number;
+  saved: number;
+};
+/** Many products' CPR numbers at once: checked only, or (apply) the right rows saved. */
+export async function importCpr(rows: CprLine[], apply: boolean): Promise<Result<CprCheck>> {
+  return apply ? send<CprCheck>("post", "/inventory/products/cpr", { rows, apply }) : attempt(() => api.post<CprCheck>("/inventory/products/cpr", { rows, apply }));
+}
 export async function deleteProduct(id: string): Promise<Result<null>> {
   return send<null>("del", `/inventory/products/${enc(id)}`);
 }

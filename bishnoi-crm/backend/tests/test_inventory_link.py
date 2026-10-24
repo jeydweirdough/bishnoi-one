@@ -149,3 +149,19 @@ def test_an_import_only_changes_what_is_the_crms(client, ana, fake):
     assert done["updated"] == 1 and done["added"] == 0
     assert [(p["row"], "Inventory" in p["message"]) for p in done["problems"]] == [(3, True), (4, True)]
     assert products(client, ana)["AMX-500"]["strength"] == "500 mg"
+
+
+def test_the_cpr_comes_over_and_says_where_it_stands(client, ana, fake):
+    from datetime import UTC, datetime, timedelta
+
+    soon = (datetime.now(UTC).date() + timedelta(days=30)).isoformat()
+    fake.products = [item("amx-500", "Amoxicillin 500mg", 25000, cprNumber="DR-XY12345", cprValidUntil="2020-01-01"),
+                     item("GLV-M", "Gloves M", 32000, cprNumber="CMDR-1", cprValidUntil=soon), item("NEW-1", "Syringe 3 mL", 1500)]
+    client.post("/products/sync", headers=ana)
+    listed = products(client, ana)
+    assert listed["AMX-500"]["cpr"] == {"number": "DR-XY12345", "validUntil": "2020-01-01", "state": "expired"}
+    assert listed["GLV-M"]["cpr"]["state"] == "expiring" and listed["NEW-1"]["cpr"] is None
+    # Renewed in Inventory, renewed here.
+    fake.products[0] = item("amx-500", "Amoxicillin 500mg", 25000, cprNumber="DR-XY12345", cprValidUntil="2099-01-01")
+    client.post("/products/sync", headers=ana)
+    assert products(client, ana)["AMX-500"]["cpr"]["state"] == "valid"

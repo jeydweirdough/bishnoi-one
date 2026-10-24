@@ -98,6 +98,7 @@ request that changes what it describes.
 | G4 | Route and van selling, field visits | Marg ★ | CRM: field visits with GPS, clinic pins, agents' trails and day routes. No offline route orders. | **ADAPT** (decided 2026-09-25, D7): visits and collections work offline (G3); van and route orders are out for now |
 | G5 | Effective-dated assignments ("who owned this in March") | SAP ★ | None: a record keeps its owner's team as a snapshot, undated. | open (proposed ADOPT for team membership and ownership) |
 | G6 | Territory management | SAP | None. | SKIP (reference only, per best-of-breed.md: heavy) |
+| G7 | Product registration (FDA CPR) | Marg ★ (drug licence fields) | **Built 2026-10-24 (Inventory):** each product's Certificate of Product Registration number and validity date (`app/cpr.py`, migration 0007), checked for the FDA's shape (DR-XY12345); every active stock product needs one. States: no CPR, no validity date, expired, expiring (within the expiry warning, 90 days), valid; filter on the product list, alerts (expired, expiring, incomplete), the report Product registrations (CPR), and Update CPR numbers: a CSV or pasted spreadsheet by SKU, checked line by line before saving. The CRM brings the CPR over with the product list and flags expired and expiring ones in its catalogue. Not blocked from sale yet. | **HAVE** (decided 2026-10-24, workstream 04): Inventory keeps it, the CRM shows it |
 
 ## H. Platform
 

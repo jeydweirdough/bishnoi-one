@@ -17,7 +17,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -107,6 +107,9 @@ def sync(db: Session, settings: Settings) -> dict:
             "generic_name": attribute(item.get("attributes"), "generic name", "generic"),
             "strength": attribute(item.get("attributes"), "strength", "dosage strength"),
             "form": attribute(item.get("attributes"), "form", "dosage form"),
+            # Its FDA registration: Inventory's, as it keeps it.
+            "cpr_number": (item.get("cprNumber") or None),
+            "cpr_valid_until": date.fromisoformat(item["cprValidUntil"]) if item.get("cprValidUntil") else None,
         }
         if product is None:
             product = Product(**values)

@@ -119,8 +119,10 @@ export function ProductsEditor({
                     <p className="font-medium">
                       {p.name}
                       {!p.isActive && <span className="ml-2 rounded-md bg-bench px-2 py-0.5 text-meta">Off</span>}
+                      {p.cpr?.state === "expired" && <span className="ml-2 rounded-md bg-danger/10 px-2 py-0.5 text-meta font-normal text-danger" title={`Valid until ${p.cpr.validUntil}: it shouldn't be sold until renewed`}>CPR expired</span>}
+                      {p.cpr?.state === "expiring" && <span className="ml-2 rounded-md bg-[#fff4e0] px-2 py-0.5 text-meta font-normal text-[#8a5a00]" title={`Valid until ${p.cpr.validUntil}`}>CPR expiring</span>}
                     </p>
-                    <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form].filter(Boolean).join(" · ")}</p>
+                    <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form, p.cpr ? `CPR ${p.cpr.number}` : null].filter(Boolean).join(" · ")}</p>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{p.unit}</td>
                   {stock && (
@@ -327,7 +329,7 @@ function ProductForm({
     if (f.key === "isActive") {
       return (
         <label className="flex h-full items-end gap-2 pb-2 text-sm">
-          <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
           {f.label}: offered on new quotes
         </label>
       );
@@ -359,7 +361,7 @@ function ProductForm({
 
         {/* Rx: an order of it needs the prescription (an order link asks for it), and a pharmacist checks it. */}
         <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-rule px-4 py-3 has-[:checked]:border-danger/40 has-[:checked]:bg-danger-tint/40">
-          <input type="checkbox" checked={needsPrescription} onChange={(e) => setNeedsPrescription(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
+          <input suppressHydrationWarning type="checkbox" checked={needsPrescription} onChange={(e) => setNeedsPrescription(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
           <span>
             <span className="block text-sm font-medium text-ink">Needs a prescription (Rx)</span>
             <span className="block text-meta text-ink-3">Customers ordering it through an order link attach the prescription, and a pharmacist checks it.</span>
