@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from app.api import iso
 from app.deps import DB, SettingsDep
 from app.levels import ZERO, by_warehouse, state
-from app.models import Product, Warehouse
+from app.models import Product, Receipt, Supplier, Warehouse
 
 MAX_SKUS = 500
 
@@ -104,3 +104,51 @@ def stock(db: DB, skus: str = Query(..., max_length=20000, description="Comma-se
             "warehouses": per,
         })
     return {"items": items}
+
+
+# --- suppliers and what they delivered: for Finance's bills (decided 2026-10-24) ---------------
+
+
+def supplier_tax_out(s: Supplier) -> dict:
+    return {
+        "id": s.id, "code": s.code, "name": s.name, "address": s.address, "tin": s.tin,
+        "vatStatus": s.vat_status, "defaultAtc": s.default_atc, "paymentTerms": s.payment_terms, "isActive": s.is_active,
+    }
+
+
+@router.get("/suppliers")
+def suppliers(db: DB, q: str | None = Query(None, max_length=80)) -> dict:
+    """Every supplier, with its tax registration: Finance makes out bills to them."""
+    query = select(Supplier).order_by(Supplier.name)
+    if q:
+        like = f"%{q.strip().lower()}%"
+        query = query.where(func.lower(Supplier.name).like(like) | func.lower(Supplier.code).like(like))
+    return {"items": [supplier_tax_out(s) for s in db.scalars(query.limit(200))]}
+
+
+@router.get("/suppliers/{supplier_id}")
+def one_supplier(db: DB, supplier_id: str) -> dict:
+    s = db.get(Supplier, supplier_id)
+    if s is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such supplier.")
+    return supplier_tax_out(s)
+
+
+@router.get("/suppliers/{supplier_id}/receipts")
+def supplier_receipts(db: DB, supplier_id: str) -> dict:
+    """The deliveries received from a supplier, newest first, each with what came at what cost: a bill starts from one."""
+    rows = db.scalars(select(Receipt).where(Receipt.supplier_id == supplier_id).order_by(Receipt.received_at.desc()).limit(50)).all()
+    return {
+        "items": [
+            {
+                "id": r.id, "number": r.number, "receivedAt": iso(r.received_at), "deliveryRef": r.delivery_ref,
+                "order": r.order.number if r.order else None,
+                "lines": [
+                    {"product": ln.product.name, "sku": ln.product.sku, "quantity": ln.quantity, "unitCost": ln.unit_cost, "amount": ln.quantity * ln.unit_cost}
+                    for ln in r.lines
+                ],
+                "totalCost": sum(ln.quantity * ln.unit_cost for ln in r.lines),
+            }
+            for r in rows
+        ]
+    }

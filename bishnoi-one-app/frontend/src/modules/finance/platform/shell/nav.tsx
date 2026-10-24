@@ -1,5 +1,6 @@
 "use client";
 
+import { ModuleBrand } from "@/src/platform/shell/module-brand";
 import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -158,14 +159,28 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/ledger`, label: "Journal entries" },
           { href: `${base}/ledger/accounts`, label: "Chart of accounts" },
           { href: `${base}/ledger/trial-balance`, label: "Trial balance" },
+          { href: `${base}/bank`, label: "Bank reconciliation" },
           { href: `${base}/ledger/categories`, label: "Expense categories", missing: missingOf(unset, ["categoryAccounts"]) },
           { href: `${base}/ledger/posting`, label: "Default accounts", missing: missingOf(unset, ["postingAccounts"]) },
         ],
       },
       // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
-      // The Sales DAT from Oojeema's exports (src/modules/finance/bir/sales-dat): only for a role that prepares BIR files.
-      { href: `${base}/bir/sales-dat`, label: "BIR sales DAT", icon: "regulatory" },
+      // What the BIR asks for, from the books (decided 2026-10-24, from Oojeema's BIR features),
+      // and the Sales DAT from Oojeema's exports (src/modules/finance/bir/sales-dat): one group.
+      {
+        href: `${base}/bir`,
+        label: "BIR reports",
+        icon: "reports",
+        subpages: [
+          { href: `${base}/bir`, label: "Books of accounts" },
+          { href: `${base}/bir/statements`, label: "Financial statements" },
+          { href: `${base}/bir/vat`, label: "VAT return" },
+          { href: `${base}/bir/lists`, label: "Summary lists" },
+          { href: `${base}/bir/withholding`, label: "Withholding tax" },
+          { href: `${base}/bir/sales-dat`, label: "Prepare BIR files (Sales DAT)" },
+        ],
+      },
       // The calendar (src/modules/finance/calendar): switched on per person by an Administrator.
       { href: `${base}/calendar`, label: "Calendar", icon: "calendar" },
     ];
@@ -632,6 +647,8 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
 const FINANCE_NEEDS: [string, string][] = [
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
+  ["/finance/bills", "bills.view"],
+  ["/finance/bank", "bank.view"],
   ["/finance/ledger/accounts", "accounts.view"],
   ["/finance/ledger/posting", "accounts.view"],
   ["/finance/ledger/categories", "categories.view"],
@@ -639,10 +656,11 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/finance/tax", "tax.view"],
   // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
   ["/finance/prices", "prices.view"],
-  ["/finance/bills", "bills.view"],
   ["/finance/suppliers", "suppliers.view"],
   ["/finance/vouchers", "vouchers.view"],
-  ["/finance/bir", "bir.prepare"],
+  // Preparing BIR files is its own tick; the reports and books are bir.view.
+  ["/finance/bir/sales-dat", "bir.prepare"],
+  ["/finance/bir", "bir.view"],
   ["/finance/calendar", "calendar.use"],
   ["/", "dashboard.view"],
 ];
@@ -666,7 +684,7 @@ function financeAdmin(me: Me): Page[] {
   const may = (p: string) => me.permissions?.includes(p) ?? false;
   return [
     ...(may("admin.users") ? [{ href: "/finance/admin/users", label: "Users", icon: "people" as const }] : []),
-    ...(may("admin.roles") ? [{ href: "/platform/access/roles", label: "Roles and permissions", icon: "roles" as const }] : []),
+    ...(may("admin.roles") ? [{ href: "/platform/roles", label: "Roles and permissions", icon: "roles" as const }] : []),
     ...(may("admin.audit") ? [{ href: "/finance/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
   ];
 }
@@ -874,22 +892,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
   const open = openOn === pathname;
   const place = placeOf(pathname, me);
 
-  const brand = (
-    <Link href="/finance" className="flex items-center gap-2.5 border-b-[3px] border-double border-ink pb-2">
-
-      <span className="min-w-0">
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
-        {/* Which app this is, not only which product. Each one is its own site on
-            its own address, so "Bishnoi One" alone leaves you working out from the port
-            whether the screen in front of you is missing or simply elsewhere. */}
-        <span className="block truncate text-base leading-tight font-semibold text-ink">
-          {thisAppLabel()}
-        </span>
-      </span>
-    </Link>
-  );
+  const brand = <ModuleBrand href="/finance" label="Finance" company={me.org?.brandName ?? me.org?.name} />;
 
   return (
     <>

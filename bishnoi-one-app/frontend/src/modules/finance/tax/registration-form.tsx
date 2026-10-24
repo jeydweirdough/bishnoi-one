@@ -26,6 +26,8 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
     branchCode: p.branchCode,
     registeredAddress: p.registeredAddress ?? "",
     pricesIncludeTax: p.pricesIncludeTax ? "yes" : "no",
+    rdoCode: p.rdoCode ?? "",
+    fiscalMonthEnd: String(p.fiscalMonthEnd ?? 12),
   });
   const [error, setError] = useState<string | null>(null);
   // What an invoice needs and isn't filled in yet, marked on its box (2026-10-22: saving
@@ -45,6 +47,8 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
         branchCode: v.branchCode.trim() || null,
         registeredAddress: v.registeredAddress.trim() || null,
         pricesIncludeTax: v.pricesIncludeTax === "yes",
+        rdoCode: v.rdoCode.trim() || null,
+        fiscalMonthEnd: Number(v.fiscalMonthEnd),
       });
       if (result.ok) {
         const missing = result.data.profile.missing ?? [];
@@ -90,6 +94,20 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           </Field>
           <Field label="Branch code" error={fields.branchCode} hint="00000 for the head office.">
             {(f) => <Input {...f} inputMode="numeric" value={v.branchCode} onChange={(e) => set({ branchCode: e.target.value.replace(/\D/g, "") })} />}
+          </Field>
+          <Field label="RDO code" error={fields.rdoCode} hint="3 digits, from the certificate of registration (Form 2303). On every BIR form.">
+            {(f) => <Input {...f} inputMode="numeric" maxLength={3} value={v.rdoCode} onChange={(e) => set({ rdoCode: e.target.value.replace(/\D/g, "") })} />}
+          </Field>
+          <Field label="Fiscal year ends in" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
+            {(f) => (
+              <select {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label="Registered address" error={fields.registeredAddress} className="sm:col-span-2">
             {(f) => <Textarea {...f} value={v.registeredAddress} onChange={(e) => set({ registeredAddress: e.target.value })} maxLength={300} />}

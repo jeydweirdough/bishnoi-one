@@ -43,7 +43,7 @@ export function GoBack({ primary = true }: { primary?: boolean }) {
 
 export function GoHome({ primary = false }: { primary?: boolean }) {
   return (
-    <a href="/platform/console" className={plainButton(primary)}>
+    <a href="/platform" className={plainButton(primary)}>
       Go home
     </a>
   );

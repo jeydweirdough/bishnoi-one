@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { moduleByKey, type ModuleDef, type ModuleKey } from "./modules";
-import { COMPANY_COOKIE, COMPANY_HEADER, MODULE_HEADER, moduleCookie } from "./session-cookie";
+import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, MODULE_HEADER, moduleCookie } from "./session-cookie";
 import type { Me, Org } from "./types";
 
 // The browser never talks to the API. Pages and server actions call it from
@@ -52,7 +52,8 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
   const [jar, address, here] = await Promise.all([cookies(), clientAddress(), named ? Promise.resolve(named) : currentModule()]);
   if (!here) throw new ApiError(500, "This page isn't part of a module, so there's no API to ask.");
   const API_URL = moduleApi(here);
-  const token = jar.get(moduleCookie(here.key))?.value;
+  // A module on the Bishnoi One account itself (the Admin Console) asks with the account's own sign-in.
+  const token = jar.get(here.accountOnly ? ACCOUNT_COOKIE : moduleCookie(here.key))?.value;
   // Before signing in, which company: the one last signed in to here. Signed
   // in, the token says (it starts with the company), so nothing is added.
   const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;

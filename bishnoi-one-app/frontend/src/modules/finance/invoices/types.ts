@@ -76,6 +76,10 @@ export type Payment = {
   method: string;
   methodLabel: string;
   reference: string | null;
+  /** What the customer withheld (their Form 2307), its ATC and the certificate's reference. */
+  cwtCentavos: number;
+  cwtAtc: string | null;
+  cwtCertificate: string | null;
   recordedBy: string;
   recordedAt: string;
   removedBy: string | null;

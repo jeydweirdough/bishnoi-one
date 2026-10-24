@@ -13,7 +13,7 @@ export type MyModule = { key: string; oldUrl: string | null };
  * Which module you're in, and the others you have, one click away (decided
  * 2026-10-23: one app, so switching is a page change, not another site).
  */
-export function ModuleSwitcher({ mine }: { mine: MyModule[] }) {
+export function ModuleSwitcher({ mine, compact = false }: { mine: MyModule[]; compact?: boolean }) {
   const pathname = usePathname();
   const here = moduleOfPath(pathname);
   const [open, setOpen] = useState(false);
@@ -32,9 +32,24 @@ export function ModuleSwitcher({ mine }: { mine: MyModule[] }) {
     };
   }, [open]);
 
-  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key));
+  // The Admin Console first, for those who have it: it's where they start.
+  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => Number(b.key === "platform") - Number(a.key === "platform"));
   return (
     <div ref={box} className="relative">
+      {compact ? (
+        // As the old app launcher: a grid at the top right, your modules under it.
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label="Your modules"
+          title="Your modules"
+          className={`grid size-10 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-sheet hover:text-ink ${open ? "bg-sheet text-ink" : ""}`}
+        >
+          <LayoutGrid className="size-5" aria-hidden />
+        </button>
+      ) : (
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -54,8 +69,9 @@ export function ModuleSwitcher({ mine }: { mine: MyModule[] }) {
         {here ? here.label : "All modules"}
         <ChevronDown className="size-4 text-ink-3" aria-hidden />
       </button>
+      )}
       {open && (
-        <div role="menu" className="absolute top-11 left-0 z-50 w-72 rounded-2xl border border-rule bg-white p-2 shadow-[0_12px_32px_rgba(20,20,20,0.12)]">
+        <div role="menu" className={`absolute top-11 z-50 ${compact ? "right-0" : "left-0"} w-72 rounded-2xl border border-rule bg-white p-2 shadow-[0_12px_32px_rgba(20,20,20,0.12)]`}>
           {list.length === 0 && <p className="px-2.5 py-2 text-meta text-ink-3">No modules given to your account yet.</p>}
           {list.map((m) => {
             const old = mine.find((x) => x.key === m.key)?.oldUrl;

@@ -29,7 +29,7 @@ export async function adminsOnly(): Promise<ReactNode | null> {
       <p className="mx-auto mt-1 max-w-md text-ink-2">
         Support sees everything on the platform and works its tickets and incidents. Changing it takes a Platform Admin.
       </p>
-      <LinkButton href="/platform/console" className="mt-5">
+      <LinkButton href="/platform" className="mt-5">
         Go to the dashboard
       </LinkButton>
     </Sheet>

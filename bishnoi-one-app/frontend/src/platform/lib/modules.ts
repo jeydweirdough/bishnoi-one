@@ -11,7 +11,7 @@ import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, Shield
 //   soon    not built yet (a "Coming soon" page, for companies that have it).
 // A module brought in (Phase 2) changes from "moving" to "live" here, and that's all.
 
-export type ModuleKey = "platform" | "console" | "crm" | "inventory" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
+export type ModuleKey = "platform" | "crm" | "inventory" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
 
 export type ModuleDef = {
   key: ModuleKey;
@@ -28,8 +28,6 @@ export type ModuleDef = {
   status: "live" | "moving" | "soon";
   /** Works on the Bishnoi One account itself: no module session is opened for it. */
   accountOnly?: boolean;
-  /** Signed in to on its own page with a staff account (the Platform console), not with a Bishnoi One account's pass. */
-  staffSignIn?: string;
   /** Its pages anyone may open, signed in or not (a customer's order link): still its module's, with no session. */
   public?: string[];
   icon: LucideIcon;
@@ -45,10 +43,9 @@ export const MODULES: ModuleDef[] = [
   { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Company settings", appKey: "exec", apiEnv: "ADMIN_API_URL", apiLocal: "http://127.0.0.1:8300", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
   { key: "inlicensing", path: "/in-licensing", label: "In-Licensing", blurb: "Product licensing", appKey: "inlicensing", apiEnv: "INLICENSING_API_URL", apiLocal: "http://127.0.0.1:8306", status: "soon", icon: FlaskConical, tint: "#e6f3f3", ink: "#2f7d7d" },
   { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiEnv: "REGULATORY_API_URL", apiLocal: "http://127.0.0.1:8308", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
-  // The Platform's staff console (Bishnoi One's own staff: companies, applications, incidents): its own staff sign-in.
-  { key: "console", path: "/platform/console", label: "Platform console", blurb: "Companies, applications and support", appKey: "platform-console", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", staffSignIn: "/platform/console/login", public: ["/platform/console/login"], icon: Network, tint: "#fdeedf", ink: "#b75a10" },
-  // The company's people and access, for its administrators; on the Bishnoi One account itself (no module session).
-  { key: "platform", path: "/platform", label: "Access", blurb: "People, roles and modules", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
+  // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform
+  // staff (same email) see APIs, companies and accounts; a company's administrators its roles.
+  { key: "platform", path: "/platform", label: "Admin Console", blurb: "APIs, companies, accounts and roles", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
 ];
 
 export const moduleByKey = (key: string | null | undefined): ModuleDef | null => MODULES.find((m) => m.key === key) ?? null;
@@ -57,7 +54,7 @@ export const moduleByAppKey = (appKey: string): ModuleDef | null => MODULES.find
 
 /** The module a path on this site belongs to: /crm and /crm/deals are the CRM's; / is nobody's. */
 export function moduleOfPath(pathname: string): ModuleDef | null {
-  // The longest path that fits: /platform/console/... is the console's, /platform/access the Platform's.
+  // The longest path that fits, should one module ever sit under another.
   return MODULES.filter((m) => pathname === m.path || pathname.startsWith(`${m.path}/`)).sort((a, b) => b.path.length - a.path.length)[0] ?? null;
 }
 

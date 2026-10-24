@@ -26,6 +26,7 @@ ACTION_LABELS = {
     "audit": "Activity log",
     "approve": "Approve and reject",
     "prepare": "Prepare BIR files",
+    "reconcile": "Reconcile statements",
     "first": "Told first about entries waiting",
     "record": "Record (post to the books)",
     "add": "Add",
@@ -66,7 +67,10 @@ AREAS: tuple[Area, ...] = (
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.
     Area("prices", "Product prices", "Prices", ("view", "approve")),
     # BIR files made from Oojeema's exports (the Sales DAT, app/bir.py); no role gets it until it's ticked.
-    Area("bir", "BIR files", "Tax", ("prepare",)),
+    # Prepare BIR files (the Sales DAT); view the books of accounts, statements, VAT return and lists (app/bir_reports.py).
+    Area("bir", "BIR files and reports", "Tax", ("view", "prepare")),
+    # Matching the bank's statements against the books (app/routers/bank.py).
+    Area("bank", "Bank reconciliation", "Accounting", ("view", "reconcile")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
 
@@ -138,6 +142,7 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         | _grant("suppliers", actions=("add", "edit", "deactivate"))
         | _grant("bills", actions=("create",))
         | _grant("vouchers", actions=("prepare",))
+        | _grant("bank", actions=("reconcile",))
         | _grant("prices", actions=("approve",)),
     ),
     (ROLE_AUDITOR_ID, AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"admin.audit"}),

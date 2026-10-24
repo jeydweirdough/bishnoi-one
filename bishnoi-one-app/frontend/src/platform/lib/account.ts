@@ -82,6 +82,8 @@ export type Account = {
   fullName: string;
   title: string | null;
   isCompanyAdmin: boolean;
+  /** Also Bishnoi One staff (same email): "admin" (Platform Admin) or "member" (Support); null otherwise. */
+  staff?: "admin" | "member" | null;
   company: { id: string; name: string; slug: string } | null;
   companies: { id: string; name: string; slug: string; current: boolean }[];
   /** The applications given to them, that their company has: a module each (by its Platform key). */

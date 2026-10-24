@@ -12,7 +12,7 @@ Bishnoi One: business apps (pharma distribution first; Philippines first) kept i
 | crm | `/crm` | 8302 | `nbcm_` |
 | finance | `/finance` | 8303 | `nbfi_` |
 | inventory | `/inventory` | 8304 | `nbin_` |
-| platform | `/platform/access` (company admins), `/platform/console` (staff) | 8305 | `nbpl_` |
+| platform | `/platform` (Admin Console: APIs, companies, accounts for staff; roles for company admins) | 8305 | `nbpl_` |
 | in-licensing | `/in-licensing` (coming soon) | 8306 | `nbil_` |
 | pharmacy | `/pharmacy` | 8307 | `nbph_` |
 | regulatory | `/regulatory` (coming soon) | 8308 | `nbrg_` |
@@ -53,9 +53,9 @@ Keep the machine light: run one app at a time and only the tests affected by a c
 
 **Tests:** `tests/conftest.py` builds a fresh SQLite database per test (`create_app` with test `Settings`) and seeds an Administrator (Ana) and a Salesperson (Ben). `TEST_DATABASE_URL` runs them on Postgres instead (it gets wiped).
 
-**The one app** (`bishnoi-one-app/frontend`, see its README): the browser never calls an API. `src/platform/lib/modules.ts` lists the modules (path, API setting, Platform key). `proxy.ts` marks each request with its module from the path, so `src/platform/lib/api.ts` talks to that module's API with that module's session cookie (`bishnoi_<module>_session`). One Bishnoi One sign-in (`/login`, Platform `/identity/*`); a module's session is opened on first use from a Platform pass (`app/auth/enter/[module]`); the staff console signs in on its own page. Module code is in `src/modules/<module>/` and pages under `app/(app)/<module>/` (console: `app/(staff)/platform/console/`, public and print pages under `app/(bare)/`); the CRM uses the shared kit `src/platform/` (UI in `ui/`), while Inventory, Finance, Admin, Pharmacy and the console still carry their own kit copy in `src/modules/<module>/platform/` until they're brought onto it. Fix the shared component, not one screen.
+**The one app** (`bishnoi-one-app/frontend`, see its README): the browser never calls an API. `src/platform/lib/modules.ts` lists the modules (path, API setting, Platform key). `proxy.ts` marks each request with its module from the path, so `src/platform/lib/api.ts` talks to that module's API with that module's session cookie (`bishnoi_<module>_session`). One Bishnoi One sign-in (`/login`, Platform `/identity/*`); a module's session is opened on first use from a Platform pass (`app/auth/enter/[module]`). The Admin Console (`/platform`) works on the account itself: Platform staff are recognised by email (`app/deps.py staff_by_account`). Module code is in `src/modules/<module>/` and pages under `app/(app)/<module>/` (Admin Console: `app/(app)/platform/`, its staff pages in `(staff)/`; public and print pages under `app/(bare)/`); the CRM uses the shared kit `src/platform/` (UI in `ui/`), while Inventory, Finance, Admin, Pharmacy and the console still carry their own kit copy in `src/modules/<module>/platform/` until they're brought onto it. Fix the shared component, not one screen.
 
-**Access (step R1, 2026-10-23):** roles are made once per company on the Platform (`app/access_roles.py`, `/identity/access`, screen `/platform/access`), one per person, with permissions and a scope per module; each API keeps declaring and enforcing its permissions and is sent the roles signed (`app/platform_roles.py`, the same in every API: `GET /platform/catalog`, `POST /platform/roles`).
+**Access (step R1, 2026-10-23):** roles are made once per company on the Platform (`app/access_roles.py`, `/identity/access`, screens `/platform/roles` and `/platform/roles/people`), one per person, with permissions and a scope per module; each API keeps declaring and enforcing its permissions and is sent the roles signed (`app/platform_roles.py`, the same in every API: `GET /platform/catalog`, `POST /platform/roles`).
 
 The `bishnoi-one-app/frontend/AGENTS.md` note applies: this Next.js version differs from training data, so check `node_modules/next/dist/docs/` before using Next APIs.
 

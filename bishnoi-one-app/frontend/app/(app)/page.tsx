@@ -6,6 +6,7 @@ import { getAccount } from "@/src/platform/lib/account";
 import { MODULES } from "@/src/platform/lib/modules";
 import { Banner } from "@/src/platform/ui/alert";
 import { myModules, primaryModule } from "@/src/one/mine";
+import { PlainFrame } from "@/src/one/plain-frame";
 
 export const metadata: Metadata = { title: "Bishnoi One" };
 
@@ -29,6 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Search }) {
   const first = me.fullName.split(" ")[0] || me.fullName;
 
   return (
+    <PlainFrame>
     <main className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-ink">Welcome, {first}</h1>
       <p className="mt-1.5 text-sm text-ink-2">
@@ -90,5 +92,6 @@ export default async function Home({ searchParams }: { searchParams: Search }) {
         </ul>
       )}
     </main>
+    </PlainFrame>
   );
 }

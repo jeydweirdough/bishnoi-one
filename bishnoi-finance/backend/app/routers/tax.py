@@ -108,6 +108,8 @@ def profile_out(p: TaxProfile, db: DB) -> dict:
         "branchCode": p.branch_code,
         "registeredAddress": p.registered_address,
         "pricesIncludeTax": p.prices_include_tax,
+        "rdoCode": p.rdo_code,
+        "fiscalMonthEnd": p.fiscal_month_end,
         "complete": profile_complete(p),
         # What's still missing, by name ("registered address"), and the sentence saying so.
         "missing": profile_missing(p),
@@ -127,7 +129,11 @@ PROFILE_PARTS = {
     "branch_code": "branch code",
     "registered_address": "registered address",
     "prices_include_tax": "catalogue prices",
+    "rdo_code": "RDO code",
+    "fiscal_month_end": "fiscal year end",
 }
+# Every part the form had before 2026-10-22, when a save logged them all.
+OLD_FORM = frozenset(list(PROFILE_PARTS)[:8])
 
 
 def history_out(db: DB, limit: int = 20) -> list[dict]:
@@ -142,7 +148,7 @@ def history_out(db: DB, limit: int = 20) -> list[dict]:
         {
             "at": iso(r.at),
             "who": names.get(r.actor_id) or r.actor,
-            "changed": None if set(r.fields or []) >= set(PROFILE_PARTS) else [PROFILE_PARTS.get(f, f) for f in PROFILE_PARTS if f in (r.fields or [])],
+            "changed": None if set(r.fields or []) >= OLD_FORM else [PROFILE_PARTS.get(f, f) for f in PROFILE_PARTS if f in (r.fields or [])],
         }
         for r in rows
     ]
@@ -207,6 +213,16 @@ class ProfileIn(Api):
     branch_code: str | None = Field(None, max_length=5)
     registered_address: str | None = Field(None, max_length=300)
     prices_include_tax: bool = True
+    # The Revenue District Office ("050") and the month the fiscal year ends (12: calendar year).
+    rdo_code: str | None = Field(None, max_length=3)
+    fiscal_month_end: int | None = Field(None, ge=1, le=12)
+
+    @field_validator("rdo_code")
+    @classmethod
+    def _rdo(cls, value: str | None) -> str | None:
+        if value is not None and value.strip() and not re.fullmatch(r"\d{3}", value.strip()):
+            raise ValueError("An RDO code is 3 digits, as on the certificate of registration (Form 2303).")
+        return value.strip() or None if value is not None else None
 
     @field_validator("branch_code")
     @classmethod
@@ -240,6 +256,11 @@ def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep
         "registered_address": body.registered_address,
         "prices_include_tax": body.prices_include_tax,
     }
+    # Left off the form, these keep what they were.
+    if "rdo_code" in body.model_fields_set:
+        new["rdo_code"] = body.rdo_code or None
+    if body.fiscal_month_end is not None:
+        new["fiscal_month_end"] = body.fiscal_month_end
     # Only what actually changed goes in the log and the history (it used to log every
     # part on the form: 2026-10-22). Saving it unchanged changes nothing.
     changed = [part for part, value in new.items() if getattr(profile, part) != value]

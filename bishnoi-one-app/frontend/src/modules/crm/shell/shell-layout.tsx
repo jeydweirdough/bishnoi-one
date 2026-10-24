@@ -6,6 +6,7 @@ import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { LinkButton } from "@/src/platform/ui/ant-button";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { Nav, type Unset, type Waiting } from "./nav";
+import { OneActions } from "@/src/one/one-actions";
 import { TopActions, type Notification } from "./top-actions";
 
 // The CRM's frame inside the one app (decided 2026-10-23): its sidebar, its own
@@ -34,7 +35,11 @@ export async function ShellLayout({ children, waiting, unset, notifications, all
   const stranded = me.org === null;
   // The sidebar as it was left: full, or collapsed to its icons.
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
-  const actions = <TopActions notifications={stranded ? undefined : notifications} allHref={allHref} search={stranded ? undefined : search} />;
+  const actions = (
+    <TopActions notifications={stranded ? undefined : notifications} allHref={allHref} search={stranded ? undefined : search}>
+      <OneActions links={[{ href: "/crm/account", label: "Your profile" }, { href: "/crm/account/mailbox", label: "Your mailbox" }]} />
+    </TopActions>
+  );
   return (
     <>
       {/* Says at once that a link was clicked; the sidebar stays, the page loads beside it. */}

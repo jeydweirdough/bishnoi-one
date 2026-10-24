@@ -274,6 +274,7 @@ POSTING = {
     "payables_account_id": ("liability", "What's owed suppliers on bills"),
     "input_tax_account_id": ("asset", "VAT on bills (input VAT)"),
     "withholding_account_id": ("liability", "Tax withheld from suppliers (EWT payable)"),
+    "cwt_account_id": ("asset", "Tax customers withheld (creditable withholding, Form 2307)"),
 }
 
 

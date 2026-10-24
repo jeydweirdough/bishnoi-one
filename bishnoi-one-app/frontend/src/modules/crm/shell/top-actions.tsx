@@ -1,31 +1,19 @@
 "use client";
 
 import { Popover } from "antd";
-import { Bell, Mail, UserRound } from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, use, useState } from "react";
 
-// The CRM's own actions at the top of its pages, in the one app: its search,
-// its notification bell (the attention prompts) and its own pages for you (your
-// CRM profile, your mailbox). Who you are, the other modules and signing out
-// are in the one app's bar above (decided 2026-10-23).
+// The top right of the CRM's pages, as before the one app: its search and its
+// notification bell (the attention prompts), then `children`: your modules and
+// you (src/one/one-actions.tsx, with your CRM profile and mailbox in its menu).
 
 /** One notification: what, why, and where it's dealt with. */
 export type Notification = { key: string; title: string; reason?: string; href: string };
 
-export function TopActions({ notifications, allHref, search }: { notifications?: Promise<Notification[]>; allHref?: string; search?: React.ReactNode }) {
-  const pathname = usePathname();
-  const iconLink = (href: string, label: string, icon: React.ReactNode) => (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className={`grid size-10 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-sheet hover:text-ink ${pathname === href ? "bg-sheet text-ink" : ""}`}
-    >
-      {icon}
-    </Link>
-  );
+export function TopActions({ notifications, allHref, search, children }: { notifications?: Promise<Notification[]>; allHref?: string; search?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-1">
       {search}
@@ -34,8 +22,7 @@ export function TopActions({ notifications, allHref, search }: { notifications?:
           <LoadedBell notifications={notifications} allHref={allHref} />
         </Suspense>
       )}
-      {iconLink("/crm/account/mailbox", "Your mailbox", <Mail className="size-5" aria-hidden />)}
-      {iconLink("/crm/account", "Your CRM profile", <UserRound className="size-5" aria-hidden />)}
+      {children}
     </div>
   );
 }

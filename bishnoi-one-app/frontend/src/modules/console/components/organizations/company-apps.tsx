@@ -75,7 +75,7 @@ export function CompanyApps({
               {detail ? (
                 <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <HealthMark status={detail.status} />
-                  <Link href={`/platform/console/users?company=${company.id}&application=${a.id}`} className="text-meta text-ink-2 hover:text-hema hover:underline">
+                  <Link href={`/platform/accounts?company=${company.id}&application=${a.id}`} className="text-meta text-ink-2 hover:text-hema hover:underline">
                     {plural(detail.userCount, "user")}
                   </Link>
                 </span>

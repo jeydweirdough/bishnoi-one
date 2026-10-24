@@ -181,6 +181,11 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
   const [amount, setAmount] = useState(String(owed / 10 ** (org.minorUnits ?? 2)));
   const [method, setMethod] = useState(methods[0]?.key ?? "cash");
   const [reference, setReference] = useState("");
+  // What the customer withheld and paid the BIR for you (their Form 2307), on top of the money received.
+  const [withheld, setWithheld] = useState(false);
+  const [cwt, setCwt] = useState("");
+  const [atc, setAtc] = useState("WC158");
+  const [certificate, setCertificate] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -193,8 +198,13 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
         e.preventDefault();
         const cents = fmt.toCentavos(amount);
         if (!cents) return setFields({ amountCentavos: "Enter the amount received." });
+        const cwtCents = withheld ? fmt.toCentavos(cwt) ?? 0 : 0;
+        if (withheld && !cwtCents) return setFields({ cwtCentavos: "Enter the tax withheld, as on the Form 2307." });
         start(async () => {
-          const result = await recordPayment(id, { paidOn, amountCentavos: cents, method, reference: reference.trim() || null });
+          const result = await recordPayment(id, {
+            paidOn, amountCentavos: cents, method, reference: reference.trim() || null,
+            cwtCentavos: cwtCents, cwtAtc: withheld ? atc.trim() || null : null, cwtCertificate: withheld ? certificate.trim() || null : null,
+          });
           if (!result.ok) {
             setError(result.error);
             setFields(result.fields ?? {});
@@ -229,6 +239,23 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
           {(p) => <Input {...p} value={reference} onChange={(e) => setReference(e.target.value)} maxLength={80} />}
         </Field>
       </div>
+      <label className="flex items-center gap-2 text-sm text-ink">
+        <input type="checkbox" checked={withheld} onChange={(e) => setWithheld(e.target.checked)} />
+        The customer withheld tax from this payment (Form 2307)
+      </label>
+      {withheld && (
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field label="Tax withheld" error={fields.cwtCentavos} hint="As on the 2307. With the amount received, it settles the invoice.">
+            {(p) => <Input {...p} inputMode="decimal" value={cwt} onChange={(e) => setCwt(e.target.value)} />}
+          </Field>
+          <Field label="ATC" error={fields.cwtAtc} hint="From the 2307, e.g. WC158 (goods, 1%) or WC160 (services, 2%).">
+            {(p) => <Input {...p} value={atc} onChange={(e) => setAtc(e.target.value.toUpperCase())} maxLength={8} />}
+          </Field>
+          <Field label="Form 2307 reference" optional error={fields.cwtCertificate} hint="Its number or date, to find it again.">
+            {(p) => <Input {...p} value={certificate} onChange={(e) => setCertificate(e.target.value)} maxLength={60} />}
+          </Field>
+        </div>
+      )}
       <FormError message={error} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={pending}>

@@ -11,6 +11,8 @@ export type TaxProfile = {
   branchCode: string;
   registeredAddress: string | null;
   pricesIncludeTax: boolean;
+  rdoCode: string | null;
+  fiscalMonthEnd: number;
   complete: boolean;
   /** What an invoice needs and the registration doesn't have yet: "registered name", "TIN", "registered address". */
   missing?: string[];

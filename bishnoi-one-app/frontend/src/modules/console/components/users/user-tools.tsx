@@ -95,7 +95,7 @@ export function DeleteUser({ id, name }: { id: string; name: string }) {
           return false;
         }
         toast.success("User deleted", { description: name });
-        router.push("/platform/console/users");
+        router.push("/platform/accounts");
       }}
     />
   );

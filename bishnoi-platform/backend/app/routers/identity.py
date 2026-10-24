@@ -32,7 +32,7 @@ from app.api import Api
 from app.access_roles import role_for_pass
 from app.audit import audit
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
-from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp, IdentitySession
+from app.models import AccessRole, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
 from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
 from app.routers.auth import Attempts
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
@@ -172,6 +172,9 @@ def me(signed: Signed, db: DB) -> dict:
         ),
         # Their one role at the company (app/access_roles.py), when they have one.
         "role": role.name if role else None,
+        # Also Bishnoi One staff here (same email): "admin" (Platform Admin) or "member" (Support), else None.
+        # The one app's Admin Console shows companies, APIs and accounts to them (app/deps.py staff_by_account).
+        "staff": db.scalar(select(User.role).where(func.lower(User.email) == person.email.lower(), User.is_active)),
         "apps": [
             {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": role.name if role else g.role, "isAppAdmin": g.is_app_admin or bool(role and role.is_admin),
              # When it was given to them: the first one given is where they start (the one app opens it after sign-in).

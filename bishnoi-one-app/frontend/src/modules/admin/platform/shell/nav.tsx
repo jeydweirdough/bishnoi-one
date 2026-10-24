@@ -1,5 +1,6 @@
 "use client";
 
+import { ModuleBrand } from "@/src/platform/shell/module-brand";
 import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -516,7 +517,7 @@ function adminPagesFor(me: Me): Page[] {
       ? [{ href: "/admin/admin/users", label: "Users", icon: "people" as const, also: ["/admin/admin/users"] }]
       : []),
     ...(may("admin.roles")
-      ? [{ href: "/platform/access/roles", label: "Roles and permissions", icon: "roles" as const }]
+      ? [{ href: "/platform/roles", label: "Roles and permissions", icon: "roles" as const }]
       : []),
     ...(may("admin.audit")
       ? [{ href: "/admin/admin/audit", label: "Activity log", icon: "auditLog" as const, also: ["/admin/admin/audit"] }]
@@ -716,22 +717,7 @@ export function Nav({ me, unset = {}, rail: railAtFirst = false, actions }: { me
   const open = openOn === pathname;
   const place = placeOf(pathname, me);
 
-  const brand = (
-    <Link href="/admin" className="flex items-center gap-2.5 border-b border-rule pb-4">
-
-      <span className="min-w-0">
-        {/* Which app this is, not only which product. Each one is its own site on
-            its own address, so "Bishnoi One" alone leaves you working out from the port
-            whether the screen in front of you is missing or simply elsewhere. */}
-        <span className="block truncate text-sm leading-tight font-semibold text-ink">
-          {thisAppLabel()}
-        </span>
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
-      </span>
-    </Link>
-  );
+  const brand = <ModuleBrand href="/admin" label="Executive Admin" company={me.org?.brandName ?? me.org?.name} />;
 
   return (
     <>

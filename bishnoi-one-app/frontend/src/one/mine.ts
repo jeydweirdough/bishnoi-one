@@ -13,18 +13,20 @@ export function myModules(me: Account): MyModule[] {
   const byGrant = [...me.apps].sort((a, b) => (a.grantedAt ?? "").localeCompare(b.grantedAt ?? ""));
   const given: MyModule[] = byGrant.flatMap((a) => {
     const m = moduleByAppKey(a.key);
-    return m && !m.accountOnly && !m.staffSignIn ? [{ key: m.key, oldUrl: a.appUrl }] : [];
+    return m && !m.accountOnly ? [{ key: m.key, oldUrl: a.appUrl }] : [];
   });
-  // People and access: the company's administrators, whatever they were given.
-  return me.isCompanyAdmin ? [...given, { key: "platform", oldUrl: null }] : given;
+  // The Admin Console: the company's administrators, and Bishnoi One's staff, whatever they were given.
+  return me.isCompanyAdmin || me.staff ? [...given, { key: "platform", oldUrl: null }] : given;
 }
 
 /**
- * Where someone starts (decided 2026-10-24): straight into the first module they
- * were given that's built, rather than a page of tiles; People and access for an
- * administrator with nothing else; null with nothing at all.
+ * Where someone starts (decided 2026-10-24): a company's administrators and
+ * Bishnoi One's staff in the Admin Console, their main place; everyone else
+ * straight into the first module they were given that's built, rather than a
+ * page of tiles; null with nothing at all. The module switcher takes either to the rest.
  */
 export function primaryModule(me: Account): ModuleDef | null {
+  if (me.isCompanyAdmin || me.staff) return moduleByKey("platform");
   const mine = myModules(me)
     .map((x) => moduleByKey(x.key))
     .filter((m): m is ModuleDef => m !== null);

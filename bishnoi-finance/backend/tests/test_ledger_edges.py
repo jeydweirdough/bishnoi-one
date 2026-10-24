@@ -123,4 +123,6 @@ def test_only_admins_set_the_default_accounts(client, ana, ben):
         "receivables_account_id": "1100", "sales_account_id": "4000", "output_tax_account_id": "2200",
         # Supplier bills (migration 0017).
         "payables_account_id": "2000", "input_tax_account_id": "1300", "withholding_account_id": "2300",
+        # Tax customers withheld (migration 0021).
+        "cwt_account_id": "1210",
     }

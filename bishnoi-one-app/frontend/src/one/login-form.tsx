@@ -5,9 +5,9 @@ import { Button } from "@/src/platform/ui/ant-button";
 import { Field, FormError, Input, PasswordInput } from "@/src/platform/ui/field";
 import { signIn, type SignInState } from "./actions";
 
-/** The Bishnoi One sign-in: email and password, then into the one app (or, given `signInWith`, the staff console's). */
-export function LoginForm({ next, signInWith = signIn }: { next: string; signInWith?: (previous: SignInState, form: FormData) => Promise<SignInState> }) {
-  const [state, action, pending] = useActionState<SignInState, FormData>(signInWith, null);
+/** The Bishnoi One sign-in: email and password, then into the one app. */
+export function LoginForm({ next }: { next: string }) {
+  const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
   // Kept as typed, so a wrong try leaves both there to fix.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -210,6 +210,10 @@ export type SupplierRow = Ref & {
   leadTimeDays: number | null;
   notes: string | null;
   isActive: boolean;
+  /** Tax registration, for Finance's bills and the BIR's purchase lists. */
+  tin: string | null;
+  vatStatus: "vat" | "non_vat";
+  defaultAtc: string | null;
   performance: Performance;
 };
 export type Supplier = SupplierRow & {

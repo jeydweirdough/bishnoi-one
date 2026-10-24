@@ -22,6 +22,9 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
     paymentTerms: supplier?.paymentTerms ?? "",
     leadTimeDays: supplier?.leadTimeDays == null ? "" : String(supplier.leadTimeDays),
     notes: supplier?.notes ?? "",
+    tin: supplier?.tin ?? "",
+    vatStatus: supplier?.vatStatus ?? "vat",
+    defaultAtc: supplier?.defaultAtc ?? "",
   });
   const [contacts, setContacts] = useState<Contact[]>(supplier?.contacts ?? []);
   const text = (k: keyof typeof d) => ({ value: d[k], onChange: (e: { target: { value: string } }) => setD({ ...d, [k]: e.target.value }) });
@@ -37,6 +40,9 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       paymentTerms: d.paymentTerms.trim() || null,
       leadTimeDays: d.leadTimeDays === "" ? null : Number(d.leadTimeDays),
       notes: d.notes.trim() || null,
+      tin: d.tin.trim() || null,
+      vatStatus: d.vatStatus,
+      defaultAtc: d.defaultAtc.trim().toUpperCase() || null,
       contacts: contacts.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), role: c.role?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null })),
     };
     save(() => saveSupplier(supplier?.id ?? null, input), (out) => ({ message: supplier ? "Supplier saved" : `${input.name} added`, go: `/inventory/suppliers/${supplier?.id ?? out.id}` }));
@@ -58,6 +64,22 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
             {(p) => <Input {...p} inputMode="numeric" value={d.leadTimeDays} onChange={(e) => setD({ ...d, leadTimeDays: e.target.value.replace(/\D/g, "") })} />}
           </Field>
           <Field label="Notes" optional error={fields.notes} className="sm:col-span-3">{(p) => <Textarea {...p} rows={2} {...text("notes")} />}</Field>
+        </div>
+      </Sheet>
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="settings">Tax registration</SectionTitle>
+        <p className="mt-1 text-meta text-ink-3">For Finance: its bills to this supplier, the input VAT, and the tax withheld (BIR Form 2307).</p>
+        <div className="mt-4 grid gap-5 sm:grid-cols-3">
+          <Field label="TIN" optional error={fields.tin} hint="123-456-789-00000, as on its invoices.">{(p) => <Input {...p} {...text("tin")} placeholder="123-456-789-00000" />}</Field>
+          <Field label="VAT" error={fields.vatStatus}>
+            {(p) => (
+              <select {...p} value={d.vatStatus} onChange={(e) => setD({ ...d, vatStatus: e.target.value as "vat" | "non_vat" })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                <option value="vat">VAT-registered</option>
+                <option value="non_vat">Not VAT-registered</option>
+              </select>
+            )}
+          </Field>
+          <Field label="Usual ATC" optional error={fields.defaultAtc} hint="Tax withheld from its payments: WC158 goods, WC160 services.">{(p) => <Input {...p} {...text("defaultAtc")} placeholder="WC158" maxLength={8} />}</Field>
         </div>
       </Sheet>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">

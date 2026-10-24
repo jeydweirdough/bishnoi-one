@@ -14,6 +14,7 @@ Permissions: invoices.view to read, .create for drafts, .issue, .void, and
 .setup for the number series.
 """
 
+import re
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -444,6 +445,7 @@ def payment_out(p: InvoicePayment) -> dict:
     return {
         "id": p.id, "paidOn": p.paid_on.isoformat(), "amountCentavos": p.amount_centavos,
         "method": p.method, "methodLabel": METHODS.get(p.method, p.method), "reference": p.reference,
+        "cwtCentavos": p.cwt_centavos, "cwtAtc": p.cwt_atc, "cwtCertificate": p.cwt_certificate,
         "recordedBy": p.recorded_by, "recordedAt": iso(p.recorded_at),
         "removedBy": p.removed_by, "removedAt": iso(p.removed_at),
     }
@@ -454,6 +456,10 @@ class PaymentIn(Api):
     amount_centavos: int = Field(ge=1)
     method: str = Field(max_length=10)
     reference: str | None = Field(None, max_length=80)
+    # What the customer withheld and paid the BIR for us (their Form 2307), on top of the money received.
+    cwt_centavos: int = Field(0, ge=0)
+    cwt_atc: str | None = Field(None, max_length=8)
+    cwt_certificate: str | None = Field(None, max_length=60)
 
 
 @router.post("/{invoice_id}/payments", status_code=status.HTTP_201_CREATED)
@@ -469,16 +475,26 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
     if body.paid_on < inv.invoice_date:
         raise field_error("paidOn", "A payment can't come before the invoice.")
     owed = inv.total_centavos - inv.paid_centavos
-    if body.amount_centavos > owed:
-        raise field_error("amountCentavos", f"That's more than is owed on this invoice ({owed / 100:,.2f}).")
-    p = InvoicePayment(invoice=inv, paid_on=body.paid_on, amount_centavos=body.amount_centavos, method=body.method, reference=body.reference, recorded_by=user.full_name)
+    settled = body.amount_centavos + body.cwt_centavos
+    if settled > owed:
+        raise field_error("amountCentavos", f"That's more than is owed on this invoice ({owed / 100:,.2f}), withholding included.")
+    atc = (body.cwt_atc or "").strip().upper() or None
+    if body.cwt_centavos and not atc:
+        raise field_error("cwtAtc", "Give the ATC the customer's Form 2307 shows (e.g. WC158).")
+    if atc and not re.fullmatch(r"W[A-Z]\d{3}[A-Z]?", atc):
+        raise field_error("cwtAtc", "An ATC looks like WC158 or WI160, as on the Form 2307.")
+    ledger = posting_settings(db)
+    p = InvoicePayment(invoice=inv, paid_on=body.paid_on, amount_centavos=body.amount_centavos, method=body.method, reference=body.reference, recorded_by=user.full_name,
+                       cwt_centavos=body.cwt_centavos, cwt_atc=atc if body.cwt_centavos else None, cwt_certificate=(body.cwt_certificate or "").strip() or None)
     how = METHODS[body.method] + (f" ({body.reference})" if body.reference else "")
+    # The withholding settles the invoice as the money does: 1210 Creditable withholding tax, credited against our income tax.
     entry = post(db, body.paid_on, f"{inv.number}: payment from {inv.customer_name}, {how}", [
         Leg(money_account(db, body.method), debit=body.amount_centavos),
-        Leg(account(db, posting_settings(db).receivables_account_id), credit=body.amount_centavos),
+        *([Leg(account(db, ledger.cwt_account_id), debit=body.cwt_centavos, description=f"Withheld by the customer ({atc})")] if body.cwt_centavos else []),
+        Leg(account(db, ledger.receivables_account_id), credit=settled),
     ], user.full_name, reference=body.reference or inv.number, source="invoice")
     p.entry_id = entry.id
-    inv.paid_centavos += body.amount_centavos
+    inv.paid_centavos += settled
     db.add(p)
     db.flush()
     audit(db, user, "invoice.paid", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
@@ -500,7 +516,7 @@ def remove_payment(user: permitted("invoices.void"), db: DB, settings: SettingsD
         legs = [Leg(ln.account, debit=ln.credit_centavos, credit=ln.debit_centavos, description=ln.description) for ln in entry.lines]
         post(db, today(settings), f"{inv.number}: payment taken off", legs, user.full_name, reference=entry.reference, source="invoice", reverses=entry)
     p.removed_at, p.removed_by = datetime.now(UTC), user.full_name
-    inv.paid_centavos -= p.amount_centavos
+    inv.paid_centavos -= p.amount_centavos + p.cwt_centavos
     audit(db, user, "invoice.payment_removed", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
     db.commit()
     return invoice_out(db, inv, settings)
