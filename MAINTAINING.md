@@ -14,35 +14,20 @@ invitation, and can push once they accept it. Point them to the README.
 
 ## One-time GitHub setup for the actions
 
-The repo has three actions, in `.github/workflows/`:
+Everyone works on `main`. The per-app branches and the Sync branches action
+were retired on 2026-10-24. The repo has one action, in `.github/workflows/`:
 
 | Action | Runs when | What it does |
 |---|---|---|
-| **Sync branches** (`sync-branches.yml`) | any push to `main` or a `bishnoi-*` branch, every 30 minutes, or by hand | Merges each app branch's new work into `main`, then rebuilds every app branch from `main` and pushes it. It also creates the branch for a new app folder. |
-| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `frontend/`, `backend/`, `.gitignore`, `README.md`, `GIT-GUIDE.md`, the workflow copy, and no secrets. |
+| **Check apps** (`check-apps.yml`) | every pull request into `main` | Checks each `bishnoi-*` folder: name, `backend/`, `.gitignore`, `README.md` and no `frontend/` (`bishnoi-one-app` excepted: it holds the screens, and needs `frontend/` and `README.md`), and no secrets. |
 
 There is no Deploy workflow: the automated one was removed on 2026-10-22. Deployment is by hand now ([below](#deploying-by-hand)).
 
-Set these once:
+Set this once:
 
-1. **Settings → Actions → General → Workflow permissions: Read and write.**
-2. **Add a `SYNC_TOKEN` secret.** GitHub's own token isn't allowed to push
-   workflow files, and each app branch carries a copy of the sync workflow.
-   With this token, the sync can push those too, including a new app's
-   branch.
-   1. Create the token: your profile → **Settings → Developer settings →
-      Personal access tokens → Fine-grained tokens → Generate new token**.
-   2. Repository access: only `jeydweirdough/bishnoi`.
-   3. Permissions: **Contents: Read and write**, **Workflows: Read and write**.
-   4. Save it on the repo: **Settings → Secrets and variables → Actions →
-      New repository secret**, named `SYNC_TOKEN`.
-   5. The token expires on the date you chose. When it does, runs fail at
-      checkout: make a new token and replace the secret.
-3. **Optional: make the check required.** Settings → Branches → add a rule
+1. **Optional: make the check required.** Settings → Branches → add a rule
    for `main` → "Require status checks to pass" → pick **check**. Then a
-   pull request can't be merged while the check is red. If you require pull
-   requests on `main`, also allow the `SYNC_TOKEN` owner to bypass the rule,
-   or the sync can't push.
+   pull request can't be merged while the check is red.
 
 ---
 
@@ -52,12 +37,12 @@ Someone proposes a new app as a pull request from an `add-app/<name>` branch
 into `main` (README section 8). Before merging:
 
 1. **Check apps is green.**
-2. **The folder name is the branch name you want.** Once merged,
-   `bishnoi-<name>` becomes the app's branch, and renaming it later means
-   renaming the folder and deleting the old branch by hand. If you want a
-   different name, ask them to rename the folder in the pull request.
-3. **The ports are free:** no other app uses them (the screens port + 4000 =
-   the API port).
+2. **The folder name is the one you want.** Renaming it later means
+   changing every place that names it. If you want a different name, ask
+   them to rename the folder in the pull request.
+3. **The API port is free:** no other app uses it. The app has no
+   `frontend/`: its screens go in the one app, `bishnoi-one-app/frontend`,
+   under a path of their own.
 4. **Nothing is committed that shouldn't be:** no `.env`, no `node_modules/`,
    no `.venv/`, no database files.
 5. **It meets the benchmark** ([`benchmarks/`](benchmarks/README.md)): each
@@ -65,13 +50,12 @@ into `main` (README section 8). Before merging:
    `open` row needs deciding first) and the rules in `patterns-to-adopt.md`,
    and its "Ours today" cells are filled in.
 
-Then **merge** it. About a minute later, Sync branches creates the
-`bishnoi-<name>` branch. Afterwards:
+Then **merge** it. Afterwards:
 
-- Add the app to the layout, branch and port tables in `README.md`, and
-  update the "next free ports" in README section 8.
-- Tell the author its branch name, and delete the `add-app/<name>` branch
-  (GitHub offers a button after the merge).
+- Add the app to the layout and port tables in `README.md`, and
+  update the "next free API port" in README section 8.
+- Delete the `add-app/<name>` branch (GitHub offers a button after the
+  merge).
 
 ---
 
@@ -85,27 +69,31 @@ when you're ready, the **Platform first** (the CRM and Inventory need its API).
 Coolify, built from this repo. To release new code: open the resource and
 press **Redeploy** (or **Deploy** after a fresh pull). Set each app's domain
 under **Configuration → Domains**, its settings under **Environment
-Variables**, and keep **Ports Exposes** matching the app's start port. The API
-first, then its screens. Watch the deployment log; an API that can't start
+Variables**, and keep **Ports Exposes** matching the app's start port. The
+screens are one more resource, the one app (`bishnoi-one-app/frontend`),
+replacing the old per-app screens resources: deploy the APIs first, then the
+one app. Watch the deployment log; an API that can't start
 answers 503 and names the setting to check.
 
-**Vercel (still possible, by hand).** Vercel doesn't build from Git (every
-app's `vercel.json`, screens and API: `git.deploymentEnabled: false`), so use
-the CLI from the app folder: `vercel --prod` in `bishnoi-<app>/backend`, then
-in `bishnoi-<app>/frontend`. Each Vercel project keeps its own Production
+**Vercel (still possible, by hand).** Vercel doesn't build the APIs from Git
+(every API's `vercel.json`: `git.deploymentEnabled: false`), so use the CLI:
+`vercel --prod` in `bishnoi-<app>/backend` for each API, then in
+`bishnoi-one-app/frontend` for the screens. Each Vercel project keeps its own Production
 environment variables. A bad deploy is rolled back from the project →
 Deployments → **Instant Rollback**.
 
 Either way the order is the same: **Platform**, then the CRM and Inventory,
-then the rest. In-Licensing and Regulatory have no screens yet.
+then the rest, then the one app's screens. In-Licensing and Regulatory show
+"Coming soon" in the one app.
 
 ---
 
 ## Putting an app online
 
 Six apps are ready for Vercel: Platform, CRM, Inventory, Finance, Executive
-Admin and Pharmacy. Each is two Vercel projects, its screens and its API, and
-they call each other, so set them up in this order.
+Admin and Pharmacy. Each is one Vercel project for its API, and one more
+project holds every app's screens (the one app). They call each other, so set
+them up in this order.
 
 1. **Database logins.** On Supabase, run `scripts/supabase/app-users.sql`
    (SQL Editor). It gives each app its own login; copy each app's address
@@ -114,15 +102,17 @@ they call each other, so set them up in this order.
    (`PASS_SIGNING_KEY`), the one key made by hand. Shown once. Every other key
    comes from the Platform's Connections page (step 6).
 3. **Projects.** On Vercel, make any project that doesn't exist yet:
-   `bishnoi-<app>` for the screens (Root Directory `bishnoi-<app>/frontend`)
-   and `bishnoi-<app>-backend` for the API (Root Directory
-   `bishnoi-<app>/backend`).
+   `bishnoi-<app>-backend` for each API (Root Directory
+   `bishnoi-<app>/backend`), and one project for the screens (Root Directory
+   `bishnoi-one-app/frontend`). The old per-app screens projects are replaced
+   by it.
 4. **Settings**, below (each project → Settings → Environment Variables →
    Production).
 5. **Deploy** each app by hand (see [Deploying by hand](#deploying-by-hand)
-   above), the Platform first; its API, then its screens.
-6. **Platform > Applications:** set each app's address to its screens'
-   address and its API. A Bishnoi One account opens an app only at that address.
+   above), the Platform first; the APIs, then the one app.
+6. **Platform > Applications:** set each app's API address. The one app's
+   address is the Platform's `ONE_APP_URL` (the same as the one app's own
+   `ONE_APP_URL`; see [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
    Then **Platform > Connections:** switch on the links between the apps. Each
    app's connect key is sent to its registered API address, signed, when it
    first asks: nothing to copy onto Vercel.
@@ -151,20 +141,17 @@ they call each other, so set them up in this order.
 | `bishnoi-crm-backend` | `CRM_APP_URL` | `https://bishnoi-one-crm.vercel.app` (links in emails) |
 | | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
 
-**Every screens project** (`bishnoi-<app>`). The `NEXT_PUBLIC_` ones are built
-in, so redeploy the screens after changing them:
+**The screens project** (the one app, `bishnoi-one-app/frontend`):
 
 | Setting | Value |
 |---|---|
-| `API_URL` | Its own API, e.g. `https://bishnoi-one-crm-backend.vercel.app` |
-| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not on the Platform itself) |
+| `ONE_APP_URL` | Its own address, e.g. `https://one.bishnoi.ai` (the same as the Platform's `ONE_APP_URL`) |
+| `PLATFORM_API_URL` | The Platform's API, e.g. `https://bishnoi-one-platform-backend.vercel.app` |
+| `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL`, `ADMIN_API_URL`, `PHARMACY_API_URL` | Each module's API, e.g. `https://bishnoi-one-crm-backend.vercel.app` |
+| `INLICENSING_API_URL`, `REGULATORY_API_URL` | Optional for now: those modules show "Coming soon" |
 
-That's all. Every other app's address (the sidebar's links between apps, the
-Bishnoi One account button, the redirects) is read from **Platform >
-Applications** as pages are served, kept 5 minutes: to move an app to a new
-domain, change it there, and every app follows without a redeploy. No
-`NEXT_PUBLIC_BISHNOI_*_URL` is needed; one that's set is only used while the
-Platform can't be reached. Leave `SHOW_DEMO_ACCOUNTS` unset online.
+Every setting is explained in `bishnoi-one-app/frontend/.env.example` and
+[bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
 What was checked before these were called ready (September 28, 2026): each
 app's tests, its production build, its migrations on a Supabase-like Postgres
@@ -348,9 +335,10 @@ To set it up:
 3. Each app's API on Vercel: `PLATFORM_API_URL` = the platform's API. The app
    fetches the public half from its `/pass/key`, and again when the key is
    replaced; `PLATFORM_PUBLIC_KEY` is only for pinning it.
-4. Each app's screens on Vercel: `NEXT_PUBLIC_BISHNOI_PLATFORM_URL` = the
-   platform's address. The sign-in page then shows "Sign in with your Bishnoi One
-   account".
+4. The screens are the one app: one Bishnoi One sign-in there opens every
+   module, and roles are managed centrally in `/platform/access`. Its
+   `PLATFORM_API_URL` = the platform's API (see
+   [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
 5. Platform > Applications: each application's address must be its real
    address: the pass goes back only to `<that address>/auth/platform` (or to
    Bishnoi One.exe on the same PC).
@@ -423,58 +411,8 @@ What Discord as the database costs, as with the orders app:
 - **About 30 messages a minute per channel.** More wait their turn
   (`DISCORD_MAX_PER_MINUTE`).
 
-For each app's screens to show announcements, Platform must know the app:
+For the screens to show an app's announcements, Platform must know the app:
 **Platform → Applications**, with its key `crm`, `inventory`, `finance`,
-`pharmacy`, `exec` (Admin) or `platform`, and the screens' `PLATFORM_API_URL`
+`pharmacy`, `exec` (Admin) or `platform`, and the one app's `PLATFORM_API_URL`
 must point at Platform's API.
 
----
-
-## When a sync fails
-
-A red ✗ on **Actions → Sync branches** almost always means the same lines
-were changed on `main` and on an app branch. Fix it from a full clone, in
-**Git Bash**, with nothing uncommitted:
-
-```
-git switch main
-git pull
-bash scripts/sync-branches.sh     # stops at the conflict
-git status                        # lists the files in conflict
-# fix the <<<<<<< ======= >>>>>>> markers in each file
-git add .
-git commit                        # finishes the merge
-bash scripts/sync-branches.sh     # run it again: it finishes and pushes
-```
-
----
-
-## Running the sync yourself
-
-- **On GitHub:** Actions → Sync branches → **Run workflow**.
-- **On your computer** (a full clone, on `main`, nothing uncommitted, in Git
-  Bash):
-  ```
-  bash scripts/sync-branches.sh                 # every app
-  bash scripts/sync-branches.sh bishnoi-crm       # just one app
-  ```
-
----
-
-## Changing the sync workflow
-
-`.github/workflows/sync-branches.yml` has a copy in each app folder
-(`bishnoi-*/.github/workflows/`). Each app branch needs its copy, because
-GitHub only runs the workflows in the branch that was pushed. Keep all the
-copies identical: Check apps fails a pull request if they differ.
-
-After editing, copy it to every app, then stage them all:
-
-```
-for d in bishnoi-*/; do cp .github/workflows/sync-branches.yml "$d.github/workflows/"; done
-git add .github "bishnoi-*/.github/*"
-```
-
-With `SYNC_TOKEN` set, pushing `main` is enough: the sync carries the copies
-to the app branches. Without it, also run `bash scripts/sync-branches.sh`
-once by hand.

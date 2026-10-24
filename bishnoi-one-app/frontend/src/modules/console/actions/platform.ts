@@ -1,0 +1,53 @@
+"use server";
+
+// Announcements and settings (app/routers/communications.py, settings.py).
+// Your own profile and password are the shared kit's (src/platform/actions).
+
+import { refresh } from "next/cache";
+import { api, enc } from "@/src/modules/console/platform/lib/api";
+import { attempt, type Result } from "@/src/modules/console/platform/lib/result";
+import type { NoticeKind, NoticeLevel, PlatformSettings } from "@/src/modules/console/lib/types";
+
+export type NoticeInput = {
+  kind: NoticeKind;
+  level: NoticeLevel;
+  title: string;
+  body?: string | null;
+  companyId?: string | null;
+  applicationId?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  publish: boolean;
+};
+
+export async function addNotice(input: NoticeInput): Promise<Result> {
+  return attempt(async () => {
+    await api.post("/platform/announcements", input);
+    refresh();
+    return null;
+  });
+}
+
+export async function updateNotice(id: string, patch: Partial<Omit<NoticeInput, "kind">>): Promise<Result> {
+  return attempt(async () => {
+    await api.patch(`/platform/announcements/${enc(id)}`, patch);
+    refresh();
+    return null;
+  });
+}
+
+export async function deleteNotice(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/platform/announcements/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}
+
+export async function saveSettings<K extends keyof PlatformSettings>(section: K, value: PlatformSettings[K]): Promise<Result<PlatformSettings>> {
+  return attempt(async () => {
+    const body = await api.put<{ settings: PlatformSettings }>(`/platform/settings/${enc(section)}`, value);
+    refresh();
+    return body.settings;
+  });
+}

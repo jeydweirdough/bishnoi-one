@@ -1,7 +1,8 @@
 # Bishnoi One
 
-Bishnoi One is a set of separate web apps (Admin, CRM, Finance, Inventory, and
-more) kept in one GitHub repo. This page shows you how to:
+Bishnoi One is a set of separate business apps (Admin, CRM, Finance, Inventory,
+and more) kept in one GitHub repo. Each app has its own API; every app's
+screens are in one web app, with one sign-in. This page shows you how to:
 
 - get the code onto your computer
 - keep it up to date
@@ -34,38 +35,44 @@ The rest of this page walks through them.
 
 ## 1. How the repo is laid out
 
-Each app is a complete web app in its own folder, with two parts:
+Each app's API lives in its own folder, in **`backend/`** (Python, FastAPI).
+The APIs don't depend on each other. Each one has its own settings and
+database.
 
-- **`frontend/`**: the screens (Next.js)
-- **`backend/`**: the API (Python, FastAPI)
-
-The apps don't depend on each other. Each one has its own settings, database
-and sign-in.
+Every app's screens are in **one** Next.js app, `bishnoi-one-app/frontend`,
+with each module under its own path. One Bishnoi One sign-in (a Platform
+account) opens every module. See
+[bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
 ```
 bishnoi/
-├── bishnoi-admin/          screens :4300   API :8300
-├── bishnoi-crm/            screens :4302   API :8302
-├── bishnoi-finance/        screens :4303   API :8303
-├── bishnoi-inventory/      screens :4304   API :8304
-├── bishnoi-platform/       screens :4305   API :8305
-├── bishnoi-in-licensing/   screens :4306   API :8306   (screens not built yet)
-├── bishnoi-pharmacy/       screens :4307   API :8307
-└── bishnoi-regulatory/     screens :4308   API :8308   (screens not built yet)
+├── bishnoi-one-app/        screens :4301   (every module, one sign-in)
+├── bishnoi-admin/          API :8300
+├── bishnoi-crm/            API :8302
+├── bishnoi-finance/        API :8303
+├── bishnoi-inventory/      API :8304
+├── bishnoi-platform/       API :8305
+├── bishnoi-in-licensing/   API :8306
+├── bishnoi-pharmacy/       API :8307
+└── bishnoi-regulatory/     API :8308
 ```
 
-### Branches
-
-| Branch | What's in it |
+| Module | Path in the one app |
 |---|---|
-| `main` | **Everything**: every app, each in its own folder |
-| `bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`, … | **One app only**, named after it |
+| CRM | `/crm` |
+| Inventory | `/inventory` |
+| Finance | `/finance` |
+| Executive Admin | `/admin` |
+| Pharmacy | `/pharmacy` |
+| Platform: company administrators (people, roles, modules) | `/platform/access` |
+| Platform: Bishnoi One staff console (own staff sign-in) | `/platform/console` |
+| In-Licensing, Regulatory | `/in-licensing`, `/regulatory` ("Coming soon") |
 
-An app branch holds the same files as that app's folder on `main`, with its
-own `README.md` on top: open the branch on GitHub to see how to clone, run,
-pull, push and deploy just that app. You can
-work on either one; GitHub keeps them matched for you
-([section 9](#9-what-happens-after-you-push)).
+### Work on `main`
+
+Every app and the one app are in one repo. Everyone works on `main`: clone
+the whole repo, pull, and push. Want a branch for a change? Branch from
+`main`, but never name it `bishnoi-…`.
 
 ---
 
@@ -110,42 +117,25 @@ browser window: sign in to GitHub, and Git remembers you from then on.
 ## 3. Clone: download the code
 
 Do this once. In your terminal, go to the folder where you keep your
-projects, then pick **one** option.
-
-### Option A: One app (most people)
-
-Use this if you work on a single app. Example for CRM:
+projects, then clone the whole repo:
 
 ```
-git clone -b bishnoi-crm --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-crm
-cd bishnoi-crm
-```
-
-For another app, replace **both** `bishnoi-crm`s with its branch name
-(`bishnoi-admin`, `bishnoi-finance`, …). You get only that app, with `frontend/`
-and `backend/` right at the top.
-
-### Option B: Everything
-
-Use this if you work across several apps, or to [add a new app](#8-add-a-new-app):
-
-```
-git clone https://github.com/jeydweirdough/nabhi.git
+git clone https://github.com/jeydweirdough/nabhi.git bishnoi
 cd bishnoi
 ```
 
-You get `main`, with every app in its own folder.
+You get `main`, with every app and the one app, each in its own folder.
 
 ### Then: create your settings files
 
 Passwords and other secrets are never stored in Git. Each app includes
-example files instead. On a full clone, `npm run <app>` copies them for you
-([section 5](#5-run-an-app)); otherwise copy them once per app:
+example files instead. `npm run <app>` copies them for you
+([section 5](#5-run-an-app)); to do it by hand, copy them once per app:
 
 | Copy this… | …to this |
 |---|---|
-| `backend/.env.example` | `backend/.env` |
-| `frontend/.env.example` | `frontend/.env.local` |
+| `backend/.env.example` | `backend/.env` (in each app's folder) |
+| `bishnoi-one-app/frontend/.env.example` | `bishnoi-one-app/frontend/.env.local` (the screens) |
 
 What each setting means, and a complete file for every app, is in
 [section 6](#6-settings-env-for-every-app). You're ready. See [Run an app](#5-run-an-app).
@@ -197,7 +187,7 @@ git pull
 git push
 ```
 
-That's it. Your work is on GitHub, and the other branch gets it too
+That's it. Your work is on GitHub, on `main`
 (see [section 9](#9-what-happens-after-you-push)).
 
 ### If `git push` is rejected
@@ -238,30 +228,39 @@ pulled, and you can ask for help.
 
 ## 5. Run an app
 
-### The quick way (full clone)
+### The quick way
 
-From the top of the repo, one command runs an app's API and screens
-together:
+From the top of the repo, one command runs the Platform, CRM, Inventory,
+Finance, Admin and Pharmacy APIs together with the one app's screens:
+
+```
+npm run one
+```
+
+Then open **http://localhost:4301** and sign in with your Bishnoi One
+account. **Ctrl+C** stops everything. `npm run one -- --setup` gets it all
+ready and starts nothing.
+
+The first time, it gets each part ready by itself: it copies the `.env`
+example files, makes each API's Python environment (`backend/.venv`, with
+`uv sync`) and installs the screens' packages (`npm install`). After that it
+only redoes what changed.
+
+To run one API alone, use its name. These run the API only: the screens are
+all in the one app.
 
 ```
 npm run bishnoi-crm
 ```
 
-The first time, it gets the app ready by itself: it copies the `.env`
-example files, makes the API's Python environment (`backend/.venv`, with
-`uv sync`) and installs the screens' packages (`npm install`). After that it
-only redoes what changed. Each line of output is marked `[api]` or `[web]`,
-and **Ctrl+C** stops both.
-
 Every app has one: `npm run bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`,
-`bishnoi-inventory`, `bishnoi-pharmacy`, `bishnoi-platform`, `bishnoi-in-licensing`,
-`bishnoi-regulatory` (the last two run their API only: no screens yet).
+`bishnoi-inventory`, `bishnoi-pharmacy`, `bishnoi-platform`, `bishnoi-in-licensing`
+and `bishnoi-regulatory`.
 
 | Also | Does |
 |---|---|
-| `npm run bishnoi-crm -- --api` | The API only |
-| `npm run bishnoi-crm -- --web` | The screens only |
-| `npm run bishnoi-crm -- --setup` | Gets it ready, starts nothing |
+| `npm run bishnoi-one-app` | The one app's screens only |
+| `npm run bishnoi-crm -- --setup` | Gets that API ready, starts nothing |
 | `npm run setup` | Gets **every** app ready |
 
 It needs only Node.js and uv (step 2): the root `package.json` has no
@@ -269,37 +268,24 @@ packages of its own to install.
 
 ### As a desktop app
 
-To try an app the way it will be used on a PC, in a window of its own, add
-`:app` to its name:
+To try the one app the way it will be used on a PC, in a window of its own:
 
 ```
-npm run bishnoi-crm:app
+npm run bishnoi-one-app:app
 ```
 
-It starts the API and the screens as above, then opens them in the app's
-own window. The first time, it installs what the window needs (in
-`desktop/`). Closing the window stops the app; so does **Ctrl+C**.
+The first time, it installs what the window needs (in `desktop/`). The APIs
+it uses must be running (for example with `npm run one` in another terminal,
+or each API on its own). The per-app `:app` commands are gone: every module
+opens in this one window. See [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
-Every app with screens has one: `bishnoi-admin:app`, `bishnoi-crm:app`,
-`bishnoi-finance:app`, `bishnoi-inventory:app`, `bishnoi-pharmacy:app` and
-`bishnoi-platform:app`. To have several open, run each in its own terminal.
-
-| In the window | What happens |
-|---|---|
-| The app itself | Its own window, taskbar button and sign-in, separate from the other apps |
-| A link to another Bishnoi One app | Opens in that app's window. If that app isn't running, a message says how to start it |
-| Sign in with your Bishnoi One account | Stays in the window, and comes back signed in |
-| Any other link (a map, a website) | Opens in your browser |
-
-This is for trying the apps on your own computer. Installers for other PCs
+This is for trying the app on your own computer. Installers for other PCs
 come later.
 
-### By hand (or on a one-app clone)
+### By hand
 
-Every app runs the same way, in **two terminals**. On a full clone, first go
-into the app's folder (`cd bishnoi-crm`).
-
-**Terminal 1: the API**
+Every API runs the same way. First go into the app's folder
+(`cd bishnoi-crm`).
 
 ```
 cd backend
@@ -307,30 +293,28 @@ uv sync
 uv run main.py
 ```
 
-**Terminal 2: the screens**
+The screens are the one app, in `bishnoi-one-app/frontend`; how to
+run it by hand is in [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
+Each module is at its path on http://localhost:4301
+([section 1](#1-how-the-repo-is-laid-out)).
 
-```
-cd frontend
-npm install
-npm run dev
-```
-
-Then open the screens in your browser:
-
-| App | Screens | API |
-|---|---|---|
-| Admin | http://localhost:4300 | http://127.0.0.1:8300 |
-| CRM | http://localhost:4302 | http://127.0.0.1:8302 |
-| Finance | http://localhost:4303 | http://127.0.0.1:8303 |
-| Inventory | http://localhost:4304 | http://127.0.0.1:8304 |
-| Platform | http://localhost:4305 | http://127.0.0.1:8305 |
-| Pharmacy | http://localhost:4307 | http://127.0.0.1:8307 |
-| In-Licensing, Regulatory | (not built) | 8306, 8308 |
+| App | API |
+|---|---|
+| Admin | http://127.0.0.1:8300 |
+| CRM | http://127.0.0.1:8302 |
+| Finance | http://127.0.0.1:8303 |
+| Inventory | http://127.0.0.1:8304 |
+| Platform | http://127.0.0.1:8305 |
+| In-Licensing | http://127.0.0.1:8306 |
+| Pharmacy | http://127.0.0.1:8307 |
+| Regulatory | http://127.0.0.1:8308 |
 
 ### Your first account
 
-Each app has **its own sign-in**, and there's no sign-up page. Create your
-account from the app's `backend/` folder:
+One Bishnoi One sign-in (a Platform account) opens every module in the one
+app, and roles are managed centrally in `/platform/access`. There's no
+sign-up page. Accounts are made with the users tool, run from an app's
+`backend/` folder (for your Bishnoi One account, `bishnoi-platform/backend`):
 
 ```
 uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
@@ -347,7 +331,7 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
   (e.g. http://127.0.0.1:8302/docs).
 - Run an API's tests with `uv run pytest` in its `backend/` folder.
 - On Windows, if the screens stop with
-  `listen EACCES: permission denied 0.0.0.0:4302`, Windows has set that port
+  `listen EACCES: permission denied 0.0.0.0:4301`, Windows has set that port
   aside (Hyper-V, WSL and Docker do this, and it changes from one restart to
   the next). `netsh interface ipv4 show excludedportrange protocol=tcp` shows
   which ports. To keep it away from the Bishnoi One ports for good, run this once
@@ -360,9 +344,10 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
 
 ### Put an app online (Vercel)
 
-Each app is **two Vercel projects** from this repo: its API and its screens.
-When you import the repo, set the project's **Root Directory** to the app's
-`backend/` or `frontend/` folder.
+Each app is **one Vercel project** from this repo, for its API, plus **one
+project for the one app's screens** (every module). When you import the repo,
+set the project's **Root Directory** to the app's `backend/` folder, or to
+`bishnoi-one-app/frontend` for the screens.
 
 Ready for Vercel today: **CRM, Inventory, Pharmacy, Platform**. Admin,
 Finance, In-Licensing and Regulatory don't have the Postgres driver, the
@@ -433,39 +418,44 @@ backup copies every company, one file each. Someone who works for two
 companies has a Platform account row at each, under one email and one
 password, and uses **Switch company** in the app's menu.
 
-**Every screens project:**
+**The screens project (the one app):**
 
 ```
-API_URL=https://<this app's API address>.vercel.app
-PLATFORM_API_URL=https://<the Platform's API address>.vercel.app
+ONE_APP_URL=https://one.bishnoi.ai
+PLATFORM_API_URL=https://<the Platform's API address>
+CRM_API_URL=https://<the CRM's API address>
+INVENTORY_API_URL=https://<Inventory's API address>
+FINANCE_API_URL=https://<Finance's API address>
+ADMIN_API_URL=https://<Admin's API address>
+PHARMACY_API_URL=https://<Pharmacy's API address>
 ```
 
-- The other apps' addresses come from **Platform > Applications**: set each
-  app's screens address there once. A new domain is changed there, and every
-  app follows within 5 minutes, with no redeploy.
-- Each app already knows which app it is: `NEXT_PUBLIC_BISHNOI_APP` isn't
-  needed.
-- Don't set `SHOW_DEMO_ACCOUNTS` online.
+- `ONE_APP_URL` must match the Platform's `ONE_APP_URL`.
+- `INLICENSING_API_URL` and `REGULATORY_API_URL` are there too, for when
+  those modules have screens.
+- Every setting is explained in `bishnoi-one-app/frontend/.env.example` and
+  [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
 **Linked apps:** the CRM's API also needs `INVENTORY_API_URL`/`KEY` and
 `FINANCE_API_URL`/`KEY` for the apps it uses, and each of those APIs needs
 the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
 
-| App | API root directory | Screens root directory |
-|---|---|---|
-| CRM | `bishnoi-crm/backend` | `bishnoi-crm/frontend` |
-| Inventory | `bishnoi-inventory/backend` | `bishnoi-inventory/frontend` |
-| Pharmacy | `bishnoi-pharmacy/backend` | `bishnoi-pharmacy/frontend` |
-| Platform | `bishnoi-platform/backend` | `bishnoi-platform/frontend` |
+| Project | Root directory |
+|---|---|
+| CRM API | `bishnoi-crm/backend` |
+| Inventory API | `bishnoi-inventory/backend` |
+| Pharmacy API | `bishnoi-pharmacy/backend` |
+| Platform API | `bishnoi-platform/backend` |
+| The one app (every module's screens) | `bishnoi-one-app/frontend` |
 
 Use the addresses Vercel actually gives your projects (e.g.
-`bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and its
-screens' `API_URL` must both name it.
+`bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and the
+one app's matching `<APP>_API_URL` must both name it.
 
 **Pushing doesn't deploy.** To put an app online, deploy it by hand, the
 Platform first: on the office Coolify server press **Redeploy**, or run
-`vercel --prod` in the app's `backend` then `frontend` folder (MAINTAINING.md,
-"Deploying by hand").
+`vercel --prod` in the app's `backend` folder; then deploy the one app from
+`bishnoi-one-app/frontend` (MAINTAINING.md, "Deploying by hand").
 
 If an API can't start, every request to it answers `503` with what's wrong
 and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
@@ -475,12 +465,13 @@ full error is in the project's logs.
 
 ## 6. Settings (`.env`) for every app
 
-Each app reads its settings from two files. Git never stores them:
+Each app's API reads its settings from one file, and the one app's screens
+from another. Git never stores them:
 
 | File | Read by | Starts from |
 |---|---|---|
-| `backend/.env` | the API | `backend/.env.example` |
-| `frontend/.env.local` | the screens | `frontend/.env.example` |
+| `bishnoi-<app>/backend/.env` | that app's API | `backend/.env.example` |
+| `bishnoi-one-app/frontend/.env.local` | the screens (every module) | `bishnoi-one-app/frontend/.env.example` |
 
 On your computer, **every setting has a default that works**, so the
 copied example files are enough to run an app. Change a setting only when
@@ -562,29 +553,32 @@ Use a different key for each link: one for CRM → Inventory, another for
 CRM → Finance, another for CRM → Pharmacy. Restart both APIs. If the key is missing or doesn't match,
 the CRM tells its users the other app can't be reached; nothing breaks.
 
-### Screens settings (every app)
+### Screens settings (the one app)
+
+The screens are one app, so they have one settings file:
+`bishnoi-one-app/frontend/.env.local`. Only the one app's server talks to the
+APIs; browsers never do.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `API_URL` | this app's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find their own API. Only the screens' server uses it; browsers never see it. |
-| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API: every other app's address (Platform > Applications) and the announcements above every page. Unreachable: the last addresses it had (or the ones below) are used, and no announcements show. |
-| `SHOW_DEMO_ACCOUNTS` | not set | `1` lists the demo accounts beside the sign-in form, for testing. Make them first with `uv run python -m app.tools.users demo` in `backend/`. **Never set it online.** |
-| `NEXT_PUBLIC_BISHNOI_APP` | built in | Which app this is, so the sidebar knows which links go to other apps. Each app already sets its own; only set it to override. |
-| `NEXT_PUBLIC_BISHNOI_<APP>_URL` | the local ports | Only a fallback, while the Platform can't be reached: the apps' addresses come from Platform > Applications. Not needed online. |
+| `ONE_APP_URL` | `http://localhost:4301` | The one app's own address, as the Platform knows it (online, `https://one.bishnoi.ai`; the Platform's `ONE_APP_URL` must be the same). |
+| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API: the one sign-in, and the Platform module's API. |
+| `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL`, `ADMIN_API_URL`, `PHARMACY_API_URL`, `INLICENSING_API_URL`, `REGULATORY_API_URL` | each module's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find each module's API. |
 
-The `<APP>` names are `EXEC` (Admin), `CRM`, `FINANCE`, `INVENTORY`,
-`PLATFORM`, `INLICENSING`, `PHARMACY` and `REGULATORY`, e.g.
-`NEXT_PUBLIC_BISHNOI_FINANCE_URL=https://bishnoi-one-finance.vercel.app`.
-`NEXT_PUBLIC_…` settings are built into the screens: **redeploy** after you
-change one. Better: leave them unset and change the address on the Platform.
+The full list is in `bishnoi-one-app/frontend/.env.example`, and
+[bishnoi-one-app/README.md](bishnoi-one-app/README.md) explains it.
 
 ### Complete files, app by app
 
 Ready to copy for your computer. Lines starting with `#` are optional:
 remove the `#` to use one.
 
+The screens' file, `bishnoi-one-app/frontend/.env.local`, is a copy of
+`bishnoi-one-app/frontend/.env.example`: every line in it is optional on your
+computer ([Screens settings](#screens-settings-the-one-app)).
+
 <details>
-<summary><b>Admin</b> (screens :4300, API :8300)</summary>
+<summary><b>Admin</b> (API :8300)</summary>
 
 `bishnoi-admin/backend/.env`
 
@@ -603,18 +597,10 @@ ENVIRONMENT=development
 # CORS_ORIGINS=[]
 ```
 
-`bishnoi-admin/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8300
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=exec
-```
-
 </details>
 
 <details>
-<summary><b>CRM</b> (screens :4302, API :8302)</summary>
+<summary><b>CRM</b> (API :8302)</summary>
 
 `bishnoi-crm/backend/.env`
 
@@ -649,18 +635,10 @@ ENVIRONMENT=development
 # PHARMACY_API_KEY=
 ```
 
-`bishnoi-crm/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8302
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=crm
-```
-
 </details>
 
 <details>
-<summary><b>Finance</b> (screens :4303, API :8303)</summary>
+<summary><b>Finance</b> (API :8303)</summary>
 
 `bishnoi-finance/backend/.env`
 
@@ -682,18 +660,10 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's FINANCE_API_KEY>"]
 ```
 
-`bishnoi-finance/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8303
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=finance
-```
-
 </details>
 
 <details>
-<summary><b>Inventory</b> (screens :4304, API :8304)</summary>
+<summary><b>Inventory</b> (API :8304)</summary>
 
 `bishnoi-inventory/backend/.env`
 
@@ -720,18 +690,10 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's INVENTORY_API_KEY>"]
 ```
 
-`bishnoi-inventory/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8304
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=inventory
-```
-
 </details>
 
 <details>
-<summary><b>Platform</b> (screens :4305, API :8305)</summary>
+<summary><b>Platform</b> (API :8305)</summary>
 
 `bishnoi-platform/backend/.env`
 
@@ -756,18 +718,10 @@ ENVIRONMENT=development
 The sign-in settings are only where Platform starts: after that, **Settings →
 Security** in the app changes them.
 
-`bishnoi-platform/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8305
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=platform
-```
-
 </details>
 
 <details>
-<summary><b>Pharmacy</b> (screens :4307, API :8307)</summary>
+<summary><b>Pharmacy</b> (API :8307)</summary>
 
 `bishnoi-pharmacy/backend/.env`
 
@@ -792,20 +746,12 @@ ENVIRONMENT=development
 # INTEGRATION_KEYS=["crm:<the CRM's PHARMACY_API_KEY>"]
 ```
 
-`bishnoi-pharmacy/frontend/.env.local`
-
-```
-API_URL=http://127.0.0.1:8307
-SHOW_DEMO_ACCOUNTS=1
-# NEXT_PUBLIC_BISHNOI_APP=pharmacy
-```
-
 </details>
 
 <details>
 <summary><b>In-Licensing</b> (API :8306) and <b>Regulatory</b> (API :8308)</summary>
 
-Only the API exists so far. Their screens have no settings yet.
+Only the API exists so far. In the one app, `/in-licensing` and `/regulatory` show "Coming soon".
 
 `bishnoi-in-licensing/backend/.env` (for Regulatory, use
 `sqlite:///.data/regulatory.db`)
@@ -914,12 +860,11 @@ decision before building it).
 ## 8. Add a new app
 
 A new app goes in through a **pull request**. You propose it, and GitHub
-checks it. The repo owner then reviews and merges it, and your app gets its
-own branch.
+checks it. The repo owner then reviews and merges it into `main`.
 
-### Step 1: Clone everything and start a branch
+### Step 1: Start a branch
 
-You need the full repo ([Option B](#option-b-everything)). Then:
+From your clone of the repo ([section 3](#3-clone-download-the-code)):
 
 ```
 git switch main
@@ -929,26 +874,24 @@ git switch -c add-app/hr
 
 Replace `hr` with your app's name.
 
-> Name your branch `add-app/<name>`. **Don't** start it with `bishnoi-`: those
-> names are kept for the app branches.
+> Name your branch `add-app/<name>`. **Don't** start it with `bishnoi-`.
 
 ### Step 2: Create the app's folder
 
 Name the folder **`bishnoi-<name>`**, using small letters, digits and dashes
-only (e.g. `bishnoi-hr`, `bishnoi-field-sales`). This becomes your app's branch
-name. Inside it, add:
+only (e.g. `bishnoi-hr`, `bishnoi-field-sales`). Inside it, add:
 
 | What | How |
 |---|---|
-| `frontend/` | the screens: start from another app's `frontend/` |
 | `backend/` | the API: start from another app's `backend/` |
 | `.gitignore` | copy it from another app |
-| `README.md` | your branch's front page on GitHub: copy it from another app, and change the app's name, what it does, its ports and its deploy workflow |
-| `GIT-GUIDE.md` | copy it from another app, and change the app name and ports |
-| `.github/workflows/sync-branches.yml` | copy `.github/workflows/sync-branches.yml` from the top of the repo, **unchanged** |
+| `README.md` | copy it from another app, and change the app's name, what it does, its port and how it's deployed |
 
-Pick the next free ports: the screens get the next number after the last app
-(currently **4309**), and the API is that + 4000 (**8309**).
+Don't add a `frontend/`: **Check apps** refuses one in an app folder. The
+app's screens go in the one app, `bishnoi-one-app/frontend`, under a path of
+their own (see [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
+
+Pick the next free API port after the last app (currently **8309**).
 
 ### Step 3: Commit and push your branch
 
@@ -973,31 +916,18 @@ runs again by itself.
 
 ### Step 5: The owner merges it
 
-The repo owner reviews your app and merges it into `main`. About a minute
-later, your app has **its own branch, named after its folder**
-(`bishnoi-hr`). From then on, anyone can clone just your app:
-
-```
-git clone -b bishnoi-hr --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-hr
-```
+The repo owner reviews your app and merges it into `main`. From then on,
+everyone has it on their next `git pull`.
 
 ---
 
 ## 9. What happens after you push
 
-**Nothing for you to do.** About a minute after any push to `main` or to an
-app branch, GitHub's **Sync branches** action runs:
+**Nothing for you to do.** Your work is on `main`, and your teammates get
+it the next time they `git pull`.
 
-- Push to an **app branch** (e.g. `bishnoi-crm`): your work is copied into
-  that app's folder on `main`.
-- Push to **`main`**: each app's folder is copied to its app branch.
-
-Every branch is brought up to date on every run, so none is left behind. Your
-teammates get your work the next time they `git pull`.
-
-You can watch it on the repo's **Actions** tab. If a run there shows a red ✗
-after your push, tell the repo owner. It usually means the same lines were
-changed on `main` and on an app branch, and it needs sorting out by hand.
+Pushing doesn't deploy. Nothing goes online until someone deploys it by hand
+([MAINTAINING.md](MAINTAINING.md)).
 
 ---
 
@@ -1008,12 +938,9 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 3. **Never commit secrets.** `.env`, `.env.local`, keys and the backend's
    `.data/` folder are already ignored by Git. Don't force them in with
    `git add -f`.
-4. **Don't open pull requests from an app branch into `main`.** The sync
-   already does that. If GitHub shows a yellow "Compare & pull request"
-   banner after you push to an app branch, ignore it. (Pull requests from an
-   `add-app/…` or `feature/…` branch are fine.)
-5. **Don't create branches that start with `bishnoi-`.** Those are the app
-   branches, and the sync manages them.
+4. **Work on `main`.** If you want a branch for a change, branch from
+   `main` and open a pull request back into `main`.
+5. **Don't create branches that start with `bishnoi-`.**
 6. **Build features to the benchmark.** Every app is measured against
    [`benchmarks/`](benchmarks/README.md) ([section 7](#7-benchmarks-what-we-build-to)): find the feature's row in
    `benchmark-matrix.md` before you build it, follow `patterns-to-adopt.md`,
@@ -1025,8 +952,7 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 
 | I want to… | Command |
 |---|---|
-| Clone one app | `git clone -b <app> --single-branch https://github.com/jeydweirdough/nabhi.git <app>` |
-| Clone everything | `git clone https://github.com/jeydweirdough/nabhi.git` |
+| Clone the repo | `git clone https://github.com/jeydweirdough/nabhi.git bishnoi` |
 | Get the latest | `git pull` |
 | See what I changed | `git status` / `git diff` |
 | Save my changes | `git add .` then `git commit -m "what changed"` |
@@ -1036,10 +962,11 @@ changed on `main` and on an app branch, and it needs sorting out by hand.
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` |
-| Run an app (API + screens) | `npm run bishnoi-crm` (from the top of a full clone) |
+| Run every API and the screens | `npm run one`, then open http://localhost:4301 (from the top of the repo) |
+| Run one API | `npm run bishnoi-crm` (from the top of the repo) |
 | Start a new app | `git switch -c add-app/<name>`, then [section 8](#8-add-a-new-app) |
 
 ---
 
-*Looking after the repo (sync settings, tokens, reviewing new apps)? See
+*Looking after the repo (adding people, reviewing new apps, deploying)? See
 [MAINTAINING.md](MAINTAINING.md).*

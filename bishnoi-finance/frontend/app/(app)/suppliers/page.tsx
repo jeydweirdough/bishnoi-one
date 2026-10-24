@@ -1,5 +1,0 @@
-// The route. The screen is in src/, so it can be read on its own.
-import { SuppliersPage } from "../../../src/screens/payables";
-
-export const metadata = { title: "Suppliers" };
-export default SuppliersPage;

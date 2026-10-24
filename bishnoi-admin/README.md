@@ -2,59 +2,49 @@
 
 Running one company.
 
-This is the **`bishnoi-admin`** branch. It holds only this app, so you can work on
-it without downloading the others. The same files are in the `bishnoi-admin/`
-folder on `main`, and GitHub keeps the two matched after every push.
+This folder is the Executive Admin API. Its screens are in the one app,
+`bishnoi-one-app/`, with every other module's.
 
 | | |
 |---|---|
-| Screens | `frontend/` · http://localhost:4300 |
+| Screens | In the one app (`bishnoi-one-app/`) · http://localhost:4301, at `/admin` |
 | API | `backend/` · http://127.0.0.1:8300 (docs at `/docs`) |
-| Branch | `bishnoi-admin` |
-| Full guide | [GIT-GUIDE.md](GIT-GUIDE.md): every step, with what to do when something goes wrong |
 
-## 1. Get the code (once)
+## Run it
 
-```
-git clone -b bishnoi-admin --single-branch https://github.com/jeydweirdough/nabhi.git bishnoi-admin
-cd bishnoi-admin
-```
-
-First time on this computer? Tell Git who you are first (section 1 of
-[GIT-GUIDE.md](GIT-GUIDE.md)).
-
-## 2. Run it
-
-**API**:
+From the repo root:
 
 ```
-cd backend
-cp .env.example .env
-uv sync
-uv run main.py
+npm run one               # every API and the one app's screens
+npm run bishnoi-admin     # this API alone
 ```
 
-Make your first account (there is no sign-up page):
+Open http://localhost:4301; this module is at `/admin`.
+
+The first run sets up `.env`, `.venv` and the packages it needs.
+Settings and passwords live in `backend/.env`. They are never in Git:
+ask whoever looks after the app for the values you need.
+
+Make your first account (there is no sign-up page), in `backend/`:
 
 ```
 uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
 ```
 
-**Screens**, in a second terminal:
+Run the tests, in `backend/`:
 
 ```
-cd frontend
-cp .env.example .env.local
-npm install
-npm run dev
+uv run pytest
 ```
 
-Open http://localhost:4300.
+## How to work
 
-Settings and passwords live in `.env` and `.env.local`. They are never in Git:
-ask whoever looks after the app for the values you need.
+Every app and the one app are in one repo. Clone it once and work on `main`:
 
-## 3. Every day: pull, then push
+```
+git clone https://github.com/jeydweirdough/nabhi.git bishnoi
+cd bishnoi
+```
 
 Before you start, get everyone else's work:
 
@@ -75,37 +65,22 @@ git push
 `git push` again. If Git names a conflict, fix the files it lists (look for
 `<<<<<<<`), then `git add .` and `git rebase --continue`, then `git push`.
 
-## 4. After you push
+Want a branch for a change? Branch from `main`, but never name it `bishnoi-…`.
 
-Within a few minutes the **Sync branches** action copies your work into the
-`bishnoi-admin/` folder on `main`, and brings anything changed on `main` back here.
-You don't do anything: the next `git pull` has it.
+## Put it online
 
-**GitHub says this branch is "ahead of" and "behind" `main`?** Ignore it; it
-always will. It counts commits, not files: `main` has every app's commits,
-and the sync's copies here count as new ones. The files are what matter, and
-the sync keeps them the same. Don't press "Sync fork", "Contribute" or
-"Compare & pull request": there's nothing to merge by hand.
-
-Working on `main` instead, with every app? Use the `bishnoi-admin/` folder and the
-same commands; your pushes reach this branch the same way. Push a change to
-one place only, never to both.
-
-## 5. Put it online
-
-Deploy it by hand, the usual way: on the office Coolify server open this app and press **Redeploy**; or run `vercel --prod` in `bishnoi-admin/backend` then `bishnoi-admin/frontend`. Any time, after the Platform.
+Deploy it by hand, the usual way: on the office Coolify server open this app and press **Redeploy**; or run `vercel --prod` in `bishnoi-admin/backend`. The screens deploy once, for every module, from `bishnoi-one-app/frontend`. Any time, after the Platform.
 
 Pushing doesn't deploy; nothing goes online until you deploy it yourself (MAINTAINING.md has the steps).
 
-## 6. Never
+## Never
 
 - `git push --force`: it deletes other people's work.
-- Commit `.env`, `.env.local`, keys or `backend/.data/`: they're ignored on purpose.
-- Open a pull request from this branch into `main`: the sync does that. Ignore GitHub's "Compare & pull request" banner.
+- Commit `.env`, keys or `backend/.data/`: they're ignored on purpose.
 
 ## More
 
-- [GIT-GUIDE.md](GIT-GUIDE.md): the full step-by-step guide for this branch
-- [`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md): how this app's API and screens work
-- [The repo's main README](https://github.com/jeydweirdough/nabhi/blob/main/README.md): every app, and how the branches fit together
-- [Benchmarks](https://github.com/jeydweirdough/nabhi/blob/main/benchmarks/README.md): what every feature is measured against
+- [`backend/README.md`](backend/README.md): how this app's API works
+- [The one app's README](../bishnoi-one-app/README.md): the screens for every module
+- [The repo's main README](../README.md): every app, and how to set them up
+- [Benchmarks](../benchmarks/README.md): what every feature is measured against

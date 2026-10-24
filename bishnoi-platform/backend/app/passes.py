@@ -14,7 +14,7 @@ The format is a compact JWS (a JWT) signed with Ed25519 ("EdDSA"):
     header  {"alg": "EdDSA", "typ": "JWT", "kid": <key id>}
     claims  {"iss": "bishnoi-platform", "aud": <app key>, "sub": <identity id>,
              "email", "name", "company", "companySlug", "companyName", "role", "appAdmin",
-             "companyAdmin", "iat", "exp", "jti"}
+             "companyAdmin", "iat", "exp", "jti", and "roleDef" when they have a role here}
 """
 
 import base64
@@ -76,7 +76,16 @@ def key_id(settings: Settings) -> str:
     return hashlib.sha256(base64.b64decode(public_key(settings))).hexdigest()[:12]
 
 
-def issue(settings: Settings, identity: Identity, company: Company, app: Application, grant: IdentityApp) -> str:
+def sign(settings: Settings, claims: dict) -> str:
+    """Claims, signed with the platform's key, as a compact JWS."""
+    header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
+    signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
+    return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
+
+
+def issue(settings: Settings, identity: Identity, company: Company, app: Application, grant: IdentityApp, role: dict | None = None) -> str:
+    """`role`: their one role at the company, as this application keeps it
+    (app/access_roles.py spec); without one, the role on their grant."""
     now = int(time.time())
     header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
     claims = {
@@ -88,13 +97,16 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
         "company": company.id,
         "companySlug": company.slug,
         "companyName": company.name,
-        "role": grant.role,
-        "appAdmin": grant.is_app_admin,
+        "role": role["name"] if role else grant.role,
+        "appAdmin": grant.is_app_admin or bool(role and role.get("admin")),
         "companyAdmin": identity.is_company_admin,
         "iat": now,
         "exp": now + LIFETIME,
         "jti": secrets.token_urlsafe(18),
     }
+    if role:
+        # The role itself, so the application keeps it as the platform has it before matching it by name.
+        claims["roleDef"] = role
     signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
     signature = signing_key(settings).sign(signing_input.encode())
     return f"{signing_input}.{b64url(signature)}"

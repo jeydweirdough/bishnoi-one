@@ -310,6 +310,50 @@ class Identity(Base):
     # have (app/routers/identity.py). None until a Platform Admin sets a first one.
     password_hash: Mapped[str | None] = mapped_column(String(255), default=None)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Their one role at this company, across every module (app/access_roles.py).
+    # None: each application still goes by the role on their grant (IdentityApp.role).
+    access_role_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="SET NULL"), default=None, index=True)
+
+
+# ---- Access: one role per person per company, for every module -------------------
+# Decided 2026-10-23 (benchmarks/decisions.md): a company's roles are kept here,
+# each with any module's permissions and a scope per module; each module's API
+# still declares its permissions and enforces every request, and is sent the
+# roles to keep in its own role tables (app/access_roles.py).
+
+
+class AccessRole(Base):
+    __tablename__ = "nbpl_access_roles"
+    __table_args__ = (UniqueConstraint("company_id", "name", name="nbpl_access_role_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Everything in every module: each module's Administrator.
+    is_admin: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AccessRolePermission(Base):
+    """One permission of one module ("crm", "customers.edit")."""
+
+    __tablename__ = "nbpl_access_role_permissions"
+
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="CASCADE"), primary_key=True)
+    app_key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    permission: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class AccessRoleScope(Base):
+    """Whose records the role reaches in one module, where the module has scopes (own, team, all)."""
+
+    __tablename__ = "nbpl_access_role_scopes"
+
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="CASCADE"), primary_key=True)
+    app_key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(16))
 
 
 class IdentitySession(Base):

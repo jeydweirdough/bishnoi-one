@@ -14,13 +14,9 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const HOST = "localhost";
 
 // The mark and colour are for the icon (make-icons.mjs), until each app has its own artwork.
+// Since 2026-10-24 there is one: the one app, every module's screens (the app frontends were removed).
 const KNOWN = {
-  "bishnoi-admin": { name: "Bishnoi One Admin", mark: "A", color: "#172233" },
-  "bishnoi-crm": { name: "Bishnoi One CRM", mark: "C", color: "#3a3f9c" },
-  "bishnoi-finance": { name: "Bishnoi One Finance", mark: "F", color: "#1f6f47" },
-  "bishnoi-inventory": { name: "Bishnoi One Inventory", mark: "I", color: "#8a4b0f" },
-  "bishnoi-pharmacy": { name: "Bishnoi One Pharmacy", mark: "Rx", color: "#0f6470" },
-  "bishnoi-platform": { name: "Bishnoi One Platform", mark: "P", color: "#414d60" },
+  "bishnoi-one-app": { name: "Bishnoi One", mark: "B", color: "#e2701b" },
 };
 
 // The app's API port, from its backend/main.py (--port's default), as scripts/run-app.mjs reads it.

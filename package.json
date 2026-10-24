@@ -1,21 +1,18 @@
 {
   "name": "bishnoi",
   "private": true,
-  "description": "Runs a Bishnoi One app, API and screens together: npm run bishnoi-crm. As a desktop app: npm run bishnoi-crm:app. See README section 5.",
+  "description": "Runs Bishnoi One: npm run one (every API and the one app's screens at http://localhost:4301). One API alone: npm run bishnoi-crm. As a desktop app: npm run bishnoi-one-app:app.",
   "scripts": {
+    "one": "node scripts/run-one.mjs",
+    "bishnoi-one-app": "node scripts/run-app.mjs bishnoi-one-app",
+    "bishnoi-one-app:app": "node scripts/run-app.mjs bishnoi-one-app --app",
     "bishnoi-admin": "node scripts/run-app.mjs bishnoi-admin",
-    "bishnoi-admin:app": "node scripts/run-app.mjs bishnoi-admin --app",
     "bishnoi-crm": "node scripts/run-app.mjs bishnoi-crm",
-    "bishnoi-crm:app": "node scripts/run-app.mjs bishnoi-crm --app",
     "bishnoi-finance": "node scripts/run-app.mjs bishnoi-finance",
-    "bishnoi-finance:app": "node scripts/run-app.mjs bishnoi-finance --app",
     "bishnoi-in-licensing": "node scripts/run-app.mjs bishnoi-in-licensing",
     "bishnoi-inventory": "node scripts/run-app.mjs bishnoi-inventory",
-    "bishnoi-inventory:app": "node scripts/run-app.mjs bishnoi-inventory --app",
     "bishnoi-pharmacy": "node scripts/run-app.mjs bishnoi-pharmacy",
-    "bishnoi-pharmacy:app": "node scripts/run-app.mjs bishnoi-pharmacy --app",
     "bishnoi-platform": "node scripts/run-app.mjs bishnoi-platform",
-    "bishnoi-platform:app": "node scripts/run-app.mjs bishnoi-platform --app",
     "bishnoi-regulatory": "node scripts/run-app.mjs bishnoi-regulatory",
     "setup": "node scripts/setup-all.mjs"
   }

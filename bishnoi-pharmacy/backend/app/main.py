@@ -70,9 +70,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(material_reviews.router)
     app.include_router(material_reviews.integration)
-    from app import platform_connect
+    from app import platform_connect, platform_roles
 
     app.include_router(platform_connect.router)
+    app.include_router(platform_roles.router)
     # Connected on the Platform as soon as this runs, not when someone first uses it.
     platform_connect.connect_now(settings)
     return app

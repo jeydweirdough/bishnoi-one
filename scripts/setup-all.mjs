@@ -11,7 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const apps = readdirSync(ROOT).filter((name) => name.startsWith("bishnoi-") && existsSync(join(ROOT, name, "backend")));
+const apps = readdirSync(ROOT).filter((name) => name.startsWith("bishnoi-") && (existsSync(join(ROOT, name, "backend")) || existsSync(join(ROOT, name, "frontend"))));
 const failed = [];
 
 for (const app of apps) {

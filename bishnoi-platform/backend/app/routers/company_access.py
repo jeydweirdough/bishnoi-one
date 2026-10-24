@@ -1,0 +1,330 @@
+"""Access for a company's own administrators, signed in with their Bishnoi One
+account: the one place their company's roles are made and people given them,
+for every module (decided 2026-10-23; app/access_roles.py says how the
+modules are told). The one app's /platform/access screens use these.
+
+- GET    /identity/access: the modules (what each declares), roles, people, and
+  who is still to be given a role.
+- POST   /identity/access/roles, PATCH and DELETE /identity/access/roles/{id}.
+- PUT    /identity/access/people/{id}/role: their one role.
+- PUT / DELETE /identity/access/people/{id}/apps/{key}: the modules they may open.
+- POST   /identity/access/import: the roles each module has today, once.
+
+Only a company administrator (Identity.is_company_admin) may; every change is
+in the audit log (names of what changed, never values) and sent to the modules.
+"""
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import Field
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app import access_roles
+from app.access_roles import ADMINISTRATOR
+from app.api import Api, changed, conflict, field_error, not_found
+from app.audit import audit
+from app.deps import DB, SettingsDep
+from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp
+from app.routers.identity import Signed
+
+router = APIRouter(prefix="/identity/access", tags=["company access"])
+
+
+def company_admin(signed: Signed) -> Identity:
+    _, person = signed
+    if not person.is_company_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only your company's administrators manage access.")
+    return person
+
+
+Admin = Annotated[Identity, Depends(company_admin)]
+
+
+def told(request: Request, settings, company_id: str) -> None:
+    access_roles.push(request.app.state.sessions, settings, company_id)
+
+
+# ---- What the screens read ------------------------------------------------------------------
+
+
+def module_out(app: Application) -> dict:
+    found = access_roles.catalog(app)
+    return {
+        "key": app.key,
+        "name": app.name,
+        "reachable": found is not None,
+        "areas": found.get("areas", []) if found else [],
+        "scopes": found.get("scopes") or [] if found else [],
+    }
+
+
+def role_out(db: Session, role: AccessRole, holders: int = 0) -> dict:
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+        "isAdmin": role.is_admin,
+        "permissions": access_roles.grants_of(db, role),
+        "scopes": access_roles.scopes_of(db, role),
+        "people": holders,
+    }
+
+
+def holders_of(db: Session, company_id: str) -> dict[str, int]:
+    return dict(db.execute(
+        select(Identity.access_role_id, func.count()).where(Identity.company_id == company_id, Identity.access_role_id.is_not(None)).group_by(Identity.access_role_id)
+    ).all())
+
+
+@router.get("")
+def overview(db: DB, me: Admin) -> dict:
+    apps = access_roles.modules_of(db, me.company_id)
+    by_id = {a.id: a for a in apps}
+    holders = holders_of(db, me.company_id)
+    roles = db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name))).all()
+    people, to_choose = [], []
+    for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id).order_by(func.lower(Identity.full_name))):
+        grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
+        given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g)} for g in grants if g.application_id in by_id]
+        people.append({
+            "id": p.id,
+            "fullName": p.full_name,
+            "email": p.email,
+            "title": p.title,
+            "status": p.status,
+            "isCompanyAdmin": p.is_company_admin,
+            "roleId": p.access_role_id,
+            "apps": given,
+        })
+        if p.access_role_id is None and any(g["role"] for g in given):
+            to_choose.append(p.id)
+    company = db.get(Company, me.company_id)
+    return {
+        "company": {"id": company.id, "name": company.name},
+        "modules": [module_out(a) for a in apps],
+        "roles": [role_out(db, r, holders.get(r.id, 0)) for r in roles],
+        "people": people,
+        # Without a role here yet, with one in an application: each still goes by that one until given one here.
+        "toChoose": to_choose,
+    }
+
+
+# ---- Roles ----------------------------------------------------------------------------------
+
+
+class RoleIn(Api):
+    name: str = Field(min_length=1, max_length=80)
+    description: str | None = Field(None, max_length=300)
+    is_admin: bool = False
+    # By module key: its permissions ("customers.edit"), and its scope where it has scopes.
+    permissions: dict[str, list[str]] = Field(default_factory=dict)
+    scopes: dict[str, str] = Field(default_factory=dict)
+
+
+class RolePatch(Api):
+    name: str | None = Field(None, min_length=1, max_length=80)
+    description: str | None = Field(None, max_length=300)
+    is_admin: bool | None = None
+    permissions: dict[str, list[str]] | None = None
+    scopes: dict[str, str] | None = None
+
+
+def name_taken(db: Session, company_id: str, name: str, but: str | None = None) -> bool:
+    q = select(AccessRole.id).where(AccessRole.company_id == company_id, func.lower(AccessRole.name) == name.lower())
+    if but:
+        q = q.where(AccessRole.id != but)
+    return db.scalar(q) is not None
+
+
+def check_modules(db: Session, company_id: str, permissions: dict[str, list[str]], scopes: dict[str, str]) -> dict[str, tuple[list[str], str | None]]:
+    """Each module named: its permissions and scope, checked against what it declares."""
+    apps = {a.key: a for a in access_roles.modules_of(db, company_id)}
+    out = {}
+    for key in set(permissions) | set(scopes):
+        app = apps.get(key)
+        if app is None:
+            raise field_error("permissions", f"Your company doesn't have {key}.")
+        found = access_roles.catalog(app)
+        if found is None:
+            raise field_error("permissions", f"{app.name} can't be reached right now, so its permissions can't be changed. Try again in a moment.")
+        unknown = sorted(set(permissions.get(key, [])) - access_roles.permissions_in(found))
+        if unknown:
+            raise field_error("permissions", f"{app.name} has no permission {', '.join(unknown)}.")
+        offered = access_roles.scopes_in(found)
+        scope = scopes.get(key) or None
+        if scope and scope not in offered:
+            raise field_error("scopes", f"{app.name} has no scope {scope}.")
+        if offered and not scope:
+            scope = offered[0]  # the narrowest: their own records
+        out[key] = (permissions.get(key, []), scope)
+    return out
+
+
+def check_name(name: str, is_admin: bool) -> None:
+    if name.strip().lower() == ADMINISTRATOR.lower() and not is_admin:
+        raise field_error("name", "Administrator is the role with everything. Name this one something else.")
+
+
+def get_role(db: Session, me: Identity, role_id: str) -> AccessRole:
+    role = db.get(AccessRole, role_id)
+    if role is None or role.company_id != me.company_id:
+        raise not_found("role")
+    return role
+
+
+@router.post("/roles", status_code=status.HTTP_201_CREATED)
+def create_role(body: RoleIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    check_name(body.name, body.is_admin)
+    if name_taken(db, me.company_id, body.name):
+        raise field_error("name", "There's already a role with that name.")
+    modules = {} if body.is_admin else check_modules(db, me.company_id, body.permissions, body.scopes)
+    role = AccessRole(company_id=me.company_id, name=body.name, description=body.description, is_admin=body.is_admin)
+    db.add(role)
+    db.flush()
+    for key, (perms, scope) in modules.items():
+        access_roles.set_module(db, role, key, perms, scope)
+    audit(db, me.email, "access.role_created", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id)
+    db.commit()
+    told(request, settings, me.company_id)
+    return role_out(db, role)
+
+
+@router.patch("/roles/{role_id}")
+def update_role(role_id: str, body: RolePatch, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    role = get_role(db, me, role_id)
+    wanted = changed(body)
+    is_admin = wanted["is_admin"] if wanted.get("is_admin") is not None else role.is_admin
+    name = wanted.get("name") or role.name
+    check_name(name, is_admin)
+    if "name" in wanted and wanted["name"] is None:
+        raise field_error("name", "Give the role a name.")
+    if wanted.get("name") and name_taken(db, me.company_id, wanted["name"], but=role.id):
+        raise field_error("name", "There's already a role with that name.")
+    if role.is_admin and not is_admin and holders_of(db, me.company_id).get(role.id) and not other_admins(db, me.company_id, but_role=role.id):
+        raise conflict("Someone must always have everything, or nobody could fix a mistake in access. Give another role everything first.")
+    fields = []
+    for key in ("name", "description", "is_admin"):
+        if key in wanted and (wanted[key] is not None or key == "description") and getattr(role, key) != wanted[key]:
+            setattr(role, key, wanted[key])
+            fields.append(key)
+    if not role.is_admin and (body.permissions is not None or body.scopes is not None):
+        modules = check_modules(db, me.company_id, body.permissions or {}, body.scopes or {})
+        keep = access_roles.grants_of(db, role), access_roles.scopes_of(db, role)
+        for key, (perms, scope) in modules.items():
+            if body.permissions is None:
+                perms = keep[0].get(key, [])
+            if body.scopes is None or key not in (body.scopes or {}):
+                scope = keep[1].get(key, scope)
+            access_roles.set_module(db, role, key, perms, scope)
+        db.flush()
+        if (access_roles.grants_of(db, role), access_roles.scopes_of(db, role)) != keep:
+            fields.append("permissions")
+    if fields:
+        from datetime import UTC, datetime
+
+        role.updated_at = datetime.now(UTC)
+        audit(db, me.email, "access.role_updated", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id, fields=fields)
+        db.commit()
+        told(request, settings, me.company_id)
+    return role_out(db, role, holders_of(db, me.company_id).get(role.id, 0))
+
+
+def other_admins(db: Session, company_id: str, but_role: str) -> int:
+    """People holding a role with everything, other than this role."""
+    return db.scalar(
+        select(func.count()).select_from(Identity).join(AccessRole, AccessRole.id == Identity.access_role_id)
+        .where(Identity.company_id == company_id, AccessRole.is_admin, AccessRole.id != but_role, Identity.status == "active")
+    ) or 0
+
+
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_role(role_id: str, request: Request, db: DB, me: Admin, settings: SettingsDep) -> Response:
+    role = get_role(db, me, role_id)
+    holders = holders_of(db, me.company_id).get(role.id, 0)
+    if holders:
+        raise conflict(f"{holders} {'person has' if holders == 1 else 'people have'} this role. Give them another one first.")
+    audit(db, me.email, "access.role_deleted", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id)
+    db.delete(role)
+    db.commit()
+    told(request, settings, me.company_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---- People ---------------------------------------------------------------------------------
+
+
+class PersonRoleIn(Api):
+    role_id: str | None = None
+
+
+def get_person(db: Session, me: Identity, person_id: str) -> Identity:
+    p = db.get(Identity, person_id)
+    if p is None or p.company_id != me.company_id:
+        raise not_found("person")
+    return p
+
+
+@router.put("/people/{person_id}/role")
+def set_role(person_id: str, body: PersonRoleIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    p = get_person(db, me, person_id)
+    role = get_role(db, me, body.role_id) if body.role_id else None
+    was = db.get(AccessRole, p.access_role_id) if p.access_role_id else None
+    if was and was.is_admin and not (role and role.is_admin) and not other_admins_people(db, me.company_id, but=p.id):
+        raise conflict("Someone must always have everything, or nobody could fix a mistake in access. Give it to someone else first.")
+    if p.access_role_id != (role.id if role else None):
+        p.access_role_id = role.id if role else None
+        audit(db, me.email, "access.role_given", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=["role"])
+        db.commit()
+        told(request, settings, me.company_id)
+    return {"id": p.id, "roleId": p.access_role_id}
+
+
+def other_admins_people(db: Session, company_id: str, but: str) -> int:
+    return db.scalar(
+        select(func.count()).select_from(Identity).join(AccessRole, AccessRole.id == Identity.access_role_id)
+        .where(Identity.company_id == company_id, AccessRole.is_admin, Identity.id != but, Identity.status == "active")
+    ) or 0
+
+
+def company_module(db: Session, me: Identity, key: str) -> Application:
+    app = db.scalar(
+        select(Application).join(CompanyApp, (CompanyApp.application_id == Application.id) & (CompanyApp.company_id == me.company_id))
+        .where(Application.key == key, Application.is_active)
+    )
+    if app is None:
+        raise not_found("module")
+    return app
+
+
+@router.put("/people/{person_id}/apps/{key}")
+def give_module(person_id: str, key: str, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    p = get_person(db, me, person_id)
+    app = company_module(db, me, key)
+    if db.get(IdentityApp, (p.id, app.id)) is None:
+        db.add(IdentityApp(identity_id=p.id, application_id=app.id, granted_by=me.email))
+        audit(db, me.email, "access.granted", target=f"{p.email} · {app.name}", target_type="identity", target_id=p.id, company_id=me.company_id, application_id=app.id)
+        db.commit()
+        told(request, settings, me.company_id)
+    return {"id": p.id, "app": app.key}
+
+
+@router.delete("/people/{person_id}/apps/{key}", status_code=status.HTTP_204_NO_CONTENT)
+def take_module(person_id: str, key: str, db: DB, me: Admin) -> Response:
+    p = get_person(db, me, person_id)
+    app = company_module(db, me, key)
+    g = db.get(IdentityApp, (p.id, app.id))
+    if g is not None:
+        audit(db, me.email, "access.withdrawn", target=f"{p.email} · {app.name}", target_type="identity", target_id=p.id, company_id=me.company_id, application_id=app.id)
+        db.delete(g)
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/import")
+def import_roles(request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    company = db.get(Company, me.company_id)
+    report = access_roles.import_roles(db, settings, company, me.email)
+    told(request, settings, me.company_id)
+    return report
