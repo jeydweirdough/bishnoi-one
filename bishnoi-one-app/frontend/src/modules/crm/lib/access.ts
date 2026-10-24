@@ -11,7 +11,7 @@ export const USERS = ["admin.users", "department.manage"] as const;
 
 export const PEOPLE_PAGES = [
   { href: "/crm/admin/users", label: "Users", permission: USERS },
-  { href: "/platform/access/roles", label: "Roles and permissions", permission: "admin.roles" },
+  { href: "/platform/roles", label: "Roles and permissions", permission: "admin.roles" },
   { href: "/crm/admin/teams", label: "Teams", permission: "admin.teams" },
 ] as const;
 

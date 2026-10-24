@@ -105,6 +105,18 @@ class Settings(BaseSettings):
     def crm_linked(self) -> bool:
         return bool(self.crm_api_url and self.crm_api_key)
 
+    # Bishnoi One Inventory, whose suppliers a bill is made out to (decided 2026-10-24: suppliers stay
+    # there, one list): its API and the key it gave Finance. The platform delivers both (Finance uses Inventory).
+    inventory_api_url: str | None = None
+    inventory_api_key: SecretStr | None = None
+    # The company's short name on the platform ("getmeds"), for calls to apps that serve several
+    # companies (Inventory). Unset: the company of the latest Bishnoi One sign-in here (app/inventory.py).
+    company: str | None = None
+
+    @property
+    def inventory_linked(self) -> bool:
+        return bool(self.inventory_api_url and self.inventory_api_key)
+
     @property
     def discord_mock_dir(self) -> Path:
         """Where mock mode keeps its tables: beside a SQLite database (so each test has its own), else .data/."""

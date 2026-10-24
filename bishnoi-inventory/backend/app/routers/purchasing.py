@@ -8,6 +8,7 @@ still owed on a placed order is a backorder. A delivery can also be received
 without an order.
 """
 
+import re
 from datetime import date
 
 from fastapi import APIRouter, Query, Response, status
@@ -50,8 +51,39 @@ class SupplierFields(Api):
     lead_time_days: int | None = Field(None, ge=0, le=3650)
     notes: str | None = Field(None, max_length=4000)
     is_active: bool | None = None
+    # Tax registration, for Finance's bills and the BIR's lists.
+    tin: str | None = Field(None, max_length=20)
+    vat_status: str | None = None
+    default_atc: str | None = Field(None, max_length=8)
 
     _email = field_validator("email")(check_email)
+
+    @field_validator("tin")
+    @classmethod
+    def _tin(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        digits = re.sub(r"[\s-]", "", value)
+        if not re.fullmatch(r"\d{9}(\d{3}|\d{5})?", digits):
+            raise ValueError("Enter the TIN as 9 digits, with the branch code after it if it has one: 123-456-789-00000.")
+        return "-".join([digits[0:3], digits[3:6], digits[6:9]] + ([digits[9:]] if digits[9:] else []))
+
+    @field_validator("vat_status")
+    @classmethod
+    def _vat(cls, value: str | None) -> str | None:
+        if value is not None and value not in ("vat", "non_vat"):
+            raise ValueError("Pick VAT-registered or not.")
+        return value
+
+    @field_validator("default_atc")
+    @classmethod
+    def _atc(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        atc = value.strip().upper()
+        if not re.fullmatch(r"W[A-Z]\d{3}[A-Z]?", atc):
+            raise ValueError("An ATC looks like WC158 or WI160.")
+        return atc
 
 
 class SupplierIn(SupplierFields):
@@ -109,6 +141,9 @@ def supplier_out(s: Supplier, perf: dict | None = None) -> dict:
         "leadTimeDays": s.lead_time_days,
         "notes": s.notes,
         "isActive": s.is_active,
+        "tin": s.tin,
+        "vatStatus": s.vat_status,
+        "defaultAtc": s.default_atc,
         "performance": perf,
     }
 
@@ -170,7 +205,7 @@ def read_supplier(_: allowed("suppliers.view"), db: DB, supplier_id: str) -> dic
 def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, supplier_id: str, body: SupplierPatch) -> dict:
     s = found(db, Supplier, supplier_id, "supplier")
     wanted = changed(body)
-    for key in ("code", "name", "is_active"):
+    for key in ("code", "name", "is_active", "vat_status"):
         if key in wanted and wanted[key] is None:
             raise field_error(key, "This can't be empty.")
     if "code" in wanted:

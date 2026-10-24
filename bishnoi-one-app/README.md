@@ -13,8 +13,7 @@ has only the screens, and since 2026-10-24 it is the only place screens are
 | Finance | `/finance` | 8303 | **here** (since 2026-10-23, its own kit) |
 | Pharmacy | `/pharmacy` | 8307 | **here** (since 2026-10-23, its own kit) |
 | Executive Admin | `/admin` | 8300 | **here** (since 2026-10-23, its own kit) |
-| Access (Platform) | `/platform/access` | 8305 | **here**: people and access, for company administrators (since 2026-10-23) |
-| Platform console | `/platform/console` | 8305 | **here**: Bishnoi One's staff (companies, applications, support), own staff sign-in (since 2026-10-24, its own kit) |
+| Admin Console (Platform) | `/platform` | 8305 | **here** (since 2026-10-24): APIs, companies and accounts for Bishnoi One's staff; roles and role assignments for a company's administrators. One sign-in |
 | In-Licensing | `/in-licensing` | 8306 | coming soon |
 | Regulatory | `/regulatory` | 8308 | coming soon |
 
@@ -52,7 +51,7 @@ see the modules your company has and you're granted, both set in the Platform
 
 Settings: `frontend/.env.example`.
 
-## People and access (`/platform/access`)
+## Roles and permissions (`/platform/roles`)
 
 A company's administrators (Platform: People > company administrator) make
 the company's roles once, for every module, and give each person one
@@ -70,12 +69,16 @@ person's role too, so a module that missed a change catches up.
 - The modules' own Roles pages here send to it. Their Users pages stay for now
   (CRM teams and employee ids live there until teams move to the Platform).
 
-## The staff console (`/platform/console`)
+## The Admin Console (`/platform`)
 
-Bishnoi One's own staff (not a company's people) sign in at
-`/platform/console/login` with their staff account (Platform `/auth/login`); the
-session is the console's own cookie, and its pages sit under their own bar
-(`app/(staff)/layout.tsx`). Signing out of it is the button beside its profile.
+The Platform's screens in the one app, with the one Bishnoi One sign-in
+(decided 2026-10-24; it replaced the separate staff console and its staff
+login). Someone whose email is also a Platform staff account is that staff
+member here (Platform `app/deps.py`, `staff_by_account`): Platform Admins
+change, Support looks. They see **APIs** (each module's API, its status and
+deployments), **Companies** and **Accounts**. A company's administrators see
+**Roles** and **Role assignments**. Incidents, support, monitoring,
+communications, connections and settings were left out.
 
 ## Hand-made details in the moved modules
 
@@ -89,9 +92,9 @@ brought onto the shared one. Fixed by hand after the move:
   search and the quote's customer link;
 - Admin: `lib/page.ts` (`adminPage`) on the home's attention and chart links;
 - Inventory: `lib/links.ts` (`inventoryPage`) on the alerts in `platform/lib/api.ts` (`getFrame`);
-- Console: its own sign-in and sign-out (`src/one/console-actions.ts`), its
-  password change through its own session, and no address-following (that was
-  for the old separate sites).
+- Admin Console: the console's APIs, Companies and Users (Accounts) pages
+  under `app/(app)/platform/(staff)/`, links to its removed pages made plain
+  text, and no address-following (that was for the old separate sites).
 
 On this computer, Finance's and Pharmacy's APIs ask the Platform for its pass
 key (their `PLATFORM_PUBLIC_KEY` is commented out): a fixed key must be the

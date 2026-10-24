@@ -1,5 +1,6 @@
 "use client";
 
+import { ModuleBrand } from "@/src/platform/shell/module-brand";
 import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -135,6 +136,16 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/invoices/series`, label: "Invoice numbers", missing: missingOf(unset, ["invoiceSeries"]) },
         ],
       },
+      // Supplier bills: what the company owes Inventory's suppliers, with input VAT and the tax withheld.
+      {
+        href: `${base}/bills`,
+        label: "Bills",
+        icon: "payments",
+        subpages: [
+          { href: `${base}/bills`, label: "Supplier bills" },
+          { href: `${base}/bills/payables`, label: "Payables" },
+        ],
+      },
       // The books: every entry, the accounts, and what they add up to.
       {
         href: `${base}/ledger`,
@@ -145,12 +156,26 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/ledger`, label: "Journal entries" },
           { href: `${base}/ledger/accounts`, label: "Chart of accounts" },
           { href: `${base}/ledger/trial-balance`, label: "Trial balance" },
+          { href: `${base}/bank`, label: "Bank reconciliation" },
           { href: `${base}/ledger/categories`, label: "Expense categories", missing: missingOf(unset, ["categoryAccounts"]) },
           { href: `${base}/ledger/posting`, label: "Default accounts", missing: missingOf(unset, ["postingAccounts"]) },
         ],
       },
       // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
+      // What the BIR asks for, from the books (decided 2026-10-24, from Oojeema's BIR features).
+      {
+        href: `${base}/bir`,
+        label: "BIR reports",
+        icon: "reports",
+        subpages: [
+          { href: `${base}/bir`, label: "Books of accounts" },
+          { href: `${base}/bir/statements`, label: "Financial statements" },
+          { href: `${base}/bir/vat`, label: "VAT return" },
+          { href: `${base}/bir/lists`, label: "Summary lists" },
+          { href: `${base}/bir/withholding`, label: "Withholding tax" },
+        ],
+      },
     ];
   }
   if (m.key === "inventory") {
@@ -614,11 +639,14 @@ function ModuleEntry({ m }: { m: ModuleAccess }) {
 const FINANCE_NEEDS: [string, string][] = [
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
+  ["/finance/bills", "bills.view"],
+  ["/finance/bank", "bank.view"],
   ["/finance/ledger/accounts", "accounts.view"],
   ["/finance/ledger/posting", "accounts.view"],
   ["/finance/ledger/categories", "categories.view"],
   ["/finance/ledger", "journal.view"],
   ["/finance/tax", "tax.view"],
+  ["/finance/bir", "bir.view"],
   ["/", "dashboard.view"],
 ];
 
@@ -641,7 +669,7 @@ function financeAdmin(me: Me): Page[] {
   const may = (p: string) => me.permissions?.includes(p) ?? false;
   return [
     ...(may("admin.users") ? [{ href: "/finance/admin/users", label: "Users", icon: "people" as const }] : []),
-    ...(may("admin.roles") ? [{ href: "/platform/access/roles", label: "Roles and permissions", icon: "roles" as const }] : []),
+    ...(may("admin.roles") ? [{ href: "/platform/roles", label: "Roles and permissions", icon: "roles" as const }] : []),
     ...(may("admin.audit") ? [{ href: "/finance/admin/audit", label: "Activity log", icon: "auditLog" as const }] : []),
   ];
 }
@@ -849,22 +877,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
   const open = openOn === pathname;
   const place = placeOf(pathname, me);
 
-  const brand = (
-    <Link href="/finance" className="flex items-center gap-2.5 border-b-[3px] border-double border-ink pb-2">
-
-      <span className="min-w-0">
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-stamp text-ink-3 uppercase">{me.org?.brandName ?? "Platform"}</span>
-        {/* Which app this is, not only which product. Each one is its own site on
-            its own address, so "Bishnoi One" alone leaves you working out from the port
-            whether the screen in front of you is missing or simply elsewhere. */}
-        <span className="block truncate text-base leading-tight font-semibold text-ink">
-          {thisAppLabel()}
-        </span>
-      </span>
-    </Link>
-  );
+  const brand = <ModuleBrand href="/finance" label="Finance" company={me.org?.brandName ?? me.org?.name} />;
 
   return (
     <>

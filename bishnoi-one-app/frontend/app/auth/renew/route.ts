@@ -14,14 +14,8 @@ export async function GET(request: NextRequest) {
   const m = moduleByKey(key);
   const where = rest.join("|");
   if (!m) return NextResponse.redirect(new URL("/login?expired=1", request.url));
-  // The staff console's session ended: its own sign-in page, back to where they were.
-  if (m.staffSignIn) {
-    const login = new URL(m.staffSignIn, request.url);
-    login.searchParams.set("next", where.startsWith(m.path) ? where : m.path);
-    const response = NextResponse.redirect(login);
-    response.cookies.delete(moduleCookie(m.key));
-    return response;
-  }
+  // The Admin Console works on the account itself: an ended account signs in again.
+  if (m.accountOnly) return NextResponse.redirect(new URL(`/login?expired=1&next=${encodeURIComponent(where || m.path)}`, request.url));
   if (request.cookies.get(RENEWED)?.value === m.key) {
     const notice = `${m.label} keeps ending its session. Try again in a minute, or tell your administrator.`;
     const response = NextResponse.redirect(new URL(`/?notice=${encodeURIComponent(notice)}`, request.url));

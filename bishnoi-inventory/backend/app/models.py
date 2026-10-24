@@ -275,6 +275,11 @@ class Supplier(Stamped, Base):
     lead_time_days: Mapped[int | None] = mapped_column(Integer, default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Its tax registration, for Finance's bills and the BIR's purchase lists: TIN ("123-456-789-00000"),
+    # VAT-registered or not ("vat", "non_vat"), and the ATC usually withheld from its payments ("WC158").
+    tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    vat_status: Mapped[str] = mapped_column(String(8), default="vat")
+    default_atc: Mapped[str | None] = mapped_column(String(8), default=None)
 
 
 class SupplierProduct(Base):

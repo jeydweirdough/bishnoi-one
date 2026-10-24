@@ -98,6 +98,10 @@ POSTING = {
     "receivables_account_id": ("asset", "What customers owe on invoices"),
     "sales_account_id": ("income", "Sales on invoices"),
     "output_tax_account_id": ("liability", "Tax on invoices (output VAT)"),
+    "cwt_account_id": ("asset", "Tax customers withheld (creditable withholding, Form 2307)"),
+    "payables_account_id": ("liability", "What suppliers are owed on bills"),
+    "input_tax_account_id": ("asset", "Tax on purchases (input VAT)"),
+    "ewt_payable_account_id": ("liability", "Tax withheld from suppliers, for the BIR (expanded withholding)"),
 }
 
 
@@ -145,7 +149,7 @@ def list_entries(
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:

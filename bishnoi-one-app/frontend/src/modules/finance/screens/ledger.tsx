@@ -20,13 +20,14 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams;
   const source = one(sp.source);
   const query = new URLSearchParams({ limit: "200" });
-  if (source === "manual" || source === "fund" || source === "invoice") query.set("source", source);
+  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill") query.set("source", source);
   const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
   const filters = [
     { value: "", label: "All" },
     { value: "manual", label: "Manual journals" },
     { value: "fund", label: "Marketing requests" },
     { value: "invoice", label: "Invoices" },
+    { value: "bill", label: "Supplier bills" },
   ];
   return (
     <>

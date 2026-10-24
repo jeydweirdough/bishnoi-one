@@ -17,6 +17,8 @@ export type ProfileInput = {
   branchCode: string | null;
   registeredAddress: string | null;
   pricesIncludeTax: boolean;
+  rdoCode: string | null;
+  fiscalMonthEnd: number;
 };
 
 export async function saveTaxProfile(input: ProfileInput): Promise<Result<TaxSetup>> {

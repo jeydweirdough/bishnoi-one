@@ -88,6 +88,8 @@ def profile_out(p: TaxProfile) -> dict:
         "branchCode": p.branch_code,
         "registeredAddress": p.registered_address,
         "pricesIncludeTax": p.prices_include_tax,
+        "rdoCode": p.rdo_code,
+        "fiscalMonthEnd": p.fiscal_month_end,
         "complete": profile_complete(p),
         "updatedAt": iso(p.updated_at),
     }
@@ -151,6 +153,16 @@ class ProfileIn(Api):
     branch_code: str | None = Field(None, max_length=5)
     registered_address: str | None = Field(None, max_length=300)
     prices_include_tax: bool = True
+    # On every BIR form and summary list. Left out, it stays as it is.
+    rdo_code: str | None = Field(None, max_length=3)
+    fiscal_month_end: int | None = Field(None, ge=1, le=12)
+
+    @field_validator("rdo_code")
+    @classmethod
+    def _rdo(cls, value: str | None) -> str | None:
+        if value is not None and value.strip() and not re.fullmatch(r"\d{3}", value.strip()):
+            raise ValueError("An RDO code is 3 digits, as on the certificate of registration (Form 2303).")
+        return value.strip() or None if value is not None else None
 
     @field_validator("branch_code")
     @classmethod
@@ -178,6 +190,10 @@ def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep
     profile.registered_name, profile.trade_name = body.registered_name, body.trade_name
     profile.tin, profile.branch_code = tin, branch or "00000"
     profile.registered_address, profile.prices_include_tax = body.registered_address, body.prices_include_tax
+    if "rdo_code" in body.model_fields_set:
+        profile.rdo_code = body.rdo_code
+    if body.fiscal_month_end is not None:
+        profile.fiscal_month_end = body.fiscal_month_end
     profile.updated_by_id = admin.id
     audit(db, admin, "tax.profile_updated", target="Tax registration", target_type="settings", fields=body.model_fields_set)
     db.commit()

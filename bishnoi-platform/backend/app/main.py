@@ -65,6 +65,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
     make_first_admin(app.state.sessions, settings)
+    try:
+        from app import links as app_links
+
+        app_links.make_automatic(app.state.sessions, settings)
+    except Exception:  # noqa: BLE001 (a link not made now is made at the next start)
+        logging.getLogger(__name__).exception("Links: couldn't make the automatic ones.")
     # The log goes to Discord too, a thread a day; announcements are kept there (app/announcements.py).
     app.state.logs = logs_for("PLATFORM", settings)
     mirror_audit(app.state.sessions, AuditEntry, app.state.logs)

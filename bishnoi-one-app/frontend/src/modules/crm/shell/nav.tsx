@@ -1,5 +1,6 @@
 "use client";
 
+import { ModuleBrand } from "@/src/platform/shell/module-brand";
 import { ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -924,19 +925,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
 
   // The module's name and the company, atop its menu. The brand is in the one
   // app's bar above (decided 2026-10-23), so it isn't said twice.
-  const brand = (
-    <Link href="/crm" className="flex items-center gap-2.5 border-b border-rule pb-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e9f0fb] text-[#4c78c8]">
-        <Icon name={moduleIcon("crm")} className="size-[1.125rem]" />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm leading-tight font-semibold text-ink">{thisAppLabel()}</span>
-        {/* No company on the platform: a Developer Admin has not opened one, and
-            saying a company name there would be saying something untrue. */}
-        <span className="block truncate text-meta text-ink-3">{me.org?.brandName ?? "Platform"}</span>
-      </span>
-    </Link>
-  );
+  const brand = <ModuleBrand href="/crm" label="CRM" company={me.org?.brandName ?? me.org?.name} />;
 
   return (
     <>

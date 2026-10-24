@@ -152,6 +152,10 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
     if isinstance(claims.get("roleDef"), dict):
         platform_roles.keep(db, claims["roleDef"])
+    if claims.get("companySlug"):
+        from app import inventory
+
+        inventory.last_company = str(claims["companySlug"])
     role = role_from(db, claims)
     user = db.scalar(select(User).where(User.platform_identity_id == claims["sub"]))
     if user is None:

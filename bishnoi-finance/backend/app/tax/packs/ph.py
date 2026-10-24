@@ -26,6 +26,7 @@ it; it isn't tax advice.
   zero-rated sales and VAT-exempt sales separately.
 """
 
+from dataclasses import dataclass
 from app.tax.engine import Code, Resolution
 
 country = "PH"
@@ -119,3 +120,30 @@ invoice = {
     # Printed on a non-VAT seller's invoices.
     "non_vat_notice": "THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.",
 }
+
+
+# Expanded withholding tax: what a buyer withholds from what it pays a supplier,
+# by the BIR's alphanumeric tax code (ATC), with its usual rate (RR 2-98 as
+# amended by RR 11-2018). WI: the payee is an individual; WC: a corporation.
+# The rate can be changed on a bill: check the BIR's current ATC list for others.
+@dataclass(frozen=True)
+class Atc:
+    code: str
+    nature: str
+    rate_bp: int
+
+
+EWT_ATCS: dict[str, Atc] = {a.code: a for a in (
+    Atc("WI010", "Professional fees, individual, gross income up to 3 million", 500),
+    Atc("WI011", "Professional fees, individual, gross income over 3 million", 1000),
+    Atc("WC010", "Professional fees, corporation, gross income up to 720,000", 1000),
+    Atc("WC011", "Professional fees, corporation, gross income over 720,000", 1500),
+    Atc("WI100", "Rentals of real or personal property, individual", 500),
+    Atc("WC100", "Rentals of real or personal property, corporation", 500),
+    Atc("WI120", "Income payments to contractors, individual", 200),
+    Atc("WC120", "Income payments to contractors, corporation", 200),
+    Atc("WI158", "Purchases of goods by top withholding agents, individual supplier", 100),
+    Atc("WC158", "Purchases of goods by top withholding agents, corporate supplier", 100),
+    Atc("WI160", "Purchases of services by top withholding agents, individual supplier", 200),
+    Atc("WC160", "Purchases of services by top withholding agents, corporate supplier", 200),
+)}

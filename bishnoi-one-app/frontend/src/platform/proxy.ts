@@ -19,25 +19,18 @@ export async function proxy(request: NextRequest) {
     headers.set(MODULE_HEADER, here.key);
     return NextResponse.next({ request: { headers } });
   }
-  // The staff console: its own staff sign-in, whether or not there's a Bishnoi One account here.
-  if (here?.staffSignIn) {
-    if (!request.cookies.get(moduleCookie(here.key))?.value) {
-      const login = new URL(here.staffSignIn, request.url);
-      login.searchParams.set("next", next);
-      return NextResponse.redirect(login);
-    }
-    headers.set(MODULE_HEADER, here.key);
-    const response = NextResponse.next({ request: { headers } });
-    if (request.method === "GET") response.cookies.set(HERE_COOKIE, `${here.key}|${next}`.slice(0, 1000), cookieOptions(8 * 3600));
-    return response;
-  }
   if (!request.cookies.get(ACCOUNT_COOKIE)?.value) {
     const login = new URL("/login", request.url);
     if (next !== "/") login.searchParams.set("next", next);
     return NextResponse.redirect(login);
   }
 
-  if (!here || here.status !== "live" || here.accountOnly) return NextResponse.next({ request: { headers } });
+  if (!here || here.status !== "live") return NextResponse.next({ request: { headers } });
+  // The Admin Console works on the account itself: marked as its module (its API is the Platform's), no session to open.
+  if (here.accountOnly) {
+    headers.set(MODULE_HEADER, here.key);
+    return NextResponse.next({ request: { headers } });
+  }
 
   if (!request.cookies.get(moduleCookie(here.key))?.value) {
     const enter = new URL(`/auth/enter/${here.key}`, request.url);

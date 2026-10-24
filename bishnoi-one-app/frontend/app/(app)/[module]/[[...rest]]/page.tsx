@@ -4,6 +4,7 @@ import { MODULES } from "@/src/platform/lib/modules";
 import { LinkButton } from "@/src/platform/ui/ant-button";
 import { buttonClass } from "@/src/platform/ui/button";
 import { myModules } from "@/src/one/mine";
+import { PlainFrame } from "@/src/one/plain-frame";
 
 /**
  * A module's address before its screens are here (decided 2026-10-23). A module
@@ -39,6 +40,7 @@ export default async function ModuleNotHereYet({ params }: { params: Promise<{ m
   }
 
   return (
+    <PlainFrame>
     <main className="mx-auto max-w-[90rem] px-4 py-16 sm:px-6">
       <div className="mx-auto max-w-lg rounded-2xl border border-rule bg-white px-6 py-12 text-center">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl" style={{ background: m.tint, color: m.ink }}>
@@ -54,5 +56,6 @@ export default async function ModuleNotHereYet({ params }: { params: Promise<{ m
         </div>
       </div>
     </main>
+    </PlainFrame>
   );
 }

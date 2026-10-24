@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { Suspense, type ReactNode } from "react";
 import { Notices } from "@/src/platform/app/notices";
+import { OneActions } from "@/src/one/one-actions";
 import { ModuleActions } from "@/src/platform/shell/module-actions";
 import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getMe } from "../lib/api";
@@ -16,7 +17,12 @@ type Props = { children: ReactNode; waiting?: Record<string, number>; unset?: Re
 export async function ShellLayout({ children, waiting, unset, bell }: Props) {
   const me = await getMe();
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
-  const actions = <ModuleActions bell={bell} profileHref="/finance/account" />;
+  // Its bell, then your modules and you (src/one/one-actions.tsx): the top right, as before the one app.
+  const actions = (
+    <ModuleActions bell={bell}>
+      <OneActions links={[{ href: "/finance/account", label: "Your profile" }]} />
+    </ModuleActions>
+  );
   return (
     <>
       <Suspense fallback={null}>

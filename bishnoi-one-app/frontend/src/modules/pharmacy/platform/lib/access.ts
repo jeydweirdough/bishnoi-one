@@ -7,7 +7,7 @@ export const can = (me: Me, permission: string): boolean => me.permissions?.incl
 /** Who's who: users, their roles, their teams. One place, three tabs. */
 export const PEOPLE_TABS = [
   { href: "/pharmacy/admin/users", label: "Users", permission: "admin.users" },
-  { href: "/platform/access/roles", label: "Roles and permissions", permission: "admin.roles" },
+  { href: "/platform/roles", label: "Roles and permissions", permission: "admin.roles" },
   { href: "/pharmacy/admin/teams", label: "Teams", permission: "admin.teams" },
 ] as const;
 
@@ -18,7 +18,7 @@ type AdminPage = { href: string; label: string; icon: "people" | "roles" | "sett
 /** The Pharmacy's Administration: its users, what each role may do, and the log of who did what. */
 const PHARMACY_ADMIN: (AdminPage & { permission: string })[] = [
   { href: "/pharmacy/admin/users", label: "Users", icon: "people", also: [], permission: "admin.users" },
-  { href: "/platform/access/roles", label: "Roles and permissions", icon: "roles", also: [], permission: "admin.roles" },
+  { href: "/platform/roles", label: "Roles and permissions", icon: "roles", also: [], permission: "admin.roles" },
   { href: "/pharmacy/admin/audit", label: "Activity log", icon: "auditLog", also: [], permission: "admin.audit" },
 ];
 

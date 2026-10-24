@@ -4,7 +4,7 @@ import { ApiError, enc, fetchFile } from "@/src/modules/console/platform/lib/api
 // through here with the signed-in person's token; the API only sends a picture
 // of someone in the same company. Nothing is returned when they have none —
 // the screens draw their initials instead.
-export async function GET(_request: Request, ctx: RouteContext<"/platform/console/people/[id]/photo">) {
+export async function GET(_request: Request, ctx: RouteContext<"/platform/people/[id]/photo">) {
   const { id } = await ctx.params;
   try {
     const file = await fetchFile(`/people/${enc(id)}/photo`);

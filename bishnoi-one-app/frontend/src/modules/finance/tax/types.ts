@@ -11,6 +11,8 @@ export type TaxProfile = {
   branchCode: string;
   registeredAddress: string | null;
   pricesIncludeTax: boolean;
+  rdoCode: string | null;
+  fiscalMonthEnd: number;
   complete: boolean;
   updatedAt: string | null;
 };

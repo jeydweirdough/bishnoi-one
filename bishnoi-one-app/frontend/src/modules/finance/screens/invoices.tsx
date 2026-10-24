@@ -308,6 +308,11 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
                   <span className="min-w-0 flex-1">
                     {p.methodLabel}
                     {p.reference && <span className="text-ink-3"> · {p.reference}</span>}
+                    {p.cwtCentavos > 0 && (
+                      <span className="text-ink-2">
+                        {" "}· {fmt.peso(p.cwtCentavos)} withheld ({p.cwtAtc}{p.cwtCertificate ? `, ${p.cwtCertificate}` : ""})
+                      </span>
+                    )}
                     <span className="text-ink-3"> · {p.recordedBy}</span>
                   </span>
                   {p.removedAt ? (

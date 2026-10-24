@@ -25,6 +25,9 @@ ACTION_LABELS = {
     "roles": "Roles and permissions",
     "audit": "Activity log",
     "approve": "Approve and reject",
+    "pay": "Record payments",
+    "record": "Record in the books",
+    "reconcile": "Reconcile statements",
 }
 
 
@@ -44,9 +47,15 @@ AREAS: tuple[Area, ...] = (
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
+    # What the company owes its suppliers (Inventory's), with input VAT and the tax withheld from them.
+    Area("bills", "Supplier bills and payments", "Bills", ("view", "create", "record", "pay", "void")),
     Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),
+    # Matching the bank's statements against the books.
+    Area("bank", "Bank reconciliation", "Accounting", ("view", "reconcile")),
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
+    # The BIR's books of accounts, financial statements, VAT return and summary lists (app/routers/bir.py).
+    Area("bir", "BIR reports and books of accounts", "Tax", ("view",)),
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.
     Area("prices", "Product prices", "Prices", ("view", "approve")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
@@ -99,6 +108,8 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         | _grant("funds", actions=("release", "check", "settle", "cancel"))
         | _grant("journal", actions=("post", "reverse"))
         | _grant("invoices", actions=("create", "issue", "collect"))
+        | _grant("bills", actions=("create", "record", "pay"))
+        | _grant("bank", actions=("reconcile",))
         | _grant("prices", actions=("approve",)),
     ),
     (ROLE_AUDITOR_ID, AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"admin.audit"}),

@@ -170,6 +170,10 @@ class TaxProfile(Base):
     # 123-456-789, and the branch code (00000 for the head office).
     tin: Mapped[str | None] = mapped_column(String(11), default=None)
     branch_code: Mapped[str] = mapped_column(String(5), default="00000")
+    # The Revenue District Office the company is registered under (e.g. "050"), and the month its
+    # fiscal year ends (12: a calendar year): on every BIR form and summary list (app/bir.py).
+    rdo_code: Mapped[str | None] = mapped_column(String(3), default=None)
+    fiscal_month_end: Mapped[int] = mapped_column(Integer, default=12)
     registered_address: Mapped[str | None] = mapped_column(String(300), default=None)
     # Whether catalogue prices already include VAT (as shelf prices do).
     prices_include_tax: Mapped[bool] = mapped_column(default=True)
@@ -293,6 +297,13 @@ class LedgerSettings(Base):
     receivables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     sales_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     output_tax_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Creditable withholding a customer deducted from a payment (their Form 2307): credited against our income tax.
+    cwt_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Where a posted supplier bill goes: what's owed to suppliers, the VAT on purchases (claimed against
+    # output VAT), and the expanded withholding held back for the BIR.
+    payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    input_tax_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    ewt_payable_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class JournalEntry(Base):
@@ -332,6 +343,8 @@ class JournalLine(Base):
     debit_centavos: Mapped[int] = mapped_column(Integer, default=0)
     credit_centavos: Mapped[int] = mapped_column(Integer, default=0)
     description: Mapped[str | None] = mapped_column(String(200), default=None)
+    # The bank reconciliation that found it on the statement (cleared); None while it hasn't shown up there.
+    reconciliation_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bank_reconciliations.id", ondelete="SET NULL"), index=True, default=None)
 
     account: Mapped[Account] = relationship(lazy="joined")
 
@@ -551,6 +564,11 @@ class InvoicePayment(Base):
     # cash, bank, ewallet, check: the money account it lands in (Default accounts).
     method: Mapped[str] = mapped_column(String(10))
     reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    # What the customer withheld from this payment and paid the BIR for us (their Form 2307):
+    # it settles the invoice as much as cash does. Its ATC ("WC158") and the certificate's reference.
+    cwt_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    cwt_atc: Mapped[str | None] = mapped_column(String(8), default=None)
+    cwt_certificate: Mapped[str | None] = mapped_column(String(60), default=None)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
     recorded_by: Mapped[str] = mapped_column(String(120))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -560,7 +578,110 @@ class InvoicePayment(Base):
     invoice: Mapped[Invoice] = relationship(back_populates="payments")
 
 
+# ---- Supplier bills: what the company owes for what it bought (decided 2026-10-24) ----------
+
+
+class SupplierBill(Base):
+    """A supplier's invoice, recorded: to one of Inventory's suppliers (copied on
+    when made), its lines by account and VAT kind, the input VAT, and the expanded
+    withholding by its ATC. Drafted, then posted (owed to the supplier, input VAT
+    claimed, tax withheld payable to the BIR), then paid; voided, never edited."""
+
+    __tablename__ = "nbfi_supplier_bills"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'posted', 'void')", name="bill_status"),
+        Index("nbfi_supplier_bills_no", "no", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up: the bill's number here (the supplier's own is supplier_invoice_no).
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    supplier_id: Mapped[str] = mapped_column(String(36), index=True)
+    supplier_name: Mapped[str] = mapped_column(String(160))
+    supplier_tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    supplier_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    supplier_vat_status: Mapped[str] = mapped_column(String(8), default="vat")
+    supplier_invoice_no: Mapped[str] = mapped_column(String(60))
+    bill_date: Mapped[date] = mapped_column(Date, index=True)
+    terms_days: Mapped[int] = mapped_column(Integer, default=30)
+    # The delivery in Inventory it was made from, if any (its receipt number).
+    delivery_ref: Mapped[str | None] = mapped_column(String(60), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    amounts_include_vat: Mapped[bool] = mapped_column(default=True)
+    # [{description, accountId, kind (vatable, zero_rated, exempt, non_vat), amountCentavos, withheld}]
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    atc: Mapped[str | None] = mapped_column(String(8), default=None)
+    ewt_rate_bp: Mapped[int] = mapped_column(Integer, default=0)
+    # Worked out from the lines (app/bills.py): net, input VAT, the withholding, what's owed.
+    computed: Mapped[dict | None] = mapped_column(JSON, default=None)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    input_tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    ewt_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    payable_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    posted_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    payments: Mapped[list["BillPayment"]] = relationship(
+        back_populates="bill", order_by="BillPayment.paid_on", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class BillPayment(Base):
+    """Money paid to a supplier against a posted bill: what's owed down, money out."""
+
+    __tablename__ = "nbfi_bill_payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_supplier_bills.id", ondelete="CASCADE"), index=True)
+    paid_on: Mapped[date] = mapped_column(Date)
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+    method: Mapped[str] = mapped_column(String(10))
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    recorded_by: Mapped[str] = mapped_column(String(120))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    bill: Mapped[SupplierBill] = relationship(back_populates="payments")
+
+
+class BankReconciliation(Base):
+    """One bank statement matched against the books (decided 2026-10-24, from
+    Oojeema): for a cash or bank account, up to the statement's date, which of
+    the book's movements the bank shows (cleared), until the cleared balance
+    equals the statement's ending balance. Finished, the cleared lines are marked
+    and the next statement starts from this one's balance."""
+
+    __tablename__ = "nbfi_bank_reconciliations"
+    __table_args__ = (CheckConstraint("status IN ('open', 'done')", name="reconciliation_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"), index=True)
+    statement_date: Mapped[date] = mapped_column(Date)
+    statement_balance_centavos: Mapped[int] = mapped_column(Integer)
+    opening_balance_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(6), default="open", index=True)
+    # While open: the journal lines ticked as on the statement.
+    cleared: Mapped[list[int]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    finished_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    account: Mapped[Account] = relationship(lazy="joined")
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, Account)
+numbered(User, Account, SupplierBill)

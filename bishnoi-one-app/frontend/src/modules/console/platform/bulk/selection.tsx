@@ -303,7 +303,7 @@ async function follow(job: Job, onProgress: (job: Job) => void): Promise<Job | n
     onProgress(job);
     await pause(job.status === "queued" ? 1000 : 700);
     try {
-      const response = await fetch(`/platform/console/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
+      const response = await fetch(`/platform/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
       if (response.ok) {
         job = (await response.json()) as Job;
         misses = 0;
