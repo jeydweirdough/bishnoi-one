@@ -128,7 +128,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
         setFields(result.fields ?? {});
         return;
       }
-      toast.success("Draft saved", { description: "Attach the supplier's invoice, then record it." });
+      toast.success("Draft saved", { description: "Attach the supplier's invoice, then submit it for approval." });
       router.push(`/bills/${result.data.id}`);
     });
   }

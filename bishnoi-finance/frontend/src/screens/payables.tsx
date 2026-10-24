@@ -6,32 +6,63 @@ import { enc, getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat } from "@/src/platform/lib/format";
 import { BillEditor } from "../payables/bill-editor";
 import { attachFile, attachSupplierFile, removeFile, removeSupplierFile } from "../payables/actions";
-import { DeleteBillDraft, RecordBill, VoidBill } from "../payables/bill-steps";
+import { BillSteps, DeleteBillDraft, VoidBill } from "../payables/bill-steps";
 import { AttachedFiles } from "../payables/files";
 import { SupplierImport } from "../payables/import";
 import { SupplierForm, SwitchSupplier } from "../payables/supplier-form";
-import { BILL_STATUS_LABELS, type Bill, type BillChoices, type BillStatus, type BillSummary, type Supplier, type Withholding } from "../payables/types";
+import { VOUCHER_STATUS_LABELS } from "../vouchers/types";
+import { BILL_STATE_LABELS, type Bill, type BillChoices, type BillState, type BillSummary, type Supplier, type Withholding } from "../payables/types";
 
-// Payables (app/routers/payables.py): suppliers, and their bills, recorded into the books
-// and voided rather than changed. Built 2026-10-23 from Aubrey's answers; making bills is
-// one tick on the Roles screen ("Supplier bills: Make and record"), so any role can have it.
+// Payables (app/routers/payables.py): suppliers, and their bills. A bill is made and submitted,
+// approved, checked if tax is withheld, and only then posted and ready to pay (Aubrey's flow,
+// 2026-10-23); voided rather than changed. Each step is a tick on the Roles screen.
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 const may = (me: { permissions?: string[] }, p: string) => me.permissions?.includes(p) ?? false;
 
-function StatusMark({ status }: { status: BillStatus }) {
-  const tone = status === "recorded" ? "bg-hema-tint text-hema" : status === "void" ? "bg-danger-tint text-danger" : "bg-bench text-ink-2";
-  return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATUS_LABELS[status]}</span>;
+function StatusMark({ state }: { state: BillState }) {
+  const tone =
+    state === "ready" || state === "paid"
+      ? "bg-hema-tint text-hema"
+      : state === "returned" || state === "partly_paid"
+        ? "bg-due-today/15 text-due-today"
+        : state === "void"
+          ? "bg-danger-tint text-danger"
+          : "bg-bench text-ink-2";
+  return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATE_LABELS[state]}</span>;
 }
 
+/** Unpaid / Partly paid / Paid, always beside the amount (you, 2026-10-23: part-payments must be seen). */
+function PaymentMark({ bill }: { bill: BillSummary }) {
+  if (bill.paymentState === "unpaid") return <span className="block text-meta text-ink-3">Unpaid</span>;
+  return <span className={`block text-meta font-semibold ${bill.paymentState === "paid" ? "text-hema" : "text-due-today"}`}>{bill.paymentLabel}</span>;
+}
+
+// Each tab is someone's list: drafts and returned (Aubrey), to approve (Malou), to check (Mel),
+// ready to pay (Cristal).
 const TABS: { key: string; label: string }[] = [
   { key: "", label: "All" },
   { key: "draft", label: "Drafts" },
-  { key: "recorded", label: "Recorded" },
+  { key: "returned", label: "Returned" },
+  { key: "to_approve", label: "To approve" },
+  { key: "to_check", label: "To check" },
+  { key: "ready", label: "Ready to pay" },
+  { key: "partly_paid", label: "Partly paid" },
+  { key: "paid", label: "Paid" },
   { key: "void", label: "Void" },
   { key: "missing", label: "Document missing" },
 ];
+
+const EVENT_LABELS: Record<string, string> = {
+  submitted: "Submitted for approval",
+  resubmitted: "Corrected and submitted again",
+  approved: "Approved",
+  returned: "Returned for correction",
+  checked: "Tax withheld checked",
+  cleared: "Posted to the books: ready to pay",
+  voided: "Voided",
+};
 
 export async function BillsPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
@@ -41,28 +72,28 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
   const q = one(sp.q);
   const query = new URLSearchParams();
   if (show === "missing") query.set("missing", "true");
-  else if (show) query.set("status", show);
+  else if (show) query.set("show", show);
   if (q) query.set("q", q);
-  const list = await load<{ items: BillSummary[]; counts: Record<BillStatus | "missing", number> }>(`/finance/bills?${query}`);
+  const list = await load<{ items: BillSummary[]; counts: Record<BillState | "missing", number>; canCreate: boolean }>(`/finance/bills?${query}`);
   return (
     <>
       <PageHeader
         title="Bills"
         actions={
-          may(me, "bills.create") && (
+          list.canCreate && (
             <LinkButton href="/bills/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
               New bill
             </LinkButton>
           )
         }
       >
-        Suppliers&apos; invoices, as the company owes them. A draft is checked and its invoice attached; recording posts it to the books, with the VAT and the
-        tax withheld worked out. A recorded bill is voided, never changed.
+        Suppliers&apos; invoices, as the company owes them. A bill is made with its invoice attached and submitted; approved; checked if tax is withheld; and
+        only then posted to the books and ready to pay. Returned, it goes back with the reason. A posted bill is voided, never changed.
       </PageHeader>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
-            const n = t.key ? list.counts[t.key as BillStatus | "missing"] : 0;
+            const n = t.key ? list.counts[t.key as BillState | "missing"] : 0;
             return (
               <Link
                 key={t.key}
@@ -71,7 +102,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
                 {t.label}
-                {n ? <span className={t.key === "missing" ? "text-due-today" : "text-ink-3"}> {n}</span> : null}
+                {n ? <span className={t.key === "missing" || t.key === "returned" ? "font-semibold text-due-today" : "text-ink-3"}> {n}</span> : null}
               </Link>
             );
           })}
@@ -84,7 +115,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
       <Sheet>
         {list.items.length === 0 ? (
           <Empty title={q || show ? "No matching bills" : "No bills yet"} icon="lists">
-            {!q && !show && may(me, "bills.create") ? "Enter the first one with New bill." : null}
+            {!q && !show && list.canCreate ? "Enter the first one with New bill." : null}
           </Empty>
         ) : (
           <div className="overflow-x-auto">
@@ -97,6 +128,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                   <th className="px-3 py-2 font-semibold">Date</th>
                   <th className="px-3 py-2 font-semibold">Due</th>
                   <th className="px-3 py-2 text-right font-semibold">To pay</th>
+                  <th className="px-3 py-2 text-right font-semibold">Left to pay</th>
                   <th className="py-2 pr-5 pl-3 font-semibold">Status</th>
                 </tr>
               </thead>
@@ -116,8 +148,9 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                     <td className="px-3 py-2.5 text-ink-2">{fmt.dateLabel(b.billDate)}</td>
                     <td className="px-3 py-2.5 text-ink-2">{b.status === "void" ? "" : fmt.dateLabel(b.dueDate)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{fmt.peso(b.payableCentavos)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{b.status === "recorded" ? fmt.peso(b.leftCentavos) : ""}</td>
                     <td className="py-2.5 pr-5 pl-3">
-                      <StatusMark status={b.status} />
+                      <StatusMark state={b.state} />
                     </td>
                   </tr>
                 ))}
@@ -136,10 +169,47 @@ export async function NewBillPage() {
   return (
     <>
       <PageHeader title="New bill" crumbs={[{ href: "/bills", label: "Bills" }]}>
-        Saved as a draft first: attach the supplier&apos;s invoice, check it, then record it from the bill&apos;s page.
+        Saved as a draft first: attach the supplier&apos;s invoice, check it against the PO and delivery receipt, then submit it for approval from the bill&apos;s
+        page.
       </PageHeader>
       <BillEditor bill={null} choices={choices} org={me.org} />
     </>
+  );
+}
+
+const WAITING: Partial<Record<BillState, string>> = {
+  draft: "A draft: whoever made it submits it for approval.",
+  returned: "Back with whoever submitted it, to be corrected and submitted again.",
+  to_approve: "Waiting for approval by someone whose role may approve bills.",
+  to_check: "Approved. Waiting for the tax withheld to be checked by someone whose role may check it.",
+};
+
+/** The bill's road to being paid, with who did each step so far: always in view, not behind a click. */
+function ApprovalPath({ bill: b }: { bill: Bill }) {
+  const at = b.state === "to_approve" ? 1 : b.state === "to_check" ? 2 : 0;
+  const submitter = at >= 1 ? ([...b.events].reverse().find((e) => e.kind === "submitted" || e.kind === "resubmitted")?.who ?? null) : null;
+  const steps = [
+    { label: "Submitted", who: submitter },
+    { label: "Approved", who: b.approvedBy },
+    ...(b.needsCheck ? [{ label: "Tax withheld checked", who: b.checkedBy }] : []),
+    { label: "Posted, ready to pay", who: null },
+  ];
+  return (
+    <ol className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
+      {steps.map((x, i) => (
+        <li key={x.label} className="flex items-center gap-2">
+          {i > 0 && (
+            <span className="text-ink-3" aria-hidden>
+              →
+            </span>
+          )}
+          <span className={x.who ? "font-semibold text-hema" : i === at ? "font-semibold text-ink" : "text-ink-3"}>
+            {x.label}
+            {x.who && <span className="font-normal text-ink-2"> · {x.who}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -151,8 +221,10 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
   const b = await load<Bill>(`/finance/bills/${enc(id)}`);
   const crumbs = [{ href: "/bills", label: "Bills" }];
   const title = `Bill ${b.no} · ${b.supplier.name}`;
+  const when = fmt.on({ dateStyle: "medium", timeStyle: "short" });
+  const lastReturn = [...b.events].reverse().find((e) => e.kind === "returned");
 
-  if (b.status === "draft" && editing && may(me, "bills.create")) {
+  if (editing && b.canEdit) {
     const choices = await load<BillChoices>("/finance/bills/choices");
     return (
       <>
@@ -169,17 +241,22 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         crumbs={crumbs}
         actions={
           <>
-            {b.status === "draft" && may(me, "bills.create") && (
+            {b.canEdit && (
               <>
                 <LinkButton href={`/bills/${b.id}?edit=1`}>Edit</LinkButton>
                 <DeleteBillDraft id={b.id} />
               </>
             )}
-            {b.status === "recorded" && may(me, "bills.void") && <VoidBill id={b.id} label={`Bill ${b.no}`} />}
+            {b.canPay && b.leftCentavos - b.setAsideCentavos > 0 && (
+              <LinkButton href={`/vouchers/new?supplier=${b.supplier.id}&bill=${b.id}`} variant="primary">
+                Pay this bill
+              </LinkButton>
+            )}
+            {b.canVoid && <VoidBill id={b.id} label={`Bill ${b.no}`} />}
           </>
         }
       >
-        <StatusMark status={b.status} />
+        <StatusMark state={b.state} />
         {b.status === "void" && (
           <span className="ml-2 text-meta text-danger">
             Voided by {b.voidedBy}: {b.voidReason}
@@ -187,15 +264,44 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         )}
       </PageHeader>
 
+      {b.status === "recorded" && (
+        <Sheet className="mb-5 px-5 py-4">
+          <p className="text-sm">
+            <span className="font-semibold">{fmt.peso(b.paidCentavos)} paid</span> of {fmt.peso(b.payableCentavos)} ·{" "}
+            <span className={b.leftCentavos ? "font-semibold" : ""}>{fmt.peso(b.leftCentavos)} left to pay</span> <PaymentMark bill={b} />
+            {b.setAsideCentavos > 0 && <span className="text-due-today"> · {fmt.peso(b.setAsideCentavos)} in a voucher not released yet</span>}
+          </p>
+          {b.vouchers.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-meta text-ink-2">
+              {b.vouchers.map((x) => (
+                <li key={x.id}>
+                  <Link href={`/vouchers/${x.id}`} className="font-mono font-semibold text-hema hover:underline">
+                    {x.number}
+                  </Link>{" "}
+                  · {fmt.peso(x.amountCentavos)} · {VOUCHER_STATUS_LABELS[x.status as keyof typeof VOUCHER_STATUS_LABELS] ?? x.status}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Sheet>
+      )}
+
+      {b.state === "returned" && lastReturn && (
+        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+          <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
+        </p>
+      )}
+
       {b.status === "draft" && (
         <Sheet className="mb-5 px-5 py-4">
-          <SectionTitle icon="approvals">Record</SectionTitle>
+          <SectionTitle icon="approvals">Approval</SectionTitle>
+          <ApprovalPath bill={b} />
           {b.problem ? (
             <p className="text-sm text-danger">{b.problem}</p>
-          ) : may(me, "bills.record") ? (
-            <RecordBill bill={b} />
+          ) : b.canSubmit || b.canApprove || b.canCheck || b.canReturn ? (
+            <BillSteps bill={b} />
           ) : (
-            <p className="text-sm text-ink-2">Waiting for someone whose role may record bills (post them to the books).</p>
+            <p className="text-sm text-ink-2">{WAITING[b.state] ?? "Waiting for the next step."}</p>
           )}
         </Sheet>
       )}
@@ -218,6 +324,8 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
               ["Checked against", [b.checkedPo && "PO", b.checkedDr && "delivery receipt"].filter(Boolean).join(" and ") || <span key="c" className="text-due-today">Not marked</span>],
               ["Zoho", b.zohoRef],
               ["Oojeema", b.oojeemaRef],
+              ["Approved by", b.approvedBy],
+              ["Tax withheld checked by", b.checkedBy],
             ]}
           />
         </div>
@@ -275,14 +383,31 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
           files={b.files}
           openBase={`/bills/${b.id}/files`}
           label="Attach the supplier's invoice"
-          attach={may(me, "bills.create") && b.status !== "void" ? attachFile.bind(null, b.id) : undefined}
-          remove={may(me, "bills.create") && b.status !== "void" ? removeFile.bind(null, b.id) : undefined}
+          attach={b.canAttach ? attachFile.bind(null, b.id) : undefined}
+          remove={b.canAttach ? removeFile.bind(null, b.id) : undefined}
           empty={<p className="text-sm text-due-today">Document missing: the supplier&apos;s invoice isn&apos;t attached yet.</p>}
         />
       </Sheet>
 
+      {b.events.length > 0 && (
+        <Sheet className="mt-5 px-5 py-4">
+          <SectionTitle>History</SectionTitle>
+          <ul className="divide-y divide-rule text-sm">
+            {b.events.map((e, i) => (
+              <li key={i} className="grid gap-1 py-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-4">
+                <span className="text-ink-2 tabular-nums">{when.format(new Date(e.at))}</span>
+                <span>
+                  <span className="font-semibold">{e.who}</span> · {EVENT_LABELS[e.kind] ?? e.kind}
+                  {e.text && <span className={e.kind === "returned" ? "text-due-today" : "text-ink-2"}>: {e.text}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
+
       <p className="mt-3 text-meta text-ink-3">
-        Entered by {b.createdBy}.{b.recordedBy && ` Recorded by ${b.recordedBy}.`}{" "}
+        Entered by {b.createdBy}.{b.recordedBy && ` Posted by ${b.recordedBy}.`}{" "}
         {b.entryId && (
           <Link href="/ledger?source=bill" className="text-hema hover:underline">
             View journal entry
@@ -498,7 +623,8 @@ export async function SupplierPage({ params, searchParams }: { params: Promise<{
                 <span className="min-w-0 flex-1 font-mono text-meta">{b.billNumber}</span>
                 <span className="text-ink-2">{fmt.dateLabel(b.billDate)}</span>
                 <span className="w-32 text-right tabular-nums">{fmt.peso(b.payableCentavos)}</span>
-                <StatusMark status={b.status} />
+                <span className="w-36 text-right text-meta tabular-nums">{b.status === "recorded" && `${fmt.peso(b.leftCentavos)} left`}</span>
+                <StatusMark state={b.state} />
               </li>
             ))}
           </ul>

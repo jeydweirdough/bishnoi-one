@@ -321,7 +321,7 @@ def list_entries(
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice", "bill"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill", "voucher"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),

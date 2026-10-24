@@ -800,6 +800,21 @@ class Bill(Base):
     total_centavos: Mapped[int] = mapped_column(Integer, default=0)
     payable_centavos: Mapped[int] = mapped_column(Integer, default=0)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    # What released payment vouchers have paid on it, and the payables account it posted to
+    # when recorded (vouchers take it off that same account). Migration 0019.
+    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # Where a draft stands in its approval (Aubrey's flow, 2026-10-23; migration 0020): none (being
+    # made), to_approve (Malou; Cristal backup), to_check (Mel, only with tax withheld), returned.
+    # It's posted (status recorded) only when it clears. Beside status, so that table is never rebuilt.
+    stage: Mapped[str | None] = mapped_column(String(12), default=None, index=True)
+    submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    approved_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    checked_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    checked_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_by: Mapped[str] = mapped_column(String(120))
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -810,6 +825,21 @@ class Bill(Base):
 
     supplier: Mapped[Supplier] = relationship(lazy="joined")
     files: Mapped[list["BillFile"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="BillFile.uploaded_at")
+    events: Mapped[list["BillEvent"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="BillEvent.id")
+
+
+class BillEvent(Base):
+    """What happened to a bill, in order: submitted, approved, returned (with why), checked, cleared, voided."""
+
+    __tablename__ = "nbfi_bill_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_bills.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    kind: Mapped[str] = mapped_column(String(20))
+    who: Mapped[str] = mapped_column(String(120))
+    who_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    text: Mapped[str | None] = mapped_column(String(300), default=None)
 
 
 class BillFile(Base):
@@ -827,7 +857,107 @@ class BillFile(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+# --- payment vouchers: paying suppliers' bills (app/routers/vouchers.py, migration 0019) -----
+#
+# Prepared for a supplier's bills ready to pay (one voucher, several bills, part of a bill
+# allowed); Cristal releases it, which posts it (Dr each bill's payables account, Cr the account
+# it's paid from). Returned with a reason, it goes back to whoever prepared it. Decided 2026-10-23
+# (Plans/Plan - Payment vouchers; Cristal Q4, Q16; Aubrey Q12, Q14). The same day Aubrey moved the
+# checks to the bill (migration 0020): to_check and to_approve, and checked_by and approved_by
+# below, are no longer used, and stay only so the table is never rebuilt.
+
+VOUCHER_STATUSES = ("draft", "returned", "to_check", "to_approve", "to_release", "released", "cancelled", "void")
+# Not yet released or cancelled: what they hold of a bill is set aside, so it isn't paid twice.
+OPEN_VOUCHERS = ("draft", "returned", "to_check", "to_approve", "to_release")
+
+
+class PaymentVoucher(Base):
+    __tablename__ = "nbfi_payment_vouchers"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (CheckConstraint(f"status IN {VOUCHER_STATUSES}", name="voucher_status"), Index("nbfi_payment_vouchers_no", "no", unique=True))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    # PV-202610-0001: the Hub's own voucher number.
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    status: Mapped[str] = mapped_column(String(12), default="draft", index=True)
+    supplier_id: Mapped[str] = mapped_column(ForeignKey("nbfi_suppliers.id"), index=True)
+    # bank (transfer), check, cash
+    method: Mapped[str] = mapped_column(String(10), default="bank")
+    # The bank or cash account it's paid from (an account under CASH in the chart).
+    paid_from_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    # The same payment in the other systems (Aubrey Q9, Q13; step 6).
+    oojeema_ref: Mapped[str | None] = mapped_column(String(60), default=None)
+    zoho_ref: Mapped[str | None] = mapped_column(String(60), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    prepared_by: Mapped[str] = mapped_column(String(120))
+    prepared_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    checked_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    checked_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    approved_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    released_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    released_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    # Set at release: when it was paid, and the bank's reference or the check's number and date.
+    paid_on: Mapped[date | None] = mapped_column(Date, default=None)
+    bank_reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    check_number: Mapped[str | None] = mapped_column(String(40), default=None)
+    check_date: Mapped[date | None] = mapped_column(Date, default=None)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    supplier: Mapped[Supplier] = relationship(lazy="joined")
+    lines: Mapped[list["VoucherLine"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="VoucherLine.position")
+    events: Mapped[list["VoucherEvent"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="VoucherEvent.id")
+    files: Mapped[list["VoucherFile"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="VoucherFile.uploaded_at")
+
+
+class VoucherLine(Base):
+    """One bill a voucher pays, and how much of it."""
+
+    __tablename__ = "nbfi_voucher_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_payment_vouchers.id", ondelete="CASCADE"), index=True)
+    bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_bills.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    amount_centavos: Mapped[int] = mapped_column(Integer)
+
+    bill: Mapped[Bill] = relationship(lazy="joined")
+
+
+class VoucherEvent(Base):
+    """What happened to a voucher, in order: submitted, checked, returned (with why), approved, released..."""
+
+    __tablename__ = "nbfi_voucher_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_payment_vouchers.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    kind: Mapped[str] = mapped_column(String(20))
+    who: Mapped[str] = mapped_column(String(120))
+    who_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    text: Mapped[str | None] = mapped_column(String(300), default=None)
+
+
+class VoucherFile(Base):
+    """Proof of payment, attached: the deposit slip, a photo of the check, the bank's confirmation."""
+
+    __tablename__ = "nbfi_voucher_files"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_payment_vouchers.id", ondelete="CASCADE"), index=True)
+    ref: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(Integer)
+    uploaded_by: Mapped[str] = mapped_column(String(120))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, Account, Supplier, Bill)
+numbered(User, Account, Supplier, Bill, PaymentVoucher)

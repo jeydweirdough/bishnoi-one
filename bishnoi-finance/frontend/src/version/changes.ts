@@ -12,6 +12,29 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.13",
+    date: "2026-10-23",
+    changes: [
+      "Supplier bills are now approved before they're paid, as Aubrey described: she makes the bill and submits it → Malou approves it (Cristal is backup) → only if tax is withheld, Mel checks the code and rate → it's posted to the books and ready to pay, and Cristal is told.",
+      "A bill waiting for approval isn't in the books yet, and isn't counted as owed to the supplier. Returned with a reason, it goes back to whoever submitted it and, once corrected, to Malou again.",
+      "Bills has a tab for each step (Drafts, Returned, To approve, To check, Ready to pay, Partly paid, Paid, Void), and each bill shows its approval steps, who did each one, and its history.",
+      "Payment vouchers are simpler: prepared, then released by Cristal. Their own check and approve steps are gone, because the bills were already approved. Only bills ready to pay can go on one, and the printed voucher shows who approved each bill.",
+      "On the Roles screen: Supplier bills → Make drafts, Approve or return, Told first, Check the tax withheld, Void (\"Record\" is gone). Payment vouchers → Prepare, Release, Void.",
+    ],
+  },
+  {
+    version: "0.4.12",
+    date: "2026-10-23",
+    changes: [
+      "Payables → Payment vouchers: pay a supplier's recorded bills, several at once, by bank transfer, check or cash, from one of the accounts under CASH in the chart (the banks, petty cash, GCash).",
+      "Each voucher goes Prepared → Checked (one checker) → Approved (Cristal is told first; Malou approves as backup) → Released, which posts it: payables down, the bank or cash down. Whoever prepared it does no later step, and the checker doesn't approve.",
+      "Returned for correction: at any step before release, with the reason; it goes back to whoever prepared it, who corrects it and submits it again.",
+      "Part of a bill can be paid. Every bill shows what's paid and what's left (and \"Partly paid\") on the list, its page, the supplier and the voucher, without extra clicks. Nothing is paid twice: what an open voucher holds of a bill is set aside.",
+      "Each voucher keeps the same payment's Oojeema PV number and Zoho reference; the printable voucher has the amount in words, the four e-signatures and a Received by line; proof of payment can be attached.",
+      "Separate ticks for every step on the Roles screen: View, Prepare, Check, Approve or return, Told first, Release, Void (Malou).",
+    ],
+  },
+  {
     version: "0.4.11",
     date: "2026-10-23",
     changes: [

@@ -141,9 +141,10 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
         label: "Payables",
         icon: "orders",
         // Suppliers sit at their own address, so the section stays open there too (2026-10-23).
-        also: [`${base}/suppliers`],
+        also: [`${base}/suppliers`, `${base}/vouchers`],
         subpages: [
           { href: `${base}/bills`, label: "Bills" },
+          { href: `${base}/vouchers`, label: "Payment vouchers" },
           { href: `${base}/suppliers`, label: "Suppliers" },
         ],
       },
@@ -635,6 +636,7 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/invoices", "invoices.view"],
   ["/bills", "bills.view"],
   ["/suppliers", "suppliers.view"],
+  ["/vouchers", "vouchers.view"],
   ["/ledger/accounts", "accounts.view"],
   ["/ledger/posting", "accounts.view"],
   ["/ledger/categories", "categories.view"],

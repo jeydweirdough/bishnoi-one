@@ -1,6 +1,7 @@
 """Suppliers and their bills (built 2026-10-23 from Aubrey's answers): the usual tax withheld
-filled in, VAT and withholding worked out, recorded straight into the books, voided rather
-than changed, no supplier or bill twice, and the supplier's invoice attached."""
+filled in, VAT and withholding worked out, posted to the books once approved (and checked, with
+tax withheld: tests/test_bill_flow.py), voided rather than changed, no supplier or bill twice,
+and the supplier's invoice attached."""
 
 import base64
 
@@ -30,6 +31,20 @@ def bill(client, who, supplier_id: str, amount=1_120_000, number="SI-0001", **ex
     return r.json()
 
 
+def cleared(client, ana, maker, b) -> dict:
+    """Submitted by whoever made it, approved by Ana; with tax withheld, checked by someone else."""
+    r = client.post(f"/finance/bills/{b['id']}/submit", headers=maker)
+    assert r.status_code == 200, r.text
+    r = client.post(f"/finance/bills/{b['id']}/approve", headers=ana)
+    assert r.status_code == 200, r.text
+    if r.json()["state"] == "to_check":
+        checker = person(client, ana, f"Checks tax {b['no']}", VIEW + ["bills.view", "bills.check"])
+        r = client.post(f"/finance/bills/{b['id']}/check", headers=checker)
+        assert r.status_code == 200, r.text
+    assert r.json()["state"] == "ready"
+    return r.json()
+
+
 def test_suppliers_keep_their_usual_withholding_and_are_never_twice(client, ben):
     s = supplier(client, ben)
     assert (s["tin"], s["branchCode"], s["withholding"]["code"], s["withholding"]["rateBp"]) == ("123-456-789", "00000", "WC158", 100)
@@ -41,25 +56,31 @@ def test_suppliers_keep_their_usual_withholding_and_are_never_twice(client, ben)
     assert unknown.status_code == 422
 
 
-def test_a_bill_takes_vat_out_withholds_on_the_rest_and_posts_when_recorded(client, ana, ben):
+def test_a_bill_takes_vat_out_withholds_on_the_rest_and_posts_when_it_clears(client, ana, ben):
     s = supplier(client, ben)
     b = bill(client, ben, s["id"])
     # ₱11,200 with VAT: ₱10,000 and ₱1,200 VAT; 1% of ₱10,000 withheld; ₱11,100 to pay.
     assert (b["status"], b["netCentavos"], b["vatCentavos"], b["withheldCentavos"], b["payableCentavos"]) == ("draft", 1_000_000, 120_000, 10_000, 1_110_000)
-    assert b["dueDate"] == "2026-10-31" and b["documentMissing"] is True
+    assert b["dueDate"] == "2026-10-31" and b["documentMissing"] is True and b["needsCheck"] is True
     assert balances(client, ana) == {}  # a draft posts nothing
-    recorded = client.post(f"/finance/bills/{b['id']}/record", headers=ben)
+    submitted = client.post(f"/finance/bills/{b['id']}/submit", headers=ben).json()
+    assert (submitted["state"], submitted["stateLabel"]) == ("to_approve", "To approve")
+    assert client.post(f"/finance/bills/{b['id']}/approve", headers=ana).json()["state"] == "to_check"
+    assert balances(client, ana) == {}  # nothing in the books while it waits
+    checker = person(client, ana, "Checks tax", VIEW + ["bills.view", "bills.check"])
+    recorded = client.post(f"/finance/bills/{b['id']}/check", headers=checker)
     assert recorded.status_code == 200, recorded.text
-    assert recorded.json()["status"] == "recorded" and recorded.json()["recordedBy"] == "Ben Cruz"
-    # Counts at once (no approval wait): the expense and input VAT, against payables and EWT payable.
+    assert (recorded.json()["status"], recorded.json()["state"], recorded.json()["recordedBy"]) == ("recorded", "ready", "Checks tax")
+    # Cleared, it counts at once: the expense and input VAT, against payables and EWT payable.
     assert balances(client, ana) == {"6500": 1_000_000, "1300": 120_000, "2000": 1_110_000, "2300": 10_000}
     entries = client.get("/finance/ledger/entries?source=bill", headers=ana).json()["items"]
     assert len(entries) == 1 and entries[0]["status"] == "approved"
-    # Recorded, it's never changed or deleted, nor recorded twice.
+    # Posted, it's never changed or deleted, nor approved or checked again.
     line = {"accountId": account(client, ben, "6500"), "amountCentavos": 100}
     assert client.put(f"/finance/bills/{b['id']}", json={"supplierId": s["id"], "billNumber": "X", "billDate": "2026-10-01", "lines": [line]}, headers=ben).status_code == 409
     assert client.delete(f"/finance/bills/{b['id']}", headers=ben).status_code == 409
-    assert client.post(f"/finance/bills/{b['id']}/record", headers=ben).status_code == 409
+    assert client.post(f"/finance/bills/{b['id']}/approve", headers=ana).status_code == 409
+    assert client.post(f"/finance/bills/{b['id']}/check", headers=checker).status_code == 409
 
 
 def test_amounts_without_vat_add_it_and_a_non_vat_line_has_none(client, ben):
@@ -77,8 +98,8 @@ def test_the_same_invoice_from_a_supplier_is_entered_once_and_voiding_frees_it(c
     twice = client.post("/finance/bills", json={"supplierId": s["id"], "billNumber": "si-0001", "billDate": "2026-10-01",
                                                   "lines": [{"accountId": account(client, ben, "6500"), "amountCentavos": 100}]}, headers=ben)
     assert twice.status_code == 422 and f"bill {first['no']}" in twice.text
-    client.post(f"/finance/bills/{first['id']}/record", headers=ben)
-    # Ben (Finance Staff) records bills but doesn't void them; Ana does, with a reason.
+    cleared(client, ana, ben, first)
+    # Ben (Finance Staff) makes bills but doesn't void them; Ana does, with a reason.
     assert client.post(f"/finance/bills/{first['id']}/void", json={"reason": "Wrong amount"}, headers=ben).status_code == 403
     voided = client.post(f"/finance/bills/{first['id']}/void", json={"reason": "Wrong amount"}, headers=ana)
     assert voided.status_code == 200 and voided.json()["status"] == "void" and voided.json()["voidReason"] == "Wrong amount"
@@ -112,11 +133,12 @@ def test_bills_are_ticks_any_role_can_have(client, ana):
     assert client.post("/finance/bills", json={"supplierId": s["id"], "billNumber": "1", "billDate": "2026-10-01", "lines": []}, headers=viewer).status_code == 403
     b = bill(client, drafter, s["id"])
     assert client.post(f"/finance/bills/{b['id']}/files", json={"name": "a.pdf", "contentType": "application/pdf", "data": PDF}, headers=drafter).status_code == 201
-    assert client.post(f"/finance/bills/{b['id']}/record", headers=drafter).status_code == 403  # drafts, but doesn't post
+    assert client.post(f"/finance/bills/{b['id']}/submit", headers=drafter).status_code == 200
+    assert client.post(f"/finance/bills/{b['id']}/approve", headers=drafter).status_code == 403  # makes bills, doesn't approve them
     assert client.post("/finance/suppliers", json=SUPPLIER | {"name": "Y", "tin": None}, headers=drafter).status_code == 403
     catalogue = client.get("/admin/roles", headers=ana).json()
     labels = {a["key"]: [x["label"] for x in a["actions"]] for a in catalogue["catalogue"]}
-    assert labels["bills"] == ["View", "Make drafts", "Record (post to the books)", "Void"]
+    assert labels["bills"] == ["View", "Make drafts (make, edit, attach, submit)", "Approve or return", "Told first about bills to approve", "Check the tax withheld", "Void"]
     assert labels["suppliers"] == ["View", "Add", "Edit", "Switch off"]
 
 
@@ -129,7 +151,7 @@ def test_a_supplier_has_zohos_details_and_its_own_payables_account(client, ana, 
     expense = client.post("/finance/suppliers", json=SUPPLIER | {"name": "X", "tin": None, "payablesAccountId": account(client, ana, "6500")}, headers=ben)
     assert expense.status_code == 422  # a payables account is a liability
     b = bill(client, ben, s["id"])
-    client.post(f"/finance/bills/{b['id']}/record", headers=ben)
+    cleared(client, ana, ben, b)
     # Its bills post to its own payables account, and the list says what's owed it.
     assert balances(client, ana)["2101-000"] == 1_110_000 and "2000" not in balances(client, ana)
     listed = next(x for x in client.get("/finance/suppliers", headers=ben).json()["items"] if x["id"] == s["id"])

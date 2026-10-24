@@ -6,7 +6,7 @@ import { attempt, type Result } from "@/src/platform/lib/result";
 import type { SupplierRow } from "./csv";
 import type { Bill, BillLineInput, ImportedSupplier, Supplier, SupplierContact, SupplierImportCheck } from "./types";
 
-// Suppliers and bills. The API works each bill out, posts it when it's recorded, and
+// Suppliers and bills. The API works each bill out, posts it once it's approved (and checked), and
 // checks the person's role for every step (app/routers/payables.py).
 
 export type SupplierInput = {
@@ -119,9 +119,11 @@ export async function deleteBill(id: string): Promise<Result<null>> {
   });
 }
 
-export async function recordBill(id: string): Promise<Result<Bill>> {
+/** One step of a bill's approval: submit, approve, check; return needs a reason. Posting happens
+ *  in the API when the bill clears. */
+export async function billStep(id: string, step: "submit" | "approve" | "check" | "return", body: object = {}): Promise<Result<Bill>> {
   return attempt(async () => {
-    const saved = await api.post<Bill>(`/finance/bills/${enc(id)}/record`, {});
+    const saved = await api.post<Bill>(`/finance/bills/${enc(id)}/${step}`, body);
     refresh();
     return saved;
   });

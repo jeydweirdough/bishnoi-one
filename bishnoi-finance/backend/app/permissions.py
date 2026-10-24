@@ -51,10 +51,12 @@ AREAS: tuple[Area, ...] = (
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
     # Accounts payable (2026-10-23): suppliers, and their bills, each step its own tick so any role
-    # can have exactly what it needs (Aubrey, and Cristal sometimes, make bills). Bills: "create"
-    # makes, edits and deletes drafts and attaches files; "record" posts them (migration 0018 split them).
+    # can have exactly what it needs. A bill (Aubrey's flow, migration 0020): made and submitted
+    # ("create"), approved (Malou "first", Cristal backup), checked only if tax is withheld (Mel),
+    # then posted and ready to pay; the payment voucher is prepared and released (Cristal).
     Area("suppliers", "Suppliers", "Payables", ("view", "add", "edit", "deactivate")),
-    Area("bills", "Supplier bills", "Payables", ("view", "create", "record", "void")),
+    Area("bills", "Supplier bills", "Payables", ("view", "create", "approve", "first", "check", "void")),
+    Area("vouchers", "Payment vouchers", "Payables", ("view", "prepare", "release", "void")),
     # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
     # first: the main approver (the Finance Head), told of every entry at once; other approvers are
     # backup, told only of the main approver's own entries and of ones waiting over a working day.
@@ -78,13 +80,26 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissi
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
 
 
+# Where an action means something else in one area, its own label there (the shared one
+# says "Review liquidations" for check, "Prepare BIR files" for prepare).
+AREA_LABELS = {
+    "bills.create": "Make drafts (make, edit, attach, submit)",
+    "bills.approve": "Approve or return",
+    "bills.first": "Told first about bills to approve",
+    "bills.check": "Check the tax withheld",
+    "vouchers.prepare": "Prepare (make, edit, submit, cancel)",
+    "vouchers.release": "Release (pay)",
+    "vouchers.void": "Void a released voucher",
+}
+
+
 def catalogue_out() -> list[dict]:
     return [
         {
             "key": a.key,
             "name": a.name,
             "group": a.group,
-            "actions": [{"key": x, "label": ACTION_LABELS[x], "permission": f"{a.key}.{x}"} for x in a.actions],
+            "actions": [{"key": x, "label": AREA_LABELS.get(f"{a.key}.{x}", ACTION_LABELS[x]), "permission": f"{a.key}.{x}"} for x in a.actions],
         }
         for a in AREAS
     ]
@@ -121,7 +136,8 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         | _grant("journal", actions=("post", "reverse"))
         | _grant("invoices", actions=("create", "issue", "collect"))
         | _grant("suppliers", actions=("add", "edit", "deactivate"))
-        | _grant("bills", actions=("create", "record"))
+        | _grant("bills", actions=("create",))
+        | _grant("vouchers", actions=("prepare",))
         | _grant("prices", actions=("approve",)),
     ),
     (ROLE_AUDITOR_ID, AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"admin.audit"}),

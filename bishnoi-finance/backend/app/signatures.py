@@ -26,7 +26,11 @@ from app.models import FundRequest, JournalEntry, Signature, SignedStep, User
 PNG = b"\x89PNG\r\n\x1a\n"
 MAX_BYTES = 300_000
 MAX_WIDTH, MAX_HEIGHT = 1200, 600
-STEP_LABELS = {"prepared": "Prepared by", "approved": "Approved by", "reviewed": "Reviewed by", "settled": "Settled by"}
+STEP_LABELS = {
+    "prepared": "Prepared by", "approved": "Approved by", "reviewed": "Reviewed by", "settled": "Settled by",
+    # Payment vouchers (2026-10-23).
+    "checked": "Checked by", "released": "Released by",
+}
 
 
 class BadImage(ValueError):

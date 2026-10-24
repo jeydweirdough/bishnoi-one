@@ -24,7 +24,13 @@ from app.models import Notification, User, utcnow
 
 # What asks something of the person: these count in the bell's red number.
 # (News, not counted: entry.approved, calendar.on, calendar.shared, calendar.done.)
-ACTIONABLE = ("entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle", "calendar.reminder")
+ACTIONABLE = (
+    "entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle", "calendar.reminder",
+    # Supplier bills and payment vouchers (2026-10-23, Aubrey's flow): waiting on a step, or back
+    # with whoever made it.
+    "bill.to_approve", "bill.to_check", "bill.returned", "bill.ready",
+    "voucher.to_release", "voucher.returned",
+)
 
 # Several unread of one of these kinds show as one line, linking to the list.
 GROUPS = {
@@ -33,6 +39,12 @@ GROUPS = {
     "fund.to_check": ("{n} liquidations are waiting for review.", "/funds/review"),
     "fund.to_settle": ("{n} refunds and reimbursements are waiting to be settled.", "/funds/settlement"),
     "calendar.reminder": ("{n} reminders from your calendar.", "/calendar"),
+    "bill.to_approve": ("{n} supplier bills are waiting for your approval.", "/bills?show=to_approve"),
+    "bill.to_check": ("{n} supplier bills are waiting for their tax withheld to be checked.", "/bills?show=to_check"),
+    "bill.returned": ("{n} supplier bills were returned to you for correction.", "/bills?show=returned"),
+    "bill.ready": ("{n} supplier bills are approved and ready to pay.", "/bills?show=ready"),
+    "voucher.to_release": ("{n} payment vouchers are ready to release.", "/vouchers?show=to_release"),
+    "voucher.returned": ("{n} payment vouchers were returned to you for correction.", "/vouchers?show=returned"),
 }
 
 

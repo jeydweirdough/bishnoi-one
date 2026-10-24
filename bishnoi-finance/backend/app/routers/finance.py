@@ -23,7 +23,7 @@ from sqlalchemy import func, select, update
 from app.access import CurrentAccess, permitted
 from app.crm import CrmUnavailable, waiting_prices
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import FundRequest, Invoice, JournalEntry, JournalLine, Notification, utcnow
+from app.models import Bill, FundRequest, Invoice, JournalEntry, JournalLine, Notification, PaymentVoucher, utcnow
 from app.notify import ACTIONABLE, GROUPS, unread_count
 from app.permissions import ROLE_ADMIN_ID, ROLE_AUDITOR_ID, ROLE_STAFF_ID
 from app.routers.tax import Api
@@ -337,7 +337,10 @@ def read_notifications(user: CurrentUser, db: DB, settings: SettingsDep, body: R
 
 # --- e-signatures on documents (app/signatures.py) -------------------------------------------
 
-SIGNED_RECORDS = {"journal_entry": ("journal.view", JournalEntry), "fund_request": ("funds.view", FundRequest)}
+SIGNED_RECORDS = {
+    "journal_entry": ("journal.view", JournalEntry), "fund_request": ("funds.view", FundRequest),
+    "payment_voucher": ("vouchers.view", PaymentVoucher), "bill": ("bills.view", Bill),  # 2026-10-23
+}
 
 
 @router.get("/signatures/{record_type}/{record_id}")
@@ -367,3 +370,8 @@ router.include_router(calendar_router)
 from app.routers.payables import router as payables_router  # noqa: E402
 
 router.include_router(payables_router)
+
+# --- payment vouchers (app/routers/vouchers.py): /finance/vouchers, the same way -------------------
+from app.routers.vouchers import router as vouchers_router  # noqa: E402
+
+router.include_router(vouchers_router)

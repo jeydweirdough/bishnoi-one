@@ -34,7 +34,7 @@ MAX_ROWS = 50_000
 # A spreadsheet runs a cell that starts with one of these as a formula.
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 # Where an entry came from, as the journal's filters name it.
-SOURCE_LABELS = {"manual": "Manual", "fund": "Marketing request", "invoice": "Invoice", "bill": "Supplier bill"}
+SOURCE_LABELS = {"manual": "Manual", "fund": "Marketing request", "invoice": "Invoice", "bill": "Supplier bill", "voucher": "Payment voucher"}
 # Only approved entries count in the books; the others are listed so nothing is hidden.
 STATUS_LABELS = {"approved": "Approved", "waiting": "Waiting for approval", "rejected": "Rejected"}
 
@@ -92,7 +92,7 @@ def journal(
     settings: SettingsDep,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice", "bill"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill", "voucher"] | None = None,
     q: str | None = Query(None, max_length=100),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> Response:

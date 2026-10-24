@@ -73,19 +73,41 @@ export type SupplierImportCheck = { rows: SupplierImportRow[]; counts: { new: nu
 
 export type BillStatus = "draft" | "recorded" | "void";
 
-export const BILL_STATUS_LABELS: Record<BillStatus, string> = { draft: "Draft", recorded: "Recorded", void: "Void" };
+/** Where a bill stands (Aubrey's flow, 2026-10-23): made, approved (Malou), checked if tax is
+ *  withheld (Mel), then posted and ready to pay. */
+export type BillState = "draft" | "returned" | "to_approve" | "to_check" | "ready" | "partly_paid" | "paid" | "void";
+
+export const BILL_STATE_LABELS: Record<BillState, string> = {
+  draft: "Draft",
+  returned: "Returned",
+  to_approve: "To approve",
+  to_check: "To check",
+  ready: "Ready to pay",
+  partly_paid: "Partly paid",
+  paid: "Paid",
+  void: "Void",
+};
 
 export type BillSummary = {
   id: string;
   no: number | null;
   status: BillStatus;
   statusLabel: string;
+  state: BillState;
+  stateLabel: string;
   supplier: { id: string; name: string };
   billNumber: string;
   billDate: string;
   dueDate: string;
   totalCentavos: number;
   payableCentavos: number;
+  withheldCentavos: number;
+  /** What released payment vouchers have paid; what's left; what open vouchers set aside (shown plainly: 2026-10-23). */
+  paidCentavos: number;
+  leftCentavos: number;
+  setAsideCentavos: number;
+  paymentState: "unpaid" | "partly_paid" | "paid";
+  paymentLabel: string;
   /** No photo or PDF of the supplier's invoice attached yet (Aubrey Q20). */
   documentMissing: boolean;
   createdBy: string;
@@ -120,16 +142,33 @@ export type Bill = Omit<BillSummary, "supplier"> & {
   lines: BillLine[];
   netCentavos: number;
   vatCentavos: number;
-  withheldCentavos: number;
+  /** Tax is withheld, so it's checked after approval (Mel). */
+  needsCheck: boolean;
   /** Why a draft's amounts can't be worked out (e.g. no VAT rate for its date). */
   problem: string | null;
   files: BillFile[];
   entryId: string | null;
+  /** The payment vouchers paying it (not cancelled ones). */
+  vouchers: { id: string; number: string; status: string; amountCentavos: number }[];
+  approvedBy: string | null;
+  approvedAt: string | null;
+  checkedBy: string | null;
+  checkedAt: string | null;
   recordedBy: string | null;
   recordedAt: string | null;
   voidedBy: string | null;
   voidedAt: string | null;
   voidReason: string | null;
+  events: { at: string; kind: string; who: string; text: string | null }[];
+  /** What this person may do to it now (the API holds the same rules). */
+  canEdit: boolean;
+  canSubmit: boolean;
+  canApprove: boolean;
+  canCheck: boolean;
+  canReturn: boolean;
+  canVoid: boolean;
+  canAttach: boolean;
+  canPay: boolean;
 };
 
 export type BillChoices = {

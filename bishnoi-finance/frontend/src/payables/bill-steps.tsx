@@ -7,35 +7,94 @@ import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, FormError, Input } from "@/src/platform/ui/field";
-import { deleteBill, recordBill, voidBill } from "./actions";
+import { billStep, deleteBill, voidBill } from "./actions";
 import type { Bill } from "./types";
 
-/** Recording a draft: it posts to the books and can't be changed after, only voided. */
-export function RecordBill({ bill }: { bill: Bill }) {
+/** The step this person may take on this bill now (Aubrey's flow, 2026-10-23): submit it for
+ *  approval; approve it (Malou; Cristal backup); check the tax withheld (Mel); or return it with
+ *  the reason. It's posted to the books when it clears; after that it's only voided. */
+export function BillSteps({ bill }: { bill: Bill }) {
+  const [returning, setReturning] = useState(false);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  function run(step: "submit" | "approve" | "check" | "return", body: object, said: (b: Bill) => string) {
+    start(async () => {
+      const result = await billStep(bill.id, step, body);
+      if (!result.ok) return setError(result.error);
+      toast.success(`Bill ${result.data.no} ${said(result.data)}`);
+      setReturning(false);
+      setReason("");
+      setError(null);
+    });
+  }
+
+  if (!(bill.canSubmit || bill.canApprove || bill.canCheck || bill.canReturn)) return null;
+  const cleared = (b: Bill) => (b.state === "ready" ? "approved and posted: ready to pay" : "approved: waiting for the tax withheld to be checked");
+
+  if (returning) {
+    return (
+      <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+        <p className="text-sm">Return bill {bill.no} to whoever submitted it? They&apos;re told why, correct it and submit it again; it goes to approval from the start.</p>
+        <Field label="What needs correcting" error={error ?? undefined}>
+          {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Wrong withholding code" autoFocus />}
+        </Field>
+        <div className="flex gap-2">
+          <Button
+            variant="danger"
+            loading={pending}
+            onClick={() => {
+              if (reason.trim().length < 3) return setError("Say why, in a few words.");
+              run("return", { reason: reason.trim() }, () => "returned for correction");
+            }}
+          >
+            Return for correction
+          </Button>
+          <Button onClick={() => setReturning(false)}>Keep it</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      <p className="text-meta text-ink-2">
-        Recording posts it to the books: the expense and its VAT, against what&apos;s owed {bill.supplier.name} and the tax withheld for the BIR. After that it
-        can&apos;t be changed, only voided.
-        {bill.documentMissing && <span className="text-due-today"> The supplier&apos;s invoice isn&apos;t attached yet: it can be added after recording too.</span>}
-        {!bill.checkedPo || !bill.checkedDr ? <span className="text-due-today"> Not marked as checked against the {[!bill.checkedPo && "PO", !bill.checkedDr && "delivery receipt"].filter(Boolean).join(" and ")}.</span> : null}
-      </p>
+      {bill.canSubmit && (
+        <p className="text-meta text-ink-2">
+          Submitting sends it for approval{bill.needsCheck ? ", then for the tax withheld to be checked" : ""}. It&apos;s posted to the books only once it clears, and can&apos;t be
+          changed while it waits.
+          {bill.documentMissing && <span className="text-due-today"> The supplier&apos;s invoice isn&apos;t attached yet.</span>}
+          {!bill.checkedPo || !bill.checkedDr ? <span className="text-due-today"> Not marked as checked against the {[!bill.checkedPo && "PO", !bill.checkedDr && "delivery receipt"].filter(Boolean).join(" and ")}.</span> : null}
+        </p>
+      )}
+      {bill.canApprove && (
+        <p className="text-meta text-ink-2">
+          Approving {bill.needsCheck ? "sends it to have its tax withheld checked; then it's posted" : "posts it to the books"}: the expense and its VAT, against what&apos;s owed{" "}
+          {bill.supplier.name}
+          {bill.needsCheck ? " and the tax withheld for the BIR" : ""}. Then it&apos;s ready to pay.
+          {bill.documentMissing && <span className="text-due-today"> The supplier&apos;s invoice isn&apos;t attached.</span>}
+        </p>
+      )}
+      {bill.canCheck && <p className="text-meta text-ink-2">Check each line&apos;s withholding code and rate below. Checked, it&apos;s posted to the books and ready to pay.</p>}
+      <div className="flex flex-wrap gap-2">
+        {bill.canSubmit && (
+          <Button variant="primary" loading={pending} onClick={() => run("submit", {}, () => (bill.state === "returned" ? "submitted again: waiting for approval" : "submitted: waiting for approval"))}>
+            {bill.state === "returned" ? "Submit again" : "Submit for approval"}
+          </Button>
+        )}
+        {bill.canApprove && (
+          <Button variant="primary" loading={pending} onClick={() => run("approve", {}, cleared)}>
+            Approve
+          </Button>
+        )}
+        {bill.canCheck && (
+          <Button variant="primary" loading={pending} onClick={() => run("check", {}, () => "checked and posted: ready to pay")}>
+            Tax withheld checked
+          </Button>
+        )}
+        {bill.canReturn && <Button onClick={() => setReturning(true)}>Return for correction…</Button>}
+      </div>
       <FormError message={error} />
-      <Button
-        variant="primary"
-        loading={pending}
-        onClick={() =>
-          start(async () => {
-            const result = await recordBill(bill.id);
-            if (!result.ok) return setError(result.error);
-            toast.success(`Bill ${result.data.no} recorded`, { description: "Posted to the books." });
-          })
-        }
-      >
-        Record bill
-      </Button>
     </div>
   );
 }

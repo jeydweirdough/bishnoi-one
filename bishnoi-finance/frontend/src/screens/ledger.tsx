@@ -33,7 +33,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
   // What the page is showing: kept by the source links, the search form and the download.
   const shown = new URLSearchParams();
-  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill") shown.set("source", source);
+  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill" || source === "voucher") shown.set("source", source);
   if (state === "waiting" || state === "rejected") shown.set("status", state);
   if (isDate(from)) shown.set("from", from);
   if (isDate(to)) shown.set("to", to);
@@ -49,6 +49,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     { value: "fund", label: "Marketing requests", by: "source" },
     { value: "invoice", label: "Invoices", by: "source" },
     { value: "bill", label: "Bills", by: "source" },
+    { value: "voucher", label: "Payment vouchers", by: "source" },
     { value: "rejected", label: "Rejected", by: "status" },
   ];
   const current = shown.get("status") ?? shown.get("source") ?? "";

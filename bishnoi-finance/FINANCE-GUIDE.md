@@ -32,8 +32,9 @@ Everyone who uses Finance has a **role**. Finance starts with three:
 | Approve or reject journal entries (not their own) | | | ✓ |
 | Make and issue sales invoices, record their payments | | ✓ | ✓ |
 | Void an invoice, set up invoice numbers | | | ✓ |
-| Add, edit and switch off suppliers; make supplier bills, attach their invoices, record them | | ✓ | ✓ |
-| Void a supplier bill | | | ✓ |
+| Add, edit and switch off suppliers; make supplier bills, attach their invoices, submit them | | ✓ | ✓ |
+| Prepare a payment voucher | | ✓ | ✓ |
+| Approve supplier bills, check their tax withheld, release payment vouchers, void bills and vouchers | | | ✓ |
 | Add or change accounts (or import a chart), default accounts and expense categories | | | ✓ |
 | Change the company's tax registration, or add a new tax rate | | | ✓ |
 | Add people, make roles, read the activity log | Activity log only | | ✓ |
@@ -298,21 +299,67 @@ invoice numbers under each customer.
   ₱100 withheld (for the supplier's 2307); **₱11,100 to pay the supplier**.
 - **Attach the supplier's invoice** on the bill's page: a photo or PDF, up to 3 MB
   (photos are made smaller first). A bill without one says **Document missing**;
-  **Bills → Document missing** lists them. Files can be added after recording too.
-- **Record bill** posts it to the books at once. After that it's never changed:
-  **Void** it (with the reason) and enter it again. The same invoice number from the
-  same supplier can't be entered twice (unless the first was voided).
+  **Bills → Document missing** lists them. Files can be added at any step before void.
+- **Approval** (Ms. Aubrey's flow, 23 October 2026), shown on the bill's page as a
+  path with who did each step:
+  1. **Submit for approval** (whoever made it: Ms. Aubrey).
+  2. **Approve** (Ms. Malou is told first; Ms. Cristal approves as backup; not whoever
+     submitted it), or **Return for correction** with the reason.
+  3. **Only if tax is withheld:** **Tax withheld checked** (Mr. Mel checks each line's
+     code and rate; not whoever approved it), or return it. A bill with nothing
+     withheld skips this step.
+  4. **Posted to the books** when it clears, and **ready to pay**: Ms. Cristal is told.
+  - While it waits it is **not in the books** and **not owed** to the supplier yet,
+    and it can't be changed. **Returned**, it goes back to whoever submitted it (their
+    **Returned** tab and the bell); corrected, **Submit again** sends it to approval
+    from the start. Every step stays in the bill's **History**.
+  - **Bills** has a tab for each step: Drafts · Returned · To approve · To check ·
+    Ready to pay · Partly paid · Paid · Void · Document missing.
+- **Posted, it's never changed:** **Void** it (with the reason) and enter it again.
+  The same invoice number from the same supplier can't be entered twice (unless the
+  first was voided).
 - **Who:** each step is its own tick on the Roles screen, so any role can have
   exactly what it needs (e.g. Ms. Cristal's as well as Ms. Aubrey's). **Supplier
-  bills:** View · Make drafts (make, edit, delete drafts and attach files) · Record
-  (post to the books) · Void. **Suppliers:** View · Add · Edit (including their
-  documents) · Switch off.
-- **Not yet:** paying bills (payment vouchers, several bills at once, through the
-  checkers), payables aging, and 2307s. Coming next.
+  bills:** View · Make drafts (make, edit, attach, submit) · Approve or return · Told
+  first about bills to approve · Check the tax withheld · Void. **Suppliers:** View ·
+  Add · Edit (including their documents) · Switch off.
+- **Paying bills: Payables → Payment vouchers.**
+  1. **Prepare** (*New payment voucher*, or *Pay this bill* on a bill ready to pay):
+     pick the supplier, tick the bills it pays (only bills **ready to pay**: approved,
+     and checked where tax is withheld) and how much of each (part of a bill is fine),
+     how it's paid (bank transfer, check or cash) and the account it's **paid from**
+     (the accounts under *CASH* in the chart: the banks, petty cash funds, GCash).
+     Add the same payment's **Oojeema PV number** and **Zoho reference**. Every bill
+     shows its total, what's paid, what other vouchers hold, *Pay now* and *Left
+     after*. **Save and submit for release.** No other OK in the Hub: the bills were
+     approved before they could be paid.
+  2. **Release** (Ms. Cristal, who may also have prepared it): the date paid and the bank's reference, or the check's
+     number and date. It's **posted**: what's owed the supplier down, the bank or cash
+     down. The bills show **Partly paid** or **Paid**. Ma'am Mira's approval stays in
+     the bank's own system (a note on release can say so).
+  - **Returned** (by someone else who may release it): it goes back to whoever
+    prepared it, with the reason (their **Returned** tab and the bell); they correct it
+    and **Submit again**. Every step stays in the voucher's **History**.
+  - **Cancel** a voucher before release (nothing was posted). **Void** a released one
+    (Ms. Malou only): the entry is reversed and the bills are owed again. A bill a
+    voucher pays can't be voided until the voucher is cancelled or voided.
+  - **Never paid twice:** what an open voucher holds of a bill is set aside, and the
+    next voucher can only take what's left.
+  - **Voucher** (the button on its page) prints it: the bills paid and who approved
+    each (and checked its tax withheld), the amount in words, the e-signatures
+    (Prepared, Released) and a **Received by** line for the supplier. Attach the deposit slip or check photo under
+    **Proof of payment**.
+  - **Ticks:** Payment vouchers: View · Prepare · Release · Void.
+- **Not yet:** payables aging, Ms. Aubrey's Payables home page, 2307s.
 
 | When | Debit | Credit |
 |---|---|---|
-| A bill is recorded | Each line's account (before VAT) and 1300 Input VAT | 2000 Accounts payable (what's paid the supplier) and 2300 Withholding tax payable – expanded |
+| A payment voucher is released | Each bill's Accounts payable (what this voucher pays of it) | The account it's paid from |
+| A payment voucher is voided | The same entry reversed, dated that day | |
+
+| When | Debit | Credit |
+|---|---|---|
+| A bill clears approval (posted) | Each line's account (before VAT) and 1300 Input VAT | 2000 Accounts payable (what's paid the supplier) and 2300 Withholding tax payable – expanded |
 | A bill is voided | The same entry reversed, dated that day | |
 
 ---
@@ -612,9 +659,9 @@ Before filing, run each DAT through BIR's RELIEF Validation Module, as before.
 - **Quote approvals, guarantee letter checks and letter payments** (DSWD, PCSO,
   and others) are done in the **CRM** today, by each team's **Team Lead**, not by
   Finance.
-- **Paying supplier bills** (payment vouchers; the bills themselves are in, under
-  Payables), **bank reconciliation**, and **separate books for 2mg Incorporated and
-  Getmeds Philippines Inc.**: not started.
+- **Payables aging, 2307 certificates for suppliers** (supplier bills and payment
+  vouchers are in, under Payables), **bank reconciliation**, and **separate books for
+  2mg Incorporated and Getmeds Philippines Inc.**: not started.
 
 ---
 
