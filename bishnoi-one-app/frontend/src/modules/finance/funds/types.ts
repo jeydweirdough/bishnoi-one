@@ -64,6 +64,8 @@ export type FundRequest = {
   entries: { id: string; number: string; date: string; memo: string; totalCentavos: number }[];
   createdAt: string;
   updatedAt: string;
+  /** Why the step at hand is held for the person viewing (one request's page only). */
+  holds?: { release: string | null; check: string | null };
 };
 
 export type FundCounts = Record<FundStatus | "overdue", number>;

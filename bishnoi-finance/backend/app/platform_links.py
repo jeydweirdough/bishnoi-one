@@ -35,7 +35,6 @@ RETRY = 30  # seconds between tries while it can't
 # Each application this one uses: its key on the platform -> (API setting, key setting, screens setting).
 USES: dict[str, tuple[str, str, str | None]] = {
     "crm": ("crm_api_url", "crm_api_key", None),
-    "inventory": ("inventory_api_url", "inventory_api_key", None),
 }
 # Where this application's own screens are, when the platform knows.
 OWN_APP_URL: str | None = None

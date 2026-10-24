@@ -37,18 +37,17 @@ def test_applications_learn_their_links_from_the_platform(client, ana, ben):
     inventory = asks(client, inventory_key).json()
     key = crm["uses"]["inventory"]["key"]
     assert crm["uses"]["inventory"] == {"apiUrl": "http://127.0.0.1:8304", "appUrl": "http://localhost:4304", "key": key}
-    # Finance uses Inventory from the start (links.AUTOMATIC): its suppliers, for bills.
-    assert inventory["usedBy"] == {"crm": key, "finance": inventory["usedBy"]["finance"]} and inventory["uses"] == {}
+    assert inventory["usedBy"] == {"crm": key} and inventory["uses"] == {}
     listed = {(l["from"]["key"], l["to"]["key"]): l for l in client.get("/platform/connections", headers=ana).json()["links"]}
     assert listed[("crm", "inventory")]["isOn"] and listed[("crm", "inventory")]["state"] in ("working", "problem")  # problem: Inventory's API isn't up in tests
 
     # Off: both lose it. A new key: both get the new one, the old one stops.
     client.patch(f"/platform/links/{link['id']}", json={"isOn": False}, headers=ana)
-    assert asks(client, crm_key).json()["uses"] == {} and "crm" not in asks(client, inventory_key).json()["usedBy"]
+    assert asks(client, crm_key).json()["uses"] == {} and asks(client, inventory_key).json()["usedBy"] == {}
     client.patch(f"/platform/links/{link['id']}", json={"isOn": True}, headers=ana)
     client.post(f"/platform/links/{link['id']}/new-key", headers=ana)
     fresh = asks(client, crm_key).json()["uses"]["inventory"]["key"]
-    assert fresh != key and asks(client, inventory_key).json()["usedBy"]["crm"] == fresh
+    assert fresh != key and asks(client, inventory_key).json()["usedBy"] == {"crm": fresh}
 
     # A replaced connect key stops working; disconnecting stops the app's answers.
     new_crm_key = connect(client, ana, "crm")
@@ -67,16 +66,3 @@ def test_link_keys_are_kept_encrypted(app, client, ana):
     with app.state.sessions() as db:
         sealed = db.scalar(select(AppLink)).secret
     assert sealed.startswith("gAAAA")  # a Fernet token, not the key itself
-
-
-def test_finance_is_linked_to_inventory_once_by_itself(app, client, ana):
-    """Made on start when both are registered; taken away, it isn't made again."""
-    from app import links
-    from tests.conftest import app_id
-
-    listed = client.get("/platform/connections", headers=ana).json()["links"]
-    link = next(l for l in listed if (l["from"]["key"], l["to"]["key"]) == ("finance", "inventory"))
-    assert client.delete(f"/platform/links/{link['id']}", headers=ana).status_code == 204
-    links.make_automatic(app.state.sessions, app.state.settings)
-    assert all((l["from"]["key"], l["to"]["key"]) != ("finance", "inventory") for l in client.get("/platform/connections", headers=ana).json()["links"])
-    assert app_id(client, ana, "finance")

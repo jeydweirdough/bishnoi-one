@@ -136,16 +136,6 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/invoices/series`, label: "Invoice numbers", missing: missingOf(unset, ["invoiceSeries"]) },
         ],
       },
-      // Supplier bills: what the company owes Inventory's suppliers, with input VAT and the tax withheld.
-      {
-        href: `${base}/bills`,
-        label: "Bills",
-        icon: "payments",
-        subpages: [
-          { href: `${base}/bills`, label: "Supplier bills" },
-          { href: `${base}/bills/payables`, label: "Payables" },
-        ],
-      },
       // The books: every entry, the accounts, and what they add up to.
       {
         href: `${base}/ledger`,
@@ -163,7 +153,8 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
       },
       // Tax is Finance's for every Bishnoi One app: registration, rates, and what a sale comes to.
       { href: `${base}/tax`, label: "Tax", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
-      // What the BIR asks for, from the books (decided 2026-10-24, from Oojeema's BIR features).
+      // What the BIR asks for, from the books (decided 2026-10-24, from Oojeema's BIR features),
+      // and the Sales DAT from Oojeema's exports (src/modules/finance/bir/sales-dat): one group.
       {
         href: `${base}/bir`,
         label: "BIR reports",
@@ -174,8 +165,11 @@ function modulePages(m: ModuleAccess, waiting: Waiting = {}, unset: Unset = {}):
           { href: `${base}/bir/vat`, label: "VAT return" },
           { href: `${base}/bir/lists`, label: "Summary lists" },
           { href: `${base}/bir/withholding`, label: "Withholding tax" },
+          { href: `${base}/bir/sales-dat`, label: "Prepare BIR files (Sales DAT)" },
         ],
       },
+      // The calendar (src/modules/finance/calendar): switched on per person by an Administrator.
+      { href: `${base}/calendar`, label: "Calendar", icon: "calendar" },
     ];
   }
   if (m.key === "inventory") {
@@ -646,7 +640,12 @@ const FINANCE_NEEDS: [string, string][] = [
   ["/finance/ledger/categories", "categories.view"],
   ["/finance/ledger", "journal.view"],
   ["/finance/tax", "tax.view"],
+  // Was missing, so Price approvals showed for every role (found 2026-10-23, Aubrey's).
+  ["/finance/prices", "prices.view"],
+  // Preparing BIR files is its own tick; the reports and books are bir.view.
+  ["/finance/bir/sales-dat", "bir.prepare"],
   ["/finance/bir", "bir.view"],
+  ["/finance/calendar", "calendar.use"],
   ["/", "dashboard.view"],
 ];
 
@@ -863,7 +862,7 @@ function placeOf(pathname: string, me: Me): string | null {
 }
 
 /** `actions`: the profile (and an app's bell), which sit at the top right; on a phone, beside the menu button. */
-export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, actions }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean; actions?: ReactNode }) {
+export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, actions, footer }: { me: Me; waiting?: Waiting; unset?: Unset; rail?: boolean; actions?: ReactNode; footer?: ReactNode }) {
   const pathname = usePathname();
   const [rail, setRail] = useState(railAtFirst);
   function toggleRail() {
@@ -899,6 +898,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
             </div>
             <Links me={me} waiting={waiting} unset={unset} />
           </div>
+          {footer && <div className="mt-6">{footer}</div>}
         </RailContext.Provider>
       </aside>
 
@@ -924,6 +924,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
         {open && (
           <div id="phone-menu" className="animate-reshape max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-rule px-3 pt-3 pb-5">
             <Links me={me} waiting={waiting} unset={unset} />
+            {footer && <div className="mt-4 border-t border-rule pt-3">{footer}</div>}
           </div>
         )}
       </div>

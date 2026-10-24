@@ -16,13 +16,13 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, select
 
 from app.api import Api, as_utc, check_email, field_error, iso
 from app.audit import audit
-from app.deps import DB, CurrentUser, SettingsDep
+from app.deps import DB, CurrentSession, CurrentUser, SettingsDep
 from app.models import AuditEntry, SignInSession, User
 from app.security import check_password_rules, hash_password, new_token, token_hash, verify_password
 
@@ -171,6 +171,85 @@ def change_password(user: CurrentUser, db: DB, settings: SettingsDep, body: Pass
     db.commit()
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
 
+
+
+# --- your e-signature (app/signatures.py; decided 2026-10-22) ----------------------------------
+
+# Someone who signs in with Bishnoi One has no Finance password they know: a sign-in
+# this recent confirms it's them instead.
+RECENT_SIGN_IN = timedelta(minutes=15)
+
+
+def signature_out(user: User, db: DB, session: CurrentSession) -> dict:
+    from app.signatures import current, data_url
+
+    mine = current(db, user.id)
+    by_password = user.platform_identity_id is None
+    fresh_until = as_utc(session.created_at) + RECENT_SIGN_IN
+    return {
+        "current": {"method": mine.method, "setAt": iso(mine.created_at), "image": data_url(mine.image)} if mine else None,
+        # How they confirm a change: their password, or (Bishnoi One sign-in) a recent sign-in.
+        "confirmBy": "password" if by_password else "recent_sign_in",
+        "recentSignIn": not by_password and fresh_until > datetime.now(UTC),
+    }
+
+
+def confirm_it_is_you(user: User, session, password: str | None) -> None:
+    if password:
+        if not verify_password(password, user.password_hash):
+            raise field_error("password", "That isn't your password.")
+        return
+    if user.platform_identity_id is not None and as_utc(session.created_at) + RECENT_SIGN_IN > datetime.now(UTC):
+        return
+    if user.platform_identity_id is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "For your safety, sign out and sign in again, then set your signature within 15 minutes.")
+    raise field_error("password", "Enter your password to confirm it's you.")
+
+
+class SignatureIn(Api):
+    # The cleaned PNG, as a data URL (made in the browser).
+    image: str = Field(min_length=20, max_length=500_000)
+    method: Literal["drawn", "uploaded"]
+    password: str | None = Field(None, max_length=256)
+
+
+class ConfirmIn(Api):
+    password: str | None = Field(None, max_length=256)
+
+
+@router.get("/signature")
+def get_signature(user: CurrentUser, db: DB, session: CurrentSession) -> dict:
+    return signature_out(user, db, session)
+
+
+@router.put("/signature")
+def set_signature(user: CurrentUser, db: DB, session: CurrentSession, body: SignatureIn) -> dict:
+    """Your signature from now on. The old one is kept for what it already signed."""
+    from app.models import Signature
+    from app.signatures import BadImage, checked_png, retire
+
+    confirm_it_is_you(user, session, body.password)
+    try:
+        image = checked_png(body.image)
+    except BadImage as e:
+        raise field_error("image", str(e)) from None
+    replaced = retire(db, user.id)
+    db.add(Signature(user_id=user.id, image=image, method=body.method))
+    audit(db, user, "signature.replaced" if replaced else "signature.set", target=user.email, target_type="user", target_id=user.id, fields=[body.method])
+    db.commit()
+    return signature_out(user, db, session)
+
+
+@router.post("/signature/remove")
+def remove_signature(user: CurrentUser, db: DB, session: CurrentSession, body: ConfirmIn) -> dict:
+    """No signature from now on; documents already signed keep theirs."""
+    from app.signatures import retire
+
+    confirm_it_is_you(user, session, body.password)
+    if retire(db, user.id):
+        audit(db, user, "signature.removed", target=user.email, target_type="user", target_id=user.id)
+        db.commit()
+    return signature_out(user, db, session)
 
 
 @router.get("/activity")

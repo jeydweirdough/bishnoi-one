@@ -3,8 +3,16 @@ reversals, and what the accounts add up to."""
 
 from datetime import date
 
+from .test_auth import bearer, sign_in
 from .test_funds import KEY, approved, categories, release, spend
 from .test_tax_api import app, ana, ben, client  # noqa: F401 (fixtures)
+
+
+def approve(client, entry: dict) -> dict:
+    """An entry typed by hand waits for approval (2026-10-22): Ana, the Administrator, approves it."""
+    r = client.post(f"/finance/ledger/entries/{entry['id']}/approve", headers=bearer(sign_in(client)))
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 def accounts(client, who) -> dict[str, dict]:
@@ -17,7 +25,7 @@ def balances(client, who) -> dict[str, int]:
     return {r["account"]["code"]: r["balanceCentavos"] for r in tb["rows"]}
 
 
-def test_a_fund_posts_at_each_step_and_advances_clear(client, ben):
+def test_a_fund_posts_at_each_step_and_advances_clear(client, ana, ben):
     req = release(client, ben, approved(client)["id"])  # 5,000 in cash
     assert balances(client, ben) == {"1000": -500000, "1200": 500000}
     cats = categories(client)
@@ -26,8 +34,8 @@ def test_a_fund_posts_at_each_step_and_advances_clear(client, ben):
     spend(client, 50000, cats["Personal"], receipt=False)
     sent = client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY).json()
     for e in sent["expenses"]:
-        client.patch(f"/finance/funds/{req['id']}/expenses/{e['id']}", json={"accepted": True}, headers=ben)
-    done = client.post(f"/finance/funds/{req['id']}/finish-check", headers=ben).json()
+        client.patch(f"/finance/funds/{req['id']}/expenses/{e['id']}", json={"accepted": True}, headers=ana)
+    done = client.post(f"/finance/funds/{req['id']}/finish-check", headers=ana).json()
     # Only the covered receipt is expensed, to its category's account (Food).
     assert balances(client, ben) == {"1000": -500000, "1200": 180000, "6100": 320000}
     client.post(f"/finance/funds/{req['id']}/returned", json={"amountCentavos": 180000, "method": "bank", "reference": "DEP-9"}, headers=ben)
@@ -37,12 +45,12 @@ def test_a_fund_posts_at_each_step_and_advances_clear(client, ben):
     assert done["entries"][1]["totalCentavos"] == 320000
 
 
-def test_spending_over_is_owed_then_paid(client, ben):
+def test_spending_over_is_owed_then_paid(client, ana, ben):
     req = release(client, ben, approved(client, amount=200000)["id"], amount=200000)
     spend(client, 250000, categories(client)["Food"])
     sent = client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY).json()
-    client.patch(f"/finance/funds/{req['id']}/expenses/{sent['expenses'][0]['id']}", json={"accepted": True}, headers=ben)
-    client.post(f"/finance/funds/{req['id']}/finish-check", headers=ben)
+    client.patch(f"/finance/funds/{req['id']}/expenses/{sent['expenses'][0]['id']}", json={"accepted": True}, headers=ana)
+    client.post(f"/finance/funds/{req['id']}/finish-check", headers=ana)
     assert balances(client, ben) == {"1000": -200000, "1200": 0, "2100": 50000, "6100": 250000}
     client.post(f"/finance/funds/{req['id']}/reimbursed", json={"amountCentavos": 50000, "method": "ewallet"}, headers=ben)
     assert balances(client, ben) == {"1000": -200000, "1020": -50000, "1200": 0, "2100": 0, "6100": 250000}
@@ -58,11 +66,13 @@ def test_manual_journals_balance_and_are_reversed_not_edited(client, ana, ben):
     body["lines"][1]["creditCentavos"] = 10000000
     entry = client.post("/finance/ledger/entries", json=body, headers=ben).json()
     assert entry["number"].startswith("JE-") and entry["totalCentavos"] == 10000000
+    approve(client, entry)
     both = {**body, "lines": [{"accountId": acc["1010"]["id"], "debitCentavos": 5, "creditCentavos": 5}, body["lines"][1]]}
     assert client.post("/finance/ledger/entries", json=both, headers=ben).status_code == 422
     back = client.post(f"/finance/ledger/entries/{entry['id']}/reverse", json={}, headers=ben).json()
     assert back["reversesId"] == entry["id"] and back["lines"][0]["creditCentavos"] == 10000000
     assert client.post(f"/finance/ledger/entries/{entry['id']}/reverse", json={}, headers=ben).status_code == 409
+    approve(client, back)
     assert balances(client, ben) == {"1010": 0, "3000": 0}
     ledger = client.get(f"/finance/ledger/accounts/{acc['1010']['id']}", headers=ben).json()
     assert [ln["balanceCentavos"] for ln in ledger["lines"]] == [10000000, 0]

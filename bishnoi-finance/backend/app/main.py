@@ -14,10 +14,9 @@ from app.db import make_engine, make_sessions
 from app.discord import log_requests, logs_for
 from app.first_admin import make_first_admin
 from app.migrate import upgrade
+from app.routers import admin, auth, exports, finance, funds, integration, invoices, ledger, prices, profile, receivables, tax, unset
 from app.routers import bank as bank_router
-from app.routers import bills as bills_router
 from app.routers import bir as bir_router
-from app.routers import admin, auth, profile, finance, funds, integration, invoices, ledger, prices, receivables, tax, unset
 from app.tax import rates as tax_rates
 from app.guard import install as install_guard
 
@@ -83,10 +82,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(integration.router)
     app.include_router(funds.router)
     app.include_router(ledger.router)
+    app.include_router(exports.router)
     app.include_router(invoices.router)
     app.include_router(receivables.router)
     app.include_router(bir_router.router)
-    app.include_router(bills_router.router)
     app.include_router(bank_router.router)
     app.include_router(prices.router)
     app.include_router(unset.router)

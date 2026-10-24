@@ -25,9 +25,13 @@ ACTION_LABELS = {
     "roles": "Roles and permissions",
     "audit": "Activity log",
     "approve": "Approve and reject",
-    "pay": "Record payments",
-    "record": "Record in the books",
+    "prepare": "Prepare BIR files",
     "reconcile": "Reconcile statements",
+    "first": "Told first about entries waiting",
+    "record": "Record (post to the books)",
+    "add": "Add",
+    "edit": "Edit",
+    "deactivate": "Switch off",
 }
 
 
@@ -47,23 +51,50 @@ AREAS: tuple[Area, ...] = (
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
     Area("categories", "Expense categories", "Marketing requests", ("view", "manage")),
     Area("invoices", "Sales invoices and payments", "Invoices", ("view", "create", "issue", "collect", "void", "setup")),
-    # What the company owes its suppliers (Inventory's), with input VAT and the tax withheld from them.
-    Area("bills", "Supplier bills and payments", "Bills", ("view", "create", "record", "pay", "void")),
-    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse")),
+    # Accounts payable (2026-10-23): suppliers, and their bills, each step its own tick so any role
+    # can have exactly what it needs. A bill (Aubrey's flow, migration 0020): made and submitted
+    # ("create"), approved (Malou "first", Cristal backup), checked only if tax is withheld (Mel),
+    # then posted and ready to pay; the payment voucher is prepared and released (Cristal).
+    Area("suppliers", "Suppliers", "Payables", ("view", "add", "edit", "deactivate")),
+    Area("bills", "Supplier bills", "Payables", ("view", "create", "approve", "first", "check", "void")),
+    Area("vouchers", "Payment vouchers", "Payables", ("view", "prepare", "release", "void")),
+    # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
+    # first: the main approver (the Finance Head), told of every entry at once; other approvers are
+    # backup, told only of the main approver's own entries and of ones waiting over a working day.
+    Area("journal", "Journal entries and reports", "Accounting", ("view", "post", "reverse", "approve", "first")),
     Area("accounts", "Chart of accounts and default accounts", "Accounting", ("view", "manage")),
-    # Matching the bank's statements against the books.
-    Area("bank", "Bank reconciliation", "Accounting", ("view", "reconcile")),
     Area("tax", "Tax setup", "Tax", ("view", "manage")),
-    # The BIR's books of accounts, financial statements, VAT return and summary lists (app/routers/bir.py).
-    Area("bir", "BIR reports and books of accounts", "Tax", ("view",)),
     # Prices are Finance's: managers' prices and reps' requested prices wait in the CRM for these.
     Area("prices", "Product prices", "Prices", ("view", "approve")),
+    # BIR files made from Oojeema's exports (the Sales DAT, app/bir.py); no role gets it until it's ticked.
+    # Prepare BIR files (the Sales DAT); view the books of accounts, statements, VAT return and lists (app/bir_reports.py).
+    Area("bir", "BIR files and reports", "Tax", ("view", "prepare")),
+    # Matching the bank's statements against the books (app/routers/bank.py).
+    Area("bank", "Bank reconciliation", "Accounting", ("view", "reconcile")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
 
-ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions())
+# Switched on for one person, not given with a role (decided 2026-10-22): an
+# Administrator turns it on under Administration → Users. Not in AREAS, so the
+# Roles screen never offers it, and no role holds it, the Administrator included.
+PER_PERSON: frozenset[str] = frozenset({"calendar.use"})
+
+ALL_PERMISSIONS: frozenset[str] = frozenset(p for a in AREAS for p in a.permissions()) | PER_PERSON
 # Someone must always hold both, or nobody could fix a mistake in access.
 KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
+
+
+# Where an action means something else in one area, its own label there (the shared one
+# says "Review liquidations" for check, "Prepare BIR files" for prepare).
+AREA_LABELS = {
+    "bills.create": "Make drafts (make, edit, attach, submit)",
+    "bills.approve": "Approve or return",
+    "bills.first": "Told first about bills to approve",
+    "bills.check": "Check the tax withheld",
+    "vouchers.prepare": "Prepare (make, edit, submit, cancel)",
+    "vouchers.release": "Release (pay)",
+    "vouchers.void": "Void a released voucher",
+}
 
 
 def catalogue_out() -> list[dict]:
@@ -72,7 +103,7 @@ def catalogue_out() -> list[dict]:
             "key": a.key,
             "name": a.name,
             "group": a.group,
-            "actions": [{"key": x, "label": ACTION_LABELS[x], "permission": f"{a.key}.{x}"} for x in a.actions],
+            "actions": [{"key": x, "label": AREA_LABELS.get(f"{a.key}.{x}", ACTION_LABELS[x]), "permission": f"{a.key}.{x}"} for x in a.actions],
         }
         for a in AREAS
     ]
@@ -103,12 +134,14 @@ STARTING_ROLES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     (
         ROLE_STAFF_ID,
         FINANCE_STAFF,
-        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, makes and issues invoices and records their payments, and approves prices.",
+        "Releases cash advances, reviews liquidations, records refunds and reimbursements, posts journal entries, makes and issues invoices and records their payments, keeps suppliers and records their bills, and approves prices.",
         VIEW_ALL
         | _grant("funds", actions=("release", "check", "settle", "cancel"))
         | _grant("journal", actions=("post", "reverse"))
         | _grant("invoices", actions=("create", "issue", "collect"))
-        | _grant("bills", actions=("create", "record", "pay"))
+        | _grant("suppliers", actions=("add", "edit", "deactivate"))
+        | _grant("bills", actions=("create",))
+        | _grant("vouchers", actions=("prepare",))
         | _grant("bank", actions=("reconcile",))
         | _grant("prices", actions=("approve",)),
     ),

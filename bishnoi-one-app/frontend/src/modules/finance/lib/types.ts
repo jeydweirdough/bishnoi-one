@@ -3,6 +3,10 @@ export type AdminUser = {
   email: string;
   fullName: string;
   isActive: boolean;
+  /** The calendar, switched on for this person (not given with a role). */
+  calendarOn: boolean;
+  /** Whether they've set an e-signature (only they can set it; an administrator can only remove it). */
+  hasSignature?: boolean;
   role: { id: string; name: string };
   createdAt: string;
   lastSignInAt: string | null;

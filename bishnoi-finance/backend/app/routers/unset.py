@@ -55,12 +55,26 @@ def unset(access: CurrentAccess, db: DB) -> dict[str, int]:
 def frame(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     """What every signed-in screen needs around its own content, in one request:
     the same answers as /auth/me, /finance/unset and /finance/funds/counts
-    (that one only for a role that may see fund requests; null otherwise)."""
+    (that one only for a role that may see fund requests; null otherwise), the
+    commit this API runs, for the sidebar's version line, and how many of this
+    person's notifications are unread, for the bell."""
+    from app.build import COMMIT, SOURCE
     from app.identity import me_out
+    from app.notify import unread_count
     from app.routers.funds import waiting
+    from app.routers.ledger import remind_backup
 
+    from app.calendar_events import remind
+
+    # Worked out as they open any page (Finance has no timers): a backup approver
+    # learns of entries waiting a working day; calendar reminders fall due.
+    remind_backup(db, access.user, settings)
+    remind(db, access.user, settings)
     return {
         "me": me_out(access.user, settings),
         "unset": unset(access, db),
         "waiting": waiting(access.user, db, settings) if access.can("funds.view") else None,
+        "build": COMMIT,
+        "buildSource": SOURCE,
+        "unreadNotifications": unread_count(db, access.user.id),
     }

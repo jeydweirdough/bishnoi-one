@@ -42,7 +42,6 @@ KNOWN: dict[tuple[str, str], str] = {
     ("crm", "finance"): "Finance works out the tax on the CRM's quotes.",
     ("crm", "pharmacy"): "The pharmacist checks the CRM's Rx quotes in Pharmacy.",
     ("finance", "crm"): "Finance reads the CRM's customers to invoice them.",
-    ("finance", "inventory"): "Finance makes out supplier bills to Inventory's suppliers, from what they delivered.",
     ("exec", "pharmacy"): "The pharmacist approves Admin's promotional material designs in Pharmacy.",
     ("exec", "crm"): "Admin reads the CRM's teams and asks their manager to approve promotional materials going out.",
 }
@@ -193,32 +192,3 @@ def may_ask(app_key: str) -> bool:
         return False
     _asked[app_key] = now
     return True
-
-
-# Links the applications need that came after the console's Connections page was
-# left out (decided 2026-10-24): made once, on start, when both applications are
-# registered. Turned off or removed afterwards, it stays that way.
-AUTOMATIC: tuple[tuple[str, str], ...] = (("finance", "inventory"),)
-
-
-def make_automatic(sessions, settings: Settings) -> None:
-    from app.audit import audit
-    from app.models import AppLink, AuditEntry
-
-    with sessions() as db:
-        for caller_key, target_key in AUTOMATIC:
-            caller = db.scalar(select(Application).where(Application.key == caller_key))
-            target = db.scalar(select(Application).where(Application.key == target_key))
-            if caller is None or target is None:
-                continue
-            if db.scalar(select(AppLink.id).where(AppLink.from_app_id == caller.id, AppLink.to_app_id == target.id)):
-                continue
-            said = f"{caller.name} uses {target.name}"
-            if db.scalar(select(AuditEntry.id).where(AuditEntry.action == "link.made", AuditEntry.target == said).limit(1)):
-                continue  # made before, and taken away since: not made again
-            link = AppLink(from_app_id=caller.id, to_app_id=target.id, secret=seal(settings, new_link_secret()))
-            db.add(link)
-            db.flush()
-            audit(db, "Bishnoi One Platform", "link.made", target=said, target_type="link", target_id=link.id, application_id=caller.id)
-            log.info("Links: made %s.", said)
-        db.commit()

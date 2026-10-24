@@ -1,5 +1,5 @@
 """The BIR's books of accounts, statements, VAT return and summary lists
-(app/bir.py works them out). Each answers as data for the screens, or with
+(app/bir_reports.py works them out). Each answers as data for the screens, or with
 ?format=csv as a file in the BIR templates' columns.
 
 - GET /finance/bir/books/{book}?start=&end=: sales-journal, cash-receipts,
@@ -16,7 +16,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app import bir
+from app import bir_reports as bir
 from app.access import permitted
 from app.deps import DB, SettingsDep
 from app.routers.funds import today

@@ -1,5 +1,6 @@
 """Settings, read from backend/.env (see .env.example)."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -100,22 +101,15 @@ class Settings(BaseSettings):
     # the part after "finance:"). Unset: the customer is typed on the invoice.
     crm_api_url: str | None = None
     crm_api_key: SecretStr | None = None
+    # Which company's customers and prices, in a CRM that keeps one database per
+    # company: its short name on Bishnoi One Platform (2MG's). Sent with every
+    # call (X-Bishnoi-Company). Unset: none is named, which the CRM accepts only
+    # off production, where it falls back to its own default company.
+    crm_company: str | None = None
 
     @property
     def crm_linked(self) -> bool:
         return bool(self.crm_api_url and self.crm_api_key)
-
-    # Bishnoi One Inventory, whose suppliers a bill is made out to (decided 2026-10-24: suppliers stay
-    # there, one list): its API and the key it gave Finance. The platform delivers both (Finance uses Inventory).
-    inventory_api_url: str | None = None
-    inventory_api_key: SecretStr | None = None
-    # The company's short name on the platform ("getmeds"), for calls to apps that serve several
-    # companies (Inventory). Unset: the company of the latest Bishnoi One sign-in here (app/inventory.py).
-    company: str | None = None
-
-    @property
-    def inventory_linked(self) -> bool:
-        return bool(self.inventory_api_url and self.inventory_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:
@@ -141,6 +135,11 @@ class Settings(BaseSettings):
             raise ValueError("SESSION_HOURS must be at least 1.")
         if self.crm_api_url and (not self.crm_api_url.startswith(("https://", "http://")) or self.crm_api_url.endswith("/")):
             raise ValueError(f"CRM_API_URL is an address like https://crm-api.example.com, with no / at the end, not {self.crm_api_url!r}.")
+        if self.crm_company is not None:
+            # Kept as the CRM keeps it (bishnoi-crm app/tenants.py): lower case, 2 to 40 letters, numbers and dashes.
+            self.crm_company = self.crm_company.strip().lower() or None
+            if self.crm_company and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,38}[a-z0-9]", self.crm_company):
+                raise ValueError(f"CRM_COMPANY is a company's short name on Bishnoi One Platform (letters, numbers and dashes), not {self.crm_company!r}.")
         for key in self.integration_keys:
             name, _, secret = key.get_secret_value().partition(":")
             if not name or len(secret) < 24:

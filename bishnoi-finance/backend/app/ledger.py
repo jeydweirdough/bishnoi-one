@@ -39,10 +39,11 @@ def next_number(db: Session, on: date) -> str:
 
 
 def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, reference: str | None = None, source: str = "manual",
-         fund: FundRequest | None = None, reverses: JournalEntry | None = None) -> JournalEntry:
+         fund: FundRequest | None = None, reverses: JournalEntry | None = None, waits: bool = False, by_id: str | None = None) -> JournalEntry:
     """A balanced entry, posted. Legs of zero are left out; a leg with no
     account (a posting account nobody set) refuses the whole entry, so the
-    step it belongs to doesn't happen either."""
+    step it belongs to doesn't happen either. `waits`: typed by hand, so it
+    counts only once someone else approves it (app/routers/ledger.py)."""
     legs = [leg for leg in legs if leg.debit or leg.credit]
     missing = [leg for leg in legs if leg.account is None]
     if missing:
@@ -53,6 +54,7 @@ def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, referen
     entry = JournalEntry(
         number=next_number(db, on), entry_date=on, memo=memo[:300], reference=reference, source=source,
         fund_request_id=fund.id if fund else None, reverses_id=reverses.id if reverses else None, posted_by=who[:120],
+        status="waiting" if waits else "approved", posted_by_id=by_id,
     )
     for i, leg in enumerate(legs):
         entry.lines.append(JournalLine(position=i, account_id=leg.account.id, debit_centavos=leg.debit, credit_centavos=leg.credit, description=leg.description))
@@ -139,7 +141,7 @@ def post_reimbursed(db: Session, r: FundRequest, amount: int, method: str, refer
 
 
 def account_out(a: Account) -> dict:
-    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active}
+    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id}
 
 
 def entry_out(e: JournalEntry) -> dict:
@@ -154,6 +156,10 @@ def entry_out(e: JournalEntry) -> dict:
         "reversesId": e.reverses_id,
         "reversedById": e.reversed_by_id,
         "postedBy": e.posted_by,
+        "status": e.status,
+        "decidedBy": e.decided_by,
+        "decidedAt": e.decided_at.isoformat() if e.decided_at else None,
+        "rejectedReason": e.rejected_reason,
         "lines": [
             {
                 "account": {"id": ln.account.id, "code": ln.account.code, "name": ln.account.name},

@@ -14,8 +14,18 @@ export type TaxProfile = {
   rdoCode: string | null;
   fiscalMonthEnd: number;
   complete: boolean;
+  /** What an invoice needs and the registration doesn't have yet: "registered name", "TIN", "registered address". */
+  missing?: string[];
+  /** "The company's registered address isn't filled in yet: every invoice needs it." */
+  missingSentence?: string;
   updatedAt: string | null;
+  /** Who changed it last, by name. */
+  updatedByName?: string | null;
 };
+
+/** One change to the registration, from the activity log: which parts, never the values.
+ *  `changed` is null for saves before 2026-10-22, which didn't record which parts changed. */
+export type TaxHistoryEntry = { at: string; who: string; changed: string[] | null };
 
 export type TaxRateRow = { id: number; rateBp: number; validFrom: string; validTo: string | null; source: "pack" | "admin"; basis: string | null };
 
@@ -32,6 +42,8 @@ export type Option = { key: string; name: string };
 
 export type TaxSetup = {
   profile: TaxProfile;
+  /** The registration's changes, newest first (the last 20). */
+  history?: TaxHistoryEntry[];
   countries: { code: string; name: string }[];
   pack: {
     country: string;

@@ -12,9 +12,10 @@ import { Nav } from "../shell/nav";
 // bar above it says who you are and switches modules; the Platform decides who
 // may open Finance (its pass), so nothing here asks again. Written by
 // scripts/move-module.mjs.
-type Props = { children: ReactNode; waiting?: Record<string, number>; unset?: Record<string, number>; bell?: ReactNode };
+// `footer`: what Finance shows at the bottom of its sidebar (its version, src/modules/finance/version).
+type Props = { children: ReactNode; waiting?: Record<string, number>; unset?: Record<string, number>; bell?: ReactNode; footer?: ReactNode };
 
-export async function ShellLayout({ children, waiting, unset, bell }: Props) {
+export async function ShellLayout({ children, waiting, unset, bell, footer }: Props) {
   const me = await getMe();
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   // Its bell, then your modules and you (src/one/one-actions.tsx): the top right, as before the one app.
@@ -29,7 +30,7 @@ export async function ShellLayout({ children, waiting, unset, bell }: Props) {
         <NavProgress />
       </Suspense>
       <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} />
+        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} footer={footer} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
           <header className="mb-4 hidden justify-end lg:flex">{actions}</header>
           <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">

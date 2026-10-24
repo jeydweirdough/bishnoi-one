@@ -527,11 +527,8 @@ after you change a file.
 Some apps ask others for data: the CRM asks **Inventory** for products and
 stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx; **Finance** asks the
 **CRM** for customers to invoice (`CRM_API_URL`, `CRM_API_KEY` in Finance, and
-`INTEGRATION_KEYS=["finance:<the key>"]` in the CRM), and **Inventory** for the suppliers its
-bills are made out to (`INVENTORY_API_URL`, `INVENTORY_API_KEY` in Finance; the Platform links
-Finance to Inventory by itself, once). Finance also names its company to Inventory, which keeps a
-database per company: `COMPANY=getmeds` in Finance (unset, the company of the latest sign-in).
-The app being asked lists a key for each caller, and the caller sends that key with every request.
+`INTEGRATION_KEYS=["finance:<the key>"]` in the CRM). The app being asked lists a key for each
+caller, and the caller sends that key with every request.
 
 1. Make a key (at least 24 characters):
 

@@ -10,9 +10,9 @@ KEY = {"X-Bishnoi-Key": CRM_KEY}
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 100).decode()
 
 
-def approved(client, source_id="req-1", liquidate=True, amount=500000):
+def approved(client, source_id="req-1", liquidate=True, amount=500000, requester=("Rico Santos", "rico@example.com")):
     body = {
-        "sourceId": source_id, "number": f"FR-202609-{source_id[-4:]}", "requesterName": "Rico Santos", "requesterEmail": "rico@example.com",
+        "sourceId": source_id, "number": f"FR-202609-{source_id[-4:]}", "requesterName": requester[0], "requesterEmail": requester[1],
         "teamName": "North Luzon", "purpose": "Partnership dinner", "details": "Dinner with Dr. Reyes' clinic", "customerName": "Reyes Clinic",
         "liquidate": liquidate, "requestedCentavos": amount, "approvedCentavos": amount, "approvedByName": "Tess Aquino",
         "approvedAt": datetime.now(UTC).isoformat(),
@@ -71,7 +71,7 @@ def test_not_liquidated_closes_on_release(client, ben):
     assert [e["kind"] for e in done["events"]] == ["approved", "released", "closed"]
 
 
-def test_unused_funds_are_returned(client, ben):
+def test_unused_funds_are_returned(client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     assert req["status"] == "to_liquidate" and req["release"]["liquidateBy"]
     cats = categories(client)
@@ -80,7 +80,7 @@ def test_unused_funds_are_returned(client, ben):
     spend(client, 50000, cats["Personal"], receipt=False)
     sent = client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico Santos"}, headers=KEY).json()
     assert sent["status"] == "to_check" and sent["tally"]["spentCentavos"] == 370000
-    done = check_all(client, ben, sent)
+    done = check_all(client, ana, sent)
     assert done["status"] == "to_return" and done["returnDueCentavos"] == 180000
     assert done["tally"] == {"spentCentavos": 370000, "coveredCentavos": 320000, "ownCentavos": 50000, "refusedCentavos": 0, "balanceCentavos": 180000}
     part = client.post(f"/finance/funds/{req['id']}/returned", json={"amountCentavos": 100000}, headers=ben).json()
@@ -90,38 +90,38 @@ def test_unused_funds_are_returned(client, ben):
     assert done["status"] == "closed"
 
 
-def test_spending_more_is_reimbursed_only_where_the_category_is(client, ben):
+def test_spending_more_is_reimbursed_only_where_the_category_is(client, ana, ben):
     req = release(client, ben, approved(client, amount=200000)["id"], amount=200000)
     cats = categories(client)
     spend(client, 250000, cats["Food"])
     spend(client, 30000, cats["Personal"])
     sent = client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY).json()
-    done = check_all(client, ben, sent)
+    done = check_all(client, ana, sent)
     assert done["status"] == "to_reimburse" and done["reimburseDueCentavos"] == 50000
     closed = client.post(f"/finance/funds/{req['id']}/reimbursed", json={"amountCentavos": 50000, "method": "ewallet", "reference": "GC-1"}, headers=ben).json()
     assert closed["status"] == "closed"
 
 
-def test_a_refused_receipt_does_not_count_and_can_be_sent_back(client, ben):
+def test_a_refused_receipt_does_not_count_and_can_be_sent_back(client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     meal = spend(client, 400000, categories(client)["Food"])["expenses"][0]
     client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY)
-    r = client.patch(f"/finance/funds/{req['id']}/expenses/{meal['id']}", json={"accepted": False}, headers=ben)
+    r = client.patch(f"/finance/funds/{req['id']}/expenses/{meal['id']}", json={"accepted": False}, headers=ana)
     assert r.status_code == 422  # needs a reason
-    back = client.post(f"/finance/funds/{req['id']}/send-back", json={"note": "The receipt is blurry"}, headers=ben).json()
+    back = client.post(f"/finance/funds/{req['id']}/send-back", json={"note": "The receipt is blurry"}, headers=ana).json()
     assert back["status"] == "to_liquidate" and back["sentBackNote"] == "The receipt is blurry"
     # Fixed and sent again; this time refused, so all of it is unused funds.
     client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY)
-    client.patch(f"/finance/funds/{req['id']}/expenses/{meal['id']}", json={"accepted": False, "refusedReason": "Not a company expense"}, headers=ben)
-    done = client.post(f"/finance/funds/{req['id']}/finish-check", headers=ben).json()
+    client.patch(f"/finance/funds/{req['id']}/expenses/{meal['id']}", json={"accepted": False, "refusedReason": "Not a company expense"}, headers=ana)
+    done = client.post(f"/finance/funds/{req['id']}/finish-check", headers=ana).json()
     assert done["status"] == "to_return" and done["returnDueCentavos"] == 500000
 
 
-def test_every_receipt_is_decided_before_the_check_is_done(client, ben):
+def test_every_receipt_is_decided_before_the_check_is_done(client, ana, ben):
     req = release(client, ben, approved(client)["id"])
     spend(client, 100000, categories(client)["Transportation"])
     client.post("/integration/funds/requests/req-1/submit", json={"by": "Rico"}, headers=KEY)
-    assert client.post(f"/finance/funds/{req['id']}/finish-check", headers=ben).status_code == 409
+    assert client.post(f"/finance/funds/{req['id']}/finish-check", headers=ana).status_code == 409
 
 
 def test_the_receipt_is_kept_and_only_changes_while_liquidating(client, ben):

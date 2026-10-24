@@ -162,7 +162,57 @@ def tax_of(computed: dict) -> int:
     return next((s["amountCentavos"] for s in computed["summary"] if s["key"] == "tax"), 0)
 
 
-def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True) -> dict:
+def links(db: Session, invoices: list[Invoice]) -> dict[str, dict]:
+    """For each invoice, what it replaces and what replaced it (cancel and reissue),
+    worked out for a whole list at once. Shown on screens and lists, never printed."""
+    ids = [i.id for i in invoices]
+    olds = {i.replaces_id for i in invoices if i.replaces_id}
+    found_old = {o.id: o for o in db.scalars(select(Invoice).where(Invoice.id.in_(olds)))} if olds else {}
+    newer = {n.replaces_id: n for n in db.scalars(select(Invoice).where(Invoice.replaces_id.in_(ids)))} if ids else {}
+    out = {}
+    for i in invoices:
+        old, new = found_old.get(i.replaces_id), newer.get(i.id)
+        out[i.id] = {
+            "replaces": {"id": old.id, "number": old.number, "voidedAt": iso(old.voided_at), "reason": old.void_reason} if old else None,
+            "replacedBy": {"id": new.id, "number": new.number, "status": new.status} if new else None,
+        }
+    return out
+
+
+# Where a problem the tax step found is, in the words of the invoice form (and the
+# form's field, so it can be highlighted there).
+PROBLEM_PLACES = {
+    ("buyer", "tin"): ("Customer's TIN", "customerTin"),
+    ("buyer", "idNumber"): ("ID number", "buyerIdNumber"),
+    ("buyer", "name"): ("Customer", "customerName"),
+    ("buyer", "address"): ("Address", "customerAddress"),
+    ("treatment",): ("Buyer type", "treatment"),
+}
+LINE_PARTS = {"category": "VAT", "quantity": "quantity", "unitPriceCentavos": "unit price", "discountCentavos": "discount"}
+
+
+def readable(detail) -> tuple[str, dict[str, str]]:
+    """What the tax step said, as sentences saying where ("Customer's TIN: ...",
+    "Line 2: ..."), and the form fields to mark. It used to say only "Some lines
+    need fixing", even when it was the customer's TIN (fixed 2026-10-22)."""
+    if isinstance(detail, str):
+        return detail, {}
+    said, fields = [], {}
+    for d in detail if isinstance(detail, list) else []:
+        loc = [p for p in d.get("loc", []) if p != "body"]
+        msg = str(d.get("msg", "")).removeprefix("Value error, ")
+        if loc[:1] == ["lines"] and len(loc) >= 2 and str(loc[1]).isdigit():
+            n = int(loc[1])
+            part = LINE_PARTS.get(str(loc[2])) if len(loc) > 2 else None
+            label, key = f"Line {n + 1}" + (f" ({part})" if part else ""), f"lines.{n}.{loc[2]}" if len(loc) > 2 else "lines"
+        else:
+            label, key = PROBLEM_PLACES.get(tuple(loc), (" ".join(map(str, loc)) or "This invoice", ".".join(map(str, loc))))
+        said.append(f"{label}: {msg}")
+        fields[key] = msg
+    return (" ".join(said) or "This draft can't be worked out yet: edit it and check each field."), fields
+
+
+def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linked: dict | None = None) -> dict:
     due = inv.invoice_date + timedelta(days=inv.terms_days)
     out = {
         "id": inv.id, "status": inv.status, "number": inv.number,
@@ -179,19 +229,22 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True) -> di
         "series": {"id": inv.series.id, "name": inv.series.name, "atpNumber": inv.series.atp_number, "atpDate": inv.series.atp_date.isoformat(),
                    "range": f"{formatted(inv.series, inv.series.first_number)} to {formatted(inv.series, inv.series.last_number)}"} if inv.series else None,
     }
+    out |= linked if linked is not None else links(db, [inv])[inv.id]
     if full:
         out["lines"] = inv.lines
         out["entryId"] = inv.entry_id
         out["payments"] = [payment_out(p) for p in inv.payments]
         out["methods"] = [{"key": k, "label": v} for k, v in METHODS.items()]
         # A draft is worked out afresh each time it's read; an issued one is as it was issued.
+        out["problemFields"] = {}
         if inv.computed is not None:
             out["computed"], out["problem"] = inv.computed, None
         else:
             try:
                 out["computed"], out["problem"] = work_out(db, settings, sale_of(inv)), None
             except HTTPException as e:
-                out["computed"], out["problem"] = None, e.detail if isinstance(e.detail, str) else "Some lines need fixing before this can be issued."
+                out["computed"] = None
+                out["problem"], out["problemFields"] = readable(e.detail)
     return out
 
 
@@ -234,7 +287,9 @@ def list_invoices(
         like = f"%{q.strip().lower()}%"
         query = query.where(or_(func.lower(Invoice.customer_name).like(like), func.lower(Invoice.number).like(like), func.lower(Invoice.reference).like(like)))
     counts = dict(db.execute(select(Invoice.status, func.count()).group_by(Invoice.status)).all())
-    return {"items": [invoice_out(db, i, settings, full=False) for i in db.scalars(query)], "counts": {k: counts.get(k, 0) for k in ("draft", "issued", "void")}}
+    rows = list(db.scalars(query))
+    linked = links(db, rows)
+    return {"items": [invoice_out(db, i, settings, full=False, linked=linked[i.id]) for i in rows], "counts": {k: counts.get(k, 0) for k in ("draft", "issued", "void")}}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -289,7 +344,7 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
             pass
     computed = work_out(db, settings, sale_of(inv))
     if computed["warnings"]:
-        raise HTTPException(status.HTTP_409_CONFLICT, " ".join(computed["warnings"]) + " Fill them in under Tax, then issue it.")
+        raise HTTPException(status.HTTP_409_CONFLICT, " ".join(computed["warnings"]) + " Go to Tax, Registration, then issue it.")
     # The series, locked while its number is taken, so two invoices issued at once never share one.
     options = usable_series(db)
     s = next((x for x in options if x.id == body.series_id), None) if body.series_id else (options[0] if options else None)
@@ -305,7 +360,9 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
     inv.total_centavos, inv.tax_centavos = computed["totalDueCentavos"], tax_of(computed)
     inv.issued_at, inv.issued_by = datetime.now(UTC), user.full_name
     ledger = posting_settings(db)
-    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}", [
+    old = db.get(Invoice, inv.replaces_id) if inv.replaces_id else None
+    replacing = f", replacing {old.number}" if old else ""
+    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}{replacing}", [
         Leg(account(db, ledger.receivables_account_id), debit=inv.total_centavos),
         Leg(account(db, ledger.sales_account_id), credit=inv.total_centavos - inv.tax_centavos),
         Leg(account(db, ledger.output_tax_account_id), credit=inv.tax_centavos),
@@ -323,6 +380,13 @@ class VoidIn(Api):
 @router.post("/{invoice_id}/void")
 def void(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoice_id: str, body: VoidIn) -> dict:
     inv = found(db, invoice_id)
+    cancel(db, settings, user, inv, body.reason)
+    db.commit()
+    return invoice_out(db, inv, settings)
+
+
+def cancel(db: Session, settings, user, inv: Invoice, reason: str) -> None:
+    """Void an issued invoice: its entry reversed, its number kept, the reason recorded."""
     if inv.status != "issued":
         raise HTTPException(status.HTTP_409_CONFLICT, "Only an issued invoice is voided. A draft is simply deleted.")
     if inv.paid_centavos:
@@ -330,12 +394,48 @@ def void(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoic
     entry = db.get(JournalEntry, inv.entry_id) if inv.entry_id else None
     if entry is not None and not entry.reversed_by_id:
         legs = [Leg(ln.account, debit=ln.credit_centavos, credit=ln.debit_centavos, description=ln.description) for ln in entry.lines]
-        post(db, today(settings), f"Void of {inv.number}: {body.reason}", legs, user.full_name, reference=inv.number, source="invoice", reverses=entry)
-    inv.status, inv.void_reason = "void", body.reason
+        post(db, today(settings), f"Void of {inv.number}: {reason}", legs, user.full_name, reference=inv.number, source="invoice", reverses=entry)
+    inv.status, inv.void_reason = "void", reason
     inv.voided_at, inv.voided_by = datetime.now(UTC), user.full_name
     audit(db, user, "invoice.voided", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
+
+
+class ReissueIn(Api):
+    # Needed when cancelling an issued invoice; a cancelled one already has its reason.
+    reason: str | None = Field(None, min_length=3, max_length=300)
+
+
+@router.post("/{invoice_id}/reissue", status_code=status.HTTP_201_CREATED)
+def reissue(user: permitted("invoices.create"), db: DB, settings: SettingsDep, invoice_id: str, body: ReissueIn) -> dict:
+    """Cancel and reissue (Rommel Q20: a posted invoice is never edited). An issued
+    invoice is voided exactly as Void does, and a draft copying it is made, marked as
+    its replacement, dated today (changeable before issuing). A cancelled invoice with
+    no replacement yet gets just the draft. Answers the new draft, to correct and issue."""
+    inv = found(db, invoice_id)
+    if inv.status == "draft":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A draft is changed directly: there's nothing to reissue.")
+    if inv.status == "issued":
+        if not access_of(user).can("invoices.void"):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role doesn't allow voiding invoices.")
+        if not body.reason:
+            raise field_error("reason", "Say why it's cancelled (at least 3 characters).")
+        cancel(db, settings, user, inv, body.reason)
+    taken = db.scalar(select(Invoice).where(Invoice.replaces_id == inv.id))
+    if taken is not None:
+        what = f"{taken.number}" if taken.number else "a draft"
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{inv.number} is already being replaced by {what}. Open that one, or delete the draft first.")
+    copy = Invoice(
+        created_by=user.full_name, replaces_id=inv.id, invoice_date=today(settings),
+        customer_id=inv.customer_id, customer_name=inv.customer_name, customer_tin=inv.customer_tin, customer_address=inv.customer_address,
+        salesperson_id=inv.salesperson_id, salesperson_name=inv.salesperson_name, treatment=inv.treatment, buyer_id_number=inv.buyer_id_number,
+        terms_days=inv.terms_days, reference=inv.reference, notes=inv.notes, prices_include_tax=inv.prices_include_tax,
+        lines=[dict(line) for line in inv.lines],
+    )
+    db.add(copy)
+    db.flush()
+    audit(db, user, "invoice.reissued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=copy.id, fields=[inv.number])
     db.commit()
-    return invoice_out(db, inv, settings)
+    return invoice_out(db, copy, settings)
 
 
 # --- payments ---------------------------------------------------------------------------------

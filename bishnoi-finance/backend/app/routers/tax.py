@@ -20,7 +20,7 @@ from app.access import access_of, permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
-from app.models import TaxProfile, TaxRate
+from app.models import AuditEntry, TaxProfile, TaxRate, User
 from app.tax import rates as rate_book
 from app.tax.engine import LineIn, SaleIn, TaxError, compute
 from app.tax.packs import PACKS, pack_for
@@ -70,13 +70,33 @@ def split_tin(value: str) -> tuple[str, str | None]:
 # --- setup ---------------------------------------------------------------------------------
 
 
+def profile_missing(p: TaxProfile | None) -> list[str]:
+    """What a tax invoice needs of the registration and it doesn't have yet, by name,
+    so every message can say which (it used to say only "aren't all filled in": 2026-10-22)."""
+    if p is None:
+        return ["registered name", "TIN", "registered address"]
+    return [label for label, value in (("registered name", p.registered_name), ("TIN", p.tin), ("registered address", p.registered_address)) if not value]
+
+
 def profile_complete(p: TaxProfile | None) -> bool:
     """Registered enough to issue a tax invoice: the name, the TIN and the address."""
-    return bool(p and p.registered_name and p.tin and p.registered_address)
+    return not profile_missing(p)
 
 
-def profile_out(p: TaxProfile) -> dict:
+def missing_sentence(missing: list[str]) -> str:
+    """"The company's registered address isn't filled in yet: every invoice needs it."
+    Only what's missing: it also reaches the CRM's quotes (/integration/tax/compute),
+    whose users can't fill it in, so Finance's own screens add where to do it."""
+    if not missing:
+        return ""
+    names = missing[0] if len(missing) == 1 else ", ".join(missing[:-1]) + " and " + missing[-1]
+    one = len(missing) == 1
+    return f"The company's {names} {'isn' if one else 'aren'}'t filled in yet: every invoice needs {'it' if one else 'them'}."
+
+
+def profile_out(p: TaxProfile, db: DB) -> dict:
     pack = pack_for(p.country)
+    by = db.get(User, p.updated_by_id) if p.updated_by_id else None
     return {
         "country": p.country,
         "countryName": pack.name,
@@ -91,8 +111,47 @@ def profile_out(p: TaxProfile) -> dict:
         "rdoCode": p.rdo_code,
         "fiscalMonthEnd": p.fiscal_month_end,
         "complete": profile_complete(p),
+        # What's still missing, by name ("registered address"), and the sentence saying so.
+        "missing": profile_missing(p),
+        "missingSentence": missing_sentence(profile_missing(p)),
         "updatedAt": iso(p.updated_at),
+        "updatedByName": by.full_name if by else None,
     }
+
+
+# The registration's parts, as the history names them (the activity log keeps these names).
+PROFILE_PARTS = {
+    "country": "country",
+    "regime": "registration type",
+    "registered_name": "registered name",
+    "trade_name": "trade name",
+    "tin": "TIN",
+    "branch_code": "branch code",
+    "registered_address": "registered address",
+    "prices_include_tax": "catalogue prices",
+    "rdo_code": "RDO code",
+    "fiscal_month_end": "fiscal year end",
+}
+# Every part the form had before 2026-10-22, when a save logged them all.
+OLD_FORM = frozenset(list(PROFILE_PARTS)[:8])
+
+
+def history_out(db: DB, limit: int = 20) -> list[dict]:
+    """The registration's changes, newest first, from the activity log: when, who, and which
+    parts (never the values). Before 2026-10-22 a save logged every part on the form, changed
+    or not, so those lines say only that it was saved."""
+    rows = db.scalars(
+        select(AuditEntry).where(AuditEntry.action == "tax.profile_updated").order_by(AuditEntry.at.desc(), AuditEntry.id.desc()).limit(limit)
+    ).all()
+    names = {u.id: u.full_name for u in db.scalars(select(User).where(User.id.in_({r.actor_id for r in rows if r.actor_id}))).all()}
+    return [
+        {
+            "at": iso(r.at),
+            "who": names.get(r.actor_id) or r.actor,
+            "changed": None if set(r.fields or []) >= OLD_FORM else [PROFILE_PARTS.get(f, f) for f in PROFILE_PARTS if f in (r.fields or [])],
+        }
+        for r in rows
+    ]
 
 
 def rate_out(r: TaxRate) -> dict:
@@ -113,7 +172,8 @@ def setup_out(db: DB, settings: Settings, can_edit: bool) -> dict:
     rows = db.scalars(select(TaxRate).where(TaxRate.country == pack.country).order_by(TaxRate.valid_from.desc())).all()
     lookup = rate_book.lookup(db, pack.country)
     return {
-        "profile": profile_out(profile),
+        "profile": profile_out(profile, db),
+        "history": history_out(db),
         "countries": [{"code": c, "name": p.name} for c, p in PACKS.items()],
         "pack": {
             "country": pack.country,
@@ -153,7 +213,7 @@ class ProfileIn(Api):
     branch_code: str | None = Field(None, max_length=5)
     registered_address: str | None = Field(None, max_length=300)
     prices_include_tax: bool = True
-    # On every BIR form and summary list. Left out, it stays as it is.
+    # The Revenue District Office ("050") and the month the fiscal year ends (12: calendar year).
     rdo_code: str | None = Field(None, max_length=3)
     fiscal_month_end: int | None = Field(None, ge=1, le=12)
 
@@ -186,17 +246,30 @@ def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep
         except ValueError as problem:
             raise field_error("tin", str(problem)) from None
         branch = branch or in_tin
-    profile.country, profile.regime = body.country, body.regime
-    profile.registered_name, profile.trade_name = body.registered_name, body.trade_name
-    profile.tin, profile.branch_code = tin, branch or "00000"
-    profile.registered_address, profile.prices_include_tax = body.registered_address, body.prices_include_tax
+    new = {
+        "country": body.country,
+        "regime": body.regime,
+        "registered_name": body.registered_name,
+        "trade_name": body.trade_name,
+        "tin": tin,
+        "branch_code": branch or "00000",
+        "registered_address": body.registered_address,
+        "prices_include_tax": body.prices_include_tax,
+    }
+    # Left off the form, these keep what they were.
     if "rdo_code" in body.model_fields_set:
-        profile.rdo_code = body.rdo_code
+        new["rdo_code"] = body.rdo_code or None
     if body.fiscal_month_end is not None:
-        profile.fiscal_month_end = body.fiscal_month_end
-    profile.updated_by_id = admin.id
-    audit(db, admin, "tax.profile_updated", target="Tax registration", target_type="settings", fields=body.model_fields_set)
-    db.commit()
+        new["fiscal_month_end"] = body.fiscal_month_end
+    # Only what actually changed goes in the log and the history (it used to log every
+    # part on the form: 2026-10-22). Saving it unchanged changes nothing.
+    changed = [part for part, value in new.items() if getattr(profile, part) != value]
+    if changed:
+        for part in changed:
+            setattr(profile, part, new[part])
+        profile.updated_by_id = admin.id
+        audit(db, admin, "tax.profile_updated", target="Tax registration", target_type="settings", fields=changed)
+        db.commit()
     return setup_out(db, settings, True)
 
 
@@ -284,8 +357,8 @@ def work_out(db, settings: Settings, body: SaleBody) -> dict:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(problem)) from None
 
     warnings = []
-    if not (profile.registered_name and profile.tin and profile.registered_address):
-        warnings.append("The company's registered name, TIN and address aren't all filled in, and every invoice needs them.")
+    if profile_missing(profile):
+        warnings.append(missing_sentence(profile_missing(profile)))
     summary = pack.invoice["summary"]["vat" if profile.regime == "vat" else "non_vat"]
     seller_code = pack.codes.get(result.seller_tax_code) if result.seller_tax_code else None
     return {

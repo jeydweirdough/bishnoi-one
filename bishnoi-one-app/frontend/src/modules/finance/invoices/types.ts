@@ -63,6 +63,10 @@ export type InvoiceSummary = {
   voidedAt: string | null;
   voidReason: string | null;
   series: { id: string; name: string; atpNumber: string; atpDate: string; range: string } | null;
+  /** Cancel and reissue (Rommel Q20): the cancelled invoice this one replaces. Shown on screen, never printed. */
+  replaces: { id: string; number: string | null; voidedAt: string | null; reason: string | null } | null;
+  /** The invoice that replaces this cancelled one (a draft has no number yet). */
+  replacedBy: { id: string; number: string | null; status: InvoiceStatus } | null;
 };
 
 export type Payment = {
@@ -86,7 +90,10 @@ export type Invoice = InvoiceSummary & {
   lines: InvoiceLine[];
   entryId: string | null;
   computed: Computed | null;
+  /** Why a draft can't be worked out yet, saying where ("Customer's TIN: ..."). */
   problem: string | null;
+  /** The form fields it's about, for marking them in the editor (e.g. customerTin, lines.1.category). */
+  problemFields?: Record<string, string>;
   payments: Payment[];
   methods: { key: string; label: string }[];
 };

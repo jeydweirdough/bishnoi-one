@@ -57,6 +57,16 @@ export async function voidInvoice(id: string, reason: string): Promise<Result<In
   });
 }
 
+/** Cancel and reissue: voids an issued invoice (reason needed) and answers a draft
+ *  copying it, marked as its replacement. For a cancelled one: only the draft. */
+export async function reissueInvoice(id: string, reason: string | null): Promise<Result<Invoice>> {
+  return attempt(async () => {
+    const copy = await api.post<Invoice>(`/finance/invoices/${enc(id)}/reissue`, { reason });
+    refresh();
+    return copy;
+  });
+}
+
 export type PaymentInput = { paidOn: string; amountCentavos: number; method: string; reference: string | null; cwtCentavos?: number; cwtAtc?: string | null; cwtCertificate?: string | null };
 
 export async function recordPayment(id: string, input: PaymentInput): Promise<Result<Invoice>> {

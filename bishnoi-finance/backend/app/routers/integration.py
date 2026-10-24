@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.deps import DB, SettingsDep
 from app.funds import category_out, decode, event, must_be, peso, request_out, store_receipt, utcnow
 from app.models import ExpenseCategory, FundExpense, FundRequest, StoredFile
+from app.notify import done, tell_holders
 from app.routers.funds import ordered_categories, receipt_of, today
 from app.routers.tax import Api, SaleBody, field_error, setup_out, work_out
 
@@ -100,6 +101,10 @@ def receive(caller: Caller, db: DB, settings: SettingsDep, body: ApprovedIn) -> 
         there = FundRequest(source_app=caller, **body.model_dump())
         event(there, "approved", body.approved_by_name, f"Approved for {peso(body.approved_centavos)} and forwarded to Finance.", body.approved_centavos)
         db.add(there)
+        db.flush()
+        team = f" ({there.team_name})" if there.team_name else ""
+        tell_holders(db, "funds.release", "fund.to_release",
+                     f"{there.number}: {peso(there.approved_centavos)} for {there.requester_name}{team} is ready for release.", link=f"/funds/{there.id}")
         db.commit()
     return request_out(there, today(settings))
 
@@ -197,6 +202,9 @@ def submit(caller: Caller, db: DB, settings: SettingsDep, source_id: str, body: 
     spent = sum(e.amount_centavos for e in r.expenses)
     count = len(r.expenses)
     event(r, "submitted", body.by, f"Liquidation submitted: {count} expense{'s' if count != 1 else ''} totalling {peso(spent)}.", spent)
+    # Not to whoever released it: someone else reviews it.
+    tell_holders(db, "funds.check", "fund.to_check", f"{r.number}: {r.requester_name}'s liquidation ({peso(spent)}) is waiting for review.",
+                 link=f"/funds/{r.id}", not_to=[r.released_by_id])
     db.commit()
     return request_out(r, today(settings))
 
@@ -208,6 +216,7 @@ def cancel(caller: Caller, db: DB, settings: SettingsDep, source_id: str, body: 
     must_be(r, "to_release")
     r.status, r.cancel_reason, r.closed_at = "cancelled", body.reason or "Cancelled by the requester.", utcnow()
     event(r, "cancelled", body.by, f"Request cancelled by the requester: {r.cancel_reason}")
+    done(db, "fund.to_release", f"/funds/{r.id}")  # nothing to release any more
     db.commit()
     return request_out(r, today(settings))
 
