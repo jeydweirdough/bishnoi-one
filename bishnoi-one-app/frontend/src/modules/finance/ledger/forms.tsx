@@ -81,7 +81,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
         setFields(result.fields ?? {});
         return;
       }
-      toast.success(`${result.data.number} posted`);
+      toast.success(`${result.data.number} posted`, { description: "Waiting for approval: it counts in the books once someone else approves it." });
       setOpen(false);
       setMemo("");
       setReference("");
@@ -172,6 +172,8 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
           </tfoot>
         </table>
       </div>
+      {/* Typing in one side clears the other on purpose: a line is one side of the entry (found confusing in testing, 2026-10-22). */}
+      <p className="text-meta text-ink-3">Each line is either a debit or a credit: typing in one clears the other. Pick an account on every line.</p>
       {debits !== credits && debits + credits > 0 && <p className="text-meta text-due-today">Out of balance by {fmt.peso(Math.abs(debits - credits))}.</p>}
       <FormError message={error} />
       <div className="flex gap-2">
@@ -195,7 +197,7 @@ export function ReverseButton({ id, number }: { id: string; number: string }) {
       triggerVariant="quiet"
       triggerSize="sm"
       title={`Reverse ${number}?`}
-      body="A reversing entry dated today is posted with every debit and credit swapped. The original entry remains in the journal; posted entries are never edited or deleted."
+      body="A reversing entry dated today is posted with every debit and credit swapped. Like any entry typed by hand, it counts once someone else approves it. The original entry remains in the journal; entries are never edited or deleted."
       confirmLabel="Post reversal"
       onConfirm={async () => {
         const result = await reverseEntry(id);
@@ -203,24 +205,50 @@ export function ReverseButton({ id, number }: { id: string; number: string }) {
           toast.error(result.error);
           return false;
         }
-        toast.success(`${result.data.number} posted`, { description: `Reverses ${number}.` });
+        toast.success(`${result.data.number} posted`, { description: `Reverses ${number} once it's approved.` });
       }}
     />
   );
 }
 
+/** A type's accounts in order, each under its parent (when the parent is the same type), with its depth. */
+function nested(of: Account[]): { a: Account; depth: number }[] {
+  const ids = new Set(of.map((a) => a.id));
+  const children = new Map<string | null, Account[]>();
+  for (const a of of) {
+    const key = a.parentId && ids.has(a.parentId) ? a.parentId : null;
+    children.set(key, [...(children.get(key) ?? []), a]);
+  }
+  const out: { a: Account; depth: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (parent: string | null, depth: number) => {
+    for (const a of children.get(parent) ?? []) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push({ a, depth });
+      walk(a.id, Math.min(depth + 1, 4));
+    }
+  };
+  walk(null, 0);
+  return out;
+}
+
 /** The chart of accounts, by type, with adding and changing an account. */
-export function ChartEditor({ accounts, canEdit }: { accounts: Account[]; canEdit: boolean }) {
+export function ChartEditor({ accounts, canEdit, importer }: { accounts: Account[]; canEdit: boolean; importer?: React.ReactNode }) {
   const [editing, setEditing] = useState<Account | "new" | null>(null);
+  const names = new Map(accounts.map((a) => [a.id, a]));
   return (
     <div className="space-y-5">
       {canEdit &&
         (editing ? (
-          <AccountForm key={editing === "new" ? "new" : editing.id} account={editing === "new" ? null : editing} onDone={() => setEditing(null)} />
+          <AccountForm key={editing === "new" ? "new" : editing.id} account={editing === "new" ? null : editing} accounts={accounts} onDone={() => setEditing(null)} />
         ) : (
-          <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
-            Add an account
-          </Button>
+          <div className="flex flex-wrap items-start gap-2">
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
+              Add an account
+            </Button>
+            {importer}
+          </div>
         ))}
       {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => {
         const of = accounts.filter((a) => a.type === t);
@@ -229,9 +257,13 @@ export function ChartEditor({ accounts, canEdit }: { accounts: Account[]; canEdi
           <section key={t}>
             <h2 className="mb-1 text-caps text-ink-3 uppercase">{TYPE_LABELS[t]}</h2>
             <ul className="divide-y divide-rule border-y border-rule">
-              {of.map((a) => (
-                <li key={a.id} className={`flex items-center gap-3 py-2 ${a.isActive ? "" : "text-ink-3"}`}>
-                  <span className="w-16 font-mono text-meta tabular-nums text-ink-2">{a.code}</span>
+              {nested(of).map(({ a, depth }) => (
+                <li key={a.id} className={`flex items-center gap-3 py-2 ${a.isActive ? "" : "text-ink-3"}`} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+                  <span className="w-20 shrink-0 font-mono text-meta tabular-nums text-ink-2">{a.code}</span>
+                  {/* Under a parent of another type (Oojeema's chart has some): said, since it can't be shown by place. */}
+                  {a.parentId && names.get(a.parentId)?.type !== a.type && (
+                    <span className="hidden text-meta text-ink-3 sm:inline">under {names.get(a.parentId)?.name} ·</span>
+                  )}
                   <a href={`/finance/ledger/accounts/${a.id}`} className="min-w-0 flex-1 truncate text-sm font-medium hover:text-hema hover:underline">
                     {a.name}
                     {!a.isActive && <span className="ml-2 text-meta font-normal">inactive</span>}
@@ -251,12 +283,13 @@ export function ChartEditor({ accounts, canEdit }: { accounts: Account[]; canEdi
   );
 }
 
-function AccountForm({ account, onDone }: { account: Account | null; onDone: () => void }) {
+function AccountForm({ account, accounts, onDone }: { account: Account | null; accounts: Account[]; onDone: () => void }) {
   const [code, setCode] = useState(account?.code ?? "");
   const [name, setName] = useState(account?.name ?? "");
   const [type, setType] = useState<AccountType>(account?.type ?? "expense");
   const [description, setDescription] = useState(account?.description ?? "");
   const [isActive, setActive] = useState(account?.isActive ?? true);
+  const [parentId, setParentId] = useState(account?.parentId ?? "");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -264,7 +297,7 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     start(async () => {
-      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive });
+      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive, parentId: parentId || null });
       if (!result.ok) {
         setError(result.error);
         setFields(result.fields ?? {});
@@ -296,9 +329,19 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
           )}
         </Field>
       </div>
-      <Field label="Description" optional error={fields.description}>
-        {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Description" optional error={fields.description}>
+          {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
+        </Field>
+        <Field label="Sits under" optional error={fields.parentId} hint="The account it's grouped under, as in Oojeema's chart.">
+          {(p) => (
+            <Select {...p} value={parentId} onChange={(e) => setParentId(e.target.value)}>
+              <option value="">Nothing (at the top)</option>
+              <AccountOptions accounts={accounts.filter((a) => a.id !== account?.id)} />
+            </Select>
+          )}
+        </Field>
+      </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
         Active (available for new entries)

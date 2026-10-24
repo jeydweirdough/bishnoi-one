@@ -10,6 +10,7 @@ import { Field, FormError, Input, Select, Textarea } from "@/src/modules/finance
 import { PickList, SaveBar } from "@/src/modules/finance/platform/ui/pick-list";
 import { SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { deleteRole, saveRole, saveUser, setUserPassword } from "@/src/modules/finance/actions/admin";
+import { removeUserSignature } from "@/src/modules/finance/signature/actions";
 import type { AdminUsers, PermissionArea, RolesData } from "@/src/modules/finance/lib/types";
 
 
@@ -202,6 +203,42 @@ export function UsersEditor({
                 ))}
               </Select>
               <span className="flex items-center gap-1 justify-self-end">
+                {/* The calendar is switched on per person, not given with a role. */}
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  disabled={pending || !u.isActive}
+                  aria-pressed={u.calendarOn}
+                  title={u.calendarOn ? "Their calendar is on: click to switch it off" : "Switch on their calendar (deadlines and reminders)"}
+                  onClick={() =>
+                    change(
+                      u.id,
+                      { calendarOn: !u.calendarOn },
+                      u.calendarOn ? `${u.fullName}'s calendar switched off` : `${u.fullName}'s calendar switched on`,
+                    )
+                  }
+                >
+                  {u.calendarOn ? "Calendar on" : "Calendar off"}
+                </Button>
+                {u.hasSignature && (
+                  <ConfirmButton
+                    label="Remove signature"
+                    triggerVariant="quiet"
+                    triggerSize="sm"
+                    title={`Remove ${u.fullName}'s e-signature?`}
+                    body="Documents they already signed keep it. Only they can set a new one, on their account page."
+                    confirmLabel="Remove"
+                    onConfirm={async () => {
+                      const r = await removeUserSignature(u.id);
+                      if (!r.ok) {
+                        toast.error(r.error);
+                        return false;
+                      }
+                      toast.success(`${u.fullName}'s signature removed`);
+                      router.refresh();
+                    }}
+                  />
+                )}
                 <NewPassword id={u.id} name={u.fullName} />
                 {u.id !== meId && (
                   <Button

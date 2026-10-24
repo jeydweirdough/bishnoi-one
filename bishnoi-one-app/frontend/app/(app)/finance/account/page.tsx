@@ -1,9 +1,19 @@
-// Your profile: who you are, Edit profile and Change password, and what you did lately.
+// Your profile: who you are, Edit profile and Change password, what you did lately,
+// and your e-signature (Finance's own, below the shared profile screen).
 import ProfilePage from "@/src/modules/finance/platform/screens/profile";
+import { load } from "@/src/modules/finance/platform/lib/api";
 import { ACTIONS } from "@/src/modules/finance/screens/admin";
+import { SignatureCard } from "@/src/modules/finance/signature/card";
+import type { MySignature } from "@/src/modules/finance/signature/types";
 
 export { metadata } from "@/src/modules/finance/platform/screens/profile";
 
-export default function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  return <ProfilePage searchParams={searchParams} actions={ACTIONS} />;
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const signature = await load<MySignature>("/auth/signature");
+  return (
+    <>
+      <ProfilePage searchParams={searchParams} actions={ACTIONS} />
+      <SignatureCard data={signature} />
+    </>
+  );
 }
