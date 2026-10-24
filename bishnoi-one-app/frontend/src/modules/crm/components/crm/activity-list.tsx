@@ -77,7 +77,7 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
     <li className="flex gap-3 py-3.5">
       {a.isPlanned ? (
         <label className={`mt-1 inline-flex size-6 shrink-0 items-center justify-center ${a.can.edit ? "cursor-pointer" : ""}`}>
-          <input
+          <input suppressHydrationWarning
             type="checkbox"
             checked={done}
             disabled={!a.can.edit || saving}

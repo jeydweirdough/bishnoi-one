@@ -253,7 +253,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                               onClick: ({ key }) => take(c, next.find((m) => m.to === key)!),
                             }}
                           >
-                            <button
+                            <button suppressHydrationWarning
                               type="button"
                               aria-label={`Move ${c.title}`}
                               className="absolute right-1.5 bottom-1.5 z-10 grid size-6 place-items-center rounded-md bg-sheet text-ink-3 opacity-0 group-hover:opacity-100 hover:bg-bench hover:text-ink focus-visible:opacity-100 max-lg:opacity-100"

@@ -57,17 +57,17 @@ function DatesForm({ action, start, end, keep }: { action: string; start: string
   return (
     <form className="flex flex-wrap items-end gap-3" action={action}>
       {Object.entries(keep ?? {}).map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
+        <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />
       ))}
       <label className="text-meta text-ink-2">
         From
-        <input type="date" name="start" defaultValue={start} className={inputClass} />
+        <input suppressHydrationWarning type="date" name="start" defaultValue={start} className={inputClass} />
       </label>
       <label className="text-meta text-ink-2">
         To
-        <input type="date" name="end" defaultValue={end} className={inputClass} />
+        <input suppressHydrationWarning type="date" name="end" defaultValue={end} className={inputClass} />
       </label>
-      <button type="submit" className={buttonClass}>
+      <button suppressHydrationWarning type="submit" className={buttonClass}>
         Show
       </button>
     </form>
@@ -79,11 +79,11 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
   return (
     <form className="flex flex-wrap items-end gap-3" action={action}>
       {Object.entries(keep ?? {}).map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
+        <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />
       ))}
       <label className="text-meta text-ink-2">
         Year
-        <select name="year" defaultValue={year} className={inputClass}>
+        <select suppressHydrationWarning name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
@@ -93,7 +93,7 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
       </label>
       <label className="text-meta text-ink-2">
         Quarter
-        <select name="quarter" defaultValue={quarter} className={inputClass}>
+        <select suppressHydrationWarning name="quarter" defaultValue={quarter} className={inputClass}>
           {[1, 2, 3, 4].map((q) => (
             <option key={q} value={q}>
               {["1st", "2nd", "3rd", "4th"][q - 1]}
@@ -101,7 +101,7 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
           ))}
         </select>
       </label>
-      <button type="submit" className={buttonClass}>
+      <button suppressHydrationWarning type="submit" className={buttonClass}>
         Show
       </button>
     </form>
@@ -723,20 +723,20 @@ function MonthForm({ year, month }: { year: number; month: number }) {
   const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return (
     <form className="flex flex-wrap items-end gap-3" action="/finance/bir/withholding">
-      <input type="hidden" name="form" value="0619e" />
+      <input suppressHydrationWarning type="hidden" name="form" value="0619e" />
       <label className="text-meta text-ink-2">
         Year
-        <select name="year" defaultValue={year} className={inputClass}>
+        <select suppressHydrationWarning name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </label>
       <label className="text-meta text-ink-2">
         Month
-        <select name="month" defaultValue={month} className={inputClass}>
+        <select suppressHydrationWarning name="month" defaultValue={month} className={inputClass}>
           {names.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
         </select>
       </label>
-      <button type="submit" className={buttonClass}>Show</button>
+      <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
     </form>
   );
 }
@@ -807,14 +807,14 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
         <TaxpayerLine who={d.taxpayer} />
         <Toolbar file={download(`/finance/bir/withholding/1604e?year=${d.year}`)}>
           <form className="flex items-end gap-3" action="/finance/bir/withholding">
-            <input type="hidden" name="form" value="1604e" />
+            <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
             <label className="text-meta text-ink-2">
               Year
-              <select name="year" defaultValue={d.year} className={inputClass}>
+              <select suppressHydrationWarning name="year" defaultValue={d.year} className={inputClass}>
                 {years.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </label>
-            <button type="submit" className={buttonClass}>Show</button>
+            <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
           </form>
         </Toolbar>
         <div className="space-y-5">

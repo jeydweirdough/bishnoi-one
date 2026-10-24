@@ -169,7 +169,7 @@ export function ActivityCalendar({
         {KINDS.map((k) => {
           const on = !hidden.includes(k.kind);
           return (
-            <button
+            <button suppressHydrationWarning
               key={k.kind}
               type="button"
               aria-pressed={on}

@@ -65,7 +65,7 @@ function GrantRow({ grant, user, canChange }: { grant: Grant; user: PlatformUser
         {grant.isAppAdmin && <AdminStamp label="App admin" />}
         {canChange && (
           <span className="flex items-center">
-            <button
+            <button suppressHydrationWarning
               type="button"
               className={ICON_BUTTON}
               title={`Change ${first}'s role in ${grant.name}`}
@@ -162,7 +162,7 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
           </Field>
         </div>
         <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
-          <input type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isAppAdmin} onChange={(e) => setAppAdmin(e.target.checked)} />
+          <input suppressHydrationWarning type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isAppAdmin} onChange={(e) => setAppAdmin(e.target.checked)} />
           <span>
             Application admin
             <span className="block text-meta text-ink-3">

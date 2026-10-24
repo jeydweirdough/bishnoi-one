@@ -153,7 +153,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                 ["warehouses", "Warehouses", warehouses.length],
               ] as const
             ).map(([key, label, n]) => (
-              <button
+              <button suppressHydrationWarning
                 key={key}
                 type="button"
                 role="tab"
@@ -170,7 +170,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
               <label className="relative min-w-0 flex-1">
                 <span className="sr-only">Search transfers</span>
                 <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
-                <input
+                <input suppressHydrationWarning
                   type="search"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -196,7 +196,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
               shown.map((t) => {
                 const on = t.id === picked;
                 return (
-                  <button
+                  <button suppressHydrationWarning
                     key={t.id}
                     type="button"
                     onClick={() => setPicked(t.id)}
@@ -292,7 +292,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
           ) : (
             <span />
           )}
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={() => startRefresh(() => router.refresh())}
             className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-lg border border-rule bg-sheet px-4 text-sm text-ink shadow-overlay hover:bg-hema-tint"
@@ -304,7 +304,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
         {unpinned.length > 0 && (
           <div className="absolute bottom-4 left-4 z-[500] max-w-sm rounded-lg border border-rule bg-sheet px-4 py-2.5 text-meta text-ink-2 shadow-overlay">
             {unpinned.map((w) => w.name).join(", ")} {unpinned.length === 1 ? "is" : "are"} not mapped.{" "}
-            <button type="button" onClick={() => setTab("warehouses")} className="font-semibold text-ink underline">
+            <button suppressHydrationWarning type="button" onClick={() => setTab("warehouses")} className="font-semibold text-ink underline">
               Locate on map
             </button>
           </div>

@@ -54,7 +54,7 @@ export function ModalFrame({
             <h2 className="text-heading text-ink">{title}</h2>
             {subtitle && <p className="mt-1 text-meta text-ink-3">{subtitle}</p>}
           </div>
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={onClose}
             className="rounded-full p-1.5 text-ink-3 hover:bg-mint hover:text-ink"
@@ -120,7 +120,7 @@ export function PermitModal({
         {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Permit name">
-          <input
+          <input suppressHydrationWarning
             name="title"
             required
             defaultValue={permit?.title ?? ""}
@@ -131,7 +131,7 @@ export function PermitModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Type">
-            <select
+            <select suppressHydrationWarning
               name="category"
               defaultValue={permit?.category ?? "boc"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -147,7 +147,7 @@ export function PermitModal({
           </FormField>
 
           <FormField label="Issuing agency">
-            <input
+            <input suppressHydrationWarning
               name="agency"
               required
               defaultValue={permit?.agency ?? "Bureau of Customs (BOC)"}
@@ -159,7 +159,7 @@ export function PermitModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Reference number">
-            <input
+            <input suppressHydrationWarning
               name="referenceNumber"
               required
               defaultValue={permit?.referenceNumber ?? ""}
@@ -169,7 +169,7 @@ export function PermitModal({
           </FormField>
 
           <FormField label="Status">
-            <select
+            <select suppressHydrationWarning
               name="status"
               defaultValue={permit?.status ?? "active"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -184,7 +184,7 @@ export function PermitModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Issue date" optional>
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="issuanceDate"
               defaultValue={permit?.issuanceDate ? permit.issuanceDate.slice(0, 10) : ""}
@@ -193,7 +193,7 @@ export function PermitModal({
           </FormField>
 
           <FormField label="Expiry date">
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="expirationDate"
               required
@@ -203,7 +203,7 @@ export function PermitModal({
           </FormField>
 
           <FormField label="Alert before expiry (days)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               name="renewalWindowDays"
               defaultValue={permit?.renewalWindowDays ?? 60}
@@ -214,7 +214,7 @@ export function PermitModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Person responsible">
-            <input
+            <input suppressHydrationWarning
               name="responsiblePerson"
               defaultValue={permit?.responsiblePerson ?? ""}
               placeholder="e.g. Deo Castillo"
@@ -223,7 +223,7 @@ export function PermitModal({
           </FormField>
 
           <FormField label="Estimated cost (PHP)" optional>
-            <input
+            <input suppressHydrationWarning
               type="number"
               step="0.01"
               name="estimatedCost"
@@ -235,7 +235,7 @@ export function PermitModal({
         </div>
 
         <FormField label="Notes" optional>
-          <textarea
+          <textarea suppressHydrationWarning
             name="notes"
             rows={2}
             defaultValue={permit?.notes ?? ""}
@@ -310,7 +310,7 @@ export function ImmigrationModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Full name">
-            <input
+            <input suppressHydrationWarning
               name="individualName"
               required
               defaultValue={record?.individualName ?? ""}
@@ -320,7 +320,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Position">
-            <input
+            <input suppressHydrationWarning
               name="designation"
               required
               defaultValue={record?.designation ?? ""}
@@ -332,7 +332,7 @@ export function ImmigrationModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Nationality">
-            <input
+            <input suppressHydrationWarning
               name="nationality"
               required
               defaultValue={record?.nationality ?? ""}
@@ -342,7 +342,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Document Type">
-            <select
+            <select suppressHydrationWarning
               name="documentType"
               defaultValue={record?.documentType ?? "acr_card"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -356,7 +356,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Document number">
-            <input
+            <input suppressHydrationWarning
               name="documentNumber"
               required
               defaultValue={record?.documentNumber ?? ""}
@@ -368,7 +368,7 @@ export function ImmigrationModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Issue date" optional>
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="issuanceDate"
               defaultValue={record?.issuanceDate ? record.issuanceDate.slice(0, 10) : ""}
@@ -377,7 +377,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Expiry date">
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="expirationDate"
               required
@@ -387,7 +387,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Alert before expiry (days)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               name="renewalLeadDays"
               defaultValue={record?.renewalLeadDays ?? 60}
@@ -398,7 +398,7 @@ export function ImmigrationModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Sponsoring company">
-            <input
+            <input suppressHydrationWarning
               name="sponsoringEntity"
               defaultValue={record?.sponsoringEntity ?? "Bishnoi One Pharma Philippines Inc."}
               className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
@@ -406,7 +406,7 @@ export function ImmigrationModal({
           </FormField>
 
           <FormField label="Person responsible">
-            <input
+            <input suppressHydrationWarning
               name="assignedAssistant"
               defaultValue={record?.assignedAssistant ?? ""}
               placeholder="e.g. Mila Aguilar"
@@ -416,7 +416,7 @@ export function ImmigrationModal({
         </div>
 
         <FormField label="Status">
-          <select
+          <select suppressHydrationWarning
             name="status"
             defaultValue={record?.status ?? "valid"}
             className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -429,7 +429,7 @@ export function ImmigrationModal({
         </FormField>
 
         <FormField label="Notes" optional>
-          <textarea
+          <textarea suppressHydrationWarning
             name="notes"
             rows={2}
             defaultValue={record?.notes ?? ""}
@@ -497,7 +497,7 @@ export function DocumentModal({
         {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Document name">
-          <input
+          <input suppressHydrationWarning
             name="title"
             required
             defaultValue={document?.title ?? ""}
@@ -508,7 +508,7 @@ export function DocumentModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Category">
-            <select
+            <select suppressHydrationWarning
               name="category"
               defaultValue={document?.category ?? "insurance"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -523,7 +523,7 @@ export function DocumentModal({
           </FormField>
 
           <FormField label="Other party">
-            <input
+            <input suppressHydrationWarning
               name="counterparty"
               required
               defaultValue={document?.counterparty ?? ""}
@@ -535,7 +535,7 @@ export function DocumentModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Reference number">
-            <input
+            <input suppressHydrationWarning
               name="referenceNumber"
               defaultValue={document?.referenceNumber ?? ""}
               placeholder="e.g. POL-DO-2026-01"
@@ -544,7 +544,7 @@ export function DocumentModal({
           </FormField>
 
           <FormField label="Expiry date" optional>
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="expirationDate"
               defaultValue={document?.expirationDate ? document.expirationDate.slice(0, 10) : ""}
@@ -553,7 +553,7 @@ export function DocumentModal({
           </FormField>
 
           <FormField label="Notice period (days)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               name="noticePeriodDays"
               defaultValue={document?.noticePeriodDays ?? 30}
@@ -564,7 +564,7 @@ export function DocumentModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Annual amount (PHP)" optional>
-            <input
+            <input suppressHydrationWarning
               type="number"
               step="0.01"
               name="annualValue"
@@ -575,7 +575,7 @@ export function DocumentModal({
           </FormField>
 
           <FormField label="Custodian">
-            <input
+            <input suppressHydrationWarning
               name="custodian"
               defaultValue={document?.custodian ?? "Corporate Secretary"}
               className="w-full rounded-full border border-control px-3 py-1.5 focus:border-hema focus:outline-hidden"
@@ -584,7 +584,7 @@ export function DocumentModal({
         </div>
 
         <div className="flex items-center gap-2">
-          <input
+          <input suppressHydrationWarning
             type="checkbox"
             id="autoRenews"
             name="autoRenews"
@@ -597,7 +597,7 @@ export function DocumentModal({
         </div>
 
         <FormField label="Notes" optional>
-          <textarea
+          <textarea suppressHydrationWarning
             name="notes"
             rows={2}
             defaultValue={document?.notes ?? ""}
@@ -674,7 +674,7 @@ export function PropertyModal({
         {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Property name">
-          <input
+          <input suppressHydrationWarning
             name="name"
             required
             defaultValue={property?.name ?? ""}
@@ -685,7 +685,7 @@ export function PropertyModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Type">
-            <select
+            <select suppressHydrationWarning
               name="propertyType"
               defaultValue={property?.propertyType ?? "office"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -699,7 +699,7 @@ export function PropertyModal({
           </FormField>
 
           <FormField label="Lessor">
-            <input
+            <input suppressHydrationWarning
               name="lessorName"
               required
               defaultValue={property?.lessorName ?? ""}
@@ -710,7 +710,7 @@ export function PropertyModal({
         </div>
 
         <FormField label="Address">
-          <input
+          <input suppressHydrationWarning
             name="address"
             required
             defaultValue={property?.address ?? ""}
@@ -721,7 +721,7 @@ export function PropertyModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Lease start">
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="leaseStart"
               defaultValue={property?.leaseStart ? property.leaseStart.slice(0, 10) : ""}
@@ -730,7 +730,7 @@ export function PropertyModal({
           </FormField>
 
           <FormField label="Lease end">
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="leaseEnd"
               required
@@ -740,7 +740,7 @@ export function PropertyModal({
           </FormField>
 
           <FormField label="Notice period (days)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               name="noticeDeadlineDays"
               defaultValue={property?.noticeDeadlineDays ?? 90}
@@ -751,7 +751,7 @@ export function PropertyModal({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Monthly rent (PHP)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               step="0.01"
               name="monthlyRent"
@@ -762,7 +762,7 @@ export function PropertyModal({
           </FormField>
 
           <FormField label="Yearly rent increase (%)">
-            <input
+            <input suppressHydrationWarning
               type="number"
               step="0.1"
               name="escalationRatePct"
@@ -772,7 +772,7 @@ export function PropertyModal({
           </FormField>
 
           <FormField label="Security deposit (PHP)" optional>
-            <input
+            <input suppressHydrationWarning
               type="number"
               step="0.01"
               name="securityDeposit"
@@ -784,7 +784,7 @@ export function PropertyModal({
         </div>
 
         <FormField label="Utility accounts" optional>
-          <textarea
+          <textarea suppressHydrationWarning
             name="utilitiesInfo"
             rows={2}
             defaultValue={property?.utilitiesInfo ?? ""}
@@ -851,7 +851,7 @@ export function TicketModal({
         {error && <div className="rounded-full bg-danger-tint p-2.5 text-meta font-medium text-danger">{error}</div>}
 
         <FormField label="Request">
-          <input
+          <input suppressHydrationWarning
             name="title"
             required
             defaultValue={ticket?.title ?? ""}
@@ -862,7 +862,7 @@ export function TicketModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Category">
-            <select
+            <select suppressHydrationWarning
               name="category"
               defaultValue={ticket?.category ?? "facilities"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -878,7 +878,7 @@ export function TicketModal({
           </FormField>
 
           <FormField label="Priority">
-            <select
+            <select suppressHydrationWarning
               name="priority"
               defaultValue={ticket?.priority ?? "normal"}
               className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -893,7 +893,7 @@ export function TicketModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Requested by">
-            <input
+            <input suppressHydrationWarning
               name="requesterName"
               required
               defaultValue={ticket?.requesterName ?? ""}
@@ -903,7 +903,7 @@ export function TicketModal({
           </FormField>
 
           <FormField label="On behalf of" optional>
-            <input
+            <input suppressHydrationWarning
               name="executiveSponsor"
               defaultValue={ticket?.executiveSponsor ?? "CEO Office"}
               placeholder="e.g. Office of the Managing Director"
@@ -914,7 +914,7 @@ export function TicketModal({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Assigned to">
-            <input
+            <input suppressHydrationWarning
               name="assignedTo"
               defaultValue={ticket?.assignedTo ?? "Deo Castillo"}
               placeholder="e.g. Deo Castillo"
@@ -923,7 +923,7 @@ export function TicketModal({
           </FormField>
 
           <FormField label="Target date">
-            <input
+            <input suppressHydrationWarning
               type="date"
               name="slaDueDate"
               defaultValue={ticket?.slaDueDate ? ticket.slaDueDate.slice(0, 10) : ""}
@@ -933,7 +933,7 @@ export function TicketModal({
         </div>
 
         <FormField label="Details">
-          <textarea
+          <textarea suppressHydrationWarning
             name="description"
             rows={3}
             required
@@ -946,7 +946,7 @@ export function TicketModal({
         {ticket && (
           <div className="grid gap-3 sm:grid-cols-2 border-t border-rule pt-3">
             <FormField label="Status">
-              <select
+              <select suppressHydrationWarning
                 name="status"
                 defaultValue={ticket.status}
                 className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"
@@ -960,7 +960,7 @@ export function TicketModal({
             </FormField>
 
             <FormField label="Resolution" optional>
-              <input
+              <input suppressHydrationWarning
                 name="resolutionNotes"
                 defaultValue={ticket.resolutionNotes ?? ""}
                 placeholder="What was done"
@@ -1032,7 +1032,7 @@ export function TicketUpdateModal({
         </div>
 
         <FormField label="Your name">
-          <input
+          <input suppressHydrationWarning
             name="authorName"
             required
             defaultValue="Bishnoi One Admin"
@@ -1041,7 +1041,7 @@ export function TicketUpdateModal({
         </FormField>
 
         <FormField label="Update">
-          <textarea
+          <textarea suppressHydrationWarning
             name="content"
             rows={3}
             required
@@ -1051,7 +1051,7 @@ export function TicketUpdateModal({
         </FormField>
 
         <FormField label="Status">
-          <select
+          <select suppressHydrationWarning
             name="newStatus"
             defaultValue={ticket.status}
             className="w-full rounded-full border border-control px-2.5 py-1.5 focus:border-hema focus:outline-hidden"

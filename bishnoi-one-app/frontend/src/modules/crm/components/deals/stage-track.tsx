@@ -59,7 +59,7 @@ export function StageTrack({
           const here = i === at;
           const first = i === 0;
           return (
-            <button
+            <button suppressHydrationWarning
               key={s.code}
               type="button"
               onClick={() => move(s)}

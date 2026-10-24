@@ -183,7 +183,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                 {found.length === 0 && <li className="px-3 py-2 text-meta text-ink-3">No customer matches. Type their details below.</li>}
                 {found.map((c) => (
                   <li key={c.id}>
-                    <button type="button" onClick={() => pick(c)} className="w-full px-3 py-2 text-left text-sm hover:bg-hema-tint">
+                    <button suppressHydrationWarning type="button" onClick={() => pick(c)} className="w-full px-3 py-2 text-left text-sm hover:bg-hema-tint">
                       <span className="font-semibold">{c.name}</span>
                       {c.address && <span className="text-ink-3"> · {c.address}</span>}
                     </button>
@@ -261,7 +261,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                     <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} maxLength={200} placeholder="Amoxicillin 500 mg, box of 100" />
                     {needsId && (
                       <label className="mt-1 flex items-center gap-1.5 text-meta text-ink-2">
-                        <input type="checkbox" checked={l.relief} onChange={(e) => set(l.key, { relief: e.target.checked })} />
+                        <input suppressHydrationWarning type="checkbox" checked={l.relief} onChange={(e) => set(l.key, { relief: e.target.checked })} />
                         The 20% discount applies (medicines, for one)
                       </label>
                     )}
@@ -291,7 +291,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                     <CellInput aria-label={`Line ${i + 1}: discount`} inputMode="decimal" className="text-right" value={l.discount} onChange={(e) => set(l.key, { discount: e.target.value })} placeholder="0.00" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <select
+                    <select suppressHydrationWarning
                       aria-label={`Line ${i + 1}: VAT category`}
                       value={l.category}
                       onChange={(e) => set(l.key, { category: e.target.value })}
@@ -306,7 +306,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                   </td>
                   <td className="py-1.5 pl-1">
                     {lines.length > 1 && (
-                      <button type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines(lines.filter((x) => x.key !== l.key))} className="inline-flex size-8 items-center justify-center rounded-[3px] text-ink-3 hover:bg-danger/10 hover:text-danger">
+                      <button suppressHydrationWarning type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines(lines.filter((x) => x.key !== l.key))} className="inline-flex size-8 items-center justify-center rounded-[3px] text-ink-3 hover:bg-danger/10 hover:text-danger">
                         <Trash2 className="size-4" aria-hidden />
                       </button>
                     )}

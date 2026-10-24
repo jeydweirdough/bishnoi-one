@@ -109,11 +109,11 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
         <label className="block">
           <span className="mb-1 block text-meta font-medium text-ink-2">From</span>
-          <input type="date" name="from" defaultValue={f.from} className="h-9 border-0 border-b border-control bg-transparent text-sm" />
+          <input suppressHydrationWarning type="date" name="from" defaultValue={f.from} className="h-9 border-0 border-b border-control bg-transparent text-sm" />
         </label>
         <label className="block">
           <span className="mb-1 block text-meta font-medium text-ink-2">To</span>
-          <input type="date" name="to" defaultValue={f.to} className="h-9 border-0 border-b border-control bg-transparent text-sm" />
+          <input suppressHydrationWarning type="date" name="to" defaultValue={f.to} className="h-9 border-0 border-b border-control bg-transparent text-sm" />
         </label>
       </Filters>
       {product && (

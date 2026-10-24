@@ -371,7 +371,7 @@ function Row({
   );
   if (onToggle && !rail) {
     return (
-      <button type="button" onClick={onToggle} aria-expanded={open} className={`w-full text-left ${className}`}>
+      <button suppressHydrationWarning type="button" onClick={onToggle} aria-expanded={open} className={`w-full text-left ${className}`}>
         {inside}
       </button>
     );
@@ -643,7 +643,7 @@ function AppSwitcher({ items }: { items: Away[] }) {
 
   return (
     <div className="mt-5">
-      <button
+      <button suppressHydrationWarning
         ref={button}
         type="button"
         onClick={toggle}
@@ -935,7 +935,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
           <div>
             <div className="mb-6 flex items-start gap-1 px-3 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:items-center group-data-[rail=true]/side:px-0">
               <div className="min-w-0 flex-1 group-data-[rail=true]/side:[&_span]:sr-only group-data-[rail=true]/side:[&_a]:border-b-0 group-data-[rail=true]/side:[&_a]:pb-0">{brand}</div>
-              <button
+              <button suppressHydrationWarning
                 type="button"
                 onClick={toggleRail}
                 aria-label={rail ? "Open the sidebar" : "Close the sidebar"}
@@ -956,7 +956,7 @@ export function Nav({ me, waiting = {}, unset = {}, rail: railAtFirst = false, a
           <div className="w-36 shrink-0">{brand}</div>
           <div className="flex min-w-0 items-center gap-1">
             {actions}
-            <button
+            <button suppressHydrationWarning
               type="button"
               onClick={() => setOpenOn(open ? null : pathname)}
               aria-expanded={open}

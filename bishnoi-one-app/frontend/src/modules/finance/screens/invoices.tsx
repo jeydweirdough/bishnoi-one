@@ -77,8 +77,8 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
           ))}
         </nav>
         <form className="flex gap-2">
-          {status && <input type="hidden" name="status" value={status} />}
-          <input name="q" defaultValue={q} placeholder="Customer, number or reference" aria-label="Find an invoice" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          {status && <input suppressHydrationWarning type="hidden" name="status" value={status} />}
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Customer, number or reference" aria-label="Find an invoice" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>

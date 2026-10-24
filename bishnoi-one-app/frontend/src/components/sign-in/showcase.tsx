@@ -60,7 +60,7 @@ export function Showcase({ slides = SLIDES, brand = "Bishnoi One Platform", labe
 
       <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Pick one">
         {slides.map((s, i) => (
-          <button
+          <button suppressHydrationWarning
             key={s.title}
             type="button"
             role="tab"

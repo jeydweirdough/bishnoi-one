@@ -27,7 +27,7 @@ export function CommandMenuButton() {
   const ask = () => window.dispatchEvent(new Event(OPEN_EVENT));
   return (
     <>
-      <button
+      <button suppressHydrationWarning
         type="button"
         onClick={ask}
         className="hidden h-10 items-center gap-2 rounded-[11px] border border-rule bg-bench pr-2 pl-3 text-meta text-ink-3 transition-colors hover:border-[#c9c9c5] hover:bg-sheet hover:text-ink md:inline-flex"
@@ -37,7 +37,7 @@ export function CommandMenuButton() {
         <span className="w-40 text-left">Search or jump to…</span>
         <kbd className="rounded-md border border-rule bg-sheet px-1.5 py-0.5 font-sans text-[0.6875rem] text-ink-3">{mac ? "⌘K" : "Ctrl K"}</kbd>
       </button>
-      <button type="button" onClick={ask} aria-label="Search" className="grid size-10 place-items-center rounded-lg text-ink-2 hover:bg-sheet hover:text-ink md:hidden">
+      <button suppressHydrationWarning type="button" onClick={ask} aria-label="Search" className="grid size-10 place-items-center rounded-lg text-ink-2 hover:bg-sheet hover:text-ink md:hidden">
         <Search className="size-5" aria-hidden />
       </button>
     </>
@@ -225,7 +225,7 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
     >
       <div className="flex items-center gap-3 border-b border-rule px-[18px] py-3.5">
         <Search className="size-5 shrink-0 text-ink" aria-hidden />
-        <input
+        <input suppressHydrationWarning
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -260,7 +260,7 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
             const on = s.key === inScope;
             const Icon = s.key === "all" ? null : KINDS[s.key].icon;
             return (
-              <button
+              <button suppressHydrationWarning
                 key={s.key}
                 type="button"
                 role="tab"
@@ -292,7 +292,7 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
                     <div className="flex items-center justify-between px-2.5 pt-3 pb-1.5">
                       <span className="text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">{heading}</span>
                       {row.more && (
-                        <button type="button" onClick={() => setScope(row.more!.scope)} className="text-[0.71875rem] font-medium text-ink-2 hover:text-ink hover:underline">
+                        <button suppressHydrationWarning type="button" onClick={() => setScope(row.more!.scope)} className="text-[0.71875rem] font-medium text-ink-2 hover:text-ink hover:underline">
                           See all {row.more.total}
                         </button>
                       )}
@@ -385,7 +385,7 @@ function Preview({ row, onGo }: { row: Row | undefined; onGo: (href: string) => 
           )}
           <div className="grid gap-1.5">
             {steps.map((s, i) => (
-              <button
+              <button suppressHydrationWarning
                 key={s.href + s.label}
                 type="button"
                 onClick={() => onGo(s.href)}

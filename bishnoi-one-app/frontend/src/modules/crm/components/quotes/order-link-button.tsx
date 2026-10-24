@@ -46,7 +46,7 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
       <p className="text-sm font-semibold text-ink">Required documents</p>
       <p className="text-meta text-ink-3">They&apos;re asked for exactly these, and can&apos;t send the order without them. Rx medicines always need a prescription.</p>
       <label className="mt-3 flex cursor-pointer items-start gap-3">
-        <input type="checkbox" checked={asks.prescriptionAlways} onChange={(e) => setAsks({ ...asks, prescriptionAlways: e.target.checked })} className="mt-0.5 size-4 accent-[#141414]" />
+        <input suppressHydrationWarning type="checkbox" checked={asks.prescriptionAlways} onChange={(e) => setAsks({ ...asks, prescriptionAlways: e.target.checked })} className="mt-0.5 size-4 accent-[#141414]" />
         <span className="text-sm text-ink">Ask for a prescription with every order, Rx or not</span>
       </label>
       {(choices?.payers?.length ?? 0) > 0 && (
@@ -66,7 +66,7 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
             {asks.documents.map((d) => (
               <li key={d} className="inline-flex h-7 items-center gap-1 rounded-md bg-hema-tint pr-1 pl-3 text-meta text-ink">
                 {d}
-                <button type="button" aria-label={`Don't ask for ${d}`} onClick={() => setAsks({ ...asks, documents: asks.documents.filter((x) => x !== d) })} className="grid size-5 place-items-center rounded-md hover:bg-sheet">
+                <button suppressHydrationWarning type="button" aria-label={`Don't ask for ${d}`} onClick={() => setAsks({ ...asks, documents: asks.documents.filter((x) => x !== d) })} className="grid size-5 place-items-center rounded-md hover:bg-sheet">
                   <X className="size-3" aria-hidden />
                 </button>
               </li>
@@ -83,7 +83,7 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {COMMON_DOCUMENTS.filter((d) => !asks.documents.includes(d)).map((d) => (
-                <button key={d} type="button" onClick={() => add(d)} className="h-7 rounded-md border border-dashed border-rule-strong px-3 text-meta text-ink-2 hover:border-ink hover:text-ink">
+                <button suppressHydrationWarning key={d} type="button" onClick={() => add(d)} className="h-7 rounded-md border border-dashed border-rule-strong px-3 text-meta text-ink-2 hover:border-ink hover:text-ink">
                   + {d}
                 </button>
               ))}
@@ -183,7 +183,7 @@ export function OrderLinkButton({ companyId = null, companyName = null, slug, la
         {made ? (
           <DialogPanel title="Order link" hint="You can copy it again from the list while it works.">
             <div className="flex items-center gap-2">
-              <input readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
+              <input suppressHydrationWarning readOnly value={made} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-rule-strong bg-bench px-4 py-2 text-sm text-ink" aria-label="The order link" />
               <Button variant="primary" icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} onClick={copy}>
                 {copied ? "Copied" : "Copy"}
               </Button>

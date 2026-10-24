@@ -157,7 +157,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
       {roles.length > 1 && (
         <div className="inline-flex flex-wrap gap-1 rounded-lg border border-rule bg-sheet p-1" role="tablist" aria-label="Role">
           {roles.map((r) => (
-            <button
+            <button suppressHydrationWarning
               key={r.id}
               type="button"
               role="tab"

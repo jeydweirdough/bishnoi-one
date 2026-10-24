@@ -43,7 +43,7 @@ export function Pager({ total, page, size = PAGE_SIZE, base, onPage, noun }: { t
       );
     }
     return (
-      <button key={aria} type="button" onClick={() => onPage?.(n)} aria-label={aria} aria-current={current ? "page" : undefined} className={className}>
+      <button suppressHydrationWarning key={aria} type="button" onClick={() => onPage?.(n)} aria-label={aria} aria-current={current ? "page" : undefined} className={className}>
         {label}
       </button>
     );

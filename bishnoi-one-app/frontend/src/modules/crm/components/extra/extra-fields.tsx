@@ -116,7 +116,7 @@ export function FieldInput({
     return (
       <div className="self-end pb-2">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-hema" />
           {f.label}
         </label>
         {f.helpText && <p className="mt-0.5 text-meta text-ink-3">{f.helpText}</p>}
@@ -134,7 +134,7 @@ export function FieldInput({
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {f.options.map((o) => (
             <label key={o} className="flex items-center gap-2 text-sm">
-              <input
+              <input suppressHydrationWarning
                 type="checkbox"
                 checked={picked.includes(o)}
                 onChange={(e) => onChange(e.target.checked ? [...picked, o] : picked.filter((x) => x !== o))}

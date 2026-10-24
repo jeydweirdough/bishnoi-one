@@ -46,7 +46,7 @@ export function CalendarMonth({ data, month, picked }: { data: CalendarData; mon
     const on = selected?.event === i.event.id && selected.on === i.on;
     return (
       <li key={`${i.event.id}-${i.on}`}>
-        <button
+        <button suppressHydrationWarning
           type="button"
           onClick={() => setSelected({ event: i.event.id, on: i.on })}
           title={`${i.event.atTime ? `${i.event.atTime} ` : ""}${i.event.title}${i.event.mine ? "" : ` (shared by ${i.event.owner.name})`}${i.done ? ", done" : ""}`}
@@ -127,7 +127,7 @@ export function CalendarMonth({ data, month, picked }: { data: CalendarData; mon
           <ul className="divide-y divide-rule text-sm">
             {thisMonth.map((i) => (
               <li key={`${i.event.id}-${i.on}`}>
-                <button type="button" onClick={() => setSelected({ event: i.event.id, on: i.on })} className="flex w-full items-baseline gap-3 py-1.5 text-left hover:text-hema">
+                <button suppressHydrationWarning type="button" onClick={() => setSelected({ event: i.event.id, on: i.on })} className="flex w-full items-baseline gap-3 py-1.5 text-left hover:text-hema">
                   <span className="w-24 shrink-0 text-meta text-ink-3">{dayLabel(i.on)}</span>
                   <span className={`min-w-0 flex-1 ${i.done ? "text-ink-3 line-through" : ""}`}>
                     {i.event.atTime && <span className="tabular-nums">{i.event.atTime} </span>}
@@ -169,7 +169,7 @@ function Details({ item, onEdit, onClose }: { item: CalItem; onEdit: () => void;
           {e.atTime ? `, ${e.atTime}` : ""}
         </span>
         <span className="flex-1" />
-        <button type="button" onClick={onClose} className="text-meta text-ink-3 hover:text-ink">
+        <button suppressHydrationWarning type="button" onClick={onClose} className="text-meta text-ink-3 hover:text-ink">
           Close
         </button>
       </div>
@@ -338,7 +338,7 @@ function EventForm({ event, people, today, onClose }: { event: CalEvent | null; 
             <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
               {people.map((p) => (
                 <label key={p.id} className="flex items-center gap-2 text-sm">
-                  <input
+                  <input suppressHydrationWarning
                     type="checkbox"
                     checked={d.sharedWith.includes(p.id)}
                     onChange={(e) => set({ sharedWith: e.target.checked ? [...d.sharedWith, p.id] : d.sharedWith.filter((x) => x !== p.id) })}

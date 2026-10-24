@@ -233,7 +233,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {catalogue.roles.map((r) => (
             <label key={r.id} className="inline-flex items-center gap-1.5 text-sm">
-              <input type="checkbox" className="accent-hema" checked={roles.includes(r.id)} onChange={(e) => setRoles(e.target.checked ? [...roles, r.id] : roles.filter((x) => x !== r.id))} />
+              <input suppressHydrationWarning type="checkbox" className="accent-hema" checked={roles.includes(r.id)} onChange={(e) => setRoles(e.target.checked ? [...roles, r.id] : roles.filter((x) => x !== r.id))} />
               {r.name}
             </label>
           ))}
@@ -242,7 +242,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
       </fieldset>
       {kpi && (
         <label className="inline-flex items-center gap-1.5 text-sm">
-          <input type="checkbox" className="accent-hema" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <input suppressHydrationWarning type="checkbox" className="accent-hema" checked={active} onChange={(e) => setActive(e.target.checked)} />
           Active (when inactive, it is kept but not shown or targeted)
         </label>
       )}

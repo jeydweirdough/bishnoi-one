@@ -186,7 +186,7 @@ export function PrepareTab({ companies }: { companies: Company[] }) {
             <Fold title="Settings" note={`${perCustomer ? "one line per customer" : "one line per invoice"} · RDO ${rdo || "—"} · year ends ${MONTH_NAMES[(parseInt(fy, 10) || 12) - 1]}`}>
               <div className="space-y-4 px-5 py-4 text-sm">
                 <label className="flex items-start gap-2">
-                  <input type="checkbox" className="mt-1" checked={perCustomer} onChange={(e) => setPerCustomer(e.target.checked)} />
+                  <input suppressHydrationWarning type="checkbox" className="mt-1" checked={perCustomer} onChange={(e) => setPerCustomer(e.target.checked)} />
                   <span>
                     One line per customer
                     <span className="block text-meta text-ink-3">All of a customer&apos;s invoices for the month are added into one line (by TIN; by name when there is no TIN). Untick for one line per invoice.</span>
@@ -291,7 +291,7 @@ function MonthButton({ k, status, current, onClick }: { k: number; status?: Any;
   else if (status.noIr && !status.items) text = "Ready · no IR to check";
   else [text, tone] = [`! ${status.diff ? "Off by " + fmt(status.diff) : pl(status.items, "item") + " to check"}`, "text-danger"];
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       onClick={onClick}
       aria-pressed={current}

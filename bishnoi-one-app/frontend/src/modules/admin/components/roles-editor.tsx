@@ -127,7 +127,7 @@ export function RolesEditor({ data }: { data: RolesPayload }) {
                       </th>
                       <td className="px-1 py-2 text-center" colSpan={data.actions.length}>
                         <label className="inline-flex items-center gap-2 text-meta text-ink-2">
-                          <input
+                          <input suppressHydrationWarning
                             type="checkbox"
                             checked={(grants[SETTINGS] ?? []).includes(s.action)}
                             onChange={(e) => toggle([SETTINGS], s.action, e.target.checked)}
@@ -172,7 +172,7 @@ function TriBox({ state, label, onChange }: { state: "all" | "some" | "none"; la
     if (box.current) box.current.indeterminate = state === "some";
   }, [state]);
   return (
-    <input
+    <input suppressHydrationWarning
       ref={box}
       type="checkbox"
       aria-label={label}
@@ -193,7 +193,7 @@ function Cell({ role, module, action, grants, toggle }: { role: string; module: 
     );
   }
   return (
-    <input
+    <input suppressHydrationWarning
       type="checkbox"
       aria-label={`${role}: ${ACTION_LABELS[action as keyof typeof ACTION_LABELS]} in ${module.name}`}
       checked={(grants[module.key] ?? []).includes(action)}
@@ -253,7 +253,7 @@ function SalesRows({ role, modules, actions, grants, toggle }: RowsProps) {
         <th scope="row" className="py-2 pr-3 text-left font-normal">
           <span className="flex flex-wrap items-center gap-x-3">
             All {modules.length} sales divisions
-            <button
+            <button suppressHydrationWarning
               type="button"
               onClick={() => setOpen(!open)}
               aria-expanded={open}
@@ -297,7 +297,7 @@ function UnbuiltRows({ role, modules, actions, grants, toggle }: RowsProps) {
     <tbody>
       <tr>
         <td colSpan={1 + actions.length} className="pt-3">
-          <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 text-meta font-semibold text-hema hover:underline">
+          <button suppressHydrationWarning type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 text-meta font-semibold text-hema hover:underline">
             <ChevronRight aria-hidden className="size-3.5" />
             {modules.length} modules not built yet
           </button>
@@ -336,7 +336,7 @@ function OrderSteps({ role, steps, grants, toggle }: {
             <div className="mt-1">
               {group.steps.map((step) => (
                 <label key={step.action} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-1 text-sm hover:bg-bench/40">
-                  <input
+                  <input suppressHydrationWarning
                     type="checkbox"
                     aria-label={`${role}: ${step.label} (orders)`}
                     checked={granted.has(step.action)}

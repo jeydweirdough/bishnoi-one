@@ -252,7 +252,7 @@ function FieldsEditor({
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-meta text-ink-2">
               <label className="flex h-8 cursor-pointer items-center gap-2">
-                <input
+                <input suppressHydrationWarning
                   type="checkbox"
                   checked={row.required}
                   onChange={(e) => change(i, { required: e.target.checked })}
@@ -261,7 +261,7 @@ function FieldsEditor({
                 Must be answered
               </label>
               <label className="flex h-8 cursor-pointer items-center gap-2">
-                <input
+                <input suppressHydrationWarning
                   type="checkbox"
                   checked={row.isActive}
                   onChange={(e) => change(i, { isActive: e.target.checked })}

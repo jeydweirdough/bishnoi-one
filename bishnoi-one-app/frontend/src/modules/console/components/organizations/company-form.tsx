@@ -144,7 +144,7 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {applications.map((a) => (
                   <label key={a.id} className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
-                    <input
+                    <input suppressHydrationWarning
                       type="checkbox"
                       className="size-4 accent-hema"
                       checked={apps.includes(a.id)}

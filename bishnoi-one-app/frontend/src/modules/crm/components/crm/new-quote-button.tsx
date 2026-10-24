@@ -62,7 +62,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
       <Modal open={open} title={"New quote for…"} onCancel={() => setOpen(false)} footer={null} width={480}>
           <label className="flex items-center gap-2 border-b border-rule-strong pb-1.5 focus-within:border-hema">
             <Search className="size-4 text-ink-3" aria-hidden />
-            <input
+            <input suppressHydrationWarning
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Type a customer's name"
@@ -85,7 +85,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
             <ul className="mt-2 max-h-80 overflow-y-auto">
               {shown.map((c) => (
                 <li key={c.id}>
-                  <button
+                  <button suppressHydrationWarning
                     type="button"
                     onClick={() => {
                       setOpen(false);
@@ -100,7 +100,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
             </ul>
           )}
           {shown.length > 0 && typed && mayAdd && (
-            <button type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-lg border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-ink hover:underline">
+            <button suppressHydrationWarning type="button" onClick={addNew} className="mt-2 flex w-full items-center gap-2 rounded-lg border-t border-rule px-2 pt-3 pb-1 text-left text-sm text-ink hover:underline">
               <UserPlus className="size-4" aria-hidden />
               Not in the list? Add &ldquo;{typed}&rdquo; as a new customer
             </button>

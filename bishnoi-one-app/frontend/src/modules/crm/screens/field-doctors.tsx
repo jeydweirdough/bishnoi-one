@@ -62,7 +62,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
       </PageHeader>
 
       <form className="mb-4 flex flex-wrap items-center gap-3" action="/crm/field/doctors">
-        <input
+        <input suppressHydrationWarning
           name="q"
           defaultValue={search}
           placeholder="Search by name"
@@ -70,13 +70,13 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
           className="h-9 w-64 rounded-lg border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
         />
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />
           With outstanding balance
         </label>
-        {zone && <input type="hidden" name="zone" value={zone} />}
-        {tier && <input type="hidden" name="tier" value={tier} />}
-        {sort === "owed" && <input type="hidden" name="sort" value="owed" />}
-        <button type="submit" className="h-9 rounded-lg border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
+        {zone && <input suppressHydrationWarning type="hidden" name="zone" value={zone} />}
+        {tier && <input suppressHydrationWarning type="hidden" name="tier" value={tier} />}
+        {sort === "owed" && <input suppressHydrationWarning type="hidden" name="sort" value="owed" />}
+        <button suppressHydrationWarning type="submit" className="h-9 rounded-lg border border-rule-strong bg-sheet px-4 text-sm font-semibold hover:border-control">
           Show
         </button>
       </form>

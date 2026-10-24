@@ -72,7 +72,7 @@ export function PeopleList({ data }: { data: AccessData }) {
           </div>
           {toChoose.size > 0 && (
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-2">
-              <input type="checkbox" checked={onlyToChoose} onChange={(e) => setOnlyToChoose(e.target.checked)} />
+              <input suppressHydrationWarning type="checkbox" checked={onlyToChoose} onChange={(e) => setOnlyToChoose(e.target.checked)} />
               Only those still to choose ({toChoose.size})
             </label>
           )}

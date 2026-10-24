@@ -102,7 +102,7 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
                     <CellInput className="w-24" inputMode="decimal" aria-label={`Line ${n + 1}: unit price`} value={r.price} onChange={(e) => setRow(n, { price: e.target.value })} />
                   </td>
                   <td className="px-2 py-2">
-                    <select
+                    <select suppressHydrationWarning
                       aria-label={`Line ${n + 1}: VAT category`}
                       value={r.category}
                       onChange={(e) => setRow(n, { category: e.target.value })}
@@ -116,7 +116,7 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
                     </select>
                   </td>
                   <td className="px-2 py-2 text-center">
-                    <input type="checkbox" aria-label={`Line ${n + 1}: covered by the SC/PWD discount`} checked={r.relief} onChange={(e) => setRow(n, { relief: e.target.checked })} className="size-4 accent-hema" />
+                    <input suppressHydrationWarning type="checkbox" aria-label={`Line ${n + 1}: covered by the SC/PWD discount`} checked={r.relief} onChange={(e) => setRow(n, { relief: e.target.checked })} className="size-4 accent-hema" />
                   </td>
                   <td className="py-2 pl-2 text-right">
                     <Button size="sm" variant="quiet" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, i) => i !== n))} aria-label={`Remove line ${n + 1}`} title="Remove this line" icon={<Trash2 className="size-4" aria-hidden />} />

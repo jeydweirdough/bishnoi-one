@@ -88,21 +88,21 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         ))}
       </nav>
       <form className="mb-4 flex flex-wrap items-end gap-3" action="/finance/ledger" role="search">
-        {shown.has("source") && <input type="hidden" name="source" value={source} />}
-        {shown.has("status") && <input type="hidden" name="status" value={state} />}
+        {shown.has("source") && <input suppressHydrationWarning type="hidden" name="source" value={source} />}
+        {shown.has("status") && <input suppressHydrationWarning type="hidden" name="status" value={state} />}
         <label className="text-meta text-ink-2">
           From
-          <input type="date" name="from" defaultValue={from} className={inputClass} />
+          <input suppressHydrationWarning type="date" name="from" defaultValue={from} className={inputClass} />
         </label>
         <label className="text-meta text-ink-2">
           To
-          <input type="date" name="to" defaultValue={to} className={inputClass} />
+          <input suppressHydrationWarning type="date" name="to" defaultValue={to} className={inputClass} />
         </label>
         <label className="text-meta text-ink-2">
           Search
-          <input type="search" name="q" defaultValue={q} maxLength={100} placeholder="Entry no., memo or reference" className={`${inputClass} w-64`} />
+          <input suppressHydrationWarning type="search" name="q" defaultValue={q} maxLength={100} placeholder="Entry no., memo or reference" className={`${inputClass} w-64`} />
         </label>
-        <button type="submit" className={buttonClass("default", "sm")}>
+        <button suppressHydrationWarning type="submit" className={buttonClass("default", "sm")}>
           Show
         </button>
         {searching && (
@@ -138,7 +138,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
               <span id={e.number} />
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 {several && e.canDecide && (
-                  <input type="checkbox" name="ids" value={e.id} form={BULK_FORM} aria-label={`Select ${e.number} to approve`} className="size-4 self-center accent-[var(--color-hema)]" />
+                  <input suppressHydrationWarning type="checkbox" name="ids" value={e.id} form={BULK_FORM} aria-label={`Select ${e.number} to approve`} className="size-4 self-center accent-[var(--color-hema)]" />
                 )}
                 <p className={`font-mono text-meta font-semibold ${e.status === "rejected" ? "line-through" : ""}`}>{e.number}</p>
                 <p className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</p>
@@ -246,13 +246,13 @@ export async function AccountPage({ params, searchParams }: { params: Promise<{ 
       <form className="mb-4 flex flex-wrap items-end gap-3" action={`/finance/ledger/accounts/${a.id}`}>
         <label className="text-meta text-ink-2">
           From
-          <input type="date" name="from" defaultValue={from} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning type="date" name="from" defaultValue={from} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </label>
         <label className="text-meta text-ink-2">
           To
-          <input type="date" name="to" defaultValue={to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning type="date" name="to" defaultValue={to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </label>
-        <button type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
+        <button suppressHydrationWarning type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
           Show
         </button>
       </form>
@@ -327,9 +327,9 @@ export async function TrialBalancePage({ searchParams }: { searchParams: Search 
       <form className="mb-4 flex items-end gap-3" action="/finance/ledger/trial-balance">
         <label className="text-meta text-ink-2">
           As of
-          <input type="date" name="to" defaultValue={tb.to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning type="date" name="to" defaultValue={tb.to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </label>
-        <button type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
+        <button suppressHydrationWarning type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
           Show
         </button>
       </form>

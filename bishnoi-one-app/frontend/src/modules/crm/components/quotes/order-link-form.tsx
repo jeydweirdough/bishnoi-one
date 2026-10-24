@@ -261,7 +261,7 @@ function PrivacyNotice({ open, orgName, rep, asksWho, asks, onAgree }: { open: b
         </div>
       </dl>
       <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-lg border border-rule px-4 py-3 has-[:checked]:border-sage has-[:checked]:bg-mint">
-        <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
+        <input suppressHydrationWarning type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} className="mt-0.5 size-4 accent-[#141414]" />
         <span className="text-sm text-ink">I have read this, and I agree to {orgName} using my information for my order, as described.</span>
       </label>
       <Button variant="primary" className="mt-4 w-full" disabled={!ticked} onClick={onAgree}>

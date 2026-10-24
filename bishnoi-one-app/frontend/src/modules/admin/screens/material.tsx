@@ -118,7 +118,7 @@ export function MaterialScreen({ data: initial }: { data: MaterialPage }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink">{m.title}</h1>
               {can.edit && (
-                <button type="button" onClick={() => setDialog("edit")} aria-label={`Change ${m.title}`} title="Change details" className="grid size-9 place-items-center rounded-full text-ink-3 hover:bg-mint hover:text-ink">
+                <button suppressHydrationWarning type="button" onClick={() => setDialog("edit")} aria-label={`Change ${m.title}`} title="Change details" className="grid size-9 place-items-center rounded-full text-ink-3 hover:bg-mint hover:text-ink">
                   <Pencil className="size-4" aria-hidden />
                 </button>
               )}
@@ -188,10 +188,10 @@ export function MaterialScreen({ data: initial }: { data: MaterialPage }) {
                       ? `Upload version ${latest.number + 1}, corrected as the pharmacist asked.`
                       : "Upload the design as a PDF or a picture (PNG or JPG), up to 3 MB."}
                 </p>
-                <input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-full file:border file:border-ink file:bg-sheet file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink" />
+                <input suppressHydrationWarning name="file" type="file" accept="application/pdf,image/png,image/jpeg" required className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-full file:border file:border-ink file:bg-sheet file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink" />
                 {latest && latest.review !== "draft" && (
                   <FormField label="What changed" optional>
-                    <textarea name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={1000} placeholder="For the pharmacist: what was corrected" className={inputClass} />
+                    <textarea suppressHydrationWarning name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={1000} placeholder="For the pharmacist: what was corrected" className={inputClass} />
                   </FormField>
                 )}
                 <Button type="submit" size="sm" disabled={pending}>

@@ -56,7 +56,7 @@ export function EditWarehouse({ warehouse }: { warehouse: Pick<Warehouse, "id" |
   const [pending, start] = useTransition();
   return (
     <>
-      <button type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-md p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
+      <button suppressHydrationWarning type="button" title="Edit warehouse" onClick={() => setOpen(!open)} className="rounded-md p-1.5 text-ink-3 hover:bg-sheet hover:text-ink">
         <Pencil className="size-4" aria-hidden />
         <span className="sr-only">Edit warehouse</span>
       </button>
@@ -158,7 +158,7 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
               {canManage && (
                 <span className="flex shrink-0 items-center gap-1">
                   {!loc.isDefault && loc.isActive && (
-                    <button type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} set as default`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
+                    <button suppressHydrationWarning type="button" title={`Make ${loc.code} the default`} onClick={() => run(() => saveLocation(warehouseId, loc.id, { isDefault: true }), `${loc.code} set as default`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                       <Star className="size-4" aria-hidden />
                     </button>
                   )}
@@ -167,11 +167,11 @@ export function LocationsEditor({ warehouseId, locations, canManage }: { warehou
                       {loc.isActive ? "Deactivate" : "Activate"}
                     </Button>
                   )}
-                  <button type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
+                  <button suppressHydrationWarning type="button" title={`Rename ${loc.code}`} onClick={() => { setEditing(loc.id); setD({ code: loc.code, name: loc.name }); setError(null); }} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-ink">
                     <Pencil className="size-4" aria-hidden />
                   </button>
                   {!loc.isDefault && loc.units === 0 && (
-                    <button type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                    <button suppressHydrationWarning type="button" title={`Delete ${loc.code}`} onClick={() => run(() => deleteLocation(warehouseId, loc.id), `${loc.code} deleted`)} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                       <Trash2 className="size-4" aria-hidden />
                     </button>
                   )}

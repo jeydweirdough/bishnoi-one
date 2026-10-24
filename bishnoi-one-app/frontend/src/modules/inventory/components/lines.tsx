@@ -232,7 +232,7 @@ export function LinesEditor({
                   )}
                   <td className="py-2.5 text-right align-top">
                     {lines.length > 1 && (
-                      <button type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="mt-1.5 rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
+                      <button suppressHydrationWarning type="button" onClick={() => onChange(lines.filter((_, j) => j !== i))} className="mt-1.5 rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger" title="Remove this line">
                         <X className="size-4" aria-hidden />
                         <span className="sr-only">Remove line {i + 1}</span>
                       </button>

@@ -96,7 +96,7 @@ export function PhotoPicker({
         <p className="mt-1.5 text-meta text-ink-3">JPEG, PNG or WebP, up to 6MB. Bishnoi One crops it to a square.</p>
         <FormError message={error} />
       </div>
-      <input
+      <input suppressHydrationWarning
         ref={input}
         type="file"
         accept="image/jpeg,image/png,image/webp"

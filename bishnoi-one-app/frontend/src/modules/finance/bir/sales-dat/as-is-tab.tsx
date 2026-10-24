@@ -180,7 +180,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
               <Field label="VAT rate %" hint="Used only to check output VAT">{(p) => <Input {...p} type="number" value={h.rate} onChange={set("rate")} />}</Field>
             </div>
             <label className="flex items-start gap-2 px-5 pb-4 text-sm">
-              <input type="checkbox" className="mt-1" checked={perCustomer} onChange={(e) => setPerCustomer(e.target.checked)} />
+              <input suppressHydrationWarning type="checkbox" className="mt-1" checked={perCustomer} onChange={(e) => setPerCustomer(e.target.checked)} />
               <span>
                 One line per customer
                 <span className="block text-meta text-ink-3">All of a customer&apos;s invoices for the month are added into one line (by TIN; by name when there is no TIN).</span>

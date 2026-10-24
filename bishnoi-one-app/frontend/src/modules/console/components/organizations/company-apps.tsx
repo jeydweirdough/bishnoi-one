@@ -62,7 +62,7 @@ export function CompanyApps({
           return (
             <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
               <label className={`inline-flex min-w-0 flex-1 items-center gap-2.5 text-sm ${canChange ? "cursor-pointer" : ""}`}>
-                <input
+                <input suppressHydrationWarning
                   type="checkbox"
                   className="size-4 accent-hema disabled:cursor-default"
                   checked={on}

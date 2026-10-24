@@ -84,7 +84,7 @@ export function OwnAppSend({ draft, ready, onLogged }: { draft: EmailDraft; read
     <div className="rounded-lg border border-rule bg-sheet px-3.5 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <span className="text-meta font-medium text-ink-3">{name}</span>
-        <button
+        <button suppressHydrationWarning
           type="button"
           onClick={() => copy(name, value)}
           className="inline-flex items-center gap-1.5 rounded-md border border-rule-strong px-2.5 py-0.5 text-meta font-medium text-ink hover:border-ink hover:bg-mint"

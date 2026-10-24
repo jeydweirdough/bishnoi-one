@@ -349,7 +349,7 @@ export function FormEditor({
               <ul className="mt-3 max-h-[28rem] space-y-1 overflow-y-auto">
                 {shown.map((f) => (
                   <li key={f.key} className="group flex items-center gap-1">
-                    <button
+                    <button suppressHydrationWarning
                       type="button"
                       draggable
                       onDragStart={startDrag(f.key)}
@@ -397,7 +397,7 @@ export function FormEditor({
                 return (
                   <section key={s.ref} aria-label={s.title}>
                     <div className="group/band flex items-center gap-2 bg-sage-deep px-3 py-2 text-white">
-                      <input
+                      <input suppressHydrationWarning
                         value={s.title}
                         onChange={(e) => changeSection(s.ref, { title: e.target.value })}
                         aria-label="Section title"
@@ -406,7 +406,7 @@ export function FormEditor({
                       />
                       <div className="flex items-center gap-0.5 rounded-md bg-white/10 p-0.5 text-meta" role="group" aria-label="Columns">
                         {([1, 2] as const).map((n) => (
-                          <button
+                          <button suppressHydrationWarning
                             key={n}
                             type="button"
                             aria-pressed={s.columns === n}
@@ -474,7 +474,7 @@ export function FormEditor({
               })}
             </div>
 
-            <button
+            <button suppressHydrationWarning
               type="button"
               onClick={addSection}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-rule-strong py-3 text-sm text-ink-2 hover:border-sage-deep hover:bg-mint hover:text-ink"
@@ -495,7 +495,7 @@ export function FormEditor({
 
 function BandButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       aria-label={label}
       title={label}
@@ -550,7 +550,7 @@ function Cell({
         picked ? "bg-mint ring-2 ring-sage-deep ring-inset" : "hover:bg-bench/60"
       } ${lifted ? "opacity-40" : ""} ${landing ? "shadow-[inset_0_3px_0_var(--color-sage-deep,#4f7f44)]" : ""}`}
     >
-      <button type="button" onClick={onPick} className="block w-full cursor-pointer text-left" aria-label={`${field.label}: change its settings`}>
+      <button suppressHydrationWarning type="button" onClick={onPick} className="block w-full cursor-pointer text-left" aria-label={`${field.label}: change its settings`}>
         <span className="flex items-center gap-1.5 text-meta text-ink-3">
           <GripVertical className="-ml-2.5 size-3.5 shrink-0 cursor-grab opacity-0 group-hover/cell:opacity-100" aria-hidden />
           <span className="truncate">{field.label}</span>
@@ -608,7 +608,7 @@ function FieldSettings({
   const options = WITH_OPTIONS.has(field.type) && !field.sharedList;
   return (
     <div>
-      <button type="button" onClick={onClose} className="mb-3 inline-flex items-center gap-1.5 text-meta text-ink-2 hover:text-ink">
+      <button suppressHydrationWarning type="button" onClick={onClose} className="mb-3 inline-flex items-center gap-1.5 text-meta text-ink-2 hover:text-ink">
         <ArrowLeft className="size-3.5" aria-hidden />
         Fields not on the form
       </button>

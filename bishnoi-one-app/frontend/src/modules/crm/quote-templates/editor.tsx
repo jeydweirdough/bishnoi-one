@@ -117,7 +117,7 @@ export function TemplateEditor({ initial, options }: Props) {
               />
             </div>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" checked={v.isActive} onChange={(e) => setV({ ...v, isActive: e.target.checked })} className="size-4 accent-hema" />
+              <input suppressHydrationWarning type="checkbox" checked={v.isActive} onChange={(e) => setV({ ...v, isActive: e.target.checked })} className="size-4 accent-hema" />
               In use (reps can print with it)
             </label>
           </div>

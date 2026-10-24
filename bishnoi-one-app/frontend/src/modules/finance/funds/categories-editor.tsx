@@ -175,12 +175,12 @@ function CategoryForm({
       </Field>
       {!sub && (
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={reimbursable} onChange={(e) => setReimbursable(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={reimbursable} onChange={(e) => setReimbursable(e.target.checked)} className="size-4 accent-hema" />
           Reimbursable (charged to the company)
         </label>
       )}
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+        <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
         Active (available in new liquidations)
       </label>
       <FormError message={error} />

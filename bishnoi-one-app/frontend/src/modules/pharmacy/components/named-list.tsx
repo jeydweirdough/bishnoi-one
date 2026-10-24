@@ -75,7 +75,7 @@ export function NamedList({ kind, rows, canCreate, canEdit, canDelete }: { kind:
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className={`font-semibold ${row.isActive ? "text-ink" : "text-ink-3"}`}>{row.name}</span>
                   {canEdit && (
-                    <button type="button" onClick={() => begin(row)} title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                    <button suppressHydrationWarning type="button" onClick={() => begin(row)} title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
                       <Pencil className="size-3.5" aria-hidden />
                     </button>
                   )}
@@ -103,7 +103,7 @@ export function NamedList({ kind, rows, canCreate, canEdit, canDelete }: { kind:
                     {row.medicineCount} medicine{row.medicineCount === 1 ? "" : "s"}
                   </span>
                   {canEdit && (
-                    <button type="button" className="font-semibold text-hema hover:underline" onClick={() => commit(row, { name: row.name, extra: row.extra, isActive: !row.isActive })}>
+                    <button suppressHydrationWarning type="button" className="font-semibold text-hema hover:underline" onClick={() => commit(row, { name: row.name, extra: row.extra, isActive: !row.isActive })}>
                       {row.isActive ? "Switch off" : "Switch on"}
                     </button>
                   )}

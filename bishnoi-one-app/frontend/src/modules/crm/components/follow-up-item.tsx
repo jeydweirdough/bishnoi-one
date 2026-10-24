@@ -69,7 +69,7 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           <SelectBox id={row.id} label={row.title} />
         </span>
       ) : row.canEdit && !saving ? (
-        <button
+        <button suppressHydrationWarning
           type="button"
           onClick={toggle}
           aria-busy={pending || undefined}

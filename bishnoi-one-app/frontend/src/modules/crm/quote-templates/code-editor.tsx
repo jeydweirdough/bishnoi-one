@@ -102,7 +102,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
           </span>
         </div>
         {showPrompt && fields && (
-          <textarea
+          <textarea suppressHydrationWarning
             readOnly
             aria-label="Prompt for another AI"
             value={aiPrompt(fields)}
@@ -124,7 +124,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
                 <ul className="mt-1 space-y-0.5">
                   {g.fields.map((f) => (
                     <li key={f.field}>
-                      <button
+                      <button suppressHydrationWarning
                         type="button"
                         onClick={() => insert(f.field)}
                         title={`Insert ${f.field} at cursor`}
@@ -153,7 +153,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
               </Button>
             )}
           </div>
-          <textarea
+          <textarea suppressHydrationWarning
             id="template-code"
             ref={area}
             value={html}

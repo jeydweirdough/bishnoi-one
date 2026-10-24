@@ -99,7 +99,7 @@ export function PromoTag({ promo, fmt, applied = false, onToggle }: { promo: Pro
   }`;
   if (!onToggle) return <span className={look}>{body}</span>;
   return (
-    <button type="button" aria-pressed={applied} onClick={onToggle} className={`${look} transition-colors hover:border-promo hover:bg-promo-tint focus-visible:ring-2 focus-visible:ring-promo focus-visible:outline-none`}>
+    <button suppressHydrationWarning type="button" aria-pressed={applied} onClick={onToggle} className={`${look} transition-colors hover:border-promo hover:bg-promo-tint focus-visible:ring-2 focus-visible:ring-promo focus-visible:outline-none`}>
       {body}
     </button>
   );
@@ -158,7 +158,7 @@ export function BundleTag({ bundle, nameOf, fmt, onUse }: { bundle: Offer; nameO
   const look = "inline-flex max-w-full min-w-0 items-stretch overflow-hidden rounded-md border border-promo/60 bg-sheet";
   if (!onUse) return <span className={look}>{body}</span>;
   return (
-    <button type="button" onClick={onUse} className={`${look} transition-colors hover:border-promo hover:bg-promo-tint focus-visible:ring-2 focus-visible:ring-promo focus-visible:outline-none`}>
+    <button suppressHydrationWarning type="button" onClick={onUse} className={`${look} transition-colors hover:border-promo hover:bg-promo-tint focus-visible:ring-2 focus-visible:ring-promo focus-visible:outline-none`}>
       {body}
     </button>
   );

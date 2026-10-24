@@ -163,17 +163,17 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
                       <CellInput aria-label={`Line ${i + 1} unit cost`} inputMode="decimal" value={r.cost} onChange={(e) => set(i, { cost: e.target.value })} className="w-24" />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      {p?.trackBatches ? <input aria-label={`Line ${i + 1} batch`} value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} w-32 font-mono`} /> : <span className="text-meta text-ink-3">—</span>}
+                      {p?.trackBatches ? <input suppressHydrationWarning aria-label={`Line ${i + 1} batch`} value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} w-32 font-mono`} /> : <span className="text-meta text-ink-3">—</span>}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      {p?.trackBatches ? <input type="date" aria-label={`Line ${i + 1} manufacture date`} value={r.manufacturedOn} onChange={(e) => set(i, { manufacturedOn: e.target.value })} className={cell} /> : null}
+                      {p?.trackBatches ? <input suppressHydrationWarning type="date" aria-label={`Line ${i + 1} manufacture date`} value={r.manufacturedOn} onChange={(e) => set(i, { manufacturedOn: e.target.value })} className={cell} /> : null}
                     </td>
                     <td className="px-2 py-2 align-top">
-                      {p?.trackExpiry ? <input type="date" aria-label={`Line ${i + 1} expiry date`} value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} /> : null}
+                      {p?.trackExpiry ? <input suppressHydrationWarning type="date" aria-label={`Line ${i + 1} expiry date`} value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} /> : null}
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                        <button suppressHydrationWarning type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                           <X className="size-4" aria-hidden />
                         </button>
                       )}

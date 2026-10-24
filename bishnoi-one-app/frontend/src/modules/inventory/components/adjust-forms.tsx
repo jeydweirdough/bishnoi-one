@@ -127,8 +127,8 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                           </Select>
                           {!r.batchId && (adds || direction === "either") && (
                             <div className="mt-1.5 flex gap-1.5">
-                              <input aria-label="New batch number" placeholder="Batch number" value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
-                              {p.trackExpiry && <input aria-label="Expiry date" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
+                              <input suppressHydrationWarning aria-label="New batch number" placeholder="Batch number" value={r.batchNo} onChange={(e) => set(i, { batchNo: e.target.value })} className={`${cell} font-mono`} />
+                              {p.trackExpiry && <input suppressHydrationWarning aria-label="Expiry date" type="date" value={r.expiresOn} onChange={(e) => set(i, { expiresOn: e.target.value })} className={cell} />}
                             </div>
                           )}
                         </>
@@ -149,7 +149,7 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
                     </td>
                     <td className="py-2 text-right align-top">
                       {rows.length > 1 && (
-                        <button type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
+                        <button suppressHydrationWarning type="button" title="Remove this line" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger"><X className="size-4" aria-hidden /></button>
                       )}
                     </td>
                   </tr>

@@ -275,7 +275,7 @@ function ModuleSection({
   const [open, setOpen] = useState(granted.length > 0);
   return (
     <Sheet className="px-5 pt-3 pb-3">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-2 py-1 text-left">
+      <button suppressHydrationWarning type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-2 py-1 text-left">
         <ChevronRight className={`size-4 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden />
         <span className="text-base font-semibold text-ink">{name}</span>
         <span className="ml-auto text-meta text-ink-3">

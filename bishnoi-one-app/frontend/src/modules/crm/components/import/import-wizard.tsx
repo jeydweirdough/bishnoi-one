@@ -197,7 +197,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                 {(p) => <Input {...p} type="password" value={password} onChange={(e) => (setPassword(e.target.value), setCheck(null))} autoComplete="new-password" />}
               </Field>
               <label className="flex items-center gap-2 self-center text-sm">
-                <input type="checkbox" checked={makeTeams} onChange={(e) => (setMakeTeams(e.target.checked), setCheck(null))} className="size-4 accent-hema" />
+                <input suppressHydrationWarning type="checkbox" checked={makeTeams} onChange={(e) => (setMakeTeams(e.target.checked), setCheck(null))} className="size-4 accent-hema" />
                 Create missing teams
               </label>
             </div>

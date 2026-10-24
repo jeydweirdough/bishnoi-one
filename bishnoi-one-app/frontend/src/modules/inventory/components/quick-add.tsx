@@ -146,7 +146,7 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
 
   return (
     <>
-      <button type="button" onClick={open} className="inline-flex items-center gap-0.5 text-meta font-semibold text-ink hover:underline">
+      <button suppressHydrationWarning type="button" onClick={open} className="inline-flex items-center gap-0.5 text-meta font-semibold text-ink hover:underline">
         <Plus className="size-3.5" aria-hidden />
         {label ?? `New ${WHAT[kind]}`}
       </button>
@@ -225,11 +225,11 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" className="size-4 accent-hema" checked={flags.batches} onChange={(e) => setFlags({ ...flags, batches: e.target.checked })} />
+                  <input suppressHydrationWarning type="checkbox" className="size-4 accent-hema" checked={flags.batches} onChange={(e) => setFlags({ ...flags, batches: e.target.checked })} />
                   Batches and expiry dates
                 </label>
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" className="size-4 accent-hema" checked={flags.serials} onChange={(e) => setFlags({ ...flags, serials: e.target.checked })} />
+                  <input suppressHydrationWarning type="checkbox" className="size-4 accent-hema" checked={flags.serials} onChange={(e) => setFlags({ ...flags, serials: e.target.checked })} />
                   Serial numbers
                 </label>
               </div>

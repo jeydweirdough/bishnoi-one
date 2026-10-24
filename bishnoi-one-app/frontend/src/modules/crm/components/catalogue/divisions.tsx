@@ -51,7 +51,7 @@ export function DivisionPicker({
               key={o.id}
               className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
             >
-              <input
+              <input suppressHydrationWarning
                 type="checkbox"
                 className="sr-only"
                 checked={value.includes(o.id)}

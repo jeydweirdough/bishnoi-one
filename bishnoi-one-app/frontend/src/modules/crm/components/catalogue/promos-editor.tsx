@@ -214,7 +214,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
               {tiers.map((t, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm">
                   From
-                  <input
+                  <input suppressHydrationWarning
                     aria-label={`Tier ${i + 1}: from quantity`}
                     inputMode="numeric"
                     value={t.minQty}
@@ -222,7 +222,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
                     className="h-9 w-20 rounded-lg border border-control px-2 text-right"
                   />
                   units,
-                  <input
+                  <input suppressHydrationWarning
                     aria-label={`Tier ${i + 1}: percent off`}
                     inputMode="decimal"
                     value={t.percent}
@@ -252,7 +252,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
         <fieldset>
           <legend className="mb-2 text-sm font-semibold">Products</legend>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={every} onChange={(e) => setEvery(e.target.checked)} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={every} onChange={(e) => setEvery(e.target.checked)} className="size-4 accent-hema" />
             Every product
           </label>
           {!every && (
@@ -260,7 +260,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
               {products.map((p) => (
                 <li key={p.id}>
                   <label className="flex items-center gap-2 text-sm">
-                    <input
+                    <input suppressHydrationWarning
                       type="checkbox"
                       checked={picked.includes(p.id)}
                       onChange={(e) => setPicked(e.target.checked ? [...picked, p.id] : picked.filter((x) => x !== p.id))}
@@ -283,7 +283,7 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
             {(p) => <Input {...p} type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />}
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
             Active
           </label>
         </div>

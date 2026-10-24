@@ -31,7 +31,7 @@ function Control({ field, value, onChange, error }: { field: Field; value: strin
   const common = { value, "aria-invalid": error ? true : undefined, onChange: (e: { target: { value: string } }) => onChange(e.target.value), className: inputClass };
   if (field.type === "choice" && field.options) {
     return (
-      <select {...common}>
+      <select suppressHydrationWarning {...common}>
         {Object.entries(field.options).map(([k, label]) => (
           <option key={k} value={k}>
             {label}
@@ -40,9 +40,9 @@ function Control({ field, value, onChange, error }: { field: Field; value: strin
       </select>
     );
   }
-  if (field.type === "long") return <textarea {...common} rows={3} placeholder={field.placeholder} />;
+  if (field.type === "long") return <textarea suppressHydrationWarning {...common} rows={3} placeholder={field.placeholder} />;
   return (
-    <input
+    <input suppressHydrationWarning
       {...common}
       type={field.type === "date" ? "date" : "text"}
       inputMode={field.type === "number" || field.type === "money" ? "decimal" : undefined}

@@ -58,15 +58,15 @@ export function BatchActions({ id, lotNo, status }: { id: string; lotNo: string;
   return (
     <span className="relative z-10 inline-flex flex-wrap justify-end gap-x-3 gap-y-1 text-meta">
       {status === "quarantined" ? (
-        <button type="button" className="font-semibold text-hema hover:underline" disabled={pending} onClick={() => run("available", null)}>
+        <button suppressHydrationWarning type="button" className="font-semibold text-hema hover:underline" disabled={pending} onClick={() => run("available", null)}>
           Release lot {lotNo}
         </button>
       ) : (
-        <button type="button" className="font-semibold text-hema hover:underline" onClick={() => ask("quarantined")}>
+        <button suppressHydrationWarning type="button" className="font-semibold text-hema hover:underline" onClick={() => ask("quarantined")}>
           Quarantine
         </button>
       )}
-      <button type="button" className="font-semibold text-danger hover:underline" onClick={() => ask("recalled")}>
+      <button suppressHydrationWarning type="button" className="font-semibold text-danger hover:underline" onClick={() => ask("recalled")}>
         Recall
       </button>
       <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-left shadow-lg backdrop:bg-ink/30">

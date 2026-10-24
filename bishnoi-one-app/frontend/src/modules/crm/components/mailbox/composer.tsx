@@ -267,7 +267,7 @@ export function Composer({ open, onClose, customer }: { open: boolean; onClose: 
           {failed && !none && (
             <p className="text-sm text-ink-2">
               It didn&apos;t go through your mailbox.{" "}
-              <button type="button" onClick={ownApp} className="font-semibold text-ink underline">
+              <button suppressHydrationWarning type="button" onClick={ownApp} className="font-semibold text-ink underline">
                 Send from your own email instead
               </button>
             </p>

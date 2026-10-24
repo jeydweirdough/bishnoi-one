@@ -157,7 +157,7 @@ function Stop({ stop, removable, onRemove }: { stop: PlanStop; removable: boolea
         </span>
       ) : (
         removable && (
-          <button type="button" onClick={onRemove} className="grid size-5 shrink-0 place-items-center rounded text-ink-3 hover:bg-sheet hover:text-danger" aria-label={`Remove ${stop.doctor.name} from this day`} title="Remove from day">
+          <button suppressHydrationWarning type="button" onClick={onRemove} className="grid size-5 shrink-0 place-items-center rounded text-ink-3 hover:bg-sheet hover:text-danger" aria-label={`Remove ${stop.doctor.name} from this day`} title="Remove from day">
             <X className="size-3.5" aria-hidden />
           </button>
         )

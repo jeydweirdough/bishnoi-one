@@ -73,7 +73,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
           <Field label="TIN" optional error={fields.tin} hint="123-456-789-00000, as on its invoices.">{(p) => <Input {...p} {...text("tin")} placeholder="123-456-789-00000" />}</Field>
           <Field label="VAT" error={fields.vatStatus}>
             {(p) => (
-              <select {...p} value={d.vatStatus} onChange={(e) => setD({ ...d, vatStatus: e.target.value as "vat" | "non_vat" })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+              <select suppressHydrationWarning {...p} value={d.vatStatus} onChange={(e) => setD({ ...d, vatStatus: e.target.value as "vat" | "non_vat" })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
                 <option value="vat">VAT-registered</option>
                 <option value="non_vat">Not VAT-registered</option>
               </select>
@@ -93,7 +93,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
                 <Input aria-label="Role" placeholder="Role" value={c.role ?? ""} onChange={(e) => set({ role: e.target.value })} />
                 <Input aria-label="Email" placeholder="Email" value={c.email ?? ""} onChange={(e) => set({ email: e.target.value })} />
                 <Input aria-label="Phone" placeholder="Phone" value={c.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} />
-                <button type="button" title="Remove" onClick={() => setContacts(contacts.filter((_, j) => j !== i))} className="justify-self-end rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+                <button suppressHydrationWarning type="button" title="Remove" onClick={() => setContacts(contacts.filter((_, j) => j !== i))} className="justify-self-end rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                   <X className="size-4" aria-hidden />
                 </button>
               </div>

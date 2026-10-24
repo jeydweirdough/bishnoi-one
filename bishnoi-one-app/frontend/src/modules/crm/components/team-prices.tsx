@@ -217,7 +217,7 @@ function TeamSheet({
             return (
               <li key={t.code} className="py-2.5">
                 <label className="flex cursor-pointer items-start gap-3">
-                  <input type="checkbox" checked={on} onChange={(e) => tick(t.code, e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-hema" />
+                  <input suppressHydrationWarning type="checkbox" checked={on} onChange={(e) => tick(t.code, e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-hema" />
                   <span className="min-w-0">
                     <span className={on ? "font-semibold" : ""}>{t.name}</span>
                     <span className="block text-meta text-ink-3">{describe(t)}</span>

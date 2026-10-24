@@ -143,7 +143,7 @@ function StageRow({
           </IconButton>
         </span>
       )}
-      <input
+      <input suppressHydrationWarning
         aria-label={`Name of ${stage.name}`}
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -153,7 +153,7 @@ function StageRow({
       {isOpen ? (
         <>
           <label className="flex items-center gap-1.5 text-meta text-ink-3">
-            <input
+            <input suppressHydrationWarning
               aria-label={`Probability of ${stage.name}`}
               inputMode="numeric"
               value={probability}

@@ -90,8 +90,8 @@ export async function ReportPage({ params, searchParams }: { params: Params<{ ke
           {r.byWarehouse && <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={[{ value: "", label: "All warehouses" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))]} />}
           {r.dated && (
             <>
-              <label className="block"><span className="mb-1 block text-meta font-medium text-ink-2">From</span><input type="date" name="from" defaultValue={f.from || r.from} className="h-9 border-0 border-b border-control bg-transparent text-sm" /></label>
-              <label className="block"><span className="mb-1 block text-meta font-medium text-ink-2">To</span><input type="date" name="to" defaultValue={f.to || r.to} className="h-9 border-0 border-b border-control bg-transparent text-sm" /></label>
+              <label className="block"><span className="mb-1 block text-meta font-medium text-ink-2">From</span><input suppressHydrationWarning type="date" name="from" defaultValue={f.from || r.from} className="h-9 border-0 border-b border-control bg-transparent text-sm" /></label>
+              <label className="block"><span className="mb-1 block text-meta font-medium text-ink-2">To</span><input suppressHydrationWarning type="date" name="to" defaultValue={f.to || r.to} className="h-9 border-0 border-b border-control bg-transparent text-sm" /></label>
             </>
           )}
         </Filters>

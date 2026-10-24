@@ -101,7 +101,7 @@ export function ChartImport() {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" aria-label="Pick the CSV file" onChange={(e) => choose(e.target.files?.[0])} />
+        <input suppressHydrationWarning ref={input} type="file" accept=".csv,text/csv" className="sr-only" aria-label="Pick the CSV file" onChange={(e) => choose(e.target.files?.[0])} />
         <Button icon={<Upload className="size-4" aria-hidden />} loading={reading} onClick={() => input.current?.click()}>
           {fileName ? "Pick another file" : "Pick the CSV file"}
         </Button>
@@ -120,7 +120,7 @@ export function ChartImport() {
               <thead className="sticky top-0 bg-sheet">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                   <th className="w-10 py-2 pl-3">
-                    <input
+                    <input suppressHydrationWarning
                       type="checkbox"
                       aria-label="Tick every row that can be imported"
                       checked={chosen.length > 0 && chosen.length === check.rows.filter(importable).length}
@@ -142,7 +142,7 @@ export function ChartImport() {
                   return (
                     <tr key={r.line} className={`align-top ${r.status === "here" ? "text-ink-3" : ""}`}>
                       <td className="py-1.5 pl-3">
-                        <input
+                        <input suppressHydrationWarning
                           type="checkbox"
                           aria-label={`Import line ${r.line}: ${r.code} ${r.name}`}
                           disabled={!can}
@@ -158,7 +158,7 @@ export function ChartImport() {
                       </td>
                       <td className="px-2 py-1.5">
                         {needsType ? (
-                          <select
+                          <select suppressHydrationWarning
                             aria-label={`Line ${r.line}: type`}
                             value={picked[r.line] ?? ""}
                             onChange={(e) => {

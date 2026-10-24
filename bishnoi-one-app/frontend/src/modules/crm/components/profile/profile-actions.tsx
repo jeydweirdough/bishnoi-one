@@ -147,7 +147,7 @@ function EditProfile({ profile, today, onClose }: { profile: Profile; today: str
         <div className="sm:col-span-6">
           <FormError message={error} />
         </div>
-        <button type="submit" hidden />
+        <button suppressHydrationWarning type="submit" hidden />
       </form>
     </Modal>
   );
@@ -202,7 +202,7 @@ function ChangePassword({ onClose }: { onClose: () => void }) {
         </Field>
         <p className="text-meta text-ink-3">Every other place you're signed in will ask for the new password.</p>
         <FormError message={error} />
-        <button type="submit" hidden />
+        <button suppressHydrationWarning type="submit" hidden />
       </form>
     </Modal>
   );

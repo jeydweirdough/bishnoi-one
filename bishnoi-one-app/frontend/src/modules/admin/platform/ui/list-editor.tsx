@@ -50,7 +50,7 @@ export function IconButton({
   children: ReactNode;
 }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       aria-label={label}
       aria-pressed={pressed}
@@ -86,7 +86,7 @@ function IconRow({
   return (
     <div className="mt-1 flex animate-reshape flex-wrap gap-1 pl-8" role="group" aria-label="Icon">
       {choices.map(({ name, label }) => (
-        <button
+        <button suppressHydrationWarning
           key={name}
           type="button"
           aria-pressed={value === name}
@@ -220,7 +220,7 @@ export function ListEditor({
                   </div>
                   <span className="ml-auto flex items-center">
                     <label className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 px-1 text-meta text-ink-2">
-                      <input
+                      <input suppressHydrationWarning
                         type="checkbox"
                         checked={row.isActive}
                         onChange={(e) => change(i, { isActive: e.target.checked })}

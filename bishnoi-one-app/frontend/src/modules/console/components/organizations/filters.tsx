@@ -38,7 +38,7 @@ export function Filters({ search, selects = [] }: { search?: string; selects?: {
         <label className="relative min-w-[min(14rem,100%)] flex-1">
           <span className="sr-only">Search</span>
           <Search className="pointer-events-none absolute top-1/2 left-0 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
-          <input
+          <input suppressHydrationWarning
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}

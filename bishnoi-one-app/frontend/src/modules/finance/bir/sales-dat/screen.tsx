@@ -22,7 +22,7 @@ export function SalesDatScreen({ companies }: { companies: Company[] }) {
     <div className="space-y-5">
       <div role="tablist" className="flex flex-wrap gap-1 border-b border-rule">
         {TABS.map(([key, label]) => (
-          <button
+          <button suppressHydrationWarning
             key={key}
             type="button"
             role="tab"
