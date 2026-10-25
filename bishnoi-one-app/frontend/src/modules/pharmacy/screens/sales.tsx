@@ -98,7 +98,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       {header}
       {view === "history" && (
         <form className="mb-3 flex flex-wrap items-end gap-3" role="search">
-          <input type="hidden" name="view" value="history" />
+          <input suppressHydrationWarning type="hidden" name="view" value="history" />
           <FilterInput label="From" type="date" name="from" defaultValue={from} max={today} />
           <FilterInput label="To" type="date" name="to" defaultValue={to} max={today} />
           <FilterInput label="Sale no. or customer" name="q" defaultValue={q} />

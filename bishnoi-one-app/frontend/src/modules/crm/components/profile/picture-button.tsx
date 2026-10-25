@@ -11,7 +11,7 @@ export function PictureButton({ name, id, photoAt }: { name: string; id: string;
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
+      <button suppressHydrationWarning
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Change your picture"

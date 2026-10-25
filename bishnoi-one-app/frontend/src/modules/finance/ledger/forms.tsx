@@ -127,7 +127,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
             {lines.map((l, i) => (
               <tr key={l.key} className="align-top">
                 <td className="py-1.5 pr-2">
-                  <select
+                  <select suppressHydrationWarning
                     aria-label={`Line ${i + 1}: account`}
                     aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
                     value={l.accountId}
@@ -343,7 +343,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
         </Field>
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+        <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
         Active (available for new entries)
       </label>
       <FormError message={error} />

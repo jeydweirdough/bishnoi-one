@@ -84,13 +84,13 @@ export function MaterialForm({ kinds, item, onClose, onSaved }: { kinds: string[
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <FormField label="Title">
-              <input value={values.title} onChange={set("title")} maxLength={160} placeholder="e.g. Glucare 500 mg leaflet" aria-invalid={errors.title ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={values.title} onChange={set("title")} maxLength={160} placeholder="e.g. Glucare 500 mg leaflet" aria-invalid={errors.title ? true : undefined} className={inputClass} />
             </FormField>
             {errors.title && <p className="mt-1 text-meta text-danger">{errors.title}</p>}
           </div>
           <div>
             <FormField label="Type">
-              <select value={values.kind} onChange={set("kind")} className={inputClass}>
+              <select suppressHydrationWarning value={values.kind} onChange={set("kind")} className={inputClass}>
                 {kinds.map((k) => (
                   <option key={k} value={k}>
                     {k}
@@ -102,34 +102,34 @@ export function MaterialForm({ kinds, item, onClose, onSaved }: { kinds: string[
           </div>
           <div>
             <FormField label="Product" optional>
-              <input value={values.product} onChange={set("product")} maxLength={160} placeholder="What it promotes" className={inputClass} />
+              <input suppressHydrationWarning value={values.product} onChange={set("product")} maxLength={160} placeholder="What it promotes" className={inputClass} />
             </FormField>
           </div>
           <div>
             <FormField label="Quantity needed" optional>
-              <input value={values.quantity} onChange={set("quantity")} inputMode="numeric" placeholder="e.g. 500" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={values.quantity} onChange={set("quantity")} inputMode="numeric" placeholder="e.g. 500" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
             </FormField>
             {errors.quantity && <p className="mt-1 text-meta text-danger">{errors.quantity}</p>}
           </div>
           <div>
             <FormField label="Date needed" optional>
-              <input type="date" value={values.neededBy} onChange={set("neededBy")} className={inputClass} />
+              <input suppressHydrationWarning type="date" value={values.neededBy} onChange={set("neededBy")} className={inputClass} />
             </FormField>
           </div>
           <div>
             <FormField label="Size and specifications" optional>
-              <input value={values.specs} onChange={set("specs")} maxLength={300} placeholder="e.g. A5, 2 sides, glossy" className={inputClass} />
+              <input suppressHydrationWarning value={values.specs} onChange={set("specs")} maxLength={300} placeholder="e.g. A5, 2 sides, glossy" className={inputClass} />
             </FormField>
           </div>
           <div>
             <FormField label="Budget" optional>
-              <input value={values.budget} onChange={set("budget")} inputMode="decimal" placeholder="₱ for the whole run" aria-invalid={errors.budget ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={values.budget} onChange={set("budget")} inputMode="decimal" placeholder="₱ for the whole run" aria-invalid={errors.budget ? true : undefined} className={inputClass} />
             </FormField>
             {errors.budget && <p className="mt-1 text-meta text-danger">{errors.budget}</p>}
           </div>
           <div className="sm:col-span-2">
             <FormField label="Description" optional>
-              <textarea value={values.description} onChange={set("description")} maxLength={1000} rows={2} placeholder="Where it's used, what it says" className={inputClass} />
+              <textarea suppressHydrationWarning value={values.description} onChange={set("description")} maxLength={1000} rows={2} placeholder="Where it's used, what it says" className={inputClass} />
             </FormField>
           </div>
           {!item && (
@@ -138,7 +138,7 @@ export function MaterialForm({ kinds, item, onClose, onSaved }: { kinds: string[
                 <label className="flex cursor-pointer items-center gap-3 rounded-[14px] border border-dashed border-rule-strong px-3.5 py-3 text-sm text-ink-2 hover:border-ink">
                   <Paperclip className="size-4 shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{design ? design.name : "Attach the design: a PDF or picture (PNG or JPG), up to 3 MB"}</span>
-                  <input type="file" accept="application/pdf,image/png,image/jpeg" className="sr-only" onChange={(e) => setDesign(e.target.files?.[0] ?? null)} />
+                  <input suppressHydrationWarning type="file" accept="application/pdf,image/png,image/jpeg" className="sr-only" onChange={(e) => setDesign(e.target.files?.[0] ?? null)} />
                 </label>
               </FormField>
               {errors.design ? (

@@ -112,7 +112,7 @@ export function SearchBar({ q, placeholder, keep = {} }: { q: string; placeholde
   return (
     <form className="flex max-w-md flex-1 items-end gap-2" role="search">
       {Object.entries(keep).map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
+        <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />
       ))}
       <Input name="q" defaultValue={q} placeholder={placeholder} aria-label={placeholder} />
       <Button type="submit" size="sm" icon={<Search className="size-4" aria-hidden />}>

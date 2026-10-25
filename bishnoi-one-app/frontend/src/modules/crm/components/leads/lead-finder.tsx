@@ -121,7 +121,7 @@ export function LeadFinder({ company, team, types, defaultWhere }: { company: st
             {types.map((t) => {
               const on = kinds.includes(t.code);
               return (
-                <button
+                <button suppressHydrationWarning
                   key={t.code}
                   type="button"
                   aria-pressed={on}
@@ -219,7 +219,7 @@ export function LeadFinder({ company, team, types, defaultWhere }: { company: st
               <ul className="mt-3 divide-y divide-rule">
                 {rows.map((r, i) => (
                   <li key={i} className="grid gap-3 py-3 lg:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
-                    <input type="checkbox" checked={r.keep} onChange={(e) => tick(i, e.target.checked)} aria-label={`Add ${r.lead.name}`} className="mt-2 size-4 accent-[var(--color-ink)]" />
+                    <input suppressHydrationWarning type="checkbox" checked={r.keep} onChange={(e) => tick(i, e.target.checked)} aria-label={`Add ${r.lead.name}`} className="mt-2 size-4 accent-[var(--color-ink)]" />
                     <div className="min-w-0 space-y-1.5">
                       <Input value={r.lead.name} onChange={(e) => set(i, { name: e.target.value })} aria-label="Name" />
                       <div className="grid grid-cols-2 gap-1.5">

@@ -38,7 +38,7 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
 
   return (
     <div ref={box} className="relative">
-      <button
+      <button suppressHydrationWarning
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -87,8 +87,8 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
                   </div>
                 ) : (
                   <form key={c.slug} action={switchCompany}>
-                    <input type="hidden" name="company" value={c.slug} />
-                    <button type="submit" role="menuitem" className="flex w-full items-center rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">
+                    <input suppressHydrationWarning type="hidden" name="company" value={c.slug} />
+                    <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">
                       {c.name}
                     </button>
                   </form>
@@ -98,7 +98,7 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
           )}
           <div className="my-1.5 border-t border-rule" />
           <form action={signOut}>
-            <button type="submit" role="menuitem" className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">
+            <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">
               <LogOut className="size-4 text-ink-3" aria-hidden />
               Sign out
             </button>

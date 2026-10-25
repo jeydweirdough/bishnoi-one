@@ -122,7 +122,7 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
         <legend className="mb-2 flex w-full items-center justify-between gap-3 text-sm font-semibold text-ink">
           <span>Checks</span>
           {!locked && !standing && (
-            <button
+            <button suppressHydrationWarning
               type="button"
               className="text-meta font-semibold text-hema hover:underline"
               onClick={() => setTicks(Object.fromEntries(rx.checks.map((c) => [c.key, open.length > 0])))}
@@ -135,7 +135,7 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
           {rx.checks.map((c) => (
             <li key={c.key} className="px-3 py-2.5">
               <label className={`flex items-start gap-3 text-sm ${locked || standing ? "" : "cursor-pointer"}`}>
-                <input
+                <input suppressHydrationWarning
                   type="checkbox"
                   className="mt-0.5 size-4 accent-[var(--color-hema)]"
                   checked={Boolean(ticks[c.key])}

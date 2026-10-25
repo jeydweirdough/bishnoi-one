@@ -64,7 +64,7 @@ export function RecordTable<T extends { id: string }>({
         <label className="relative w-80 max-w-full">
           <span className="sr-only">{searchLabel}</span>
           <Search className="pointer-events-none absolute top-1/2 left-4 size-[18px] -translate-y-1/2 text-ink-3" aria-hidden />
-          <input
+          <input suppressHydrationWarning
             value={q}
             onChange={(e) => (setQ(e.target.value), setPage(0))}
             placeholder={searchLabel}
@@ -76,7 +76,7 @@ export function RecordTable<T extends { id: string }>({
             {[["all", "All"] as const, ...Object.entries(filter.options)].map(([key, label]) => {
               const n = key === "all" ? rows.length : rows.filter((r) => filter.matches(r, key)).length;
               return (
-                <button
+                <button suppressHydrationWarning
                   key={key}
                   type="button"
                   aria-pressed={pick === key}
@@ -156,7 +156,7 @@ export function RecordTable<T extends { id: string }>({
 
 function PagerButton({ children, label, current, disabled, onClick }: { children: ReactNode; label: string; current?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       aria-label={label}
       aria-current={current ? "page" : undefined}
@@ -264,14 +264,14 @@ export function NameCell({
       <span className="min-w-0">
         <span className="flex flex-wrap items-center gap-x-1">
           {onEdit ? (
-            <button type="button" onClick={onEdit} className="text-left font-semibold text-ink hover:underline">
+            <button suppressHydrationWarning type="button" onClick={onEdit} className="text-left font-semibold text-ink hover:underline">
               {name}
             </button>
           ) : (
             <span className="font-semibold text-ink">{name}</span>
           )}
           {onEdit && (
-            <button type="button" onClick={onEdit} aria-label={`Change ${name}`} title={`Change ${what}`} className="grid size-7 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink">
+            <button suppressHydrationWarning type="button" onClick={onEdit} aria-label={`Change ${name}`} title={`Change ${what}`} className="grid size-7 place-items-center rounded-full text-ink-3 hover:bg-sheet hover:text-ink">
               <Pencil className="size-3.5" aria-hidden />
             </button>
           )}

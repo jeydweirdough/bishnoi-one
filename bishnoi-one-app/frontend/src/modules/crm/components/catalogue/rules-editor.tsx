@@ -103,7 +103,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
 
   const box = (label: string, value: boolean, set: (v: boolean) => void) => (
     <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} className="size-4 accent-hema" />
+      <input suppressHydrationWarning type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} className="size-4 accent-hema" />
       {label}
     </label>
   );
@@ -215,7 +215,7 @@ function SettingsForm({ rules }: { rules: SalesRules }) {
           {(p) => <Input {...p} inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value)} />}
         </Field>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={letters} onChange={(e) => setLetters(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={letters} onChange={(e) => setLetters(e.target.checked)} className="size-4 accent-hema" />
           Accept guarantee letters (DSWD, PCSO…) as payment
         </label>
         <div className="grid grid-cols-2 gap-4">

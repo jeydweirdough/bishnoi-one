@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
+from app import cpr
 from app.access import CurrentAccess, allowed
 from app.api import iso
 from app.config import Settings
@@ -76,6 +77,14 @@ def alerts(db: DB, settings: Settings, access: CurrentAccess) -> list[dict]:
     add("expiring", "warning", f"Expiring within {settings.expiry_warning_days} days", len(soon), "/batches?expiry=expiring", [f"{b.product.name} · {b.batch_no}: {n} on {b.expires_on:%d %b %Y}" for b, n in soon], "stock.view")
     pending_po = db.scalars(select(PurchaseOrder).where(PurchaseOrder.status.in_(("ordered", "partial"))).order_by(PurchaseOrder.expected_on)).all()
     late = [po for po in pending_po if po.expected_on and po.expected_on < today()]
+    # Product registrations (app/cpr.py): selling without a valid CPR isn't allowed.
+    registrations = [(x, cpr.state(x, today(), settings.expiry_warning_days)) for x in db.scalars(select(Product).where(cpr.state_sql(today(), settings.expiry_warning_days).in_(cpr.ATTENTION)).order_by(Product.cpr_valid_until, Product.name))]
+    lapsed = [x for x, s in registrations if s == "expired"]
+    renew = [x for x, s in registrations if s == "expiring"]
+    unregistered = [x for x, s in registrations if s in ("missing", "no_date")]
+    add("cpr_expired", "critical", "CPR expired", len(lapsed), "/products?cpr=expired", [f"{x.name} · {x.cpr_number}: expired {x.cpr_valid_until:%d %b %Y}" for x in lapsed], "products.view")
+    add("cpr_expiring", "warning", f"CPR expiring within {settings.expiry_warning_days} days", len(renew), "/products?cpr=expiring", [f"{x.name} · {x.cpr_number}: {x.cpr_valid_until:%d %b %Y}" for x in renew], "products.view")
+    add("cpr_missing", "warning", "Products without a complete CPR", len(unregistered), "/products?cpr=missing", [f"{x.name}: " + ("no CPR number" if not x.cpr_number else "no validity date") for x in unregistered], "products.view")
     add("receiving", "info", "Purchase orders to receive", len(pending_po), "/purchase-orders?status=ordered,partial", [f"{po.number} · {po.supplier.name}" + (" (late)" if po in late else "") for po in pending_po], "purchasing.view")
     add("drafts", "info", "Purchase orders to approve", db.scalar(select(func.count()).select_from(PurchaseOrder).where(PurchaseOrder.status == "draft")) or 0, "/purchase-orders?status=draft", [], "purchasing.approve")
     transit = db.scalars(select(Transfer).where(Transfer.status == "in_transit")).all()
@@ -313,6 +322,18 @@ def expiring(p: Params):
     return [col("sku", "SKU"), col("product", "Product"), col("batch", "Batch"), col("expiresOn", "Expires", "date"), col("daysLeft", "Days left", "number"), col("warehouse", "Warehouse"), col("location", "Location"), col("onHand", "On hand", "number"), col("value", "Value", "money")], rows
 
 
+def registrations(p: Params):
+    """Every product that needs a CPR, or has one: its number, validity and state, the ones needing someone first."""
+    warn = p.settings.expiry_warning_days
+    order = {s: i for i, s in enumerate(cpr.STATES)}
+    products = [x for x in p.db.scalars(select(Product).order_by(Product.name)) if cpr.needs_one(x) or x.cpr_number]
+    rows = []
+    for x in sorted(products, key=lambda x: (order[cpr.state(x, today(), warn)], x.cpr_valid_until or date.max, x.name.lower())):
+        c = cpr.out(x, today(), warn)
+        rows.append({"sku": x.sku, "product": x.name, "brand": x.brand.name if x.brand else "", "cprNumber": c["number"] or "", "validUntil": c["validUntil"], "daysLeft": c["daysLeft"], "state": c["label"]})
+    return [col("sku", "SKU"), col("product", "Product"), col("brand", "Brand"), col("cprNumber", "CPR number"), col("validUntil", "Valid until", "date"), col("daysLeft", "Days left", "number"), col("state", "State")], rows
+
+
 def purchase_history(p: Params):
     q = select(Receipt).where(Receipt.received_at >= p.after, Receipt.received_at < p.before).order_by(Receipt.received_at.desc())
     if p.warehouse:
@@ -462,6 +483,7 @@ REPORTS: tuple[Report, ...] = (
     Report("low", "Low stock", "Attention", "Available at or below the reorder point, with how many to order.", by_state("low")),
     Report("out", "Out of stock", "Attention", "Nothing available, with how many to order.", by_state("out")),
     Report("expiring", "Expiring products", "Attention", "Batches on hand that have expired or expire within the warning window.", expiring),
+    Report("registrations", "Product registrations (CPR)", "Attention", "Each product's FDA registration: missing, without a date, expired or expiring first.", registrations, by_warehouse=False),
     Report("dead", "Dead stock", "Attention", "On hand, with nothing issued or transferred out in the dead-stock window.", dead_stock),
     Report("movements", "Stock movement", "Activity", "Every movement in the period.", stock_movement, dated=True),
     Report("product-movement", "Product movement", "Activity", "Each product's ins and outs over the period.", product_movement, dated=True),

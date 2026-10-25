@@ -62,7 +62,7 @@ export function NewPersonForm({ roles, divisions, apps }: { roles: Role[]; divis
       <fieldset className="space-y-4">
         <legend className="mb-3 text-sm font-semibold text-ink">What they can reach</legend>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={grant} onChange={(e) => setGrant(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={grant} onChange={(e) => setGrant(e.target.checked)} className="size-4 accent-hema" />
           Give them a role now (you can add more after)
         </label>
         {grant && (

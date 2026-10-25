@@ -217,7 +217,7 @@ function BundleForm({
                     </option>
                   ))}
                 </Select>
-                <input
+                <input suppressHydrationWarning
                   aria-label={`Item ${i + 1}: quantity`}
                   inputMode="numeric"
                   value={item.qty}
@@ -239,7 +239,7 @@ function BundleForm({
         </fieldset>
 
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={asOneLine} onChange={(e) => setOneLine(e.target.checked)} className="size-4 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={asOneLine} onChange={(e) => setOneLine(e.target.checked)} className="size-4 accent-hema" />
           One line on the quote (untick to list its items, sharing the set price)
         </label>
 
@@ -251,7 +251,7 @@ function BundleForm({
             {(p) => <Input {...p} type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />}
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
             Active
           </label>
         </div>

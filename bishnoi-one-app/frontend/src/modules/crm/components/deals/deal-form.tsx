@@ -345,7 +345,7 @@ export function DealForm({
         {PRIORITIES.map((x) => {
           const on = (priority || null) === x.value;
           return (
-            <button
+            <button suppressHydrationWarning
               key={x.label}
               type="button"
               role="radio"

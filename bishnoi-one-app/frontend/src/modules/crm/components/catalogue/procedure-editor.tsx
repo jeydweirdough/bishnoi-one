@@ -48,7 +48,7 @@ function OrderList({
             </span>
             {toggle && (
               <label className="flex items-center gap-1.5 text-meta">
-                <input type="checkbox" checked={on} disabled={disabled || Boolean(why)} onChange={(e) => toggle.set(key, e.target.checked)} className="size-4 accent-hema" />
+                <input suppressHydrationWarning type="checkbox" checked={on} disabled={disabled || Boolean(why)} onChange={(e) => toggle.set(key, e.target.checked)} className="size-4 accent-hema" />
                 On
               </label>
             )}
@@ -127,7 +127,7 @@ export function ProcedureEditor({ rules }: { rules: PriceRules }) {
           <h3 className="text-sm font-semibold">3 · Tax, last</h3>
           <p className="mb-2 text-meta text-ink-3">Worked out by Finance, by its tax rules, and kept on the quote as the invoice will show it.</p>
           <label className={`flex items-center gap-2 rounded-lg border border-rule px-3 py-2 text-sm ${rules.financeLinked ? "" : "text-ink-3"}`}>
-            <input type="checkbox" checked={tax} disabled={!edit || !rules.financeLinked} onChange={(e) => setTax(e.target.checked)} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={tax} disabled={!edit || !rules.financeLinked} onChange={(e) => setTax(e.target.checked)} className="size-4 accent-hema" />
             Add tax from Finance
           </label>
           {!rules.financeLinked && (

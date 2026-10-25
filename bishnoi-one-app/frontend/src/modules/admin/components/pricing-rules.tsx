@@ -215,7 +215,7 @@ function DivisionRules({ data }: { data: PricingRules }) {
                     return (
                       <li key={t.code} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
                         <label className="flex min-w-0 cursor-pointer items-start gap-3">
-                          <input
+                          <input suppressHydrationWarning
                             type="checkbox"
                             checked={Boolean(rule)}
                             onChange={(e) => setRule(t.code, e.target.checked ? "always" : null)}
@@ -229,7 +229,7 @@ function DivisionRules({ data }: { data: PricingRules }) {
                         {/* Only asked once the price is on. */}
                         {rule && (
                           <label className="ml-7 inline-flex cursor-pointer items-center gap-2 text-meta text-ink-2 sm:ml-0">
-                            <input
+                            <input suppressHydrationWarning
                               type="checkbox"
                               checked={rule === "with_rx"}
                               onChange={(e) => setRule(t.code, e.target.checked ? "with_rx" : "always")}
@@ -246,7 +246,7 @@ function DivisionRules({ data }: { data: PricingRules }) {
             )}
 
             <label className="flex cursor-pointer items-start gap-3">
-              <input
+              <input suppressHydrationWarning
                 type="checkbox"
                 checked={draft.allowsGuaranteeLetters}
                 onChange={(e) => change({ allowsGuaranteeLetters: e.target.checked })}
@@ -376,11 +376,11 @@ function EditPriceType({ type, onDone }: { type: PriceType; onDone: () => void }
       </Field>
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-meta text-ink-2">
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} className="size-3.5 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} className="size-3.5 accent-hema" />
           Quote needs notes
         </label>
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={approval} onChange={(e) => setApproval(e.target.checked)} className="size-3.5 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={approval} onChange={(e) => setApproval(e.target.checked)} className="size-3.5 accent-hema" />
           Finance approves the quote
         </label>
       </div>
@@ -443,11 +443,11 @@ function NewPriceType({ onDone }: { onDone: () => void }) {
       />
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-meta text-ink-2">
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} className="size-3.5 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} className="size-3.5 accent-hema" />
           Quote needs notes
         </label>
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={approval} onChange={(e) => setApproval(e.target.checked)} className="size-3.5 accent-hema" />
+          <input suppressHydrationWarning type="checkbox" checked={approval} onChange={(e) => setApproval(e.target.checked)} className="size-3.5 accent-hema" />
           Finance approves the quote
         </label>
       </div>

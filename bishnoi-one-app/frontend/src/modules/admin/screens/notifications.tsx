@@ -110,7 +110,7 @@ export function NotificationsScreen({
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
         <div className="inline-flex flex-wrap rounded-[12px] border border-rule-strong bg-sheet p-0.5">
           {severities.map((s) => (
-            <button
+            <button suppressHydrationWarning
               key={s.key}
               type="button"
               onClick={() => setSelectedSeverity(s.key)}

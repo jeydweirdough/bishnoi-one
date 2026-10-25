@@ -64,7 +64,7 @@ export function ChipsInput({
           </Chip>
         ))}
         <span className="inline-flex items-center gap-1">
-          <input
+          <input suppressHydrationWarning
             id={id}
             value={text}
             maxLength={120}
@@ -83,7 +83,7 @@ export function ChipsInput({
             placeholder={placeholder}
             className="h-8 w-44 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none"
           />
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={add}
             disabled={!text.trim()}

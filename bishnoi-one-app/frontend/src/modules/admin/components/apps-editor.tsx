@@ -215,7 +215,7 @@ export function AppsEditor({ apps }: { apps: AppLink[] }) {
                 </Field>
 
                 <label className="flex items-start gap-2 text-sm">
-                  <input
+                  <input suppressHydrationWarning
                     type="checkbox"
                     checked={current.isActive}
                     onChange={(e) => change({ isActive: e.target.checked })}

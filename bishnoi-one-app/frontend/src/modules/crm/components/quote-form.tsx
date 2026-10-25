@@ -316,7 +316,7 @@ export function QuoteForm({
       <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-end">
         {withRx.length > 0 && (
           <label className="flex h-9 items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.rx} onChange={(e) => setRx(e.target.checked)} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={draft.rx} onChange={(e) => setRx(e.target.checked)} className="size-4 accent-hema" />
             Has a prescription (Rx)
           </label>
         )}

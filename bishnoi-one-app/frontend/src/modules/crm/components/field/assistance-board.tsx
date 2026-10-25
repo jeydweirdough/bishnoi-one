@@ -114,7 +114,7 @@ export function AssistanceBoard({ data, doctors, today, dateLabel }: { data: Ass
                               {f.name}
                             </a>
                             {data.can.edit && (
-                              <button type="button" onClick={() => act(() => removeAssistanceFile(a.id, f.n), "File removed")} className="grid size-5 place-items-center rounded text-ink-3 hover:text-danger" aria-label={`Remove ${f.name}`}>
+                              <button suppressHydrationWarning type="button" onClick={() => act(() => removeAssistanceFile(a.id, f.n), "File removed")} className="grid size-5 place-items-center rounded text-ink-3 hover:text-danger" aria-label={`Remove ${f.name}`}>
                                 <X className="size-3" aria-hidden />
                               </button>
                             )}
@@ -146,7 +146,7 @@ export function AssistanceBoard({ data, doctors, today, dateLabel }: { data: Ass
                         },
                       }}
                     >
-                      <button type="button" className="grid size-8 place-items-center rounded-lg text-ink-3 hover:bg-bench hover:text-ink" aria-label={`Actions for ${a.patientName}'s application`}>
+                      <button suppressHydrationWarning type="button" className="grid size-8 place-items-center rounded-lg text-ink-3 hover:bg-bench hover:text-ink" aria-label={`Actions for ${a.patientName}'s application`}>
                         <MoreHorizontal className="size-4" aria-hidden />
                       </button>
                     </Dropdown>

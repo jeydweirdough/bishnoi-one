@@ -7,7 +7,7 @@ import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { deleteProduct } from "@/src/modules/inventory/actions/inventory";
 import { ProductGallery, SupplierPrices } from "@/src/modules/inventory/components/product-extras";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
-import { ExpiryMark, NoAccess, Stamp, StateMark, Table, Td } from "@/src/modules/inventory/components/ui";
+import { CprMark, ExpiryMark, NoAccess, Stamp, StateMark, Table, Td } from "@/src/modules/inventory/components/ui";
 import { Barcode, BarList, Card, DetailPanel, InfoCard, InfoSection, Pill, StatCards } from "@/src/modules/inventory/components/detail";
 import { Icon } from "@/src/modules/inventory/platform/ui/icons";
 import { MOVEMENT_KINDS, PRODUCT_STATUSES, PRODUCT_TYPES, referenceHref, signed } from "@/src/modules/inventory/lib/labels";
@@ -197,6 +197,17 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
               <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{p.description}</p>
             )}
           </InfoSection>
+          {(p.cpr.state !== "not_needed" || p.cpr.number) && (
+            <InfoSection
+              icon="letters"
+              title="Product registration"
+              action={<CprMark cpr={p.cpr} />}
+              items={[
+                ["CPR number", p.cpr.number ?? (may("products.edit") ? <Link key="add-cpr" href={`/inventory/products/${p.id}/edit`} className="text-ink hover:underline">Add the CPR number</Link> : "None")],
+                ["Valid until", p.cpr.validUntil ? `${day(p.cpr.validUntil)}${p.cpr.daysLeft != null && p.cpr.daysLeft >= 0 ? ` · ${fmt.count(p.cpr.daysLeft)} days left` : ""}` : "Not given"],
+              ]}
+            />
+          )}
           {priceRows.length > 0 && (
             <InfoSection icon="pricing" title="Price list" items={[]}>
               <p className="mt-1 text-meta text-ink-3">As given with the product list, per unit and per pack. Selling and cost prices are below.</p>

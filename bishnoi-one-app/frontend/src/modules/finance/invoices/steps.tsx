@@ -240,7 +240,7 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
         </Field>
       </div>
       <label className="flex items-center gap-2 text-sm text-ink">
-        <input type="checkbox" checked={withheld} onChange={(e) => setWithheld(e.target.checked)} />
+        <input suppressHydrationWarning type="checkbox" checked={withheld} onChange={(e) => setWithheld(e.target.checked)} />
         The customer withheld tax from this payment (Form 2307)
       </label>
       {withheld && (

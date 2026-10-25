@@ -10,7 +10,7 @@ import { plainButton } from "@/src/modules/console/platform/screens/error-screen
 export function TryAgain({ reset, primary = true }: { reset?: () => void; primary?: boolean }) {
   const router = useRouter();
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       className={plainButton(primary)}
       onClick={() => {
@@ -28,7 +28,7 @@ export function TryAgain({ reset, primary = true }: { reset?: () => void; primar
 /** Back where they came from; with nowhere to go back to, home. */
 export function GoBack({ primary = true }: { primary?: boolean }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       className={plainButton(primary)}
       onClick={() => {

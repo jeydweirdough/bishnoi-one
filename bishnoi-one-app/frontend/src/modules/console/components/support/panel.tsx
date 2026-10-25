@@ -38,7 +38,7 @@ export function PanelButton({ label, title, icon, variant = "default", size = "m
   return (
     <>
       {tool ? (
-        <button type="button" onClick={() => setOpen(true)} aria-label={label} title={label} aria-haspopup="dialog" className={TOOL}>
+        <button suppressHydrationWarning type="button" onClick={() => setOpen(true)} aria-label={label} title={label} aria-haspopup="dialog" className={TOOL}>
           {icon}
         </button>
       ) : (
@@ -57,7 +57,7 @@ export function PanelButton({ label, title, icon, variant = "default", size = "m
             <h2 id={titleId} className="text-heading">
               {title}
             </h2>
-            <button type="button" onClick={close} className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
+            <button suppressHydrationWarning type="button" onClick={close} className="rounded-full p-1 text-ink-3 hover:bg-bench hover:text-ink" aria-label="Close">
               <X className="size-4" aria-hidden />
             </button>
           </div>

@@ -92,7 +92,7 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
       <form className="mb-4 flex flex-wrap items-end gap-3" action={t.path} role="search">
         <label className="text-meta text-ink-2">
           Search
-          <input
+          <input suppressHydrationWarning
             type="search"
             name="q"
             defaultValue={q}
@@ -101,7 +101,7 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
             className="ml-2 h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
           />
         </label>
-        <button type="submit" className={buttonClass("default", "sm")}>
+        <button suppressHydrationWarning type="submit" className={buttonClass("default", "sm")}>
           Search
         </button>
         {q && (

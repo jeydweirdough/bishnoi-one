@@ -148,7 +148,7 @@ export function UserForm({
           {(p) => <Input {...p} value={values.title} onChange={set("title")} />}
         </Field>
         <label className="flex cursor-pointer items-start gap-2.5 self-end pb-1 text-sm text-ink">
-          <input type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isCompanyAdmin} onChange={(e) => setCompanyAdmin(e.target.checked)} />
+          <input suppressHydrationWarning type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isCompanyAdmin} onChange={(e) => setCompanyAdmin(e.target.checked)} />
           <span>
             Company admin
             <span className="block text-meta text-ink-3">Manages the company&apos;s users and access.</span>
@@ -174,7 +174,7 @@ export function UserForm({
                 return (
                   <li key={a.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
                     <label className="inline-flex min-w-[8rem] cursor-pointer items-center gap-2 text-sm font-semibold text-ink">
-                      <input type="checkbox" className="size-4 accent-hema" checked={p.on} onChange={(e) => setPick(a.id, { on: e.target.checked })} />
+                      <input suppressHydrationWarning type="checkbox" className="size-4 accent-hema" checked={p.on} onChange={(e) => setPick(a.id, { on: e.target.checked })} />
                       {a.name}
                     </label>
                     {p.on && (
@@ -184,7 +184,7 @@ export function UserForm({
                           <Input value={p.role} placeholder={`Role in ${a.name} (optional)`} onChange={(e) => setPick(a.id, { role: e.target.value })} maxLength={60} />
                         </label>
                         <label className="inline-flex cursor-pointer items-center gap-2 text-meta text-ink-2">
-                          <input type="checkbox" className="size-4 accent-hema" checked={p.isAppAdmin} onChange={(e) => setPick(a.id, { isAppAdmin: e.target.checked })} />
+                          <input suppressHydrationWarning type="checkbox" className="size-4 accent-hema" checked={p.isAppAdmin} onChange={(e) => setPick(a.id, { isAppAdmin: e.target.checked })} />
                           Runs {a.name} for {companyName}
                         </label>
                       </>

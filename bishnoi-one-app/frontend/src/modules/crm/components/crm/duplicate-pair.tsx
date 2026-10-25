@@ -70,7 +70,7 @@ export function DuplicatePair({
               </Link>
               {mayMerge && (
                 <span className="flex shrink-0 items-center gap-1.5 text-meta text-ink-2">
-                  <input type="radio" name={`keep-${a.id}-${b.id}`} checked={keep === r.id} onChange={() => setKeep(r.id)} className="accent-hema" />
+                  <input suppressHydrationWarning type="radio" name={`keep-${a.id}-${b.id}`} checked={keep === r.id} onChange={() => setKeep(r.id)} className="accent-hema" />
                   Keep this record
                 </span>
               )}

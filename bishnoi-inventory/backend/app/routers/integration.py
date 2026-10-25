@@ -66,6 +66,9 @@ def products(db: DB) -> dict:
                 "brand": p.brand.name if p.brand else None,
                 "variantLabel": p.variant_label,
                 "attributes": p.attributes or {},
+                # Its FDA Certificate of Product Registration (app/cpr.py).
+                "cprNumber": p.cpr_number,
+                "cprValidUntil": p.cpr_valid_until.isoformat() if p.cpr_valid_until else None,
                 "updatedAt": iso(p.updated_at),
             }
             for p in items

@@ -113,7 +113,7 @@ export function Reconcile({ rec, org, canReconcile }: { rec: Reconciliation; org
               <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                 <th className="w-10 py-2.5 pl-5 font-semibold">
                   {!locked && (
-                    <input
+                    <input suppressHydrationWarning
                       type="checkbox"
                       aria-label="Tick every line"
                       checked={ticked.size === rec.lines.length}
@@ -132,7 +132,7 @@ export function Reconcile({ rec, org, canReconcile }: { rec: Reconciliation; org
               {rec.lines.map((l) => (
                 <tr key={l.id} className={ticked.has(l.id) ? "bg-hema-tint/40" : ""}>
                   <td className="py-2 pl-5">
-                    <input type="checkbox" aria-label={`On the statement: ${l.memo}`} checked={ticked.has(l.id)} disabled={locked} onChange={(e) => toggle(l.id, e.target.checked)} />
+                    <input suppressHydrationWarning type="checkbox" aria-label={`On the statement: ${l.memo}`} checked={ticked.has(l.id)} disabled={locked} onChange={(e) => toggle(l.id, e.target.checked)} />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">{fmt.dateLabel(l.date)}</td>
                   <td className="px-3 py-2 font-mono text-meta whitespace-nowrap">{l.number}</td>

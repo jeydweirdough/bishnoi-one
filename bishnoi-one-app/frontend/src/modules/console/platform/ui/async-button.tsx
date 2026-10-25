@@ -18,7 +18,7 @@ export function AsyncChip({
 }: Omit<ComponentProps<"button">, "onClick"> & { onRun: () => Promise<void> }) {
   const [pending, start] = useTransition();
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       {...rest}
       disabled={pending}

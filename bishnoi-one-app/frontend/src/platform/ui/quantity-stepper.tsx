@@ -18,10 +18,10 @@ export function QuantityStepper({
   const btn = "grid size-8 shrink-0 place-items-center text-ink-2 transition-colors hover:bg-[#f4f4f2] hover:text-ink disabled:opacity-40";
   return (
     <div className="inline-flex h-9 w-full max-w-[8.5rem] items-stretch overflow-hidden rounded-[8px] border border-[#dededa] bg-sheet focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(168,214,155,0.45)] aria-invalid:border-danger" aria-invalid={rest["aria-invalid"]}>
-      <button type="button" className={btn} onClick={() => step(-1)} disabled={n !== null && n <= min} aria-label="One less" tabIndex={-1}>
+      <button suppressHydrationWarning type="button" className={btn} onClick={() => step(-1)} disabled={n !== null && n <= min} aria-label="One less" tabIndex={-1}>
         <Minus className="size-3.5" aria-hidden />
       </button>
-      <input
+      <input suppressHydrationWarning
         {...rest}
         inputMode="numeric"
         value={value}
@@ -33,7 +33,7 @@ export function QuantityStepper({
         }}
         className="w-full min-w-0 border-x border-[#ececea] bg-transparent text-center text-sm text-ink tabular-nums outline-none"
       />
-      <button type="button" className={btn} onClick={() => step(1)} aria-label="One more" tabIndex={-1}>
+      <button suppressHydrationWarning type="button" className={btn} onClick={() => step(1)} aria-label="One more" tabIndex={-1}>
         <Plus className="size-3.5" aria-hidden />
       </button>
     </div>

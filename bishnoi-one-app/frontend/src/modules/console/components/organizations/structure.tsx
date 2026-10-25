@@ -76,7 +76,7 @@ function UnitRow({ unit, companyId, canChange }: { unit: Unit; companyId: string
           <span className="font-semibold text-ink">{unit.name}</span>
           {canChange && (
             <span className="flex items-center">
-              <button type="button" className={ICON_BUTTON} title={`Edit ${w.one} ${unit.name}`} aria-label={`Edit ${w.one} ${unit.name}`} onClick={() => setEditing(true)}>
+              <button suppressHydrationWarning type="button" className={ICON_BUTTON} title={`Edit ${w.one} ${unit.name}`} aria-label={`Edit ${w.one} ${unit.name}`} onClick={() => setEditing(true)}>
                 <Pencil className="size-4" aria-hidden />
               </button>
               <ConfirmButton

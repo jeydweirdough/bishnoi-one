@@ -134,7 +134,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
                         placeholder={removing ? "Removed on save" : d.saved ? `Saved${d.ending ? `, ends in ${d.ending}` : ""}. Type to replace.` : "Not saved yet"}
                       />
                       {canChange && d.saved && !removing && (
-                        <button type="button" className="text-meta text-ink-3 hover:text-danger hover:underline" onClick={() => set(d.key, "")}>
+                        <button suppressHydrationWarning type="button" className="text-meta text-ink-3 hover:text-danger hover:underline" onClick={() => set(d.key, "")}>
                           Remove the saved {d.label.toLowerCase()}
                         </button>
                       )}

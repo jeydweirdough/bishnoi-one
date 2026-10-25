@@ -67,7 +67,7 @@ export function PickList({
                   const on = i.key === selected;
                   return (
                     <li key={i.key}>
-                      <button
+                      <button suppressHydrationWarning
                         type="button"
                         onClick={() => onSelect(i.key)}
                         aria-pressed={on}

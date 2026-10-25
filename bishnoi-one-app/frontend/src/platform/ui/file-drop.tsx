@@ -145,7 +145,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
           Drop {multiple ? "your files" : "your file"} here or <span className="font-medium underline underline-offset-2">browse</span>
         </span>
         {note && <span className="mt-1 text-meta text-ink-3">{note}</span>}
-        <input
+        <input suppressHydrationWarning
           ref={setInput}
           id={inputId}
           name={name}
@@ -195,7 +195,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
                 <span className="block text-meta text-ink-3">{size(f.size)}</span>
               </span>
               {!busy && (
-                <button type="button" onClick={() => removeAt(i)} className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-bench hover:text-ink" aria-label={`Remove ${f.name}`}>
+                <button suppressHydrationWarning type="button" onClick={() => removeAt(i)} className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-bench hover:text-ink" aria-label={`Remove ${f.name}`}>
                   <Trash2 className="size-4" aria-hidden />
                 </button>
               )}
@@ -222,7 +222,7 @@ export function FileDrop({ accept, note, maxBytes, name, id, ref, onFile, onChan
                 {shown.size ? <span className="block text-meta text-ink-3">{size(shown.size)}</span> : null}
               </span>
               {file && !keep && (
-                <button
+                <button suppressHydrationWarning
                   type="button"
                   onClick={remove}
                   disabled={busy}

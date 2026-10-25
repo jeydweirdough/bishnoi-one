@@ -72,7 +72,7 @@ export function Bell({ unread }: { unread: number }) {
 
   return (
     <div ref={box} className="relative">
-      <button
+      <button suppressHydrationWarning
         type="button"
         onClick={toggle}
         aria-haspopup="dialog"
@@ -93,7 +93,7 @@ export function Bell({ unread }: { unread: number }) {
           <div className="flex items-center justify-between border-b border-rule px-4 py-2.5">
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {count > 0 && (
-              <button type="button" onClick={() => read()} disabled={pending} className="text-meta text-hema hover:underline disabled:opacity-60">
+              <button suppressHydrationWarning type="button" onClick={() => read()} disabled={pending} className="text-meta text-hema hover:underline disabled:opacity-60">
                 Mark all as read
               </button>
             )}
@@ -120,7 +120,7 @@ export function Bell({ unread }: { unread: number }) {
                         {body}
                       </Link>
                     ) : (
-                      <button type="button" onClick={() => opened(n)} className="block w-full px-4 py-2.5 text-left hover:bg-bench">
+                      <button suppressHydrationWarning type="button" onClick={() => opened(n)} className="block w-full px-4 py-2.5 text-left hover:bg-bench">
                         {body}
                       </button>
                     )}

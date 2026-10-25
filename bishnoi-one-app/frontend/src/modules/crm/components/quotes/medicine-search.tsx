@@ -107,7 +107,7 @@ export function MedicineSearch({
         </h2>
         <label className="mt-3 flex h-12 items-center gap-3 rounded-lg border border-control bg-sheet px-5 focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)]">
           <Search className="size-4 text-ink-3" aria-hidden />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type its name, generic name or code" aria-label="Find a medicine" autoFocus className="w-full bg-transparent text-sm outline-none" />
+          <input suppressHydrationWarning value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type its name, generic name or code" aria-label="Find a medicine" autoFocus className="w-full bg-transparent text-sm outline-none" />
         </label>
         {!q.trim() && medicines.length > 0 && (
           <p className="mt-3 text-meta text-ink-3">
@@ -199,7 +199,7 @@ export function MedicineSearch({
                         <span className="mt-1.5 flex items-center gap-2">
                           <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-control px-3 focus-within:border-ink">
                             <span className="text-meta text-ink-3">₱</span>
-                            <input
+                            <input suppressHydrationWarning
                               value={asking[id]}
                               onChange={(e) => setAsking((a) => ({ ...a, [id]: e.target.value }))}
                               inputMode="decimal"
@@ -266,7 +266,7 @@ function Quantity({ value, onChange, name }: { value: number; onChange: (n: numb
       <IconButton label={`One less ${name}`} size="sm" onClick={() => onChange(value - 1)}>
         <Minus className="size-3.5" aria-hidden />
       </IconButton>
-      <input
+      <input suppressHydrationWarning
         value={value}
         onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
         inputMode="numeric"

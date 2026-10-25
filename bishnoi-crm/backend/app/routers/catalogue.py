@@ -207,6 +207,20 @@ def update_settings(access: Edit, me: CurrentUser, db: DB, body: SettingsPatch) 
 # --- products ------------------------------------------------------------------------------
 
 
+CPR_WARNING_DAYS = 90  # as Inventory's expiry warning
+
+
+def cpr_out(p: Product) -> dict | None:
+    """Its FDA registration as Inventory keeps it, and where it stands: valid, expiring (within
+    CPR_WARNING_DAYS), expired, or no_date (a number, no validity date). None: no CPR kept."""
+    if not p.cpr_number:
+        return None
+    today = datetime.now(UTC).date()
+    until = p.cpr_valid_until
+    state = "no_date" if until is None else "expired" if until < today else "expiring" if (until - today).days <= CPR_WARNING_DAYS else "valid"
+    return {"number": p.cpr_number, "validUntil": until.isoformat() if until else None, "state": state}
+
+
 def product_out(p: Product, access: Access) -> dict:
     # Who sees prices waiting for Finance (and what was proposed): whoever sets or decides them.
     is_editor = access.can("products.edit") or access.can("products.approve") or access.can("products.prices")
@@ -231,6 +245,8 @@ def product_out(p: Product, access: Access) -> dict:
         "vatCategory": p.vat_category,
         "needsPrescription": p.needs_prescription,
         "isActive": p.is_active,
+        # Its FDA registration (CPR), from Inventory: expired means it shouldn't be sold.
+        "cpr": cpr_out(p),
         # Its code, name, unit, state and SRP are Inventory's, changed there.
         "fromInventory": p.inventory_id is not None,
         "hasApprovedSrp": has_approved_srp,

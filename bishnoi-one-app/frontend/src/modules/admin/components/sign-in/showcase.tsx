@@ -54,7 +54,7 @@ export function Showcase() {
 
       <div className="mt-8 flex items-center gap-1.5" role="tablist" aria-label="Pick one">
         {SLIDES.map((s, i) => (
-          <button
+          <button suppressHydrationWarning
             key={s.title}
             type="button"
             role="tab"

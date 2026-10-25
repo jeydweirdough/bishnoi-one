@@ -517,7 +517,7 @@ function Permissions({
                               : "border-rule-strong bg-sheet text-ink-2"
                           } ${locked ? "cursor-default opacity-80" : "cursor-pointer hover:border-hema"}`}
                         >
-                          <input
+                          <input suppressHydrationWarning
                             type="checkbox"
                             className="sr-only"
                             checked={on}

@@ -83,7 +83,7 @@ function RoleCard({ role, catalogue, onDone }: { role?: RoleRow; catalogue: Perm
             <div className="flex items-center gap-1.5">
               <h2 className="text-heading text-ink">{role?.name}</h2>
               {!locked && (
-                <button type="button" onClick={() => setNaming(true)} title={`Rename ${role?.name}`} aria-label={`Rename ${role?.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                <button suppressHydrationWarning type="button" onClick={() => setNaming(true)} title={`Rename ${role?.name}`} aria-label={`Rename ${role?.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
                   <Pencil className="size-3.5" aria-hidden />
                 </button>
               )}
@@ -124,7 +124,7 @@ function RoleCard({ role, catalogue, onDone }: { role?: RoleRow; catalogue: Perm
                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                       {area.actions.map((a) => (
                         <label key={a.permission} className={`inline-flex items-center gap-1.5 text-meta ${locked ? "text-ink-3" : "cursor-pointer text-ink-2"}`}>
-                          <input
+                          <input suppressHydrationWarning
                             type="checkbox"
                             className="size-3.5 accent-[var(--color-hema)]"
                             checked={locked || granted.has(a.permission)}

@@ -17,7 +17,7 @@ export function LoginForm({ next }: { next: string }) {
   }, [state?.go]);
   return (
     <form action={action} className="mt-8 space-y-5" noValidate>
-      <input type="hidden" name="next" value={next} />
+      <input suppressHydrationWarning type="hidden" name="next" value={next} />
       <Field label="Work email">
         {(p) => <Input {...p} name="email" type="email" autoComplete="username" value={email || state?.email || ""} onChange={(e) => setEmail(e.target.value)} autoFocus required />}
       </Field>

@@ -38,6 +38,8 @@ type Draft = {
   parentId: string;
   variantLabel: string;
   attributes: [string, string][];
+  cprNumber: string;
+  cprValidUntil: string;
 };
 
 const whole = (s: string) => s.replace(/[^\d]/g, "");
@@ -82,7 +84,10 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
     trackSerials: product?.trackSerials ?? false,
     parentId: product?.parentId ?? preset?.parentId ?? "",
     variantLabel: product?.variantLabel ?? "",
-    attributes: product ? Object.entries(product.attributes) : [["", ""]],
+    // Imported products can carry numbers here (a price list's srp_unit): the form edits them as text.
+    attributes: product ? Object.entries(product.attributes).map(([k, v]): [string, string] => [k, v == null ? "" : String(v)]) : [["", ""]],
+    cprNumber: product?.cpr.number ?? "",
+    cprValidUntil: product?.cpr.validUntil ?? "",
   }));
   const set = (change: Partial<Draft>) => setD({ ...d, ...change });
   // Added from here ("+ New …"): picked at once, and listed until the page's own lists have them.
@@ -119,6 +124,8 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
       parentId: d.parentId || null,
       variantLabel: d.variantLabel.trim() || null,
       attributes: Object.fromEntries(d.attributes.filter(([k, v]) => k.trim() && v.trim()).map(([k, v]) => [k.trim(), v.trim()])),
+      cprNumber: d.cprNumber.trim() || null,
+      cprValidUntil: d.cprValidUntil || null,
     };
     save(() => saveProduct(product?.id ?? null, input), (out) => ({
       message: product ? "Product saved" : `${input.name} added`,
@@ -201,6 +208,19 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
+        <SectionTitle icon="letters">Product registration</SectionTitle>
+        <p className="mt-1 text-meta text-ink-3">The FDA Certificate of Product Registration (CPR). Every active stock product needs one to be sold.</p>
+        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="CPR number" optional error={fields.cprNumber} hint="As printed on the certificate, for example DR-XY12345.">
+            {(p) => <Input {...p} value={d.cprNumber} placeholder="DR-XY12345" onChange={(e) => set({ cprNumber: e.target.value.toUpperCase() })} />}
+          </Field>
+          <Field label="Valid until" optional error={fields.cprValidUntil}>
+            {(p) => <Input {...p} type="date" value={d.cprValidUntil} onChange={(e) => set({ cprValidUntil: e.target.value })} />}
+          </Field>
+        </div>
+      </Sheet>
+
+      <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="pricing">Purchasing and sales</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2">
@@ -225,7 +245,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
             {(p) => <Input {...p} inputMode="decimal" value={d.taxRate} onChange={(e) => set({ taxRate: e.target.value.replace(/[^\d.]/g, "") })} />}
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-2 sm:col-span-3">
-            <input type="checkbox" checked={d.taxInclusive} onChange={(e) => set({ taxInclusive: e.target.checked })} className="size-4 accent-hema" />
+            <input suppressHydrationWarning type="checkbox" checked={d.taxInclusive} onChange={(e) => set({ taxInclusive: e.target.checked })} className="size-4 accent-hema" />
             Prices include tax
           </label>
         </div>
@@ -255,7 +275,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
           <div className="grid gap-3 sm:grid-cols-3">
             {tracking.map((t) => (
               <label key={t.key} className="flex gap-2 text-sm">
-                <input
+                <input suppressHydrationWarning
                   type="checkbox"
                   className="mt-0.5 size-4 accent-hema"
                   checked={d[t.key] || (t.key === "trackBatches" && d.trackExpiry)}
@@ -293,7 +313,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
             <div key={i} className="flex items-end gap-3">
               <Input aria-label={`Specification ${i + 1} name`} placeholder="Size" value={k} className="max-w-48" onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [e.target.value, a[1]] : a)) })} />
               <Input aria-label={`Specification ${i + 1} value`} placeholder="Medium" value={v} onChange={(e) => set({ attributes: d.attributes.map((a, j) => (j === i ? [a[0], e.target.value] : a)) })} />
-              <button type="button" title="Remove specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
+              <button suppressHydrationWarning type="button" title="Remove specification" onClick={() => set({ attributes: d.attributes.filter((_, j) => j !== i) })} className="rounded-md p-1.5 text-ink-3 hover:bg-bench hover:text-danger">
                 <X className="size-4" aria-hidden />
               </button>
             </div>

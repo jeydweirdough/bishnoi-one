@@ -84,7 +84,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
       <PageHeader title="Reports">Every report covers the days chosen below, the pharmacy&apos;s own days. The last 30 days unless you pick others.</PageHeader>
       <Tabs label="Reports" current={name} tabs={(Object.keys(REPORTS) as Name[]).map((n) => ({ value: n, label: REPORTS[n], href: `/pharmacy/reports?r=${n}${keep}` }))} />
       <form className="mb-4 flex flex-wrap items-end gap-3">
-        <input type="hidden" name="r" value={name} />
+        <input suppressHydrationWarning type="hidden" name="r" value={name} />
         {name !== "expiry" && <FilterInput label="From" type="date" name="from" defaultValue={from || r.from} />}
         <FilterInput label={name === "expiry" ? "Expired or expiring by" : "To"} type="date" name="to" defaultValue={to || r.to} max={name === "expiry" ? undefined : today} />
         <Button type="submit" size="sm">

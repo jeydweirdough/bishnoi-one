@@ -84,7 +84,7 @@ function Toolbar() {
     <div className="mb-4 flex flex-wrap items-end gap-3" aria-hidden>
       <div className="relative min-w-[14rem] flex-1">
         <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" />
-        <input type="search" disabled placeholder="Search" tabIndex={-1} className="block h-10 w-full rounded-[3px] border border-control bg-sheet pr-4 pl-11 text-sm placeholder:text-ink-3/80" />
+        <input suppressHydrationWarning type="search" disabled placeholder="Search" tabIndex={-1} className="block h-10 w-full rounded-[3px] border border-control bg-sheet pr-4 pl-11 text-sm placeholder:text-ink-3/80" />
       </div>
       <span className="h-10 w-40 rounded-[3px] border border-control bg-sheet max-sm:hidden" />
     </div>

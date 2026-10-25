@@ -129,7 +129,7 @@ export function ViewsBar({ list, views }: { list: ViewList; views: Views }) {
               </label>
               {views.canShare && (
                 <label className="flex items-center gap-2 text-sm text-ink">
-                  <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="size-4 accent-[var(--color-ink)]" />
+                  <input suppressHydrationWarning type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="size-4 accent-[var(--color-ink)]" />
                   Share with everyone who sees this list
                 </label>
               )}

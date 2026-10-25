@@ -180,7 +180,7 @@ function CheckRow({ request, expense: e, categories, org }: { request: FundReque
         <p className="text-sm font-semibold tabular-nums">{fmt.peso(e.amountCentavos)}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <select suppressHydrationWarning
           aria-label={`${e.description}: category`}
           value={e.category?.id ?? ""}
           disabled={pending}

@@ -127,7 +127,7 @@ export function ImportWizard({ kind }: { kind: ImportKind }) {
                         {f.hint && <span className="block text-meta font-normal text-ink-3">{f.hint}</span>}
                       </th>
                       <td className="px-3 py-2 align-top">
-                        <select
+                        <select suppressHydrationWarning
                           aria-label={`Column for ${f.label}`}
                           value={col ?? ""}
                           onChange={(e) => map(f.key, e.target.value)}

@@ -53,7 +53,7 @@ export function Alert({
         <div className="ml-auto flex shrink-0 items-start gap-1.5">
           {actions}
           {onClose && (
-            <button type="button" onClick={onClose} aria-label="Dismiss" className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-[#f4f4f2] hover:text-ink">
+            <button suppressHydrationWarning type="button" onClick={onClose} aria-label="Dismiss" className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-[#f4f4f2] hover:text-ink">
               <X className="size-4" aria-hidden />
             </button>
           )}
@@ -73,7 +73,7 @@ export function Banner({ tone = "info", children, action, onClose, className = "
       <span className="min-w-0 flex-1">{children}</span>
       {action && <span className="font-semibold underline-offset-[3px] [&_a]:underline">{action}</span>}
       {onClose && (
-        <button type="button" onClick={onClose} aria-label="Dismiss" className="grid size-6 place-items-center rounded opacity-70 hover:opacity-100">
+        <button suppressHydrationWarning type="button" onClick={onClose} aria-label="Dismiss" className="grid size-6 place-items-center rounded opacity-70 hover:opacity-100">
           <X className="size-3.5" aria-hidden />
         </button>
       )}

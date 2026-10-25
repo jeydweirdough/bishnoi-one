@@ -71,7 +71,7 @@ export function CustomerFilters({
       <label className="relative min-w-0 flex-1 basis-56">
         <span className="sr-only">Search customers</span>
         <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" />
-        <input
+        <input suppressHydrationWarning
           type="search"
           value={q}
           onChange={(e) => onSearch(e.target.value)}

@@ -69,7 +69,7 @@ export function OperationRecord({ path, data, can }: { path: OperationsPath; dat
                 <span className="rounded-[6px] border-[1.5px] border-ink px-2 py-px text-[12.5px] font-semibold tracking-[0.05em]">{record.plate}</span>
               )}
               {can.edit && (
-                <button type="button" onClick={() => setEditing(true)} aria-label={`Change ${name}`} title="Change details" className="grid size-9 place-items-center rounded-full text-ink-3 hover:bg-mint hover:text-ink">
+                <button suppressHydrationWarning type="button" onClick={() => setEditing(true)} aria-label={`Change ${name}`} title="Change details" className="grid size-9 place-items-center rounded-full text-ink-3 hover:bg-mint hover:text-ink">
                   <Pencil className="size-4" aria-hidden />
                 </button>
               )}
@@ -122,7 +122,7 @@ export function OperationRecord({ path, data, can }: { path: OperationsPath; dat
           >
             <label className="min-w-64 flex-1">
               <span className="sr-only">Note</span>
-              <input
+              <input suppressHydrationWarning
                 autoFocus
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -186,7 +186,7 @@ export function OperationRecord({ path, data, can }: { path: OperationsPath; dat
                       <dt className="text-[12px] text-ink-3">{r.label}</dt>
                       <dd className={`text-[13.5px] whitespace-pre-line ${r.value ? "font-medium text-ink" : "text-ink-3"}`}>
                         {r.value ?? (can.edit ? (
-                          <button type="button" onClick={() => setEditing(true)} className="underline hover:text-ink">
+                          <button suppressHydrationWarning type="button" onClick={() => setEditing(true)} className="underline hover:text-ink">
                             Add
                           </button>
                         ) : (

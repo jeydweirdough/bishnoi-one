@@ -147,17 +147,17 @@ export function HomeCalendar({ items, canLog }: { items: CountdownHighlight[]; c
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Previous week" disabled={week <= thisWeek} onClick={() => shift(-1)} className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-mint disabled:opacity-30">
+          <button suppressHydrationWarning type="button" aria-label="Previous week" disabled={week <= thisWeek} onClick={() => shift(-1)} className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-mint disabled:opacity-30">
             <ChevronLeft className="size-4" aria-hidden />
           </button>
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={() => choose(today)}
             className={`h-8 rounded-full border px-3 text-[13px] font-medium ${chosen === today ? "border-ink bg-ink text-white" : "border-rule-strong text-ink hover:border-ink"}`}
           >
             Today
           </button>
-          <button type="button" aria-label="Next week" disabled={week >= lastWeek} onClick={() => shift(1)} className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-mint disabled:opacity-30">
+          <button suppressHydrationWarning type="button" aria-label="Next week" disabled={week >= lastWeek} onClick={() => shift(1)} className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-mint disabled:opacity-30">
             <ChevronRight className="size-4" aria-hidden />
           </button>
         </div>
@@ -199,7 +199,7 @@ export function HomeCalendar({ items, canLog }: { items: CountdownHighlight[]; c
           <div className="mt-2 text-sm text-ink-2">
             Nothing falls due on this day.{" "}
             {nextDay ? (
-              <button type="button" onClick={() => choose(nextDay)} className="font-semibold text-ink underline">
+              <button suppressHydrationWarning type="button" onClick={() => choose(nextDay)} className="font-semibold text-ink underline">
                 Next: {dayName(nextDay, today)} ({byDay.get(nextDay)!.length})
               </button>
             ) : (
@@ -302,7 +302,7 @@ function DayPill({
           ? "text-ink-3/60"
           : "text-ink hover:bg-mint";
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       role="tab"
       aria-selected={selected}

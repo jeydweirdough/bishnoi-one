@@ -143,7 +143,7 @@ export function AttentionCard({ prompts }: { prompts: Prompt[] }) {
           </IconButton>
           <span className="flex items-center gap-1.5">
             {pages.map((_, i) => (
-              <button
+              <button suppressHydrationWarning
                 key={i}
                 type="button"
                 onClick={() => go(i)}

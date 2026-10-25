@@ -100,7 +100,7 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           </Field>
           <Field label="Fiscal year ends in" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
             {(f) => (
-              <select {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+              <select suppressHydrationWarning {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
                 {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
                   <option key={m} value={i + 1}>
                     {m}

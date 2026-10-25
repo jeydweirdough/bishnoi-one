@@ -23,7 +23,7 @@ function Fields({ items }: { items: [string, ReactNode][] }) {
         ))}
       </dl>
       {empty.length > 0 && (
-        <button
+        <button suppressHydrationWarning
           type="button"
           onClick={() => setShowEmpty(!showEmpty)}
           className={`text-meta text-ink-3 hover:text-ink hover:underline ${shown.length || showEmpty ? "mt-3" : ""}`}

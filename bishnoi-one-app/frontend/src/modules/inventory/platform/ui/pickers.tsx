@@ -132,7 +132,7 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
               <>
                 {menu}
                 <div className="mt-1 flex items-center justify-between gap-2 border-t border-rule px-2 pt-2 pb-1">
-                  <button
+                  <button suppressHydrationWarning
                     type="button"
                     disabled={picked === 0}
                     onMouseDown={(e) => e.preventDefault()}
@@ -141,7 +141,7 @@ export function Combobox<V = string>({ className = "", options, value, onChange,
                   >
                     Clear
                   </button>
-                  <button
+                  <button suppressHydrationWarning
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setOpen(false)}

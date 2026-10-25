@@ -127,7 +127,7 @@ function NameField({
     >
       <div className="flex h-10 items-center gap-1.5 rounded-[12px] border border-hema bg-sheet pr-1 pl-2.5 ring-2 ring-hema/15">
         <Icon name={icon} className="size-4 text-ink-3" />
-        <input
+        <input suppressHydrationWarning
           aria-label={label}
           aria-invalid={error ? true : undefined}
           value={value}
@@ -140,7 +140,7 @@ function NameField({
           autoFocus
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3/80"
         />
-        <button
+        <button suppressHydrationWarning
           type="submit"
           aria-label={saveLabel}
           title={saveLabel}
@@ -149,7 +149,7 @@ function NameField({
         >
           <Check className="size-4" aria-hidden />
         </button>
-        <button
+        <button suppressHydrationWarning
           type="button"
           aria-label="Cancel"
           title="Cancel (Esc)"
@@ -169,7 +169,7 @@ function NameField({
 /** Where a branch ends: add the next thing there. Quiet until pointed at, so a tree of them doesn't shout. */
 function AddHere({ label, full, onClick }: { label: string; full: string; onClick: () => void }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       onClick={onClick}
       aria-label={full}
@@ -190,7 +190,7 @@ function IconChoice({ value, onPick }: { value: IconName; onPick: (icon: IconNam
   return (
     <div className="flex flex-wrap gap-1" role="group" aria-label="Icon">
       {DEPARTMENT_ICONS.map(({ name, label }) => (
-        <button
+        <button suppressHydrationWarning
           key={name}
           type="button"
           aria-pressed={value === name}
@@ -381,7 +381,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                     }}
                   />
                 ) : (
-                  <button
+                  <button suppressHydrationWarning
                     type="button"
                     aria-pressed={isSelected}
                     onClick={() => select(nodeKey)}
@@ -472,7 +472,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                   />
                 ) : (
                   <div className={`${frame(!team.isActive, isSelected)} pr-1`}>
-                    <button
+                    <button suppressHydrationWarning
                       type="button"
                       aria-pressed={isSelected}
                       onClick={() => select(nodeKey)}
@@ -482,7 +482,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                       <span className="line-clamp-2 min-w-0 flex-1 leading-tight font-semibold">{team.name}</span>
                     </button>
                     {!team.isActive && <Off />}
-                    <button
+                    <button suppressHydrationWarning
                       type="button"
                       aria-expanded={open}
                       aria-label={count ? `${count} headquarters in ${team.name}: ${open ? "fold" : "show"}` : `Add a headquarters to ${team.name}`}
@@ -535,7 +535,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
     return (
       <li key={d.code} className={s.item}>
         <div className={`${s.node} ${s.division}`}>
-          <button
+          <button suppressHydrationWarning
             type="button"
             aria-expanded={open}
             aria-label={`${d.name} division, ${d.teams.length} ${d.teams.length === 1 ? "team" : "teams"}`}
@@ -605,7 +605,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                         />
                       ) : (
                         <div className={`${frame(off, isSelected)} pr-1`}>
-                          <button
+                          <button suppressHydrationWarning
                             type="button"
                             aria-expanded={open}
                             aria-label={`${dep.name} department, ${count} ${what}`}
@@ -623,7 +623,7 @@ export function TeamsEditor({ company, divisions }: { company: string; divisions
                           </button>
                           {off && <Off />}
                           {dep.own && (
-                            <button
+                            <button suppressHydrationWarning
                               type="button"
                               aria-pressed={isSelected}
                               aria-label={`Change ${dep.name}`}

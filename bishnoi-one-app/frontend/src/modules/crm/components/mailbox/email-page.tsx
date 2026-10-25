@@ -108,7 +108,7 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
               const isOpen = shown === a.id;
               return (
                 <li key={a.id}>
-                  <button type="button" onClick={() => setShown(isOpen ? null : a.id)} className="grid w-full gap-x-4 px-5 py-3 text-left hover:bg-bench/60 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]">
+                  <button suppressHydrationWarning type="button" onClick={() => setShown(isOpen ? null : a.id)} className="grid w-full gap-x-4 px-5 py-3 text-left hover:bg-bench/60 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]">
                     <span className="truncate text-sm text-ink-2">To {p.to}</span>
                     <span className="min-w-0 truncate">
                       <span className="font-medium text-ink">{a.subject}</span>

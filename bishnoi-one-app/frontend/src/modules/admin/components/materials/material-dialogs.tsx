@@ -80,34 +80,34 @@ export function ProductionDialog({ material, onClose, onDone }: { material: Mate
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <FormField label="Quantity">
-              <input value={v.quantity} onChange={set("quantity")} inputMode="numeric" placeholder="e.g. 500" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={v.quantity} onChange={set("quantity")} inputMode="numeric" placeholder="e.g. 500" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
             </FormField>
             <Hint error={errors.quantity} />
           </div>
           <div>
             <FormField label="Supplier" optional>
-              <input value={v.supplier} onChange={set("supplier")} maxLength={160} placeholder="The printer or maker" className={inputClass} />
+              <input suppressHydrationWarning value={v.supplier} onChange={set("supplier")} maxLength={160} placeholder="The printer or maker" className={inputClass} />
             </FormField>
           </div>
           <div>
             <FormField label="Total cost" optional>
-              <input value={v.cost} onChange={set("cost")} inputMode="decimal" placeholder="₱" aria-invalid={errors.cost ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={v.cost} onChange={set("cost")} inputMode="decimal" placeholder="₱" aria-invalid={errors.cost ? true : undefined} className={inputClass} />
             </FormField>
             <Hint error={errors.cost} />
           </div>
           <div>
             <FormField label="Date ordered">
-              <input type="date" value={v.orderedOn} onChange={set("orderedOn")} className={inputClass} />
+              <input suppressHydrationWarning type="date" value={v.orderedOn} onChange={set("orderedOn")} className={inputClass} />
             </FormField>
           </div>
           <div>
             <FormField label="Expected delivery" optional>
-              <input type="date" value={v.expectedOn} onChange={set("expectedOn")} className={inputClass} />
+              <input suppressHydrationWarning type="date" value={v.expectedOn} onChange={set("expectedOn")} className={inputClass} />
             </FormField>
           </div>
           <div className="sm:col-span-2">
             <FormField label="Notes" optional>
-              <textarea value={v.notes} onChange={set("notes")} rows={2} maxLength={500} className={inputClass} />
+              <textarea suppressHydrationWarning value={v.notes} onChange={set("notes")} rows={2} maxLength={500} className={inputClass} />
             </FormField>
           </div>
         </div>
@@ -160,7 +160,7 @@ export function DistributionDialog({ material, onClose, onDone }: { material: Ma
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <FormField label="Team">
-              <select
+              <select suppressHydrationWarning
                 value={v.teamId}
                 onChange={(e) => setV({ ...v, teamId: e.target.value, recipientId: "" })}
                 disabled={!teams}
@@ -179,7 +179,7 @@ export function DistributionDialog({ material, onClose, onDone }: { material: Ma
           </div>
           <div>
             <FormField label="Recipient" optional>
-              <select value={v.recipientId} onChange={(e) => setV({ ...v, recipientId: e.target.value })} disabled={!team} aria-invalid={errors.recipientId ? true : undefined} className={inputClass}>
+              <select suppressHydrationWarning value={v.recipientId} onChange={(e) => setV({ ...v, recipientId: e.target.value })} disabled={!team} aria-invalid={errors.recipientId ? true : undefined} className={inputClass}>
                 <option value="">The whole team</option>
                 {team?.people.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -192,13 +192,13 @@ export function DistributionDialog({ material, onClose, onDone }: { material: Ma
           </div>
           <div>
             <FormField label="Quantity">
-              <input value={v.quantity} onChange={(e) => setV({ ...v, quantity: e.target.value })} inputMode="numeric" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
+              <input suppressHydrationWarning value={v.quantity} onChange={(e) => setV({ ...v, quantity: e.target.value })} inputMode="numeric" aria-invalid={errors.quantity ? true : undefined} className={inputClass} />
             </FormField>
             <Hint error={errors.quantity} />
           </div>
           <div className="sm:col-span-2">
             <FormField label="Purpose" optional>
-              <textarea value={v.purpose} onChange={(e) => setV({ ...v, purpose: e.target.value })} rows={2} maxLength={500} placeholder="e.g. Doctor visits in October" className={inputClass} />
+              <textarea suppressHydrationWarning value={v.purpose} onChange={(e) => setV({ ...v, purpose: e.target.value })} rows={2} maxLength={500} placeholder="e.g. Doctor visits in October" className={inputClass} />
             </FormField>
           </div>
         </div>
@@ -253,14 +253,14 @@ export function DateDialog({
         className="space-y-5"
       >
         <FormField label={label}>
-          <input type="date" value={on} max={today()} onChange={(e) => setOn(e.target.value)} className={inputClass} />
+          <input suppressHydrationWarning type="date" value={on} max={today()} onChange={(e) => setOn(e.target.value)} className={inputClass} />
         </FormField>
         <div>
           <FormField label="Proof" optional>
             <label className="flex cursor-pointer items-center gap-3 rounded-[14px] border border-dashed border-rule-strong px-3.5 py-3 text-sm text-ink-2 hover:border-ink">
               <Paperclip className="size-4 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{proof ? proof.name : "Attach a photo (PNG or JPG) or a PDF, up to 3 MB"}</span>
-              <input type="file" accept="image/png,image/jpeg,application/pdf" capture="environment" className="sr-only" onChange={(e) => setProof(e.target.files?.[0] ?? null)} />
+              <input suppressHydrationWarning type="file" accept="image/png,image/jpeg,application/pdf" capture="environment" className="sr-only" onChange={(e) => setProof(e.target.files?.[0] ?? null)} />
             </label>
           </FormField>
           <p className="mt-1 text-meta text-ink-3">{proofHint}</p>

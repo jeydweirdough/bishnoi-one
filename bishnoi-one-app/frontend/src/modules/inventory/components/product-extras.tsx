@@ -81,7 +81,7 @@ export function ProductGallery({ productId, name, images, canEdit }: { productId
               )}
             </span>
             <span className="text-meta text-ink-3">PNG, JPG or WebP</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={pending} onChange={(e) => add(e.target.files?.[0])} />
+            <input suppressHydrationWarning type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={pending} onChange={(e) => add(e.target.files?.[0])} />
           </label>
         ) : current ? (
           // eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box
@@ -93,7 +93,7 @@ export function ProductGallery({ productId, name, images, canEdit }: { productId
           </span>
         )}
         {canEdit && (adding || !full) && (
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={() => setAdding(!adding)}
             disabled={pending}
@@ -109,7 +109,7 @@ export function ProductGallery({ productId, name, images, canEdit }: { productId
         <ul className="mt-3 flex flex-wrap gap-2" aria-label="Images">
           {images.map((id) => (
             <li key={id} className="group relative">
-              <button
+              <button suppressHydrationWarning
                 type="button"
                 onClick={() => {
                   setShown(id);
@@ -122,7 +122,7 @@ export function ProductGallery({ productId, name, images, canEdit }: { productId
                 <img src={`/inventory/products/${productId}/images/${id}`} alt="" className="size-full object-contain" />
               </button>
               {canEdit && (
-                <button
+                <button suppressHydrationWarning
                   type="button"
                   onClick={() => remove(id)}
                   title="Remove image"
@@ -137,7 +137,7 @@ export function ProductGallery({ productId, name, images, canEdit }: { productId
         </ul>
       )}
       {images.length === 1 && canEdit && !adding && (
-        <button type="button" onClick={() => remove(images[0])} className="mt-2 inline-flex items-center gap-1 text-meta text-ink-3 hover:text-danger">
+        <button suppressHydrationWarning type="button" onClick={() => remove(images[0])} className="mt-2 inline-flex items-center gap-1 text-meta text-ink-3 hover:text-danger">
           <Trash2 className="size-3.5" aria-hidden />
           Remove image
         </button>
@@ -169,7 +169,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
           {/* eslint-disable-next-line @next/next/no-img-element -- served through our own route, sized by the box */}
           <img src={`/inventory/products/${productId}/images/${id}`} alt="" className="size-full object-contain" />
           {canEdit && (
-            <button
+            <button suppressHydrationWarning
               type="button"
               title="Remove image"
               onClick={() =>
@@ -189,7 +189,7 @@ export function ProductImages({ productId, images, canEdit }: { productId: strin
       ))}
       {canEdit && images.length < 8 && (
         <>
-          <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => e.target.files?.[0] && add(e.target.files[0])} />
+          <input suppressHydrationWarning ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => e.target.files?.[0] && add(e.target.files[0])} />
           <Button className="!h-28 !w-28 flex-col" icon={<ImagePlus className="size-5" aria-hidden />} loading={pending} onClick={() => input.current?.click()}>
             Add image
           </Button>
@@ -254,7 +254,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
                   <td className="px-3 py-2.5 text-right font-semibold text-ink tabular-nums">{fmt.peso(sp.price)}</td>
                   {canEdit && (
                     <td className="py-2.5 text-right">
-                      <button
+                      <button suppressHydrationWarning
                         type="button"
                         title={`Remove ${sp.supplier.name}'s price`}
                         aria-label={`Remove ${sp.supplier.name}'s price`}

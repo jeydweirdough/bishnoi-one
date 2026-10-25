@@ -29,7 +29,7 @@ export function TopActions({ notifications, allHref, search, children }: { notif
 
 function BellButton({ count, open = false }: { count: number; open?: boolean }) {
   return (
-    <button
+    <button suppressHydrationWarning
       type="button"
       aria-label={count ? `Notifications: ${count}` : "Notifications"}
       title="Notifications"

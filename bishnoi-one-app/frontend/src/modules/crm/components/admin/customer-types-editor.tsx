@@ -138,7 +138,7 @@ function TypeRow({
       <span className="w-32">
         <StatusTag status={type.code} types={[type]} />
       </span>
-      <input
+      <input suppressHydrationWarning
         aria-label={`Name of ${type.name}`}
         value={name}
         onChange={(e) => setName(e.target.value)}

@@ -184,7 +184,7 @@ function RowActions({ kind, item, items: all, canEdit, canDelete, onEdit }: { ki
         placement="bottomRight"
         menu={{ items, onClick: ({ key }) => (key === "edit" ? onEdit() : key === "toggle" ? void toggle() : key === "delete" ? (using ? setMoving(true) : remove()) : undefined) }}
       >
-        <button
+        <button suppressHydrationWarning
           type="button"
           aria-label={`Actions for ${item.name}`}
           title={`Actions for ${item.name}`}
@@ -336,7 +336,7 @@ export function CatalogTable({ kind, items, all, canEdit, canDelete }: { kind: C
             <tr key={item.key} className="relative hover:bg-bench/40">
               <Td>
                 {canEdit ? (
-                  <button type="button" onClick={() => setEditing(item)} className="text-left font-semibold text-ink after:absolute after:inset-0 hover:underline" title={`Edit ${w.one} ${item.name}`}>
+                  <button suppressHydrationWarning type="button" onClick={() => setEditing(item)} className="text-left font-semibold text-ink after:absolute after:inset-0 hover:underline" title={`Edit ${w.one} ${item.name}`}>
                     {kind === "categories" ? item.path : item.name}
                   </button>
                 ) : (

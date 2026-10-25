@@ -45,7 +45,7 @@ export function Modal({ open, title, children, onCancel, onOk, okText = "OK", ca
           <h2 id={titleId} className="text-heading">
             {title}
           </h2>
-          <button type="button" onClick={onCancel} aria-label="Close" className="-mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-bench hover:text-ink">
+          <button suppressHydrationWarning type="button" onClick={onCancel} aria-label="Close" className="-mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-bench hover:text-ink">
             <X className="size-4" aria-hidden />
           </button>
         </div>

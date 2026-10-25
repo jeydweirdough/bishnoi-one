@@ -144,7 +144,7 @@ def search(access: CurrentAccess, db: DB, q: str = Query(..., min_length=1, max_
                 "title": p.name,
                 "sub": " · ".join(x for x in (p.code, p.generic_name, p.strength) if x),
                 "href": f"/products?q={p.code or p.name}",
-                "facts": facts(fact("Code", p.code), fact("Generic name", p.generic_name), fact("Strength", p.strength), fact("Form", p.form), fact("Prescription", "Needed" if p.needs_prescription else None)),
+                "facts": facts(fact("Code", p.code), fact("Generic name", p.generic_name), fact("Strength", p.strength), fact("Form", p.form), fact("Prescription", "Needed" if p.needs_prescription else None), fact("CPR", p.cpr_number)),
                 "actions": [{"label": "Open product", "href": f"/products?q={p.code or p.name}"}],
             },
         )

@@ -195,7 +195,7 @@ function UploadPicker({ onChange }: { onChange: (c: Cleaned | null) => void }) {
 
   return (
     <div className="space-y-3">
-      <input
+      <input suppressHydrationWarning
         type="file"
         accept="image/png,image/jpeg"
         aria-label="Choose a photo or scan of your signature"
@@ -229,7 +229,7 @@ function UploadPicker({ onChange }: { onChange: (c: Cleaned | null) => void }) {
           ) : (
             <label className="flex items-center gap-3 text-meta text-ink-2">
               Keep more
-              <input type="range" min={0} max={1} step={0.05} value={strength} onChange={(e) => setStrength(Number(e.target.value))} className="flex-1 accent-[var(--color-hema)]" aria-label="How much of the picture counts as paper" />
+              <input suppressHydrationWarning type="range" min={0} max={1} step={0.05} value={strength} onChange={(e) => setStrength(Number(e.target.value))} className="flex-1 accent-[var(--color-hema)]" aria-label="How much of the picture counts as paper" />
               Cleaner
             </label>
           )}

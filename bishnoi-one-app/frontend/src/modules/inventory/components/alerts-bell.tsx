@@ -40,7 +40,7 @@ export function AlertsBell({ alerts }: { alerts: Alert[] }) {
         </div>
       }
     >
-      <button
+      <button suppressHydrationWarning
         type="button"
         title="Notifications"
         aria-label={any ? `Notifications: ${alerts.length}` : "Notifications"}

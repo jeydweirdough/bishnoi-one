@@ -171,7 +171,7 @@ export function LogActivity({
       </Field>
 
       <label className="flex items-center gap-2 text-sm">
-        <input
+        <input suppressHydrationWarning
           type="checkbox"
           checked={withFollowUp}
           onChange={(e) => setWithFollowUp(e.target.checked)}

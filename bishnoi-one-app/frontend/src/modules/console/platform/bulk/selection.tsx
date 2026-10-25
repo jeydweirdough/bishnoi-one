@@ -134,7 +134,7 @@ export function SelectBox({ id, label }: { id: string; label: string }) {
   if (!s.selecting) return null;
   return (
     <label className="relative z-10 -m-3 inline-flex cursor-pointer p-3">
-      <input
+      <input suppressHydrationWarning
         type="checkbox"
         checked={s.isSelected(id)}
         onChange={() => s.toggle(id)}
@@ -156,7 +156,7 @@ export function SelectAllBox({ label = "Select all on this page", children }: { 
   if (!s.selecting) return null;
   return (
     <label className={`relative z-10 inline-flex cursor-pointer items-center gap-3 ${children ? "py-2" : "-m-3 p-3"}`}>
-      <input
+      <input suppressHydrationWarning
         ref={box}
         type="checkbox"
         checked={s.pageState === "all"}

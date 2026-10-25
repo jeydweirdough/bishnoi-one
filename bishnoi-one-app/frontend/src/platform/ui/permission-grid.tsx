@@ -85,7 +85,7 @@ export function PermissionGrid({
                               on ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2"
                             } ${locked ? "cursor-default" : "cursor-pointer hover:border-hema"}`}
                           >
-                            <input
+                            <input suppressHydrationWarning
                               type="checkbox"
                               className="sr-only"
                               checked={on}

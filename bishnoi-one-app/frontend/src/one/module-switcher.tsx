@@ -38,7 +38,7 @@ export function ModuleSwitcher({ mine, compact = false }: { mine: MyModule[]; co
     <div ref={box} className="relative">
       {compact ? (
         // As the old app launcher: a grid at the top right, your modules under it.
-        <button
+        <button suppressHydrationWarning
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
@@ -50,7 +50,7 @@ export function ModuleSwitcher({ mine, compact = false }: { mine: MyModule[]; co
           <LayoutGrid className="size-5" aria-hidden />
         </button>
       ) : (
-      <button
+      <button suppressHydrationWarning
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}

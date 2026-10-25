@@ -217,7 +217,7 @@ export function RenewalsChart({ months }: { months: RenewalMonth[] }) {
   return (
     <div>
       <div className="mb-2 flex justify-end">
-        <button type="button" onClick={() => setAsTable(!asTable)} className="text-meta font-medium text-hema hover:underline">
+        <button suppressHydrationWarning type="button" onClick={() => setAsTable(!asTable)} className="text-meta font-medium text-hema hover:underline">
           {asTable ? "Show chart" : "Show as table"}
         </button>
       </div>

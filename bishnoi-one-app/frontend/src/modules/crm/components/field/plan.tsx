@@ -46,7 +46,7 @@ export function PlanPicker({ id, name, plan, editable }: { id: string; name: str
           onClick: ({ key }) => save({ tier: key ? (Number(key) as 1 | 2 | 3) : null }),
         }}
       >
-        <button type="button" aria-label={`${name}: ${tierLabel}. Change the tier`} className={`${PILL} ${shown.tier ? "bg-ink/8 text-ink" : "border border-dashed border-rule-strong text-ink-3"}`}>
+        <button suppressHydrationWarning type="button" aria-label={`${name}: ${tierLabel}. Change the tier`} className={`${PILL} ${shown.tier ? "bg-ink/8 text-ink" : "border border-dashed border-rule-strong text-ink-3"}`}>
           {shown.tier ? `T${shown.tier}` : "Tier"}
           <ChevronDown className="size-3" aria-hidden />
         </button>
@@ -74,7 +74,7 @@ export function PlanPicker({ id, name, plan, editable }: { id: string; name: str
           onClick: ({ key }) => save({ zone: (key || null) as Zone | null }),
         }}
       >
-        <button
+        <button suppressHydrationWarning
           type="button"
           aria-label={`${name}: ${zone ? `${zone.label} zone` : "no zone"}. Change the zone`}
           className={`${PILL} ${zone ? zone.pill : "border border-dashed border-rule-strong text-ink-3"}`}

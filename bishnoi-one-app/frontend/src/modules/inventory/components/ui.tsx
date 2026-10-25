@@ -6,7 +6,7 @@ import { Select } from "@/src/modules/inventory/platform/ui/field";
 import { ToggleLinks } from "@/src/modules/inventory/platform/ui/toggle-links";
 import { Flag } from "@/src/modules/inventory/platform/ui/marks";
 import { Amount } from "@/src/modules/inventory/platform/ui/amount";
-import type { Expiry, StockState } from "@/src/modules/inventory/lib/types";
+import type { Cpr, Expiry, StockState } from "@/src/modules/inventory/lib/types";
 import { STOCK_STATES } from "@/src/modules/inventory/lib/labels";
 
 // The pieces every Inventory screen is built from. Server components: the
@@ -46,6 +46,14 @@ export function ExpiryMark({ expiry, label }: { expiry: Expiry; label: string })
   if (expiry === "expired") return <Flag letter="!">Expired {label}</Flag>;
   if (expiry === "expiring") return <Flag letter="⏱">{label}</Flag>;
   return <span className="text-ink-2">{label}</span>;
+}
+
+/** Where a product's FDA registration (CPR) stands: flagged when it needs someone, quiet when it's fine. */
+export function CprMark({ cpr }: { cpr: Cpr }) {
+  if (cpr.state === "expired" || cpr.state === "missing") return <Flag letter="!">{cpr.label}</Flag>;
+  if (cpr.state === "expiring" || cpr.state === "no_date") return <Flag letter="⏱">{cpr.label}</Flag>;
+  if (cpr.state === "not_needed") return <span className="text-meta text-ink-3">—</span>;
+  return <span className="text-meta text-ink-3">{cpr.label}</span>;
 }
 
 /** A table on a sheet, with room to scroll sideways on a phone. */
@@ -89,12 +97,12 @@ export function RowLink({ href, children, sub }: { href: string; children: React
 export function Filters({ children, q, placeholder = "Search", keep = {} }: { children?: ReactNode; q?: string; placeholder?: string; keep?: Record<string, string> }) {
   return (
     <form role="search" className="mb-3 flex flex-wrap items-end gap-3">
-      {Object.entries(keep).map(([k, v]) => v && <input key={k} type="hidden" name={k} value={v} />)}
+      {Object.entries(keep).map(([k, v]) => v && <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />)}
       {q !== undefined && (
         <label className="relative min-w-[14rem] flex-1">
           <span className="sr-only">{placeholder}</span>
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
-          <input
+          <input suppressHydrationWarning
             type="search"
             name="q"
             defaultValue={q}
