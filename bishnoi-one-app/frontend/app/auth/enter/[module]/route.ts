@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { AccountError, ONE_APP_URL, accountCall } from "@/src/platform/lib/account";
+import { AccountError, accountCall, oneAppUrl } from "@/src/platform/lib/account";
 import { moduleApi } from "@/src/platform/lib/api";
 import { moduleByKey } from "@/src/platform/lib/modules";
 import { ACCOUNT_COOKIE, COMPANY_COOKIE, companyOfToken, cookieOptions, moduleCookie } from "@/src/platform/lib/session-cookie";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   let pass: string;
   try {
-    pass = (await accountCall<{ pass: string }>("/identity/pass", { app: m.appKey, returnTo: `${ONE_APP_URL}/auth/platform` }, account, address)).pass;
+    pass = (await accountCall<{ pass: string }>("/identity/pass", { app: m.appKey, returnTo: `${oneAppUrl(request.headers, request.url)}/auth/platform` }, account, address)).pass;
   } catch (error) {
     if (error instanceof AccountError && error.status === 401) return toLogin();
     return home(error instanceof Error ? error.message : `${m.label} couldn't be opened.`);
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   let session: { accessToken: string; expiresIn: number };
   try {
-    const response = await fetch(`${moduleApi(m)}/auth/platform`, {
+    const response = await fetch(`${await moduleApi(m)}/auth/platform`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(address ? { "X-Forwarded-For": address } : {}) },
       body: JSON.stringify({ pass }),

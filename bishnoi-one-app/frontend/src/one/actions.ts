@@ -2,7 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { AccountError, accountCall, accountToken } from "@/src/platform/lib/account";
+import { AccountError, PLATFORM_API, accountCall, accountToken } from "@/src/platform/lib/account";
 import { MODULES } from "@/src/platform/lib/modules";
 import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie } from "@/src/platform/lib/session-cookie";
 
@@ -90,4 +90,36 @@ export async function changePassword(current: string, next: string): Promise<Pas
     if (e instanceof AccountError && (e.status === 400 || e.status === 403) && /current/i.test(error)) return { ok: false, error, fields: { currentPassword: error } };
     return { ok: false, error };
   }
+}
+
+export type SetUpState = { error?: string; fields?: Record<string, string>; go?: string; values?: Record<string, string> } | null;
+
+/**
+ * The first run (decided 2026-10-27): the company and its first administrator,
+ * made on the Platform with the setup code from its log, then signed in.
+ */
+export async function setUp(_previous: SetUpState, form: FormData): Promise<SetUpState> {
+  const values = Object.fromEntries(["code", "companyName", "name", "email"].map((k) => [k, String(form.get(k) ?? "").trim()]));
+  const password = String(form.get("password") ?? "");
+  let response: Response;
+  try {
+    response = await fetch(`${PLATFORM_API}/setup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...values, password }), cache: "no-store" });
+  } catch {
+    return { error: "Bishnoi One can't be reached right now. Check the connection and try again.", values };
+  }
+  if (!response.ok) {
+    const detail = (await response.json().catch(() => null))?.detail;
+    if (typeof detail === "string") return { error: detail, values };
+    const fields: Record<string, string> = {};
+    for (const e of Array.isArray(detail) ? detail : []) fields[String(e.loc?.at(-1))] = String(e.msg ?? "").replace(/^Value error, /, "");
+    return { fields, error: Object.keys(fields).length ? undefined : "Setting up didn't work. Try again.", values };
+  }
+  try {
+    const session = await accountCall<Session>("/identity/login", { email: values.email, password }, null, await forwardedFor());
+    await dropModuleSessions();
+    (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
+  } catch {
+    return { go: "/login" };
+  }
+  return { go: "/" };
 }

@@ -44,6 +44,8 @@ SERVICES: tuple[Service, ...] = (
     Service("gmail", "Gmail (Google Workspace)", "Each person sends from their own Gmail address, and every email sent is kept on the customer."),
     Service("outlook", "Outlook (Microsoft 365)", "Each person sends from their own Outlook address, and every email sent is kept on the customer."),
     Service("zoho_mail", "Zoho Mail", "Each person sends from their own Zoho Mail address, and every email sent is kept on the customer."),
+    # The CRM's own emails (app/mail.py), unless SMTP_* is set on this server.
+    Service("smtp", "Email sending (Brevo or any SMTP service)", "The CRM's own emails: quotes waiting for approval, price approvals and other notices."),
     # The lead inbox's channels (app/routers/inbox.py): each calls the CRM's /hooks/<channel>.
     Service("facebook", "Facebook (lead forms and Messenger)", "Answers to the page's lead forms, and Messenger messages to the page, arrive in the lead inbox."),
     Service("whatsapp", "WhatsApp Business", "Messages to the company's WhatsApp number arrive in the lead inbox."),

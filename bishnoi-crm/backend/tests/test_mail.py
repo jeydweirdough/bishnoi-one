@@ -60,3 +60,18 @@ def test_nothing_is_sent_while_email_is_off(app, client, crew, ids, outbox):
     app.state.settings.email_enabled = False
     waiting_quote(client, crew, ids)
     assert outbox == []
+
+
+def test_with_nothing_set_here_the_platforms_email_service_sends_it(app, client, crew, ids, monkeypatch):
+    """Email sending is set on the platform (the company's Brevo login and SMTP key), not on this server."""
+    from app import connections
+
+    app.state.settings.email_enabled = False
+    brevo = {"host": "smtp-relay.brevo.com", "port": "587", "username": "a1@smtp-brevo.com", "password": "xsmtpsib-k", "from_email": "crm@getmeds.ph"}
+    monkeypatch.setattr(connections, "service", lambda settings, key, company=None: brevo if key == "smtp" else None)
+    sent = []
+    monkeypatch.setattr(mail.threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda self: sent.append(args)})())
+    waiting_quote(client, crew, ids)
+    assert sent, "nothing was sent"
+    relay = sent[0][1]
+    assert (relay.host, relay.port, relay.username, relay.password, relay.sender, relay.mock) == ("smtp-relay.brevo.com", 587, "a1@smtp-brevo.com", "xsmtpsib-k", "crm@getmeds.ph", False)

@@ -1,5 +1,6 @@
 """Settings, read from backend/.env (see .env.example)."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = API_DIR / ".data"
+
+
+def on_a_server() -> bool:
+    """Whether this runs on a hosting service, which says so in its own settings."""
+    return bool(os.environ.get("VERCEL_ENV")) or any(name.startswith("COOLIFY_") for name in os.environ)
 
 
 class Settings(BaseSettings):
@@ -98,6 +104,19 @@ class Settings(BaseSettings):
             if name and name not in out:
                 out.append(name)
         return out
+
+    @model_validator(mode="after")
+    def _where_it_runs(self):
+        """Nothing to set for where it runs (decided 2026-10-27). On a server
+        (Vercel, Coolify) it's production unless ENVIRONMENT says otherwise; on
+        this computer, development. In production with no ALLOWED_HOSTS it
+        answers to whatever name it's reached by: nothing here is built from that
+        name, and every request is checked by its sign-in or key."""
+        if "environment" not in self.model_fields_set and on_a_server():
+            self.environment = "production"
+        if "allowed_hosts" not in self.model_fields_set and self.environment == "production":
+            self.allowed_hosts = ["*"]
+        return self
 
     @model_validator(mode="after")
     def _this_computer_always(self):

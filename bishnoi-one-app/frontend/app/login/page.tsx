@@ -27,6 +27,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const next = asked.startsWith("/") && !asked.startsWith("//") ? asked : "/";
   const expired = q.expired === "1";
 
+  // A new Bishnoi One with nobody in it yet: set it up first (app/setup).
+  const setup = await accountCall<{ needed: boolean }>("/setup").catch(() => null);
+  if (setup?.needed) redirect("/setup");
+
   const token = await accountToken();
   if (token) {
     const me = await accountCall<Account>("/identity/me", undefined, token).catch(() => null);

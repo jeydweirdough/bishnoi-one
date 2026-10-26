@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * The one key a Bishnoi One deployment makes by hand: the Platform's signing key.
+ * Optional since 2026-10-27: without PASS_SIGNING_KEY the Platform makes its signing key on its
+ * first start and keeps it in its own database. Use this only to keep the key in the server's
+ * settings instead.
  *
  *   node scripts/deploy-keys.mjs
  *

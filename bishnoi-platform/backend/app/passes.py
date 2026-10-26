@@ -51,6 +51,33 @@ def new_signing_key() -> str:
     return base64.b64encode(_raw_private(Ed25519PrivateKey.generate())).decode()
 
 
+KEPT_AS = "signing_key"  # its row in nbpl_settings: never one of Settings' sections, so never shown
+
+
+def keep_in_database(sessions, settings: Settings) -> None:
+    """Production without PASS_SIGNING_KEY (decided 2026-10-27): the key is made
+    on the first start and kept in this database, so there's no key to make by
+    hand. Whoever has a copy of this database can sign passes, so its backups
+    are kept as safely as the server's settings. PASS_SIGNING_KEY still wins."""
+    from pydantic import SecretStr
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models import PlatformSetting
+
+    if settings.pass_signing_key is not None or not settings.is_production:
+        return
+    with sessions() as db:
+        row = db.get(PlatformSetting, KEPT_AS)
+        if row is None:
+            db.add(PlatformSetting(key=KEPT_AS, value={"key": new_signing_key()}, updated_by="first start"))
+            try:
+                db.commit()
+            except IntegrityError:  # another server made it at the same moment: theirs stands
+                db.rollback()
+            row = db.get(PlatformSetting, KEPT_AS)
+        settings.pass_signing_key = SecretStr(row.value["key"])
+
+
 def signing_key(settings: Settings) -> Ed25519PrivateKey:
     if settings.pass_signing_key is not None:
         raw = base64.b64decode(settings.pass_signing_key.get_secret_value().strip())

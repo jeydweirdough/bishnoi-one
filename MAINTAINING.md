@@ -98,57 +98,45 @@ them up in this order.
 1. **Database logins.** On Supabase, run `scripts/supabase/app-users.sql`
    (SQL Editor). It gives each app its own login; copy each app's address
    from the result (the pooler, port 6543).
-2. **Key.** `node scripts/deploy-keys.mjs` prints the Platform's signing key
-   (`PASS_SIGNING_KEY`), the one key made by hand. Shown once. Every other key
-   comes from the Platform's Connections page (step 6).
-3. **Projects.** On Vercel, make any project that doesn't exist yet:
+2. **Projects.** On Vercel, make any project that doesn't exist yet:
    `bishnoi-<app>-backend` for each API (Root Directory
    `bishnoi-<app>/backend`), and one project for the screens (Root Directory
-   `bishnoi-one-app/frontend`). The old per-app screens projects are replaced
-   by it.
-4. **Settings**, below (each project → Settings → Environment Variables →
-   Production).
-5. **Deploy** each app by hand (see [Deploying by hand](#deploying-by-hand)
-   above), the Platform first; the APIs, then the one app.
-6. **Platform > Applications:** set each app's API address. The one app's
-   address is the Platform's `ONE_APP_URL` (the same as the one app's own
-   `ONE_APP_URL`; see [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
-   Then **Platform > Connections:** switch on the links between the apps. Each
-   app's connect key is sent to its registered API address, signed, when it
-   first asks: nothing to copy onto Vercel.
-   A company's outside services (Zoho Books, Gmail, Outlook, Zoho Mail) are
-   filled in on the Platform too: **Companies > the company > Connections**.
-7. **First sign-in:** sign in with the FIRST_ADMIN account, then delete
-   `FIRST_ADMIN_PASSWORD` from the project and redeploy.
-8. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
+   `bishnoi-one-app/frontend`).
+3. **Settings**, below: the only ones there are (since 2026-10-27).
+4. **Deploy** each app by hand (see [Deploying by hand](#deploying-by-hand)
+   above): the Platform first, then the APIs, then the one app.
+5. **Set up:** open the one app. A new Platform shows **Set up Bishnoi One**:
+   the company and its first administrator, with the setup code from the
+   Platform's log (Vercel → the Platform's project → Logs). Once only.
+6. **Admin Console > Applications:** each app's API address and where it opens
+   (`https://one.bishnoi.ai/crm`...). Each app is sent its connect key there by
+   itself, the one app finds each API there, and the links between the apps
+   (Connections) and their keys follow: nothing to copy anywhere.
+   A company's outside services, Brevo email sending included, are filled in at
+   **Companies > the company > Connections**.
+7. **Check:** each API's `/health` answers `{"ok": true}`. If a setting is
    wrong, every request answers 503 naming the setting to look at.
 
-**Every API** (`bishnoi-<app>-backend`):
+**The Platform** (`bishnoi-platform-backend`): `DATABASE_URL` only.
+
+**Every other API** (`bishnoi-<app>-backend`):
 
 | Setting | Value |
 |---|---|
-| `ENVIRONMENT` | `production` |
 | `DATABASE_URL` | Its login from step 1 |
-| `ALLOWED_HOSTS` | `["bishnoi-<app>-backend.vercel.app"]`, its own address |
-| `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | The first administrator (step 7) |
-| `PLATFORM_API_URL` | `https://bishnoi-one-platform-backend.vercel.app` (not the Platform itself): its public key is fetched from there |
-
-**Only some APIs:**
-
-| Project | Setting | Value |
-|---|---|---|
-| `bishnoi-platform-backend` | `PASS_SIGNING_KEY` | From step 2 (secret) |
-| `bishnoi-crm-backend` | `CRM_APP_URL` | `https://bishnoi-one-crm.vercel.app` (links in emails) |
-| | `ORDERS_API_URL`, `ORDERS_API_KEY` | From Bishnoi One Order, when it's ready |
-
-**The screens project** (the one app, `bishnoi-one-app/frontend`):
-
-| Setting | Value |
-|---|---|
-| `ONE_APP_URL` | Its own address, e.g. `https://one.bishnoi.ai` (the same as the Platform's `ONE_APP_URL`) |
 | `PLATFORM_API_URL` | The Platform's API, e.g. `https://bishnoi-one-platform-backend.vercel.app` |
-| `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL`, `ADMIN_API_URL`, `PHARMACY_API_URL` | Each module's API, e.g. `https://bishnoi-one-crm-backend.vercel.app` |
-| `INLICENSING_API_URL`, `REGULATORY_API_URL` | Optional for now: those modules show "Coming soon" |
+
+**The screens project** (the one app): `PLATFORM_API_URL` only.
+
+Worked out by themselves, and still settable to override: `ENVIRONMENT`
+(production on Vercel and Coolify), `ALLOWED_HOSTS` (any name in production),
+`PASS_SIGNING_KEY` (made on the Platform's first start and kept in its
+database; so keep its backups as safe as the server's settings), the first
+administrator (`FIRST_ADMIN_*`, or the setup screen), the one app's
+`ONE_APP_URL` and `*_API_URL` (from Applications), the keys between apps
+(`INTEGRATION_KEYS`, `*_API_KEY`, `PLATFORM_APP_KEY`: from Connections) and the
+CRM's email (`SMTP_*`: the company's Email sending service). On a server that
+is neither Vercel nor Coolify, add `ENVIRONMENT=production`.
 
 Every setting is explained in `bishnoi-one-app/frontend/.env.example` and
 [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
@@ -163,6 +151,9 @@ opening all five apps.
 ---
 
 ## Linking the CRM to Inventory
+
+> Not needed when the apps are connected to the Platform (2026-10-27): the link and its key are
+> made on its Connections page. These steps are for an app running without the Platform.
 
 The CRM's products come from Inventory, with their SRP, and it shows
 Inventory's stock on Products and on new quotes. The two APIs talk through a
@@ -200,6 +191,9 @@ old one.
 ---
 
 ## Linking the CRM to Finance
+
+> Not needed when the apps are connected to the Platform (2026-10-27): the link and its key are
+> made on its Connections page. These steps are for an app running without the Platform.
 
 Finance works out the tax on CRM quotes (the Philippines: VAT, exempt,
 zero-rated, senior citizen and PWD), as the last step of the CRM's price
@@ -257,6 +251,9 @@ tax setup; Finance Staff (Joy, Fely) do everything else.
 ---
 
 ## Linking the CRM to Pharmacy
+
+> Not needed when the apps are connected to the Platform (2026-10-27): the link and its key are
+> made on its Connections page. These steps are for an app running without the Platform.
 
 Pharmacy checks that orders are compliant. A CRM quote marked **Rx** can't be
 ordered until a pharmacist in Pharmacy verifies its prescription.
