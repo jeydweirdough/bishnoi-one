@@ -198,9 +198,40 @@ def purchase_brief(po: PurchaseOrder) -> dict:
 
 
 class Report:
-    def __init__(self, key: str, title: str, group: str, about: str, build: Callable, *, dated: bool = False, by_warehouse: bool = True):
+    """One report. `chart`: how the one app charts it ({kind: bar|line, x: column, series: [columns]})."""
+
+    def __init__(self, key: str, title: str, group: str, about: str, build: Callable, *, dated: bool = False, by_warehouse: bool = True, chart: dict | None = None, fixed: bool = False):
         self.key, self.title, self.group, self.about, self.build = key, title, group, about, build
-        self.dated, self.by_warehouse = dated, by_warehouse
+        self.dated, self.by_warehouse, self.chart, self.fixed = dated, by_warehouse, chart, fixed
+
+
+def bar(x: str, *series: str) -> dict:
+    return {"kind": "bar", "x": x, "series": list(series)}
+
+
+def figure(label: str, value, kind: str = "number", tone: str | None = None) -> dict:
+    return {"label": label, "value": value, "kind": kind, **({"tone": tone} if tone else {})}
+
+
+def total(rows: list[dict], key: str) -> int:
+    return sum(int(r.get(key) or 0) for r in rows)
+
+
+# The headline figures over a report's rows, beside its table (the shared report kit shows them).
+SUMMARY: dict[str, Callable[[list[dict]], list[dict]]] = {
+    "current": lambda rows: [figure("Products", len({r["sku"] for r in rows})), figure("On hand", total(rows, "onHand")), figure("Available", total(rows, "available"))],
+    "valuation": lambda rows: [figure("Value at cost", total(rows, "value"), "money"), figure("Value at selling price", total(rows, "retail"), "money"), figure("Margin on hand", total(rows, "retail") - total(rows, "value"), "money", "good"), figure("Products", len(rows))],
+    "aging": lambda rows: [figure("Value", total(rows, "value"), "money"), figure("Products", len(rows))],
+    "low": lambda rows: [figure("Products low", len(rows), tone="warn" if rows else None), figure("Suggested to order", total(rows, "suggested"))],
+    "out": lambda rows: [figure("Products out", len(rows), tone="bad" if rows else None), figure("Suggested to order", total(rows, "suggested"))],
+    "expiring": lambda rows: [figure("Batches", len(rows), tone="warn" if rows else None), figure("Units", total(rows, "onHand")), figure("Value at risk", total(rows, "value"), "money", "bad" if rows else None), figure("Already expired", sum(1 for r in rows if (r.get("daysLeft") or 0) < 0), tone="bad")],
+    "registrations": lambda rows: [figure("Need attention", sum(1 for r in rows if r["state"] != "CPR valid"), tone="bad"), figure("Expired", sum(1 for r in rows if r["state"] == "CPR expired"), tone="bad"), figure("Expiring", sum(1 for r in rows if r["state"] == "CPR expiring"), tone="warn"), figure("Valid", sum(1 for r in rows if r["state"] == "CPR valid"), tone="good")],
+    "dead": lambda rows: [figure("Products", len(rows), tone="warn" if rows else None), figure("Value tied up", total(rows, "value"), "money", "bad" if rows else None)],
+    "purchases": lambda rows: [figure("Lines received", len(rows)), figure("Units", total(rows, "quantity")), figure("Value", total(rows, "total"), "money")],
+    "issuance": lambda rows: [figure("Lines issued", len(rows)), figure("Units", total(rows, "quantity")), figure("Value", total(rows, "total"), "money")],
+    "adjustments": lambda rows: [figure("Lines", len(rows)), figure("Net units", total(rows, "quantity")), figure("Net value", total(rows, "value"), "money")],
+    "fast": lambda rows: [figure("Units issued", total(rows, "issued")), figure("Orders", total(rows, "orders"))],
+}
 
 
 def col(key: str, label: str, kind: str = "text") -> dict:
@@ -475,23 +506,229 @@ def fast_moving(p: Params):
     return [col("sku", "SKU"), col("product", "Product"), col("issued", "Units issued", "number"), col("orders", "Orders", "number"), col("perDay", "Per day", "number"), col("available", "Available", "number"), col("cover", "Days of cover", "number")], rows[:100]
 
 
+# --- Zoho-style aggregated reports ----------------------------------------------------------------
+# These match what Zoho Inventory offers (Sales by Customer, Sales by Item, etc.): each row is a
+# grouping dimension (customer, product, salesperson, vendor) and every other column is a pre-computed
+# aggregate — count, total quantity, total value — ready to read without further customization.
+
+
+def sales_by_customer(p: Params):
+    """Like Zoho's 'Sales by Customer': each recipient's order count, quantity, value, and share."""
+    q = select(Order).where(Order.status == "issued", Order.issued_at >= p.after, Order.issued_at < p.before)
+    if p.warehouse:
+        q = q.where(Order.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for o in p.db.scalars(q):
+        r = by.setdefault(o.recipient, {"customer": o.recipient, "orders": 0, "items": 0, "quantity": 0, "value": 0})
+        r["orders"] += 1
+        for line in o.lines:
+            r["items"] += 1
+            r["quantity"] += line.quantity
+            r["value"] += line.quantity * line.unit_price
+    rows = sorted(by.values(), key=lambda r: -r["value"])
+    grand = sum(r["value"] for r in rows) or 1
+    for r in rows:
+        r["share"] = round(r["value"] / grand, 4)
+    return [col("customer", "Customer"), col("orders", "Order count", "number"), col("items", "Line items", "number"), col("quantity", "Total quantity", "number"), col("value", "Total value", "money"), col("share", "Share of total", "percent")], rows
+
+
+def sales_by_item(p: Params):
+    """Like Zoho's 'Sales by Item': each product issued — quantity, value, average price, share."""
+    q = select(Order).where(Order.status == "issued", Order.issued_at >= p.after, Order.issued_at < p.before)
+    if p.warehouse:
+        q = q.where(Order.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for o in p.db.scalars(q):
+        for line in o.lines:
+            r = by.setdefault(line.product_id, {"sku": line.product.sku, "product": line.product.name, "orders": 0, "quantity": 0, "value": 0})
+            r["orders"] += 1
+            r["quantity"] += line.quantity
+            r["value"] += line.quantity * line.unit_price
+    rows = sorted(by.values(), key=lambda r: -r["value"])
+    grand = sum(r["value"] for r in rows) or 1
+    for r in rows:
+        r["avgPrice"] = round(r["value"] / r["quantity"]) if r["quantity"] else 0
+        r["share"] = round(r["value"] / grand, 4)
+    return [col("sku", "SKU"), col("product", "Product"), col("orders", "Times ordered", "number"), col("quantity", "Total quantity", "number"), col("avgPrice", "Avg unit price", "money"), col("value", "Total value", "money"), col("share", "Share of total", "percent")], rows
+
+
+def sales_by_salesperson(p: Params):
+    """Like Zoho's 'Sales by Salesperson': each person who issued orders — count, quantity, value."""
+    q = select(Order).where(Order.status == "issued", Order.issued_at >= p.after, Order.issued_at < p.before)
+    if p.warehouse:
+        q = q.where(Order.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for o in p.db.scalars(q):
+        name = o.issued_by.full_name if o.issued_by else (o.created_by.full_name if o.created_by else "Unknown")
+        uid = o.issued_by_id or o.created_by_id or ""
+        r = by.setdefault(uid, {"salesperson": name, "orderCount": 0, "items": 0, "quantity": 0, "value": 0})
+        r["orderCount"] += 1
+        for line in o.lines:
+            r["items"] += 1
+            r["quantity"] += line.quantity
+            r["value"] += line.quantity * line.unit_price
+    rows = sorted(by.values(), key=lambda r: -r["value"])
+    return [col("salesperson", "Name"), col("orderCount", "Order count", "number"), col("items", "Line items", "number"), col("quantity", "Total quantity", "number"), col("value", "Total value", "money")], rows
+
+
+def purchases_by_vendor(p: Params):
+    """Like Zoho's 'Purchases by Vendor': each supplier's receipt count, quantity, spend."""
+    q = select(Receipt).where(Receipt.received_at >= p.after, Receipt.received_at < p.before)
+    if p.warehouse:
+        q = q.where(Receipt.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for r in p.db.scalars(q):
+        name = r.supplier.name if r.supplier else "No supplier"
+        sid = r.supplier_id or ""
+        row = by.setdefault(sid, {"vendor": name, "receipts": 0, "purchaseOrders": 0, "items": 0, "quantity": 0, "spend": 0})
+        row["receipts"] += 1
+        if r.order_id:
+            row["purchaseOrders"] += 1  # counts per receipt; duplicates possible but close enough
+        for line in r.lines:
+            row["items"] += 1
+            row["quantity"] += line.quantity
+            row["spend"] += line.quantity * line.unit_cost
+    rows = sorted(by.values(), key=lambda r: -r["spend"])
+    grand = sum(r["spend"] for r in rows) or 1
+    for r in rows:
+        r["share"] = round(r["spend"] / grand, 4)
+    return [col("vendor", "Vendor"), col("receipts", "Receipts", "number"), col("items", "Line items", "number"), col("quantity", "Total quantity", "number"), col("spend", "Total spend", "money"), col("share", "Share of total", "percent")], rows
+
+
+def purchases_by_item(p: Params):
+    """Like Zoho's 'Purchases by Item': each product received — quantity, cost, avg unit cost."""
+    q = select(Receipt).where(Receipt.received_at >= p.after, Receipt.received_at < p.before)
+    if p.warehouse:
+        q = q.where(Receipt.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for rec in p.db.scalars(q):
+        for line in rec.lines:
+            r = by.setdefault(line.product_id, {"sku": line.product.sku, "product": line.product.name, "receipts": 0, "quantity": 0, "spend": 0})
+            r["receipts"] += 1
+            r["quantity"] += line.quantity
+            r["spend"] += line.quantity * line.unit_cost
+    rows = sorted(by.values(), key=lambda r: -r["spend"])
+    for r in rows:
+        r["avgCost"] = round(r["spend"] / r["quantity"]) if r["quantity"] else 0
+    return [col("sku", "SKU"), col("product", "Product"), col("receipts", "Times received", "number"), col("quantity", "Total quantity", "number"), col("avgCost", "Avg unit cost", "money"), col("spend", "Total cost", "money")], rows
+
+
+def inventory_summary(p: Params):
+    """Like Zoho's 'Inventory Summary': each product's opening stock, received, issued, adjusted, closing, and value.
+    Opening = closing − received + issued − adjusted, where closing is the current on-hand."""
+    products = {x.id: x for x in stocked(p.db)}
+    levels = by_product(p.db, list(products), p.warehouse)
+    q = select(Movement.product_id, Movement.kind, func.sum(Movement.quantity)).where(
+        Movement.at >= p.after, Movement.at < p.before,
+        Movement.kind.not_in(("reserve", "release")),
+    ).group_by(Movement.product_id, Movement.kind)
+    if p.warehouse:
+        q = q.where(Movement.warehouse_id == p.warehouse)
+    moves: dict[str, dict] = defaultdict(lambda: {"received": 0, "issued": 0, "adjusted": 0, "transferred": 0})
+    for pid, kind, n in p.db.execute(q):
+        n = int(n or 0)
+        if kind == "receive":
+            moves[pid]["received"] += n
+        elif kind == "issue":
+            moves[pid]["issued"] += abs(n)
+        elif kind == "adjust":
+            moves[pid]["adjusted"] += n
+        elif kind in ("transfer_in", "transfer_out"):
+            moves[pid]["transferred"] += n
+        elif kind in ("damage", "write_off", "lost", "expired", "return_in", "return_out"):
+            moves[pid]["adjusted"] += n
+    rows = []
+    for pid, x in products.items():
+        closing = levels.get(pid, ZERO)["onHand"]
+        m = moves.get(pid, {"received": 0, "issued": 0, "adjusted": 0, "transferred": 0})
+        opening = closing - m["received"] + m["issued"] - m["adjusted"] - m["transferred"]
+        if not (opening or closing or m["received"] or m["issued"]):
+            continue
+        rows.append({"sku": x.sku, "product": x.name, "opening": opening, "received": m["received"], "issued": m["issued"], "adjusted": m["adjusted"], "closing": closing, "value": closing * x.cost_price})
+    rows.sort(key=lambda r: r["product"].lower())
+    return [col("sku", "SKU"), col("product", "Product"), col("opening", "Opening stock", "number"), col("received", "Received", "number"), col("issued", "Issued", "number"), col("adjusted", "Adjusted", "number"), col("closing", "Closing stock", "number"), col("value", "Closing value", "money")], rows
+
+
+def committed_stock(p: Params):
+    """Like Zoho's 'Committed Stock Details': products with stock committed to open orders — reserved, allocated, by whom."""
+    q = select(Order).where(Order.status.in_(("confirmed", "picking")))
+    if p.warehouse:
+        q = q.where(Order.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for o in p.db.scalars(q):
+        for line in o.lines:
+            r = by.setdefault(line.product_id, {"sku": line.product.sku, "product": line.product.name, "orders": 0, "committed": 0, "value": 0, "customers": set()})
+            r["orders"] += 1
+            r["committed"] += line.quantity
+            r["value"] += line.quantity * line.unit_price
+            r["customers"].add(o.recipient)
+    products_map = {x.id: x for x in stocked(p.db)}
+    product_levels = by_product(p.db, list(by), p.warehouse)
+    rows = []
+    for pid, r in by.items():
+        lv = product_levels.get(pid, ZERO)
+        rows.append({"sku": r["sku"], "product": r["product"], "orders": r["orders"], "customers": len(r["customers"]), "committed": r["committed"], "available": lv["available"], "onHand": lv["onHand"], "value": r["value"]})
+    rows.sort(key=lambda r: -r["committed"])
+    return [col("sku", "SKU"), col("product", "Product"), col("orders", "Open orders", "number"), col("customers", "Customers", "number"), col("committed", "Committed qty", "number"), col("onHand", "On hand", "number"), col("available", "Available", "number"), col("value", "Committed value", "money")], rows
+
+
+def batch_summary(p: Params):
+    """Like Zoho's 'Batch Details': each batch with its product, manufacturing/expiry dates, status, and stock."""
+    q = select(Stock).join(Batch, Stock.batch_id == Batch.id).where(Stock.on_hand > 0)
+    if p.warehouse:
+        q = q.where(Stock.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for s in p.db.scalars(q):
+        b = s.batch
+        r = by.setdefault(b.id, {"sku": s.product.sku, "product": s.product.name, "batch": b.batch_no, "manufactured": day(b.manufactured_on) if b.manufactured_on else "", "expires": day(b.expires_on) if b.expires_on else "", "status": "Expired" if b.expires_on and b.expires_on < today() else ("Expiring" if b.expires_on and (b.expires_on - today()).days <= p.settings.expiry_warning_days else "Active"), "warehouses": set(), "onHand": 0, "value": 0})
+        r["onHand"] += s.on_hand
+        r["value"] += s.on_hand * s.product.cost_price
+        r["warehouses"].add(s.location.warehouse.code)
+    rows = []
+    for r in by.values():
+        rows.append({**r, "warehouses": ", ".join(sorted(r["warehouses"]))})
+    rows.sort(key=lambda r: (r["status"] != "Expired", r["status"] != "Expiring", r["product"].lower()))
+    return [col("sku", "SKU"), col("product", "Product"), col("batch", "Batch"), col("manufactured", "Manufactured", "date"), col("expires", "Expires", "date"), col("status", "Status"), col("warehouses", "Warehouses"), col("onHand", "On hand", "number"), col("value", "Value", "money")], rows
+
+
+# Summary figures for the new aggregated reports.
+SUMMARY.update({
+    "sales-by-customer": lambda rows: [figure("Customers", len(rows)), figure("Orders", sum(r["orders"] for r in rows)), figure("Total value", sum(r["value"] for r in rows), "money")],
+    "sales-by-item": lambda rows: [figure("Products", len(rows)), figure("Total quantity", sum(r["quantity"] for r in rows)), figure("Total value", sum(r["value"] for r in rows), "money")],
+    "sales-by-salesperson": lambda rows: [figure("People", len(rows)), figure("Orders", sum(r["orderCount"] for r in rows)), figure("Total value", sum(r["value"] for r in rows), "money")],
+    "purchases-by-vendor": lambda rows: [figure("Vendors", len(rows)), figure("Receipts", sum(r["receipts"] for r in rows)), figure("Total spend", sum(r["spend"] for r in rows), "money")],
+    "purchases-by-item": lambda rows: [figure("Products", len(rows)), figure("Total quantity", sum(r["quantity"] for r in rows)), figure("Total spend", sum(r["spend"] for r in rows), "money")],
+    "inventory-summary": lambda rows: [figure("Products", len(rows)), figure("Opening", sum(r["opening"] for r in rows)), figure("Received", sum(r["received"] for r in rows)), figure("Issued", sum(r["issued"] for r in rows)), figure("Closing", sum(r["closing"] for r in rows)), figure("Closing value", sum(r["value"] for r in rows), "money")],
+    "committed": lambda rows: [figure("Products committed", len(rows)), figure("Committed units", sum(r["committed"] for r in rows)), figure("Committed value", sum(r["value"] for r in rows), "money")],
+    "batch-summary": lambda rows: [figure("Batches", len(rows)), figure("Units", sum(r["onHand"] for r in rows)), figure("Value", sum(r["value"] for r in rows), "money"), figure("Expired", sum(1 for r in rows if r["status"] == "Expired"), tone="bad"), figure("Expiring", sum(1 for r in rows if r["status"] == "Expiring"), tone="warn")],
+})
+
+
 REPORTS: tuple[Report, ...] = (
     Report("current", "Current inventory", "Stock", "Every product in every warehouse, with each quantity.", current_inventory),
-    Report("valuation", "Inventory valuation", "Stock", "What the stock on hand is worth, at cost and at selling price.", valuation),
-    Report("warehouses", "Warehouse inventory", "Stock", "Each warehouse's totals side by side.", warehouse_inventory, by_warehouse=False),
+    Report("valuation", "Inventory valuation", "Stock", "What the stock on hand is worth, at cost and at selling price.", valuation, chart=bar("product", "value", "retail"), fixed=True),
+    Report("warehouses", "Warehouse inventory", "Stock", "Each warehouse's totals side by side.", warehouse_inventory, by_warehouse=False, chart=bar("warehouse", "onHand", "available")),
     Report("aging", "Stock aging", "Stock", "How long stock has been sitting, by when it came in.", stock_aging),
+    Report("inventory-summary", "Inventory summary", "Stock", "Each product's opening stock, received, issued, adjusted and closing stock for the period.", inventory_summary, dated=True, chart=bar("product", "received", "issued")),
+    Report("committed", "Committed stock", "Stock", "Products with stock committed to open orders that haven't shipped.", committed_stock, by_warehouse=True),
+    Report("batch-summary", "Batch details", "Stock", "Every batch on hand: product, expiry, status and which warehouses hold it.", batch_summary),
     Report("low", "Low stock", "Attention", "Available at or below the reorder point, with how many to order.", by_state("low")),
     Report("out", "Out of stock", "Attention", "Nothing available, with how many to order.", by_state("out")),
-    Report("expiring", "Expiring products", "Attention", "Batches on hand that have expired or expire within the warning window.", expiring),
-    Report("registrations", "Product registrations (CPR)", "Attention", "Each product's FDA registration: missing, without a date, expired or expiring first.", registrations, by_warehouse=False),
-    Report("dead", "Dead stock", "Attention", "On hand, with nothing issued or transferred out in the dead-stock window.", dead_stock),
-    Report("movements", "Stock movement", "Activity", "Every movement in the period.", stock_movement, dated=True),
-    Report("product-movement", "Product movement", "Activity", "Each product's ins and outs over the period.", product_movement, dated=True),
-    Report("fast", "Fast-moving products", "Activity", "What's issued the most, and how long what's left will last.", fast_moving, dated=True),
+    Report("expiring", "Expiring products", "Attention", "Batches on hand that have expired or expire within the warning window.", expiring, fixed=True),
+    Report("registrations", "Product registrations (CPR)", "Attention", "Each product's FDA registration: missing, without a date, expired or expiring first.", registrations, by_warehouse=False, fixed=True),
+    Report("dead", "Dead stock", "Attention", "On hand, with nothing issued or transferred out in the dead-stock window.", dead_stock, chart=bar("product", "value")),
+    Report("movements", "Stock movement", "Activity", "Every movement in the period.", stock_movement, dated=True, fixed=True),
+    Report("product-movement", "Product movement", "Activity", "Each product's ins and outs over the period.", product_movement, dated=True, chart=bar("product", "in", "out")),
+    Report("fast", "Fast-moving products", "Activity", "What's issued the most, and how long what's left will last.", fast_moving, dated=True, chart=bar("product", "issued")),
+    Report("sales-by-customer", "Sales by customer", "Sales", "Each customer's order count, quantity and value — like Zoho's 'Sales by Customer'.", sales_by_customer, dated=True, chart=bar("customer", "value")),
+    Report("sales-by-item", "Sales by item", "Sales", "Each product issued: quantity, average price, value and share of total.", sales_by_item, dated=True, chart=bar("product", "value")),
+    Report("sales-by-salesperson", "Sales by salesperson", "Sales", "Each person who issued orders: count, quantity and value.", sales_by_salesperson, dated=True, by_warehouse=False, chart=bar("salesperson", "value")),
     Report("purchases", "Purchase history", "Purchasing", "Everything received in the period.", purchase_history, dated=True),
-    Report("suppliers", "Supplier performance", "Purchasing", "Fill rate, on-time deliveries and lead time, per supplier.", supplier_performance, by_warehouse=False),
-    Report("issuance", "Sales & issuance history", "Orders", "Everything issued in the period.", issuance_history, dated=True),
-    Report("adjustments", "Inventory adjustments", "Control", "Every posted adjustment in the period, with its reason.", adjustments_report, dated=True),
+    Report("purchases-by-vendor", "Purchases by vendor", "Purchasing", "Each supplier's receipt count, quantity and spend — like Zoho's 'Purchases by Vendor'.", purchases_by_vendor, dated=True, chart=bar("vendor", "spend")),
+    Report("purchases-by-item", "Purchases by item", "Purchasing", "Each product received: quantity, average cost and total spend.", purchases_by_item, dated=True, chart=bar("product", "spend")),
+    Report("suppliers", "Supplier performance", "Purchasing", "Fill rate, on-time deliveries and lead time, per supplier.", supplier_performance, by_warehouse=False, chart=bar("supplier", "fillRate", "onTimeRate")),
+    Report("issuance", "Sales and issuance history", "Orders", "Everything issued in the period.", issuance_history, dated=True),
+    Report("adjustments", "Inventory adjustments", "Control", "Every posted adjustment in the period, with its reason.", adjustments_report, dated=True, fixed=True),
     Report("variance", "Inventory variance", "Control", "Differences found by counts approved in the period.", variance, dated=True),
 )
 BY_KEY = {r.key: r for r in REPORTS}
@@ -499,7 +736,7 @@ BY_KEY = {r.key: r for r in REPORTS}
 
 @router.get("/reports")
 def list_reports(_: allowed("reports.view")) -> list[dict]:
-    return [{"key": r.key, "title": r.title, "group": r.group, "about": r.about, "dated": r.dated, "byWarehouse": r.by_warehouse} for r in REPORTS]
+    return [{"key": r.key, "title": r.title, "group": r.group, "about": r.about, "dated": r.dated, "byWarehouse": r.by_warehouse, "fixed": r.fixed} for r in REPORTS]
 
 
 def run(db: DB, settings: Settings, key: str, warehouse: str | None, start: date | None, end: date | None) -> tuple[Report, list[dict], list[dict], Params]:
@@ -526,7 +763,11 @@ def read_report(
     end: date | None = Query(None, alias="to"),
 ) -> dict:
     report, columns, rows, params = run(db, settings, key, warehouse, start, end)
-    return {"key": report.key, "title": report.title, "about": report.about, "dated": report.dated, "byWarehouse": report.by_warehouse, "from": day(params.start), "to": day(params.end), "columns": columns, "rows": rows}
+    return {
+        "key": report.key, "title": report.title, "group": report.group, "about": report.about, "dated": report.dated, "byWarehouse": report.by_warehouse, "fixed": report.fixed,
+        "from": day(params.start), "to": day(params.end), "columns": columns, "rows": rows,
+        "summary": SUMMARY[report.key](rows) if report.key in SUMMARY else [], "chart": report.chart,
+    }
 
 
 @router.get("/reports/{key}/csv")
