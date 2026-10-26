@@ -115,7 +115,7 @@ export function RecordTable<T extends { id: string }>({
             </thead>
             <tbody>
               {slice.map((r) => (
-                <tr key={r.id} className={`border-b border-rule last:border-0 hover:bg-mint ${rowTone?.(r) === "bad" ? "bg-danger-tint/30" : ""}`}>
+                <tr key={r.id} className={`group border-b border-rule last:border-0 hover:bg-mint ${rowTone?.(r) === "bad" ? "bg-danger-tint/30" : ""}`}>
                   {columns.map((c) => (
                     <td key={c.key} className={`px-[18px] py-3.5 align-middle ${c.kind === "num" ? "text-right tabular-nums" : ""} ${c.kind === "hide-sm" ? "hidden md:table-cell" : ""}`}>
                       {c.render(r)}

@@ -133,8 +133,13 @@ export function useSelection(): Selection {
 export function SelectBox({ id, label }: { id: string; label: string }) {
   const s = useSelection();
   if (!s.selecting) return null;
+  const isChecked = s.isSelected(id);
+  const anySelected = s.ids.length > 0;
+  const visibility = isChecked || anySelected
+    ? "opacity-100"
+    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100";
   return (
-    <label className="relative z-10 -m-3 inline-flex cursor-pointer p-3">
+    <label className={`relative z-10 -m-3 inline-flex cursor-pointer p-3 transition-opacity duration-150 ${visibility}`}>
       <input suppressHydrationWarning
         type="checkbox"
         checked={s.isSelected(id)}
@@ -156,7 +161,7 @@ export function SelectAllBox({ label = "Select all on this page", children }: { 
   }, [s.pageState]);
   if (!s.selecting) return null;
   return (
-    <label className={`relative z-10 inline-flex cursor-pointer items-center gap-3 ${children ? "py-2" : "-m-3 p-3"}`}>
+    <label className={`relative z-10 inline-flex cursor-pointer items-center gap-3 transition-opacity duration-150 ${children ? "py-2" : "-m-3 p-3"} ${s.pageState !== "none" || children ? "opacity-100" : "opacity-60 hover:opacity-100 focus-within:opacity-100"}`}>
       <input suppressHydrationWarning
         ref={box}
         type="checkbox"
@@ -190,7 +195,7 @@ export function SelectableRow({
     <Tag
       data-selected={selected || undefined}
       aria-busy={busy || undefined}
-      className={`${className} transition-opacity ${selected ? "bg-hema-tint/60" : ""} ${busy ? "opacity-45" : ""}`}
+      className={`group ${className} transition-colors ${selected ? "bg-hema-tint/60" : ""} ${busy ? "opacity-45" : ""}`}
     >
       {children}
     </Tag>

@@ -36,7 +36,7 @@ export function ExpandableTable({ columns, rows, minWidth = "46rem" }: { columns
             const isOpen = open === r.id;
             return (
               <Fragment key={r.id}>
-                <tr className={`border-b border-rule transition-colors ${isOpen ? "bg-mint/60" : "hover:bg-bench/60"} ${r.muted ? "text-ink-3" : ""}`}>
+                <tr className={`group border-b border-rule transition-colors ${isOpen ? "bg-mint/60" : "hover:bg-bench/60"} ${r.muted ? "text-ink-3" : ""}`}>
                   {r.cells.map((cell, i) => (
                     <td key={columns[i].key} className={`px-3 py-3 first:pl-5 ${columns[i].align === "right" ? "text-right tabular-nums" : ""} ${columns[i].className ?? ""}`}>
                       {cell}

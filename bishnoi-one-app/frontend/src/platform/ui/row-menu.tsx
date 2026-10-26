@@ -99,7 +99,11 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
         aria-expanded={Boolean(at)}
         aria-label={label}
         title="Actions"
-        className={`relative z-[1] grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-bench hover:text-ink focus-visible:ring-2 focus-visible:ring-sage focus-visible:outline-none disabled:opacity-40 ${at ? "bg-bench text-ink" : ""}`}
+        className={`relative z-[1] grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-all hover:bg-bench hover:text-ink focus-visible:ring-2 focus-visible:ring-sage focus-visible:outline-none disabled:opacity-40 ${
+          at
+            ? "bg-bench text-ink opacity-100"
+            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+        }`}
       >
         <Ellipsis className="size-[1.125rem]" aria-hidden />
       </button>
