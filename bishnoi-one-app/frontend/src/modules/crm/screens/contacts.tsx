@@ -1,4 +1,6 @@
-import { Copy, Plus } from "lucide-react";
+import { CalendarPlus, Copy, ExternalLink, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteContact } from "@/src/modules/crm/actions/crm";
 import { ListViews } from "@/src/modules/crm/components/crm/list-views";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -47,7 +49,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
         actions={
           <>
             {can(me, "customers.edit") && (
-              <LinkButton href="/crm/companies/duplicates?kind=contact" icon={<Copy className="size-4" aria-hidden />}>
+              <LinkButton href="/crm/customers/duplicates?kind=contact" icon={<Copy className="size-4" aria-hidden />}>
                 Possible duplicates
               </LinkButton>
             )}
@@ -137,6 +139,31 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                           <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
                           <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
                         </Link>
+                        <RowMenu
+                          label={`Actions for ${c.name}`}
+                          items={[
+                            { label: "Open", icon: <ExternalLink />, href: `/crm/contacts/${c.id}` },
+                            ...(c.can.edit ? [{ label: "Edit", icon: <Pencil />, href: `/crm/contacts/${c.id}/edit` }] : []),
+                            "divider" as const,
+                            ...(can(me, "activities.create") && c.can.edit
+                              ? [{ label: "Log activity", icon: <CalendarPlus />, href: `/crm/activities/new?contact=${c.id}${c.company ? `&company=${c.company.id}` : ""}&back=/crm/contacts` }]
+                              : []),
+                            ...(can(me, "quotes.create") ? [{ label: "New quote", icon: <FileText />, href: `/crm/contacts/${c.id}/quotes/new` }] : []),
+                            ...(c.can.delete
+                              ? [
+                                  "divider" as const,
+                                  {
+                                    label: "Delete",
+                                    icon: <Trash2 />,
+                                    run: deleteContact.bind(null, c.id),
+                                    danger: true,
+                                    confirm: `Delete ${c.name}? This can't be undone.`,
+                                    done: `${c.name} deleted`,
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
                       </SelectableRow>
                     ))}
                   </ul>

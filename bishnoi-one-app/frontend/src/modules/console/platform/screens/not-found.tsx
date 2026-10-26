@@ -1,6 +1,2 @@
-import { ErrorScreen } from "@/src/modules/console/platform/screens/error-screen";
-import { GoBack, GoHome } from "@/src/modules/console/platform/screens/error-actions";
-
-export default function NotFound() {
-  return <ErrorScreen kind="notFound" actions={<><GoHome primary /><GoBack primary={false} /></>} />;
-}
+// The shared kit's, so every module draws it the same way (decided 2026-10-26, DRY).
+export * from "@/src/platform/screens/not-found";

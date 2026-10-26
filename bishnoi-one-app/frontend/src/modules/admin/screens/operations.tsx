@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import { useState } from "react";
-import type { OperationsPath } from "@/src/modules/admin/actions/operations";
+import { deleteOperation, type OperationsPath } from "@/src/modules/admin/actions/operations";
 import { KINDS, type Cell, type Item } from "@/src/modules/admin/components/operations/kinds";
 import { RecordForm } from "@/src/modules/admin/components/operations/record-form";
 import { DueCell, Initials, RecordTable, Tag } from "@/src/modules/admin/components/record-table";
@@ -86,12 +87,45 @@ export function OperationsScreen({ path, items: initialItems, can }: { path: Ope
         filter={kind.filter}
         emptyIcon={kind.icon}
         empty={{ title: `No ${kind.title.toLowerCase()} yet`, body: can.create ? `Add the first ${kind.one}.` : "They appear here once they're added." }}
-        columns={kind.columns.map((c, n) => ({
-          key: c.key,
-          label: c.label,
-          kind: c.kind,
-          render: (row: Item) => <CellView cell={c.cell(row)} href={n === 0 ? `${kind.route}/${row.id}` : undefined} />,
-        }))}
+        columns={[
+          ...kind.columns.map((c, n) => ({
+            key: c.key,
+            label: c.label,
+            kind: c.kind,
+            render: (row: Item) => <CellView cell={c.cell(row)} href={n === 0 ? `${kind.route}/${row.id}` : undefined} />,
+          })),
+          {
+            key: "actions",
+            label: "",
+            width: "3.5rem",
+            render: (row: Item) => (
+              <RowMenu
+                label={`Actions for ${kind.name(row)}`}
+                items={[
+                  { label: "Open", icon: <ExternalLink />, href: `${kind.route}/${row.id}` },
+                  ...(can.delete
+                    ? [
+                        "divider" as const,
+                        {
+                          label: "Delete",
+                          icon: <Trash2 />,
+                          // The list holds its rows itself, so a deleted one leaves it here too.
+                          run: async () => {
+                            const r = await deleteOperation(path, row.id);
+                            if (r.ok) setItems((all) => all.filter((x) => x.id !== row.id));
+                            return r;
+                          },
+                          danger: true,
+                          confirm: `Delete ${kind.name(row)}? This can't be undone.`,
+                          done: "Deleted",
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ),
+          },
+        ]}
       />
 
       {adding && <RecordForm kind={kind} item={null} onClose={() => setAdding(false)} onSaved={(saved) => setItems((all) => [saved, ...all])} />}

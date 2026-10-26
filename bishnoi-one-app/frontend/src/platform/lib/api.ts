@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { moduleByKey, type ModuleDef, type ModuleKey } from "./modules";
-import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, MODULE_HEADER, moduleCookie } from "./session-cookie";
+import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, MODULE_HEADER, VIEW_AS_HEADER, moduleCookie, viewAsCookie } from "./session-cookie";
 import type { Me, Org } from "./types";
 
 // The browser never talks to the API. Pages and server actions call it from
@@ -57,6 +57,8 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
   // Before signing in, which company: the one last signed in to here. Signed
   // in, the token says (it starts with the company), so nothing is added.
   const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
+  // An administrator viewing this module as someone: every request answered as them, read-only (src/one/view-as.tsx).
+  const viewAs = here.accountOnly ? undefined : jar.get(viewAsCookie(here.key))?.value?.split("|")[0];
   // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
   const form = body instanceof FormData;
   try {
@@ -66,6 +68,7 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(address ? { "X-Forwarded-For": address } : {}),
         ...(company ? { [COMPANY_HEADER]: company } : {}),
+        ...(viewAs ? { [VIEW_AS_HEADER]: viewAs } : {}),
         ...(body === undefined || form ? {} : { "Content-Type": "application/json" }),
         ...extra,
       },

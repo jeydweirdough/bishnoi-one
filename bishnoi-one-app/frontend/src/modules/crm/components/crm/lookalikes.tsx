@@ -34,7 +34,7 @@ export function Lookalikes({ name, phone, email }: { name: string; phone: string
         {found.map((c) => (
           <li key={c.id} className="min-w-0 truncate">
             {c.canOpen ? (
-              <Link href={`/crm/companies/${c.id}`} target="_blank" className="font-medium text-ink hover:underline">
+              <Link href={`/crm/customers/${c.id}`} target="_blank" className="font-medium text-ink hover:underline">
                 {c.name}
               </Link>
             ) : (

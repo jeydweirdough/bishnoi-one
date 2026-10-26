@@ -14,16 +14,16 @@ Only a company administrator (Identity.is_company_admin) may; every change is
 in the audit log (names of what changed, never values) and sent to the modules.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import access_roles
 from app.access_roles import ADMINISTRATOR
-from app.api import Api, changed, conflict, field_error, not_found
+from app.api import Api, changed, check_email, conflict, field_error, not_found
 from app.audit import audit
 from app.deps import DB, SettingsDep
 from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp
@@ -279,6 +279,106 @@ def set_role(person_id: str, body: PersonRoleIn, request: Request, db: DB, me: A
         db.commit()
         told(request, settings, me.company_id)
     return {"id": p.id, "roleId": p.access_role_id}
+
+
+# ---- People: the company's own administrators add and keep them (R2, decided 2026-10-26) --------
+# One list of people for every module: added here once, with the modules they may open and
+# their role; switched off here, they're off everywhere. Each module keeps only what is its own
+# about a person (an e-signature, a licence number, an employee ID).
+
+
+class PersonIn(Api):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: str = Field(max_length=254)
+    title: str | None = Field(None, max_length=120)
+    role_id: str | None = None
+    apps: list[str] = []
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str) -> str:
+        return check_email(value)
+
+
+class PersonPatch(Api):
+    full_name: str | None = Field(None, min_length=2, max_length=120)
+    title: str | None = Field(None, max_length=120)
+    status: Literal["active", "suspended"] | None = None
+
+
+class PasswordIn(Api):
+    password: str | None = Field(None, max_length=200)
+
+
+def person_out(p: Identity) -> dict:
+    return {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status, "isCompanyAdmin": p.is_company_admin, "roleId": p.access_role_id}
+
+
+@router.post("/people", status_code=status.HTTP_201_CREATED)
+def add_person(body: PersonIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Someone new at the company: their account, their role and the modules they may open, in one go."""
+    if db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == body.email.lower())):
+        raise field_error("email", "Somebody here already has that email.")
+    role = get_role(db, me, body.role_id) if body.role_id else None
+    apps = [company_module(db, me, key) for key in dict.fromkeys(body.apps)]
+    p = Identity(company_id=me.company_id, full_name=body.full_name.strip(), email=body.email, title=(body.title or "").strip() or None, access_role_id=role.id if role else None)
+    # Already at another company: the same person, with the password they have.
+    elsewhere = db.scalar(select(Identity).where(func.lower(Identity.email) == body.email.lower(), Identity.password_hash.is_not(None)))
+    if elsewhere is not None:
+        p.password_hash, p.password_changed_at = elsewhere.password_hash, elsewhere.password_changed_at
+    db.add(p)
+    db.flush()
+    for app in apps:
+        db.add(IdentityApp(identity_id=p.id, application_id=app.id, granted_by=me.email))
+    audit(db, me.email, "access.person_added", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
+    db.commit()
+    told(request, settings, me.company_id)
+    return {"person": person_out(p), "hasPassword": p.password_hash is not None}
+
+
+@router.patch("/people/{person_id}")
+def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Their name or title, or switching them off (and on again): off, they can't sign in to any module."""
+    p = get_person(db, me, person_id)
+    fields = {k: v for k, v in changed(body).items() if v is not None and getattr(p, k) != v}
+    if fields.get("status") == "suspended":
+        if p.id == me.id:
+            raise conflict("You can't switch yourself off. Ask another administrator.")
+        role = db.get(AccessRole, p.access_role_id) if p.access_role_id else None
+        if role and role.is_admin and not other_admins_people(db, me.company_id, but=p.id):
+            raise conflict("Someone must always have everything, or nobody could fix a mistake in access. Give it to someone else first.")
+    for name, value in fields.items():
+        setattr(p, name, value.strip() if isinstance(value, str) and name != "status" else value)
+    if fields:
+        action = {"suspended": "access.person_suspended", "active": "access.person_reactivated"}.get(fields.get("status"), "access.person_changed")
+        audit(db, me.email, action, target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=sorted(fields))
+        db.commit()
+        told(request, settings, me.company_id)
+    return {"person": person_out(p)}
+
+
+@router.post("/people/{person_id}/password")
+def set_person_password(person_id: str, body: PasswordIn, db: DB, me: Admin) -> dict:
+    """A first (or replacement) password for their Bishnoi One account; made up when none is typed,
+    and shown once. Their other sign-ins end; they change it themselves afterwards."""
+    from datetime import UTC, datetime
+    import secrets
+
+    from app.security import check_password_rules, hash_password
+
+    p = get_person(db, me, person_id)
+    made = body.password is None
+    password = body.password or secrets.token_urlsafe(9)
+    problem = check_password_rules(password)
+    if problem:
+        raise field_error("password", problem)
+    hashed, now = hash_password(password), datetime.now(UTC)
+    # One password at every company of theirs.
+    for row in db.scalars(select(Identity).where(func.lower(Identity.email) == p.email.lower())):
+        row.password_hash, row.password_changed_at = hashed, now
+    audit(db, me.email, "access.password_set", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
+    db.commit()
+    return {"password": password if made else None}
 
 
 def other_admins_people(db: Session, company_id: str, but: str) -> int:

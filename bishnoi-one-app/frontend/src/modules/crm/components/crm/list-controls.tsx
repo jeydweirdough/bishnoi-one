@@ -107,7 +107,7 @@ export function DeleteRecord({ kind, id, name, body }: { kind: "company" | "cont
           return false;
         }
         toast.success(`${kind === "company" ? "Customer" : "Contact"} deleted`, { description: name });
-        router.push(kind === "company" ? "/crm/companies" : "/crm/contacts");
+        router.push(kind === "company" ? "/crm/customers" : "/crm/contacts");
         router.refresh();
       }}
     />

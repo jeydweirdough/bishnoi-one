@@ -230,10 +230,12 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linke
                    "range": f"{formatted(inv.series, inv.series.first_number)} to {formatted(inv.series, inv.series.last_number)}"} if inv.series else None,
     }
     out |= linked if linked is not None else links(db, [inv])[inv.id]
+    # Every listing carries the payments (loaded with the invoices, no extra queries): the
+    # Sales list opens a row in place to show them (2026-10-25).
+    out["payments"] = [payment_out(p) for p in inv.payments]
     if full:
         out["lines"] = inv.lines
         out["entryId"] = inv.entry_id
-        out["payments"] = [payment_out(p) for p in inv.payments]
         out["methods"] = [{"key": k, "label": v} for k, v in METHODS.items()]
         # A draft is worked out afresh each time it's read; an issued one is as it was issued.
         out["problemFields"] = {}
@@ -289,7 +291,34 @@ def list_invoices(
     counts = dict(db.execute(select(Invoice.status, func.count()).group_by(Invoice.status)).all())
     rows = list(db.scalars(query))
     linked = links(db, rows)
-    return {"items": [invoice_out(db, i, settings, full=False, linked=linked[i.id]) for i in rows], "counts": {k: counts.get(k, 0) for k in ("draft", "issued", "void")}}
+    return {
+        "items": [invoice_out(db, i, settings, full=False, linked=linked[i.id]) for i in rows],
+        "counts": {k: counts.get(k, 0) for k in ("draft", "issued", "void")},
+        "figures": month_figures(db, settings),
+        # How a payment can be made, for Record payment on an opened row.
+        "methods": [{"key": k, "label": v} for k, v in METHODS.items()],
+    }
+
+
+def month_figures(db: Session, settings) -> dict:
+    """The Sales list's two headline figures, this month and last: what was invoiced (issued, not
+    void, by invoice date) and what was collected (payments by the day paid, removed ones left out)."""
+    now = today(settings)
+    first = now.replace(day=1)
+    before = (first - timedelta(days=1)).replace(day=1)
+
+    def invoiced(start: date, end: date) -> int:
+        return int(db.scalar(select(func.coalesce(func.sum(Invoice.total_centavos), 0)).where(
+            Invoice.status == "issued", Invoice.invoice_date >= start, Invoice.invoice_date < end)) or 0)
+
+    def collected(start: date, end: date) -> int:
+        return int(db.scalar(select(func.coalesce(func.sum(InvoicePayment.amount_centavos), 0)).where(
+            InvoicePayment.removed_at.is_(None), InvoicePayment.paid_on >= start, InvoicePayment.paid_on < end)) or 0)
+
+    return {
+        "invoicedCentavos": invoiced(first, now + timedelta(days=1)), "invoicedLastMonthCentavos": invoiced(before, first),
+        "collectedCentavos": collected(first, now + timedelta(days=1)), "collectedLastMonthCentavos": collected(before, first),
+    }
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

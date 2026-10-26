@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { Field, FormError, Input, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
 import { createSupplier, updateSupplier, type SupplierInput } from "@/src/modules/pharmacy/actions/pharmacy";
 import type { Supplier } from "@/src/modules/pharmacy/lib/types";
 
@@ -57,25 +57,27 @@ export function SupplierForm({ supplier, canEdit = true }: { supplier?: Supplier
       }}
       className="space-y-6"
     >
-      <fieldset disabled={!canEdit} className="grid gap-5 sm:grid-cols-2">
-        <Field label="Name" error={fields.name}>
-          {(p) => <Input {...p} value={v.name} onChange={(e) => set({ name: e.target.value })} required autoFocus={!supplier} />}
-        </Field>
-        <Field label="Contact person" optional>
-          {(p) => <Input {...p} value={v.contactPerson} onChange={(e) => set({ contactPerson: e.target.value })} />}
-        </Field>
-        <Field label="Phone" optional>
-          {(p) => <Input {...p} type="tel" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />}
-        </Field>
-        <Field label="Email" optional error={fields.email}>
-          {(p) => <Input {...p} type="email" value={v.email} onChange={(e) => set({ email: e.target.value })} />}
-        </Field>
-        <Field label="Address" optional className="sm:col-span-2">
-          {(p) => <Input {...p} value={v.address} onChange={(e) => set({ address: e.target.value })} />}
-        </Field>
-        <Field label="Notes" optional className="sm:col-span-2">
-          {(p) => <Textarea {...p} value={v.notes} onChange={(e) => set({ notes: e.target.value })} maxLength={4000} />}
-        </Field>
+      <fieldset disabled={!canEdit}>
+        <FormGrid>
+          <Field label="Name" size="md" error={fields.name}>
+            {(p) => <Input {...p} value={v.name} onChange={(e) => set({ name: e.target.value })} required autoFocus={!supplier} />}
+          </Field>
+          <Field label="Contact person" size="md" optional>
+            {(p) => <Input {...p} value={v.contactPerson} onChange={(e) => set({ contactPerson: e.target.value })} />}
+          </Field>
+          <Field label="Phone" size="md" optional>
+            {(p) => <Input {...p} type="tel" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />}
+          </Field>
+          <Field label="Email" size="md" optional error={fields.email}>
+            {(p) => <Input {...p} type="email" value={v.email} onChange={(e) => set({ email: e.target.value })} />}
+          </Field>
+          <Field label="Address" size="full" optional>
+            {(p) => <Input {...p} value={v.address} onChange={(e) => set({ address: e.target.value })} />}
+          </Field>
+          <Field label="Notes" size="full" optional>
+            {(p) => <Textarea {...p} value={v.notes} onChange={(e) => set({ notes: e.target.value })} maxLength={4000} />}
+          </Field>
+        </FormGrid>
       </fieldset>
       <FormError message={error} />
       {canEdit && (

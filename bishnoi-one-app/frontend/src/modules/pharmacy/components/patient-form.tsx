@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
 import { createPatient, updatePatient, type PatientInput } from "@/src/modules/pharmacy/actions/pharmacy";
 import type { Patient, PersonKind } from "@/src/modules/pharmacy/lib/types";
 
@@ -63,50 +63,52 @@ export function PatientForm({ patient, today, kind = "patient", canEdit = true }
       }}
       className="space-y-6"
     >
-      <fieldset disabled={!canEdit} className="grid gap-5 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Choice
-            name="kind"
-            legend="Kind"
-            value={v.kind}
-            onChange={(k) => set({ kind: k })}
-            options={[
-              { value: "patient", label: "Patient: has prescriptions dispensed" },
-              { value: "customer", label: "Customer: buys over the counter" },
-            ]}
-          />
-        </div>
-        <Field label="Full name" error={fields.fullName}>
-          {(p) => <Input {...p} value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} required autoFocus={!patient} />}
-        </Field>
-        <Field label="Date of birth" optional error={fields.birthDate}>
-          {(p) => <Input {...p} type="date" max={today} value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} />}
-        </Field>
-        <Field label="Sex" optional>
-          {(p) => (
-            <Select {...p} value={v.sex} onChange={(e) => set({ sex: e.target.value })}>
-              <option value="">Not given</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="other">Other</option>
-            </Select>
-          )}
-        </Field>
-        <Field label="Phone" optional error={fields.phone}>
-          {(p) => <Input {...p} type="tel" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />}
-        </Field>
-        <Field label="Email" optional error={fields.email}>
-          {(p) => <Input {...p} type="email" value={v.email} onChange={(e) => set({ email: e.target.value })} />}
-        </Field>
-        <Field label="Address" optional>
-          {(p) => <Input {...p} value={v.address} onChange={(e) => set({ address: e.target.value })} />}
-        </Field>
-        <Field label="Allergies" optional className="sm:col-span-2" hint="Shown on every prescription check and at dispensing.">
-          {(p) => <Input {...p} value={v.allergies} onChange={(e) => set({ allergies: e.target.value })} placeholder="Penicillin, sulfa drugs…" />}
-        </Field>
-        <Field label="Notes" optional className="sm:col-span-2">
-          {(p) => <Textarea {...p} value={v.notes} onChange={(e) => set({ notes: e.target.value })} maxLength={4000} />}
-        </Field>
+      <fieldset disabled={!canEdit}>
+        <FormGrid>
+          <div className="sm:col-span-6">
+            <Choice
+              name="kind"
+              legend="Kind"
+              value={v.kind}
+              onChange={(k) => set({ kind: k })}
+              options={[
+                { value: "patient", label: "Patient: has prescriptions dispensed" },
+                { value: "customer", label: "Customer: buys over the counter" },
+              ]}
+            />
+          </div>
+          <Field label="Full name" size="lg" error={fields.fullName}>
+            {(p) => <Input {...p} value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} required autoFocus={!patient} />}
+          </Field>
+          <Field label="Date of birth" size="sm" optional error={fields.birthDate}>
+            {(p) => <Input {...p} type="date" max={today} value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} />}
+          </Field>
+          <Field label="Sex" size="sm" optional>
+            {(p) => (
+              <Select {...p} value={v.sex} onChange={(e) => set({ sex: e.target.value })}>
+                <option value="">Not given</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other</option>
+              </Select>
+            )}
+          </Field>
+          <Field label="Phone" size="lg" optional error={fields.phone}>
+            {(p) => <Input {...p} type="tel" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />}
+          </Field>
+          <Field label="Email" size="md" optional error={fields.email}>
+            {(p) => <Input {...p} type="email" value={v.email} onChange={(e) => set({ email: e.target.value })} />}
+          </Field>
+          <Field label="Address" size="md" optional>
+            {(p) => <Input {...p} value={v.address} onChange={(e) => set({ address: e.target.value })} />}
+          </Field>
+          <Field label="Allergies" size="full" optional hint="Shown on every prescription check and at dispensing.">
+            {(p) => <Input {...p} value={v.allergies} onChange={(e) => set({ allergies: e.target.value })} placeholder="Penicillin, sulfa drugs…" />}
+          </Field>
+          <Field label="Notes" size="full" optional>
+            {(p) => <Textarea {...p} value={v.notes} onChange={(e) => set({ notes: e.target.value })} maxLength={4000} />}
+          </Field>
+        </FormGrid>
       </fieldset>
       <FormError message={error} />
       {canEdit && (

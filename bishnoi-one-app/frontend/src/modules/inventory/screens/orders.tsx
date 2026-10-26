@@ -1,4 +1,8 @@
-import { Plus } from "lucide-react";
+import { Ban, ClipboardList, ExternalLink, PackageOpen, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
+import { ExpandableTable } from "@/src/platform/ui/expandable-table";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/src/modules/inventory/platform/ui/icons";
@@ -24,6 +28,25 @@ import { canAddFrom, context, keepInRange, paging, type Params, type Search } fr
 import { batchChoices, given, referenceOf } from "@/src/modules/inventory/lib/reference";
 import type { BatchRow, Order, OrderBrief, Paged, Reference, Reservation } from "@/src/modules/inventory/lib/types";
 
+type OrderFigures = { openCount: number; issuedThisMonth: number; issuedLastMonth: number };
+
+const ORDER_TABS: [string, string][] = [["", "All"], ["draft", "Drafts"], ["confirmed", "Reserved"], ["picking", "Picking"], ["issued", "Issued"], ["cancelled", "Cancelled"]];
+
+const ORDER_PILL: Record<OrderBrief["status"], [PillTone, string]> = {
+  draft: ["plain", "Draft"],
+  confirmed: ["info", "Reserved"],
+  picking: ["warn", "Picking"],
+  issued: ["good", "Issued"],
+  cancelled: ["bad", "Cancelled"],
+};
+
+/** This month against last, in words: "12% vs last month". */
+function change(now: number, before: number): Figure["change"] {
+  if (!before) return now ? { text: "New this month", tone: "flat" } : undefined;
+  const pct = Math.round(((now - before) / before) * 100);
+  return { text: `${Math.abs(pct)}% vs last month`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+}
+
 export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day, at } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
@@ -40,6 +63,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
     ["orders"],
   );
   const list: Paged<OrderBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  const figures = board ? null : (await loadQuery<{ orderFigures: OrderFigures }>("query($kind: String) { orderFigures(kind: $kind) }", { kind: f.kind || null }, ["orderFigures"])).orderFigures;
   if (!board) keepInRange(list.items.length, list.total, page, base);
   const orders = list.items;
   const issued = f.status === "issued";
@@ -53,42 +77,134 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
       >
         {info ? `${info.intro} Reserved, picked, then issued.` : "Outbound stock: customer orders and issues to departments and projects. Order → reserved → picked → issued."}
       </PageHeader>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ToggleLinks
-          current={board ? "board" : "list"}
-          options={[
-            { value: "board", label: "Board", href: `/inventory/orders${query({ ...f, status: "", view: "" })}` },
-            { value: "list", label: "List", href: `/inventory/orders${query({ ...f, view: "list" })}` },
-            { value: "reservations", label: "Reservations", href: "/inventory/reservations" },
-          ]}
-        />
-      </div>
+      {board && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <ToggleLinks
+            current="board"
+            options={[
+              { value: "board", label: "Board", href: `/inventory/orders${query({ ...f, status: "", view: "" })}` },
+              { value: "list", label: "List", href: `/inventory/orders${query({ ...f, view: "list" })}` },
+              { value: "reservations", label: "Reservations", href: "/inventory/reservations" },
+            ]}
+          />
+        </div>
+      )}
       <Chips label="Type" current={f.kind} options={[{ value: "", label: "All types", href: `/inventory/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/inventory/orders${query({ ...f, kind: k.kind })}` }))]} />
-      {!board && !issued && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("confirmed", "Reserved"), chip("picking", "Picking"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: board ? "" : "list" }} />
-      {board && orders.length > 0 ? (
-        <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
+      {board ? (
+        <>
+          <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: "" }} />
+          {orders.length > 0 ? (
+            <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
+          ) : (
+            <Sheet>
+              <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q)} clear={info ? listHref(info) : "/inventory/orders"} may={may} />
+            </Sheet>
+          )}
+        </>
       ) : (
-      <Sheet>
-        {orders.length === 0 ? (
-          <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={info ? listHref(info) : "/inventory/orders"} may={may} />
-        ) : (
-          <Table head={["Order", info ? info.recipient.label : "Recipient", ...(info ? [] : ["Type"]), "Warehouse", "Status", issued ? "Issued" : "Required date", " Units", ...(info && !info.priced ? [] : [" Value"])]} min="52rem">
-            {orders.map((o) => (
-              <tr key={o.id} className="relative hover:bg-bench/40">
-                <Td><RowLink href={`/inventory/orders/${o.id}`}>{o.number}</RowLink></Td>
-                <Td>{o.recipient}</Td>
-                {!info && <Td className="text-ink-2">{ORDER_KINDS[o.kind]}</Td>}
-                <Td>{o.warehouse.code}</Td>
-                <Td><OrderStamp status={o.status} /></Td>
-                <Td className="whitespace-nowrap">{issued ? at(o.issuedAt) : day(o.neededOn)}</Td>
-                <Td num>{fmt.count(o.units)}</Td>
-                {(!info || info.priced) && <Td num>{o.total ? fmt.peso(o.total) : "—"}</Td>}
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Sheet>
+        <ListFrame>
+          {figures && (
+            <FigureStrip
+              figures={[
+                { label: "Open orders", value: fmt.count(figures.openCount), icon: <ClipboardList className="size-5" aria-hidden /> },
+                ...(!info || info.priced ? [{ label: "Issued this month", value: fmt.peso(figures.issuedThisMonth), icon: <PackageOpen className="size-5" aria-hidden />, change: change(figures.issuedThisMonth, figures.issuedLastMonth) }] : []),
+              ]}
+            />
+          )}
+          <UnderlineTabs tabs={ORDER_TABS.map(([value, label]) => ({ href: `/inventory/orders${query({ q: f.q, kind: f.kind, status: value, view: "list" })}`, label, current: f.status === value }))} />
+          <ListToolbar q={f.q} placeholder={info ? `Search order number or ${info.recipient.label.toLowerCase()}` : "Search order number or recipient"} keep={{ status: f.status, kind: f.kind, view: "list" }}>
+            <ToggleLinks
+              current="list"
+              options={[
+                { value: "board", label: "Board", href: `/inventory/orders${query({ q: f.q, kind: f.kind })}` },
+                { value: "list", label: "List", href: `/inventory/orders${query({ ...f, view: "list" })}` },
+                { value: "reservations", label: "Reservations", href: "/inventory/reservations" },
+              ]}
+            />
+          </ListToolbar>
+          {orders.length === 0 ? (
+            <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={`/inventory/orders${query({ kind: f.kind, view: "list" })}`} may={may} />
+          ) : (
+            <ExpandableTable
+              minWidth="52rem"
+              columns={[
+                { key: "order", label: "Order" },
+                { key: "to", label: info ? info.recipient.label : "Recipient" },
+                ...(info ? [] : [{ key: "kind", label: "Type" }]),
+                { key: "when", label: issued ? "Issued" : "Required date" },
+                { key: "units", label: "Units", align: "right" as const },
+                ...(!info || info.priced ? [{ key: "value", label: "Value", align: "right" as const }] : []),
+                { key: "status", label: "Status" },
+              ]}
+              rows={orders.map((o) => {
+                const st = ORDER_PILL[o.status];
+                const priced = !info || info.priced;
+                return {
+                  id: o.id,
+                  muted: o.status === "cancelled",
+                  actions: (
+                    <RowMenu
+                      label={`Actions for ${o.number}`}
+                      items={[
+                        { label: "Open", icon: <ExternalLink />, href: `/inventory/orders/${o.id}` },
+                        ...(o.status === "draft" && may("orders.edit") ? [{ label: "Edit", icon: <Pencil />, href: `/inventory/orders/${o.id}/edit` }] : []),
+                        "divider" as const,
+                        { label: "Print", icon: <Printer />, href: `/inventory/print/orders/${o.id}` },
+                        ...((o.status === "draft" ? may("orders.edit") : (o.status === "confirmed" || o.status === "picking") && may("orders.approve"))
+                          ? [
+                              "divider" as const,
+                              { label: "Cancel order", icon: <Ban />, run: orderStep.bind(null, o.id, "cancel" as const), danger: true, confirm: `Cancel ${o.number}?`, done: "Order cancelled" },
+                            ]
+                          : []),
+                        ...(o.status === "draft" && may("orders.edit")
+                          ? [{ label: "Delete", icon: <Trash2 />, run: deleteOrder.bind(null, o.id), danger: true, confirm: `Delete ${o.number}? This can't be undone.`, done: `${o.number} deleted` }]
+                          : []),
+                      ]}
+                    />
+                  ),
+                  cells: [
+                    <Link key="n" href={`/inventory/orders/${o.id}`} className="font-mono text-meta font-semibold text-ink hover:text-sage-deep hover:underline">{o.number}</Link>,
+                    <span key="r" className="font-medium text-ink">{o.recipient}</span>,
+                    ...(info ? [] : [<span key="k" className="text-ink-2">{ORDER_KINDS[o.kind]}</span>]),
+                    <span key="w" className="whitespace-nowrap text-ink-2">{issued ? at(o.issuedAt) : day(o.neededOn)}</span>,
+                    <span key="u">{fmt.count(o.units)}</span>,
+                    ...(priced ? [<span key="v" className="font-medium">{o.total ? fmt.peso(o.total) : ""}</span>] : []),
+                    <StatusPill key="s" tone={st[0]}>{st[1]}</StatusPill>,
+                  ],
+                  detail: (
+                    <div className="space-y-3">
+                      <table className="w-full text-meta">
+                        <thead>
+                          <tr className="text-left text-ink-3">
+                            <th className="py-1 pr-3 font-medium">SKU</th>
+                            <th className="px-3 py-1 font-medium">Item</th>
+                            <th className="px-3 py-1 text-right font-medium">Quantity</th>
+                            {priced && <th className="px-3 py-1 text-right font-medium">Unit price</th>}
+                            {priced && <th className="py-1 pl-3 text-right font-medium">Amount</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {o.items.map((l) => (
+                            <tr key={l.sku} className="border-t border-rule/70">
+                              <td className="py-1.5 pr-3 font-mono text-ink-2">{l.sku}</td>
+                              <td className="px-3 py-1.5 text-ink">{l.product}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{fmt.count(l.quantity)}</td>
+                              {priced && <td className="px-3 py-1.5 text-right tabular-nums text-ink-2">{fmt.peso(l.unitPrice)}</td>}
+                              {priced && <td className="py-1.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(l.quantity * l.unitPrice)}</td>}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-rule/70 pt-3">
+                        <LinkButton href={`/inventory/orders/${o.id}`}>Open order</LinkButton>
+                      </div>
+                    </div>
+                  ),
+                };
+              })}
+            />
+          )}
+        </ListFrame>
       )}
       {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "order" : "orders"} />}
     </>
@@ -194,7 +310,7 @@ export async function NewOrderChooser() {
   if (!may("orders.create")) return <NoAccess what="creating orders" />;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/orders", label: "Orders" }]} title="New order">
+      <PageHeader crumbs={[{ href: "/inventory/orders", label: "Sales orders" }]} title="New order">
         Select the order type.
       </PageHeader>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -261,7 +377,7 @@ export async function ReservationsPage({ searchParams }: { searchParams: Search 
   const rows = list.items;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/orders", label: "Orders" }]} title="Reservations">Stock reserved for open orders: reserved on confirmation and allocated during picking. Reserved stock is not available to other orders.</PageHeader>
+      <PageHeader crumbs={[{ href: "/inventory/orders", label: "Sales orders" }]} title="Reservations">Stock reserved for open orders: reserved on confirmation and allocated during picking. Reserved stock is not available to other orders.</PageHeader>
       <Sheet>
         {rows.length === 0 ? (
           <Empty icon="issuance" title="No reservations" />

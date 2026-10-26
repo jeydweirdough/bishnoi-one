@@ -1,4 +1,6 @@
-import { Plus } from "lucide-react";
+import { Boxes, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteMedicine } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Flag } from "@/src/modules/pharmacy/platform/ui/marks";
@@ -122,7 +124,7 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] text-left text-sm">
-              <Head columns={["Medicine", "Category", "Class", { label: "Price", right: true }, { label: "On hand", right: true }, { label: "Available", right: true }]} />
+              <Head columns={["Medicine", "Category", "Class", { label: "Price", right: true }, { label: "On hand", right: true }, { label: "Available", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {medicines.map((m) => (
                   <tr key={m.id} className="relative hover:bg-bench/40">
@@ -147,6 +149,18 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
                     </td>
                     <td className="py-3 pr-5 pl-3 text-right">
                       {m.status === "active" && (m.available ?? 0) <= m.reorderLevel ? <Flag letter="!">{m.available ?? 0}</Flag> : <Qty n={m.available ?? 0} />}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      <RowMenu
+                        label={`Actions for ${m.label}`}
+                        items={[
+                          { label: "Open", icon: <ExternalLink />, href: `/pharmacy/medicines/${m.id}` },
+                          ...(may("batches.view") ? ["divider" as const, { label: "All batches", icon: <Boxes />, href: `/pharmacy/batches?medicine=${m.id}` }] : []),
+                          ...(may("medicines.delete")
+                            ? ["divider" as const, { label: "Delete", icon: <Trash2 />, run: deleteMedicine.bind(null, m.id), danger: true, confirm: `Delete ${m.label}? This can't be undone.`, done: `${m.label} deleted` }]
+                            : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

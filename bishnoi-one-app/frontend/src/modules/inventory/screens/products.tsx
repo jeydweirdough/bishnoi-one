@@ -1,5 +1,7 @@
 import { FirstStep } from "@/src/modules/inventory/components/setup";
-import { Plus } from "lucide-react";
+import { ArrowLeftRight, ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteProduct } from "@/src/modules/inventory/actions/inventory";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
@@ -10,7 +12,7 @@ import { context, keepInRange, paging, type Search } from "@/src/modules/invento
 import { given, referenceOf } from "@/src/modules/inventory/lib/reference";
 import type { Paged, ProductRow, Reference } from "@/src/modules/inventory/lib/types";
 
-export const metadata = { title: "Products" };
+export const metadata = { title: "Items" };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, me } = await context();
@@ -53,19 +55,37 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <CprMark cpr={p.cpr} />
         {p.cpr.number && <span className="block font-mono text-meta text-ink-3">{p.cpr.number}</span>}
       </Td>
+      <td className="px-2 py-2 text-right">
+        <RowMenu
+          label={`Actions for ${p.name}`}
+          items={[
+            { label: "Open", icon: <ExternalLink />, href: `/inventory/products/${p.id}` },
+            ...(may("products.edit") ? [{ label: "Edit", icon: <Pencil />, href: `/inventory/products/${p.id}/edit` }] : []),
+            "divider" as const,
+            ...(may("stock.view") ? [{ label: "Stock movements", icon: <ArrowLeftRight />, href: `/inventory/movements?product=${p.id}` }] : []),
+            ...(may("purchasing.create") && !p.variantCount ? [{ label: "New purchase order", icon: <ShoppingCart />, href: `/inventory/purchase-orders/new?product=${p.id}` }] : []),
+            ...(may("products.delete")
+              ? [
+                  "divider" as const,
+                  { label: "Delete", icon: <Trash2 />, run: deleteProduct.bind(null, p.id), danger: true, confirm: `Delete ${p.name}? This can't be undone.`, done: `${p.name} deleted` },
+                ]
+              : []),
+          ]}
+        />
+      </td>
     </tr>
   );
 
   return (
     <>
       <PageHeader
-        title="Products"
+        title="Items"
         actions={
           <>
-            {may("products.edit") && <LinkButton href="/inventory/products/cpr">Update CPR numbers</LinkButton>}
+            {may("products.edit") && <LinkButton href="/inventory/products/cpr">Item registrations (CPR)</LinkButton>}
             {may("products.create") && (
               <LinkButton href="/inventory/products/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                Add product
+                New item
               </LinkButton>
             )}
           </>
@@ -85,9 +105,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </Filters>
       <Sheet>
         {products.length === 0 ? (
-          <FirstStep icon="products" title="No products" body="Add stocked items with their SKU, unit and reorder level." href="/inventory/products/new" action="Add product" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.cpr || f.status !== "active")} clear="/inventory/products" may={may} />
+          <FirstStep icon="products" title="No items" body="Add stocked items with their SKU, unit and reorder level." href="/inventory/products/new" action="New item" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.cpr || f.status !== "active")} clear="/inventory/products" may={may} />
         ) : (
-          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock", "CPR"]} min="60rem">
+          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock", "CPR", <span key="a" className="sr-only">Actions</span>]} min="60rem">
             {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}
           </Table>
         )}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { Choice, Field, FormError, Input, Select } from "@/src/modules/pharmacy/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select } from "@/src/modules/pharmacy/platform/ui/field";
 import { makeFormat } from "@/src/modules/pharmacy/platform/lib/format";
 import type { Org } from "@/src/modules/pharmacy/platform/lib/types";
 import { counterSale } from "@/src/modules/pharmacy/actions/pharmacy";
@@ -107,8 +107,8 @@ export function SaleForm({ medicines, customers, org }: { medicines: Option[]; c
         </Button>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Customer" optional hint="For their purchase history. Leave empty for a walk-in.">
+      <FormGrid>
+        <Field label="Customer" size="lg" optional hint="For their purchase history. Leave empty for a walk-in.">
           {(p) => (
             <Select {...p} value={customer} onChange={(e) => setCustomer(e.target.value)}>
               <option value="">Walk-in</option>
@@ -120,10 +120,10 @@ export function SaleForm({ medicines, customers, org }: { medicines: Option[]; c
             </Select>
           )}
         </Field>
-        <Field label={`Discount (${fmt.symbol})`} optional>
+        <Field label={`Discount (${fmt.symbol})`} size="sm" optional>
           {(p) => <Input {...p} inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" />}
         </Field>
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-6">
           <Choice
             name="payment"
             legend="Paid by"
@@ -132,7 +132,7 @@ export function SaleForm({ medicines, customers, org }: { medicines: Option[]; c
             options={(Object.keys(PAYMENT_METHODS) as PaymentMethod[]).map((m) => ({ value: m, label: PAYMENT_METHODS[m] }))}
           />
         </div>
-      </div>
+      </FormGrid>
 
       <FormError message={error} />
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">

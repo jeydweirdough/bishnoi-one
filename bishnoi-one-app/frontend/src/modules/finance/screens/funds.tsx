@@ -1,4 +1,6 @@
+import { ExternalLink, FileText } from "lucide-react";
 import Link from "next/link";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import { buttonClass } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -124,8 +126,8 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
         ) : (
           <ul className="divide-y divide-rule">
             {items.map((r) => (
-              <li key={r.id}>
-                <Link href={`/finance/funds/${r.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-bench/60">
+              <li key={r.id} className="flex items-center gap-2 pr-3 hover:bg-bench/60">
+                <Link href={`/finance/funds/${r.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 py-3 pl-5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {r.requester.name}
@@ -147,6 +149,13 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
                   {mixed && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-2">{r.statusLabel}</span>}
                   <Amount r={r} fmt={fmt} />
                 </Link>
+                <RowMenu
+                  label={`Actions for ${r.number}`}
+                  items={[
+                    { label: "Open", icon: <ExternalLink />, href: `/finance/funds/${r.id}` },
+                    ...(r.checkedAt ? [{ label: "Liquidation report", icon: <FileText />, href: `/finance/funds/${r.id}/report` }] : []),
+                  ]}
+                />
               </li>
             ))}
           </ul>

@@ -1,7 +1,8 @@
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { getAccount, type Account } from "@/src/platform/lib/account";
 import { OneActions } from "@/src/one/one-actions";
-import { ModuleBrand } from "@/src/platform/shell/module-brand";
+import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
 
 /** What this person may open here: the Platform's own pages for its staff, roles for a company's administrators. */
@@ -18,12 +19,15 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     });
   if (me.isCompanyAdmin)
     groups.push({
-      label: "Roles and permissions",
+      label: "Users and roles",
+      // A role is made, then given to people.
+      flow: true,
       pages: [
         { href: "/platform/roles", label: "Roles", icon: "roles" },
-        { href: "/platform/roles/people", label: "Role assignments", icon: "teams" },
+        { href: "/platform/roles/people", label: "People", icon: "teams" },
       ],
     });
+  if (me.isCompanyAdmin) groups.push({ label: "Reports", pages: [{ href: "/platform/reports", label: "Reports Center", icon: "reports" }] });
   return groups;
 }
 
@@ -36,18 +40,17 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
  */
 export async function AdminConsoleFrame({ children }: { children: ReactNode }) {
   const me = await getAccount();
+  const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
+  const actions = (
+    <div className="flex items-center gap-1">
+      <OneActions />
+    </div>
+  );
   return (
-    <div className="lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh w-[16.5rem] flex-col overflow-y-auto px-4 py-6 lg:flex print:!hidden">
-        <div className="mb-6 px-3">
-          <ModuleBrand href="/platform" label="Admin Console" company={me.company?.name} />
-        </div>
-        <ConsoleNav groups={consoleGroups(me)} />
-      </aside>
+    <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
+      <ConsoleNav groups={consoleGroups(me)} mine={myModules(me)} company={me.company?.name} rail={rail} actions={actions} />
       <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-        <header className="mb-4 flex items-center justify-end gap-1">
-          <OneActions />
-        </header>
+        <header className="mb-4 hidden items-center justify-end gap-1 lg:flex">{actions}</header>
         <div className="mx-auto max-w-[80rem]">{children}</div>
       </main>
     </div>

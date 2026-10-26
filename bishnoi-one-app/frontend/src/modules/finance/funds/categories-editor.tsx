@@ -4,7 +4,7 @@ import { Pencil, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/modules/finance/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import type { Account } from "@/src/modules/finance/ledger/types";
 import { saveCategory } from "@/src/modules/finance/funds/actions";
 import type { ExpenseCategory } from "@/src/modules/finance/funds/types";
@@ -139,12 +139,12 @@ function CategoryForm({
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule bg-sheet p-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={sub ? "Sub-category name" : "Category name"} error={fields.name}>
+      <FormGrid>
+        <Field label={sub ? "Sub-category name" : "Category name"} size="md" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={sub ? "Dining" : "Food"} autoFocus />}
         </Field>
         {sub ? (
-          <Field label="Parent category" error={fields.parentId}>
+          <Field label="Parent category" size="md" error={fields.parentId}>
             {(p) => (
               <Select {...p} value={parent} onChange={(e) => setParent(e.target.value)}>
                 {tops.map((t) => (
@@ -156,7 +156,7 @@ function CategoryForm({
             )}
           </Field>
         ) : (
-          <Field label="Expense account" error={fields.accountId} hint="Expenses in this category and its sub-categories post to this account.">
+          <Field label="Expense account" size="md" error={fields.accountId} hint="Expenses in this category and its sub-categories post to this account.">
             {(p) => (
               <Select {...p} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
                 <option value="">Select an account…</option>
@@ -169,7 +169,7 @@ function CategoryForm({
             )}
           </Field>
         )}
-      </div>
+      </FormGrid>
       <Field label="Description" optional error={fields.description}>
         {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>

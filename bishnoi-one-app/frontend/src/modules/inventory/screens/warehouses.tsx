@@ -1,4 +1,6 @@
+import { ClipboardCheck, ExternalLink, Package, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
@@ -23,7 +25,7 @@ export async function WarehousesPage({ searchParams }: { searchParams: Search })
         {warehouses.length === 0 ? (
           <Empty icon="warehouses" title="No warehouses">Add a warehouse, then receive stock into it.</Empty>
         ) : (
-          <Table head={["Warehouse", "Address", " Locations", " Products", " Units", " Value"]}>
+          <Table head={["Warehouse", "Address", " Locations", " Products", " Units", " Value", <span key="a" className="sr-only">Actions</span>]}>
             {warehouses.map((w) => (
               <tr key={w.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/inventory/warehouses/${w.id}`} sub={w.isActive ? w.code : `${w.code} · inactive`}>{w.name}</RowLink></Td>
@@ -32,6 +34,23 @@ export async function WarehousesPage({ searchParams }: { searchParams: Search })
                 <Td num>{fmt.count(w.products)}</Td>
                 <Td num>{fmt.count(w.units)}</Td>
                 <Td num>{fmt.peso(w.value)}</Td>
+                <td className="px-2 py-2 text-right">
+                  <RowMenu
+                    label={`Actions for ${w.name}`}
+                    items={[
+                      { label: "Open", icon: <ExternalLink />, href: `/inventory/warehouses/${w.id}` },
+                      "divider" as const,
+                      ...(may("stock.view") ? [{ label: "View stock", icon: <Package />, href: `/inventory/stock?warehouse=${w.id}` }] : []),
+                      ...(may("counts.create") ? [{ label: "Start count", icon: <ClipboardCheck />, href: `/inventory/counts?warehouse=${w.id}` }] : []),
+                      ...(may("warehouses.manage")
+                        ? [
+                            "divider" as const,
+                            { label: "Delete", icon: <Trash2 />, run: deleteWarehouse.bind(null, w.id), danger: true, confirm: `Delete ${w.name}? Only a warehouse with no stock movements can be deleted; otherwise deactivate it.`, done: `${w.name} deleted` },
+                          ]
+                        : []),
+                    ]}
+                  />
+                </td>
               </tr>
             ))}
           </Table>

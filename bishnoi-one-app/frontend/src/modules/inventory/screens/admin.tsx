@@ -1,12 +1,12 @@
-import Link from "next/link";
-import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
-import { Empty, PageHeader, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
+import { PeopleNotice } from "@/src/platform/ui/people-notice";
+import { AuditLog } from "@/src/platform/screens/audit";
+import { PageHeader } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { RolesEditor, UsersEditor } from "@/src/modules/inventory/components/admin";
-import { Chips, NoAccess } from "@/src/modules/inventory/components/ui";
-import { param, query, referenceHref } from "@/src/modules/inventory/lib/labels";
+import { NoAccess } from "@/src/modules/inventory/components/ui";
+import { query } from "@/src/modules/inventory/lib/labels";
 import { context, type Search } from "@/src/modules/inventory/lib/page";
-import type { AdminUsers, AuditEntry, Page, RolesData } from "@/src/modules/inventory/lib/types";
+import type { AdminUsers, RolesData } from "@/src/modules/inventory/lib/types";
 
 export async function UsersPage() {
   const { me, may, fmt } = await context();
@@ -16,6 +16,7 @@ export async function UsersPage() {
   return (
     <>
       <PageHeader title="Users and roles">Users who can sign in to Inventory and their roles. Changes apply on the user&apos;s next action.</PageHeader>
+      <PeopleNotice own="each person's role in Inventory" />
       <UsersEditor data={data} meId={me.user.id} when={when} />
     </>
   );
@@ -87,53 +88,14 @@ const FILTERS = [
 
 const TARGETS: Record<string, string> = { product: "/inventory/products", supplier: "/inventory/suppliers", warehouse: "/inventory/warehouses" };
 
+/** The activity log: the shared one (src/platform/screens/audit.tsx), with Inventory's words, filters and record links. */
 export async function AuditPage({ searchParams }: { searchParams: Search }) {
-  const { may, at } = await context();
+  const { may } = await context();
   if (!may("admin.audit")) return <NoAccess what="the activity log" />;
-  const s = await searchParams;
-  const action = FILTERS.find((f) => f.key === param(s, "action"))?.key ?? "";
-  const before = param(s, "before");
-  const { audit: page } = await loadQuery<{ audit: Page<AuditEntry> }>(
-    `query Audit($action: String, $before: Int) { audit(action: $action, before: $before, limit: 50) }`,
-    { ...(action ? { action } : {}), ...(before ? { before: Number(before) } : {}) },
-    ["audit"],
-  );
-  const last = page.items.at(-1);
   return (
-    <>
-      <PageHeader title="Activity log">
-        User actions, newest first. Changed fields are listed without their values. Stock changes are recorded in stock movements.
-      </PageHeader>
-      <Chips label="Show" current={action} options={FILTERS.map((f) => ({ value: f.key, label: f.label, href: `/inventory/admin/audit${query({ action: f.key })}` }))} />
-      <Sheet className="px-5 pt-2 pb-3">
-        {page.items.length === 0 ? (
-          <Empty title={before ? "No older records" : "No activity recorded"} icon="auditLog" />
-        ) : (
-          <ol className="divide-y divide-rule">
-            {page.items.map((e) => {
-              const href = e.targetType && e.targetId ? (referenceHref(e.targetType, e.targetId) ?? (TARGETS[e.targetType] ? `${TARGETS[e.targetType]}/${e.targetId}` : null)) : null;
-              return (
-                <li key={e.id} className="grid gap-x-4 gap-y-0.5 py-3 sm:grid-cols-[11rem_minmax(0,1fr)]">
-                  <time dateTime={e.at} className="text-meta text-ink-3 tabular-nums">{at(e.at)}</time>
-                  <div className="min-w-0">
-                    <p className="text-sm">
-                      <span className="font-semibold">{ACTIONS[e.action] ?? e.action.replaceAll(/[._]/g, " ")}</span>
-                      {e.target && <span className="text-ink-2"> · {href ? <Link href={href} className="hover:text-ink hover:underline">{e.target}</Link> : e.target}</span>}
-                    </p>
-                    <p className="text-meta text-ink-3">by {e.actor}{e.fields.length > 0 && <> · changed {e.fields.join(", ")}</>}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Sheet>
-      {(page.more || before) && (
-        <div className="mt-4 flex gap-2">
-          {before && <LinkButton href={`/inventory/admin/audit${query({ action })}`} size="sm" variant="quiet">Newest</LinkButton>}
-          {page.more && last && <LinkButton href={`/inventory/admin/audit${query({ action, before: last.id })}`} size="sm">Older</LinkButton>}
-        </div>
-      )}
-    </>
+    <AuditLog
+      searchParams={searchParams}
+      settings={{ words: ACTIONS, filters: FILTERS, targets: TARGETS, about: "User actions, newest first. Changed fields are listed without their values. Stock changes are recorded in stock movements." }}
+    />
   );
 }

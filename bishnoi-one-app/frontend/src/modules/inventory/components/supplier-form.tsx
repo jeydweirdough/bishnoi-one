@@ -107,7 +107,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       </Sheet>
       <FormError message={error} />
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>{supplier ? "Save changes" : "Add supplier"}</Button>
+        <Button type="submit" variant="primary" loading={pending}>{supplier ? "Save changes" : "Save vendor"}</Button>
         <LinkButton href={supplier ? `/inventory/suppliers/${supplier.id}` : "/inventory/suppliers"} variant="quiet">Cancel</LinkButton>
       </div>
     </form>

@@ -14,6 +14,8 @@ one of them:
 | **Odoo** | The closest match to how we're built: one timeline for any record, one filter shown as table, board or chart |
 | **Marg ERP** | Indian pharma distribution: keyboard entry, batches and expiry, trade schemes, GST, receivables |
 | **Veeva** | Pharma field work: structured doctor visits, call plans, offline, records locked once submitted. Its regulated extras stay out (see best-of-breed.md) |
+| **HubSpot** | The everyday CRM: associations, one activity on several records, the inbox |
+| **Zoho** (added 2026-10-24) | The suite: one sign-in, a sidebar that switches modules and keeps each module's menu to its processes, blueprints |
 
 ## The files
 
@@ -22,6 +24,7 @@ one of them:
 | [benchmark-matrix.md](benchmark-matrix.md) | **The benchmark.** One row per capability: who does it best, where each of our apps stands today, and the decision for it |
 | [best-of-breed.md](best-of-breed.md) | Reference notes: what each benchmark actually does, and why it matters to us |
 | [patterns-to-adopt.md](patterns-to-adopt.md) | Patterns we build every app to, whichever app it is |
+| [surpass.md](surpass.md) | What we add to beat each benchmark, with the reports; the sidebar (module switcher, process menu) and trails and tracks |
 | [decisions.md](decisions.md) | The decisions rows depend on (ICP, D2, D4, D7, D8), what each means, and what's still open |
 
 ## The rules

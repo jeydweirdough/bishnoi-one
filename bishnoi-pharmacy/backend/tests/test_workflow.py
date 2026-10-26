@@ -258,10 +258,16 @@ def test_reports_and_the_dashboard(client, ben, cy, stocked):
     take_in(client, cy, stocked["id"])
     dash = client.get("/dashboard", headers=cy).json()
     assert dash["prescriptions"]["inbox"] == 1 and dash["stock"]["expiring"] == 1  # the SOON lot
-    for name in ("prescriptions", "dispensing", "sales", "usage", "expiry", "stock"):
-        r = client.get(f"/reports/{name}", headers=ben)
-        assert r.status_code == 200, (name, r.text)
-    assert client.get("/reports/sales", headers=cy).status_code == 403  # assistants don't read reports
+    listed = client.get("/reports", headers=ben).json()
+    assert {"Prescriptions", "Dispensing", "Sales", "Inventory"} <= {r["group"] for r in listed}
+    for r in listed:  # every report answers in the report kit's shape
+        body = client.get(f"/reports/{r['key']}", headers=ben)
+        assert body.status_code == 200, (r["key"], body.text)
+        assert body.json()["columns"], r["key"]
+    expiring = client.get("/reports/expiry", headers=ben).json()
+    assert len(expiring["rows"]) == 1  # the SOON lot
+    assert client.get("/reports", headers=cy).json() == []  # assistants don't read reports
+    assert client.get("/reports/sales-summary", headers=cy).status_code == 403
 
 
 def test_administration_is_the_administrators(client, ana, ben):

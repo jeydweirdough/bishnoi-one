@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
 import { logVisit, pinClinic } from "@/src/modules/crm/actions/field";
@@ -214,8 +214,8 @@ export function LogVisitForm({
           </Select>
         )}
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Outcome" error={fields.outcome}>
+      <FormGrid>
+        <Field label="Outcome" size="md" error={fields.outcome}>
           {(p) => (
             <Select {...p} value={outcome} onChange={(e) => setOutcome(e.target.value as VisitOutcome)}>
               {OUTCOMES.map((o) => (
@@ -227,7 +227,7 @@ export function LogVisitForm({
           )}
         </Field>
         {outcome !== "not_in" && (
-          <Field label="Patient Care Group" error={fields.careGroup}>
+          <Field label="Patient Care Group" size="md" error={fields.careGroup}>
             {(p) => (
               <Select {...p} value={careGroup} onChange={(e) => setCareGroup(e.target.value as CareGroup)}>
                 {CARE_GROUP.map((c) => (
@@ -239,16 +239,16 @@ export function LogVisitForm({
             )}
           </Field>
         )}
-      </div>
+      </FormGrid>
       {collecting && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Amount collected" error={fields.amountCentavos}>
+        <FormGrid>
+          <Field label="Amount collected" size="sm" error={fields.amountCentavos}>
             {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus />}
           </Field>
-          <Field label="Receipt number" optional hint="The OR or acknowledgment receipt you gave." error={fields.receiptNo}>
+          <Field label="Receipt number" size="lg" optional hint="The OR or acknowledgment receipt you gave." error={fields.receiptNo}>
             {(p) => <Input {...p} value={receipt} onChange={(e) => setReceipt(e.target.value)} maxLength={40} />}
           </Field>
-        </div>
+        </FormGrid>
       )}
       <Field label="Date and time" error={fields.visitedAt}>
         {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}

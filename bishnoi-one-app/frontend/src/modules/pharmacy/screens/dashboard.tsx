@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import { ClipboardPlus, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
         {fmt.dateLabel(d.today)} · {d.sales.count} sale{d.sales.count === 1 ? "" : "s"} today, {fmt.peso(d.sales.totalCentavos)} ·{" "}
         {d.dispensing.today} dispensing{d.dispensing.today === 1 ? "" : "s"} ({d.dispensing.unitsToday} units)
       </PageHeader>
+      <Welcome module="pharmacy" name={me.user.fullName.split(" ")[0]} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Sheet className="px-5 pt-5 pb-2">

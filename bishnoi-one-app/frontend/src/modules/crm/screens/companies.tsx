@@ -1,9 +1,12 @@
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteCompany } from "@/src/modules/crm/actions/crm";
+import { MenuDivider, MenuLink, MoreMenu } from "@/src/platform/ui/more-menu";
 import { CustomerSharingButton } from "@/src/modules/crm/components/crm/customer-sharing";
 import { Board as KanbanBoard } from "@/src/platform/ui/board";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { moveCustomerType } from "@/src/modules/crm/actions/boards";
 import { ListViews } from "@/src/modules/crm/components/crm/list-views";
-import { Copy, Download, Sparkles, Upload } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, Handshake, Pencil, Sparkles, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { NewCustomerButton } from "@/src/modules/crm/components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -65,7 +68,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const layoutHref = (l: string) => {
     const next = new URLSearchParams(here);
     if (l === "board") next.set("layout", "board");
-    return `/crm/companies${next.size ? `?${next}` : ""}`;
+    return `/crm/customers${next.size ? `?${next}` : ""}`;
   };
   const filters = (types: CustomerType[]) => (
     <Filters
@@ -85,30 +88,38 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         title="Customers"
         actions={
           <>
-            {/* Whether a division's customers show to the others: the administrator's, and a manager's for their divisions. */}
-            {(can(me, "admin.teams") || me.role?.scope === "managed") && <CustomerSharingButton />}
+            {/* One main action, one helper, the rest under More (decided 2026-10-26, Hick's law). */}
             {can(me, "customers.create") && (
-              <LinkButton href="/crm/companies/find" icon={<Sparkles className="size-4" aria-hidden />}>
+              <LinkButton href="/crm/customers/find" icon={<Sparkles className="size-4" aria-hidden />}>
                 Find leads with AI
-              </LinkButton>
-            )}
-            {can(me, "customers.edit") && (
-              <LinkButton href="/crm/companies/duplicates" icon={<Copy className="size-4" aria-hidden />}>
-                Possible duplicates
-              </LinkButton>
-            )}
-            {(can(me, "customers.create") || can(me, "customers.edit")) && (
-              <LinkButton href="/crm/companies/import" icon={<Upload className="size-4" aria-hidden />}>
-                Import
-              </LinkButton>
-            )}
-            {can(me, "reports.export") && (
-              <LinkButton href={`/crm/companies/export${here.size ? `?${here}` : ""}`} download icon={<Download className="size-4" aria-hidden />}>
-                {filtered ? "Export these" : "Export"}
               </LinkButton>
             )}
             {can(me, "customers.create") && (
 <NewCustomerButton />
+            )}
+            {(can(me, "customers.create") || can(me, "customers.edit") || can(me, "reports.export") || can(me, "admin.teams") || me.role?.scope === "managed") && (
+              <MoreMenu>
+                {(can(me, "customers.create") || can(me, "customers.edit")) && (
+                  <MenuLink href="/crm/customers/import" icon={<Upload />}>
+                    Import customers
+                  </MenuLink>
+                )}
+                {can(me, "reports.export") && (
+                  <MenuLink href={`/crm/customers/export${here.size ? `?${here}` : ""}`} icon={<Download />} download>
+                    {filtered ? "Export these customers" : "Export customers"}
+                  </MenuLink>
+                )}
+                {can(me, "customers.edit") && (
+                  <>
+                    <MenuDivider />
+                    <MenuLink href="/crm/customers/duplicates" icon={<Copy />}>
+                      Possible duplicates
+                    </MenuLink>
+                  </>
+                )}
+                {/* Whether a division's customers show to the others: the administrator's, and a manager's for their divisions. */}
+                {(can(me, "admin.teams") || me.role?.scope === "managed") && <CustomerSharingButton menu />}
+              </MoreMenu>
             )}
           </>
         }
@@ -165,7 +176,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                       title={filtered ? "No customers match" : "No customers yet"}
                       actions={
                         filtered ? (
-                          <LinkButton href="/crm/companies">Clear filters</LinkButton>
+                          <LinkButton href="/crm/customers">Clear filters</LinkButton>
                         ) : (
                           can(me, "customers.create") && (
         <NewCustomerButton />
@@ -189,7 +200,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                           <SelectableRow key={c.id} id={c.id} as="li" className="flex items-center gap-3 px-5 hover:bg-bench/40">
                             {bulkAllowed && <SelectBox id={c.id} label={c.name} />}
                             <Link
-                              href={`/crm/companies/${c.id}`}
+                              href={`/crm/customers/${c.id}`}
                               className="grid min-w-0 flex-1 gap-1 py-3 md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,9rem)_minmax(0,9rem)_6rem] md:items-center md:gap-4"
                             >
                               <span className="min-w-0">
@@ -217,6 +228,30 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                               <span className="truncate text-meta text-ink-2">{c.owner.id === me.user.id ? "You" : c.owner.name}</span>
                               <span className="text-meta text-ink-3">{c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity"}</span>
                             </Link>
+                            {/* What can be done to this customer, by the person's role (decided 2026-10-26). */}
+                            <RowMenu
+                              label={`Actions for ${c.name}`}
+                              items={[
+                                { label: "Open", icon: <ExternalLink />, href: `/crm/customers/${c.id}` },
+                                ...(can(me, "customers.edit") ? [{ label: "Edit", icon: <Pencil />, href: `/crm/customers/${c.id}/edit` }] : []),
+                                "divider" as const,
+                                ...(can(me, "deals.create") ? [{ label: "New deal", icon: <Handshake />, href: `/crm/deals/new?company=${c.id}` }] : []),
+                                ...(can(me, "quotes.create") ? [{ label: "New quote", icon: <FileText />, href: `/crm/customers/${c.id}/quotes/new` }] : []),
+                                ...(can(me, "customers.delete")
+                                  ? [
+                                      "divider" as const,
+                                      {
+                                        label: "Delete",
+                                        icon: <Trash2 />,
+                                        run: deleteCompany.bind(null, c.id),
+                                        danger: true,
+                                        confirm: `Delete ${c.name}? Its contacts, deals and history go with it.`,
+                                        done: `${c.name} deleted`,
+                                      },
+                                    ]
+                                  : []),
+                              ]}
+                            />
                           </SelectableRow>
                         ))}
                       </ul>
@@ -227,7 +262,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                   <RecordsBulk kind="companies" types={types} can={bulk} people={people} filters={Object.fromEntries(here)} total={list.total} org={me.org} />
                 )}
               </SelectionProvider>
-              <Pager total={list.total} page={page} size={SIZE} base={`/crm/companies${here.size ? `?${here}` : ""}`} />
+              <Pager total={list.total} page={page} size={SIZE} base={`/crm/customers${here.size ? `?${here}` : ""}`} />
             </>
           );
         }}
@@ -267,7 +302,7 @@ function CustomersBoard({ me, list, types, fmt }: { me: Awaited<ReturnType<typeo
         cards={list.items.map((c) => ({
           id: c.id,
           column: c.status,
-          href: `/crm/companies/${c.id}`,
+          href: `/crm/customers/${c.id}`,
           title: c.name,
           sub: [c.city, c.industry].filter(Boolean).join(" · ") || undefined,
           when: c.lastActivityAt ? fmt.whenLabel(c.lastActivityAt) : "No activity",

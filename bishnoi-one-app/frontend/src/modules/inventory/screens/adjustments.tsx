@@ -35,7 +35,7 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
   return (
     <>
       <PageHeader
-        title="Stock adjustments"
+        title="Inventory adjustments"
         actions={may("adjustments.create") && <LinkButton href="/inventory/adjustments/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New adjustment</LinkButton>}
       >
         Corrects stock when the physical quantity differs from the system. Each adjustment needs a reason and is recorded in stock movements.
@@ -44,7 +44,7 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
       <Chips label="Status" current={status} options={[chip("", "All"), chip("pending", "Pending approval"), chip("posted", "Posted"), chip("rejected", "Rejected")]} />
       <Sheet>
         {rows.length === 0 ? (
-          <Empty icon="adjustments" title="No adjustments" />
+          <Empty icon="adjustments" title="No inventory adjustments" />
         ) : (
           <Table head={["Adjustment", "Reason", "Warehouse", "Status", "Created by", " Units", " Value"]} min="52rem">
             {rows.map((a) => (
@@ -75,7 +75,7 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/inventory/adjustments", label: "Adjustments" }]}
+        crumbs={[{ href: "/inventory/adjustments", label: "Inventory adjustments" }]}
         title={a.number}
         tools={pending && may("adjustments.create") && <RecordTools what="adjustment" name={a.number} remove={withdrawAdjustment.bind(null, a.id)} after="/inventory/adjustments" removeNote="It hasn't been posted, so nothing in stock changes." />}
         actions={
@@ -120,7 +120,7 @@ export async function NewAdjustmentPage({ searchParams }: { searchParams: Search
   const { may } = await context();
   if (!may("adjustments.create")) return <NoAccess what="creating adjustments" />;
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
-  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/inventory/adjustments/new", title: "New adjustment", doing: "adjust stock", crumbs: [{ href: "/inventory/adjustments", label: "Adjustments" }], may });
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/inventory/adjustments/new", title: "New adjustment", doing: "adjust stock", crumbs: [{ href: "/inventory/adjustments", label: "Inventory adjustments" }], may });
   if (gate) return gate;
   const s = await searchParams;
   const { reference: ref, reasons, batches } = await loadQuery<{ reference: Pick<Reference, "products" | "units" | "warehouses">; reasons: ReasonOption[]; batches: BatchRow[] }>(
@@ -130,7 +130,7 @@ export async function NewAdjustmentPage({ searchParams }: { searchParams: Search
   );
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/adjustments", label: "Adjustments" }]} title="New adjustment">
+      <PageHeader crumbs={[{ href: "/inventory/adjustments", label: "Inventory adjustments" }]} title="New inventory adjustment">
         {may("adjustments.approve") ? "Stock is updated when you save." : "Requires approval before stock is updated."}
       </PageHeader>
       <AdjustmentForm canAdd={canAddFrom(may)} reference={ref} reasons={reasons} batches={batches} approves={may("adjustments.approve")} preset={{ reason: param(s, "reason"), warehouseId: param(s, "warehouse") }} />

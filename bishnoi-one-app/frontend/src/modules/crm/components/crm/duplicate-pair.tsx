@@ -49,7 +49,7 @@ export function DuplicatePair({
   const [pending, start] = useTransition();
   const kept = keep === a.id ? a : b;
   const other = keep === a.id ? b : a;
-  const path = kind === "company" ? "/crm/companies" : "/crm/contacts";
+  const path = kind === "company" ? "/crm/customers" : "/crm/contacts";
   const noun = kind === "company" ? "customer" : "contact";
 
   return (

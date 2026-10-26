@@ -17,6 +17,7 @@ from app.migrate import upgrade
 from app.routers import admin, auth, exports, finance, funds, integration, invoices, ledger, prices, profile, receivables, tax, unset
 from app.routers import bank as bank_router
 from app.routers import bir as bir_router
+from app.routers import reports as reports_router
 from app.tax import rates as tax_rates
 from app.guard import install as install_guard
 
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(invoices.router)
     app.include_router(receivables.router)
     app.include_router(bir_router.router)
+    app.include_router(reports_router.router)
     app.include_router(bank_router.router)
     app.include_router(prices.router)
     app.include_router(unset.router)

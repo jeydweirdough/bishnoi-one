@@ -110,3 +110,23 @@ operations, commerce).
 Marketing email at scale, landing pages, ads and social publishing (the
 marketing hub); the service hub's tickets and customer portal; Breeze AI
 (AI out, per the project's rules, until lead sources and integrations, g-integrations).
+
+
+## Zoho (One, CRM, Books, Inventory): the suite and its sidebar
+
+Added 2026-10-24 as the reference for how a suite of modules is navigated.
+Zoho One gives one sign-in across its apps; each app's sidebar starts with an
+app switcher and keeps its own menu short, grouped by the work (Zoho Books:
+Sales, Purchases, Accountant, Reports). Blueprints draw a process as states,
+with who may move a record on and what they must fill in. Settings are found
+by search.
+
+### Transferable (promoted to [patterns-to-adopt.md](patterns-to-adopt.md))
+
+- The switcher at the top of the sidebar, listing only what you may use (P15).
+- Menus grouped by process, not record type (P15).
+- Blueprints as the track on a record, its approvals and the stuck report (P16).
+
+### Not transferable
+
+- Zoho's per-app separate settings and billing: ours stay on the Platform.

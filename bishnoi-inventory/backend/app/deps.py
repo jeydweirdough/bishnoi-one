@@ -84,6 +84,7 @@ def current_session(
 
 
 def current_user(
+    request: Request,
     record: Annotated[SignInSession, Depends(current_session)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
@@ -93,7 +94,10 @@ def current_user(
     user = db.get(User, record.user_id)
     if user is None or not user.is_active or as_utc(record.created_at) < as_utc(user.password_changed_at):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SIGN_IN_AGAIN)
-    return user
+    # An administrator viewing as someone: answered as them, read-only (app/platform_roles.py).
+    from app.platform_roles import viewed_as
+
+    return viewed_as(request, db, user)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]

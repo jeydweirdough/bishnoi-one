@@ -18,6 +18,7 @@ database as before (StoredFile).
 import logging
 import threading
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from app.config import Settings
 
@@ -58,7 +59,11 @@ def client(settings: Settings):
 
 def _browsers_allowed(settings: Settings) -> None:
     """The bucket takes uploads from the screens' own address, nobody else's (set once per process)."""
-    origins = sorted({o.rstrip("/") for o in [*settings.s3_browser_origins, *settings.cors_origins] if o})
+    # The screens' own address (CRM_APP_URL: the one app online) is always one of them, so a
+    # customer's order link can upload wherever the screens are served.
+    own = urlsplit(settings.crm_app_url) if settings.crm_app_url else None
+    here = [f"{own.scheme}://{own.netloc}"] if own and own.scheme and own.netloc else []
+    origins = sorted({o.rstrip("/") for o in [*settings.s3_browser_origins, *settings.cors_origins, *here] if o})
     marker = f"{settings.s3_bucket}|{'|'.join(origins)}"
     with _lock:
         if marker in _cors_done:

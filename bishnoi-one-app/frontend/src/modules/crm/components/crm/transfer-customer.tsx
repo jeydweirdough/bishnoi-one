@@ -58,7 +58,7 @@ export function TransferCustomer({ companyId, companyName }: { companyId: string
       toast.success(`${companyName} is now ${r.data.to.name}'s`, { description: extra ? `With ${extra}.` : undefined });
       close();
       // Out of reach now: back to the customers this person still has.
-      if (!r.data.stillYours) router.push("/crm/companies");
+      if (!r.data.stillYours) router.push("/crm/customers");
     });
   }
 

@@ -33,12 +33,12 @@ export default async function QuickQuotePage({ params, searchParams }: { params:
     : [];
   return (
     <>
-      <PageHeader title="Quick quote" crumbs={[{ href: `/crm/companies/${company.id}`, label: company.name }]}>
+      <PageHeader title="Quick quote" crumbs={[{ href: `/crm/customers/${company.id}`, label: company.name }]}>
         Find the medicines {company.name} needs, at their price, and pick how many: the quote is made, and its quotation letter opens.
       </PageHeader>
       {types.length > 1 && (
         <div className="mb-4">
-          <ToggleLinks current={type.code} options={types.map((t) => ({ value: t.code, label: t.name, href: `/crm/companies/${company.id}/quotes/quick?type=${t.code}` }))} />
+          <ToggleLinks current={type.code} options={types.map((t) => ({ value: t.code, label: t.name, href: `/crm/customers/${company.id}/quotes/quick?type=${t.code}` }))} />
         </div>
       )}
       {type ? (

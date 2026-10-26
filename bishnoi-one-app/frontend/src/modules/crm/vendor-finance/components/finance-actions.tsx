@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
 import { checkLetter, decideApproval, decideCredit, recordPayment, type Decision } from "@/src/modules/crm/vendor-finance/actions";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org, Quote } from "@/src/platform/lib/types";
@@ -125,17 +125,17 @@ function PaymentFields({ quote, org }: { quote: Quote; org: Org }) {
       <p className="text-meta font-semibold text-ink-2">
         Record a payment <span className="font-normal text-ink-3">· {fmt.peso(left)} left on the letter</span>
       </p>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Paid on" error={fields.paidOn}>
+      <FormGrid>
+        <Field label="Paid on" size="sm" error={fields.paidOn}>
           {(p) => <Input {...p} name="paidOn" type="date" defaultValue={today} max={today} />}
         </Field>
-        <Field label="Amount" error={fields.amountCentavos}>
+        <Field label="Amount" size="sm" error={fields.amountCentavos}>
           {(p) => <Input {...p} name="amount" inputMode="decimal" defaultValue={(left / 100).toFixed(2)} className="text-right" />}
         </Field>
-      </div>
-      <Field label="Reference" optional error={fields.reference}>
-        {(p) => <Input {...p} name="reference" maxLength={80} placeholder="Check or OR number" />}
-      </Field>
+        <Field label="Reference" size="sm" optional error={fields.reference}>
+          {(p) => <Input {...p} name="reference" maxLength={80} placeholder="Check or OR number" />}
+        </Field>
+      </FormGrid>
       <FormError message={error} />
       <Button type="submit" size="sm" variant="primary" loading={pending}>
         Record payment

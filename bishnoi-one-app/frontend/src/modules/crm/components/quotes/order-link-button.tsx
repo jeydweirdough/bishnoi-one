@@ -95,7 +95,8 @@ function AsksFields({ choices, asks, setAsks }: { choices: Choices | null; asks:
   );
 }
 
-const address = (slug: string, token: string) => `${window.location.origin}/order/${slug}/${token}`;
+// The customer's page is the CRM's public order page in the one app: /crm/order/<company>/<token>.
+const address = (slug: string, token: string) => `${window.location.origin}/crm/order/${slug}/${token}`;
 
 async function copyText(text: string) {
   await navigator.clipboard.writeText(text).catch(() => null);
@@ -251,7 +252,7 @@ export function LinkList({ links, choices, slug, onChanged, showCustomer = false
                 {showCustomer && (
                   <span className="font-medium">
                     {l.customer ? (
-                      <a href={`/crm/companies/${l.customer.id}`} className="hover:underline">
+                      <a href={`/crm/customers/${l.customer.id}`} className="hover:underline">
                         {l.customer.name}
                       </a>
                     ) : (

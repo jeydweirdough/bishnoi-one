@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
-import { CellInput, Field, FormError, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
+import { CellInput, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { formatTin } from "@/src/modules/finance/lib/tin";
@@ -200,11 +200,11 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
             )}
           </div>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Customer" error={fields.customerName}>
+        <FormGrid>
+          <Field label="Customer" size="lg" error={fields.customerName}>
             {(p) => <Input {...p} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} maxLength={200} />}
           </Field>
-          <Field label="TIN" optional error={fields.customerTin} hint="Type the digits only: the dashes go in by themselves. 9 digits, then the branch code if any. Required when the customer is VAT-registered.">
+          <Field label="TIN" size="sm" optional error={fields.customerTin} hint="Type the digits only: the dashes go in by themselves. 9 digits, then the branch code if any. Required when the customer is VAT-registered.">
             {(p) => (
               <Input
                 {...p}
@@ -216,10 +216,10 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
               />
             )}
           </Field>
-          <Field label="Address" optional error={fields.customerAddress} className="sm:col-span-2">
+          <Field label="Address" optional error={fields.customerAddress} size="full">
             {(p) => <Input {...p} value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} maxLength={300} />}
           </Field>
-          <Field label="Buyer type" error={fields.treatment}>
+          <Field label="Buyer type" size="md" error={fields.treatment}>
             {(p) => (
               <Select {...p} value={treatment} onChange={(e) => setTreatment(e.target.value)}>
                 {choices.treatments.map((t) => (
@@ -231,11 +231,11 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
             )}
           </Field>
           {needsId && (
-            <Field label="ID number" error={fields.buyerIdNumber} hint="The senior citizen's OSCA ID or the PWD ID.">
+            <Field label="ID number" size="md" error={fields.buyerIdNumber} hint="The senior citizen's OSCA ID or the PWD ID.">
               {(p) => <Input {...p} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} maxLength={40} />}
             </Field>
           )}
-        </div>
+        </FormGrid>
       </section>
 
       <section className="space-y-3 rounded-[3px] border border-rule bg-sheet p-5">

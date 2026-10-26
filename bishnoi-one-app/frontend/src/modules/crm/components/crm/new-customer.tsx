@@ -22,7 +22,7 @@ function formHref(team: string, kind: string, name: string, then: Then) {
   const q = new URLSearchParams({ team, type: kind });
   if (name.trim()) q.set("name", name.trim());
   if (then) q.set("then", then);
-  return `/crm/companies/new?${q}`;
+  return `/crm/customers/new?${q}`;
 }
 
 /**

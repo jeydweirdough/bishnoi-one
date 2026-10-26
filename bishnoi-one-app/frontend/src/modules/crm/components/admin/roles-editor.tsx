@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { PermissionGrid } from "@/src/platform/ui/permission-grid";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { createRole, deleteRole, updateRole, type RoleInput } from "@/src/modules/crm/actions/admin";
@@ -144,14 +144,14 @@ export function RolesEditor({ data }: { data: RolesData }) {
               changed or deleted, so there's always a way to fix access. To give someone less, make a new role.
             </p>
           ) : (
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              <Field label="Name" error={errors.fields.name}>
+            <FormGrid className="mt-4">
+              <Field label="Name" size="md" error={errors.fields.name}>
                 {(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}
               </Field>
-              <Field label="Description" optional error={errors.fields.description}>
+              <Field label="Description" size="full" optional error={errors.fields.description}>
                 {(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}
               </Field>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-6">
                 <Choice<Scope>
                   name="scope"
                   legend="Record access"
@@ -160,7 +160,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
                   options={data.scopes.map((s) => ({ value: s.key, label: s.label }))}
                 />
               </div>
-            </div>
+            </FormGrid>
           )}
         </Sheet>
 

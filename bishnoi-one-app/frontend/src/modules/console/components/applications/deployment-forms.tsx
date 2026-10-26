@@ -4,7 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/src/modules/console/platform/ui/confirm";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/modules/console/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/console/platform/ui/field";
 import { addDeployment, addIntegration, deleteIntegration, updateIntegration, type IntegrationInput } from "@/src/modules/console/actions/applications";
 import type { Deployment, Integration } from "@/src/modules/console/lib/types";
 import { HEALTH } from "@/src/modules/console/lib/words";
@@ -123,14 +123,14 @@ function IntegrationForm({ appId, link, onDone }: { appId: string; link?: Integr
       }}
       className="space-y-5"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Name" error={fieldError(fields, "name")}>
+      <FormGrid>
+        <Field label="Name" size="md" error={fieldError(fields, "name")}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder="Payments" autoFocus />}
         </Field>
-        <Field label="Target" optional hint="A service, host or partner." error={fieldError(fields, "target")}>
+        <Field label="Target" size="md" optional hint="A service, host or partner." error={fieldError(fields, "target")}>
           {(p) => <Input {...p} value={target} onChange={(e) => setTarget(e.target.value)} />}
         </Field>
-      </div>
+      </FormGrid>
       <Field
         label="Health check URL"
         optional

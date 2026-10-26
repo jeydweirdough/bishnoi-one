@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { saveTerms, type TermsSettings } from "@/src/modules/crm/actions/settings";
 import type { Terms } from "@/src/modules/crm/components/terms/terms";
@@ -45,14 +45,14 @@ export function TermsEditor({ data }: { data: TermsSettings }) {
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="particulars">Terms</SectionTitle>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <Field label="Visited account (singular)" hint="On visits: Doctor, Account, Store." error={errors.fields?.["visited.one"]}>
+        <FormGrid className="mt-4">
+          <Field label="Visited account (singular)" size="md" hint="On visits: Doctor, Account, Store." error={errors.fields?.["visited.one"]}>
             {(p) => <Input {...p} value={draft.visited.one} maxLength={40} onChange={(e) => set({ visited: { ...draft.visited, one: e.target.value } })} />}
           </Field>
-          <Field label="Visited account (plural)" hint="In the menu: Field work → Doctors, Accounts, Stores." error={errors.fields?.["visited.many"]}>
+          <Field label="Visited account (plural)" size="md" hint="In the menu: Field work → Doctors, Accounts, Stores." error={errors.fields?.["visited.many"]}>
             {(p) => <Input {...p} value={draft.visited.many} maxLength={40} onChange={(e) => set({ visited: { ...draft.visited, many: e.target.value } })} />}
           </Field>
-          <Field label="Customer type" hint={`The customer type listed under ${many}. Any customer, if none is picked.`} error={errors.fields?.visitedType}>
+          <Field label="Customer type" size="md" hint={`The customer type listed under ${many}. Any customer, if none is picked.`} error={errors.fields?.visitedType}>
             {(p) => (
               <Select {...p} value={draft.visitedType ?? ""} onChange={(e) => set({ visitedType: e.target.value || null })}>
                 <option value="">Any customer</option>
@@ -64,16 +64,16 @@ export function TermsEditor({ data }: { data: TermsSettings }) {
               </Select>
             )}
           </Field>
-          <Field label="Visit location" hint={`"Logged away from the ${site}", and the place's pin.`} error={errors.fields?.site}>
+          <Field label="Visit location" size="md" hint={`"Logged away from the ${site}", and the place's pin.`} error={errors.fields?.site}>
             {(p) => <Input {...p} value={draft.site} maxLength={40} onChange={(e) => set({ site: e.target.value })} />}
           </Field>
-          <Field label="Product detailing" hint="The heading over the products discussed on visits." error={errors.fields?.detailing}>
+          <Field label="Product detailing" size="md" hint="The heading over the products discussed on visits." error={errors.fields?.detailing}>
             {(p) => <Input {...p} value={draft.detailing} maxLength={60} onChange={(e) => set({ detailing: e.target.value })} />}
           </Field>
-          <Field label="Generic name" hint="The kind of form field that offers it." error={errors.fields?.genericName}>
+          <Field label="Generic name" size="md" hint="The kind of form field that offers it." error={errors.fields?.genericName}>
             {(p) => <Input {...p} value={draft.genericName} maxLength={40} onChange={(e) => set({ genericName: e.target.value })} />}
           </Field>
-        </div>
+        </FormGrid>
         <p className="mt-5 rounded-lg bg-mint px-4 py-3 text-meta text-ink-2">
           Reads as: “Select the {one} response” · “{many} visited” · “At the {site}”
         </p>

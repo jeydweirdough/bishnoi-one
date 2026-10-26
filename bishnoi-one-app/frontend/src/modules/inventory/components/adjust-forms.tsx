@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/inventory/platform/ui/button";
-import { CellInput, Field, FormError, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
+import { CellInput, Field, FormError, FormGrid, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
 import { QuantityInput } from "@/src/modules/inventory/components/quantity";
 import { Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { addCountLine, countStep, createAdjustment, recordCounts, startCount } from "@/src/modules/inventory/actions/inventory";
@@ -70,16 +70,16 @@ export function AdjustmentForm({ reference, reasons, batches, approves, preset, 
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setFresh((l) => [...l, a]); setWarehouseId(a.value); setRows([blank()]); }} />}>
-            <Field label="Warehouse" error={fields.warehouseId}>
+        <FormGrid>
+          <WithAdd can={canAdd.warehouse} className="sm:col-span-3" add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { setFresh((l) => [...l, a]); setWarehouseId(a.value); setRows([blank()]); }} />}>
+            <Field label="Warehouse" size="md" error={fields.warehouseId}>
               {(p) => <Select {...p} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setRows([blank()]); }}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}{fresh.filter((a) => a.kind === "warehouse").map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</Select>}
             </Field>
           </WithAdd>
-          <Field label="Reason" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Marks stock as damaged: still on hand, but no longer available." : "Removes stock.") : "A negative quantity removes stock; a positive one adds it."}>
+          <Field label="Reason" size="md" error={fields.reason} hint={direction === "adds" ? "Adds stock." : direction === "removes" ? (reason === "damaged" ? "Marks stock as damaged: still on hand, but no longer available." : "Removes stock.") : "A negative quantity removes stock; a positive one adds it."}>
             {(p) => <Select {...p} value={reason} onChange={(e) => setReason(e.target.value as AdjustmentReason)}>{reasons.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</Select>}
           </Field>
-        </div>
+        </FormGrid>
       </Sheet>
       <Sheet className="px-5 pt-4 pb-4 sm:px-6">
         <div className="overflow-x-auto">

@@ -1,4 +1,6 @@
-import { Plus } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteSupplier } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
@@ -50,7 +52,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Se
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">
-              <Head columns={["Supplier", "Contact", { label: "Deliveries", right: true }, { label: "Last delivery", right: true }]} />
+              <Head columns={["Supplier", "Contact", { label: "Deliveries", right: true }, { label: "Last delivery", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {rows.map((s) => (
                   <tr key={s.id} className="relative hover:bg-bench/40">
@@ -65,6 +67,17 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Se
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">{s.deliveryCount}</td>
                     <td className="py-3 pr-5 pl-3 text-right text-meta text-ink-2">{s.lastDeliveryOn ? fmt.dateLabel(s.lastDeliveryOn) : "—"}</td>
+                    <td className="px-2 py-2 text-right">
+                      <RowMenu
+                        label={`Actions for ${s.name}`}
+                        items={[
+                          { label: "Open", icon: <ExternalLink />, href: `/pharmacy/suppliers/${s.id}` },
+                          ...(may("suppliers.delete")
+                            ? ["divider" as const, { label: "Delete", icon: <Trash2 />, run: deleteSupplier.bind(null, s.id), danger: true, confirm: `Delete ${s.name}? Only a supplier with no deliveries on record can be deleted; switch them off instead.`, done: `${s.name} deleted` }]
+                            : []),
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

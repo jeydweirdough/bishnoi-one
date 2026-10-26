@@ -243,6 +243,8 @@ export type POBrief = {
   received: number;
   total: number;
   createdAt: string;
+  /** Its lines, short, for a list row that opens in place. */
+  items: { sku: string; product: string; quantity: number; received: number; unitCost: number }[];
 };
 export type PO = POBrief & {
   notes: string | null;
@@ -298,6 +300,8 @@ export type OrderBrief = {
   createdAt: string;
   confirmedAt: string | null;
   issuedAt: string | null;
+  /** Its lines, short, for a list row that opens in place. */
+  items: { sku: string; product: string; quantity: number; unitPrice: number }[];
 };
 export type Order = OrderBrief & {
   notes: string | null;
@@ -406,7 +410,7 @@ export type Dashboard = {
 
 export type PurchaseHome = POBrief & { firstItem: string | null; moreItems: number };
 
-export type ReportInfo = { key: string; title: string; group: string; about: string; dated: boolean; byWarehouse: boolean };
+export type ReportInfo = { key: string; title: string; group: string; about: string; dated: boolean; byWarehouse: boolean; fixed?: boolean };
 export type ReportColumn = { key: string; label: string; kind: "text" | "number" | "money" | "date" | "datetime" | "percent" };
 export type Report = ReportInfo & { from: string; to: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[] };
 

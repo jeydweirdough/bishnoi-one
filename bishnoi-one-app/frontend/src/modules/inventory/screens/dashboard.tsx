@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -9,6 +10,8 @@ import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { MonthBars, TrendLine } from "@/src/modules/inventory/components/home-charts";
 import { POStamp, POStatusIcon } from "@/src/modules/inventory/components/stamps";
 import { NoAccess, Table } from "@/src/modules/inventory/components/ui";
+import { AlertList } from "@/src/modules/inventory/components/alerts";
+import { inventoryPage } from "@/src/modules/inventory/lib/links";
 import { context, type Search } from "@/src/modules/inventory/lib/page";
 import type { Dashboard, PurchaseHome } from "@/src/modules/inventory/lib/types";
 
@@ -93,6 +96,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           )}
         </div>
       </div>
+      <Welcome module="inventory" name={firstName} />
 
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -205,6 +209,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
 
         <div className="min-w-0 space-y-5">
+          {/* What needs someone here, worst first (moved from the sidebar, 2026-10-24: pending actions belong on the dashboard). */}
+          <Sheet className="px-5 pt-4 pb-3">
+            <SectionTitle icon="alerts" action={<Link href="/inventory/alerts" className="text-meta text-ink hover:underline">View all</Link>}>
+              Pending actions
+            </SectionTitle>
+            <AlertList compact alerts={d.alerts.map((a) => ({ ...a, href: inventoryPage(a.href) }))} />
+          </Sheet>
           {may("purchasing.view") && (
             <Sheet className="px-5 pt-4 pb-3">
               <SectionTitle icon="purchaseOrders" action={<Link href="/inventory/purchase-orders" className="text-meta text-ink hover:underline">View all</Link>}>

@@ -1,5 +1,6 @@
 import { FirstStep } from "@/src/modules/inventory/components/setup";
-import { Plus } from "lucide-react";
+import { ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
@@ -36,7 +37,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
   return (
     <>
       <PageHeader
-        title="Suppliers"
+        title="Vendors"
         actions={may("suppliers.create") && <LinkButton href="/inventory/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add supplier</LinkButton>}
       >
         Vendors you buy from, with contact details, payment terms and delivery performance.
@@ -45,9 +46,9 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
       <Filters q={f.q} placeholder="Name, code or contact" keep={{ state: f.state }} />
       <Sheet>
         {suppliers.length === 0 ? (
-          <FirstStep icon="suppliers" title="No suppliers" body="Vendors you buy from, with their payment terms and lead times." href="/inventory/suppliers/new" action="Add supplier" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/inventory/suppliers" may={may} />
+          <FirstStep icon="suppliers" title="No vendors" body="Vendors you buy from, with their payment terms and lead times." href="/inventory/suppliers/new" action="Add supplier" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/inventory/suppliers" may={may} />
         ) : (
-          <Table head={["Supplier", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received"]} min="56rem">
+          <Table head={["Supplier", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received", <span key="a" className="sr-only">Actions</span>]} min="56rem">
             {suppliers.map((x) => (
               <tr key={x.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/inventory/suppliers/${x.id}`} sub={x.code}>{x.name}</RowLink></Td>
@@ -58,6 +59,23 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
                 <Td num>{rate(x.performance?.fillRate)}</Td>
                 <Td num>{rate(x.performance?.onTimeRate)}</Td>
                 <Td num>{fmt.pesoCompact(x.performance?.spend ?? 0)}</Td>
+                <td className="px-2 py-2 text-right">
+                  <RowMenu
+                    label={`Actions for ${x.name}`}
+                    items={[
+                      { label: "Open", icon: <ExternalLink />, href: `/inventory/suppliers/${x.id}` },
+                      ...(may("suppliers.edit") ? [{ label: "Edit", icon: <Pencil />, href: `/inventory/suppliers/${x.id}/edit` }] : []),
+                      "divider" as const,
+                      ...(may("purchasing.create") && x.isActive ? [{ label: "New purchase order", icon: <ShoppingCart />, href: `/inventory/purchase-orders/new?supplier=${x.id}` }] : []),
+                      ...(may("suppliers.delete")
+                        ? [
+                            "divider" as const,
+                            { label: "Delete", icon: <Trash2 />, run: deleteSupplier.bind(null, x.id), danger: true, confirm: `Delete ${x.name}? A supplier with purchase orders cannot be deleted; deactivate it instead.`, done: `${x.name} deleted` },
+                          ]
+                        : []),
+                    ]}
+                  />
+                </td>
               </tr>
             ))}
           </Table>
@@ -77,7 +95,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/inventory/suppliers", label: "Suppliers" }]}
+        crumbs={[{ href: "/inventory/suppliers", label: "Vendors" }]}
         title={x.name}
         tools={
           <RecordTools
@@ -176,7 +194,7 @@ export async function NewSupplierPage() {
   if (!may("suppliers.create")) return <NoAccess what="adding suppliers" />;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/suppliers", label: "Suppliers" }]} title="Add supplier" />
+      <PageHeader crumbs={[{ href: "/inventory/suppliers", label: "Vendors" }]} title="New vendor" />
       <SupplierForm />
     </>
   );
@@ -189,7 +207,7 @@ export async function EditSupplierPage({ params }: { params: Params<{ id: string
   const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/suppliers", label: "Suppliers" }, { href: `/inventory/suppliers/${x.id}`, label: x.name }]} title={`Edit ${x.name}`} />
+      <PageHeader crumbs={[{ href: "/inventory/suppliers", label: "Vendors" }, { href: `/inventory/suppliers/${x.id}`, label: x.name }]} title={`Edit ${x.name}`} />
       <SupplierForm supplier={x} />
       <SupplierActive supplier={x} />
     </>

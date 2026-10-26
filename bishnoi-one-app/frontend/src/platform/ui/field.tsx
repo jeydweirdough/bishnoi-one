@@ -1,5 +1,8 @@
 "use client";
 
+import { Info } from "lucide-react";
+import { plainText } from "@/src/platform/ui/about-tip";
+import { Tip } from "@/src/platform/ui/tip";
 import { Alert, Input as AntInput, Radio, type InputRef } from "antd";
 import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
 import { DateInput, type FieldChange } from "./pickers";
@@ -20,26 +23,56 @@ type FieldProps = {
   hint?: ReactNode;
   error?: string;
   optional?: boolean;
+  /** Its width in a FormGrid: sm a code or date, md half, lg most of a row, full the row. */
+  size?: FieldSize;
   className?: string;
   children: (props: { id: string; "aria-invalid"?: boolean; "aria-describedby"?: string }) => ReactNode;
 };
 
-export function Field({ label, hint, error, optional, className = "", children }: FieldProps) {
+export type FieldSize = "sm" | "md" | "lg" | "full";
+const SPAN: Record<FieldSize, string> = { sm: "sm:col-span-2", md: "sm:col-span-3", lg: "sm:col-span-4", full: "sm:col-span-6" };
+
+/**
+ * A form's fields, balanced (decided 2026-10-25): six columns on a wide screen, each field as
+ * wide as what it takes (a code short, an email half, notes the row), one under another on a phone.
+ */
+export function FormGrid({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`grid gap-x-4 gap-y-5 sm:grid-cols-6 ${className}`}>{children}</div>;
+}
+
+/**
+ * One field: its label above, the control, and under it only an error. A plain-words hint sits
+ * behind an ⓘ beside the label (decided 2026-10-25), so fields side by side stay the same height
+ * and the form reads as a form, not a page of notes; a hint with a link or live part stays under it.
+ */
+export function Field({ label, hint, error, optional, size, className = "", children }: FieldProps) {
   const id = useId();
   const noteId = `${id}-note`;
-  const note = error || hint;
+  const tip = plainText(hint);
+  const below = error || (tip ? null : hint);
   return (
-    <div className={`min-w-0 ${className}`}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">
-        {label}
-        {optional && <span className="font-normal text-ink-3"> (optional)</span>}
-      </label>
-      {children({ id, "aria-invalid": error ? true : undefined, "aria-describedby": note ? noteId : undefined })}
-      {note && (
-        <p id={noteId} className={`mt-1 text-meta ${error ? "text-[#ff4d4f]" : "text-ink-3"}`}>
-          {note}
+    <div className={`min-w-0 ${size ? SPAN[size] : ""} ${className}`}>
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <label htmlFor={id} className="text-sm font-medium text-ink">
+          {label}
+          {optional && <span className="font-normal text-ink-3"> (optional)</span>}
+        </label>
+        {tip && (
+          <Tip tip={tip} className="inline-flex text-ink-3 hover:text-ink">
+            <Info className="size-3.5" aria-hidden />
+          </Tip>
+        )}
+      </div>
+      {children({ id, "aria-invalid": error ? true : undefined, "aria-describedby": error || hint ? noteId : undefined })}
+      {below ? (
+        <p id={noteId} className={`mt-1 text-meta ${error ? "text-danger" : "text-ink-3"}`}>
+          {below}
         </p>
-      )}
+      ) : tip ? (
+        <span id={noteId} className="sr-only">
+          {tip}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { CustomEntity, Org } from "@/src/platform/lib/types";
 import { saveCustomerType, createTeam } from "@/src/modules/crm/actions/admin";
@@ -260,14 +260,14 @@ export function AddProduct({
         })
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Code" error={failed?.fields?.code}>
+      <FormGrid>
+        <Field label="Code" size="sm" error={failed?.fields?.code}>
           {(p) => <Input {...p} value={code} onChange={(e) => setCode(e.target.value)} maxLength={40} autoFocus placeholder="e.g. AMX-500" />}
         </Field>
-        <Field label="Sold by" hint="e.g. box of 100" error={failed?.fields?.unit}>
+        <Field label="Sold by" size="lg" hint="e.g. box of 100" error={failed?.fields?.unit}>
           {(p) => <Input {...p} value={unit} onChange={(e) => setUnit(e.target.value)} maxLength={40} />}
         </Field>
-      </div>
+      </FormGrid>
       <Field label="Name" error={failed?.fields?.name}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={160} />}
       </Field>

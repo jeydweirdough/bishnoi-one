@@ -44,7 +44,7 @@ export default async function NewDealPage({ searchParams }: { searchParams: Sear
   const [company, stages, lists, people, priceList] = await formData(companyId, can(me, "quotes.view"));
   return (
     <>
-      <PageHeader crumbs={[{ href: "/crm/deals", label: "Deals" }, { href: `/crm/companies/${company.id}`, label: company.name }]} title={`New deal with ${company.name}`}>
+      <PageHeader crumbs={[{ href: "/crm/deals", label: "Deals" }, { href: `/crm/customers/${company.id}`, label: company.name }]} title={`New deal with ${company.name}`}>
         It starts in the first stage unless you pick another.
       </PageHeader>
       <Sheet className="max-w-[56rem] px-5 py-6 sm:px-8">

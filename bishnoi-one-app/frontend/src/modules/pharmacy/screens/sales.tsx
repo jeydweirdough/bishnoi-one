@@ -1,4 +1,5 @@
-import { ShoppingCart } from "lucide-react";
+import { ExternalLink, ShoppingCart, User } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import Link from "next/link";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
@@ -118,7 +119,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[46rem] text-left text-sm">
-              <Head columns={["Sale", "Customer", "Items", "Paid by", { label: "Total", right: true }, { label: "When", right: true }]} />
+              <Head columns={["Sale", "Customer", "Items", "Paid by", { label: "Total", right: true }, { label: "When", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {list.items.map((s) => (
                   <tr key={s.id} className="relative hover:bg-bench/40">
@@ -138,6 +139,15 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                       {s.refundedCentavos > 0 && <span className="block text-meta text-ink-3">−{fmt.peso(s.refundedCentavos)} refunded</span>}
                     </td>
                     <td className="py-3 pr-5 pl-3 text-right text-meta text-ink-2">{fmt.whenLabel(s.soldAt)}</td>
+                    <td className="px-2 py-2 text-right">
+                      <RowMenu
+                        label={`Actions for ${s.number}`}
+                        items={[
+                          { label: "Open", icon: <ExternalLink />, href: `/pharmacy/sales/${s.id}` },
+                          ...(s.patient && may("patients.view") ? ["divider" as const, { label: "Open customer", icon: <User />, href: `/pharmacy/patients/${s.patient.id}` }] : []),
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

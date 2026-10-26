@@ -586,6 +586,73 @@ def place_order(
     }
 
 
+@router.get("/public/quote-links/{token}/quotation")
+def read_quotation(db: DB, settings: SettingsDep, token: str) -> dict:
+    """The customer's quotation, by the link they ordered on (decided 2026-10-26): where it stands
+    while it's reviewed (prices, the guarantee letter, a pharmacist's check of the prescription),
+    then the quotation itself, with its prices, once nothing is pending. The link's token is the key:
+    only whoever has the link sees it. Nothing here changes the quote."""
+    from app import pharmacy
+    from app.models import Quote
+    from app.quote_templates import document
+    from app.routers.quote_templates import code_html, fitting, template_out
+    from app.routers.quotes import sales_settings, state_of
+
+    link = db.scalar(select(QuoteLink).where(QuoteLink.token_hash == token_hash(token[:100])))
+    if link is None or not link.quote_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no order on this link yet.")
+    quote = db.get(Quote, link.quote_id)
+    if quote is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This order was withdrawn. Ask your representative for a new link.")
+    from app.models import User
+
+    owner = db.get(User, quote.owner_id) if quote.owner_id else None
+    rep = owner.full_name if owner else "Your representative"
+    head = {"number": quote.number, "rep": rep, "orderedAt": quote.created_at.isoformat() if quote.created_at else None}
+    state = state_of(quote)
+    if state == "rejected":
+        return {**head, "state": "rejected", "steps": []}
+    # What it waits on, in plain words, each done or not: shown as a checklist while it's reviewed.
+    rx_outcome = pharmacy.outcome(quote) if quote.rx else None
+    steps = [
+        {"label": "Prices reviewed", "done": quote.approval_status != "pending"},
+        *([{"label": f"{quote.payer_name or 'Guarantee'} letter checked", "done": quote.letter_status != "pending"}] if quote.letter_status not in (None, "none") else []),
+        *([{"label": "Prescription checked by a pharmacist", "done": rx_outcome == "verified"}] if quote.rx else []),
+    ]
+    if rx_outcome in ("rejected", "needs_clarification"):
+        return {**head, "state": "clarify", "steps": steps}
+    if not all(x["done"] for x in steps):
+        return {**head, "state": "waiting", "steps": steps}
+
+    # Ready: the quotation as the company prints it (its template, else the standard one).
+    out = {**head, "state": "ready", "steps": steps}
+    fits = [t for t in fitting(db, quote) if t.kind in ("form", "code")]
+    if fits:
+        t = fits[0]
+        doc = document(db, quote, t, settings)
+        out["document"] = {"template": template_out(db, t), **doc, **({"html": code_html(db, t, doc)} if t.kind == "code" else {})}
+        return out
+    sales = sales_settings(db)
+    out["standard"] = {
+        "letterhead": {"name": settings.org_name, "address": sales.company_address, "tin": sales.company_tin, "contact": sales.company_contact},
+        "customerName": quote.customer_name,
+        "createdAt": quote.created_at.isoformat() if quote.created_at else None,
+        "validUntil": quote.valid_until,
+        "priceTypeName": quote.price_type_name,
+        "rx": quote.rx,
+        "lines": [
+            {"name": l.get("productName"), "code": l.get("productCode"), "quantity": l.get("quantity"), "unit": l.get("unit"),
+             "unitPriceCentavos": l.get("unitPriceCentavos"), "totalCentavos": l.get("totalCentavos")}
+            for l in quote.lines or []
+        ],
+        "grossCentavos": quote.gross_centavos,
+        "discountCentavos": (quote.promo_discount_centavos or 0) + (quote.discount_centavos or 0),
+        "totalCentavos": quote.total_centavos,
+        "terms": sales.quote_terms,
+    }
+    return out
+
+
 class Spot(Api):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)

@@ -14,19 +14,22 @@ export function OwnerField({
   onChange,
   error,
   label = "Owner",
+  size,
 }: {
   people: Assignable[];
   value: string;
   onChange: (id: string) => void;
   error?: string;
   label?: string;
+  /** Its width in a FormGrid. */
+  size?: "sm" | "md" | "lg" | "full";
 }) {
   // Nobody else to give it to (a salesperson's own records): nothing to ask.
   // It's theirs, and the API makes it so when nobody is sent.
   if (people.length <= 1) return null;
   const teams = [...new Set(people.map((p) => p.team?.name ?? ""))];
   return (
-    <Field label={label} error={error}>
+    <Field label={label} size={size} error={error}>
       {(p) => (
         <Select {...p} value={value} onChange={(e) => onChange(e.target.value)}>
           {teams.map((team) => (

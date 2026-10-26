@@ -120,7 +120,7 @@ export async function saveTemplate(id: string | null, input: TemplateInput): Pro
 /** A customer's own address and their contacts' addresses, to pick who an email is to. */
 export async function customerAddresses(companyId: string): Promise<{ name: string; email: string | null; contacts: { id: string; name: string; email: string | null }[] } | null> {
   return api
-    .get<{ name: string; email: string | null; contacts: { id: string; name: string; email: string | null }[] }>(`/crm/companies/${encodeURIComponent(companyId)}`)
+    .get<{ name: string; email: string | null; contacts: { id: string; name: string; email: string | null }[] }>(`/crm/customers/${encodeURIComponent(companyId)}`)
     .then((c) => ({ name: c.name, email: c.email, contacts: c.contacts }))
     .catch(() => null);
 }

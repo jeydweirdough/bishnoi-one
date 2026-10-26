@@ -96,6 +96,12 @@ def test_payments_bring_what_is_owed_down_and_post(client, ana, ben):  # noqa: F
     part = pay(100000, reference="DEP-1").json()
     assert (part["paidCentavos"], part["balanceCentavos"]) == (100000, 124000)
     assert [p["methodLabel"] for p in part["payments"]] == ["Bank transfer"]
+    # The Sales list opens a row to its payments, and heads with the month's invoiced and collected.
+    listed = client.get("/finance/invoices", headers=ana).json()
+    row = next(i for i in listed["items"] if i["id"] == inv["id"])
+    assert [p["amountCentavos"] for p in row["payments"]] == [100000]
+    f = listed["figures"]
+    assert (f["invoicedCentavos"], f["collectedCentavos"], f["collectedLastMonthCentavos"]) == (224000, 100000, 0)
     assert balances(client, ana) == {"1010": 100000, "1100": 124000, "4000": 200000, "2200": 24000}
     # Paid, it can't be voided until the payment is taken off; only who may void takes it off.
     assert client.post(f"/finance/invoices/{inv['id']}/void", json={"reason": "Wrong"}, headers=ana).status_code == 409

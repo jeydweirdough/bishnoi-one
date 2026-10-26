@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { sendToPharmacy } from "@/src/modules/crm/actions/quote-pharmacy";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org, Quote } from "@/src/platform/lib/types";
 
@@ -79,14 +79,14 @@ function DetailsForm({ quote, org, again, onDone }: { quote: Quote; org: Org; ag
       <Field label="Prescriber" error={fields.prescriberName}>
         {(p) => <Input {...p} name="prescriberName" maxLength={120} defaultValue={sent?.prescriberName} placeholder="Dr. Elena Ramos" />}
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Licence number" optional error={fields.prescriberLicense}>
+      <FormGrid>
+        <Field label="Licence number" size="lg" optional error={fields.prescriberLicense}>
           {(p) => <Input {...p} name="prescriberLicense" maxLength={40} defaultValue={sent?.prescriberLicense ?? ""} />}
         </Field>
-        <Field label="Prescribed on" error={fields.prescribedOn}>
+        <Field label="Prescribed on" size="sm" error={fields.prescribedOn}>
           {(p) => <Input {...p} name="prescribedOn" type="date" max={today} defaultValue={sent?.prescribedOn ?? ""} />}
         </Field>
-      </div>
+      </FormGrid>
       <Field label="Clinic or hospital" optional error={fields.prescriberClinic}>
         {(p) => <Input {...p} name="prescriberClinic" maxLength={160} defaultValue={sent?.prescriberClinic ?? ""} />}
       </Field>

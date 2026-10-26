@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { plural } from "../lib/format";
 import type { Job } from "../lib/types";
+import { moduleOfPath } from "../lib/modules";
 
 // Picking several records and acting on them at once, the way a mail app does:
 // tick rows, a bar rises from the bottom with what can be done to them, and the
@@ -296,14 +297,17 @@ export function BulkStep({
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Follows a queued job through /jobs/[id] until it's done; null when it can't be followed. */
+/** Follows a queued job through its module's /<module>/jobs/[id] until it's done; null when it can't be followed.
+ *  The job route sits under each module in the one app (app/(app)/<module>/jobs/[id]), so the address
+ *  takes the module the page is in: a bare /jobs/[id] doesn't exist (found by a REA pass, 2026-10-25). */
 async function follow(job: Job, onProgress: (job: Job) => void): Promise<Job | null> {
   let misses = 0;
   while (job.status !== "done") {
     onProgress(job);
     await pause(job.status === "queued" ? 1000 : 700);
     try {
-      const response = await fetch(`/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
+      const base = moduleOfPath(window.location.pathname)?.path ?? "";
+      const response = await fetch(`${base}/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
       if (response.ok) {
         job = (await response.json()) as Job;
         misses = 0;

@@ -124,7 +124,7 @@ export function EmailPage({ box, initial, teamWide, when }: { box: MailboxInfo; 
                         {a.company && (
                           <>
                             {" · "}
-                            <Link href={`/crm/companies/${a.company.id}`} className="text-ink underline">
+                            <Link href={`/crm/customers/${a.company.id}`} className="text-ink underline">
                               {a.company.name}
                             </Link>
                           </>

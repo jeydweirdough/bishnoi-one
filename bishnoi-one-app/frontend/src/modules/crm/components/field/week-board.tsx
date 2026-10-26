@@ -143,7 +143,7 @@ function Stop({ stop, removable, onRemove }: { stop: PlanStop; removable: boolea
     <li className={`group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-meta ${stop.visited ? "border-filed/30 bg-mint" : "border-rule bg-bench/60"}`}>
       <span className={`size-2 shrink-0 rounded-full ${zone ? zone.dot : "bg-rule-strong"}`} title={zone ? `${zone.label} zone` : "No zone"} aria-hidden />
       <span className="min-w-0 flex-1">
-        <a href={`/crm/companies/${stop.doctor.id}`} className="block truncate font-medium text-ink hover:underline">
+        <a href={`/crm/customers/${stop.doctor.id}`} className="block truncate font-medium text-ink hover:underline">
           {stop.doctor.name}
         </a>
         <span className="block truncate text-ink-3">

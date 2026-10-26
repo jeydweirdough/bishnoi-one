@@ -31,11 +31,11 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app import platform_pass
 from app.audit import audit
-from app.models import Role, RolePermission, User
+from app.models import Role, RolePermission, User, SignInSession
 from app.permissions import ALL_PERMISSIONS, catalogue_out
 
 # ---- This application ----------------------------------------------------------------------
@@ -175,6 +175,9 @@ def take_roles(body: NoteIn, request: Request) -> Response:
             if role is not None and user is not None and user.role_id != role.id:
                 give(user, role)
                 audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["role"])
+            # Switched off (or on) on the Platform: the same here (R2).
+            if user is not None and follow_status(db, user, p.get("active")):
+                audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["isActive"])
         db.commit()
     _newest[claims["slug"]] = claims["iat"]
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -192,3 +195,92 @@ def export_roles(body: NoteIn, request: Request) -> dict:
                 for r in db.scalars(select(Role).order_by(Role.name))
             ]
         }
+
+
+# ---- R2 (decided 2026-10-26): the Platform keeps people, roles and passwords ----------------
+# Once this application is connected to Bishnoi One Platform (PLATFORM_API_URL), a person is added,
+# given their role, given a password and switched off only there (the one app's People), and signs
+# in only with their Bishnoi One account. This application keeps a copy of the roles to check every
+# request against (taken from the Platform, never edited here) and what is its own about a person.
+# Not connected (a standalone install, the tests): everything here works as before.
+
+PLATFORM_OWNS = {"fullName", "email", "roleId", "isActive", "password"}
+ON_PLATFORM = "People, their roles and passwords, and switching people off are kept in Bishnoi One: change it in People."
+
+
+def managed(settings) -> bool:
+    return bool(getattr(settings, "platform_api_url", None))
+
+
+async def kept_on_platform(request: Request) -> None:
+    """On adding people, setting passwords and changing roles here: refused once the Platform keeps them.
+    A change to what is this application's own about a person (a licence number, a team) still goes."""
+    if not managed(request.app.state.settings):
+        return
+    if request.method == "PATCH" and "/users/" in request.url.path:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 (not JSON: let the endpoint answer it)
+            return
+        if not isinstance(body, dict) or not PLATFORM_OWNS.intersection(body):
+            return
+    raise HTTPException(status.HTTP_409_CONFLICT, ON_PLATFORM)
+
+
+async def signs_in_here(request: Request) -> None:
+    """This application's own password sign-in: closed once people sign in with their Bishnoi One account."""
+    if managed(request.app.state.settings):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in with your Bishnoi One account.")
+
+
+def follow_status(db, user: User, active) -> bool:
+    """Switched off (or on) on the Platform: the same here, and switched off ends their sessions at once."""
+    if active is None or bool(active) == user.is_active:
+        return False
+    user.is_active = bool(active)
+    if not user.is_active:
+        db.execute(delete(SignInSession).where(SignInSession.user_id == user.id))
+    return True
+
+
+# ---- View as (decided 2026-10-26) ------------------------------------------------------------
+# An administrator sees this application exactly as one of its people does: their permissions,
+# their scope, their records. Read-only: nothing can be changed while viewing. Asked for with the
+# X-Bishnoi-View-As header (a person's id), honoured only for someone who manages users here.
+
+VIEW_AS_HEADER = "x-bishnoi-view-as"
+READ_ONLY = {"GET", "HEAD", "OPTIONS"}
+
+
+def may_view_as(user: User) -> bool:
+    from app.access import permissions_of
+
+    return "admin.users" in permissions_of(user.role)
+
+
+def viewed_as(request: Request, db, user: User) -> User:
+    """The person to answer as: `user`, or whom they're viewing as (see above)."""
+    wanted = request.headers.get(VIEW_AS_HEADER)
+    if not wanted or wanted == user.id:
+        return user
+    if not may_view_as(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can view as someone else.")
+    other = db.get(User, wanted)
+    if other is None or not other.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That person isn't here, or is switched off.")
+    if request.method not in READ_ONLY and not request.url.path.endswith(("/auth/logout", "/auth/view-as")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"You're viewing as {other.full_name}: changes are off. Stop viewing to make changes.")
+    request.state.viewed_by = user
+    return other
+
+
+def people_by_role(db) -> list[dict]:
+    """Everyone switched on, by role: the role that may do most first, down to the one that may do least."""
+    from app.access import permissions_of
+
+    groups: dict[str, dict] = {}
+    for u in db.scalars(select(User).where(User.is_active).order_by(func.lower(User.full_name))):
+        r = u.role
+        g = groups.setdefault(r.id, {"role": r.name, "size": len(permissions_of(r)), "people": []})
+        g["people"].append({"id": u.id, "fullName": u.full_name, "email": u.email})
+    return sorted(groups.values(), key=lambda g: (-g["size"], g["role"].lower()))

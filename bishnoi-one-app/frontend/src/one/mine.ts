@@ -1,6 +1,6 @@
 import "server-only";
 import type { Account } from "@/src/platform/lib/account";
-import { moduleByAppKey, moduleByKey, type ModuleDef } from "@/src/platform/lib/modules";
+import { MODULES, moduleByAppKey, moduleByKey, type ModuleDef } from "@/src/platform/lib/modules";
 import type { MyModule } from "./module-switcher";
 
 /**
@@ -15,8 +15,11 @@ export function myModules(me: Account): MyModule[] {
     const m = moduleByAppKey(a.key);
     return m && !m.accountOnly ? [{ key: m.key, oldUrl: a.appUrl }] : [];
   });
-  // The Admin Console: the company's administrators, and Bishnoi One's staff, whatever they were given.
-  return me.isCompanyAdmin || me.staff ? [...given, { key: "platform", oldUrl: null }] : given;
+  if (!(me.isCompanyAdmin || me.staff)) return given;
+  // A company's administrators, and Bishnoi One's staff, see every module (decided 2026-10-25): what
+  // the company has (Platform gives administrators all of it), the ones coming soon, and the Admin Console.
+  const soon: MyModule[] = MODULES.filter((m) => m.status === "soon" && !given.some((x) => x.key === m.key)).map((m) => ({ key: m.key, oldUrl: null }));
+  return [...given, ...soon, { key: "platform", oldUrl: null }];
 }
 
 /**

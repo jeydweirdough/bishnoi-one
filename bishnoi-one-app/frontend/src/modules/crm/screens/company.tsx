@@ -76,7 +76,7 @@ const customerPage = cache(async (id: string, quotes: boolean, visits: boolean, 
   if (why !== 404) throw new Error(errors[0]?.message ?? "The customer couldn't be read.");
   // Merged into another customer: its old links lead to the one kept.
   const merged = await api.get<{ newId: string }>(`/merged/${enc(id)}`).catch(() => null);
-  if (merged) redirect(`/crm/companies/${merged.newId}`);
+  if (merged) redirect(`/crm/customers/${merged.newId}`);
   notFound();
 });
 
@@ -142,7 +142,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
       Object.entries(company.links ?? {}).map(([key, l]) => [
         key,
         l.canOpen ? (
-          <Link href={`/crm/companies/${l.id}`} className="text-ink hover:underline">
+          <Link href={`/crm/customers/${l.id}`} className="text-ink hover:underline">
             {l.name}
           </Link>
         ) : (
@@ -208,7 +208,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
   return (
     <>
       <nav aria-label="Breadcrumb" className="mb-3 text-meta">
-        <Link href="/crm/companies" className="text-ink-2 underline-offset-2 hover:text-ink hover:underline">
+        <Link href="/crm/customers" className="text-ink-2 underline-offset-2 hover:text-ink hover:underline">
           Customers
         </Link>
       </nav>
@@ -226,7 +226,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
               </h1>
               {company.code && <span className="rounded-md bg-[#f3f3f1] px-2 py-0.5 text-meta font-medium tracking-wide text-ink-2">{company.code}</span>}
               {/* Edit and delete act on the customer itself, so they sit with its name. */}
-              {company.can.edit && <EditRecord href={`/crm/companies/${company.id}/edit`} what="customer" />}
+              {company.can.edit && <EditRecord href={`/crm/customers/${company.id}/edit`} what="customer" />}
               {company.can.delete && (
                 <DeleteRecord
                   kind="company"
@@ -263,10 +263,10 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
               <>
                 {/* The medicine search: a quick quote here, or a link for the customer to order from. */}
                 <OrderLinkButton companyId={company.id} companyName={company.name} slug={me.org.slug} />
-                <LinkButton href={`/crm/companies/${company.id}/quotes/quick`} icon={<Search className="size-4" aria-hidden />}>
+                <LinkButton href={`/crm/customers/${company.id}/quotes/quick`} icon={<Search className="size-4" aria-hidden />}>
                   Quick quote
                 </LinkButton>
-                <LinkButton href={`/crm/companies/${company.id}/quotes/new`} variant={mayVisit && isDoctor ? "default" : "primary"} icon={<Plus className="size-4" aria-hidden />}>
+                <LinkButton href={`/crm/customers/${company.id}/quotes/new`} variant={mayVisit && isDoctor ? "default" : "primary"} icon={<Plus className="size-4" aria-hidden />}>
                   New quote
                 </LinkButton>
               </>
@@ -288,7 +288,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                 <dt className="text-meta text-ink-3">Profile</dt>
                 <dd className="text-sm">
                   {profile.pct < 100 && company.can.edit ? (
-                    <Link href={`/crm/companies/${company.id}/edit?complete=1`} className="font-semibold text-sage-deep hover:underline">
+                    <Link href={`/crm/customers/${company.id}/edit?complete=1`} className="font-semibold text-sage-deep hover:underline">
                       Complete it
                     </Link>
                   ) : (
@@ -322,7 +322,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
         <div className="min-w-0 space-y-5">
           <Sheet className="px-5 pb-2">
             <RecordTabs
-              base={`/crm/companies/${company.id}`}
+              base={`/crm/customers/${company.id}`}
               current={tab}
               tabs={[
                 { key: "activity", label: "Activity", count: company.activities.length },
@@ -341,7 +341,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             ) : tab === "quotes" && quotes ? (
               quotes.items.length ? (
                 <>
-                  <QuotesPanel customerHref={`/crm/companies/${company.id}`} quotes={quotes.items} canAdd={false} showWho />
+                  <QuotesPanel customerHref={`/crm/customers/${company.id}`} quotes={quotes.items} canAdd={false} showWho />
                   {quotes.total > quotes.items.length && (
                     <Link href={`/crm/quotes?q=${encodeURIComponent(company.name)}`} className="block py-2 text-meta text-ink hover:underline">
                       See all {quotes.total}
@@ -354,7 +354,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
                   title="No quotes yet"
                   action={
                     can(me, "quotes.create") && (
-                      <LinkButton href={`/crm/companies/${company.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                      <LinkButton href={`/crm/customers/${company.id}/quotes/new`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
                         Create quote
                       </LinkButton>
                     )

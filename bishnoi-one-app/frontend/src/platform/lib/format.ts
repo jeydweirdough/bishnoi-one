@@ -204,3 +204,5 @@ export type Format = ReturnType<typeof makeFormat>;
 const fallback = makeFormat(FALLBACK);
 
 export const { todayKey, dueLabel, whenLabel, greeting, dateLabel, monthLabel, peso, pesoCompact, toCentavos, pesosText } = fallback;
+/** The whole set in the first company's formats, for pages with no company to ask (a customer's public quotation). */
+export const fallbackFormat = fallback;

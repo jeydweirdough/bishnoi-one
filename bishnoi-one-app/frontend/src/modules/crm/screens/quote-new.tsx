@@ -28,7 +28,7 @@ async function NewQuote({ to, dealId }: { to: QuoteFor; dealId?: string }) {
   // How much Inventory has, as the quote is started (a product it doesn't have is left out).
   const codes = priceList.products.map((p) => p.code);
   const stock = codes.length ? await load<StockAnswer>(`/stock?codes=${encodeURIComponent(codes.join(","))}`) : null;
-  const list = to.kind === "companies" ? { href: "/crm/companies", label: "Customers" } : { href: "/crm/contacts", label: "Contacts" };
+  const list = to.kind === "companies" ? { href: "/crm/customers", label: "Customers" } : { href: "/crm/contacts", label: "Contacts" };
   return (
     <>
       <PageHeader crumbs={[list, { href: `/crm/${to.kind}/${to.id}`, label: customer.name }]} title={`New quote for ${customer.name}`}>

@@ -101,7 +101,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/inventory/products", label: "Products" }, ...(p.parent ? [{ href: `/inventory/products/${p.parent.id}`, label: p.parent.name }] : [])]}
+        crumbs={[{ href: "/inventory/products", label: "Items" }, ...(p.parent ? [{ href: `/inventory/products/${p.parent.id}`, label: p.parent.name }] : [])]}
         title={p.name}
         tools={
           <RecordTools

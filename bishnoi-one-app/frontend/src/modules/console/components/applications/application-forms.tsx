@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { AsyncButton } from "@/src/modules/console/platform/ui/async-button";
 import { ConfirmButton } from "@/src/modules/console/platform/ui/confirm";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/modules/console/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/console/platform/ui/field";
 import { addApplication, updateApplication, type ApplicationPatch } from "@/src/modules/console/actions/applications";
 import type { Application } from "@/src/modules/console/lib/types";
 import { fieldError, orNull } from "@/src/modules/console/components/support/errors";
@@ -79,20 +79,20 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
       }}
       className="space-y-5"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Name" error={fieldError(fields, "name")}>
+      <FormGrid>
+        <Field label="Name" size="lg" error={fieldError(fields, "name")}>
           {(p) => <Input {...p} value={v.name} onChange={set("name")} autoFocus required />}
         </Field>
         {app ? (
-          <Field label="Key" hint="Set at registration. Other applications identify it by this key.">
+          <Field label="Key" size="sm" hint="Set at registration. Other applications identify it by this key.">
             {(p) => <Input {...p} value={app.key} disabled />}
           </Field>
         ) : (
-          <Field label="Key" hint="A short lower-case name like crm or hris." error={fieldError(fields, "key")}>
+          <Field label="Key" size="sm" hint="A short lower-case name like crm or hris." error={fieldError(fields, "key")}>
             {(p) => <Input {...p} value={v.key} onChange={set("key")} autoCapitalize="none" spellCheck={false} required />}
           </Field>
         )}
-      </div>
+      </FormGrid>
       <Field label="Description" optional error={fieldError(fields, "description")}>
         {(p) => <Textarea {...p} rows={2} value={v.description} onChange={set("description")} />}
       </Field>

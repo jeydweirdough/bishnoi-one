@@ -185,3 +185,81 @@ open before; they see that it exists (its name), as with the look-alikes.
 Overview (the figures that matter for its type) and Activities, with search
 and filters. Right: associations, quotes, deals and materials, each with
 + Add. Same wording as today; on a phone the three stack.
+
+
+## P15. Module switcher and a process-oriented, directive sidebar · adopted · J1, J2, J3
+
+**From Zoho One:** one sign-in, a switcher at the top of the sidebar, and each
+app's menu short and about its work.
+
+**For us:** the top of every module's sidebar is the switcher, listing only
+the modules the person's company and role give them. Under it the module's menu grouped by process in the order the work
+happens (CRM: Find, Sell, Field work, Keep, Measure), each step with its count.
+Set-up sits at the foot, a red mark on what's missing. One primary action per
+page and the next step offered after saving. One shared component
+(`src/platform/shell/sidebar.tsx`); each module's menu is its `shell/nav.tsx`,
+which only lists its processes and steps: the sidebar is fixed once, for all.
+
+**One layout in every module (2026-10-26, following the CRM):** Home; the work areas in the order
+the work happens, 2 to 6 pages each (one page: a plain row); Reports as one row (with only what the
+Reports Center doesn't hold beside it: Finance's statements and books, Inventory's stock movements);
+at the foot **Users and roles** (Users, Roles) then **Settings** (the set-up lists: warehouses,
+categories, brands, units, taxes… and the **Activity log** last). No counts on rows (what waits is on
+Home and the bell; the shared sidebar doesn't draw them), no section headings; only a red mark for
+something not set up.
+
+## P16. Trails and tracks · adopted · J4, J5
+
+**Trail:** every main record's page shows who did what and when (made,
+changed which fields, approved, returned with the reason, posted, voided,
+sent), newest first, from the audit log and the record's own events. Values
+only for fields that opt in (B3).
+
+**Track:** every record that moves through steps shows them, the current one
+lit, who has it and since when; the same steps give the sidebar's counts and
+the module's "time in each step, and what's stuck" report.
+
+## P17. The list layout · adopted · E1, I1
+
+**From the user's reference (a clinic Sales page, 2026-10-25):** one white frame per list holding,
+top to bottom: two or three headline figures with their change on last month (dividers, not
+cards); underline tabs (with counts); one toolbar row (search left; period and export right); a
+table with small uppercase headings, even rows, soft status pills, and rows that **open in place**
+to their details (an invoice's payments, an order's lines) with the actions for them right there.
+One accent colour, for actions only. Kit: `src/platform/ui/list-layout.tsx` (ListFrame,
+FigureStrip, UnderlineTabs, ListToolbar, StatusPill) and `src/platform/ui/expandable-table.tsx`.
+On (2026-10-25): Finance Sales invoices (rows open to payments, Record payment in place); Inventory Purchase orders and Sales orders, list view (rows open to their lines; boards kept); CRM Quotes (rows open to lines, credit status and letter). Next: CRM Customers, once the expandable table takes the bulk-selection checkboxes.
+
+## P18. Plain, guided screens: the five UX rules · adopted · all
+
+**The user's standard (2026-10-25):** "the system is good, but the UX isn't". Screens show the work,
+not explanations, and lead the person to the next thing to fill. Every screen is checked against:
+
+1. **Jakob's law:** familiar patterns. Lists, tabs, record pages and forms look and behave as in
+   Zoho and every web app; one way per thing across all modules.
+2. **Hick's law:** few choices at a time. One main action per screen, at most three next steps,
+   filters in one row, rare options folded away (set-up under its own tab or a fold).
+3. **Fitts's law:** big, near targets. Whole rows open their record; actions sit in the same place
+   on every row; 44 px targets on phones.
+4. **Law of proximity:** what belongs together sits together. A field's context sits under it (two-line
+   rows); actions beside what they act on; one container per list.
+5. **Doherty threshold:** answers within 400 ms. The page frame draws at once, records stream in
+   (`Later`), every action confirms in a message, with Undo where it can be undone.
+
+**No words an icon already says:** the icon stays, the words go into the shared tooltip
+(`src/platform/ui/tip.tsx`), which is also the element's spoken name. A page's explanation is an ⓘ
+beside its title (`ui/about-tip.tsx`, in every module's PageHeader); only live lines (counts, links)
+stay under the title. Amounts short with the whole on hover (`ui/amount.tsx`).
+
+**Forms, balanced (2026-10-25):** one `Field` in every module (same label size, errors in red under
+the field, a plain hint as an ⓘ beside the label so neighbours stay the same height) laid out on
+`FormGrid`, six columns: each field as wide as what it holds (`size`: sm a code, date or amount; md
+names, emails, selects; lg the longer partner of a short one; full notes and addresses), each row adding up to six.
+
+**Directive:** a record's page says what it still needs as buttons to the very place to fill it
+(`ui/next-steps.tsx`, "To do": three at most, the pressing one red, none when complete); empty
+states offer the next action; the sidebar marks what isn't set up.
+
+On (2026-10-25): every PageHeader (ⓘ for explanations); CRM deals table and deal page (icons with tips,
+To do strip); Lead inbox (tabs, one frame, channel marks). Next: the same pass on Customers, Quotes,
+Activities, then Inventory, Finance, Pharmacy, Admin, one screen at a time.

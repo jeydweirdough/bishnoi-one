@@ -90,7 +90,7 @@ export function FollowUpItem({ row, today, org, showCustomer = true }: { row: Fo
           {showCustomer && row.customerName && (
             <>
               <Link
-                href={row.href ?? `/crm/companies/${row.customerId}`}
+                href={row.href ?? `/crm/customers/${row.customerId}`}
                 className="font-medium text-ink hover:underline"
               >
                 {row.customerName}

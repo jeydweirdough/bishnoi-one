@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/console/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/console/platform/ui/confirm";
-import { Field, FormError, Input, Select } from "@/src/modules/console/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/modules/console/platform/ui/field";
 import { Empty } from "@/src/modules/console/platform/ui/sheet";
 import { grantApplication, withdrawApplication } from "@/src/modules/console/actions/users";
 import { ago, when } from "@/src/modules/console/lib/words";
@@ -141,11 +141,11 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
         }}
         className="space-y-4"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <FormGrid>
           {grant ? (
-            <p className="text-sm font-semibold text-ink sm:col-span-2">{grant.name}</p>
+            <p className="text-sm font-semibold text-ink sm:col-span-6">{grant.name}</p>
           ) : (
-            <Field label="Application" error={fields.applicationId}>
+            <Field label="Application" size="md" error={fields.applicationId}>
               {(p) => (
                 <Select {...p} value={appId} onChange={(e) => setAppId(e.target.value)} autoFocus>
                   {user.canBeGiven.map((a) => (
@@ -157,10 +157,10 @@ function GrantForm({ user, grant, onDone }: { user: PlatformUserDetail; grant?: 
               )}
             </Field>
           )}
-          <Field label={`Role in ${appName}`} optional error={fields.role} hint="Their role in the application, e.g. Pharmacist or Sales rep.">
+          <Field label={`Role in ${appName}`} size="md" optional error={fields.role} hint="Their role in the application, e.g. Pharmacist or Sales rep.">
             {(p) => <Input {...p} value={role} onChange={(e) => setRole(e.target.value)} maxLength={60} autoFocus={Boolean(grant)} />}
           </Field>
-        </div>
+        </FormGrid>
         <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
           <input suppressHydrationWarning type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isAppAdmin} onChange={(e) => setAppAdmin(e.target.checked)} />
           <span>

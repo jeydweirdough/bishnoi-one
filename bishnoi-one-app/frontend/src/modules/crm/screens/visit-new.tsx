@@ -25,7 +25,7 @@ export default async function VisitNewPage({ searchParams }: { searchParams: Pro
   const terms = termsOf(me);
   // What the way back is called: the doctor's page, or the list it came from.
   const from = doctors.items.find((d) => d.id === initial)?.name;
-  const label = back.startsWith("/crm/companies") && from ? from : back === "/" ? "Home" : back.startsWith("/crm/field/doctors") ? terms.visited.many : back.startsWith("/crm/field/routes") ? "Route" : "Visits";
+  const label = back.startsWith("/crm/customers") && from ? from : back === "/" ? "Home" : back.startsWith("/crm/field/doctors") ? terms.visited.many : back.startsWith("/crm/field/routes") ? "Route" : "Visits";
   return (
     <>
       <PageHeader title="Log visit" crumbs={[{ href: back, label }]}>

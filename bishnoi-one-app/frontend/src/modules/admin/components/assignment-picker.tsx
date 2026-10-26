@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Field, Select } from "@/src/modules/admin/platform/ui/field";
+import { Field, FormGrid, Select } from "@/src/modules/admin/platform/ui/field";
 import type { AssignmentInput } from "@/src/modules/admin/actions/admin";
 import type { AppModule, OrgDivision, Role } from "@/src/modules/admin/platform/lib/types";
 
@@ -65,8 +65,8 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Role" error={errors.roleKey}>
+      <FormGrid>
+        <Field label="Role" size="md" error={errors.roleKey}>
           {(p) => (
             <Select
               {...p}
@@ -84,7 +84,7 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
             </Select>
           )}
         </Field>
-        <Field label="Module" error={errors.moduleKey}>
+        <Field label="Module" size="md" error={errors.moduleKey}>
           {(p) => (
             <Select
               {...p}
@@ -112,7 +112,7 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
           )}
         </Field>
         {moduleKey !== SETTINGS && (
-          <Field label="Division" error={errors.divisionCode} hint={ownDivisionOnly ? `${picked?.name} only has its own records.` : undefined}>
+          <Field label="Division" size="md" error={errors.divisionCode} hint={ownDivisionOnly ? `${picked?.name} only has its own records.` : undefined}>
             {(p) =>
               ownDivisionOnly ? (
                 <Select {...p} value={moduleKey} disabled>
@@ -140,7 +140,7 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
           </Field>
         )}
         {division && (
-          <Field label="Team" error={errors.subdivisionCode}>
+          <Field label="Team" size="md" error={errors.subdivisionCode}>
             {(p) => (
               <Select
                 {...p}
@@ -161,7 +161,7 @@ export function AssignmentPicker({ roles, divisions, apps = [], personName = "Th
             )}
           </Field>
         )}
-      </div>
+      </FormGrid>
       <p className="rounded-[12px] bg-bench/60 px-3 py-2 text-meta text-ink-2">
         {personName} will be <strong className="font-semibold text-ink">{role?.name ?? "—"}</strong> {sentence}.
       </p>

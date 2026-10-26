@@ -1,14 +1,15 @@
-import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
+import { PeopleNotice } from "@/src/platform/ui/people-notice";
+import { AuditLog } from "@/src/platform/screens/audit";
 import Link from "next/link";
 import { Avatar } from "@/src/modules/pharmacy/platform/ui/avatar";
-import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
+import { Empty, PageHeader, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
 import { enc, load } from "@/src/modules/pharmacy/platform/lib/api";
 import { NoAccess } from "@/src/modules/pharmacy/components/bits";
 import { RolesEditor } from "@/src/modules/pharmacy/components/roles-editor";
-import { PasswordForm, UserForm } from "@/src/modules/pharmacy/components/user-form";
-import { pageFor, param, type Search } from "@/src/modules/pharmacy/lib/page";
-import type { AdminUser, AuditItem, PermissionArea, RoleOption, RoleRow } from "@/src/modules/pharmacy/lib/types";
+import { UserForm } from "@/src/modules/pharmacy/components/user-form";
+import { pageFor, type Search } from "@/src/modules/pharmacy/lib/page";
+import type { AdminUser, PermissionArea, RoleOption, RoleRow } from "@/src/modules/pharmacy/lib/types";
 
 // Administration: the Pharmacy's own users, what each role may do, and the log
 // of who did what. Each page asks for its own permission.
@@ -22,14 +23,10 @@ export async function UsersPage() {
     <>
       <PageHeader
         title="Users"
-        actions={
-          <LinkButton href="/pharmacy/admin/users/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-            Add person
-          </LinkButton>
-        }
       >
         {active} active{users.length > active ? ` · ${users.length - active} switched off` : ""}. Everyone here signs in to the Pharmacy only.
       </PageHeader>
+      <PeopleNotice own="each pharmacist's licence number" />
       <Sheet>
         {users.length === 0 ? (
           <Empty icon="people" title="No one yet" />
@@ -63,18 +60,9 @@ export async function UsersPage() {
   );
 }
 
+/** People are added once for every module, in Bishnoi One's People (R2). */
 export async function UserNewPage() {
-  const { allowed } = await pageFor("admin.users");
-  if (!allowed) return <NoAccess what="managing users" />;
-  const { roles } = await load<{ users: AdminUser[]; roles: RoleOption[] }>("/admin/users");
-  return (
-    <>
-      <PageHeader crumbs={[{ href: "/pharmacy/admin/users", label: "Users" }]} title="Add person" />
-      <Sheet className="max-w-[50rem] px-5 py-6 sm:px-8">
-        <UserForm roles={roles} />
-      </Sheet>
-    </>
-  );
+  redirect("/platform/roles/people");
 }
 
 export async function UserPage({ params }: { params: Promise<{ id: string }> }) {
@@ -90,11 +78,6 @@ export async function UserPage({ params }: { params: Promise<{ id: string }> }) 
       <div className="max-w-[50rem] space-y-4">
         <Sheet className="px-5 py-6 sm:px-8">
           <UserForm key={`${user.role.id}-${user.isActive}-${user.fullName}`} roles={user.roles} user={user} isMe={user.id === me.user.id} />
-        </Sheet>
-        <Sheet className="px-5 py-5 sm:px-8">
-          <SectionTitle icon="password">Password</SectionTitle>
-          <p className="mt-1 mb-3 text-meta text-ink-3">Setting a new one ends every session they have open.</p>
-          <PasswordForm userId={user.id} />
         </Sheet>
       </div>
     </>
@@ -127,56 +110,9 @@ const AREAS: Record<string, string> = {
   "auth.": "Sign-ins",
 };
 
+/** The activity log: the shared one (src/platform/screens/audit.tsx), with Pharmacy's filters. */
 export async function AuditPage({ searchParams }: { searchParams: Search }) {
-  const { fmt, allowed } = await pageFor("admin.audit");
+  const { allowed } = await pageFor("admin.audit");
   if (!allowed) return <NoAccess what="the activity log" />;
-  const search = await searchParams;
-  const action = param(search, "action");
-  const before = param(search, "before");
-  const page = await load<{ items: AuditItem[]; more: boolean }>(
-    `/admin/audit?limit=50${action ? `&action=${enc(action)}` : ""}${before ? `&before=${enc(before)}` : ""}`,
-  );
-  return (
-    <>
-      <PageHeader title="Activity log">Who did what, and when. It names what changed, never the values.</PageHeader>
-      <nav aria-label="Filter" className="mb-3 flex flex-wrap gap-1.5">
-        {Object.entries(AREAS).map(([key, label]) => (
-          <Link
-            key={key}
-            href={key ? `/pharmacy/admin/audit?action=${enc(key)}` : "/pharmacy/admin/audit"}
-            aria-current={key === action ? "true" : undefined}
-            className={`rounded-full border px-2.5 py-0.5 text-meta ${key === action ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:text-ink"}`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
-      <Sheet>
-        {page.items.length === 0 ? (
-          <Empty icon="auditLog" title="Nothing logged yet" />
-        ) : (
-          <ul className="divide-y divide-rule">
-            {page.items.map((e) => (
-              <li key={e.id} className="grid gap-1 px-5 py-2.5 text-sm md:grid-cols-[10rem_minmax(0,14rem)_minmax(0,1fr)] md:gap-5">
-                <span className="text-meta text-ink-3">{fmt.whenLabel(e.at)}</span>
-                <span className="truncate text-ink-2">{e.actor}</span>
-                <span className="min-w-0">
-                  <span className="font-medium text-ink">{e.action.replaceAll("_", " ").replace(".", " · ")}</span>
-                  {e.target && <span className="text-ink-2"> — {e.target}</span>}
-                  {e.fields.length > 0 && <span className="block text-meta text-ink-3">Changed: {e.fields.join(", ")}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {page.more && (
-          <div className="border-t border-rule px-5 py-3 text-right">
-            <Link href={`/pharmacy/admin/audit?${action ? `action=${enc(action)}&` : ""}before=${page.items[page.items.length - 1].id}`} className="text-meta font-semibold text-hema hover:underline">
-              Older entries
-            </Link>
-          </div>
-        )}
-      </Sheet>
-    </>
-  );
+  return <AuditLog searchParams={searchParams} settings={{ filters: Object.entries(AREAS).map(([key, label]) => ({ key, label })), peoplePages: true }} />;
 }

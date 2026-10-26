@@ -184,7 +184,7 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
   return (
     <>
       <PageHeader
-        title="Batches and expiry"
+        title="Batches"
         actions={may("adjustments.create") && <LinkButton href="/inventory/adjustments/new?reason=expired">Write off expired stock</LinkButton>}
       >
         All batches on hand, sorted by expiry date in issue order (first-expired, first-out).

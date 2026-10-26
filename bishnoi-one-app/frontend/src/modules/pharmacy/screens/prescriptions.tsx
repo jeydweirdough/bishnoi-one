@@ -1,4 +1,5 @@
-import { ClipboardPlus } from "lucide-react";
+import { ClipboardPlus, ExternalLink, Pill, User } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
@@ -67,7 +68,7 @@ export default async function PrescriptionsPage({ searchParams }: { searchParams
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[46rem] text-left text-sm">
-              <Head columns={["Prescription", "Patient", "Medicines", view === "verified" ? "Dispensing" : "Status", { label: "Received", right: true }]} />
+              <Head columns={["Prescription", "Patient", "Medicines", view === "verified" ? "Dispensing" : "Status", { label: "Received", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {rows.map((rx) => (
                   <tr key={rx.id} className="relative hover:bg-bench/40">
@@ -96,6 +97,19 @@ export default async function PrescriptionsPage({ searchParams }: { searchParams
                           </Link>
                         </span>
                       )}
+                    </td>
+                    <td className="px-2 py-2 text-right align-top">
+                      <RowMenu
+                        label={`Actions for ${rx.number}`}
+                        items={[
+                          { label: (view === "inbox" || view === "pending") && checker ? (view === "inbox" ? "Check" : "Continue checking") : "Open", icon: <ExternalLink />, href: `/pharmacy/prescriptions/${rx.id}` },
+                          "divider" as const,
+                          ...(rx.status === "verified" && !rx.source && rx.items.some((i) => i.remaining > 0) && may("dispensing.create")
+                            ? [{ label: "Dispense", icon: <Pill />, href: `/pharmacy/dispensing/new?rx=${rx.id}` }]
+                            : []),
+                          ...(may("patients.view") ? [{ label: "Open patient", icon: <User />, href: `/pharmacy/patients/${rx.patient.id}` }] : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

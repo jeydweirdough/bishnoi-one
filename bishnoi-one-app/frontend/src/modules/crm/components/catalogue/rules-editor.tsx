@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { percent, percentText, toBasisPoints } from "@/src/platform/lib/format";
 import type { PriceEntry, PriceRule, SalesRules } from "@/src/platform/lib/types";
@@ -117,16 +117,16 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
       }}
       className="mt-3 space-y-4 rounded-xl bg-bench px-4 py-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormGrid>
         {!kind && (
-          <Field label="Code" error={fields.code} hint="Short and unique, e.g. PATIENT">
+          <Field label="Code" size="sm" error={fields.code} hint="Short and unique, e.g. PATIENT">
             {(p) => <Input {...p} value={code} onChange={(e) => setCode(e.target.value)} autoFocus />}
           </Field>
         )}
-        <Field label="Name" error={fields.name}>
+        <Field label="Name" size={kind ? "md" : "lg"} error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus={!!kind} />}
         </Field>
-        <Field label="The price comes from" error={fields.entry}>
+        <Field label="The price comes from" size="md" error={fields.entry}>
           {(p) => (
             <Select {...p} value={entry} onChange={(e) => setEntry(e.target.value as PriceEntry)}>
               <option value="list">The price list</option>
@@ -134,7 +134,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
             </Select>
           )}
         </Field>
-        <Field label="Offered" error={fields.rule}>
+        <Field label="Offered" size="md" error={fields.rule}>
           {(p) => (
             <Select {...p} value={rule} onChange={(e) => setRule(e.target.value as PriceRule)}>
               <option value="always">On every quote</option>
@@ -142,7 +142,7 @@ function PriceTypeForm({ kind, onDone }: { kind: PriceType | null; onDone: () =>
             </Select>
           )}
         </Field>
-      </div>
+      </FormGrid>
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         {box("Needs notes", requiresNotes, setNotes)}
         {box("Needs approval", needsApproval, setApproval)}
@@ -218,14 +218,14 @@ function SettingsForm({ rules }: { rules: SalesRules }) {
           <input suppressHydrationWarning type="checkbox" checked={letters} onChange={(e) => setLetters(e.target.checked)} className="size-4 accent-hema" />
           Accept guarantee letters (DSWD, PCSO…) as payment
         </label>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="At risk after (days)" error={fields.atRiskDays}>
+        <FormGrid>
+          <Field label="At risk after (days)" size="sm" error={fields.atRiskDays}>
             {(p) => <Input {...p} inputMode="numeric" value={atRisk} onChange={(e) => setAtRisk(e.target.value)} />}
           </Field>
-          <Field label="Lost after (days)" error={fields.lostDays}>
+          <Field label="Lost after (days)" size="sm" error={fields.lostDays}>
             {(p) => <Input {...p} inputMode="numeric" value={lost} onChange={(e) => setLost(e.target.value)} />}
           </Field>
-        </div>
+        </FormGrid>
         <p className="text-meta text-ink-3">A customer with no quote in that long is at risk, then lost.</p>
         <FormError message={error} />
         <Button type="submit" variant="primary" size="sm" loading={pending}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { MENU_ROW } from "@/src/platform/ui/more-menu";
 import { Modal, Switch } from "antd";
 import { Share2 } from "lucide-react";
 import { useState, useTransition } from "react";
@@ -14,7 +15,8 @@ import { customerSharing, setCustomerSharing, type Sharing } from "@/src/modules
  * the same name, email or phone, they're told it exists (by name and division,
  * never its details), and a field pointing at a customer can pick it.
  */
-export function CustomerSharingButton() {
+/** `menu`: drawn as a row of a More menu (ui/more-menu.tsx) rather than a button. */
+export function CustomerSharingButton({ menu = false }: { menu?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [teams, setTeams] = useState<Sharing[] | null>(null);
   const [busy, start] = useTransition();
@@ -35,9 +37,16 @@ export function CustomerSharingButton() {
 
   return (
     <>
-      <Button icon={<Share2 className="size-4" aria-hidden />} onClick={show}>
-        Customer sharing
-      </Button>
+      {menu ? (
+        <button suppressHydrationWarning type="button" role="menuitem" onClick={show} className={MENU_ROW}>
+          <Share2 className="size-4 shrink-0 text-ink-3" aria-hidden />
+          Customer sharing
+        </button>
+      ) : (
+        <Button icon={<Share2 className="size-4" aria-hidden />} onClick={show}>
+          Customer sharing
+        </Button>
+      )}
       <Modal open={open} title="Customer sharing" onCancel={() => setOpen(false)} footer={null} width={560}>
         <p className="text-sm text-ink-2">
           Whether other divisions are told a customer is already here when they add the same one, and can pick it as a hospital or other linked customer. They only

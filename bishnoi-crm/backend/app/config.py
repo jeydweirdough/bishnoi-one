@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     aws_secret_access_key: SecretStr | None = None
     aws_region: str = "ap-southeast-1"
     s3_bucket: str = "assets"
-    # Where the screens run, allowed to upload into the bucket from the browser.
-    s3_browser_origins: list[str] = ["http://localhost:4302", "http://127.0.0.1:4302"]
+    # Where the screens run, allowed to upload into the bucket from the browser: the one app
+    # (4301, since 2026-10-24) and the old CRM screens (4302). CRM_APP_URL is added on its own.
+    s3_browser_origins: list[str] = ["http://localhost:4301", "http://127.0.0.1:4301", "http://localhost:4302", "http://127.0.0.1:4302"]
     # The first administrator, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + a database it
     # can reach and you can't). Once they exist these are ignored; remove the

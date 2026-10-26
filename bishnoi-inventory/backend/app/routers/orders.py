@@ -73,6 +73,8 @@ def order_brief(o: Order) -> dict:
         "lineCount": len(o.lines),
         "units": sum(line.quantity for line in o.lines),
         "total": sum(line.quantity * line.unit_price for line in o.lines),
+        # Its lines, short, for a list row that opens in place (2026-10-25).
+        "items": [{"sku": line.product.sku, "product": line.product.name, "quantity": line.quantity, "unitPrice": line.unit_price} for line in o.lines],
         "createdAt": iso(o.created_at),
         "confirmedAt": iso(o.confirmed_at),
         "issuedAt": iso(o.issued_at),
@@ -156,6 +158,24 @@ def list_orders(
     if limit is not None:
         return {"items": [order_brief(o) for o in db.scalars(cut(query.order_by(Order.id), limit, offset))], "total": total(db, query)}
     return [order_brief(o) for o in db.scalars(query.limit(500))]
+
+
+@router.get("/order-figures")
+def order_figures(_: View, db: DB, kind: str | None = Query(None, max_length=16)) -> dict:
+    """The list's headline figures: orders still open, and the value issued this month and last (of this kind, when one is picked)."""
+    from app.routers.purchasing import month_starts
+
+    before, first, after = month_starts()
+    base = select(Order)
+    if kind:
+        base = base.where(Order.kind == kind)
+    open_ = len(db.scalars(base.where(Order.status.in_(("draft", "confirmed", "picking")))).all())
+
+    def issued(start: datetime, end: datetime) -> int:
+        rows = db.scalars(base.where(Order.status == "issued", Order.issued_at >= start, Order.issued_at < end)).all()
+        return sum(line.quantity * line.unit_price for o in rows for line in o.lines)
+
+    return {"openCount": open_, "issuedThisMonth": issued(first, after), "issuedLastMonth": issued(before, first)}
 
 
 @router.get("/reservations")

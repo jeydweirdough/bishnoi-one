@@ -12,7 +12,7 @@ import { FormError } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
 import { addAssociation, findTargets, removeAssociation, type AssocKind, type Associations } from "@/src/modules/crm/actions/associations";
 
-const HREF: Record<AssocKind, string> = { company: "/crm/companies", contact: "/crm/contacts", deal: "/crm/deals" };
+const HREF: Record<AssocKind, string> = { company: "/crm/customers", contact: "/crm/contacts", deal: "/crm/deals" };
 const WHICH: Record<AssocKind, string> = { company: "Which customer", contact: "Which contact", deal: "Which deal" };
 
 /**

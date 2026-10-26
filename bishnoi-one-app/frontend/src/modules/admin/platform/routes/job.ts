@@ -4,7 +4,7 @@ import type { Job } from "@/src/modules/admin/platform/lib/types";
 // A bulk action's progress, for the page that started it. A GET route rather
 // than a server action: Next runs server actions one at a time per tab, and
 // polling through them would hold up everything else the person clicks.
-export async function GET(_request: Request, ctx: RouteContext<"/admin/jobs/[id]">) {
+export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   try {
     const job = await api.get<Job>(`/jobs/${enc(id)}`);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { moduleOfPath } from "../lib/modules";
 import { plainButton } from "./error-screen";
 
 // The error pages' buttons. Plain elements, not the kit's Ant buttons, so they
@@ -41,9 +42,11 @@ export function GoBack({ primary = true }: { primary?: boolean }) {
   );
 }
 
+/** Home of the module they're in (/inventory), else Bishnoi One's home: one button for every module. */
 export function GoHome({ primary = false }: { primary?: boolean }) {
+  const here = moduleOfPath(usePathname() ?? "/");
   return (
-    <a href="/" className={plainButton(primary)}>
+    <a href={here?.path ?? "/"} className={plainButton(primary)}>
       Go home
     </a>
   );

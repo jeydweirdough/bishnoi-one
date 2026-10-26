@@ -125,7 +125,7 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
             {a.alsoOn!.map((c, n) => (
               <span key={c.id}>
                 {n > 0 && ", "}
-                <Link href={`/crm/companies/${c.id}`} className="text-ink hover:underline">
+                <Link href={`/crm/customers/${c.id}`} className="text-ink hover:underline">
                   {c.name}
                 </Link>
               </span>
@@ -142,7 +142,7 @@ function Line({ a, org, hide }: { a: ActivityItem; org: Org; hide: string[] }) {
             )}
             {a.contact && !hide.includes("contact") && a.company && !hide.includes("company") && <span className="text-ink-3"> at </span>}
             {a.company && !hide.includes("company") && (
-              <Link href={`/crm/companies/${a.company.id}`} className="text-ink hover:underline">
+              <Link href={`/crm/customers/${a.company.id}`} className="text-ink hover:underline">
                 {a.company.name}
               </Link>
             )}

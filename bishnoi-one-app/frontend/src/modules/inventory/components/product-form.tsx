@@ -3,7 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Button, LinkButton } from "@/src/modules/inventory/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { makeFormat } from "@/src/modules/inventory/platform/lib/format";
 import type { Org } from "@/src/modules/inventory/platform/lib/types";
@@ -148,15 +148,15 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="products">Basic information</SectionTitle>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="SKU" error={fields.sku}>
+        <FormGrid className="mt-4">
+          <Field label="SKU" size="sm" error={fields.sku}>
             {(p) => <Input {...p} value={d.sku} onChange={(e) => set({ sku: e.target.value })} autoFocus={!product} />}
           </Field>
-          <Field label="Product name" error={fields.name} className="lg:col-span-2">
+          <Field label="Product name" size="lg" error={fields.name}>
             {(p) => <Input {...p} value={d.name} onChange={(e) => set({ name: e.target.value })} />}
           </Field>
-          <WithAdd can={canAdd.category} add={<QuickAdd kind="category" onAdded={took("categoryId")} context={{ categories: reference.categories.map((c) => ({ id: c.id, path: c.path })) }} label="New" />}>
-            <Field label="Category" optional error={fields.categoryId}>
+          <WithAdd can={canAdd.category} className="sm:col-span-3" add={<QuickAdd kind="category" onAdded={took("categoryId")} context={{ categories: reference.categories.map((c) => ({ id: c.id, path: c.path })) }} label="New" />}>
+            <Field label="Category" size="md" optional error={fields.categoryId}>
               {(p) => (
                 <Select {...p} value={d.categoryId} onChange={(e) => set({ categoryId: e.target.value })}>
                   <option value="">None</option>
@@ -165,8 +165,8 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               )}
             </Field>
           </WithAdd>
-          <WithAdd can={canAdd.brand} add={<QuickAdd kind="brand" onAdded={took("brandId")} label="New" />}>
-            <Field label="Brand" optional error={fields.brandId}>
+          <WithAdd can={canAdd.brand} className="sm:col-span-3" add={<QuickAdd kind="brand" onAdded={took("brandId")} label="New" />}>
+            <Field label="Brand" size="md" optional error={fields.brandId}>
               {(p) => (
                 <Select {...p} value={d.brandId} onChange={(e) => set({ brandId: e.target.value })}>
                   <option value="">None</option>
@@ -175,18 +175,18 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               )}
             </Field>
           </WithAdd>
-          <Field label="Barcode" optional error={fields.barcode}>
+          <Field label="Barcode" size="sm" optional error={fields.barcode}>
             {(p) => <Input {...p} value={d.barcode} onChange={(e) => set({ barcode: e.target.value })} inputMode="numeric" />}
           </Field>
-          <Field label="Product type" error={fields.productType} hint={locked ? "Locked after the first stock movement." : undefined}>
+          <Field label="Product type" size="sm" error={fields.productType} hint={locked ? "Locked after the first stock movement." : undefined}>
             {(p) => (
               <Select {...p} value={d.productType} disabled={locked} onChange={(e) => set({ productType: e.target.value as ProductType })}>
                 {Object.entries(PRODUCT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             )}
           </Field>
-          <WithAdd can={canAdd.unit && !locked} add={<QuickAdd kind="unit" onAdded={took("unitCode")} label="New" />}>
-            <Field label="Unit of measure" error={fields.unitCode}>
+          <WithAdd can={canAdd.unit && !locked} className="sm:col-span-2" add={<QuickAdd kind="unit" onAdded={took("unitCode")} label="New" />}>
+            <Field label="Unit of measure" size="sm" error={fields.unitCode}>
               {(p) => (
                 <Select {...p} value={d.unitCode} disabled={locked} onChange={(e) => set({ unitCode: e.target.value })}>
                   {pickFrom(units)}
@@ -194,36 +194,36 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               )}
             </Field>
           </WithAdd>
-          <Field label="Status" error={fields.status}>
+          <Field label="Status" size="sm" error={fields.status}>
             {(p) => (
               <Select {...p} value={d.status} onChange={(e) => set({ status: e.target.value as ProductStatus })}>
                 {Object.entries(PRODUCT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             )}
           </Field>
-          <Field label="Description" optional error={fields.description} className="sm:col-span-2 lg:col-span-3">
+          <Field label="Description" optional error={fields.description} size="full">
             {(p) => <Textarea {...p} rows={2} value={d.description} onChange={(e) => set({ description: e.target.value })} />}
           </Field>
-        </div>
+        </FormGrid>
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="letters">Product registration</SectionTitle>
         <p className="mt-1 text-meta text-ink-3">The FDA Certificate of Product Registration (CPR). Every active stock product needs one to be sold.</p>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="CPR number" optional error={fields.cprNumber} hint="As printed on the certificate, for example DR-XY12345.">
+        <FormGrid className="mt-4">
+          <Field label="CPR number" size="lg" optional error={fields.cprNumber} hint="As printed on the certificate, for example DR-XY12345.">
             {(p) => <Input {...p} value={d.cprNumber} placeholder="DR-XY12345" onChange={(e) => set({ cprNumber: e.target.value.toUpperCase() })} />}
           </Field>
-          <Field label="Valid until" optional error={fields.cprValidUntil}>
+          <Field label="Valid until" size="sm" optional error={fields.cprValidUntil}>
             {(p) => <Input {...p} type="date" value={d.cprValidUntil} onChange={(e) => set({ cprValidUntil: e.target.value })} />}
           </Field>
-        </div>
+        </FormGrid>
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="pricing">Purchasing and sales</SectionTitle>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sm:col-span-2">
+        <FormGrid className="mt-4">
+          <div className="sm:col-span-4">
             <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" onAdded={took("supplierId")} label="New" />}>
               <Field label="Preferred supplier" optional error={fields.supplierId}>
                 {(p) => (
@@ -235,20 +235,20 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               </Field>
             </WithAdd>
           </div>
-          <Field label={`Cost price (${fmt.symbol})`} error={fields.costPrice} hint="Per unit. Used to value stock.">
+          <Field label={`Cost price (${fmt.symbol})`} size="sm" error={fields.costPrice} hint="Per unit. Used to value stock.">
             {(p) => <Input {...p} inputMode="decimal" value={d.costPrice} onChange={(e) => set({ costPrice: e.target.value })} />}
           </Field>
-          <Field label={`Selling price (${fmt.symbol})`} error={fields.sellingPrice}>
+          <Field label={`Selling price (${fmt.symbol})`} size="sm" error={fields.sellingPrice}>
             {(p) => <Input {...p} inputMode="decimal" value={d.sellingPrice} onChange={(e) => set({ sellingPrice: e.target.value })} />}
           </Field>
-          <Field label="Tax rate (%)" error={fields.taxRateBp}>
+          <Field label="Tax rate (%)" size="sm" error={fields.taxRateBp}>
             {(p) => <Input {...p} inputMode="decimal" value={d.taxRate} onChange={(e) => set({ taxRate: e.target.value.replace(/[^\d.]/g, "") })} />}
           </Field>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-2 sm:col-span-3">
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-2 sm:col-span-2">
             <input suppressHydrationWarning type="checkbox" checked={d.taxInclusive} onChange={(e) => set({ taxInclusive: e.target.checked })} className="size-4 accent-hema" />
             Prices include tax
           </label>
-        </div>
+        </FormGrid>
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
@@ -294,8 +294,8 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
 
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="lists">Variant and specifications</SectionTitle>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <Field label="Parent product" optional error={fields.parentId} hint="For example, 3 mL is a variant of BD Syringe.">
+        <FormGrid className="mt-4">
+          <Field label="Parent product" size="lg" optional error={fields.parentId} hint="For example, 3 mL is a variant of BD Syringe.">
             {(p) => (
               <Select {...p} value={d.parentId} onChange={(e) => set({ parentId: e.target.value })}>
                 <option value="">None</option>
@@ -303,10 +303,10 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
               </Select>
             )}
           </Field>
-          <Field label="Variant label" optional error={fields.variantLabel}>
+          <Field label="Variant label" size="sm" optional error={fields.variantLabel}>
             {(p) => <Input {...p} value={d.variantLabel} placeholder="3 mL" disabled={!d.parentId} onChange={(e) => set({ variantLabel: e.target.value })} />}
           </Field>
-        </div>
+        </FormGrid>
         <p className="mt-5 mb-2 text-meta font-medium text-ink-2">Specifications</p>
         <div className="space-y-2">
           {d.attributes.map(([k, v], i) => (
@@ -328,7 +328,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
       <FormError message={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
-          {product ? "Save changes" : "Add product"}
+          {product ? "Save changes" : "Save item"}
         </Button>
         <LinkButton href={product ? `/inventory/products/${product.id}` : "/inventory/products"} variant="quiet">
           Cancel

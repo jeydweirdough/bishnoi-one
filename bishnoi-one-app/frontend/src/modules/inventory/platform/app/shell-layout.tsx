@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { Suspense, type ReactNode } from "react";
 import { Notices } from "@/src/platform/app/notices";
 import { OneActions } from "@/src/one/one-actions";
+import { getAccount } from "@/src/platform/lib/account";
+import { myModules } from "@/src/one/mine";
 import { ModuleActions } from "@/src/platform/shell/module-actions";
 import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getMe } from "../lib/api";
@@ -16,6 +18,8 @@ type Props = { children: ReactNode; waiting?: Record<string, number>; unset?: Re
 
 export async function ShellLayout({ children, waiting, unset, bell }: Props) {
   const me = await getMe();
+  // The modules this person was given, for the switcher at the top of the sidebar.
+  const mine = myModules(await getAccount());
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   // Its bell, then your modules and you (src/one/one-actions.tsx): the top right, as before the one app.
   const actions = (
@@ -29,7 +33,7 @@ export async function ShellLayout({ children, waiting, unset, bell }: Props) {
         <NavProgress />
       </Suspense>
       <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-        <Nav me={me} waiting={waiting} unset={unset} rail={rail} actions={actions} />
+        <Nav me={me} mine={mine} waiting={waiting} unset={unset} rail={rail} actions={actions} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
           <header className="mb-4 hidden justify-end lg:flex">{actions}</header>
           <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">

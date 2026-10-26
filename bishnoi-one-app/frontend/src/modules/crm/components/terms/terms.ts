@@ -1,5 +1,6 @@
-// The company's own words (Settings → Terms; the API's app/terms.py). The CRM
-// speaks in general terms; a company that says it differently names it once.
+// The CRM's words. Standard terms only, as Zoho names things (decided 2026-10-24): a company's
+// own words (Settings → Terms, the API's app/terms.py) are no longer shown. What still applies
+// from there is which customer type field agents visit (visitedType), which is a setting, not a word.
 import type { Me } from "@/src/platform/lib/types";
 
 export type Terms = {
@@ -23,9 +24,9 @@ export const GENERAL_TERMS: Terms = {
   genericName: "Product family",
 };
 
-/** The signed-in company's words, general where it hasn't said. */
+/** The CRM's standard words, with the company's choice of which customers field agents visit. */
 export function termsOf(me: Pick<Me, "org"> | null | undefined): Terms {
-  return { ...GENERAL_TERMS, ...(me?.org?.terms ?? {}) };
+  return { ...GENERAL_TERMS, visitedType: me?.org?.terms?.visitedType ?? null };
 }
 
 /** "Doctor" -> "doctor", for the middle of a sentence. */

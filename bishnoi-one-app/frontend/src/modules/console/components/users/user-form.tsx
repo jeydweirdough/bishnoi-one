@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/console/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/modules/console/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/modules/console/platform/ui/field";
 import { Subheading } from "@/src/modules/console/platform/ui/sheet";
 import { addUser, updateUser, type UserPatch } from "@/src/modules/console/actions/users";
 import { plural } from "@/src/modules/console/lib/words";
@@ -114,12 +114,12 @@ export function UserForm({
       }}
       className="space-y-7"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
+      <FormGrid>
         <Field
           label="Company"
           error={fields.companyId}
           hint={user ? "Changing company keeps only the applications assigned to the new company." : "The company the user belongs to."}
-          className="sm:col-span-2"
+          size="md"
         >
           {(p) => (
             <Select {...p} value={companyId} onChange={(e) => chooseCompany(e.target.value)} required>
@@ -134,27 +134,27 @@ export function UserForm({
           )}
         </Field>
         {moving && losing.length > 0 && (
-          <p role="status" className="rounded-[14px] bg-danger-tint px-3 py-2 text-meta text-danger sm:col-span-2">
+          <p role="status" className="rounded-[14px] bg-danger-tint px-3 py-2 text-meta text-danger sm:col-span-6">
             {companyName} doesn&apos;t have {losing.map((g) => g.name).join(", ")}. {user?.fullName} will lose {losing.length === 1 ? "it" : "them"} with the move.
           </p>
         )}
-        <Field label="Full name" error={fields.fullName}>
+        <Field label="Full name" size="md" error={fields.fullName}>
           {(p) => <Input {...p} value={values.fullName} onChange={set("fullName")} autoFocus={!user && Boolean(companyId)} required />}
         </Field>
-        <Field label="Email" error={fields.email}>
+        <Field label="Email" size="md" error={fields.email}>
           {(p) => <Input {...p} type="email" inputMode="email" autoCapitalize="none" value={values.email} onChange={set("email")} required />}
         </Field>
-        <Field label="Title" optional error={fields.title} hint="Job title, e.g. Pharmacist.">
+        <Field label="Title" size="md" optional error={fields.title} hint="Job title, e.g. Pharmacist.">
           {(p) => <Input {...p} value={values.title} onChange={set("title")} />}
         </Field>
-        <label className="flex cursor-pointer items-start gap-2.5 self-end pb-1 text-sm text-ink">
+        <label className="flex cursor-pointer items-start gap-2.5 self-end pb-1 text-sm text-ink sm:col-span-3">
           <input suppressHydrationWarning type="checkbox" className="mt-0.5 size-4 accent-hema" checked={isCompanyAdmin} onChange={(e) => setCompanyAdmin(e.target.checked)} />
           <span>
             Company admin
             <span className="block text-meta text-ink-3">Manages the company&apos;s users and access.</span>
           </span>
         </label>
-      </div>
+      </FormGrid>
 
       {!user && (
         <fieldset className="space-y-2">

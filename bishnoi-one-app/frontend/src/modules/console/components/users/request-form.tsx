@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/console/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/console/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/console/platform/ui/field";
 import { requestAccess } from "@/src/modules/console/actions/users";
 import type { Ref } from "@/src/modules/console/lib/types";
 
@@ -69,9 +69,10 @@ export function RequestAccess({
       }}
       className="space-y-4 rounded-[18px] bg-bench/40 px-4 py-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormGrid>
         <Field
           label="Application"
+          size="md"
           error={fields.applicationId}
           hint={appId && !companyApps.includes(appId) ? "Not yet assigned to their company; it must be assigned before the request can be approved." : undefined}
         >
@@ -85,13 +86,13 @@ export function RequestAccess({
             </Select>
           )}
         </Field>
-        <Field label="Requested role" optional error={fields.role}>
+        <Field label="Requested role" size="md" optional error={fields.role}>
           {(p) => <Input {...p} value={role} onChange={(e) => setRole(e.target.value)} maxLength={60} />}
         </Field>
-        <Field label="Reason" optional error={fields.reason} className="sm:col-span-2">
+        <Field label="Reason" optional error={fields.reason} size="full">
           {(p) => <Textarea {...p} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
         </Field>
-      </div>
+      </FormGrid>
       <FormError message={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" variant="primary" loading={pending} disabled={!appId}>

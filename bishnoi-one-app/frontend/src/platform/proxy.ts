@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isPublicPath, moduleOfPath } from "./lib/modules";
+import { isPublicPath, moduleOfPath, moduleByKey } from "./lib/modules";
 import { ACCOUNT_COOKIE, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie } from "./lib/session-cookie";
 
 // The first gate for every page of the one app (decided 2026-10-23):
@@ -11,7 +11,11 @@ import { ACCOUNT_COOKIE, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const next = pathname + search;
-  const here = moduleOfPath(pathname);
+  const reportModule = pathname.match(/^\/platform\/reports\/(crm|inventory|finance|admin|pharmacy)(?:\/|$)/)?.[1];
+  const here = reportModule ? moduleByKey(reportModule) : moduleOfPath(pathname);
+  // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer
+  // isn't signed in, so they go straight to the order page, never to the sign-in page.
+  if (pathname.startsWith("/order/")) return NextResponse.redirect(new URL(`/crm${pathname}${search}`, request.url), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   // A module's public page (a customer's order link): anyone, signed in or not, still talking to that module's API.

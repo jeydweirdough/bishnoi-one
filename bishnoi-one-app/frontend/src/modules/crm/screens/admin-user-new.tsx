@@ -1,25 +1,8 @@
-import { PageHeader, Sheet } from "@/src/platform/ui/sheet";
-import { USERS, can, canAny } from "@/src/modules/crm/lib/access";
-import { getCompanyMe, load } from "@/src/platform/lib/api";
-import type { UserOptions } from "@/src/platform/lib/types";
-import { UserForm } from "@/src/modules/crm/components/admin/user-form";
-import { NoAccess } from "@/src/modules/crm/components/admin/words";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Add a person" };
 
-export default async function NewUserPage() {
-  const me = await getCompanyMe();
-  if (!canAny(me, USERS)) return <NoAccess what="managing users" />;
-  const options = await load<UserOptions>("/admin/users/options");
-
-  return (
-    <>
-      <PageHeader title="Add a person" crumbs={[{ href: "/crm/admin/users", label: "Users" }]}>
-        They sign in to Sales with this email and the first password you give them.
-      </PageHeader>
-      <Sheet className="px-5 pt-5 pb-6">
-        <UserForm {...options} />
-      </Sheet>
-    </>
-  );
+/** People are added once for every module, in Bishnoi One's People (R2, decided 2026-10-26). */
+export default function NewUserPage() {
+  redirect("/platform/roles/people");
 }

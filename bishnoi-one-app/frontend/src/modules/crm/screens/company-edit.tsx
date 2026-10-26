@@ -34,8 +34,8 @@ export default async function EditCompanyPage({
       <PageHeader
         title={complete ? `Complete ${company.name}'s profile` : `Edit ${company.name}`}
         crumbs={[
-          { href: "/crm/companies", label: "Customers" },
-          { href: `/crm/companies/${company.id}`, label: company.name },
+          { href: "/crm/customers", label: "Customers" },
+          { href: `/crm/customers/${company.id}`, label: company.name },
         ]}
       >
         {complete && "Only what's still empty. Fill in what you know; the rest can wait for the next visit."}

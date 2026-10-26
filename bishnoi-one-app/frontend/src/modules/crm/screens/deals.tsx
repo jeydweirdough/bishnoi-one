@@ -1,4 +1,6 @@
-import { ArrowDown, ArrowUp, Download, Target } from "lucide-react";
+import { ArrowDown, ArrowUp, Building2, CalendarCheck, CalendarClock, CalendarPlus, ChevronsUpDown, CircleAlert, CircleX, Download, ExternalLink, FileText, Flag, Hourglass, Pencil, Scale, Target, Trash2, UserPlus, type LucideIcon } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { Tip } from "@/src/platform/ui/tip";
 import { ListViews } from "@/src/modules/crm/components/crm/list-views";
 import Link from "next/link";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
@@ -7,7 +9,7 @@ import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet"
 import { Figures, ListRows } from "@/src/platform/ui/skeleton";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { Board as KanbanBoard, type BoardCard } from "@/src/platform/ui/board";
-import { moveDealStage } from "@/src/modules/crm/actions/deals";
+import { deleteDeal, moveDealStage } from "@/src/modules/crm/actions/deals";
 import { can } from "@/src/modules/crm/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
@@ -23,6 +25,7 @@ import { Breakdown, FigureCard, type Figure } from "@/src/modules/crm/components
 import { CATEGORY_LABELS, PRIORITIES, PriorityFlag, StageTag, closeLabel, periodsFrom } from "@/src/modules/crm/components/deals/words";
 import { shiftMonth } from "@/src/modules/crm/components/field/words";
 import { Amount, Amounts } from "@/src/platform/ui/amount";
+import { shorten } from "@/src/platform/lib/short-amount";
 
 export const metadata = { title: "Deals" };
 
@@ -295,7 +298,7 @@ async function Board({
     <>
       <Filters selects={[{ name: "period", label: "Closing", options: periodOptions(periods, "Any time") }]} />
       <p className="mb-3 text-meta text-ink-2">
-        {fmt.plural(count, "open deal")} worth {fmt.peso(total)}; {fmt.peso(weighted)} weighted by probability.
+        {fmt.plural(count, "open deal")} worth <Amount text={fmt.peso(total)} />; <Amount text={fmt.peso(weighted)} /> weighted by probability.
       </p>
       {count === 0 ? (
         <Sheet className="px-5 py-2">
@@ -382,11 +385,15 @@ async function Table({
     return k.size ? `${base}${base.includes("?") ? "&" : "?"}${k}` : base;
   };
   const sortHref = (key: SortKey) => kept({ sort: key, desc: sort === key && !desc ? "1" : "" });
-  const Head = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
-    <th className={`px-3 py-2 font-medium ${right ? "text-right" : ""}`} aria-sort={sort === k ? (desc ? "descending" : "ascending") : undefined}>
-      <Link href={sortHref(k)} className="inline-flex items-center gap-1 hover:text-ink">
+  const Head = ({ k, children, right, first }: { k: SortKey; children: React.ReactNode; right?: boolean; first?: boolean }) => (
+    <th className={`${first ? "px-5" : "px-3"} py-2.5 font-medium ${right ? "text-right" : ""}`} aria-sort={sort === k ? (desc ? "descending" : "ascending") : undefined}>
+      <Link href={sortHref(k)} className={`group inline-flex items-center gap-1 hover:text-ink ${sort === k ? "text-ink" : ""}`}>
         {children}
-        {sort === k && (desc ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />)}
+        {sort === k ? (
+          desc ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />
+        ) : (
+          <ChevronsUpDown className="size-3 opacity-40 group-hover:opacity-100" aria-hidden />
+        )}
       </Link>
     </th>
   );
@@ -418,7 +425,7 @@ async function Table({
       />
       <Sheet className="overflow-x-auto">
         <p className="border-b border-rule px-5 py-2.5 text-meta text-ink-2">
-          {fmt.plural(list.total, "deal")} worth {fmt.peso(list.valueCentavos)}
+          {fmt.plural(list.total, "deal")} worth <Amount text={fmt.peso(list.valueCentavos)} />
         </p>
         {list.items.length === 0 ? (
           <div className="px-5 py-2">
@@ -431,69 +438,171 @@ async function Table({
             </Empty>
           </div>
         ) : (
+          // Every row reads the same way (decided 2026-10-25): each column a headline and, under it, its
+          // context behind a small icon, so the table stays calm without losing anything a benchmark
+          // shows. The deal and its customer; the stage and how likely it is; the value and its
+          // weighted share; the next step and what it is; the close date and how far off it is; the
+          // owner and who added it when. Colour only where something needs doing.
           <table className="w-full min-w-[60rem] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-bench">
               <tr className="border-b border-rule text-left text-meta text-ink-3">
-                <th className="px-5 py-2 font-medium">
-                  <Link href={sortHref("name")} className="inline-flex items-center gap-1 hover:text-ink">
-                    Deal
-                    {sort === "name" && (desc ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />)}
-                  </Link>
-                </th>
-                <th className="px-3 py-2 font-medium">Created by</th>
-                <Head k="created">Created</Head>
+                <Head k="name" first>Deal</Head>
+                <Head k="stage">Stage</Head>
                 <Head k="value" right>
                   Value
                 </Head>
-                <th className="px-3 py-2 font-medium">Assigned to</th>
-                <Head k="stage">Stage</Head>
-                <Head k="priority">Priority</Head>
-                {state === "open" && <th className="px-3 py-2 font-medium">Next step</th>}
                 <Head k="close">{state === "open" ? "Close date" : "Closed"}</Head>
+                <Head k="created">Owner</Head>
+                {state === "open" && <th className="w-16 px-3 py-2.5 text-center font-medium">Next</th>}
+                <th className="w-12" aria-label="Actions" />
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
-              {list.items.map((d) => (
-                <tr key={d.id} className="hover:bg-bench/40">
-                  <td className="px-5 py-2.5">
-                    <Link href={`/crm/deals/${d.id}`} className="font-medium text-ink hover:underline">
-                      {d.name}
-                    </Link>
-                    <p className="text-meta text-ink-3">{d.company.name}</p>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Person who={d.createdBy} />
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{fmt.dateLabel(d.createdAt.slice(0, 10))}</td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">{fmt.peso(d.valueCentavos)}</td>
-                  <td className="px-3 py-2.5">
-                    <Person who={d.owner} />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <StageTag deal={d} />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <PriorityFlag priority={d.priority} />
-                  </td>
-                  {state === "open" && (
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {d.nextStep ? (
-                        <span className={d.nextStep.at.slice(0, 10) < today ? "font-semibold text-danger" : "text-ink-2"} title={d.nextStep.subject}>
-                          {fmt.dateLabel(d.nextStep.at.slice(0, 10))}
-                          <span className="block max-w-40 truncate text-meta text-ink-3">{d.nextStep.subject}</span>
+              {list.items.map((d) => {
+                const left = daysBetween(today, d.expectedCloseOn);
+                const late = d.state === "open" && left < 0;
+                const next = d.nextStep;
+                const nextLate = next && next.at.slice(0, 10) < today;
+                const pri = PRIORITIES.find((x) => x.value === d.priority);
+                const added = fmt.dateLabel(d.createdAt.slice(0, 10));
+                const priLabel = d.priority && pri ? `${pri.label} priority` : "Priority not set";
+                return (
+                  <tr key={d.id} className="relative cursor-pointer align-top transition-colors hover:bg-mint/50 focus-within:bg-mint/50">
+                    <td className={`max-w-[20rem] px-5 py-3 ${late ? "shadow-[inset_3px_0_0_var(--color-danger)]" : ""}`}>
+                      <span className="flex items-center gap-1.5">
+                        {/* The flag says the priority (filled when set, outline when not); the word is in its tip. */}
+                        <Tip tip={priLabel} className="inline-flex shrink-0">
+                          <Flag
+                            className={`size-3.5 ${d.priority ? "" : "text-ink-3"}`}
+                            style={d.priority && pri ? { color: pri.color, fill: pri.color } : undefined}
+                            aria-hidden
+                          />
+                        </Tip>
+                        {/* The name's link covers the row, so anywhere on it opens the deal. */}
+                        <Link href={`/crm/deals/${d.id}`} className="truncate font-medium text-ink outline-none after:absolute after:inset-0 hover:underline focus-visible:underline" title={d.name}>
+                          {d.name}
+                        </Link>
+                      </span>
+                      <Sub icon={Building2} title={d.company.name}>{d.company.name}</Sub>
+                    </td>
+                    <td className="px-3 py-3">
+                      <StageTag deal={d} />
+                      {d.state === "open" && (
+                        <Tip tip={`${Math.round(d.probability)}% likely to close`} className="mt-2 flex w-16 py-0.5">
+                          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-mint-2" aria-hidden>
+                            <span className="block h-full rounded-full bg-sage-deep" style={{ width: `${Math.max(4, Math.min(100, d.probability))}%` }} />
+                          </span>
+                        </Tip>
+                      )}
+                      {d.state === "lost" && d.lostReason && <Sub icon={CircleX} title={d.lostReason}>{d.lostReason}</Sub>}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {/* Short in the list too (₱381K), the whole amount on hover; in full on the deal's page. */}
+                      <Amount className="font-medium text-ink tabular-nums" text={fmt.peso(d.valueCentavos)} />
+                      {d.state === "open" && (
+                        <span className="mt-0.5 flex justify-end">
+                          <Tip tip={`Weighted by probability: ${fmt.peso(d.weightedCentavos)}`} className="inline-flex items-center gap-1 text-meta text-ink-3 tabular-nums">
+                            <Scale className="size-3" aria-hidden />
+                            {shorten(fmt.peso(d.weightedCentavos)) ?? fmt.peso(d.weightedCentavos)}
+                          </Tip>
                         </span>
-                      ) : (
-                        <span className="text-meta text-ink-3">None planned</span>
                       )}
                     </td>
-                  )}
-                  <td className={`px-3 py-2.5 whitespace-nowrap ${d.state === "open" && d.expectedCloseOn < today ? "font-semibold text-danger" : "text-ink-2"}`}>
-                    {fmt.dateLabel(d.expectedCloseOn)}
-                    {d.state === "lost" && d.lostReason && <span className="block text-meta font-normal text-ink-3">{d.lostReason}</span>}
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className={`flex items-center gap-1.5 ${late ? "font-semibold text-danger" : "text-ink"}`}>
+                        {late ? <CircleAlert className="size-3.5 shrink-0" aria-hidden /> : <CalendarCheck className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
+                        {fmt.dateLabel(d.expectedCloseOn)}
+                      </span>
+                      {d.state === "open" && (
+                        <Tip
+                          tip={late ? `Overdue by ${fmt.plural(-left, "day")}` : left === 0 ? "Closes today" : `Closes in ${fmt.plural(left, "day")}`}
+                          className={`mt-1 inline-flex items-center gap-1 rounded-md text-meta tabular-nums ${
+                            late ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-[#fdf3e1] px-1.5 font-medium text-due-today" : "text-ink-3"
+                          }`}
+                        >
+                          <Hourglass className="size-3" aria-hidden />
+                          {left === 0 ? "Today" : `${Math.abs(left)}d`}
+                        </Tip>
+                      )}
+                    </td>
+                    <td className="max-w-52 px-3 py-3">
+                      <Person who={d.owner} />
+                      <Tip tip={`Added by ${d.createdBy?.name ?? "someone no longer here"} on ${added}`} className="mt-0.5 inline-flex items-center gap-1.5 text-meta text-ink-3">
+                        <UserPlus className="size-3" aria-hidden />
+                        {added}
+                      </Tip>
+                    </td>
+                    {state === "open" && (
+                      <td className="px-3 py-3 text-center">
+                        <Tip
+                          passive
+                          tip={
+                            next
+                              ? `${nextLate ? "Overdue next step" : "Next step"}: ${next.subject} · ${fmt.dateLabel(next.at.slice(0, 10))}`
+                              : "No next step planned: open the deal to plan one"
+                          }
+                          className="inline-flex"
+                        >
+                          <Link
+                            href={`/crm/deals/${d.id}`}
+                            aria-label={next ? `Next step: ${next.subject}, ${fmt.dateLabel(next.at.slice(0, 10))}` : `Plan the next step on ${d.name}`}
+                            className={`relative z-[1] grid size-8 place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sage ${
+                              !next
+                                ? "bg-[#fdf3e1] text-due-today hover:bg-[#fae6c2]"
+                                : nextLate
+                                  ? "bg-danger-tint text-danger hover:bg-danger/15"
+                                  : "bg-bench text-ink-2 hover:bg-mint-2 hover:text-ink"
+                            }`}
+                          >
+                            {next ? <CalendarClock className="size-4" aria-hidden /> : <CalendarPlus className="size-4" aria-hidden />}
+                          </Link>
+                        </Tip>
+                      </td>
+                    )}
+                    <td className="px-2 py-2 text-right">
+                      <RowMenu
+                        label={`Actions for ${d.name}`}
+                        items={[
+                          { label: "Open", icon: <ExternalLink />, href: `/crm/deals/${d.id}` },
+                          ...(d.can.edit ? [{ label: "Edit", icon: <Pencil />, href: `/crm/deals/${d.id}/edit` }] : []),
+                          "divider" as const,
+                          ...(d.can.quote ? [{ label: "New quote", icon: <FileText />, href: `/crm/customers/${d.company.id}/quotes/new?deal=${d.id}` }] : []),
+                          { label: "Open customer", icon: <Building2 />, href: `/crm/customers/${d.company.id}` },
+                          ...(d.can.delete
+                            ? [
+                                "divider" as const,
+                                {
+                                  label: "Delete",
+                                  icon: <Trash2 />,
+                                  run: deleteDeal.bind(null, d.id),
+                                  danger: true,
+                                  confirm: `Delete ${d.name}? This can't be undone.`,
+                                  done: `${d.name} deleted`,
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
+            <tfoot>
+              <tr className="border-t border-rule bg-bench text-meta">
+                <td className="px-5 py-2.5 text-ink-3">{list.items.length < list.total ? `These ${list.items.length} of ${list.total}` : `All ${list.total}`}</td>
+                <td />
+                <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
+                  <Amount className="font-semibold text-ink" text={fmt.peso(list.items.reduce((t, d) => t + d.valueCentavos, 0))} />
+                  {state === "open" && (
+                    <span className="block text-ink-3">
+                      <Amount text={fmt.peso(list.items.reduce((t, d) => t + d.weightedCentavos, 0))} /> weighted
+                    </span>
+                  )}
+                </td>
+                <td colSpan={state === "open" ? 4 : 3} />
+              </tr>
+            </tfoot>
           </table>
         )}
       </Sheet>
@@ -502,12 +611,27 @@ async function Table({
   );
 }
 
+/** A row's second line: its context behind a small icon, cut short with the whole of it on hover. */
+function Sub({ icon: Icon, title, children }: { icon?: LucideIcon; title?: string; children: React.ReactNode }) {
+  return (
+    <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-meta text-ink-3" title={title}>
+      {Icon && <Icon className="size-3 shrink-0" aria-hidden />}
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+/** Whole days from one YYYY-MM-DD to another (negative when it's gone by). */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
 function Person({ who }: { who: { id: string; name: string } | null }) {
   if (!who) return <span className="text-meta text-ink-3">Unassigned</span>;
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2">
+    <span className="flex min-w-0 items-center gap-2 text-ink" title={who.name}>
       <Avatar name={who.name} id={who.id} size="sm" />
-      {who.name}
+      <span className="truncate">{who.name}</span>
     </span>
   );
 }
@@ -541,7 +665,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
       <Sheet className="px-5 py-4">
         <h2 className="text-sm font-semibold text-ink">{forecast.label}</h2>
         <p className="mb-4 text-meta text-ink-3">
-          Won is what closed in the period; the rest is open deals expected to close in it. Weighted by probability: {fmt.peso(t.weightedCentavos)}. Omitted and lost deals
+          Won is what closed in the period; the rest is open deals expected to close in it. Weighted by probability: <Amount text={fmt.peso(t.weightedCentavos)} />. Omitted and lost deals
           are left out.
         </p>
         {t.deals === 0 ? (
@@ -559,7 +683,7 @@ async function Forecast({ fmt, period, periods, showPeople }: { fmt: Format; per
                   ))}
                 </div>
                 <span className="text-meta text-ink-2 sm:text-right">
-                  {fmt.peso(r.wonCentavos + r.commitCentavos)} won or committed
+                  <Amount text={fmt.peso(r.wonCentavos + r.commitCentavos)} /> won or committed
                 </span>
               </li>
             ))}
@@ -717,7 +841,7 @@ async function Overview({
                 <Ranked
                   fmt={fmt}
                   empty="No deals won in this period."
-                  rows={r.customers.map((c) => ({ key: c.customer.id, name: c.customer.name, href: `/crm/companies/${c.customer.id}`, value: c.wonCentavos, note: fmt.plural(c.wonCount, "deal") }))}
+                  rows={r.customers.map((c) => ({ key: c.customer.id, name: c.customer.name, href: `/crm/customers/${c.customer.id}`, value: c.wonCentavos, note: fmt.plural(c.wonCount, "deal") }))}
                 />
               </Sheet>
               <Sheet className="px-5 py-4">

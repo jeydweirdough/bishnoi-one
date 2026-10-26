@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
@@ -46,6 +47,7 @@ export function AdminDashboard({ me, params = {} }: { me: Me & { org: Org }; par
   return (
     <>
       <PageHeader title="Dashboard">How the company is selling: revenue and its growth, the pipeline, and how each person is doing.</PageHeader>
+      <Welcome module="crm" name={me.user.fullName.split(" ")[0]} greeting={makeFormat(me.org).greeting()} lead />
       <Suspense fallback={<AdminLoading />}>
         <AdminFigures me={me} params={params} />
       </Suspense>
@@ -126,7 +128,7 @@ async function AdminFigures({ me, params }: { me: Me & { org: Org }; params: Par
       value: String(now?.newCustomers ?? insights.totals.newCustomersThisMonth),
       label: "New customers this month",
       note: last ? `Last month ${last.newCustomers}` : `${insights.totals.customers} in all`,
-      href: "/crm/companies",
+      href: "/crm/customers",
     },
     {
       value: winRate === null ? "—" : `${winRate}%`,

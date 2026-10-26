@@ -58,3 +58,28 @@ export async function importRoles(): Promise<Result<ImportReport>> {
     return report;
   });
 }
+
+// People, kept here once for every module (R2, decided 2026-10-26).
+
+export type PersonInput = { fullName: string; email: string; title: string | null; roleId: string | null; apps: string[] };
+
+export async function addPerson(input: PersonInput): Promise<Result<{ person: { id: string; fullName: string }; hasPassword: boolean }>> {
+  return attempt(async () => {
+    const made = await accountSend<{ person: { id: string; fullName: string }; hasPassword: boolean }>("POST", "/identity/access/people", input);
+    refresh();
+    return made;
+  });
+}
+
+export async function changePerson(id: string, change: { fullName?: string; title?: string | null; status?: "active" | "suspended" }): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("PATCH", `/identity/access/people/${enc(id)}`, change);
+    refresh();
+    return null;
+  });
+}
+
+/** A made-up password (shown once), or the one typed. */
+export async function setPersonPassword(id: string, password?: string): Promise<Result<{ password: string | null }>> {
+  return attempt(async () => accountSend<{ password: string | null }>("POST", `/identity/access/people/${enc(id)}/password`, password ? { password } : {}));
+}

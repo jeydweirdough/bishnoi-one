@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AttentionPanel } from "@/src/modules/crm/components/attention-panel";
@@ -45,11 +46,12 @@ export function FieldHome({ me }: { me: Me & { org: Org } }) {
           </Later>
         }
       >
-        {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. {fmt.monthLabel(fmt.todayKey().slice(0, 7))}: your visits and collections against your goals.{" "}
+        {fmt.monthLabel(fmt.todayKey().slice(0, 7))}: your visits and collections against your goals.{" "}
         <Link href="/crm/field/routes" className="font-medium text-ink underline-offset-4 hover:underline">
           Today&apos;s route
         </Link>
       </PageHeader>
+      <Welcome module="crm" name={me.user.fullName.split(" ")[0]} greeting={fmt.greeting()} team={me.team?.name} />
       <Suspense fallback={null}>
         <AttentionPanel />
       </Suspense>
@@ -200,7 +202,7 @@ async function FieldCards({ me, answer }: { me: Me & { org: Org }; answer: Promi
                 <li key={d.id} className="flex items-center gap-3 py-2.5">
                   <ZoneTag zone={d.zone} />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/crm/companies/${d.id}`} className="block truncate font-medium text-ink hover:underline">
+                    <Link href={`/crm/customers/${d.id}`} className="block truncate font-medium text-ink hover:underline">
                       {d.name}
                     </Link>
                     <p className="truncate text-meta text-ink-3">
@@ -236,7 +238,7 @@ async function FieldCards({ me, answer }: { me: Me & { org: Org }; answer: Promi
               {owing.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 py-2.5">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/crm/companies/${d.id}`} className="block truncate font-medium text-ink hover:underline">
+                    <Link href={`/crm/customers/${d.id}`} className="block truncate font-medium text-ink hover:underline">
                       {d.name}
                     </Link>
                     <p className="truncate text-meta text-ink-3">

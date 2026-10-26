@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/modules/finance/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/finance/platform/ui/field";
 import { formatTin } from "@/src/modules/finance/lib/tin";
 import { saveTaxProfile } from "@/src/modules/finance/tax/actions";
 import type { TaxSetup } from "@/src/modules/finance/tax/types";
@@ -82,23 +82,23 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           onChange={(regime) => set({ regime })}
           options={setup.pack.regimes.map((r) => ({ value: r.key, label: r.name }))}
         />
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Registered name" error={fields.registeredName} hint="Exactly as on the BIR Certificate of Registration.">
+        <FormGrid>
+          <Field label="Registered name" size="md" error={fields.registeredName} hint="Exactly as on the BIR Certificate of Registration.">
             {(f) => <Input {...f} value={v.registeredName} onChange={(e) => set({ registeredName: e.target.value })} />}
           </Field>
-          <Field label="Trade name" optional>
+          <Field label="Trade name" size="md" optional>
             {(f) => <Input {...f} value={v.tradeName} onChange={(e) => set({ tradeName: e.target.value })} />}
           </Field>
-          <Field label="TIN" error={fields.tin} hint="9 digits; the dashes go in by themselves.">
+          <Field label="TIN" size="sm" error={fields.tin} hint="9 digits; the dashes go in by themselves.">
             {(f) => <Input {...f} inputMode="numeric" value={v.tin} onChange={(e) => set({ tin: formatTin(e.target.value, false) })} placeholder="123-456-789" maxLength={11} />}
           </Field>
-          <Field label="Branch code" error={fields.branchCode} hint="00000 for the head office.">
+          <Field label="Branch code" size="sm" error={fields.branchCode} hint="00000 for the head office.">
             {(f) => <Input {...f} inputMode="numeric" value={v.branchCode} onChange={(e) => set({ branchCode: e.target.value.replace(/\D/g, "") })} />}
           </Field>
-          <Field label="RDO code" error={fields.rdoCode} hint="3 digits, from the certificate of registration (Form 2303). On every BIR form.">
+          <Field label="RDO code" size="sm" error={fields.rdoCode} hint="3 digits, from the certificate of registration (Form 2303). On every BIR form.">
             {(f) => <Input {...f} inputMode="numeric" maxLength={3} value={v.rdoCode} onChange={(e) => set({ rdoCode: e.target.value.replace(/\D/g, "") })} />}
           </Field>
-          <Field label="Fiscal year ends in" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
+          <Field label="Fiscal year ends in" size="md" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
             {(f) => (
               <select suppressHydrationWarning {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
                 {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
@@ -109,10 +109,10 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
               </select>
             )}
           </Field>
-          <Field label="Registered address" error={fields.registeredAddress} className="sm:col-span-2">
+          <Field label="Registered address" error={fields.registeredAddress} size="full">
             {(f) => <Textarea {...f} value={v.registeredAddress} onChange={(e) => set({ registeredAddress: e.target.value })} maxLength={300} />}
           </Field>
-        </div>
+        </FormGrid>
         <Choice
           name="inclusive"
           legend="Catalogue prices"

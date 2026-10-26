@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Plus, Upload } from "lucide-react";
+import { PeopleNotice } from "@/src/platform/ui/people-notice";
+import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -86,13 +87,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
         title="People and access"
         actions={
           <>
-            {can(me, "admin.users") && (
-              <LinkButton href="/crm/admin/users/import" icon={<Upload className="size-4" aria-hidden />}>
-                Import
-              </LinkButton>
-            )}
-            <LinkButton href="/crm/admin/users/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add person
+            {/* People are added once for every module, in Bishnoi One's People (R2, decided 2026-10-26). */}
+            <LinkButton href="/platform/roles/people" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+              Add person in People
             </LinkButton>
           </>
         }
@@ -101,6 +98,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
           ? "Everyone who uses the CRM. Each person has one role, which says what they may do, and may be in one team."
           : "The people in the teams you manage: their role, their team and their details. Other roles are given by an administrator."}
       </PageHeader>
+      <PeopleNotice own="each person's employee ID and teams" />
 
       {/* Three figures, each a filter: the few things an administrator acts on. */}
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -139,8 +137,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
               title={everyone.length ? "Nobody matches" : "No one yet"}
               actions={
                 !everyone.length && (
-                  <LinkButton href="/crm/admin/users/new" variant="primary">
-                    Add a person
+                  <LinkButton href="/platform/roles/people" variant="primary">
+                    Add people in People
                   </LinkButton>
                 )
               }

@@ -34,7 +34,7 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
                 {showDoctor && (
                   <>
                     {" · "}
-                    <Link href={`/crm/companies/${v.company.id}`} className="text-ink hover:underline">
+                    <Link href={`/crm/customers/${v.company.id}`} className="text-ink hover:underline">
                       {v.company.name}
                     </Link>
                   </>

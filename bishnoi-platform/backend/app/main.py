@@ -34,6 +34,7 @@ from app.routers import (
     monitoring,
     profile,
     public,
+    saved_reports,
     support,
     unset,
     users,
@@ -107,6 +108,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(company_access.router)
+    app.include_router(saved_reports.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
     app.include_router(applications.router)

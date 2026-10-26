@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useActivityFeed } from "@/src/modules/crm/components/activity-feed";
 import { Button } from "@/src/platform/ui/button";
-import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Icon, listIcon } from "@/src/platform/ui/icons";
 import { logActivity } from "@/src/modules/crm/actions/customers";
 import { makeFormat } from "@/src/platform/lib/format";
@@ -185,11 +185,11 @@ export function LogActivity({
           <Field label="Follow-up" error={fields.title}>
             {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} placeholder="e.g. Send samples" />}
           </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Due" error={fields.dueOn}>
+          <FormGrid>
+            <Field label="Due" size="sm" error={fields.dueOn}>
               {(p) => <Input {...p} name="dueOn" type="date" defaultValue={addDays(today, 1)} min={today} />}
             </Field>
-            <Field label="For" error={fields.assigneeId}>
+            <Field label="For" size="lg" error={fields.assigneeId}>
               {(p) => (
                 <Select {...p} name="assigneeId" defaultValue={me.id ?? ""}>
                   {people.map((person) => (
@@ -200,7 +200,7 @@ export function LogActivity({
                 </Select>
               )}
             </Field>
-          </div>
+          </FormGrid>
         </div>
       )}
 

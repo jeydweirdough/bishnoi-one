@@ -1,3 +1,5 @@
+import { Welcome } from "@/src/platform/ui/welcome";
+import { greeting } from "@/src/modules/finance/platform/lib/format";
 import { Figure } from "@/src/modules/finance/platform/ui/figure";
 import { PageHeader, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -19,7 +21,8 @@ export default async function FinanceHome() {
   const dashboard = await load<Dashboard>("/finance/dashboard");
   return (
     <>
-      <PageHeader title="Overview">{me.user.fullName}, here is what needs Finance&apos;s action today.</PageHeader>
+      <PageHeader title="Overview">What needs Finance&apos;s action today.</PageHeader>
+      <Welcome module="finance" name={me.user.fullName.split(" ")[0]} greeting={greeting()} />
       <div className="space-y-5">
         {dashboard.kept ? (
           <KeptOverview org={me.org} />

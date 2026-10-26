@@ -1,4 +1,6 @@
-import { Plus } from "lucide-react";
+import { ClipboardPlus, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deletePatient } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Flag } from "@/src/modules/pharmacy/platform/ui/marks";
@@ -50,7 +52,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">
-              <Head columns={["Name", "Born", "Phone", kind === "patient" ? "Prescriptions" : "Allergies", { label: "Last visit", right: true }]} />
+              <Head columns={["Name", "Born", "Phone", kind === "patient" ? "Prescriptions" : "Allergies", { label: "Last visit", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {rows.map((p) => {
                   const years = age(p.birthDate);
@@ -70,6 +72,18 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
                       <td className="px-3 py-3 text-ink-2">{p.phone ?? "—"}</td>
                       <td className="px-3 py-3 text-ink-2">{kind === "patient" ? p.prescriptionCount : (p.allergies ?? "—")}</td>
                       <td className="py-3 pr-5 pl-3 text-right text-meta text-ink-2">{p.lastVisitAt ? fmt.whenLabel(p.lastVisitAt) : "—"}</td>
+                      <td className="px-2 py-2 text-right">
+                        <RowMenu
+                          label={`Actions for ${p.fullName}`}
+                          items={[
+                            { label: "Open", icon: <ExternalLink />, href: `/pharmacy/patients/${p.id}` },
+                            ...(kind === "patient" && may("prescriptions.create") ? ["divider" as const, { label: "Receive prescription", icon: <ClipboardPlus />, href: `/pharmacy/prescriptions/new?patient=${p.id}` }] : []),
+                            ...(may("patients.delete")
+                              ? ["divider" as const, { label: "Delete", icon: <Trash2 />, run: deletePatient.bind(null, p.id), danger: true, confirm: `Delete ${p.fullName}? Only someone with no prescriptions or purchases can be deleted.`, done: `${p.fullName} deleted` }]
+                              : []),
+                          ]}
+                        />
+                      </td>
                     </tr>
                   );
                 })}

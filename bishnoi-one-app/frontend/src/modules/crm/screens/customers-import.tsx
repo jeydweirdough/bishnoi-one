@@ -11,10 +11,10 @@ export default async function CustomersImportPage() {
   if (!can(me, "customers.create") && !can(me, "customers.edit")) return <NoAccess what="importing customers" />;
   return (
     <>
-      <PageHeader title="Import customers" crumbs={[{ href: "/crm/companies", label: "Customers" }]}>
+      <PageHeader title="Import customers" crumbs={[{ href: "/crm/customers", label: "Customers" }]}>
         Customers and everything on their form, from a spreadsheet: new ones added, ones with their customer code updated.
       </PageHeader>
-      <ImportWizard kind="customers" back="/crm/companies" />
+      <ImportWizard kind="customers" back="/crm/customers" />
     </>
   );
 }

@@ -18,7 +18,7 @@ export function Duplicates({
 }: {
   message: string;
   found: Duplicate[];
-  base: "/crm/companies" | "/crm/contacts";
+  base: "/crm/customers" | "/crm/contacts";
   onAddAnyway: () => void;
   pending: boolean;
   /** They were being added to quote: offer to quote the one already here instead. */
@@ -42,7 +42,7 @@ export function Duplicates({
               {d.canOpen === false ? " · someone else's" : ""}
             </span>
             {quote && d.canOpen !== false && (
-              <Link href={`/crm/companies/${d.id}/quotes/new`} className="ml-2 font-medium text-ink hover:underline">
+              <Link href={`/crm/customers/${d.id}/quotes/new`} className="ml-2 font-medium text-ink hover:underline">
                 Quote them instead
               </Link>
             )}

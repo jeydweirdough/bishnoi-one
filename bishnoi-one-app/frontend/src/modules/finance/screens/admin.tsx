@@ -1,9 +1,9 @@
-import Link from "next/link";
-import { LinkButton } from "@/src/modules/finance/platform/ui/button";
-import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
+import { PeopleNotice } from "@/src/platform/ui/people-notice";
+import { AuditLog } from "@/src/platform/screens/audit";
+import { PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { RolesEditor, UsersEditor } from "@/src/modules/finance/components/admin";
-import type { AdminUsers, AuditEntry, PageData, RolesData } from "@/src/modules/finance/lib/types";
+import type { AdminUsers, RolesData } from "@/src/modules/finance/lib/types";
 
 
 export async function UsersPage() {
@@ -31,6 +31,7 @@ export async function UsersPage() {
       >
         Who can sign in to Finance, and the role each one has.
       </PageHeader>
+      <PeopleNotice own="each person's e-signature and calendar" />
       <UsersEditor data={data} meId={me.user.id} when={when} />
     </>
   );
@@ -111,11 +112,8 @@ const FILTERS = [
   { key: "tax.", label: "Tax" },
 ];
 
-export async function AuditPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+/** The activity log: the shared one (src/platform/screens/audit.tsx), with this module's words and filters. */
+export async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await getCompanyMe();
   const may = (p: string) => me.permissions?.includes(p) ?? me.canManageSettings;
   if (!may("admin.audit")) {
@@ -126,90 +124,5 @@ export async function AuditPage({
       </Sheet>
     );
   }
-  const s = await searchParams;
-  const actionParam = typeof s?.action === "string" ? s.action : "";
-  const beforeParam = typeof s?.before === "string" ? s.before : "";
-  const queryParts = [];
-  if (actionParam) queryParts.push(`action=${encodeURIComponent(actionParam)}`);
-  if (beforeParam) queryParts.push(`before=${encodeURIComponent(beforeParam)}`);
-  queryParts.push("limit=50");
-  const qs = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
-
-  const page = await load<PageData<AuditEntry>>(`/admin/audit${qs}`);
-  const last = page.items.at(-1);
-
-  return (
-    <>
-      <PageHeader
-        title="Activity log"
-      >
-        Every change made in Finance, and who made it.
-      </PageHeader>
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <span className="text-meta font-semibold text-ink-2 mr-1">Show:</span>
-        {FILTERS.map((f) => {
-          const active = actionParam === f.key;
-          return (
-            <Link
-              key={f.key}
-              href={`/finance/admin/audit${f.key ? `?action=${f.key}` : ""}`}
-              className={`rounded-full px-3 py-1 text-meta font-medium transition-colors ${
-                active
-                  ? "bg-hema text-white"
-                  : "border border-rule-strong bg-sheet text-ink-2 hover:bg-bench"
-              }`}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-      </div>
-      <Sheet className="px-5 pt-2 pb-3">
-        {page.items.length === 0 ? (
-          <Empty title={beforeParam ? "No older entries" : "No activity yet"} icon="auditLog" />
-        ) : (
-          <ol className="divide-y divide-rule">
-            {page.items.map((e) => (
-              <li key={e.id} className="grid gap-x-4 gap-y-0.5 py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-                <time dateTime={e.at} className="text-meta text-ink-3 tabular-nums">
-                  {new Date(e.at).toLocaleString()}
-                </time>
-                <div className="min-w-0">
-                  <p className="text-sm text-ink">
-                    <span className="font-semibold">{ACTIONS[e.action] ?? e.action.replaceAll(/[._]/g, " ")}</span>
-                    {e.target && <span className="text-ink-2 font-medium"> · {e.target}</span>}
-                  </p>
-                  <p className="text-meta text-ink-3">
-                    by {e.actor}
-                    {e.fields && e.fields.length > 0 && <> · changed {e.fields.join(", ")}</>}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Sheet>
-      {(page.more || beforeParam) && (
-        <div className="mt-4 flex gap-2">
-          {beforeParam && (
-            <LinkButton
-              href={`/finance/admin/audit${actionParam ? `?action=${actionParam}` : ""}`}
-              size="sm"
-              variant="quiet"
-            >
-              Newest
-            </LinkButton>
-          )}
-          {page.more && last && (
-            <LinkButton
-              href={`/finance/admin/audit?before=${last.id}${actionParam ? `&action=${actionParam}` : ""}`}
-              size="sm"
-            >
-              Older
-            </LinkButton>
-          )}
-        </div>
-      )}
-    </>
-  );
+  return <AuditLog searchParams={searchParams} settings={{ words: ACTIONS, filters: FILTERS }} />;
 }

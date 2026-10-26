@@ -80,6 +80,9 @@
      blindness (every pair, deutan/protan/tritan); green was dropped because it
      reads the same as eosin to red-green colour-blind people. */
   --color-due-today: #d48806;
+  /* The same amber as words: #d48806 is 2.9:1 on white, too faint to read (WCAG asks 4.5:1).
+     Dots, bars and fills keep the bright one; text takes this (5.9:1). */
+  --color-due-today-ink: #8a5a00;
   --color-due-later: #2f54eb;
   /* Promos: the sale-tag yellow, so a product on promo stands out wherever it's picked.
      The ink on it is a deep brown (5.4:1 on the yellow, 8.4:1 on the tint). */
@@ -253,3 +256,7 @@ table > thead > tr {
 .ant-btn { gap: 8px; }
 .ant-btn.ant-btn-sm { gap: 6px; }
 .ant-btn.ant-btn-lg { gap: 10px; }
+
+/* Amber as text reads in its darker ink (see --color-due-today-ink); unlayered, so it wins
+   over the utility while bg-due-today, ring-due-today and fills keep the bright amber. */
+.text-due-today { color: var(--color-due-today-ink); }
