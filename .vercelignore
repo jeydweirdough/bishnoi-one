@@ -1,0 +1,12 @@
+# The one app is deployed from here (its Vercel project's Root Directory is
+# bishnoi-one-app/frontend): only that folder is uploaded, never the APIs, their
+# settings or local databases. The CLI doesn't read .gitignore (decided 2026-10-27).
+/*
+!/bishnoi-one-app/
+/bishnoi-one-app/*
+!/bishnoi-one-app/frontend/
+**/node_modules/
+**/.next/
+**/.env
+**/.env.*
+!**/.env.example

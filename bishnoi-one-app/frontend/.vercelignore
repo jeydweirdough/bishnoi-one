@@ -1,0 +1,7 @@
+# Never uploaded to Vercel: the CLI doesn't read .gitignore (decided 2026-10-27).
+# Settings live in the Vercel project; Vercel installs and builds by itself.
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
