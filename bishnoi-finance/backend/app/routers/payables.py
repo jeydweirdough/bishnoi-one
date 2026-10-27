@@ -23,7 +23,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, or_, select, text
 
 from app.access import access_of, permissions_of, permitted
 from app.audit import audit
@@ -32,11 +32,13 @@ from app.funds import RECEIPT_TYPES, decode
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.models import OPEN_VOUCHERS, Account, Bill, BillEvent, BillFile, JournalEntry, PaymentVoucher, StoredFile, Supplier, SupplierFile, VoucherLine
-from app.payables import VAT_KINDS, WITHHOLDING, withholding_out, work_out
+from app.payables import PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, withholding_out, work_out
 from app.notify import done, holders, tell
 from app.routers.funds import today
 from app.routers.tax import Api, field_error, split_tin
 from app.signatures import sign
+from app.supplier_import import SupplierImportCheckIn, SupplierImportIn, clean_supplier_row
+from app.supplier_directory import classify_directory
 
 router = APIRouter(tags=["payables"])
 
@@ -133,6 +135,7 @@ def supplier_out(db: DB, s: Supplier, owed: int | None = None) -> dict:
         "salutation": s.salutation, "firstName": s.first_name, "lastName": s.last_name,
         "tin": s.tin, "branchCode": s.branch_code, "address": s.address,
         "vatRegistered": s.vat_registered,
+        "taxDefaultsConfirmed": s.tax_defaults_confirmed, "importDetails": s.import_details,
         "withholding": {"code": code, "name": WITHHOLDING[code][0], "rateBp": WITHHOLDING[code][1]} if code in WITHHOLDING else None,
         "termsDays": s.terms_days, "email": s.email, "phone": s.phone, "mobile": s.mobile,
         "payablesAccount": account_brief(db, s.payables_account_id),
@@ -180,6 +183,7 @@ class ContactIn(Api):
 
 
 class SupplierIn(Api):
+    tax_defaults_confirmed: bool = False
     name: str = Field(min_length=1, max_length=200)
     company_name: str | None = Field(None, max_length=200)
     salutation: str | None = Field(None, max_length=10)
@@ -263,133 +267,90 @@ def add_supplier(user: permitted("suppliers.add"), db: DB, body: SupplierIn) -> 
 # Zoho's vendors: decision 1; Zoho's Company ID is the TIN, decision 3; pesos only, decision 4).
 
 
-class SupplierRowIn(Api):
-    name: str | None = Field(None, max_length=300)
-    company_name: str | None = Field(None, max_length=300)
-    salutation: str | None = Field(None, max_length=40)
-    first_name: str | None = Field(None, max_length=200)
-    last_name: str | None = Field(None, max_length=200)
-    email: str | None = Field(None, max_length=400)
-    phone: str | None = Field(None, max_length=100)
-    mobile: str | None = Field(None, max_length=100)
-    tin: str | None = Field(None, max_length=100)
-    company_id: str | None = Field(None, max_length=100)
-    address: str | None = Field(None, max_length=600)
-    terms: str | None = Field(None, max_length=60)
-    notes: str | None = Field(None, max_length=2000)
-    status: str | None = Field(None, max_length=40)
-    currency: str | None = Field(None, max_length=10)
-
-
-class SupplierImportCheckIn(Api):
-    rows: list[SupplierRowIn] = Field(min_length=1, max_length=3000)
-
-
-def terms_days(text: str | None) -> int:
-    """Zoho's payment terms as days: "Net 30" or "30" is 30; "Due on receipt" is 0; none: 30."""
-    if not text:
-        return 30
-    digits = re.search(r"\d+", text)
-    if digits:
-        return min(int(digits.group()), 365)
-    return 0 if "receipt" in text.lower() else 30
-
-
-def cut(value: str | None, size: int) -> str | None:
-    value = (value or "").strip()
-    return value[:size] or None
-
-
-def clean_supplier_row(r: SupplierRowIn) -> tuple[dict, list[str], list[str]]:
-    """The row as a supplier would be saved, what was noted on the way, and what stops it."""
-    notes, problems = [], []
-    name = (r.name or "").strip() or (r.company_name or "").strip()
-    if not name:
-        problems.append("No name.")
-    elif len(name) > 200:
-        problems.append("The name is over 200 characters.")
-    tin = branch = None
-    for given in (r.tin, r.company_id):
-        if given and given.strip() and tin is None:
-            try:
-                tin, in_tin = split_tin(given)
-                branch = in_tin or "00000"
-            except ValueError:
-                notes.append(f"Company ID in Zoho: {given.strip()} (not a TIN).")
-    if r.currency and r.currency.strip().upper() not in ("PHP", "₱"):
-        notes.append(f"Billed in {r.currency.strip().upper()} in Zoho: Finance keeps pesos only for now.")
-    remarks = "\n".join(x for x in [(r.notes or "").strip(), *notes] if x)[:500] or None
-    return {
-        "name": name[:200], "companyName": cut(r.company_name, 200), "salutation": cut(r.salutation, 10),
-        "firstName": cut(r.first_name, 80), "lastName": cut(r.last_name, 80), "email": cut(r.email, 254),
-        "phone": cut(r.phone, 40), "mobile": cut(r.mobile, 40), "tin": tin, "branchCode": branch if tin else None,
-        "address": cut(r.address, 300), "termsDays": terms_days(r.terms), "notes": remarks,
-        "isActive": (r.status or "").strip().lower() not in ("inactive", "disabled"),
-    }, notes, problems
+def supplier_import_preview(db, body):
+    here = list(db.scalars(select(Supplier)))
+    if body.mode == "directory":
+        return classify_directory(body.rows, here)
+    by_name = {s.name.strip().lower(): s for s in here}
+    by_tin = {(s.tin, s.branch_code): s for s in here if s.tin}
+    accounts = payables_accounts(db)
+    account_ids = {a["id"] for a in accounts}
+    seen_name, seen_tin, out = {}, {}, []
+    for i, row in enumerate(body.rows):
+        value, notes, errors, reviews = clean_supplier_row(row)
+        key, tin_key = value["name"].strip().lower(), (value["tin"], value["branchCode"])
+        twin = by_name.get(key) or (by_tin.get(tin_key) if value["tin"] else None)
+        earlier = seen_name.get(key) or (seen_tin.get(tin_key) if value["tin"] else None)
+        related = [s for s in here if value["tin"] and s.tin == value["tin"] and s.branch_code != value["branchCode"]]
+        related += [s for s in out if value["tin"] and s["supplier"]["tin"] == value["tin"] and s["supplier"]["branchCode"] != value["branchCode"]]
+        if related and not row.review.branch_confirmed:
+            reviews.append("Same TIN with another branch: confirm this is a separate supplier branch.")
+        account_source = row.accounts_payable
+        matches = [a for a in accounts if account_source and account_source.casefold() in (a["code"].casefold(), a["name"].casefold(), f'{a["code"]} - {a["name"]}'.casefold())]
+        if (account_source or value["payablesAccountId"]) and not row.review.account_confirmed:
+            reviews.append("Confirm the source Accounts Payable account or explicitly use the default.")
+        if value["payablesAccountId"] and value["payablesAccountId"] not in account_ids:
+            errors.append("Pick an active liability account.")
+        # Validate all destination limits without silently truncating any source value.
+        try:
+            validation_value = {k: v for k, v in value.items() if k != "isActive"}
+            validation_value["vatRegistered"] = value["vatRegistered"] if value["vatRegistered"] is not None else True
+            SupplierIn.model_validate(validation_value)
+        except ValueError as problem:
+            errors.extend(f'{".".join(str(p) for p in e["loc"])}: {e["msg"]}' for e in problem.errors(include_input=False))
+        if key:
+            seen_name.setdefault(key, row.record or i + 1)
+        if value["tin"]:
+            seen_tin.setdefault(tin_key, row.record or i + 1)
+        state = "here" if twin else "duplicate" if earlier else "problem" if errors else "review" if reviews else "new"
+        message = f"Already in Finance as {twin.name}; left unchanged." if twin else f"Same supplier as record {earlier} (name or TIN and branch)." if earlier else " ".join(errors + reviews + notes) or None
+        out.append({"line": i + 1, "record": row.record or i + 1, "status": state, "note": message, "errors": errors, "reviews": reviews, "warnings": notes, "supplier": value,
+                    "accountMatches": matches})
+    return {"rows": out, "counts": {k: sum(r["status"] == k for r in out) for k in ("new", "review", "here", "duplicate", "problem")}, "payablesAccounts": accounts, "withholding": withholding_out()}
 
 
 @router.post("/suppliers/import/check")
 def check_supplier_import(user: permitted("suppliers.add"), db: DB, body: SupplierImportCheckIn) -> dict:
-    here = list(db.scalars(select(Supplier)))
-    by_name = {s.name.strip().lower(): s for s in here}
-    by_tin = {(s.tin, s.branch_code): s for s in here if s.tin}
-    seen_name: dict[str, int] = {}
-    seen_tin: dict[tuple, int] = {}
-    out = []
-    for i, r in enumerate(body.rows):
-        supplier, notes, problems = clean_supplier_row(r)
-        key, tin_key = supplier["name"].lower(), (supplier["tin"], supplier["branchCode"])
-        twin = by_name.get(key) or (by_tin.get(tin_key) if supplier["tin"] else None)
-        earlier = seen_name.get(key) or (seen_tin.get(tin_key) if supplier["tin"] else None)
-        if earlier and not problems:
-            problems.append(f"The same supplier as line {earlier} (same name or TIN).")
-        if supplier["name"]:
-            seen_name.setdefault(key, i + 1)
-        if supplier["tin"]:
-            seen_tin.setdefault(tin_key, i + 1)
-        status_ = "here" if twin else "problem" if problems else "new"
-        note = f"Already in Finance as {twin.name}." if twin else " ".join(problems + notes) or None
-        if status_ == "new" and not supplier["isActive"]:
-            note = " ".join(x for x in ["Inactive in Zoho: imported switched off.", note] if x)
-        out.append({"line": i + 1, "status": status_, "note": note, "supplier": supplier})
-    counts = {k: sum(1 for x in out if x["status"] == k) for k in ("new", "here", "problem")}
-    return {"rows": out, "counts": counts}
+    return supplier_import_preview(db, body)
 
 
-class SupplierImportRowIn(SupplierIn):
-    is_active: bool = True
-
-
-class SupplierImportIn(Api):
-    suppliers: list[SupplierImportRowIn] = Field(min_length=1, max_length=3000)
-
-
-def first_message(detail) -> str:
-    if isinstance(detail, list) and detail and isinstance(detail[0], dict):
-        return str(detail[0].get("msg", "")).replace("Value error, ", "")
-    return str(detail)
+def lock_supplier_writes(db):
+    # No row changes: acquire a writer lock before checking supplier identities.
+    # PostgreSQL table lock also serialises inserts into an otherwise empty table.
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("LOCK TABLE nbfi_suppliers IN SHARE ROW EXCLUSIVE MODE"))
+    else:
+        db.execute(text("UPDATE nbfi_suppliers SET name = name WHERE 1 = 0"))
 
 
 @router.post("/suppliers/import", status_code=status.HTTP_201_CREATED)
 def run_supplier_import(user: permitted("suppliers.add"), db: DB, body: SupplierImportIn) -> dict:
-    """Adds the chosen suppliers, all or none: a supplier already here (same name, or TIN and
-    branch) refuses the lot, naming its line. VAT-registered and nothing withheld unless the
-    row says otherwise: Zoho's export doesn't carry them in the BIR's terms."""
-    added = 0
-    for i, row in enumerate(body.suppliers):
-        s = Supplier(created_by=user.full_name, is_active=row.is_active)
-        try:
-            apply_supplier(db, s, SupplierIn.model_validate(row.model_dump(exclude={"is_active"})))
-        except HTTPException as refused:
-            db.rollback()
-            raise HTTPException(status.HTTP_409_CONFLICT, f"Line {i + 1} ({row.name}): {first_message(refused.detail)} Nothing was imported.") from None
-        db.add(s)
-        db.flush()  # so a later row with the same name or TIN is caught
-        added += 1
-    audit(db, user, "suppliers.imported", target=f"{added} suppliers", target_type="supplier")
-    db.commit()
-    return {"added": added}
-
+    if not body.confirmed:
+        raise HTTPException(422, "Confirm the selected suppliers before importing. Nothing was imported.")
+    try:
+        lock_supplier_writes(db)
+        checked = supplier_import_preview(db, body)
+        refused = next((r for r in checked["rows"] if r["status"] != "new"), None) if body.mode == "review" else None
+        if refused:
+            raise HTTPException(409, f'Record {refused["record"]}: {refused["note"]} Nothing was imported.')
+        for row in checked["rows"]:
+            if row["status"] != "new":
+                continue
+            value = dict(row["supplier"])
+            supplier = Supplier(created_by=user.full_name, is_active=value.pop("isActive"), import_details=row.get("importDetails", {}))
+            value["taxDefaultsConfirmed"] = body.mode == "review"
+            if value["vatRegistered"] is None:
+                value["vatRegistered"] = True  # storage compatibility only; flag prevents auto-fill
+            apply_supplier(db, supplier, SupplierIn.model_validate(value))
+            db.add(supplier)
+            db.flush()
+        added = checked["counts"]["new"]
+        audit(db, user, "suppliers.imported", target=f'{added} suppliers', target_type="supplier")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"added": added, "counts": checked["counts"]} if body.mode == "directory" else {"added": added}
 
 def found_supplier(db: DB, supplier_id: str) -> Supplier:
     s = db.get(Supplier, supplier_id)
@@ -509,7 +470,7 @@ def may_bill(user, b: Bill) -> dict:
     open_ = b.status == "draft" and b.stage in (None, "returned")
     return {
         "canEdit": open_ and can("bills.create"),
-        "canSubmit": open_ and can("bills.create"),
+        "canSubmit": open_ and can("bills.create") and b.tax_reviewed,
         "canApprove": b.status == "draft" and b.stage == "to_approve" and can("bills.approve") and not mine,
         "canCheck": b.status == "draft" and b.stage == "to_check" and can("bills.check") and not mine and b.approved_by_id != user.id,
         "canReturn": b.status == "draft" and not mine and (
@@ -534,13 +495,15 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
     lines = worked[0] if worked else b.lines
     totals = worked[1:] if worked else (b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos)
     return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0)) | (may_bill(user, b) if user is not None else {}) | {
-        "supplier": supplier_out(db, b.supplier),
+        "supplier": supplier_out(db, b.supplier), "taxReviewed": b.tax_reviewed,
         "poNumber": b.po_number, "drNumber": b.dr_number, "checkedPo": b.checked_po, "checkedDr": b.checked_dr,
         "amountsIncludeVat": b.amounts_include_vat, "zohoRef": b.zoho_ref, "oojeemaRef": b.oojeema_ref, "notes": b.notes,
         "lines": [
             ln | {
                 "account": {"id": a.id, "code": a.code, "name": a.name} if (a := accounts.get(ln["accountId"])) else None,
                 "vatLabel": VAT_KINDS.get(ln["vat"], ln["vat"]),
+                "purchaseType": ln.get("purchaseType", "other_goods"),
+                "purchaseTypeLabel": PURCHASE_TYPES[ln.get("purchaseType", "other_goods")],
                 "withholdingRateBp": WITHHOLDING[ln["withholding"]][1] if ln.get("withholding") in WITHHOLDING else None,
             }
             for ln in lines
@@ -576,7 +539,8 @@ def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep) -
         "suppliers": [supplier_out(db, s, 0) for s in suppliers],
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
         "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
-        "withholding": withholding_out(),
+        "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
+        "withholding": withholding_out(), "canEditSuppliers": access_of(user).can("suppliers.edit"),
         "today": today(settings).isoformat(),
     }
 
@@ -585,10 +549,21 @@ def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep) -
 def list_bills(
     user: permitted("bills.view"),
     db: DB,
+    settings: SettingsDep,
     show: str | None = Query(None, max_length=20),
     q: str | None = Query(None, max_length=100),
     missing: bool = False,
+    queue: str | None = Query(None, max_length=30),
+    supplier_id: str | None = Query(None, alias="supplierId", max_length=36),
+    bucket: str | None = Query(None, max_length=12),
 ) -> dict:
+    from app.payables_work import BILL_QUEUES, event_note, filter_bills
+    from app.routers.receivables import BUCKETS
+
+    if queue and queue not in BILL_QUEUES:
+        raise field_error("queue", "Pick a listed Payables work queue.")
+    if bucket and bucket not in {k for k, _, _ in BUCKETS}:
+        raise field_error("bucket", "Pick a listed aging bucket.")
     query = select(Bill).join(Supplier, Supplier.id == Bill.supplier_id)
     if show in STATE_LABELS:
         query = query.where(STATE == show)
@@ -600,19 +575,22 @@ def list_bills(
         ))
     if missing:
         query = query.where(Bill.status != "void", ~select(BillFile.id).where(BillFile.bill_id == Bill.id).exists())
-    items = db.scalars(query.order_by(Bill.bill_date.desc(), Bill.no.desc()).limit(300)).all()
+    items = db.scalars(query.order_by(Bill.bill_date.desc(), Bill.no.desc())).all()
     held = set_aside(db, [b.id for b in items])
+    items = filter_bills(items, user, today(settings), held, queue, supplier_id, bucket)
     counts = dict(db.execute(select(STATE, func.count()).select_from(Bill).group_by(STATE)).all())
     without = db.scalar(select(func.count()).select_from(Bill).where(Bill.status != "void", ~select(BillFile.id).where(BillFile.bill_id == Bill.id).exists())) or 0
     can = access_of(user).can
     return {
-        "items": [bill_summary(b, held.get(b.id, 0)) for b in items],
+        "items": [bill_summary(b, held.get(b.id, 0)) | {"queueNote": event_note(b, today(settings), bool(queue and queue.startswith("sent_"))) if queue else None} for b in items],
         "counts": {k: counts.get(k, 0) for k in STATE_LABELS} | {"missing": without},
         "canCreate": can("bills.create"),
+        "queueLabel": BILL_QUEUES[queue][0] if queue else None,
     }
 
 
 class BillLineIn(Api):
+    purchase_type: Literal["services", "capital_goods", "other_goods", "importation"] = "other_goods"
     account_id: str
     description: str | None = Field(None, max_length=200)
     amount_centavos: int = Field(gt=0, lt=10**11)
@@ -621,6 +599,10 @@ class BillLineIn(Api):
 
 
 class BillIn(Api):
+    tax_reviewed: bool = False
+    save_supplier_defaults: bool = False
+    supplier_vat_registered: bool | None = None
+    supplier_withholding: str | None = None
     supplier_id: str
     bill_number: str = Field(min_length=1, max_length=60)
     bill_date: date
@@ -640,7 +622,7 @@ def line_error(i: int, field: str, message: str) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "lines", i, field], "msg": message}])
 
 
-def apply_bill(db: DB, settings, b: Bill, body: BillIn) -> None:
+def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
     supplier = db.get(Supplier, body.supplier_id)
     if supplier is None or not supplier.is_active:
         raise field_error("supplierId", "Pick an active supplier.")
@@ -662,13 +644,25 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn) -> None:
             raise line_error(i, "accountId", "Pick an active expense or asset account.")
         if line.withholding and line.withholding not in WITHHOLDING:
             raise line_error(i, "withholding", "Pick a withholding code from the list.")
-        lines.append({"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": line.withholding})
+        lines.append({"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": line.withholding, "purchaseType": line.purchase_type})
+    b.tax_reviewed = body.tax_reviewed and all("vat" in line.model_fields_set and "withholding" in line.model_fields_set for line in body.lines)
     b.supplier_id, b.bill_number, b.bill_date, b.due_date = supplier.id, number, body.bill_date, due
     b.po_number, b.dr_number, b.checked_po, b.checked_dr = body.po_number, body.dr_number, body.checked_po, body.checked_dr
     b.amounts_include_vat, b.zoho_ref, b.oojeema_ref, b.notes, b.lines = body.amounts_include_vat, body.zoho_ref, body.oojeema_ref, body.notes, lines
     # Worked out now, so a draft's list shows its total; clearing works it out again.
     w = work_out(db, lines, body.bill_date, body.amounts_include_vat)
     b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos = w.net, w.vat, w.withheld, w.total, w.payable
+    if body.save_supplier_defaults:
+        if not access_of(user).can("suppliers.edit"):
+            raise HTTPException(403, "You may review this bill, but changing supplier defaults requires Edit suppliers.")
+        if not b.tax_reviewed or body.supplier_vat_registered is None or "supplier_withholding" not in body.model_fields_set:
+            raise HTTPException(422, "Explicitly confirm supplier VAT registration and withholding before saving defaults.")
+        if body.supplier_withholding and body.supplier_withholding not in WITHHOLDING:
+            raise HTTPException(422, "Choose a valid supplier withholding code.")
+        supplier.vat_registered, supplier.withholding, supplier.tax_defaults_confirmed = body.supplier_vat_registered, body.supplier_withholding, True
+        audit(db, user, "supplier.tax_defaults_confirmed", target=supplier.name, target_type="supplier", target_id=supplier.id, fields=["vat_registered", "withholding", "tax_defaults_confirmed"])
+    if b.tax_reviewed:
+        bill_event(b, "tax_reviewed", user)
 
 
 def found_bill(db: DB, bill_id: str) -> Bill:
@@ -687,7 +681,7 @@ def editable(b: Bill) -> None:
 @router.post("/bills", status_code=status.HTTP_201_CREATED)
 def add_bill(user: permitted("bills.create"), db: DB, settings: SettingsDep, body: BillIn) -> dict:
     b = Bill(created_by=user.full_name)
-    apply_bill(db, settings, b, body)
+    apply_bill(db, settings, b, body, user)
     db.add(b)
     db.flush()
     audit(db, user, "bill.created", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
@@ -704,7 +698,7 @@ def read_bill(user: permitted("bills.view"), db: DB, bill_id: str) -> dict:
 def change_bill(user: permitted("bills.create"), db: DB, settings: SettingsDep, bill_id: str, body: BillIn) -> dict:
     b = found_bill(db, bill_id)
     editable(b)
-    apply_bill(db, settings, b, body)
+    apply_bill(db, settings, b, body, user)
     audit(db, user, "bill.updated", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
     db.commit()
     return bill_out(db, b, user)
@@ -768,6 +762,8 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     """For approval: Malou is told first (bills.first); the other approvers are backup (Cristal)."""
     b = found_bill(db, bill_id)
     editable(b)
+    if not b.tax_reviewed:
+        raise HTTPException(409, "Open this draft and confirm its VAT and withholding choices before submitting.")
     if not b.supplier.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or pick another.")
     w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)

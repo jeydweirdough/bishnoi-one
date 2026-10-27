@@ -588,12 +588,12 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
         </Sheet>
       ) : which === "slp" ? (
         <Table
-          wide="min-w-[60rem]"
-          head={[{ label: "TIN" }, { label: "Registered name" }, { label: "Exempt", right: true }, { label: "Zero-rated", right: true }, { label: "Taxable", right: true }, { label: "Input tax", right: true }, { label: "Gross taxable", right: true }]}
+          wide="min-w-[110rem]"
+          head={[{ label: "TIN" }, { label: "Registered name" }, { label: "Exempt", right: true }, { label: "Zero-rated", right: true }, { label: "Taxable", right: true }, { label: "Input tax", right: true }, { label: "Gross taxable", right: true }, ...["Services", "Services VAT", "Capital goods", "Capital goods VAT", "Other goods", "Other goods VAT", "Importation", "Importation VAT"].map((label) => ({ label, right: true }))]}
           foot={
             <tr className="border-t-2 border-ink font-semibold tabular-nums">
               <td className={td} colSpan={2}>Total</td>
-              {["exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "inputTaxCentavos", "grossTaxableCentavos"].map((k) => (
+              {["exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "inputTaxCentavos", "grossTaxableCentavos", "servicesCentavos", "servicesInputTaxCentavos", "capitalGoodsCentavos", "capitalGoodsInputTaxCentavos", "otherGoodsCentavos", "otherGoodsInputTaxCentavos", "importationCentavos", "importationInputTaxCentavos"].map((k) => (
                 <td key={k} className={`${td} ${num}`}>{fmt.peso(n(data.totals[k]))}</td>
               ))}
             </tr>
@@ -603,7 +603,7 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
             <tr key={i}>
               <td className={td}>{(r.tin as string) || <span className="text-danger">None</span>}</td>
               <td className={td}>{r.name as string}</td>
-              {["exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "inputTaxCentavos", "grossTaxableCentavos"].map((k) => (
+              {["exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "inputTaxCentavos", "grossTaxableCentavos", "servicesCentavos", "servicesInputTaxCentavos", "capitalGoodsCentavos", "capitalGoodsInputTaxCentavos", "otherGoodsCentavos", "otherGoodsInputTaxCentavos", "importationCentavos", "importationInputTaxCentavos"].map((k) => (
                 <td key={k} className={`${td} ${num}`}>{fmt.peso(n(r[k]))}</td>
               ))}
             </tr>

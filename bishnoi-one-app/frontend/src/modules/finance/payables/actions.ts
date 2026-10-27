@@ -4,12 +4,13 @@ import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/finance/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/finance/platform/lib/result";
 import type { SupplierRow } from "@/src/modules/finance/payables/csv";
-import type { Bill, BillLineInput, ImportedSupplier, Supplier, SupplierContact, SupplierImportCheck } from "@/src/modules/finance/payables/types";
+import type { Bill, BillLineInput, Supplier, SupplierContact, SupplierImportCheck } from "@/src/modules/finance/payables/types";
 
 // Suppliers and bills. The API works each bill out, posts it once it's approved (and checked), and
 // checks the person's role for every step (app/routers/payables.py).
 
 export type SupplierInput = {
+  taxDefaultsConfirmed?: boolean;
   name: string;
   companyName: string | null;
   salutation: string | null;
@@ -38,9 +39,9 @@ export async function checkSupplierImport(rows: SupplierRow[]): Promise<Result<S
 }
 
 /** The chosen suppliers, added all or none. */
-export async function importSuppliers(suppliers: ImportedSupplier[]): Promise<Result<{ added: number }>> {
+export async function importSuppliers(rows: SupplierRow[]): Promise<Result<{ added: number }>> {
   return attempt(async () => {
-    const done = await api.post<{ added: number }>("/finance/suppliers/import", { suppliers });
+    const done = await api.post<{ added: number }>("/finance/suppliers/import", { rows, confirmed: true });
     refresh();
     return done;
   });
@@ -88,6 +89,10 @@ export async function saveSupplier(id: string | null, input: SupplierInput): Pro
 }
 
 export type BillInput = {
+  taxReviewed: boolean;
+  saveSupplierDefaults?: boolean;
+  supplierVatRegistered?: boolean | null;
+  supplierWithholding?: string | null;
   supplierId: string;
   billNumber: string;
   billDate: string;

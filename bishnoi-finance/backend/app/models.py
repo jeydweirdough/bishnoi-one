@@ -35,6 +35,33 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+class SalesOrder(Base):
+    __tablename__ = "nbfi_sales_orders"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(40), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    customer_tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    customer_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    order_date: Mapped[date] = mapped_column(Date)
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    salesperson: Mapped[str | None] = mapped_column(String(120), default=None)
+    terms_days: Mapped[int] = mapped_column(Integer, default=30)
+    prices_include_tax: Mapped[bool] = mapped_column(default=True)
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    notes: Mapped[str | None] = mapped_column(String(1000), default=None)
+    created_by_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id"))
+    created_by: Mapped[str] = mapped_column(String(120))
+    submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id"), default=None)
+    events: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    __mapper_args__ = {"version_id_col": version}
+
+
 class Role(Base):
     __tablename__ = "nbfi_roles"
 
@@ -748,6 +775,8 @@ class Supplier(Base):
     branch_code: Mapped[str | None] = mapped_column(String(5), default=None)
     address: Mapped[str | None] = mapped_column(String(300), default=None)
     vat_registered: Mapped[bool] = mapped_column(default=True)
+    tax_defaults_confirmed: Mapped[bool] = mapped_column(default=False)
+    import_details: Mapped[dict] = mapped_column(JSON, default=dict)
     # The BIR's code for what's usually withheld (app/payables.py WITHHOLDING); none: nothing.
     withholding: Mapped[str | None] = mapped_column(String(10), default=None)
     terms_days: Mapped[int] = mapped_column(Integer, default=30)
@@ -806,6 +835,7 @@ class Bill(Base):
     notes: Mapped[str | None] = mapped_column(String(500), default=None)
     # [{accountId, description, amountCentavos, vat, withholding}] as entered.
     lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    tax_reviewed: Mapped[bool] = mapped_column(default=False)
     # Worked out (app/payables.py), and kept as recorded.
     net_centavos: Mapped[int] = mapped_column(Integer, default=0)
     vat_centavos: Mapped[int] = mapped_column(Integer, default=0)

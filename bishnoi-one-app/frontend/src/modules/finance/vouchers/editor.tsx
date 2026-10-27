@@ -158,7 +158,7 @@ export function VoucherEditor({ voucher, choices: first, preselect, org }: { vou
                     return (
                       <tr key={b.id} className={`align-top ${on ? "bg-hema-tint/30" : ""}`}>
                         <td className="py-2">
-                          <input type="checkbox" aria-label={`Pay bill ${b.no}`} checked={on} disabled={!on && b.availableCentavos <= 0} onChange={(e) => tick(b, e.target.checked)} className="size-4 accent-hema" />
+                          <input suppressHydrationWarning type="checkbox" aria-label={`Pay bill ${b.no}`} checked={on} disabled={!on && b.availableCentavos <= 0} onChange={(e) => tick(b, e.target.checked)} className="size-4 accent-hema" />
                         </td>
                         <td className="py-2 pr-2">
                           <span className="font-mono text-meta font-semibold">{b.no}</span> · their invoice <span className="font-mono text-meta">{b.billNumber}</span>

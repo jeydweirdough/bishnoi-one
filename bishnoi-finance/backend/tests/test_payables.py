@@ -25,7 +25,7 @@ def supplier(client, who, **extra) -> dict:
 
 def bill(client, who, supplier_id: str, amount=1_120_000, number="SI-0001", **extra) -> dict:
     line = {"accountId": account(client, who, "6500"), "description": "Packaging materials", "amountCentavos": amount, "vat": "vat", "withholding": "WC158"}
-    body = {"supplierId": supplier_id, "billNumber": number, "billDate": "2026-10-01", "lines": [line]} | extra
+    body = {"taxReviewed": True, "supplierId": supplier_id, "billNumber": number, "billDate": "2026-10-01", "lines": [line]} | extra
     r = client.post("/finance/bills", json=body, headers=who)
     assert r.status_code == 201, r.text
     return r.json()

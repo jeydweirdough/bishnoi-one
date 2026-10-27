@@ -8,6 +8,7 @@ import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
 import { FormError } from "@/src/modules/finance/platform/ui/field";
 import { ACCEPTED, MAX_FILE_BYTES, shrink } from "@/src/modules/finance/payables/shrink";
 import type { BillFile } from "@/src/modules/finance/payables/types";
+import { PrintAttachmentSources } from "../printing/attachment-source";
 
 type Done = { ok: true } | { ok: false; error: string };
 
@@ -62,6 +63,7 @@ export function AttachedFiles({
 
   return (
     <div className="space-y-3">
+      <PrintAttachmentSources files={files} openBase={openBase} />
       {files.length ? (
         <ul className="divide-y divide-rule rounded-[3px] border border-rule">
           {files.map((f) => (
@@ -99,7 +101,7 @@ export function AttachedFiles({
       )}
       {attach && (
         <>
-          <input ref={input} type="file" accept={ACCEPTED} multiple className="sr-only" aria-label={label} onChange={(e) => upload(e.target.files)} />
+          <input suppressHydrationWarning ref={input} type="file" accept={ACCEPTED} multiple className="sr-only" aria-label={label} onChange={(e) => upload(e.target.files)} />
           <Button icon={<Paperclip className="size-4" aria-hidden />} loading={pending} onClick={() => input.current?.click()}>
             Attach a photo or PDF
           </Button>

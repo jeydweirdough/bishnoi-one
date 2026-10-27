@@ -34,7 +34,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
     mobile: supplier?.mobile ?? "",
     tin: formatTin(supplier?.tin ? `${supplier.tin}${supplier.branchCode ?? ""}` : ""),
     address: supplier?.address ?? "",
-    vat: supplier ? (supplier.vatRegistered ? "yes" : "no") : "yes",
+    vat: supplier?.taxDefaultsConfirmed ? (supplier.vatRegistered ? "yes" : "no") : "",
     withholding: supplier?.withholding?.code ?? "",
     terms: String(supplier?.termsDays ?? 30),
     payablesAccountId: supplier?.payablesAccount?.id ?? "",
@@ -45,6 +45,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
   });
   const [contacts, setContacts] = useState<SupplierContact[]>(supplier?.contacts.length ? supplier.contacts : []);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [taxConfirmed, setTaxConfirmed] = useState(supplier?.taxDefaultsConfirmed ?? false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const set = (patch: Partial<typeof v>) => setV({ ...v, ...patch });
@@ -70,7 +71,8 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
         tin: blank(v.tin),
         branchCode: null,
         address: blank(v.address),
-        vatRegistered: v.vat === "yes",
+        vatRegistered: v.vat ? v.vat === "yes" : supplier?.vatRegistered ?? true,
+        taxDefaultsConfirmed: taxConfirmed && !!v.vat,
         withholding: v.withholding || null,
         termsDays: Number(v.terms) || 0,
         email: blank(v.email),
@@ -151,7 +153,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
           name="vat"
           legend="Do they charge VAT?"
           value={v.vat}
-          onChange={(vat) => set({ vat })}
+          onChange={(vat) => { setTaxConfirmed(false); set({ vat }); }}
           options={[
             { value: "yes", label: "VAT-registered" },
             { value: "no", label: "Not VAT-registered" },
@@ -160,7 +162,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
           <Field label="Usual tax withheld" optional error={fields.withholding} hint="Filled in on each new bill from them; a line can use another. The 1% and 2% apply when the company is a top withholding agent.">
             {(p) => (
-              <Select {...p} value={v.withholding} onChange={(e) => set({ withholding: e.target.value })}>
+              <Select {...p} value={v.withholding} onChange={(e) => { setTaxConfirmed(false); set({ withholding: e.target.value }); }}>
                 <option value="">None</option>
                 {withholding.map((w) => (
                   <option key={w.code} value={w.code}>
@@ -174,6 +176,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
             {(p) => <Input {...p} inputMode="numeric" value={v.terms} onChange={(e) => set({ terms: e.target.value.replace(/\D/g, "") })} maxLength={3} />}
           </Field>
         </div>
+        <label className="flex gap-2 text-sm"><input suppressHydrationWarning type="checkbox" checked={taxConfirmed} disabled={!v.vat} onChange={event => setTaxConfirmed(event.target.checked)} />Confirm these supplier VAT/withholding defaults for future bills (optional)</label>
         <Field label="Accounts payable" optional error={fields.payablesAccountId} hint="Where their bills post what's owed. Left empty: the default (Accounting → Default accounts).">
           {(p) => (
             <Select {...p} value={v.payablesAccountId} onChange={(e) => set({ payablesAccountId: e.target.value })}>
@@ -208,7 +211,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
                 {contacts.map((c, i) => (
                   <tr key={i}>
                     <td className="py-1.5 pr-2">
-                      <select aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                      <select suppressHydrationWarning aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
                         <option value="" />
                         {SALUTATIONS.map((s) => (
                           <option key={s} value={s}>

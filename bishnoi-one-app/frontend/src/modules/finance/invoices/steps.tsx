@@ -1,6 +1,8 @@
 "use client";
 
-import { Printer, Trash2 } from "lucide-react";
+import { FinancePrintButton } from "@/src/modules/finance/printing/print-action";
+
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -166,11 +168,7 @@ export function ReissueInvoice({ id, number, cancelled = false }: { id: string; 
 }
 
 export function PrintButton() {
-  return (
-    <Button icon={<Printer className="size-4" aria-hidden />} onClick={() => window.print()}>
-      Print
-    </Button>
-  );
+  return <FinancePrintButton />;
 }
 
 /** Money received against an issued invoice. */

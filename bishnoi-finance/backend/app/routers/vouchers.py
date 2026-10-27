@@ -203,7 +203,11 @@ def expect(v: PaymentVoucher, *states: str) -> None:
 
 
 @router.get("")
-def list_vouchers(user: permitted("vouchers.view"), db: DB, show: str | None = Query(None, max_length=20), q: str | None = Query(None, max_length=100)) -> dict:
+def list_vouchers(user: permitted("vouchers.view"), db: DB, show: str | None = Query(None, max_length=20), q: str | None = Query(None, max_length=100), queue: str | None = Query(None, max_length=30)) -> dict:
+    from app.payables_work import VOUCHER_QUEUES, event_note, filter_vouchers
+
+    if queue and queue not in VOUCHER_QUEUES:
+        raise field_error("queue", "Pick a listed voucher work queue.")
     query = select(PaymentVoucher).join(Supplier, Supplier.id == PaymentVoucher.supplier_id)
     if show in STATUS_LABELS:
         query = query.where(PaymentVoucher.status == show)
@@ -214,10 +218,13 @@ def list_vouchers(user: permitted("vouchers.view"), db: DB, show: str | None = Q
             func.lower(func.coalesce(PaymentVoucher.oojeema_ref, "")).like(like), func.lower(func.coalesce(PaymentVoucher.zoho_ref, "")).like(like),
             func.lower(func.coalesce(PaymentVoucher.bank_reference, "")).like(like), func.lower(func.coalesce(PaymentVoucher.check_number, "")).like(like),
         ))
-    items = db.scalars(query.order_by(PaymentVoucher.updated_at.desc()).limit(300)).all()
+    items = db.scalars(query.order_by(PaymentVoucher.updated_at.desc())).all()
+    if queue:
+        items = filter_vouchers(items, user, queue)
     counts = dict(db.execute(select(PaymentVoucher.status, func.count()).group_by(PaymentVoucher.status)).all())
     can = access_of(user).can
-    return {"items": [voucher_summary(v) for v in items], "counts": {k: counts.get(k, 0) for k in STATUS_LABELS}, "canPrepare": can("vouchers.prepare")}
+    return {"items": [voucher_summary(v) | {"queueNote": event_note(v, date.today()) if queue == "returned" else None} for v in items], "counts": {k: counts.get(k, 0) for k in STATUS_LABELS}, "canPrepare": can("vouchers.prepare"),
+            "queueLabel": VOUCHER_QUEUES[queue] if queue else None}
 
 
 @router.get("/choices")

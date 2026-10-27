@@ -39,6 +39,7 @@ WITHHOLDING: dict[str, tuple[str, int]] = {
 
 # A line's VAT: 12% (taken out, or added), zero-rated, exempt, or none (a non-VAT supplier).
 VAT_KINDS = {"vat": "VAT 12%", "zero": "Zero-rated", "exempt": "VAT-exempt", "none": "No VAT"}
+PURCHASE_TYPES = {"services": "Services", "capital_goods": "Capital goods", "other_goods": "Other goods", "importation": "Importation"}
 
 
 def withholding_out() -> list[dict]:

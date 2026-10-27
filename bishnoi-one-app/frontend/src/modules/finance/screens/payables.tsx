@@ -9,6 +9,7 @@ import { attachFile, attachSupplierFile, removeFile, removeSupplierFile } from "
 import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/payables/bill-steps";
 import { AttachedFiles } from "@/src/modules/finance/payables/files";
 import { SupplierImport } from "@/src/modules/finance/payables/import";
+import { ImportedDetails } from "../payables/import-details";
 import { SupplierForm, SwitchSupplier } from "@/src/modules/finance/payables/supplier-form";
 import { VOUCHER_STATUS_LABELS } from "@/src/modules/finance/vouchers/types";
 import { BILL_STATE_LABELS, type Bill, type BillChoices, type BillState, type BillSummary, type Supplier, type Withholding } from "@/src/modules/finance/payables/types";
@@ -55,6 +56,7 @@ const TABS: { key: string; label: string }[] = [
 ];
 
 const EVENT_LABELS: Record<string, string> = {
+  tax_reviewed: "Bill VAT and withholding reviewed",
   submitted: "Submitted for approval",
   resubmitted: "Corrected and submitted again",
   approved: "Approved",
@@ -74,7 +76,8 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
   if (show === "missing") query.set("missing", "true");
   else if (show) query.set("show", show);
   if (q) query.set("q", q);
-  const list = await load<{ items: BillSummary[]; counts: Record<BillState | "missing", number>; canCreate: boolean }>(`/finance/bills?${query}`);
+  for (const key of ["queue", "supplierId", "bucket"]) if (one(sp[key])) query.set(key, one(sp[key]));
+  const list = await load<{ items: (BillSummary & { queueNote?: string | null })[]; counts: Record<BillState | "missing", number>; canCreate: boolean; queueLabel: string | null }>(`/finance/bills?${query}`);
   return (
     <>
       <PageHeader
@@ -90,6 +93,9 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
         Suppliers&apos; invoices, as the company owes them. A bill is made with its invoice attached and submitted; approved; checked if tax is withheld; and
         only then posted to the books and ready to pay. Returned, it goes back with the reason. A posted bill is voided, never changed.
       </PageHeader>
+      {(list.queueLabel || query.has("supplierId") || query.has("bucket")) && <p className="mb-3 text-sm text-ink-2">
+        {list.queueLabel ?? "Filtered bills"}{query.has("bucket") ? ` · aging bucket: ${query.get("bucket")}` : ""} · {list.items.length} matching bills · <Link href="/finance/bills" className="text-hema hover:underline">Clear filters</Link> · <Link href="/finance/bills/aging" className="text-hema hover:underline">Accounts payable aging</Link>
+      </p>}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
@@ -108,8 +114,9 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
           })}
         </nav>
         <form className="flex gap-2">
-          {show && <input type="hidden" name="show" value={show} />}
-          <input name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          {["queue", "supplierId", "bucket"].map((key) => query.has(key) ? <input suppressHydrationWarning key={key} type="hidden" name={key} value={query.get(key)!} /> : null)}
+          {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>
@@ -151,6 +158,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                     <td className="px-3 py-2.5 text-right tabular-nums">{b.status === "recorded" ? fmt.peso(b.leftCentavos) : ""}</td>
                     <td className="py-2.5 pr-5 pl-3">
                       <StatusMark state={b.state} />
+                      {b.queueNote && <span className="mt-1 block text-meta text-ink-2">{b.queueNote}</span>}
                     </td>
                   </tr>
                 ))}
@@ -295,6 +303,8 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
       {b.status === "draft" && (
         <Sheet className="mb-5 px-5 py-4">
           <SectionTitle icon="approvals">Approval</SectionTitle>
+          {b.status === "draft" && !b.taxReviewed && <p className="mb-3 text-sm">Before submission, <Link href={`/finance/bills/${b.id}?edit=1`} className="text-hema underline">edit this draft</Link> and confirm its VAT and withholding choices.</p>}
+          {!b.supplier.tin && <p className="mb-3 text-meta text-ink-2">Supplier TIN is missing or unresolved. This record does not establish complete BIR supplier details.</p>}
           <ApprovalPath bill={b} />
           {b.problem ? (
             <p className="text-sm text-danger">{b.problem}</p>
@@ -334,6 +344,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
             <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
               <th className="py-1.5 pr-2 font-semibold">Account</th>
               <th className="px-2 py-1.5 font-semibold">Description</th>
+              <th className="px-2 py-1.5 font-semibold">Purchase type</th>
               <th className="w-28 px-2 py-1.5 font-semibold">VAT</th>
               <th className="w-28 px-2 py-1.5 font-semibold">Withheld</th>
               <th className="w-32 py-1.5 pl-2 text-right font-semibold">Amount</th>
@@ -344,6 +355,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
               <tr key={i}>
                 <td className="py-1.5 pr-2">{l.account ? `${l.account.code} · ${l.account.name}` : "—"}</td>
                 <td className="px-2 py-1.5 text-ink-2">{l.description}</td>
+                <td className="px-2 py-1.5 text-ink-2">{l.purchaseTypeLabel}</td>
                 <td className="px-2 py-1.5 text-meta text-ink-2">{l.vatLabel}</td>
                 <td className="px-2 py-1.5 text-meta text-ink-2">{l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None"}</td>
                 <td className="py-1.5 pl-2 text-right tabular-nums">{fmt.peso(l.amountCentavos)}</td>
@@ -451,7 +463,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">{list.canAdd && <SupplierImport />}</div>
         <form>
-          <input name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>
@@ -571,8 +583,8 @@ export async function SupplierPage({ params, searchParams }: { params: Promise<{
           <Particulars
             items={[
               ["TIN", s.tin ? `${s.tin}-${s.branchCode ?? "00000"}` : null],
-              ["VAT", s.vatRegistered ? "VAT-registered" : "Not VAT-registered"],
-              ["Usually withheld", s.withholding ? `${s.withholding.code} · ${s.withholding.name} · ${s.withholding.rateBp / 100}%` : "Nothing"],
+              ["VAT", !s.taxDefaultsConfirmed ? "Tax defaults not confirmed" : s.vatRegistered ? "VAT-registered" : "Not VAT-registered"],
+              ["Usually withheld", !s.taxDefaultsConfirmed ? "Not confirmed" : s.withholding ? `${s.withholding.code} · ${s.withholding.name} · ${s.withholding.rateBp / 100}%` : "Nothing"],
               ["Terms", s.termsDays ? `${s.termsDays} days` : "Cash"],
               ["Accounts payable", s.payablesAccount ? `${s.payablesAccount.code} · ${s.payablesAccount.name}` : "The default"],
               ["Bank", [s.bankName, s.bankAccountName, s.bankAccountNumber].filter(Boolean).join(" · ") || null],
@@ -581,6 +593,7 @@ export async function SupplierPage({ params, searchParams }: { params: Promise<{
           />
         </div>
       </Sheet>
+      <ImportedDetails details={s.importDetails} />
       {s.contacts.length > 0 && (
         <Sheet className="mt-5 px-5 py-4">
           <SectionTitle>Contact persons</SectionTitle>

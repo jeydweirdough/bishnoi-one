@@ -234,6 +234,17 @@ def dashboard(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
     return {"kept": False, "on": on.isoformat(), "sections": [{"key": k, **build[k]()} for k in section_keys(access)]}
 
 
+@router.get("/dashboard/payables")
+def payables_dashboard(access: CurrentAccess, db: DB, settings: SettingsDep) -> dict:
+    from fastapi import HTTPException
+    from app.payables_work import work
+    from app.routers.funds import today
+
+    if not (access.can("bills.view") or access.can("vouchers.view")):
+        raise HTTPException(403, "Your role doesn't allow viewing Payables.")
+    return work(db, access.user, today(settings))
+
+
 # --- BIR files ----------------------------------------------------------------------------------
 
 
@@ -375,3 +386,10 @@ router.include_router(payables_router)
 from app.routers.vouchers import router as vouchers_router  # noqa: E402
 
 router.include_router(vouchers_router)
+
+from app.routers.payables_reports import router as payables_reports_router  # noqa: E402
+
+router.include_router(payables_reports_router)
+
+from app.routers.sales_orders import router as sales_orders_router  # noqa: E402
+router.include_router(sales_orders_router)

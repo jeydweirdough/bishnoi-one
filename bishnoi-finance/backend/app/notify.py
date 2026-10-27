@@ -30,6 +30,7 @@ ACTIONABLE = (
     # with whoever made it.
     "bill.to_approve", "bill.to_check", "bill.returned", "bill.ready",
     "voucher.to_release", "voucher.returned",
+    "sales_order.to_approve", "sales_order.returned",
 )
 
 # Several unread of one of these kinds show as one line, linking to the list.

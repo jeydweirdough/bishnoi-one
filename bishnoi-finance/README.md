@@ -21,6 +21,28 @@ npm run bishnoi-finance     # this API alone
 
 Open http://localhost:4301; this module is at `/finance`.
 
+To run only Finance and its sign-in/screens, use three terminals at the repo root:
+
+```
+npm.cmd run bishnoi-platform
+npm.cmd run bishnoi-finance
+npm.cmd run bishnoi-one-app
+```
+
+Check for already-running services before starting another copy. The Platform
+handles sign-in; the Finance command alone starts only its API.
+
+Learning and review:
+- [Offline learning guide](../docs/finance-learning-guide.html): input lifecycles,
+  section interactions, examples and report sources (local 0.4.16).
+- [Finance team guide](FINANCE-GUIDE.md): procedures and setup.
+- [Handover](FINANCE-HANDOVER.md): architecture and dated implementation status.
+
+The Payables screens are in the one app, including current accounts payable
+aging at `/finance/bills/aging`. Its balances are current-day balances, not
+reconstructed historical balances. Supplier/chart imports do not import bills,
+payments or opening balances.
+
 The first run sets up `.env`, `.venv` and the packages it needs.
 Settings and passwords live in `backend/.env`. They are never in Git:
 ask whoever looks after the app for the values you need.
@@ -34,7 +56,7 @@ uv run python -m app.tools.users add --email you@example.com --name "Your Name" 
 Run the tests, in `backend/`:
 
 ```
-uv run pytest
+uv run python -m pytest
 ```
 
 ## How to work

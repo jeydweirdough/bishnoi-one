@@ -19,15 +19,15 @@ def act(client, who, b, action, body=None, expect=200) -> dict:
 def test_a_bill_without_tax_withheld_clears_when_malou_approves(client, ana, team):
     aubrey, cristal, malou = team["aubrey"], team["cristal"], team["malou"]
     s = supplier(client, aubrey, withholding=None)
-    plain = {"accountId": account(client, aubrey, "6500"), "amountCentavos": 1_120_000, "vat": "vat"}
-    b = client.post("/finance/bills", json={"supplierId": s["id"], "billNumber": "SI-0100", "billDate": "2026-10-01", "lines": [plain]}, headers=aubrey).json()
+    plain = {"accountId": account(client, aubrey, "6500"), "amountCentavos": 1_120_000, "vat": "vat", "withholding": None}
+    b = client.post("/finance/bills", json={"taxReviewed": True, "supplierId": s["id"], "billNumber": "SI-0100", "billDate": "2026-10-01", "lines": [plain]}, headers=aubrey).json()
     assert b["needsCheck"] is False and b["canSubmit"] is True
     act(client, aubrey, b, "submit")
     # Malou is told first; Cristal, the backup, isn't (decision 5).
     assert "bill.to_approve" in kinds(client, malou) and "bill.to_approve" not in kinds(client, cristal)
     done = act(client, malou, b, "approve")
     assert (done["status"], done["state"], done["approvedBy"], done["checkedBy"]) == ("recorded", "ready", "Finance Head", None)
-    assert [e["kind"] for e in done["events"]] == ["submitted", "approved", "cleared"]
+    assert [e["kind"] for e in done["events"]] == ["tax_reviewed", "submitted", "approved", "cleared"]
     assert balances(client, ana)["2000"] == 1_120_000
     # Ready to pay: Cristal is told; the bell's item for Malou is done.
     assert "bill.ready" in kinds(client, cristal)
@@ -72,7 +72,7 @@ def test_returned_it_goes_back_to_aubrey_and_then_to_malou_again(client, ana, te
     act(client, aubrey, b, "submit")
     # Nothing is changed while it waits.
     line = {"accountId": account(client, aubrey, "6500"), "amountCentavos": 1_000_000, "vat": "vat", "withholding": "WC158"}
-    body = {"supplierId": s["id"], "billNumber": "SI-0001", "billDate": "2026-10-01", "lines": [line]}
+    body = {"taxReviewed": True, "supplierId": s["id"], "billNumber": "SI-0001", "billDate": "2026-10-01", "lines": [line]}
     assert client.put(f"/finance/bills/{b['id']}", json=body, headers=aubrey).status_code == 409
     act(client, aubrey, b, "return", {"reason": "Mine"}, expect=403)  # she submitted it
     act(client, malou, b, "approve")

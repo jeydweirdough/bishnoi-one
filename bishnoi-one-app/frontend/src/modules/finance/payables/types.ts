@@ -15,6 +15,8 @@ export type SupplierContact = {
 };
 
 export type Supplier = {
+  taxDefaultsConfirmed: boolean;
+  importDetails: Record<string, unknown>;
   id: string;
   no: number | null;
   /** How they're shown (Zoho's Display Name). */
@@ -51,6 +53,10 @@ export type Supplier = {
 
 /** A supplier from an import, as it would be saved (app/routers/payables.py, /suppliers/import/check). */
 export type ImportedSupplier = {
+  contacts: Partial<SupplierContact>[];
+  vatRegistered: boolean | null;
+  withholding: string | null;
+  payablesAccountId: string | null;
   name: string;
   companyName: string | null;
   salutation: string | null;
@@ -67,9 +73,9 @@ export type ImportedSupplier = {
   isActive: boolean;
 };
 
-export type SupplierImportRow = { line: number; status: "new" | "here" | "problem"; note: string | null; supplier: ImportedSupplier };
+export type SupplierImportRow = { line: number; record: number; status: "new" | "review" | "here" | "duplicate" | "conflict" | "problem"; note: string | null; errors: string[]; reviews: string[]; warnings: string[]; supplier: ImportedSupplier; accountMatches: { id: string; code: string; name: string }[] };
 
-export type SupplierImportCheck = { rows: SupplierImportRow[]; counts: { new: number; here: number; problem: number } };
+export type SupplierImportCheck = { rows: SupplierImportRow[]; counts: Record<SupplierImportRow["status"], number>; payablesAccounts: { id: string; code: string; name: string }[]; withholding: Withholding[] };
 
 export type BillStatus = "draft" | "recorded" | "void";
 
@@ -114,13 +120,15 @@ export type BillSummary = {
 };
 
 export type VatKind = "vat" | "zero" | "exempt" | "none";
+export type PurchaseType = "services" | "capital_goods" | "other_goods" | "importation";
 
 /** A line as the form sends it. */
-export type BillLineInput = { accountId: string; description: string | null; amountCentavos: number; vat: VatKind; withholding: string | null };
+export type BillLineInput = { accountId: string; description: string | null; amountCentavos: number; vat: VatKind; withholding: string | null; purchaseType: PurchaseType };
 
 export type BillLine = BillLineInput & {
   account: { id: string; code: string; name: string } | null;
   vatLabel: string;
+  purchaseTypeLabel: string;
   withholdingRateBp: number | null;
   netCentavos?: number;
   vatCentavos?: number;
@@ -130,6 +138,7 @@ export type BillLine = BillLineInput & {
 export type BillFile = { id: string; name: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string };
 
 export type Bill = Omit<BillSummary, "supplier"> & {
+  taxReviewed: boolean;
   supplier: Supplier;
   poNumber: string | null;
   drNumber: string | null;
@@ -172,9 +181,11 @@ export type Bill = Omit<BillSummary, "supplier"> & {
 };
 
 export type BillChoices = {
+  canEditSuppliers: boolean;
   suppliers: Supplier[];
   accounts: { id: string; code: string; name: string; type: "expense" | "asset" }[];
   vatKinds: { key: VatKind; label: string }[];
+  purchaseTypes: { key: PurchaseType; label: string }[];
   withholding: Withholding[];
   today: string;
 };

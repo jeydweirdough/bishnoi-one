@@ -40,7 +40,7 @@ export default async function JournalVoucherPage({ params }: { params: Promise<{
         )}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink pb-3">
           <div>
-            <p className="text-meta text-ink-3 uppercase">{me.org.name}</p>
+            <p className="finance-document-company-name text-meta text-ink-3 uppercase">{me.org.name}</p>
             <h2 className="text-heading">Journal voucher</h2>
           </div>
           <dl className="text-right text-sm">

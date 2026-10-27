@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Bill, Invoice, InvoicePayment, JournalEntry, JournalLine, LedgerSettings, Supplier, TaxProfile
+from app.models import Account, Bill, Invoice, InvoicePayment, JournalEntry, JournalLine, Supplier, TaxProfile
 from app import payables
 from app.tax.packs.ph import PERCENTAGE
 from app.tax.rates import lookup
@@ -165,8 +165,9 @@ def general_journal(db: Session, start: date, end: date) -> dict:
 
 
 def money_accounts(db: Session) -> set[str]:
-    s = db.get(LedgerSettings, 1)
-    return {a for a in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if a} if s else set()
+    from app.money_accounts import money_account_ids
+
+    return money_account_ids(db)
 
 
 def cash_disbursements(db: Session, start: date, end: date) -> dict:
@@ -320,6 +321,12 @@ def vat_return(db: Session, p: Period) -> dict:
             {"key": "purchases", "label": "VATable purchases (net of VAT)", "amountCentavos": purchases["vatable"]},
             {"key": "purchases_other", "label": "Zero-rated, exempt and non-VAT purchases", "amountCentavos": purchases["zero_rated"] + purchases["exempt"] + purchases["non_vat"]},
             {"key": "input", "label": "Input VAT on purchases", "amountCentavos": input_tax},
+            *[
+                {"key": f"{kind}_{part}", "label": f"{label}: {description}",
+                 "amountCentavos": sum(b.by_type[kind][field] for b in bills)}
+                for kind, label in payables.PURCHASE_TYPES.items()
+                for part, description, field in (("purchases", "purchases before VAT", "netCentavos"), ("input", "input VAT", "vatCentavos"))
+            ],
             {"key": "payable", "label": "VAT payable" if output >= input_tax else "Excess input VAT, carried over", "amountCentavos": abs(output - input_tax)},
         ],
         "notes": ["Input VAT is from recorded supplier bills dated in the quarter. Taxes customers withheld (the SAWT) are credited on the income tax return, not here."],
@@ -389,6 +396,7 @@ class Purchase:
 
     bill: Bill
     by_kind: dict[str, int]
+    by_type: dict[str, dict[str, int]]
     held: list[tuple[str, int, int, int]]  # (ATC, rate in basis points, base, tax withheld)
 
     @property
@@ -415,15 +423,19 @@ class Purchase:
 def purchase(db: Session, bill: Bill) -> Purchase:
     worked = payables.work_out(db, bill.lines or [], bill.bill_date, bill.amounts_include_vat)
     kinds = {"vatable": 0, "zero_rated": 0, "exempt": 0, "non_vat": 0}
+    types = {k: {"netCentavos": 0, "vatCentavos": 0} for k in payables.PURCHASE_TYPES}
     held: dict[tuple[str, int], list[int]] = {}
     for line in worked.lines:
+        group = types[line.get("purchaseType", "other_goods")]
+        group["netCentavos"] += line["netCentavos"]
+        group["vatCentavos"] += line["vatCentavos"]
         kinds[{"vat": "vatable", "zero": "zero_rated", "exempt": "exempt"}.get(line["vat"], "non_vat")] += line["netCentavos"]
         code = line.get("withholding")
         if code and line["withheldCentavos"]:
             row = held.setdefault((code, payables.WITHHOLDING[code][1]), [0, 0])
             row[0] += line["netCentavos"]
             row[1] += line["withheldCentavos"]
-    return Purchase(bill, kinds, [(code, bp, base, tax) for (code, bp), (base, tax) in held.items()])
+    return Purchase(bill, kinds, types, [(code, bp, base, tax) for (code, bp), (base, tax) in held.items()])
 
 
 def bills_between(db: Session, start: date, end: date, *, with_void: bool = False, supplier_id: str | None = None) -> list[Purchase]:
@@ -472,8 +484,15 @@ def slp(db: Session, p: Period) -> dict:
         row["taxableCentavos"] += k["vatable"]
         row["inputTaxCentavos"] += pu.bill.vat_centavos
         row["grossTaxableCentavos"] += k["vatable"] + pu.bill.vat_centavos
+        for kind, amounts in pu.by_type.items():
+            row[f"{camel(kind)}Centavos"] = row.get(f"{camel(kind)}Centavos", 0) + amounts["netCentavos"]
+            row[f"{camel(kind)}InputTaxCentavos"] = row.get(f"{camel(kind)}InputTaxCentavos", 0) + amounts["vatCentavos"]
     rows = sorted(by.values(), key=lambda r: r["name"].upper())
     totals = {k: sum(r[k] for r in rows) for k in ("exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "inputTaxCentavos", "grossTaxableCentavos")}
+    for kind in payables.PURCHASE_TYPES:
+        for suffix in ("Centavos", "InputTaxCentavos"):
+            key = f"{camel(kind)}{suffix}"
+            totals[key] = sum(r[key] for r in rows)
     return {"rows": rows, "totals": totals, "missingTin": sum(1 for r in rows if not r["tin"])}
 
 

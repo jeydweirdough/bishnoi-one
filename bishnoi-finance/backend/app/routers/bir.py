@@ -151,8 +151,8 @@ def summary_list(which: Literal["sls", "slp", "sawt", "qap"], _: Viewer, db: DB,
     elif which == "slp":
         data = bir.slp(db, p)
         if format == "csv":
-            return as_csv(f"Summary List of Purchases {year} Q{quarter}", ["TIN", "Registered name", "Address", "Exempt purchases", "Zero-rated purchases", "Taxable purchases", "Input tax", "Gross taxable purchases"],
-                          [[r["tin"] or "", r["name"], r["address"] or "", pesos(r["exemptCentavos"]), pesos(r["zeroRatedCentavos"]), pesos(r["taxableCentavos"]), pesos(r["inputTaxCentavos"]), pesos(r["grossTaxableCentavos"])] for r in data["rows"]])
+            return as_csv(f"Summary List of Purchases {year} Q{quarter}", ["TIN", "Registered name", "Address", "Exempt purchases", "Zero-rated purchases", "Taxable purchases", "Input tax", "Gross taxable purchases", *[f"{label}: {part}" for label in bir.payables.PURCHASE_TYPES.values() for part in ("Purchases before VAT", "Input VAT")]],
+                          [[r["tin"] or "", r["name"], r["address"] or "", pesos(r["exemptCentavos"]), pesos(r["zeroRatedCentavos"]), pesos(r["taxableCentavos"]), pesos(r["inputTaxCentavos"]), pesos(r["grossTaxableCentavos"]), *[pesos(r[f"{bir.camel(kind)}{suffix}"]) for kind in bir.payables.PURCHASE_TYPES for suffix in ("Centavos", "InputTaxCentavos")]] for r in data["rows"]])
         title = "Summary List of Purchases"
     elif which == "qap":
         data = bir.qap(db, p)

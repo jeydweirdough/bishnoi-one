@@ -6,6 +6,7 @@ import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api"
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { PrintButton } from "@/src/modules/finance/invoices/steps";
 import { AttachedFiles } from "@/src/modules/finance/payables/files";
+import { PrintAttachmentSources } from "../printing/attachment-source";
 import { SignatureLines } from "@/src/modules/finance/signature/blocks";
 import type { SignedStep } from "@/src/modules/finance/signature/types";
 import { attachVoucherFile, removeVoucherFile } from "@/src/modules/finance/vouchers/actions";
@@ -44,7 +45,8 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
   const query = new URLSearchParams();
   if (show) query.set("show", show);
   if (q) query.set("q", q);
-  const list = await load<{ items: VoucherSummary[]; counts: Record<VoucherStatus, number>; canPrepare: boolean }>(`/finance/vouchers?${query}`);
+  if (one(sp.queue)) query.set("queue", one(sp.queue));
+  const list = await load<{ items: (VoucherSummary & { queueNote?: string | null })[]; counts: Record<VoucherStatus, number>; canPrepare: boolean; queueLabel: string | null }>(`/finance/vouchers?${query}`);
   return (
     <>
       <PageHeader
@@ -60,6 +62,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
         Paying suppliers&apos; bills once they&apos;re approved: prepared, then released, which posts it. A voucher returned for correction goes back to whoever
         prepared it, with the reason.
       </PageHeader>
+      {list.queueLabel && <p className="mb-3 text-sm text-ink-2">{list.queueLabel} · {list.items.length} matching vouchers · <Link href="/finance/vouchers" className="text-hema hover:underline">Clear filters</Link></p>}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
@@ -78,8 +81,9 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
           })}
         </nav>
         <form className="flex gap-2">
-          {show && <input type="hidden" name="show" value={show} />}
-          <input name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          {query.has("queue") && <input suppressHydrationWarning type="hidden" name="queue" value={query.get("queue")!} />}
+          {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>
@@ -123,6 +127,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
                     <td className="px-3 py-2.5 text-right tabular-nums">{fmt.peso(v.totalCentavos)}</td>
                     <td className="py-2.5 pr-5 pl-3">
                       <StatusMark status={v.status} />
+                      {v.queueNote && <span className="mt-1 block text-meta text-ink-2">{v.queueNote}</span>}
                     </td>
                   </tr>
                 ))}
@@ -211,6 +216,7 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
       )}
 
       <div className="mb-5">
+        {v.lines.map(line => <PrintAttachmentSources key={line.billId} files={line.files} openBase={`/finance/bills/${line.billId}/files`} />)}
         <VoucherSteps voucher={v} today={fmt.todayKey()} />
       </div>
 
@@ -347,6 +353,8 @@ export async function PrintVoucherPage({ params }: { params: Promise<{ id: strin
   const kind = v.method === "check" ? "Check voucher" : "Payment voucher";
   return (
     <>
+      <PrintAttachmentSources files={v.files} openBase={`/finance/vouchers/${v.id}/files`} />
+      {v.lines.map(line => <PrintAttachmentSources key={line.billId} files={line.files} openBase={`/finance/bills/${line.billId}/files`} />)}
       <div className="print:hidden">
         <PageHeader crumbs={[{ href: `/finance/vouchers/${v.id}`, label: v.number }]} title={`${kind} ${v.number}`} actions={<PrintButton />}>
           Print it, or choose &quot;Save as PDF&quot; in the print window.
@@ -360,7 +368,7 @@ export async function PrintVoucherPage({ params }: { params: Promise<{ id: strin
         )}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink pb-3">
           <div>
-            <p className="text-meta text-ink-3 uppercase">{me.org.name}</p>
+            <p className="finance-document-company-name text-meta text-ink-3 uppercase">{me.org.name}</p>
             <h2 className="text-heading">{kind}</h2>
           </div>
           <dl className="text-right text-sm">

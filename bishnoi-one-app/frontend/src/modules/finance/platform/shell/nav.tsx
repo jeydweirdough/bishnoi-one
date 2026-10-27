@@ -33,6 +33,7 @@ function missingOf(unset: Unset, keys: string[]): Missing {
 const NEEDS: [string, string][] = [
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
+  ["/finance/sales-orders", "sales_orders.view"],
   ["/finance/bills", "bills.view"],
   ["/finance/suppliers", "suppliers.view"],
   ["/finance/vouchers", "vouchers.view"],
@@ -62,8 +63,10 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
   const keep = (steps: Step[]) => steps.filter((s) => opens(s.href.split("?")[0]));
   // As Zoho Books lays it out: Sales, Expenses, Approvals, Banking, Accountant, Taxes, Reports.
   const processes: Process[] = [
+    { label: "Sales orders", icon: "orders", steps: keep([{ href: "/finance/sales-orders", label: "Sales orders", icon: "orders" }]) },
     { label: "Payables", icon: "orders", steps: keep([
       { href: "/finance/bills", label: "Bills", icon: "orders", exact: true },
+      { href: "/finance/bills/aging", label: "Supplier aging", icon: "reports" },
       { href: "/finance/vouchers", label: "Payment vouchers", icon: "payments" },
       { href: "/finance/suppliers", label: "Suppliers", icon: "people" },
     ]) },

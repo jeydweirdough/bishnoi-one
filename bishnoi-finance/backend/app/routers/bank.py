@@ -27,16 +27,16 @@ from sqlalchemy.orm import Session
 from app.access import permitted
 from app.audit import audit
 from app.deps import DB
-from app.models import Account, BankReconciliation, JournalEntry, JournalLine, LedgerSettings
+from app.money_accounts import money_account_ids
+from app.models import Account, BankReconciliation, JournalEntry, JournalLine
 from app.routers.tax import Api, field_error
 
 router = APIRouter(prefix="/finance/bank", tags=["bank"])
 
 
 def money_accounts(db: Session) -> list[Account]:
-    """The accounts money moves through (the default cash, bank, e-wallet and check accounts), and any other asset named a bank or cash."""
-    s = db.get(LedgerSettings, 1)
-    ids = {a for a in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if a} if s else set()
+    """Active CASH descendants and defaults, plus existing bank/cash-named assets."""
+    ids = money_account_ids(db)
     q = select(Account).where(Account.is_active, Account.type == "asset")
     return [a for a in db.scalars(q.order_by(Account.code)) if a.id in ids or any(w in a.name.lower() for w in ("bank", "cash"))]
 

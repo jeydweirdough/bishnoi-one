@@ -1,0 +1,68 @@
+/* Named pages and selectors are Finance-only, even when Next retains this stylesheet. */
+@page financePortrait { size: A4 portrait; margin: 12mm 13mm 14mm; }
+@page financeLandscape { size: A4 landscape; margin: 11mm 12mm 13mm; }
+
+.finance-print-banner, .finance-print-context, .finance-print-footer, .finance-print-editing,
+.finance-print-attachments, .finance-print-attachment-warning { display: none; }
+.finance-print-toolbar { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
+.finance-print-scope[data-editing="true"] .finance-print-toolbar { display: none; }
+
+@media print {
+  body:has(.finance-print-scope) { background: white !important; color: #151c20; }
+  .finance-shell { display: block !important; }
+  .finance-shell > aside, .finance-shell > div[class*="sticky"] { display: none !important; }
+  .finance-shell-main { padding: 0 !important; }
+  .finance-shell-width { max-width: none !important; margin: 0 !important; }
+  .finance-shell-actions, .finance-shell-notices, .finance-print-toolbar, .finance-print-action { display: none !important; }
+  .finance-print-scope { page: financePortrait; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #151c20; }
+  .finance-print-scope[data-print-layout="landscape"] { page: financeLandscape; font-size: 9pt; }
+  .finance-print-banner { display: flex; justify-content: space-between; align-items: center; gap: 10mm; border-bottom: 1.5pt solid #26454b; padding: 0 0 4mm; margin-bottom: 5mm; break-inside: avoid; }
+  .finance-print-company { display: flex; align-items: center; gap: 4mm; min-width: 0; }
+  .finance-print-company-logo { width: 44mm; height: 20mm; overflow: hidden; flex-shrink: 0; }
+  .finance-print-company-logo img { display: block; width: 44mm; height: 44mm; max-width: none; transform: translateY(-11mm); }
+  .finance-print-company-name { font-size: 13pt; font-weight: 700; line-height: 1.25; margin: 0 0 1mm; }
+  .finance-print-department { font-size: 8pt; color: #4a555b; margin: 0; }
+  .finance-print-system { display: flex; align-items: center; justify-content: flex-end; margin-left: auto; text-align: right; gap: 2.5mm; flex-shrink: 0; }
+  .finance-print-system img { width: 11mm; height: 11mm; object-fit: contain; }
+  .finance-print-system strong { display: block; font-size: 9pt; letter-spacing: .08em; }
+  .finance-print-system span { display: block; font-size: 7.5pt; color: #4a555b; }
+  .finance-print-context:not(:empty) { display: block; font-size: 8pt; padding-bottom: 3mm; margin-bottom: 4mm; border-bottom: .5pt solid #b1bbc0; overflow-wrap: anywhere; }
+  .finance-print-footer { display: flex; justify-content: space-between; gap: 5mm; border-top: .5pt solid #87969c; margin-top: 8mm; padding-top: 2.5mm; font-size: 7.5pt; color: #465158; break-inside: avoid; }
+  .finance-print-scope[data-editing="true"] .finance-print-editing { display: block; padding: 3mm; border: 1pt solid #555; font-weight: 700; }
+  .finance-print-content { max-width: none !important; width: 100%; }
+  .finance-print-content h1 { font-size: 19pt; line-height: 1.2; margin-bottom: 2mm; }
+  .finance-print-content h2 { font-size: 13pt; line-height: 1.25; }
+  .finance-print-content .finance-document-company-name { display: none; }
+  .finance-print-content h1, .finance-print-content h2, .finance-print-content h3 { break-after: avoid; }
+  .finance-print-content :is([data-finance-sheet], .shadow-sheet) { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin-top: 4mm; background: white !important; }
+  .finance-print-content :is([data-finance-sheet], .shadow-sheet):first-child { margin-top: 0; }
+  .finance-print-content nav, .finance-print-content form, .finance-print-content button,
+  .finance-print-content [role="tablist"], .finance-print-content header > :last-child:not(:first-child) { display: none !important; }
+  .finance-print-content a { color: inherit !important; text-decoration: none !important; }
+  .finance-print-content svg { display: none !important; }
+  .finance-print-content [class*="overflow-x"], .finance-print-content [class*="overflow-auto"] { overflow: visible !important; }
+  .finance-print-content table { width: 100% !important; min-width: 0 !important; border-collapse: collapse; font-size: 9pt; }
+  .finance-print-scope[data-print-layout="landscape"] table { font-size: 7.5pt; }
+  .finance-print-content thead { display: table-header-group; }
+  /* Print totals once at the end, rather than repeat the total on every page. */
+  .finance-print-content tfoot { display: table-row-group; break-inside: avoid; font-weight: 700; }
+  .finance-print-content th, .finance-print-content td { padding: 2.2mm 1.5mm !important; height: auto !important; width: auto; overflow-wrap: anywhere; border-bottom: .4pt solid #c1c9cc; vertical-align: top; }
+  .finance-print-content th { color: #172d32; font-weight: 700; }
+  .finance-print-content td.tabular-nums { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .finance-print-content tr { break-inside: avoid; }
+  .finance-print-content dl { margin-top: 3mm; margin-bottom: 4mm; }
+  .finance-print-content .finance-signatures, .finance-print-content .break-inside-avoid { break-inside: avoid; }
+  .finance-print-content .finance-signatures { margin-top: 8mm; padding-top: 4mm; border-top: .5pt solid #b1bbc0; }
+  .finance-print-content img { max-width: 100%; }
+  .finance-print-content [class*="opacity-"] { opacity: 1 !important; }
+  .finance-print-content [class*="bg-danger"], .finance-print-content [class*="bg-due-today"] { background: white !important; color: #111 !important; border: .7pt solid #666; }
+  .finance-print-content .text-meta { font-size: 8pt; }
+  .finance-print-attachments { display: block; }
+  .finance-print-attachment-page { page: financePortrait; break-before: page; break-inside: avoid; margin: 0; }
+  .finance-print-attachment-page p { font-size: 8pt; margin: 0 0 3mm; overflow-wrap: anywhere; }
+  .finance-print-attachment-page img { display: block; width: auto; height: auto; max-width: 184mm; max-height: 248mm; margin: 0 auto; object-fit: contain; }
+  .finance-print-attachment-page[data-orientation="landscape"] { page: financeLandscape; }
+  .finance-print-attachment-page[data-orientation="landscape"] img { max-width: 270mm; max-height: 165mm; }
+  .finance-print-scope[data-attachments-pending="true"] .finance-print-attachment-warning { display: block; padding: 3mm; border: 1pt solid; font-weight: bold; }
+  .finance-print-scope[data-attachments-pending="true"] .finance-print-attachments { display: none; }
+}

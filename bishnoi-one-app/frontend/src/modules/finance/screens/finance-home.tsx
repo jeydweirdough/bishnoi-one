@@ -8,6 +8,7 @@ import { CashBalances } from "@/src/modules/finance/dashboard/cash";
 import { DashboardSection } from "@/src/modules/finance/dashboard/sections";
 import type { Dashboard } from "@/src/modules/finance/dashboard/types";
 import type { FundCounts } from "@/src/modules/finance/funds/types";
+import { PayablesHome } from "@/src/modules/finance/payables/home";
 
 // Finance's overview. A role made for the finance team gets the sections its
 // work calls for (GET /finance/dashboard, planned 2026-10-22); the starting
@@ -24,6 +25,7 @@ export default async function FinanceHome() {
       <PageHeader title="Overview">What needs Finance&apos;s action today.</PageHeader>
       <Welcome module="finance" name={me.user.fullName.split(" ")[0]} greeting={greeting()} />
       <div className="space-y-5">
+        {(me.permissions?.includes("bills.view") || me.permissions?.includes("vouchers.view")) && <PayablesHome org={me.org} />}
         {dashboard.kept ? (
           <KeptOverview org={me.org} />
         ) : (

@@ -12,6 +12,66 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.20",
+    date: "2026-10-27",
+    changes: [
+      "Sales Orders now has separate permissions for viewing, making drafts, submitting, approving or returning, and cancelling. Waiting-for-me and waiting-on-approval lists show each side of the hand-off.",
+      "Order history records who acted and when. You cannot approve work you prepared; outdated or repeated decisions are rejected. This is local Finance approval only and does not update Zoho, issue invoices or release stock.",
+    ],
+  },
+  {
+    version: "0.4.19",
+    date: "2026-10-26",
+    changes: [
+      "Import the supplier directory with one file-level confirmation. Individual tax reviews are no longer required at import; duplicates and identity conflicts are classified automatically.",
+      "Missing or questionable supplier details are retained for later. Unknown tax defaults do not prefill bills. Confirm the actual bill's tax choices before submission; users allowed to edit suppliers can optionally save reusable defaults.",
+    ],
+  },
+  {
+    version: "0.4.18",
+    date: "2026-10-26",
+    changes: [
+      "Supplier CSV import recognises CF.TIN and custom contact numbers, preserves terms labels and billing details, and explains which columns are captured or excluded.",
+      "The existing import table now includes expandable reviews for TINs, tax choices, payable accounts, terms and addresses. Nothing is imported until the selected rows are reviewed and confirmed.",
+      "Imports recheck duplicates and destination fields before saving all selected suppliers together. Existing suppliers, bills, payments and opening balances are unchanged.",
+    ],
+  },
+  {
+    version: "0.4.17",
+    date: "2026-10-26",
+    changes: [
+      "Printouts use the 2MG logo without repeating its company name, with Bishnoi One aligned to the right.",
+      "Attached PDFs and photos are included as supporting pages when printing supplier records, bills and vouchers. Printing waits for every page and stops if a file cannot be prepared. Original uploads are unchanged.",
+    ],
+  },
+  {
+    version: "0.4.16",
+    date: "2026-10-26",
+    changes: [
+      "Finance documents and report views now share a professional print layout: 2MG identity and logo, Bishnoi One branding, clear tables, totals and existing signature evidence.",
+      "Print / Save as PDF is available on Finance record and report views. Wide schedules use landscape pages; printouts retain their status and reporting filters. CSV and DAT files are unchanged.",
+    ],
+  },
+  {
+    version: "0.4.15",
+    date: "2026-10-26",
+    changes: [
+      "Overview now shows Payables work: drafts, returned bills and vouchers, approvals, tax checks, payments to prepare or release, and your bills waiting on others. Each count opens its matching list.",
+      "Accounts payable aging shows today's unpaid supplier balances by overdue period, with bill links and CSV download. Money reserved in unreleased vouchers is shown separately from what is still owed and available to prepare.",
+      "Pending approvals are excluded from amounts owed. Aging shows current balances only; it does not reconstruct past balances.",
+      "Finance screens run inside Bishnoi One under /finance. The team guide, setup notes and offline learning guide now describe the one-app workflow and current feature limits.",
+    ],
+  },
+  {
+    version: "0.4.14",
+    date: "2026-10-25",
+    changes: [
+      "Choose services, capital goods, other goods or importation on each bill line. The bill review, Summary List of Purchases and quarterly VAT return show the breakdown. Existing lines start as other goods.",
+      "The Cash Disbursements Journal and bank reconciliation include accounts under CASH, including nested accounts, alongside the default money accounts.",
+      "Payables fields now include the browser form-filler compatibility fix.",
+    ],
+  },
+  {
     version: "0.4.13",
     date: "2026-10-23",
     changes: [

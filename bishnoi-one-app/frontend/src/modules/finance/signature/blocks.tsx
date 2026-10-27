@@ -10,7 +10,7 @@ const when = (iso: string, timeZone: string) =>
 
 export function SignatureLines({ lines, signed, timeZone }: { lines: { step: string; label: string }[]; signed: SignedStep[]; timeZone: string }) {
   return (
-    <div className="mt-10 grid gap-8 sm:grid-cols-2 print:grid-cols-2">
+    <div className="finance-signatures mt-10 grid gap-8 sm:grid-cols-2 print:grid-cols-2">
       {lines.map((line) => {
         // The latest of that step (an entry approved once; a step redone keeps its newest).
         const s = [...signed].reverse().find((x) => x.step === line.step);

@@ -3,6 +3,11 @@
 This guide explains what Finance does today, step by step, in the words
 the screens use. It is for the people who will use it, not for developers.
 
+**Updated 26 October 2026 for local 0.4.16.** Open the screens at
+http://localhost:4301/finance. They are part of Bishnoi One, not a separate
+Finance website. For a lesson-by-lesson explanation, use the
+[offline learning guide](../docs/finance-learning-guide.html).
+
 What Finance covers today:
 
 - **Marketing requests (cash advances):** releasing money to employees, checking
@@ -25,7 +30,7 @@ Everyone who uses Finance has a **role**. Finance starts with three:
 
 | | Auditor | Finance Staff | Administrator |
 |---|---|---|---|
-| See every page, request, invoice and entry; download spreadsheets | ✓ | ✓ | ✓ |
+| View core records/reports and download spreadsheets allowed by the role (Calendar and Sales DAT access are separate) | ✓ | ✓ | ✓ |
 | Release or decline a cash advance | | ✓ | ✓ |
 | Review liquidations, record refunds and reimbursements | | ✓ | ✓ |
 | Post a manual journal entry, or reverse an entry (both wait for approval) | | ✓ | ✓ |
@@ -39,9 +44,12 @@ Everyone who uses Finance has a **role**. Finance starts with three:
 | Change the company's tax registration, or add a new tax rate | | | ✓ |
 | Add people, make roles, read the activity log | Activity log only | | ✓ |
 
-An Administrator can also make **new roles** under **Administration → Roles**,
-ticking exactly what each may do (for example, a Cashier who may only release
-cash). Each person has one role, set under **Administration → Users**.
+Roles and permissions in the one app lead to the Platform's central access
+screens. Our existing local Finance roles remain until the separate central-role
+adoption step is approved. With Bishnoi One sign-in, changing a role only in
+Finance's Users page does not reliably override the role supplied at sign-in.
+Check with the administrator before changing access; do not infer a person's
+permissions only from their job title.
 
 If you sign in with your **Bishnoi One account**, your role comes from it: an
 administrator of Finance there is an Administrator here; a role with the same
@@ -54,6 +62,13 @@ or the tax registration). Until it's set, the step that needs it can't be done.
 ---
 
 ## 2. The Overview page
+
+**Payables (A+B)** now appears when you may view bills or vouchers, alongside
+the existing Overview. It shows eligible approvals/checks, team draft bills,
+your returned/submitted work, payment preparation/release, missing documents
+and due amounts. Each count opens its matching list. Groups can contain the
+same bill: do not add their amounts together. Unreleased vouchers reserve money
+but do not reduce what is owed. Current supplier aging is linked from this section.
 
 **What you see depends on your role.** A role made for your work shows the
 sections that work calls for, and nothing else:
@@ -261,7 +276,8 @@ invoice numbers under each customer.
 
 ### Payables: suppliers and their bills
 
-**Payables** in the sidebar has **Bills** and **Suppliers**.
+**Payables** in the sidebar has **Bills**, **Accounts payable aging**,
+**Payment vouchers** and **Suppliers**.
 
 - **Suppliers**, laid out like Zoho's vendors: the **primary contact** (salutation,
   first and last name), **company name** (as registered) and **display name** (how
@@ -291,7 +307,8 @@ invoice numbers under each customer.
   in), type **their invoice number**, the bill date (the due date follows from the
   terms), the **PO** and **delivery receipt** numbers, and tick **checked against
   the PO / delivery receipt**. Each line: the **account** (an expense or asset), a
-  description, the **amount**, its **VAT** (12%, zero-rated, exempt, none) and the
+  description, **purchase type** (services, capital goods, other goods or importation),
+  the **amount**, its **VAT** (12%, zero-rated, exempt, none) and the
   **tax withheld**. Say whether the amounts **include VAT** (as printed on the
   invoice). The bill's **Zoho** and **Oojeema** numbers can be kept on it too.
   **Save as draft.**
@@ -350,7 +367,12 @@ invoice numbers under each customer.
     (Prepared, Released) and a **Received by** line for the supplier. Attach the deposit slip or check photo under
     **Proof of payment**.
   - **Ticks:** Payment vouchers: View · Prepare · Release · Void.
-- **Not yet:** payables aging, Ms. Aubrey's Payables home page, 2307s.
+- **Accounts payable aging:** today's unpaid/part-paid posted bills, grouped by
+  supplier and due-date bucket, with owed/reserved/available amounts, bill links
+  and CSV. It does not reconstruct past-date balances.
+- **Supplier 2307s and purchase/withholding reports:** under **BIR reports**,
+  for the roles permitted to view them. They read eligible supplier bills; no
+  second purchase entry is needed when a voucher pays the bill.
 
 | When | Debit | Credit |
 |---|---|---|
@@ -630,7 +652,9 @@ connected.
 **BIR sales DAT** in the sidebar makes the monthly Summary List of Sales file
 (the `.DAT` sent to BIR through RELIEF) from Oojeema's exports. It does what the
 converter page Sir Rommel used before, with the same results, and it opens only
-for a role allowed to **Prepare BIR files** (Administration → Roles).
+for a role allowed to **Prepare BIR files**. Role management in the one app
+links to the Platform's access screens; existing local Finance roles remain
+until the separate central-role adoption step.
 
 - **Prepare monthly DAT:** drop the month's exports from Oojeema (the DAT, the
   Sales Relief or Sales Journal, the General Ledger, the Income Statement). Pick
@@ -659,9 +683,17 @@ Before filing, run each DAT through BIR's RELIEF Validation Module, as before.
 - **Quote approvals, guarantee letter checks and letter payments** (DSWD, PCSO,
   and others) are done in the **CRM** today, by each team's **Team Lead**, not by
   Finance.
-- **Payables aging, 2307 certificates for suppliers** (supplier bills and payment
-  vouchers are in, under Payables), **bank reconciliation**, and **separate books for
-  2mg Incorporated and Getmeds Philippines Inc.**: not started.
+- **Opening balances and linked historical transaction imports:** the supplier
+  and chart importers do not bring in bills, payments, sales or account balances.
+  The cut-off/history strategy is still to be agreed.
+- **Credit memos/sales returns, the full importation workflow, and complete
+  purchase-tax detail for non-bill spending** remain to be planned and built.
+- **Official sales ingestion, remaining BIR submission formats and production
+  rollout** still require decisions and validation. GPI stays on Zoho under the
+  recorded scope; this is not a completed two-company accounting rollout.
+- **Already available:** current supplier aging, supplier 2307 report views,
+  financial statements and bank reconciliation. Validate their results with
+  Finance before relying on them for filing.
 
 ---
 
@@ -678,3 +710,16 @@ Already answered in the October questionnaire: releasing and reviewing are done
 by different people; receipts are due in one week, and an employee liquidates
 before the next release; entries a marketing request made can still be reversed
 from the journal.
+
+## Printing and Save as PDF (local 0.4.16)
+Finance record/report print views use a common company/system header and footer. For the signed-in2MG company this includes the supplied2MG logo and smaller Bishnoi One mark. Invoice registration fields, document numbers/statuses, tables, totals and recorded signatures remain part of the source document. Wide schedules request landscape; ordinary documents request portrait.
+Use Print / Save as PDF on report/record views, or the existing document Print button. Images/fonts are awaited; a failed logo/signature prompts a refresh instead of knowingly printing incomplete evidence. Applied filter context is printed; unsent filter edits are not treated as report filters. Check preview before saving; browser settings can override size/orientation. Browser visual/pagination acceptance is still pending, not implied by server-render checks. CSV/DAT unchanged.
+
+### Printing attached documents (0.4.17)
+Use Print / Save as PDF to append attached PDF pages and photos to bills, supplier records and vouchers. Existing file permissions apply. Printing stops if files cannot be prepared; original downloads remain unchanged. Packets above100 supporting pages must be printed separately. Browser-menu printing warns if attachments are unprepared. Actual browser preview acceptance pending.
+
+### Supplier import review (0.4.18)
+Use Suppliers -> Import from a file. The existing inline panel/table recognises CF.TIN and CF.Contact Number. Expand column coverage and each row's details to inspect what will be saved. Explicitly confirm VAT/withholding; confirm payable mappings and conflicting terms/addresses. Invalid TINs block the row; missing TINs require acknowledgement and remain incomplete for BIR details. Additional numbers and labelled terms/billing details use existing fields,with visible overflow errors. Filters preserve selections; group tax choices require explicit confirmation. After editing,Recheck preview retains deliberate exclusions and selects newly ready rows. Final confirmation imports selected suppliers all or none after backend validation. Existing suppliers remain unchanged;source IDs,bills,payments and opening balances are excluded. Unknown outcomes require rechecking before retry. Decisions are temporary until import; closing/picking another file warns that choices will be lost.
+
+### Directory-first import0.4.19 (supersedes0.4.18 review instructions)
+Choose CSV -> optional summary/details -> one Import directory confirmation. No individual vendor reviews. Clear directory facts imported automatically; duplicates/existing/unusable/conflicting identities excluded. Unresolved values/hints retained under Imported details kept for later. Tax defaults unconfirmed;actual bill VAT/withholding must be explicitly chosen and reviewed before submission. Edit suppliers permission allows optional saved defaults from bill or supplier form. Existing values/posted bills preserved;source IDs/bills/payments/opening balances not imported. Recheck before retry after an unknown outcome.

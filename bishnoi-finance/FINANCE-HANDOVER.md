@@ -23,6 +23,36 @@ Commits not on main (oldest last): `87b8130` vouchers + bill flow · `8fbaf82` p
 
 ---
 
+## Current local status — 26 October 2026
+
+This dated update supersedes the older pending-work statements below.
+
+- One-app screen batches 1–6 are complete on `feature/finance-safe-improvements`;
+  Payables moved in `3f30dcd`. Existing branch commits were pushed at `69d6965`.
+  Do not rebuild or move the Payables screens again.
+- Local, uncommitted 0.4.14: bill-line purchase types with migration 0023 (JSON
+  backfill inside existing bill lines), CASH descendants in disbursements/bank
+  reconciliation, and Payables form-filler compatibility attributes.
+- Local, uncommitted 0.4.15: permission-based Payables work queues on Overview,
+  current-day AP aging at `/finance/bills/aging`, supplier/bucket drilldowns and
+  CSV. Amounts owed, reserved in open vouchers and available to prepare remain
+  distinct. No A+B migration or changes to approval/release rules.
+- [Offline learning guide](../docs/finance-learning-guide.html) covers input
+  lifecycles and section interactions. Permission-specific lessons are later.
+- Last implementation checks: 45 affected backend tests, 24 Finance screen
+  tests, one-app type check and five-account server-render/download checks passed.
+  Browser visual/keyboard/zoom acceptance remains outstanding; HTTP checks are
+  not a substitute. Local version is not a deployment claim.
+- Batch 7 documentation is updated in this review. Central-role adoption,
+  real staff rollout and deployment remain separate decisions. No commit/push
+  of the new local work has been requested.
+- An earlier fetch failed on GitHub DNS; the retry during this review succeeded
+  (26 October). `origin/main` remained `0b2a686`, with no missing main commits.
+  Fetch again before a later merge or commit rather than relying on this snapshot.
+- Review follow-up: 26 targeted Calendar/signature/export/Sales DAT backend
+  checks and 55 five-account HTTP page/access/download checks passed. Current
+  local permissions, rather than older role descriptions, governed access checks.
+
 ## 2. Against main's one-app change (`61a34b3`)
 
 **Merged as `8edb03d` with `git merge -X no-renames`.** Without it, Git's rename detection treats main's moved Finance files as renames and half-applies our old screens into the one app *unconverted*, and puts two of our files (`lib/tin.ts`, the account page) into the **Admin** module because they look alike. **Please merge our branch with `-X no-renames` too**, or the same happens.
@@ -36,8 +66,8 @@ After the merge: the one app was left exactly as main had it; our old `bishnoi-f
 | 3 | Journal approval, chart import + accounts under accounts, journal voucher print, ledger/statement/trial balance downloads, e-signatures (account page card, signature lines, Remove signature), Users' calendar switch | ✅ `f4bb085` |
 | 4 | Marketing requests (liquidation report, download), invoices (cancel and reissue, clearer problems, TIN dashes), tax (On record, History), Price approvals fix | ✅ `c8b4c23` |
 | 5 | Calendar, BIR Sales DAT (+ sidebar entries) | ✅ committed with this handover (checked by type check, tests and page loads; the finance team's own check still to come) |
-| 6 | **Payables: suppliers (+ CSV import), bills (approval flow), payment vouchers (+ print)**, sidebar group, supplier CSV test | ⏳ next. Until then `/finance/bills|suppliers|vouchers` fall to the one app's "moving into Bishnoi One" page |
-| 7 | Guide addresses, README note, What's new 0.4.14 | ⏳ |
+| 6 | **Payables: suppliers (+ CSV import), bills (approval flow), payment vouchers (+ print)**, sidebar group, supplier CSV test | Complete on branch: `3f30dcd`; pushed with existing commits |
+| 7 | Guide addresses, README note, What's new | Documentation updated 26 October; current local feature version 0.4.15 |
 
 ### How the screens are moved (so you can follow or continue it)
 A converter applies the same rules main used for Finance; run on main's old Finance (`66087d2`) it reproduces main's one-app copy for **128 of 134 files**, the other 6 being your hand edits (`lib/api.ts`, `lib/apps.ts`, the frame, nav, the roles redirect, `profile-actions`).
@@ -146,10 +176,13 @@ How they're written (please keep if you touch them):
 
 ## 7. What's still planned
 
-1. **Batch 6** Payables screens into the one app; **batch 7** docs; then **bring in the Platform roles** (its own step).
-2. **Payables home and aging** (decided, parked for the move): a Payables section on the Overview ("waiting for me", "sent, waiting on others", due by the 15th / month-end, document missing) and a Payables → Aging page (same buckets as AR aging, money already in unreleased vouchers shown beside it, CSV).
+1. **Bring in the Platform roles** as its own approved step; the screen move and batch 7 documentation are complete on this branch.
+2. **Payables home and aging:** built locally in 0.4.15; visual acceptance and commit/push still pending. Historical-date aging is deferred; current balances are explicitly labelled.
 3. **An ⓘ beside every screen's title** explaining the screen (Finance's page header only).
-4. Then, needing no one else: a reminder to the backup approver when a bill waits over a working day; 2307 certificates from posted bills; a monthly withholding (0619-E / 1601-EQ) summary; profit and loss and balance sheet; approve several bills; a printable bill with its signatures; offline drafts for bills.
+4. Later proposals: reminder to the backup bill approver after a working day;
+   approve several bills; printable bill with signatures; offline bill drafts.
+   Supplier 2307s, withholding summaries and financial statement screens already
+   exist in Jade's BIR reports and need validation rather than a duplicate build.
 5. Waiting on others: Dispatch/Pharmacy invoicing in Finance and sending invoices to Zoho; opening balances from Zoho (a cut-off date); petty cash and SSS/PhilHealth/Pag-IBIG remittances; which number Zoho's invoices carry; how 2MG and GPI are companies on the Platform.
 6. **Working rule for Finance plans:** Zoho Books is the baseline; each plan says what's confusing in Zoho's way and how we improve on it.
 
@@ -162,3 +195,9 @@ Reversal date not validated, and fund/invoice entries can be reversed from the j
 - No real customer or personal data, converter files, or bank account numbers are in the repo. Local databases (`.data/*.db`) and `.env` files are git-ignored. Test names in tests are made up.
 - Nothing is deployed from this branch; no live data was changed.
 - Questions about this work: zie1203 (bermas.zictc@gmail.com).
+
+## Print-layout update —26 October2026 (local0.4.16)
+Finance-owned printing/{frame.tsx,print-action.tsx,print.css} supplies common branding/frame; existing page bodies remain authoritative.2MG asset copied to public/finance/brand/2mg-logo.jpg (original root2MGlogo.jpg preserved), existing Bishnoi mark copied beside it. Company branding uses cached Platform getAccount().company because Finance's local Org is generic bishnoi/Bishnoi One; no settings/roles/database changed. Other companies do not get2MG logo. Finance-local shell/sheet/actions/signature classes scope print CSS; no shared-kit/other-app stylesheet edits. Report/record print toolbar added; existing invoice/dedicated print actions reused, new/edit/settings forms do not get a new print action. Named A4 portrait/landscape pages, repeated table headers, totals once, signature-group breaks, applied-filter context and printed-time footer. No page-counter guarantee.24screen tests/type check,55HTTP role checks,17branded page renders/assets and component controller checks passed. Browser unavailable: actual PDF visual/pagination acceptance remains pending. Uncommitted/unpushed; no new migration.
+
+### Supplier importer0.4.18
+Approved phases1-4 retain existing inline UI and Finance kit. Frontend payables/csv.ts+import-review.ts+import.tsx; backend app/supplier_import.py and routers/payables.py. Existing/check endpoint accepts source rows plus temporary review decisions; final/import now accepts rows+confirmed and recomputes eligibility under a supplier writer lock. Old suppliers-only payload rejected,preventing bypass of explicit tax/TIN review. Existing DB fields only;no migration. Source identities separately deferred. Deploy paired frontend/API versions;no deployment performed here. Tax defaults are unconfirmed in preview;no VAT/ATC inference. Real file only read for aggregate mapping coverage;not imported.

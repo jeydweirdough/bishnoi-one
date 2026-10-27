@@ -41,7 +41,7 @@ export default async function LiquidationReportPage({ params }: { params: Promis
         {!r.checkedAt && <p className="mb-4 rounded-[3px] bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">Not reviewed yet: these figures can still change.</p>}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink pb-3">
           <div>
-            <p className="text-meta text-ink-3 uppercase">{me.org.name}</p>
+            <p className="finance-document-company-name text-meta text-ink-3 uppercase">{me.org.name}</p>
             <h2 className="text-heading">Liquidation report</h2>
           </div>
           <dl className="text-right text-sm">
