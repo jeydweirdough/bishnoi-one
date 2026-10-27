@@ -180,6 +180,23 @@ SERVICES: tuple[Service, ...] = (
             Detail("form_key", "Form key", "Any long random text. The website or tool sends it in the X-Bishnoi-Key header with each enquiry (name, business, phone, email, city, message) to the CRM's address /hooks/form.", secret=True),
         ),
     ),
+    # The CRM's own emails (quotes waiting for approval, price approvals): sent
+    # through the company's email delivery service, set here instead of on the
+    # CRM's server (decided 2026-10-27). SMTP_* on the server still wins.
+    Service(
+        key="smtp",
+        name="Email sending (Brevo or any SMTP service)",
+        purpose="The CRM's own emails: quotes waiting for approval, price approvals and other notices.",
+        help_url="https://help.brevo.com/hc/en-us/articles/7924908994450",
+        apps=("crm",),
+        details=(
+            Detail("host", "SMTP server", "Brevo: smtp-relay.brevo.com. Another service: its SMTP server's address."),
+            Detail("port", "Port", "587 for almost every service (Brevo too).", required=False),
+            Detail("username", "Login", "Brevo → SMTP and API → SMTP: the login shown there (it ends in @smtp-brevo.com)."),
+            Detail("password", "SMTP key", "On the same page: Generate a new SMTP key (it starts xsmtpsib-). Not the API key.", secret=True),
+            Detail("from_email", "Sent from", "An address the service has verified, e.g. crm@getmeds.ph (Brevo → Senders, domains and dedicated IPs)."),
+        ),
+    ),
 )
 
 BY_KEY = {s.key: s for s in SERVICES}
@@ -260,4 +277,19 @@ def check_zoho_books(details: dict[str, str]) -> str:
     raise CheckFailed("Signed in to Zoho, but no organization there has that Organization ID.")
 
 
-CHECKS = {"zoho_books": check_zoho_books}
+def check_smtp(details: dict[str, str]) -> str:
+    """Signs in to the SMTP server with the login and key; sends nothing."""
+    import smtplib
+
+    try:
+        with smtplib.SMTP(details.get("host", ""), int(details.get("port") or 587), timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(details.get("username", ""), details.get("password", ""))
+    except smtplib.SMTPAuthenticationError:
+        raise CheckFailed("The server didn't accept the login and SMTP key.") from None
+    except (OSError, smtplib.SMTPException, ValueError) as e:
+        raise CheckFailed(f"Couldn't reach the SMTP server ({type(e).__name__}). Check its address and port.") from None
+    return "Signed in to the SMTP server."
+
+
+CHECKS = {"zoho_books": check_zoho_books, "smtp": check_smtp}

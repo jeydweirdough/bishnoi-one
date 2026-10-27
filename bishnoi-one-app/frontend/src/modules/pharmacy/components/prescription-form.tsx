@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
 import { receivePrescription, updatePrescription, type ItemInput } from "@/src/modules/pharmacy/actions/pharmacy";
 import type { Prescription } from "@/src/modules/pharmacy/lib/types";
 
@@ -129,11 +129,11 @@ export function PrescriptionForm({
             />
           )}
           {who === "existing" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Find" hint={chosen ? `Chosen: ${chosen.fullName}` : "Type part of their name."}>
+            <FormGrid>
+              <Field label="Find" size="md" hint={chosen ? `Chosen: ${chosen.fullName}` : "Type part of their name."}>
                 {(p) => <Input {...p} value={find} onChange={(e) => setFind(e.target.value)} placeholder="Name" autoComplete="off" />}
               </Field>
-              <Field label="Patient" error={fields.patientId}>
+              <Field label="Patient" size="md" error={fields.patientId}>
                 {(p) => (
                   <Select {...p} value={patientId} onChange={(e) => setPatientId(e.target.value)}>
                     <option value="">Pick someone</option>
@@ -148,42 +148,42 @@ export function PrescriptionForm({
                   </Select>
                 )}
               </Field>
-            </div>
+            </FormGrid>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Full name" error={fields.fullName}>
+            <FormGrid>
+              <Field label="Full name" size="lg" error={fields.fullName}>
                 {(p) => <Input {...p} value={newPatient.fullName} onChange={(e) => setNewPatient({ ...newPatient, fullName: e.target.value })} required />}
               </Field>
-              <Field label="Date of birth" optional error={fields.birthDate}>
+              <Field label="Date of birth" size="sm" optional error={fields.birthDate}>
                 {(p) => <Input {...p} type="date" max={today} value={newPatient.birthDate} onChange={(e) => setNewPatient({ ...newPatient, birthDate: e.target.value })} />}
               </Field>
-              <Field label="Phone" optional>
+              <Field label="Phone" size="md" optional>
                 {(p) => <Input {...p} type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />}
               </Field>
-              <Field label="Allergies" optional hint="Shown on every check.">
+              <Field label="Allergies" size="md" optional hint="Shown on every check.">
                 {(p) => <Input {...p} value={newPatient.allergies} onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })} />}
               </Field>
-            </div>
+            </FormGrid>
           )}
         </fieldset>
       )}
 
       <fieldset className="space-y-4">
         <legend className="mb-2 text-heading text-ink">Prescriber</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Prescriber" error={fields.prescriberName}>
+        <FormGrid>
+          <Field label="Prescriber" size="lg" error={fields.prescriberName}>
             {(p) => <Input {...p} value={prescriber.name} onChange={(e) => setPrescriber({ ...prescriber, name: e.target.value })} placeholder="Dr. …" required />}
           </Field>
-          <Field label="Licence no." optional hint="Required for dangerous drugs." error={fields.prescriberLicense}>
+          <Field label="Licence no." size="sm" optional hint="Required for dangerous drugs." error={fields.prescriberLicense}>
             {(p) => <Input {...p} value={prescriber.license} onChange={(e) => setPrescriber({ ...prescriber, license: e.target.value })} />}
           </Field>
-          <Field label="Clinic or hospital" optional>
+          <Field label="Clinic or hospital" size="lg" optional>
             {(p) => <Input {...p} value={prescriber.clinic} onChange={(e) => setPrescriber({ ...prescriber, clinic: e.target.value })} />}
           </Field>
-          <Field label="Prescription date" error={fields.prescribedOn}>
+          <Field label="Prescription date" size="sm" error={fields.prescribedOn}>
             {(p) => <Input {...p} type="date" value={prescriber.on} onChange={(e) => setPrescriber({ ...prescriber, on: e.target.value })} required />}
           </Field>
-        </div>
+        </FormGrid>
       </fieldset>
 
       <fieldset className="space-y-3">

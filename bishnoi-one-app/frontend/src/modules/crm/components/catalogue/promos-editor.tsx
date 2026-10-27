@@ -7,7 +7,7 @@ import { Pager, usePages } from "@/src/platform/ui/pager";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, percentText, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import { PROMO_KINDS, promoTerms } from "@/src/platform/lib/labels";
@@ -170,11 +170,11 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
         }}
         className="space-y-5"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" error={fields.name}>
+        <FormGrid>
+          <Field label="Name" size="md" error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus={!promo} />}
           </Field>
-          <Field label="Kind" error={fields.kind}>
+          <Field label="Kind" size="md" error={fields.kind}>
             {(p) => (
               <Select {...p} value={kind} onChange={(e) => setKind(e.target.value as PromoKind)}>
                 {(Object.keys(PROMO_KINDS) as PromoKind[]).map((k) => (
@@ -186,26 +186,26 @@ function PromoForm({ fmt, promo, products, teams, onDone }: { fmt: Format; promo
             )}
           </Field>
           {kind === "percent" && (
-            <Field label="Percent off" error={fields.percent ?? fields.percentBp}>
+            <Field label="Percent off" size="sm" error={fields.percent ?? fields.percentBp}>
               {(p) => <Input {...p} inputMode="decimal" value={percent} onChange={(e) => setPercent(e.target.value)} placeholder="10" />}
             </Field>
           )}
           {kind === "amount" && (
-            <Field label={`Off each unit (${fmt.symbol})`} error={fields.amount ?? fields.amountCentavos}>
+            <Field label={`Off each unit (${fmt.symbol})`} size="sm" error={fields.amount ?? fields.amountCentavos}>
               {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25.00" />}
             </Field>
           )}
           {kind === "free_goods" && (
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Buy" error={fields.buy ?? fields.buyQty}>
+            <>
+              <Field label="Buy" size="sm" error={fields.buy ?? fields.buyQty}>
                 {(p) => <Input {...p} inputMode="numeric" value={buy} onChange={(e) => setBuy(e.target.value)} placeholder="10" />}
               </Field>
-              <Field label="Get free" error={fields.free ?? fields.freeQty}>
+              <Field label="Get free" size="sm" error={fields.free ?? fields.freeQty}>
                 {(p) => <Input {...p} inputMode="numeric" value={free} onChange={(e) => setFree(e.target.value)} placeholder="1" />}
               </Field>
-            </div>
+            </>
           )}
-        </div>
+        </FormGrid>
 
         {kind === "tiered" && (
           <fieldset>

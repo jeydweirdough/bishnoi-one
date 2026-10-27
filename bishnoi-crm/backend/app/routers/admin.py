@@ -15,6 +15,7 @@ from pydantic.alias_generators import to_camel
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 
+from app import platform_roles
 from app.routers.profile import split_name
 from app.access import Access, keep_an_administrator, permissions_of, require
 from app.api import email_address
@@ -237,7 +238,7 @@ def user_options(access: People, db: DB) -> dict:
     }
 
 
-@router.post("/users", status_code=status.HTTP_201_CREATED)
+@router.post("/users", status_code=status.HTTP_201_CREATED, dependencies=[Depends(platform_roles.kept_on_platform)])
 def create_user(access: People, me: CurrentUser, db: DB, body: UserIn) -> dict:
     if email_taken(db, body.email):
         raise field_error("email", "Someone here already has that email.")
@@ -269,7 +270,7 @@ def read_user(access: People, db: DB, user_id: str) -> dict:
     return user_out(user, last)
 
 
-@router.patch("/users/{user_id}")
+@router.patch("/users/{user_id}", dependencies=[Depends(platform_roles.kept_on_platform)])
 def update_user(access: People, me: CurrentUser, db: DB, user_id: str, body: UserPatch) -> dict:
     user = reachable_user(db, access, user_id)
     wanted = changed(body)
@@ -308,7 +309,7 @@ def update_user(access: People, me: CurrentUser, db: DB, user_id: str, body: Use
     return user_out(user)
 
 
-@router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(platform_roles.kept_on_platform)])
 def set_password(access: People, me: CurrentUser, db: DB, user_id: str, body: PasswordIn) -> Response:
     """A new password, set by an admin (or the person's manager). Every session the person had ends."""
     user = reachable_user(db, access, user_id)
@@ -409,7 +410,7 @@ def permission_catalogue(_: Roles) -> dict:
     return {"catalogue": catalogue_out(), "scopes": [{"key": s, "label": SCOPE_LABELS[s]} for s in SCOPES]}
 
 
-@router.post("/roles", status_code=status.HTTP_201_CREATED)
+@router.post("/roles", status_code=status.HTTP_201_CREATED, dependencies=[Depends(platform_roles.kept_on_platform)])
 def create_role(_: Roles, me: CurrentUser, db: DB, body: RoleIn) -> dict:
     if name_taken(db, Role, body.name):
         raise field_error("name", "There's already a role with that name.")
@@ -422,7 +423,7 @@ def create_role(_: Roles, me: CurrentUser, db: DB, body: RoleIn) -> dict:
     return role_out(role)
 
 
-@router.patch("/roles/{role_id}")
+@router.patch("/roles/{role_id}", dependencies=[Depends(platform_roles.kept_on_platform)])
 def update_role(_: Roles, me: CurrentUser, db: DB, role_id: str, body: RolePatch) -> dict:
     role = get_role(db, role_id)
     wanted = changed(body)
@@ -448,7 +449,7 @@ def update_role(_: Roles, me: CurrentUser, db: DB, role_id: str, body: RolePatch
     return role_out(role, role_users(db).get(role.id, 0))
 
 
-@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(platform_roles.kept_on_platform)])
 def delete_role(_: Roles, me: CurrentUser, db: DB, role_id: str) -> Response:
     role = get_role(db, role_id)
     if role.is_system:

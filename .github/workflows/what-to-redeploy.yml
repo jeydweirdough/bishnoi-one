@@ -1,0 +1,121 @@
+# Says which apps need redeploying, and deploys nothing (decided 2026-10-27):
+# deployment stays by hand, so Vercel's deployments are only spent on what changed.
+#
+# After every push to main, the run's summary lists each app that changed since it
+# was last marked deployed (its tag deployed/<app>), with the order to deploy them.
+# Tests, README files and the command-line tools (app/tools/) don't count: they
+# aren't part of what runs online.
+#
+# After deploying by hand: Actions -> What to redeploy -> Run workflow, with the
+# apps deployed (e.g. "platform inventory one-app", or "all"). That moves their
+# tags to this commit, so the next run starts from there.
+name: What to redeploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deployed:
+        description: 'Mark as deployed (e.g. "platform inventory one-app", or "all"). Empty: only show the list.'
+        required: false
+        default: ""
+
+permissions:
+  contents: write # only to move the deployed/<app> tags when asked
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mark the apps deployed
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deployed != ''
+        env:
+          DEPLOYED: ${{ github.event.inputs.deployed }}
+          MARKED_BY: ${{ github.actor }}
+        run: |
+          all="platform crm inventory finance pharmacy admin in-licensing regulatory one-app"
+          [ "$DEPLOYED" = "all" ] && DEPLOYED="$all"
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          for app in $DEPLOYED; do
+            case " $all " in *" $app "*) ;; *) echo "::error::$app isn't an app (one of: $all)"; exit 1;; esac
+            # An annotated tag: it keeps when it was marked, and by whom.
+            git tag -f -a "deployed/$app" -m "Deployed by $MARKED_BY" HEAD
+            git push -f origin "deployed/$app"
+            echo "Marked $app deployed at $(git rev-parse --short HEAD)."
+          done
+
+      - name: List what changed since each app was deployed
+        env:
+          PUSHED_BY: ${{ github.actor }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          export TZ=Asia/Manila
+          # app | its folder | its Vercel project | deploy order
+          apps=(
+            "platform|bishnoi-platform/backend|bishnoione-platform-backend|1"
+            "crm|bishnoi-crm/backend|bishnoione-crm-backend|2"
+            "inventory|bishnoi-inventory/backend|bishnoione-inventory-backend|2"
+            "finance|bishnoi-finance/backend|bishnoione-finance-backend|3"
+            "pharmacy|bishnoi-pharmacy/backend|(not on Vercel yet)|3"
+            "admin|bishnoi-admin/backend|bishnoi-one-admin-backend|3"
+            "in-licensing|bishnoi-in-licensing/backend|(not on Vercel yet)|3"
+            "regulatory|bishnoi-regulatory/backend|(not on Vercel yet)|3"
+            "one-app|bishnoi-one-app/frontend|bishnoi-one-app|4"
+          )
+          git fetch --tags --force --quiet
+          {
+            echo "## What to redeploy"
+            echo
+            if [ "$EVENT" = "push" ]; then what="Pushed"; else what="Run"; fi
+            echo "$what by **$PUSHED_BY** on $(date '+%Y-%m-%d %H:%M') (Manila time), at $(git rev-parse --short HEAD): $(git log -1 --format='%s' | cut -c1-90)"
+            echo
+            echo "Deploy in this order: the Platform, then the APIs, then the one app. Nothing here deploys by itself."
+            echo
+            echo "| Order | App | Vercel project | Last deployed | Changed since | Last change | By | Files |"
+            echo "|---|---|---|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          needed=0
+          for row in "${apps[@]}"; do
+            IFS='|' read -r app dir project order <<< "$row"
+            if git rev-parse -q --verify "refs/tags/deployed/$app" >/dev/null; then
+              since="deployed/$app"
+              # When it was marked deployed, by whom, and at which commit (an older plain tag: the commit's date).
+              when=$(git for-each-ref "refs/tags/deployed/$app" --format='%(taggerdate:format-local:%Y-%m-%d %H:%M)')
+              by=$(git for-each-ref "refs/tags/deployed/$app" --format='%(contents:subject)' | sed -n 's/^Deployed by //p')
+              [ -z "$when" ] && when=$(git log -1 --format='%cd' --date='format-local:%Y-%m-%d %H:%M' "deployed/$app")
+              label="$when${by:+ by $by} ($(git rev-parse --short "deployed/$app^{commit}"))"
+            else
+              # Never marked: the last day's changes, until it's marked once.
+              since="$(git rev-list -n1 --before='1 day ago' HEAD || true)"
+              label="not marked yet"
+            fi
+            [ -z "$since" ] && continue
+            only=(-- "$dir" ':(exclude)*/tests/*' ':(exclude)*/app/tools/*' ':(exclude)*.md' ':(exclude)*/.env.example')
+            changed=$(git diff --name-only "$since" HEAD "${only[@]}" | wc -l)
+            if [ "$changed" -gt 0 ]; then
+              commits=$(git rev-list --count "$since..HEAD" "${only[@]}")
+              first=$(git log --reverse --format='%cd' --date='format-local:%Y-%m-%d' "$since..HEAD" "${only[@]}" | head -1)
+              last=$(git log -1 --format='%cd' --date='format-local:%Y-%m-%d %H:%M' "$since..HEAD" "${only[@]}")
+              # Everyone whose changes are in it, most changes first.
+              who=$(git log --format='%an' "$since..HEAD" "${only[@]}" | sort | uniq -c | sort -rn | awk '{ $1=""; sub(/^ /, ""); print }' | paste -sd ',' - | sed 's/,/, /g')
+              echo "| $order | **$app** | \`$project\` | $label | $commits commit(s) from $first | $last | $who | $changed |" >> "$GITHUB_STEP_SUMMARY"
+              needed=$((needed + 1))
+            fi
+          done
+          {
+            echo
+            if [ "$needed" -eq 0 ]; then
+              echo "Nothing to redeploy: no app changed since it was last marked deployed."
+            else
+              echo "$needed app(s) to redeploy. Afterwards: Actions -> What to redeploy -> Run workflow, with the apps you deployed."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"

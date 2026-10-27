@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app import passes, setup
 from app.announcements import import_from_database, make_table
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
@@ -34,6 +35,7 @@ from app.routers import (
     monitoring,
     profile,
     public,
+    saved_reports,
     support,
     unset,
     users,
@@ -64,7 +66,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_guard(app, "Platform")
     app.state.settings = settings
     app.state.sessions = make_sessions(engine)
+    # The key passes are signed with: PASS_SIGNING_KEY, else kept in this database (app/passes.py).
+    passes.keep_in_database(app.state.sessions, settings)
     make_first_admin(app.state.sessions, settings)
+    # No account yet and none in the settings: the one app's first-run screen, with a code from the log (app/setup.py).
+    setup.announce(app.state.sessions, settings)
     # The log goes to Discord too, a thread a day; announcements are kept there (app/announcements.py).
     app.state.logs = logs_for("PLATFORM", settings)
     mirror_audit(app.state.sessions, AuditEntry, app.state.logs)
@@ -107,6 +113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(company_access.router)
+    app.include_router(saved_reports.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
     app.include_router(applications.router)
@@ -120,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(communications.router)
     app.include_router(settings_router.router)
     app.include_router(public.router)
+    app.include_router(setup.router)
     app.include_router(connections.router)
     app.include_router(services_router.router)
     return app

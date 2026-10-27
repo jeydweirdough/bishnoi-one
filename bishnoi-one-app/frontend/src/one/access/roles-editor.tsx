@@ -8,7 +8,7 @@ import { InlineMessage } from "@/src/platform/ui/alert";
 import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
 import { PermissionGrid } from "@/src/platform/ui/permission-grid";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
@@ -196,14 +196,14 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
           >
             {role ? role.name : "New role"}
           </SectionTitle>
-          <div className="mt-4 grid gap-5 sm:grid-cols-2">
-            <Field label="Name" error={errors.fields.name}>
+          <FormGrid className="mt-4">
+            <Field label="Name" size="md" error={errors.fields.name}>
               {(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}
             </Field>
-            <Field label="Description" optional error={errors.fields.description}>
+            <Field label="Description" size="full" optional error={errors.fields.description}>
               {(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}
             </Field>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-6">
               <Choice<"chosen" | "all">
                 name="reach"
                 legend="What it allows"
@@ -215,7 +215,7 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
                 ]}
               />
             </div>
-          </div>
+          </FormGrid>
         </Sheet>
 
         {draft.isAdmin ? (

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import type { Deal, DealLists, DealStage } from "@/src/platform/lib/types";
 import { deleteDeal, loseDeal, reopenDeal, winDeal } from "@/src/modules/crm/actions/deals";
 
@@ -138,8 +138,8 @@ export function DealClose({
             </Field>
           )}
           {step === "lose" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Loss reason" error={fields.reason}>
+            <FormGrid>
+              <Field label="Loss reason" size="md" error={fields.reason}>
                 {(p) => (
                   <Select {...p} value={reason} onChange={(e) => setReason(e.target.value)}>
                     <option value="">Select a reason</option>
@@ -151,14 +151,14 @@ export function DealClose({
                   </Select>
                 )}
               </Field>
-              <Field label="Competitor" optional error={fields.competitor} hint="The competitor that won the deal, if known.">
+              <Field label="Competitor" size="md" optional error={fields.competitor} hint="The competitor that won the deal, if known.">
                 {(p) => <Input {...p} value={competitor} onChange={(e) => setCompetitor(e.target.value)} maxLength={120} />}
               </Field>
-            </div>
+            </FormGrid>
           )}
           {step === "reopen" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Reopen at stage" error={fields.stageCode}>
+            <FormGrid>
+              <Field label="Reopen at stage" size="lg" error={fields.stageCode}>
                 {(p) => (
                   <Select {...p} value={stageCode} onChange={(e) => setStageCode(e.target.value)}>
                     {open.map((s) => (
@@ -169,10 +169,10 @@ export function DealClose({
                   </Select>
                 )}
               </Field>
-              <Field label="Expected close date" error={fields.expectedCloseOn}>
+              <Field label="Expected close date" size="sm" error={fields.expectedCloseOn}>
                 {(p) => <Input {...p} type="date" value={closeOn} onChange={(e) => setCloseOn(e.target.value)} />}
               </Field>
-            </div>
+            </FormGrid>
           )}
           <div className="flex gap-3">
             <Button type="submit" variant="primary" loading={pending}>

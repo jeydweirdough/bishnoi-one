@@ -31,7 +31,7 @@ export default async function NewCompanyPage({ searchParams }: { searchParams: S
   if (!kind) {
     return (
       <>
-        <PageHeader title="Add a customer" crumbs={[{ href: "/crm/companies", label: "Customers" }]}>
+        <PageHeader title="Add a customer" crumbs={[{ href: "/crm/customers", label: "Customers" }]}>
           {next}
         </PageHeader>
         <Sheet className="max-w-xl px-5 pt-5 pb-6">
@@ -42,7 +42,7 @@ export default async function NewCompanyPage({ searchParams }: { searchParams: S
   }
   return (
     <>
-      <PageHeader title="Add a customer" crumbs={[{ href: "/crm/companies", label: "Customers" }]}>
+      <PageHeader title="Add a customer" crumbs={[{ href: "/crm/customers", label: "Customers" }]}>
         {next}
       </PageHeader>
       <Sheet className="px-5 pt-5 pb-6">

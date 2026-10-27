@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, TextButton } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { connectSmtp, detectMailbox, disconnectMailbox, makeDefaultMailbox, startMailbox, type MailboxDetect, type MailboxInfo } from "@/src/modules/crm/actions/mailbox";
 
@@ -176,12 +176,12 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
                       </TextButton>
                     )}
                     {advanced && (
-                      <div className="mt-3 grid gap-3 rounded-xl border border-rule px-4 py-4 sm:grid-cols-2">
-                        {found.smtp.guessed && <p className="text-meta text-ink-3 sm:col-span-2">Our best guess; your provider&apos;s help pages or your IT give the right ones.</p>}
-                        <Field label="Server">{(p) => <Input {...p} value={server.host} onChange={(e) => setServer({ ...server, host: e.target.value })} />}</Field>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Field label="Port">{(p) => <Input {...p} inputMode="numeric" value={String(server.port)} onChange={(e) => setServer({ ...server, port: Number(e.target.value) || 587 })} />}</Field>
-                          <Field label="Security">
+                      <FormGrid className="mt-3 rounded-xl border border-rule px-4 py-4">
+                        {found.smtp.guessed && <p className="text-meta text-ink-3 sm:col-span-6">Our best guess; your provider&apos;s help pages or your IT give the right ones.</p>}
+                        <Field label="Server" size="lg">{(p) => <Input {...p} value={server.host} onChange={(e) => setServer({ ...server, host: e.target.value })} />}</Field>
+                        <>
+                          <Field label="Port" size="sm">{(p) => <Input {...p} inputMode="numeric" value={String(server.port)} onChange={(e) => setServer({ ...server, port: Number(e.target.value) || 587 })} />}</Field>
+                          <Field label="Security" size="sm">
                             {(p) => (
                               <Select {...p} value={server.security} onChange={(e) => setServer({ ...server, security: e.target.value as MailboxDetect["smtp"]["security"] })}>
                                 <option value="starttls">STARTTLS</option>
@@ -190,11 +190,11 @@ export function MailboxPanel({ info }: { info: MailboxInfo }) {
                               </Select>
                             )}
                           </Field>
-                        </div>
-                        <div className="sm:col-span-2">
+                        </>
+                        <div className="sm:col-span-4">
                           <Field label="User name" hint="Usually your email address.">{(p) => <Input {...p} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />}</Field>
                         </div>
-                      </div>
+                      </FormGrid>
                     )}
                   </div>
                 )}

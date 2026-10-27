@@ -139,10 +139,12 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
 
     roles = db.scalars(select(AccessRole).where(AccessRole.company_id == company.id).order_by(AccessRole.name)).all()
     by_id = {r.id: r for r in roles}
+    # Everyone who may open this module: their role (when they have one here) and, since R2, whether
+    # they're switched on, so switching someone off on the Platform switches them off in the module.
     people = db.execute(
-        select(Identity.email, Identity.access_role_id)
+        select(Identity.email, Identity.access_role_id, Identity.status)
         .join(IdentityApp, (IdentityApp.identity_id == Identity.id) & (IdentityApp.application_id == app.id))
-        .where(Identity.company_id == company.id, Identity.access_role_id.is_not(None))
+        .where(Identity.company_id == company.id)
         .order_by(Identity.email)
     ).all()
     now = int(time.time())
@@ -153,7 +155,10 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
         "company": company.id,
         "slug": company.slug,
         "roles": [spec(db, r, app.key) for r in roles],
-        "people": [{"email": e.lower(), "role": by_id[rid].name, "admin": by_id[rid].is_admin} for e, rid in people if rid in by_id],
+        "people": [
+            {"email": e.lower(), "role": by_id[rid].name if rid in by_id else None, "admin": bool(rid in by_id and by_id[rid].is_admin), "active": st == "active"}
+            for e, rid, st in people
+        ],
         "iat": now,
         "exp": now + PUSH_LIFETIME,
         "jti": secrets.token_urlsafe(12),

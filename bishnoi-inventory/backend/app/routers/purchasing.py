@@ -9,7 +9,7 @@ without an order.
 """
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Query, Response, status
 from pydantic import Field, field_validator
@@ -55,8 +55,15 @@ class SupplierFields(Api):
     tin: str | None = Field(None, max_length=20)
     vat_status: str | None = None
     default_atc: str | None = Field(None, max_length=8)
+    # What it bills in (ISO code): PHP unless said.
+    currency: str | None = Field(None, pattern=r"^[A-Za-z]{3}$")
 
     _email = field_validator("email")(check_email)
+
+    @field_validator("currency")
+    @classmethod
+    def _currency(cls, value: str | None) -> str | None:
+        return value.upper() if value else value
 
     @field_validator("tin")
     @classmethod
@@ -144,6 +151,7 @@ def supplier_out(s: Supplier, perf: dict | None = None) -> dict:
         "tin": s.tin,
         "vatStatus": s.vat_status,
         "defaultAtc": s.default_atc,
+        "currency": s.currency,
         "performance": perf,
     }
 
@@ -205,7 +213,7 @@ def read_supplier(_: allowed("suppliers.view"), db: DB, supplier_id: str) -> dic
 def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, supplier_id: str, body: SupplierPatch) -> dict:
     s = found(db, Supplier, supplier_id, "supplier")
     wanted = changed(body)
-    for key in ("code", "name", "is_active", "vat_status"):
+    for key in ("code", "name", "is_active", "vat_status", "currency"):
         if key in wanted and wanted[key] is None:
             raise field_error(key, "This can't be empty.")
     if "code" in wanted:
@@ -272,6 +280,8 @@ def po_brief(po: PurchaseOrder) -> dict:
         "received": received,
         "total": sum(line.quantity * line.unit_cost for line in po.lines),
         "createdAt": iso(po.created_at),
+        # Its lines, short, for a list row that opens in place (2026-10-25).
+        "items": [{"sku": line.product.sku, "product": line.product.name, "quantity": line.quantity, "received": line.received, "unitCost": line.unit_cost} for line in po.lines],
     }
 
 
@@ -342,6 +352,34 @@ def list_pos(
     if limit is not None:
         return {"items": [po_brief(po) for po in db.scalars(cut(query.order_by(PurchaseOrder.id), limit, offset))], "total": total(db, query)}
     return [po_brief(po) for po in db.scalars(query.limit(500))]
+
+
+@router.get("/purchase-order-figures")
+def po_figures(_: allowed("purchasing.view"), db: DB) -> dict:
+    """The list's headline figures: what's still to come in (count, value, late) and what was received this month and last."""
+    pending = db.scalars(select(PurchaseOrder).where(PurchaseOrder.status.in_(("ordered", "partial")))).all()
+    before, first, after = month_starts()
+
+    def received(start: datetime, end: datetime) -> int:
+        q = select(func.coalesce(func.sum(ReceiptLine.quantity * ReceiptLine.unit_cost), 0)).join(Receipt).where(Receipt.received_at >= start, Receipt.received_at < end)
+        return int(db.scalar(q) or 0)
+
+    return {
+        "pendingCount": len(pending),
+        "pendingValue": sum(max(0, line.quantity - line.received) * line.unit_cost for po in pending for line in po.lines),
+        "lateCount": sum(1 for po in pending if po.expected_on is not None and po.expected_on < today()),
+        "receivedThisMonth": received(first, after),
+        "receivedLastMonth": received(before, first),
+    }
+
+def month_starts() -> tuple[datetime, datetime, datetime]:
+    """This month's first moment, last month's, and next month's (UTC), for the lists' month figures."""
+    now = datetime.now(UTC)
+    first = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    before = (first - timedelta(days=1)).replace(day=1)
+    after = (first + timedelta(days=32)).replace(day=1)
+    return before, first, after
+
 
 
 @router.post("/purchase-orders", status_code=status.HTTP_201_CREATED)

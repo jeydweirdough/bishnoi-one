@@ -24,7 +24,7 @@ export default async function NewContactPage({ searchParams }: { searchParams: S
     <>
       <PageHeader
         title={from ? `Add a contact at ${from.name}` : "Add a contact"}
-        crumbs={from ? [{ href: "/crm/companies", label: "Customers" }, { href: `/crm/companies/${from.id}`, label: from.name }] : [{ href: "/crm/contacts", label: "Contacts" }]}
+        crumbs={from ? [{ href: "/crm/customers", label: "Customers" }, { href: `/crm/customers/${from.id}`, label: from.name }] : [{ href: "/crm/contacts", label: "Contacts" }]}
       />
       <Sheet className="px-5 pt-5 pb-6">
         <ContactForm people={people} companies={companies.items.map((c) => ({ id: c.id, name: c.name }))} companyId={from?.id} layout={fields} />

@@ -5,7 +5,7 @@ import { NoAccess } from "@/src/modules/inventory/components/ui";
 import { context } from "@/src/modules/inventory/lib/page";
 import type { CprState } from "@/src/modules/inventory/lib/types";
 
-export const metadata = { title: "Update CPR numbers" };
+export const metadata = { title: "Item registrations (CPR)" };
 
 type Summary = { counts: Record<CprState, number>; attention: number; warningDays: number };
 
@@ -17,7 +17,7 @@ export default async function ProductsCprPage() {
   const c = s.counts;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/products", label: "Products" }]} title="Update CPR numbers">
+      <PageHeader crumbs={[{ href: "/inventory/products", label: "Items" }]} title="Item registrations (CPR)">
         Each product&apos;s FDA Certificate of Product Registration, by SKU, from a spreadsheet. Nothing is saved until you have checked the rows.{" "}
         {s.attention > 0 ? (
           <a href="/inventory/products?cpr=attention" className="text-ink hover:underline">

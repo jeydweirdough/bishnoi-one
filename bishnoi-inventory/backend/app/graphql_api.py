@@ -171,6 +171,14 @@ class Query:
         return route(catalog.cpr_summary, info)
 
     @strawberry.field
+    def purchase_order_figures(self, info: strawberry.Info) -> JSON | None:
+        return route(purchasing.po_figures, info)
+
+    @strawberry.field
+    def order_figures(self, info: strawberry.Info, kind: str | None = None) -> JSON | None:
+        return route(orders.order_figures, info, kind=kind)
+
+    @strawberry.field
     def product(self, info: strawberry.Info, id: str) -> JSON | None:
         return route(catalog.read_product, info, product_id=id)
 

@@ -76,7 +76,26 @@ function stopAll(code = 0) {
 process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));
 
+/** Whether a part's API answers its /health yet. */
+async function answers(port) {
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// The Platform first, and only then the rest (2026-10-26): every module asks it for its links the
+// moment it starts, so it must already be answering, or they each log "can't reach the platform".
+let platformWaited = false;
 for (const part of PARTS) {
+  if (platformWaited === false && part.label !== "platform" && PARTS.some((p) => p.label === "platform")) {
+    platformWaited = true;
+    const until = Date.now() + 90_000;
+    while (!stopping && Date.now() < until && !(await answers(8305))) await new Promise((r) => setTimeout(r, 1000));
+    console.log(paint("2", (await answers(8305)) ? "  Platform is answering: starting the rest." : "  Platform isn't answering yet: starting the rest anyway."));
+  }
   const cwd = join(ROOT, part.app, part.dir);
   if (!existsSync(cwd)) {
     console.log(paint("33", `! ${part.app}/${part.dir} isn't here: skipped.`));

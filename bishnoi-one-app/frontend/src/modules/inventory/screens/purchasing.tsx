@@ -1,4 +1,8 @@
-import { Plus } from "lucide-react";
+import { Ban, ExternalLink, FileText, PackageCheck, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
+import { ExpandableTable } from "@/src/platform/ui/expandable-table";
+
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
@@ -24,6 +28,27 @@ import type { Backorder, Paged, PO, POBrief, Receipt, ReceiptBrief, Reference } 
 // The purchase order and receiving forms pick from the same lists.
 const FORM_LISTS = referenceOf("products", "suppliers", "units", "warehouses");
 
+type POFigures = { pendingCount: number; pendingValue: number; lateCount: number; receivedThisMonth: number; receivedLastMonth: number };
+
+const STATUS_TABS: [string, string][] = [["", "All"], ["draft", "Drafts"], ["ordered,partial", "Pending delivery"], ["partial", "Partially received"], ["received", "Received"], ["cancelled", "Cancelled"]];
+
+/** Where a purchase order stands, as one word. */
+function poStanding(po: POBrief): { tone: PillTone; label: string } {
+  if (po.status === "cancelled") return { tone: "bad", label: "Cancelled" };
+  if (po.status === "received") return { tone: "good", label: "Received" };
+  if (po.late) return { tone: "bad", label: "Late" };
+  if (po.status === "partial") return { tone: "warn", label: "Partially received" };
+  if (po.status === "ordered") return { tone: "info", label: "Ordered" };
+  return { tone: "plain", label: "Draft" };
+}
+
+/** This month against last, in words: "12% vs last month". */
+function change(now: number, before: number): Figure["change"] {
+  if (!before) return now ? { text: "New this month", tone: "flat" } : undefined;
+  const pct = Math.round(((now - before) / before) * 100);
+  return { text: `${Math.abs(pct)}% vs last month`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+}
+
 export async function PurchaseOrdersPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, day } = await context();
   if (!may("purchasing.view")) return <NoAccess what="purchase orders" />;
@@ -39,6 +64,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
     ["orders"],
   );
   const list: Paged<POBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
+  const figures = board ? null : (await loadQuery<{ purchaseOrderFigures: POFigures }>("query { purchaseOrderFigures }", {}, ["purchaseOrderFigures"])).purchaseOrderFigures;
   if (!board) keepInRange(list.items.length, list.total, page, base);
   const orders = list.items;
   const chip = (status: string, label: string) => ({ value: status, label, href: `/inventory/purchase-orders${query({ q: f.q, status })}` });
@@ -55,41 +81,138 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
       >
         Purchase order → supplier delivery → goods receipt → stock.
       </PageHeader>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ToggleLinks
-          current={board ? "board" : "list"}
-          options={[
-            { value: "board", label: "Board", href: `/inventory/purchase-orders${query({ ...f, status: "", view: "" })}` },
-            { value: "list", label: "List", href: `/inventory/purchase-orders${query({ ...f, view: "list" })}` },
-            { value: "backorders", label: "Backorders", href: "/inventory/backorders" },
-          ]}
-        />
-      </div>
-      {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("ordered,partial", "Pending delivery"), chip("partial", "Partially received"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder="PO number or supplier" keep={{ status: f.status, view: board ? "" : "list" }} />
-      {board && orders.length > 0 ? (
-        <PurchaseOrdersBoard orders={orders} fmt={fmt} day={day} may={may} />
+      {board && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <ToggleLinks
+            current="board"
+            options={[
+              { value: "board", label: "Board", href: `/inventory/purchase-orders${query({ ...f, status: "", view: "" })}` },
+              { value: "list", label: "List", href: `/inventory/purchase-orders${query({ ...f, view: "list" })}` },
+              { value: "backorders", label: "Backorders", href: "/inventory/backorders" },
+            ]}
+          />
+        </div>
+      )}
+      {board ? (
+        <>
+          <Filters q={f.q} placeholder="PO number or supplier" keep={{ status: f.status, view: "" }} />
+          {orders.length > 0 ? (
+            <PurchaseOrdersBoard orders={orders} fmt={fmt} day={day} may={may} />
+          ) : (
+            <Sheet>
+              <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q)} clear="/inventory/purchase-orders" may={may} />
+            </Sheet>
+          )}
+        </>
       ) : (
-      <Sheet>
-        {orders.length === 0 ? (
-          <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/inventory/purchase-orders" may={may} />
-        ) : (
-          <Table head={["Order", "Supplier", "Deliver to", "Status", "Ordered", "Expected", " Received", " Total"]} min="56rem">
-            {orders.map((po) => (
-              <tr key={po.id} className="relative hover:bg-bench/40">
-                <Td><RowLink href={`/inventory/purchase-orders/${po.id}`} sub={`${po.lineCount} line${po.lineCount === 1 ? "" : "s"}`}>{po.number}</RowLink></Td>
-                <Td>{po.supplier.name}</Td>
-                <Td>{po.warehouse.code}</Td>
-                <Td><POStamp status={po.status} late={po.late} /></Td>
-                <Td>{day(po.orderedOn)}</Td>
-                <Td>{day(po.expectedOn)}</Td>
-                <Td num>{fmt.count(po.received)} / {fmt.count(po.ordered)}</Td>
-                <Td num>{fmt.peso(po.total)}</Td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Sheet>
+        <ListFrame>
+          {figures && (
+            <FigureStrip
+              figures={[
+                { label: "Pending delivery", value: fmt.peso(figures.pendingValue), icon: <Truck className="size-5" aria-hidden />, change: { text: `${fmt.count(figures.pendingCount)} orders${figures.lateCount ? `, ${fmt.count(figures.lateCount)} late` : ""}`, tone: "flat" } },
+                { label: "Received this month", value: fmt.peso(figures.receivedThisMonth), icon: <PackageCheck className="size-5" aria-hidden />, change: change(figures.receivedThisMonth, figures.receivedLastMonth) },
+              ]}
+            />
+          )}
+          <UnderlineTabs tabs={STATUS_TABS.map(([value, label]) => ({ href: `/inventory/purchase-orders${query({ q: f.q, status: value, view: "list" })}`, label, current: f.status === value }))} />
+          <ListToolbar q={f.q} placeholder="Search PO number or supplier" keep={{ status: f.status, view: "list" }}>
+            <ToggleLinks
+              current="list"
+              options={[
+                { value: "board", label: "Board", href: `/inventory/purchase-orders${query({ q: f.q })}` },
+                { value: "list", label: "List", href: `/inventory/purchase-orders${query({ ...f, view: "list" })}` },
+                { value: "backorders", label: "Backorders", href: "/inventory/backorders" },
+              ]}
+            />
+          </ListToolbar>
+          {orders.length === 0 ? (
+            <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/inventory/purchase-orders?view=list" may={may} />
+          ) : (
+            <ExpandableTable
+              minWidth="56rem"
+              columns={[
+                { key: "order", label: "Order" },
+                { key: "supplier", label: "Vendor" },
+                { key: "to", label: "Deliver to" },
+                { key: "expected", label: "Expected" },
+                { key: "received", label: "Received", align: "right" },
+                { key: "total", label: "Total", align: "right" },
+                { key: "status", label: "Status" },
+              ]}
+              rows={orders.map((po) => {
+                const st = poStanding(po);
+                return {
+                  id: po.id,
+                  muted: po.status === "cancelled",
+                  actions: (
+                    <RowMenu
+                      label={`Actions for ${po.number}`}
+                      items={[
+                        { label: "Open", icon: <ExternalLink />, href: `/inventory/purchase-orders/${po.id}` },
+                        ...(po.status === "draft" && may("purchasing.edit") ? [{ label: "Edit", icon: <Pencil />, href: `/inventory/purchase-orders/${po.id}/edit` }] : []),
+                        "divider" as const,
+                        ...((po.status === "ordered" || po.status === "partial") && may("receiving.receive")
+                          ? [{ label: "Receive delivery", icon: <PackageCheck />, href: `/inventory/purchase-orders/${po.id}#receive` }]
+                          : []),
+                        { label: "Print", icon: <Printer />, href: `/inventory/print/purchase-orders/${po.id}` },
+                        ...((po.status === "draft" || po.status === "ordered") && may("purchasing.approve")
+                          ? [
+                              "divider" as const,
+                              { label: "Cancel order", icon: <Ban />, run: purchaseOrderStep.bind(null, po.id, "cancel" as const), danger: true, confirm: `Cancel ${po.number}? No further receipts can be recorded against it.`, done: "Cancelled" },
+                            ]
+                          : []),
+                        ...(po.status === "draft" && may("purchasing.edit")
+                          ? [{ label: "Delete", icon: <Trash2 />, run: deletePurchaseOrder.bind(null, po.id), danger: true, confirm: `Delete ${po.number}? This can't be undone.`, done: `${po.number} deleted` }]
+                          : []),
+                      ]}
+                    />
+                  ),
+                  cells: [
+                    <Link key="n" href={`/inventory/purchase-orders/${po.id}`} className="font-mono text-meta font-semibold text-ink hover:text-sage-deep hover:underline">{po.number}</Link>,
+                    <span key="s" className="font-medium text-ink">{po.supplier.name}</span>,
+                    <span key="w" className="text-ink-2">{po.warehouse.code}</span>,
+                    <span key="e" className={po.late ? "font-medium text-danger" : "text-ink-2"}>{day(po.expectedOn)}</span>,
+                    <span key="r">{fmt.count(po.received)} / {fmt.count(po.ordered)}</span>,
+                    <span key="t" className="font-medium">{fmt.peso(po.total)}</span>,
+                    <StatusPill key="p" tone={st.tone}>{st.label}</StatusPill>,
+                  ],
+                  detail: (
+                    <div className="space-y-3">
+                      <table className="w-full text-meta">
+                        <thead>
+                          <tr className="text-left text-ink-3">
+                            <th className="py-1 pr-3 font-medium">SKU</th>
+                            <th className="px-3 py-1 font-medium">Item</th>
+                            <th className="px-3 py-1 text-right font-medium">Ordered</th>
+                            <th className="px-3 py-1 text-right font-medium">Received</th>
+                            <th className="px-3 py-1 text-right font-medium">Unit cost</th>
+                            <th className="py-1 pl-3 text-right font-medium">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {po.items.map((l) => (
+                            <tr key={l.sku} className="border-t border-rule/70">
+                              <td className="py-1.5 pr-3 font-mono text-ink-2">{l.sku}</td>
+                              <td className="px-3 py-1.5 text-ink">{l.product}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{fmt.count(l.quantity)}</td>
+                              <td className={`px-3 py-1.5 text-right tabular-nums ${l.received < l.quantity && po.status !== "draft" ? "text-[#8a5a00]" : ""}`}>{fmt.count(l.received)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-ink-2">{fmt.peso(l.unitCost)}</td>
+                              <td className="py-1.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(l.quantity * l.unitCost)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-rule/70 pt-3">
+                        {/* Deliveries are received on the order's own page, where the receive form is. */}
+                        <LinkButton href={`/inventory/purchase-orders/${po.id}`}>{may("receiving.receive") && (po.status === "ordered" || po.status === "partial") ? "Open to receive" : "Open purchase order"}</LinkButton>
+                      </div>
+                    </div>
+                  ),
+                };
+              })}
+            />
+          )}
+        </ListFrame>
       )}
       {!board && <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "purchase order" : "purchase orders"} />}
     </>
@@ -196,7 +319,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
 
 function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]; at: (iso: string | null) => string; count: (n: number) => string; peso: (n: number) => string }) {
   return (
-    <Table head={["Receipt", "Received date", "Supplier", "Warehouse", "Order", " Units", " Value"]} min="52rem">
+    <Table head={["Receipt", "Received date", "Supplier", "Warehouse", "Order", " Units", " Value", <span key="a" className="sr-only">Actions</span>]} min="52rem">
       {receipts.map((r) => (
         <tr key={r.id} className="relative hover:bg-bench/40">
           <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink></Td>
@@ -206,6 +329,16 @@ function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]
           <Td>{r.order ? <Link href={`/inventory/purchase-orders/${r.order.id}`} className="relative z-10 hover:text-ink hover:underline">{r.order.number}</Link> : "—"}</Td>
           <Td num>{count(r.units)}</Td>
           <Td num>{peso(r.total)}</Td>
+          <td className="px-2 py-2 text-right">
+            <RowMenu
+              label={`Actions for ${r.number}`}
+              items={[
+                { label: "Open", icon: <ExternalLink />, href: `/inventory/receipts/${r.id}` },
+                { label: "Print", icon: <Printer />, href: `/inventory/print/receipts/${r.id}` },
+                ...(r.order ? ["divider" as const, { label: "Open purchase order", icon: <FileText />, href: `/inventory/purchase-orders/${r.order.id}` }] : []),
+              ]}
+            />
+          </td>
         </tr>
       ))}
     </Table>
@@ -258,14 +391,14 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
   return (
     <>
       <PageHeader
-        title="Receiving"
+        title="Purchase receives"
         actions={may("receiving.receive") && <LinkButton href="/inventory/receipts/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Receive stock</LinkButton>}
       >
         All goods receipts. To receive against a purchase order, open the order.
       </PageHeader>
       <Filters q={q} placeholder="Receipt or delivery number" />
       <Sheet>
-        {receipts.length === 0 ? <FirstStep icon="receiving" title="No goods receipts" body="Stock is received through a goods receipt, with or without a purchase order." needs={["warehouse", "product"]} href="/inventory/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/inventory/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
+        {receipts.length === 0 ? <FirstStep icon="receiving" title="No purchase receives" body="Stock is received through a goods receipt, with or without a purchase order." needs={["warehouse", "product"]} href="/inventory/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/inventory/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
       </Sheet>
       <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "goods receipt" : "goods receipts"} />
     </>
@@ -279,7 +412,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
   const { receipt: r } = await loadQuery<{ receipt: Receipt }>(`query Receipt($id: String!) { receipt(id: $id) }`, { id }, ["receipt"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/receipts", label: "Receiving" }]} title={r.number} actions={<><PrintLink href={`/inventory/print/receipts/${r.id}`} />{may("stock.view") && <LinkButton href={`/inventory/movements?q=${enc(r.number)}`}>View stock movements</LinkButton>}</>}>
+      <PageHeader crumbs={[{ href: "/inventory/receipts", label: "Purchase receives" }]} title={r.number} actions={<><PrintLink href={`/inventory/print/receipts/${r.id}`} />{may("stock.view") && <LinkButton href={`/inventory/movements?q=${enc(r.number)}`}>View stock movements</LinkButton>}</>}>
         Received {at(r.receivedAt)} by {r.receivedBy?.name ?? "—"} into {r.warehouse.name} · {r.location.code}
         {r.supplier && <> from {r.supplier.name}</>}
         {r.order && <> against <Link href={`/inventory/purchase-orders/${r.order.id}`} className="text-ink hover:underline">{r.order.number}</Link></>}
@@ -314,12 +447,12 @@ export async function NewReceiptPage() {
   const { me, may } = await context();
   if (!may("receiving.receive")) return <NoAccess what="receiving stock" />;
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
-  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/inventory/receipts/new", title: "Receive stock", doing: "receive stock", crumbs: [{ href: "/inventory/receipts", label: "Receiving" }], may });
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "product"], then: "/inventory/receipts/new", title: "Receive stock", doing: "receive stock", crumbs: [{ href: "/inventory/receipts", label: "Purchase receives" }], may });
   if (gate) return gate;
   const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses"> }>(`query NewReceipt { ${FORM_LISTS} }`, {}, ["reference"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/receipts", label: "Receiving" }]} title="Receive stock">
+      <PageHeader crumbs={[{ href: "/inventory/receipts", label: "Purchase receives" }]} title="Receive stock">
         For deliveries without a purchase order, such as donations, returns or found stock. To receive against a purchase order, open the order.
       </PageHeader>
       <ReceiveForm org={me.org} reference={ref} canAdd={canAddFrom(may)} />

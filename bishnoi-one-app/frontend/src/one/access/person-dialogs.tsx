@@ -1,0 +1,188 @@
+"use client";
+
+import { Modal } from "antd";
+import { Copy, KeyRound, Pencil, Plus, Power, UserPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/src/platform/ui/button";
+import { Field, FormGrid, Input } from "@/src/platform/ui/field";
+import { Select } from "@/src/platform/ui/pickers";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { addPerson, changePerson, setPersonPassword } from "./actions";
+import { moduleLabel } from "./labels";
+import type { AccessData, AccessPerson } from "./types";
+
+// Adding and keeping a company's people, on the Platform, once for every module (R2, decided
+// 2026-10-26): what each module's own Users page used to do, here. A password is made up and
+// shown once, to hand over; they change it themselves after.
+
+/** The new password, shown once with a copy button. */
+function showPassword(name: string, password: string) {
+  Modal.info({
+    title: `${name}'s password`,
+    icon: <KeyRound className="mr-3 size-5 text-sage-deep" aria-hidden />,
+    okText: "Done",
+    content: (
+      <div className="mt-2 space-y-2">
+        <p className="text-sm text-ink-2">Give it to them yourself. It isn&apos;t shown again; they can change it after signing in.</p>
+        <p className="flex items-center gap-2 rounded-lg bg-bench px-3 py-2 font-mono text-sm">
+          <span className="min-w-0 flex-1 truncate">{password}</span>
+          <button
+            suppressHydrationWarning
+            type="button"
+            aria-label="Copy password"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            onClick={() => navigator.clipboard.writeText(password).then(() => toast.success("Password copied"), () => toast.error("Couldn't copy: select it instead."))}
+          >
+            <Copy className="size-4" aria-hidden />
+          </button>
+        </p>
+      </div>
+    ),
+  });
+}
+
+async function newPassword(person: { id: string; fullName: string }) {
+  const r = await setPersonPassword(person.id);
+  if (!r.ok) return toast.error(r.error);
+  if (r.data.password) showPassword(person.fullName, r.data.password);
+}
+
+/** Add person: who they are, their role, and the modules they may open. */
+export function AddPerson({ data }: { data: AccessData }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [busy, start] = useTransition();
+  const [form, setForm] = useState({ fullName: "", email: "", title: "", roleId: "", apps: [] as string[] });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function save() {
+    start(async () => {
+      const r = await addPerson({ fullName: form.fullName.trim(), email: form.email.trim(), title: form.title.trim() || null, roleId: form.roleId || null, apps: form.apps });
+      if (!r.ok) {
+        setErrors("fields" in r && r.fields ? r.fields : {});
+        return void toast.error(r.error);
+      }
+      setOpen(false);
+      setForm({ fullName: "", email: "", title: "", roleId: "", apps: [] });
+      router.refresh();
+      const { person, hasPassword } = r.data;
+      toast.success(`${person.fullName} added`, {
+        description: hasPassword ? "They sign in with the password they already have at another company." : "Set their first password to hand over.",
+        action: hasPassword ? undefined : { label: "Set a password", onClick: () => void newPassword(person) },
+        duration: 10_000,
+      });
+    });
+  }
+
+  return (
+    <>
+      <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+        Add person
+      </Button>
+      <Modal open={open} title="Add person" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add person" confirmLoading={busy} width={600} destroyOnHidden>
+        <FormGrid className="pt-2">
+          <Field label="Full name" size="md" error={errors.fullName}>
+            {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} autoFocus maxLength={120} />}
+          </Field>
+          <Field label="Work email" size="md" error={errors.email} hint="They sign in with this.">
+            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
+          </Field>
+          <Field label="Title" size="md" optional>
+            {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} placeholder="e.g. Pharmacist" />}
+          </Field>
+          <Field label="Role" size="md" optional error={errors.roleId}>
+            {(p) => (
+              <Select {...p} value={form.roleId} onChange={(e) => setForm({ ...form, roleId: e.target.value })}>
+                <option value="">No role yet</option>
+                {data.roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <fieldset className="sm:col-span-6">
+            <legend className="mb-1.5 text-sm font-medium text-ink">Modules they may open</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {data.modules.map((m) => {
+                const on = form.apps.includes(m.key);
+                return (
+                  <button
+                    suppressHydrationWarning
+                    key={m.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setForm({ ...form, apps: on ? form.apps.filter((k) => k !== m.key) : [...form.apps, m.key] })}
+                    className={`inline-flex items-center gap-1 rounded-md border px-3 py-1 text-meta transition-colors ${on ? "border-sage-deep bg-mint-2 font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-3 hover:border-sage-deep"}`}
+                  >
+                    {!on && <Plus className="size-3" aria-hidden />}
+                    {moduleLabel(m)}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        </FormGrid>
+      </Modal>
+    </>
+  );
+}
+
+/** A person's ⋯: change their details, set a new password, switch them off or on. */
+export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "" });
+  const [busy, start] = useTransition();
+  const off = person.status !== "active";
+
+  function save() {
+    start(async () => {
+      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null });
+      if (!r.ok) return void toast.error(r.error);
+      setEditing(false);
+      toast.success("Saved");
+      router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <RowMenu
+        label={`Actions for ${person.fullName}`}
+        items={[
+          { label: "Change name or title", icon: <Pencil />, onSelect: () => setEditing(true) },
+          { label: "Set a new password", icon: <KeyRound />, onSelect: () => void newPassword(person) },
+          ...(isMe
+            ? []
+            : [
+                "divider" as const,
+                off
+                  ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
+                  : {
+                      label: "Switch off",
+                      icon: <Power />,
+                      run: () => changePerson(person.id, { status: "suspended" }),
+                      danger: true,
+                      confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
+                      done: `${person.fullName} is switched off`,
+                    },
+              ]),
+        ]}
+      />
+      <Modal open={editing} title={`Change ${person.fullName}`} onCancel={() => !busy && setEditing(false)} onOk={save} okText="Save" confirmLoading={busy} width={480} destroyOnHidden>
+        <FormGrid className="pt-2">
+          <Field label="Full name" size="full">
+            {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={120} />}
+          </Field>
+          <Field label="Title" size="full" optional>
+            {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
+          </Field>
+        </FormGrid>
+      </Modal>
+    </>
+  );
+}

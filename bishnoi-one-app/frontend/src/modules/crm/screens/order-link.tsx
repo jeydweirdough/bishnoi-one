@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { ApiError, api } from "@/src/platform/lib/api";
 import { COMPANY_HEADER } from "@/src/platform/lib/session-cookie";
 import { EmptyDrawing } from "@/src/platform/ui/empty-drawings";
@@ -25,6 +26,11 @@ export default async function OrderLinkPage({ params }: { params: Params }) {
     link = await api.get<Link>(`/public/quote-links/${encodeURIComponent(token)}`, { [COMPANY_HEADER]: company });
   } catch (e) {
     gone = e instanceof ApiError && typeof e.detail === "string" ? e.detail : "This link can't be opened right now. Try again in a moment.";
+    // Used for an order: from now on it opens that order's quotation.
+    if (e instanceof ApiError && e.status === 410) {
+      const ordered = await api.get(`/public/quote-links/${encodeURIComponent(token)}/quotation`, { [COMPANY_HEADER]: company }).then(() => true, () => false);
+      if (ordered) redirect(`/crm/order/${company}/${token}/quotation`);
+    }
   }
 
   return (

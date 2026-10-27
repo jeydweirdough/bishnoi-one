@@ -1,6 +1,3 @@
-// Customers are companies and contacts now: the old address goes to the new section.
-import { redirect } from "next/navigation";
+// The route. The screen is in src/, so it can be read on its own.
+export { NewCompanyQuote as default, metadata } from "@/src/modules/crm/screens/quote-new";
 
-export default function Page() {
-  redirect("/crm/companies");
-}

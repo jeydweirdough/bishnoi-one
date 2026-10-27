@@ -116,7 +116,7 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
               {route.planned.map((p) => (
                 <li key={p.id} className="flex items-center gap-2 py-2 text-sm">
                   <ZoneTag zone={p.doctor.zone} />
-                  <Link href={`/crm/companies/${p.doctor.id}`} className="min-w-0 flex-1 truncate text-ink hover:underline">
+                  <Link href={`/crm/customers/${p.doctor.id}`} className="min-w-0 flex-1 truncate text-ink hover:underline">
                     {p.doctor.name}
                   </Link>
                   <span className={`text-meta ${p.visited ? "font-semibold text-filed" : "text-ink-3"}`}>{p.visited ? "Visited" : "Not visited"}</span>

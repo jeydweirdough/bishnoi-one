@@ -10,9 +10,17 @@ import { ACCOUNT_COOKIE } from "./session-cookie";
 
 export const PLATFORM_API = (process.env.PLATFORM_API_URL ?? "http://127.0.0.1:8305").replace(/\/$/, "");
 
-// Where this site is, as the Platform knows it (its ONE_APP_URL): a module's pass
-// names it as the return. On this computer, the dev server's own address.
-export const ONE_APP_URL = (process.env.ONE_APP_URL ?? "http://localhost:4301").replace(/\/$/, "");
+// Where this site is: a module's pass names it as the return. ONE_APP_URL when
+// set; else the address it was reached at (decided 2026-10-27: nothing to set),
+// which the Platform accepts when it's an application's address in Applications.
+export function oneAppUrl(headers: Headers, fallback: string): string {
+  const set = process.env.ONE_APP_URL;
+  if (set) return set.replace(/\/$/, "");
+  const first = (name: string) => headers.get(name)?.split(",")[0].trim() || null;
+  const host = first("x-forwarded-host") || first("host");
+  const proto = first("x-forwarded-proto") || new URL(fallback).protocol.replace(":", "");
+  return host ? `${proto}://${host}` : new URL(fallback).origin;
+}
 
 export class AccountError extends Error {
   constructor(

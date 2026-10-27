@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
-import { CellInput, Choice, Field, FormError, Input, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
+import { CellInput, Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/pharmacy/platform/ui/field";
 import { Flag } from "@/src/modules/pharmacy/platform/ui/marks";
 import { makeFormat } from "@/src/modules/pharmacy/platform/lib/format";
 import type { Org } from "@/src/modules/pharmacy/platform/lib/types";
@@ -143,21 +143,23 @@ export function DispenseForm({ rx, org }: { rx: Prepared; org: Org }) {
         </section>
       ))}
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Choice
-          name="payment"
-          legend="Paid by"
-          value={payment}
-          onChange={setPayment}
-          options={(Object.keys(PAYMENT_METHODS) as PaymentMethod[]).map((m) => ({ value: m, label: PAYMENT_METHODS[m] }))}
-        />
-        <Field label={`Discount (${fmt.symbol})`} optional hint="Senior citizen, PWD or other discount, as an amount.">
+      <FormGrid>
+        <div className="sm:col-span-4">
+          <Choice
+            name="payment"
+            legend="Paid by"
+            value={payment}
+            onChange={setPayment}
+            options={(Object.keys(PAYMENT_METHODS) as PaymentMethod[]).map((m) => ({ value: m, label: PAYMENT_METHODS[m] }))}
+          />
+        </div>
+        <Field label={`Discount (${fmt.symbol})`} size="sm" optional hint="Senior citizen, PWD or other discount, as an amount.">
           {(p) => <Input {...p} inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" />}
         </Field>
-        <Field label="Counselling or notes" optional className="sm:col-span-2">
+        <Field label="Counselling or notes" size="full" optional>
           {(p) => <Textarea {...p} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} />}
         </Field>
-      </div>
+      </FormGrid>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
         <p className="text-sm text-ink-2">

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
 import { Modal } from "@/src/modules/finance/platform/ui/modal";
 import { SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { deleteEvent, saveEvent, setDone } from "@/src/modules/finance/calendar/actions";
@@ -267,102 +267,104 @@ function EventForm({ event, people, today, onClose }: { event: CalEvent | null; 
     <Modal open title={event ? "Edit event" : "Add an event"} onCancel={onClose} footer={null} width={560}>
       <form
         noValidate
-        className="mt-3 grid gap-4 sm:grid-cols-2"
+        className="mt-3"
         onSubmit={(e) => {
           e.preventDefault();
           send();
         }}
       >
-        <div className="sm:col-span-2">
-          <Field label="What" error={fields.title} hint="e.g. 2550Q for Q3, ER cut-off, Bank reconciliation">
-            {(p) => <Input {...p} value={d.title} maxLength={160} onChange={(e) => set({ title: e.target.value })} autoFocus />}
+        <FormGrid>
+          <div className="sm:col-span-6">
+            <Field label="What" error={fields.title} hint="e.g. 2550Q for Q3, ER cut-off, Bank reconciliation">
+              {(p) => <Input {...p} value={d.title} maxLength={160} onChange={(e) => set({ title: e.target.value })} autoFocus />}
+            </Field>
+          </div>
+          <Field label="Date" size="sm" error={fields.startsOn}>
+            {(p) => <Input {...p} type="date" value={d.startsOn} onChange={(e) => set({ startsOn: e.target.value })} />}
           </Field>
-        </div>
-        <Field label="Date" error={fields.startsOn}>
-          {(p) => <Input {...p} type="date" value={d.startsOn} onChange={(e) => set({ startsOn: e.target.value })} />}
-        </Field>
-        <Field label="Time (optional)" error={fields.atTime}>
-          {(p) => <Input {...p} type="time" value={d.atTime ?? ""} onChange={(e) => set({ atTime: e.target.value || null })} />}
-        </Field>
-        <Field label="Repeats" error={fields.repeat}>
-          {(p) => (
-            <Select {...p} value={d.repeat} onChange={(e) => set({ repeat: e.target.value as Repeat, until: e.target.value === "none" ? null : d.until })}>
-              {Object.entries(REPEATS).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        {d.repeat !== "none" ? (
-          <Field label="Until (optional)" error={fields.until}>
-            {(p) => <Input {...p} type="date" value={d.until ?? ""} onChange={(e) => set({ until: e.target.value || null })} />}
+          <Field label="Time (optional)" size="sm" error={fields.atTime}>
+            {(p) => <Input {...p} type="time" value={d.atTime ?? ""} onChange={(e) => set({ atTime: e.target.value || null })} />}
           </Field>
-        ) : (
-          <span className="hidden sm:block" />
-        )}
-        <Field label="Remind me" error={fields.remindDays} hint="Working days: Monday to Saturday, not counting holidays.">
-          {(p) => (
-            <Select {...p} value={d.remindDays === null ? "" : String(d.remindDays)} onChange={(e) => set({ remindDays: e.target.value === "" ? null : (Number(e.target.value) as RemindDays) })}>
-              {REMINDERS.map(([k, label]) => (
-                <option key={label} value={k === null ? "" : String(k)}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="About (optional)" error={fields.link}>
-          {(p) => (
-            <Select {...p} value={d.link ?? ""} onChange={(e) => set({ link: e.target.value || null })}>
-              <option value="">No page</option>
-              {PAGES.map(([href, label]) => (
-                <option key={href} value={href}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <div className="sm:col-span-2">
-          <Field label="Notes (optional)" error={fields.notes}>
-            {(p) => <Textarea {...p} rows={2} maxLength={1000} value={d.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} />}
+          <Field label="Repeats" size="sm" error={fields.repeat}>
+            {(p) => (
+              <Select {...p} value={d.repeat} onChange={(e) => set({ repeat: e.target.value as Repeat, until: e.target.value === "none" ? null : d.until })}>
+                {Object.entries(REPEATS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
           </Field>
-        </div>
-        <fieldset className="sm:col-span-2">
-          <legend className="text-sm font-medium text-ink">Share with</legend>
-          {people.length === 0 ? (
-            <p className="mt-1 text-meta text-ink-3">Nobody else has the calendar yet. Only you will see it.</p>
+          {d.repeat !== "none" ? (
+            <Field label="Until (optional)" size="sm" error={fields.until}>
+              {(p) => <Input {...p} type="date" value={d.until ?? ""} onChange={(e) => set({ until: e.target.value || null })} />}
+            </Field>
           ) : (
-            <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
-              {people.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm">
-                  <input suppressHydrationWarning
-                    type="checkbox"
-                    checked={d.sharedWith.includes(p.id)}
-                    onChange={(e) => set({ sharedWith: e.target.checked ? [...d.sharedWith, p.id] : d.sharedWith.filter((x) => x !== p.id) })}
-                    className="size-4 accent-[var(--color-hema)]"
-                  />
-                  {p.name}
-                </label>
-              ))}
-            </div>
+            <span className="hidden sm:col-span-2 sm:block" />
           )}
-          <p className="mt-1 text-meta text-ink-3">They see it and can mark it done; only you can change it.</p>
-          {fields.sharedWith && <p className="text-meta text-danger">{fields.sharedWith}</p>}
-        </fieldset>
-        <div className="sm:col-span-2">
-          <FormError message={error} />
-        </div>
-        <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" variant="primary" loading={pending}>
-            {event ? "Save" : "Add event"}
-          </Button>
-          <Button variant="quiet" onClick={onClose} disabled={pending}>
-            Cancel
-          </Button>
-        </div>
+          <Field label="Remind me" size="lg" error={fields.remindDays} hint="Working days: Monday to Saturday, not counting holidays.">
+            {(p) => (
+              <Select {...p} value={d.remindDays === null ? "" : String(d.remindDays)} onChange={(e) => set({ remindDays: e.target.value === "" ? null : (Number(e.target.value) as RemindDays) })}>
+                {REMINDERS.map(([k, label]) => (
+                  <option key={label} value={k === null ? "" : String(k)}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="About (optional)" size="md" error={fields.link}>
+            {(p) => (
+              <Select {...p} value={d.link ?? ""} onChange={(e) => set({ link: e.target.value || null })}>
+                <option value="">No page</option>
+                {PAGES.map(([href, label]) => (
+                  <option key={href} value={href}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <div className="sm:col-span-6">
+            <Field label="Notes (optional)" error={fields.notes}>
+              {(p) => <Textarea {...p} rows={2} maxLength={1000} value={d.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} />}
+            </Field>
+          </div>
+          <fieldset className="sm:col-span-6">
+            <legend className="text-sm font-medium text-ink">Share with</legend>
+            {people.length === 0 ? (
+              <p className="mt-1 text-meta text-ink-3">Nobody else has the calendar yet. Only you will see it.</p>
+            ) : (
+              <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
+                {people.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm">
+                    <input suppressHydrationWarning
+                      type="checkbox"
+                      checked={d.sharedWith.includes(p.id)}
+                      onChange={(e) => set({ sharedWith: e.target.checked ? [...d.sharedWith, p.id] : d.sharedWith.filter((x) => x !== p.id) })}
+                      className="size-4 accent-[var(--color-hema)]"
+                    />
+                    {p.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-meta text-ink-3">They see it and can mark it done; only you can change it.</p>
+            {fields.sharedWith && <p className="text-meta text-danger">{fields.sharedWith}</p>}
+          </fieldset>
+          <div className="sm:col-span-6">
+            <FormError message={error} />
+          </div>
+          <div className="flex gap-2 sm:col-span-6">
+            <Button type="submit" variant="primary" loading={pending}>
+              {event ? "Save" : "Add event"}
+            </Button>
+            <Button variant="quiet" onClick={onClose} disabled={pending}>
+              Cancel
+            </Button>
+          </div>
+        </FormGrid>
       </form>
     </Modal>
   );

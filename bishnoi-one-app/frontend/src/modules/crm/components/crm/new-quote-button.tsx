@@ -45,7 +45,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
   const addNew = () => setAdding(true);
   const quoteFor = (c: Customer) => {
     setOpen(false);
-    router.push(`/crm/companies/${c.id}/quotes/new`);
+    router.push(`/crm/customers/${c.id}/quotes/new`);
   };
   const addButton = (text: string) =>
     mayAdd && (
@@ -89,7 +89,7 @@ export function NewQuoteButton({ customers, variant = "primary", label = "New qu
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      router.push(`/crm/companies/${c.id}/quotes/new`);
+                      router.push(`/crm/customers/${c.id}/quotes/new`);
                     }}
                     className="w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-hema-tint hover:text-ink"
                   >

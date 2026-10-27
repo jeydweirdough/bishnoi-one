@@ -200,7 +200,7 @@ function TeamSheet({
       if (!result.ok) return setError(result.error);
       setError(null);
       onSaved(result.data);
-      toast.success("Special prices saved", { description: `Reps in ${teamName} see them on their next quote.` });
+      toast.success("Price book saved", { description: `Reps in ${teamName} see them on their next quote.` });
     });
   }
 

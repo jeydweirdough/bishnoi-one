@@ -191,3 +191,20 @@ def test_the_one_app_may_take_a_pass_for_any_module(app, client, jade):
     r = client.post("/identity/pass", json={"app": "crm", "returnTo": one}, headers=h)
     assert r.status_code == 200, r.text
     assert client.post("/identity/pass", json={"app": "crm", "returnTo": "https://one.bishnoi.test/elsewhere"}, headers=h).status_code == 400
+
+
+def test_a_company_administrator_opens_every_application_the_company_has(client, ana, jade):
+    """Decided 2026-10-25: the company's administrator sees and opens every module the company has,
+    as Administrator, whatever they were given one by one."""
+    boss = client.post("/platform/users", json={"companyId": jade["company"]["id"], "fullName": "Ai Four", "email": "ai4@getmeds.test", "isCompanyAdmin": True}, headers=ana).json()["user"]
+    client.put(f"/platform/users/{boss['id']}/applications/{app_id(client, ana, 'crm')}", json={"role": "Salesperson"}, headers=ana)
+    password = client.post(f"/platform/users/{boss['id']}/password", json={}, headers=ana).json()["password"]
+    h = {"Authorization": f"Bearer {sign_in(client, 'ai4@getmeds.test', password).json()['accessToken']}"}
+    me = client.get("/identity/me", headers=h).json()
+    assert {a["key"]: a["isAppAdmin"] for a in me["apps"]} == {"crm": True, "pharmacy": True}  # pharmacy never given to them
+    r = client.post("/identity/pass", json={"app": "pharmacy", "returnTo": "http://localhost:4307/auth/platform"}, headers=h)
+    assert r.status_code == 200, r.text
+    claims = claims_of(r.json()["pass"], client.get("/pass/key").json()["publicKey"])
+    assert (claims["role"], claims["appAdmin"], claims["companyAdmin"]) == ("Administrator", True, True)
+    inventory = client.post("/identity/pass", json={"app": "inventory", "returnTo": "http://localhost:4304/auth/platform"}, headers=h)
+    assert inventory.status_code == 403  # still only what the company has

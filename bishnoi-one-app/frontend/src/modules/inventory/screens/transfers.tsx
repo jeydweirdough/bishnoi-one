@@ -1,4 +1,5 @@
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Ban, ExternalLink, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { ToggleLinks } from "@/src/modules/inventory/platform/ui/toggle-links";
@@ -42,7 +43,7 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
   return (
     <>
       <PageHeader
-        title="Stock transfers"
+        title="Transfer orders"
         actions={may("transfers.create") && <LinkButton href="/inventory/transfers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New transfer</LinkButton>}
       >
         Moving stock between warehouses: requested, approved, dispatched, in transit, received.
@@ -64,9 +65,9 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
       ) : (
       <Sheet>
         {transfers.length === 0 ? (
-          <FirstStep icon="transfers" title="No transfers" body="Move stock between warehouses, with approval and in-transit tracking." needs={["twoWarehouses", "stock"]} href="/inventory/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/inventory/transfers" may={may} />
+          <FirstStep icon="transfers" title="No transfer orders" body="Move stock between warehouses, with approval and in-transit tracking." needs={["twoWarehouses", "stock"]} href="/inventory/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/inventory/transfers" may={may} />
         ) : (
-          <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units"]} min="52rem">
+          <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units", <span key="a" className="sr-only">Actions</span>]} min="52rem">
             {transfers.map((t) => (
               <tr key={t.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/inventory/transfers/${t.id}`} sub={`${t.lineCount} line${t.lineCount === 1 ? "" : "s"}`}>{t.number}</RowLink></Td>
@@ -76,6 +77,26 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
                 <Td className="text-meta text-ink-2">{at(t.dispatchedAt)}</Td>
                 <Td className="text-meta text-ink-2">{at(t.receivedAt)}</Td>
                 <Td num>{fmt.count(t.units)}</Td>
+                <td className="px-2 py-2 text-right">
+                  <RowMenu
+                    label={`Actions for ${t.number}`}
+                    items={[
+                      { label: "Open", icon: <ExternalLink />, href: `/inventory/transfers/${t.id}` },
+                      ...((t.status === "draft" || t.status === "requested") && may("transfers.create") ? [{ label: "Edit", icon: <Pencil />, href: `/inventory/transfers/${t.id}/edit` }] : []),
+                      "divider" as const,
+                      { label: "Print", icon: <Printer />, href: `/inventory/print/transfers/${t.id}` },
+                      ...(((t.status === "draft" || t.status === "requested") ? may("transfers.create") : t.status === "approved" && may("transfers.approve"))
+                        ? [
+                            "divider" as const,
+                            { label: "Cancel transfer", icon: <Ban />, run: transferStep.bind(null, t.id, "cancel" as const), danger: true, confirm: `Cancel ${t.number}?`, done: "Transfer cancelled" },
+                          ]
+                        : []),
+                      ...(t.status === "draft" && may("transfers.create")
+                        ? [{ label: "Delete", icon: <Trash2 />, run: deleteTransfer.bind(null, t.id), danger: true, confirm: `Delete ${t.number}? This can't be undone.`, done: `${t.number} deleted` }]
+                        : []),
+                    ]}
+                  />
+                </td>
               </tr>
             ))}
           </Table>
@@ -111,7 +132,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/inventory/transfers", label: "Transfers" }]}
+        crumbs={[{ href: "/inventory/transfers", label: "Transfer orders" }]}
         title={t.number}
         tools={pending && (
           <RecordTools what="transfer" name={t.number} editHref={may("transfers.create") ? `/inventory/transfers/${t.id}/edit` : undefined} remove={t.status === "draft" && may("transfers.create") ? deleteTransfer.bind(null, t.id) : undefined} after="/inventory/transfers" />
@@ -185,12 +206,12 @@ export async function NewTransferPage() {
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
-  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["twoWarehouses", "stock"], then: "/inventory/transfers/new", title: "New transfer", doing: "move stock between warehouses", crumbs: [{ href: "/inventory/transfers", label: "Transfers" }], may });
+  const gate = NeedsFirst({ setup: await loadSetup(), needs: ["twoWarehouses", "stock"], then: "/inventory/transfers/new", title: "New transfer", doing: "move stock between warehouses", crumbs: [{ href: "/inventory/transfers", label: "Transfer orders" }], may });
   if (gate) return gate;
   const { reference: ref, availability: available } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfers" }]} title="New transfer" />
+      <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfer orders" }]} title="New transfer order" />
       <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
     </>
   );
@@ -207,7 +228,7 @@ export async function EditTransferPage({ params }: { params: Params<{ id: string
   );
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfers" }, { href: `/inventory/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />
+      <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfer orders" }, { href: `/inventory/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />
       <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} transfer={t} available={available} />
     </>
   );

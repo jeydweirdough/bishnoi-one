@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, IconButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Field, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import type { DealLists, DealStage, ForecastCategory } from "@/src/platform/lib/types";
 import { deleteDealStage, saveDealLists, saveDealStage, type DealStageChange } from "@/src/modules/crm/actions/deals";
@@ -245,14 +245,14 @@ export function DealListsEditor({ lists }: { lists: DealLists }) {
           });
         }}
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Lead sources" hint="One per line. Deals already using a removed one keep it." error={fields.sources}>
+        <FormGrid>
+          <Field label="Lead sources" size="md" hint="One per line. Deals already using a removed one keep it." error={fields.sources}>
             {(p) => <Textarea {...p} rows={7} value={sources} onChange={(e) => setSources(e.target.value)} />}
           </Field>
-          <Field label="Reasons a deal is lost" hint="One per line. Asked for when a deal is marked lost." error={fields.lostReasons}>
+          <Field label="Reasons a deal is lost" size="md" hint="One per line. Asked for when a deal is marked lost." error={fields.lostReasons}>
             {(p) => <Textarea {...p} rows={7} value={reasons} onChange={(e) => setReasons(e.target.value)} />}
           </Field>
-        </div>
+        </FormGrid>
         <Button type="submit" variant="primary" loading={pending}>
           Save lists
         </Button>

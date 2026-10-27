@@ -11,10 +11,10 @@ export async function AccessFrame({ current, children }: { current: "people" | "
   const data = await loadAccess();
   return (
     <>
-      <PageHeader title={current === "people" ? "Role assignments" : "Roles"}>
+      <PageHeader title={current === "people" ? "People" : "Roles"}>
         {data ? (
           current === "people" ? (
-            <>Each person at {data.company.name} has one role, for every module, and the modules they may open. The modules are told at once.</>
+            <>Everyone at {data.company.name}, once for every module: add people, give each one role and the modules they may open, set passwords, switch people off. The modules are told at once.</>
           ) : (
             <>What each role may do in each module, and whose records it reaches. The modules are told at once.</>
           )

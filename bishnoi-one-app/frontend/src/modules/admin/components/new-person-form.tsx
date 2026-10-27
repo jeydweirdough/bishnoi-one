@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { AssignmentPicker, initialAssignment } from "@/src/modules/admin/components/assignment-picker";
 import { Button, LinkButton } from "@/src/modules/admin/platform/ui/button";
-import { Field, FormError, Input } from "@/src/modules/admin/platform/ui/field";
+import { Field, FormError, FormGrid, Input } from "@/src/modules/admin/platform/ui/field";
 import { createPerson, type AssignmentInput } from "@/src/modules/admin/actions/admin";
 import type { AppModule, OrgDivision, Role } from "@/src/modules/admin/platform/lib/types";
 
@@ -41,22 +41,24 @@ export function NewPersonForm({ roles, divisions, apps }: { roles: Role[]; divis
 
   return (
     <form onSubmit={submit} noValidate className="space-y-7">
-      <fieldset className="grid gap-5 sm:grid-cols-2">
+      <fieldset>
         <legend className="mb-3 text-sm font-semibold text-ink">Who</legend>
-        <Field label="Full name" error={fields.fullName}>
-          {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus />}
-        </Field>
-        <Field label="Work email" error={fields.email}>
-          {(p) => <Input {...p} name="email" type="email" inputMode="email" autoComplete="off" />}
-        </Field>
-        <Field
-          label="Temporary password"
-          error={fields.password}
-          hint="At least 8 characters. Share it privately; they can't change it themselves yet, so an admin resets it."
-          className="sm:col-span-2"
-        >
-          {(p) => <Input {...p} name="password" type="text" autoComplete="new-password" spellCheck={false} />}
-        </Field>
+        <FormGrid>
+          <Field label="Full name" size="md" error={fields.fullName}>
+            {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus />}
+          </Field>
+          <Field label="Work email" size="md" error={fields.email}>
+            {(p) => <Input {...p} name="email" type="email" inputMode="email" autoComplete="off" />}
+          </Field>
+          <Field
+            label="Temporary password"
+            error={fields.password}
+            hint="At least 8 characters. Share it privately; they can't change it themselves yet, so an admin resets it."
+            size="md"
+          >
+            {(p) => <Input {...p} name="password" type="text" autoComplete="new-password" spellCheck={false} />}
+          </Field>
+        </FormGrid>
       </fieldset>
 
       <fieldset className="space-y-4">

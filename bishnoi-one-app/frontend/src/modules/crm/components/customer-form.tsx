@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/platform/ui/button";
-import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { createCustomer, updateCustomer, type CustomerInput } from "@/src/modules/crm/actions/customers";
 import { CUSTOMER_STATUSES, pickable } from "@/src/platform/lib/labels";
 import type { Customer, CustomerStatus, Duplicate, ListItem, OrgTeam } from "@/src/platform/lib/types";
@@ -83,122 +83,128 @@ export function CustomerForm({ teams, kinds, customer }: Props) {
       }}
       className="space-y-7"
     >
-      <fieldset className="grid gap-5 sm:grid-cols-2">
+      <fieldset>
         <legend className="mb-3 text-sm font-semibold text-ink">Assignment</legend>
-        {canChooseDivision && (
-          <Field label="Division" error={fields.division}>
-            {(p) => (
-              <Select
-                {...p}
-                value={division}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setDivision(next);
-                  // Its teams are different ones, so the choice below restarts.
-                  setTeam(teams.find((t) => t.division === next)?.code ?? "");
-                  setHeadquarters("");
-                }}
-              >
-                {divisions.map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        )}
-        {inDivision.length === 1 ? (
-          <div>
-            <p className="mb-1 text-meta font-medium text-ink-2">Team</p>
-            <p className="flex h-9 items-center border-b border-rule text-sm">{inDivision[0].name}</p>
-            <p className="mt-1 text-meta text-ink-3">The only team you can {customer ? "move it to" : "add customers to"}.</p>
-          </div>
-        ) : (
-          <Field label="Team" error={fields.team}>
-            {(p) => (
-              <Select
-                {...p}
-                value={team}
-                onChange={(e) => {
-                  setTeam(e.target.value);
-                  setHeadquarters("");
-                }}
-              >
-                {inDivision.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        )}
-        <Field label="Headquarters" optional error={fields.headquarters} hint={hqs.length === 0 ? "This team has no headquarters." : undefined}>
-          {(p) => (
-            <Select {...p} value={headquarters} onChange={(e) => setHeadquarters(e.target.value)} disabled={hqs.length === 0}>
-              <option value="">None</option>
-              {hqs.map((h) => (
-                <option key={h.code} value={h.code}>
-                  {h.name}
-                </option>
-              ))}
-            </Select>
+        <FormGrid>
+          {canChooseDivision && (
+            <Field label="Division" size="md" error={fields.division}>
+              {(p) => (
+                <Select
+                  {...p}
+                  value={division}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setDivision(next);
+                    // Its teams are different ones, so the choice below restarts.
+                    setTeam(teams.find((t) => t.division === next)?.code ?? "");
+                    setHeadquarters("");
+                  }}
+                >
+                  {divisions.map((d) => (
+                    <option key={d.code} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
           )}
-        </Field>
-        {moving && (
-          <p className="animate-reshape rounded-lg bg-hema-tint px-3 py-2 text-meta text-ink-2 sm:col-span-2">
-            Moving this customer to <strong>{current?.name}</strong> moves its calls, visits and follow-ups too. People who only
-            work in {customer.teamName} won&apos;t see it anymore.
-          </p>
-        )}
+          {inDivision.length === 1 ? (
+            <div className="sm:col-span-3">
+              <p className="mb-1 text-meta font-medium text-ink-2">Team</p>
+              <p className="flex h-9 items-center border-b border-rule text-sm">{inDivision[0].name}</p>
+              <p className="mt-1 text-meta text-ink-3">The only team you can {customer ? "move it to" : "add customers to"}.</p>
+            </div>
+          ) : (
+            <Field label="Team" size="md" error={fields.team}>
+              {(p) => (
+                <Select
+                  {...p}
+                  value={team}
+                  onChange={(e) => {
+                    setTeam(e.target.value);
+                    setHeadquarters("");
+                  }}
+                >
+                  {inDivision.map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
+          <Field label="Headquarters" size="md" optional error={fields.headquarters} hint={hqs.length === 0 ? "This team has no headquarters." : undefined}>
+            {(p) => (
+              <Select {...p} value={headquarters} onChange={(e) => setHeadquarters(e.target.value)} disabled={hqs.length === 0}>
+                <option value="">None</option>
+                {hqs.map((h) => (
+                  <option key={h.code} value={h.code}>
+                    {h.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          {moving && (
+            <p className="animate-reshape rounded-lg bg-hema-tint px-3 py-2 text-meta text-ink-2 sm:col-span-6">
+              Moving this customer to <strong>{current?.name}</strong> moves its calls, visits and follow-ups too. People who only
+              work in {customer.teamName} won&apos;t see it anymore.
+            </p>
+          )}
+        </FormGrid>
       </fieldset>
 
-      <fieldset className="grid gap-5 sm:grid-cols-2">
+      <fieldset>
         <legend className="mb-3 text-sm font-semibold text-ink">Details</legend>
-        <Field label="Name" error={fields.name} className="sm:col-span-2" hint="Write it the way it should read in the list, title and all.">
-          {(p) => <Input {...p} name="name" defaultValue={customer?.name} required maxLength={120} autoComplete="off" />}
-        </Field>
-        <div className="sm:col-span-2">
-          <Choice
-            legend="Type"
-            name="kind"
-            value={kind}
-            onChange={setKind}
-            options={choices.map((k) => ({ value: k.code, label: k.name }))}
-          />
-        </div>
-        <Field label="Specialty" optional error={fields.specialty} hint="The field they work in, if it helps tell them apart.">
-          {(p) => <Input {...p} name="specialty" defaultValue={customer?.specialty ?? ""} maxLength={80} placeholder="e.g. Pediatrics" />}
-        </Field>
-        <div className="sm:col-span-2">
-          <Choice
-            legend="Status"
-            name="status"
-            value={status}
-            onChange={setStatus}
-            options={Object.entries(CUSTOMER_STATUSES).map(([value, label]) => ({ value: value as CustomerStatus, label }))}
-          />
-        </div>
+        <FormGrid>
+          <Field label="Name" size="md" error={fields.name} hint="Write it the way it should read in the list, title and all.">
+            {(p) => <Input {...p} name="name" defaultValue={customer?.name} required maxLength={120} autoComplete="off" />}
+          </Field>
+          <div className="sm:col-span-6">
+            <Choice
+              legend="Type"
+              name="kind"
+              value={kind}
+              onChange={setKind}
+              options={choices.map((k) => ({ value: k.code, label: k.name }))}
+            />
+          </div>
+          <Field label="Specialty" size="md" optional error={fields.specialty} hint="The field they work in, if it helps tell them apart.">
+            {(p) => <Input {...p} name="specialty" defaultValue={customer?.specialty ?? ""} maxLength={80} placeholder="e.g. Pediatrics" />}
+          </Field>
+          <div className="sm:col-span-6">
+            <Choice
+              legend="Status"
+              name="status"
+              value={status}
+              onChange={setStatus}
+              options={Object.entries(CUSTOMER_STATUSES).map(([value, label]) => ({ value: value as CustomerStatus, label }))}
+            />
+          </div>
+        </FormGrid>
       </fieldset>
 
-      <fieldset className="grid gap-5 sm:grid-cols-2">
+      <fieldset>
         <legend className="mb-3 text-sm font-semibold text-ink">Contact information</legend>
-        <Field label="Phone" optional error={fields.phone}>
-          {(p) => <Input {...p} name="phone" type="tel" inputMode="tel" defaultValue={customer?.phone ?? ""} placeholder="0917 123 4567" />}
-        </Field>
-        <Field label="Email" optional error={fields.email}>
-          {(p) => <Input {...p} name="email" type="email" inputMode="email" defaultValue={customer?.email ?? ""} />}
-        </Field>
-        <Field label="Address" optional error={fields.address}>
-          {(p) => <Input {...p} name="address" defaultValue={customer?.address ?? ""} maxLength={240} />}
-        </Field>
-        <Field label="City" optional error={fields.city}>
-          {(p) => <Input {...p} name="city" defaultValue={customer?.city ?? ""} maxLength={80} />}
-        </Field>
-        <Field label="Notes" optional error={fields.notes} className="sm:col-span-2">
-          {(p) => <Textarea {...p} name="notes" defaultValue={customer?.notes ?? ""} maxLength={2000} rows={3} />}
-        </Field>
+        <FormGrid>
+          <Field label="Phone" size="md" optional error={fields.phone}>
+            {(p) => <Input {...p} name="phone" type="tel" inputMode="tel" defaultValue={customer?.phone ?? ""} placeholder="0917 123 4567" />}
+          </Field>
+          <Field label="Email" size="md" optional error={fields.email}>
+            {(p) => <Input {...p} name="email" type="email" inputMode="email" defaultValue={customer?.email ?? ""} />}
+          </Field>
+          <Field label="Address" size="lg" optional error={fields.address}>
+            {(p) => <Input {...p} name="address" defaultValue={customer?.address ?? ""} maxLength={240} />}
+          </Field>
+          <Field label="City" size="sm" optional error={fields.city}>
+            {(p) => <Input {...p} name="city" defaultValue={customer?.city ?? ""} maxLength={80} />}
+          </Field>
+          <Field label="Notes" optional error={fields.notes} size="full">
+            {(p) => <Textarea {...p} name="notes" defaultValue={customer?.notes ?? ""} maxLength={2000} rows={3} />}
+          </Field>
+        </FormGrid>
       </fieldset>
 
       {duplicates.length > 0 ? (

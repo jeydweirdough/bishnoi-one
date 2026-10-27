@@ -154,7 +154,7 @@ export function CompanyForm({
           const extraChange = extraChanges(allFields, extra, company.extra);
           if (extraChange) change.extra = extraChange;
           if (Object.keys(change).length === 0) {
-            router.push(`/crm/companies/${company.id}`);
+            router.push(`/crm/customers/${company.id}`);
             return { ok: true, data: company };
           }
           return await updateCompany(company.id, change);
@@ -168,7 +168,7 @@ export function CompanyForm({
       }),
       onSuccess: (data) => {
         router.push(
-          company || !then ? `/crm/companies/${data.id}` : then === "quote" ? `/crm/companies/${data.id}/quotes/new` : `/crm/deals/new?company=${encodeURIComponent(data.id)}`,
+          company || !then ? `/crm/customers/${data.id}` : then === "quote" ? `/crm/customers/${data.id}/quotes/new` : `/crm/deals/new?company=${encodeURIComponent(data.id)}`,
         );
         router.refresh();
       },
@@ -202,7 +202,7 @@ export function CompanyForm({
                     onChange={(v) => setStatus(v)}
                     options={options}
                     showSearch={{ optionFilterProp: "label" }}
-                    placeholder="Type to search"
+                    placeholder="Choose"
                   />
                 )}
               </Field>
@@ -270,7 +270,7 @@ export function CompanyForm({
         e.preventDefault();
         submit();
       }}
-      className={`space-y-7 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}
+      className={`space-y-6 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}
     >
       <LayoutForm
         layout={layout}
@@ -301,13 +301,13 @@ export function CompanyForm({
 
       <FormError message={error} />
       {duplicates.length > 0 && (
-        <Duplicates message={dupMessage} found={duplicates} base="/crm/companies" pending={pending} onAddAnyway={() => submit(true)} quote={then === "quote"} />
+        <Duplicates message={dupMessage} found={duplicates} base="/crm/customers" pending={pending} onAddAnyway={() => submit(true)} quote={then === "quote"} />
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" loading={pending}>
           {company ? "Save changes" : "Add customer"}
         </Button>
-        <LinkButton href={company ? `/crm/companies/${company.id}` : then === "quote" ? "/crm/quotes" : then === "deal" ? "/crm/deals" : "/crm/companies"} variant="quiet">
+        <LinkButton href={company ? `/crm/customers/${company.id}` : then === "quote" ? "/crm/quotes" : then === "deal" ? "/crm/deals" : "/crm/customers"} variant="quiet">
           Cancel
         </LinkButton>
       </div>

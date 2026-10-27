@@ -99,7 +99,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
               icon="retention"
               title="No at-risk customers"
               actions={
-                <LinkButton href="/crm/companies" variant="quiet">
+                <LinkButton href="/crm/customers" variant="quiet">
                   View customers
                 </LinkButton>
               }
@@ -125,7 +125,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: Pr
                         </span>
                       )}
                       <div className="min-w-0">
-                        <Link href={`/crm/companies/${row.customerId}`} className="font-semibold text-ink hover:underline">
+                        <Link href={`/crm/customers/${row.customerId}`} className="font-semibold text-ink hover:underline">
                           {row.name}
                         </Link>
                         <p className="text-meta text-ink-3">

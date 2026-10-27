@@ -8,11 +8,12 @@ nobody able to manage users and roles (access.keep_an_administrator).
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import Depends, APIRouter, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import func, select
 
+from app import platform_roles
 from app.routers.profile import split_name
 from app.access import allowed, keep_an_administrator, permissions_of
 from app.api import Api, changed, check_email, field_error, iso
@@ -107,7 +108,7 @@ def list_users(_: Users, db: DB) -> dict:
     }
 
 
-@router.post("/users", status_code=status.HTTP_201_CREATED)
+@router.post("/users", status_code=status.HTTP_201_CREATED, dependencies=[Depends(platform_roles.kept_on_platform)])
 def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
     if email_taken(db, body.email):
         raise field_error("email", "Someone here already has that email.")
@@ -121,7 +122,7 @@ def create_user(_: Users, me: CurrentUser, db: DB, body: UserIn) -> dict:
     return user_out(db.get(User, user.id))
 
 
-@router.patch("/users/{user_id}")
+@router.patch("/users/{user_id}", dependencies=[Depends(platform_roles.kept_on_platform)])
 def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch) -> dict:
     user = get_user(db, user_id)
     wanted = changed(body)
@@ -154,7 +155,7 @@ def update_user(_: Users, me: CurrentUser, db: DB, user_id: str, body: UserPatch
     return user_out(user)
 
 
-@router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(platform_roles.kept_on_platform)])
 def set_password(_: Users, me: CurrentUser, db: DB, user_id: str, body: PasswordIn) -> Response:
     """A new password, set by an admin. Every session the person had ends."""
     user = get_user(db, user_id)
@@ -233,7 +234,7 @@ def list_roles(_: Roles, db: DB) -> dict:
     return {"roles": [role_out(r, counts.get(r.id, 0)) for r in roles], "catalogue": catalogue_out()}
 
 
-@router.post("/roles", status_code=status.HTTP_201_CREATED)
+@router.post("/roles", status_code=status.HTTP_201_CREATED, dependencies=[Depends(platform_roles.kept_on_platform)])
 def create_role(_: Roles, me: CurrentUser, db: DB, body: RoleIn) -> dict:
     if name_taken(db, body.name):
         raise field_error("name", "There's already a role with that name.")
@@ -246,7 +247,7 @@ def create_role(_: Roles, me: CurrentUser, db: DB, body: RoleIn) -> dict:
     return role_out(role)
 
 
-@router.patch("/roles/{role_id}")
+@router.patch("/roles/{role_id}", dependencies=[Depends(platform_roles.kept_on_platform)])
 def update_role(_: Roles, me: CurrentUser, db: DB, role_id: str, body: RolePatch) -> dict:
     role = get_role(db, role_id)
     wanted = changed(body)
@@ -272,7 +273,7 @@ def update_role(_: Roles, me: CurrentUser, db: DB, role_id: str, body: RolePatch
     return role_out(role, role_users(db).get(role.id, 0))
 
 
-@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(platform_roles.kept_on_platform)])
 def delete_role(_: Roles, me: CurrentUser, db: DB, role_id: str) -> Response:
     role = get_role(db, role_id)
     if role.is_system:

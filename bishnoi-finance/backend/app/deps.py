@@ -56,7 +56,10 @@ def current_user(
     if user is None or not user.is_active or as_utc(record.created_at) < as_utc(user.password_changed_at):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SIGN_IN_AGAIN)
     request.state.actor = f"{user.full_name} · {user.email}"  # for the Discord log (app/discord.py)
-    return user
+    # An administrator viewing as someone: answered as them, read-only (app/platform_roles.py).
+    from app.platform_roles import viewed_as
+
+    return viewed_as(request, db, user)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]

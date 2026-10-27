@@ -1,4 +1,8 @@
-import { Plus } from "lucide-react";
+import { Banknote, Building2, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, CircleX, Clock, FileText, Flag, Hourglass, Package, Percent, Plus, Scale, User, UserPlus } from "lucide-react";
+import { NextSteps, type NextStep } from "@/src/platform/ui/next-steps";
+import { Amount } from "@/src/platform/ui/amount";
+import { Tip } from "@/src/platform/ui/tip";
+import { shorten } from "@/src/platform/lib/short-amount";
 import Link from "next/link";
 import { LinkButton } from "@/src/platform/ui/button";
 import { PageHeader, Particulars, SectionTitle, Sheet, Empty } from "@/src/platform/ui/sheet";
@@ -26,6 +30,17 @@ export async function generateMetadata({ params }: { params: Params }) {
 }
 
 const APPROVAL: Record<string, string> = { none: "Ready", approved: "Approved", pending: "Waiting for approval", rejected: "Rejected" };
+// A quote's approval as an icon in its colour; the word is in its tip.
+const APPROVAL_MARK: Record<string, { icon: typeof CircleCheck; tone: string }> = {
+  none: { icon: CircleCheck, tone: "text-sage-deep" },
+  approved: { icon: CircleCheck, tone: "text-sage-deep" },
+  pending: { icon: Clock, tone: "text-due-today" },
+  rejected: { icon: CircleX, tone: "text-danger" },
+};
+
+/** Whole days from one YYYY-MM-DD to another (negative when it's gone by). */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+const short = (text: string) => shorten(text) ?? text;
 
 export default async function DealPage({ params }: { params: Params }) {
   const me = await getCompanyMe();
@@ -37,6 +52,19 @@ export default async function DealPage({ params }: { params: Params }) {
   const winners = deal.quotes.filter((q) => q.approvalStatus === "none" || q.approvalStatus === "approved");
   const overdue = deal.state === "open" && deal.expectedCloseOn < today;
   const wonWith = deal.quotes.find((q) => q.id === deal.wonQuoteId);
+  const left = daysBetween(today, deal.expectedCloseOn);
+  // What the deal still needs, most pressing first; each opens where it's filled in.
+  const edit = `/crm/deals/${deal.id}/edit`;
+  const todo: NextStep[] =
+    deal.state !== "open"
+      ? []
+      : [
+          ...(overdue && deal.can.edit ? [{ label: "Move the close date", href: edit, icon: CalendarClock, urgent: true }] : []),
+          ...(deal.lines.length === 0 && deal.can.edit ? [{ label: "Add products", href: edit, icon: Package }] : []),
+          ...(deal.quotes.length === 0 && deal.can.quote ? [{ label: "Make a quote", href: `/crm/customers/${deal.company.id}/quotes/new?deal=${deal.id}`, icon: FileText }] : []),
+          ...(!deal.contact && deal.can.edit ? [{ label: "Add a contact", href: edit, icon: UserPlus }] : []),
+          ...(!deal.priority && deal.can.edit ? [{ label: "Set the priority", href: edit, icon: Flag }] : []),
+        ];
 
   return (
     <>
@@ -51,35 +79,74 @@ export default async function DealPage({ params }: { params: Params }) {
         crumbs={[{ href: "/crm/deals", label: "Deals" }]}
         actions={
           deal.can.quote && (
-            <LinkButton href={`/crm/companies/${deal.company.id}/quotes/new?deal=${deal.id}`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+            <LinkButton href={`/crm/customers/${deal.company.id}/quotes/new?deal=${deal.id}`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>
               New quote
             </LinkButton>
           )
         }
       >
-        <Link href={`/crm/companies/${deal.company.id}`} className="text-ink hover:underline">
-          {deal.company.name}
-        </Link>
-        {deal.contact && <> · {deal.contact.name}</>}
+        <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Link href={`/crm/customers/${deal.company.id}`} className="inline-flex items-center gap-1.5 text-ink hover:underline">
+            <Building2 className="size-4 text-ink-3" aria-hidden />
+            {deal.company.name}
+          </Link>
+          {deal.contact && (
+            <span className="inline-flex items-center gap-1.5">
+              <User className="size-4 text-ink-3" aria-hidden />
+              {deal.contact.name}
+            </span>
+          )}
+        </span>
         <StageTrack dealId={deal.id} current={deal.stage.code} state={deal.state} stages={stages} canMove={deal.can.edit} />
       </PageHeader>
+
+      <NextSteps steps={todo} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
             <Sheet className="px-4 py-3">
-              <p className="text-meta text-ink-3">{deal.state === "won" ? "Won" : "Expected value"}</p>
-              <p className="mt-1 text-figure text-ink">{fmt.peso(deal.valueCentavos)}</p>
+              <p className="flex items-center gap-1.5 text-meta text-ink-3">
+                <Banknote className="size-3.5" aria-hidden />
+                {deal.state === "won" ? "Won" : "Expected value"}
+              </p>
+              <p className="mt-1 text-figure text-ink">
+                <Amount text={fmt.peso(deal.valueCentavos)} />
+              </p>
             </Sheet>
             <Sheet className="px-4 py-3">
-              <p className="text-meta text-ink-3">Probability</p>
+              <p className="flex items-center gap-1.5 text-meta text-ink-3">
+                <Percent className="size-3.5" aria-hidden />
+                Probability
+              </p>
               <p className="mt-1 text-figure text-ink">{deal.probability}%</p>
-              {deal.state === "open" && <p className="text-meta text-ink-3">{fmt.peso(deal.weightedCentavos)} weighted</p>}
+              {deal.state === "open" && (
+                <Tip tip={`Weighted by probability: ${fmt.peso(deal.weightedCentavos)}`} className="mt-0.5 inline-flex items-center gap-1 text-meta text-ink-3 tabular-nums">
+                  <Scale className="size-3" aria-hidden />
+                  {short(fmt.peso(deal.weightedCentavos))}
+                </Tip>
+              )}
             </Sheet>
             <Sheet className="px-4 py-3">
-              <p className="text-meta text-ink-3">{deal.state === "open" ? "Expected to close" : "Closed"}</p>
-              <p className={`mt-1 text-figure ${overdue ? "text-danger" : "text-ink"}`}>{fmt.dateLabel(deal.expectedCloseOn)}</p>
-              {overdue && <p className="text-meta text-danger">Past its date: move it, or close it.</p>}
+              <p className="flex items-center gap-1.5 text-meta text-ink-3">
+                <CalendarCheck className="size-3.5" aria-hidden />
+                {deal.state === "open" ? "Expected to close" : "Closed"}
+              </p>
+              <p className={`mt-1 flex items-center gap-1.5 text-figure ${overdue ? "text-danger" : "text-ink"}`}>
+                {overdue && <CircleAlert className="size-5" aria-hidden />}
+                {fmt.dateLabel(deal.expectedCloseOn)}
+              </p>
+              {deal.state === "open" && (
+                <Tip
+                  tip={overdue ? `Overdue by ${fmt.plural(-left, "day")}: move the date, or close the deal` : left === 0 ? "Closes today" : `Closes in ${fmt.plural(left, "day")}`}
+                  className={`mt-0.5 inline-flex items-center gap-1 rounded-md text-meta tabular-nums ${
+                    overdue ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-[#fdf3e1] px-1.5 font-medium text-due-today" : "text-ink-3"
+                  }`}
+                >
+                  <Hourglass className="size-3" aria-hidden />
+                  {left === 0 ? "Today" : `${Math.abs(left)}d`}
+                </Tip>
+              )}
             </Sheet>
           </div>
 
@@ -109,7 +176,7 @@ export default async function DealPage({ params }: { params: Params }) {
                 lists={lists}
                 stages={stages}
                 today={today}
-                quotes={winners.map((q) => ({ id: q.id, label: `${q.number}, ${fmt.peso(q.totalCentavos)}` }))}
+                quotes={winners.map((q) => ({ id: q.id, label: `${q.number} · ${short(fmt.peso(q.totalCentavos))}` }))}
               />
             </Sheet>
           )}
@@ -150,11 +217,25 @@ export default async function DealPage({ params }: { params: Params }) {
                       <td className="py-2 text-right">
                         {fmt.count(l.quantity)} {l.unit}
                       </td>
-                      <td className="py-2 text-right">{fmt.peso(l.unitPriceCentavos)}</td>
-                      <td className="py-2 text-right">{fmt.peso(l.totalCentavos)}</td>
+                      <td className="py-2 text-right tabular-nums">
+                        <Amount text={fmt.peso(l.unitPriceCentavos)} />
+                      </td>
+                      <td className="py-2 text-right font-medium text-ink tabular-nums">
+                        <Amount text={fmt.peso(l.totalCentavos)} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
+                {deal.lines.length > 1 && (
+                  <tfoot>
+                    <tr className="border-t border-rule">
+                      <td colSpan={3} className="py-2 text-right text-meta text-ink-3">Total</td>
+                      <td className="py-2 text-right font-semibold text-ink tabular-nums">
+                        <Amount text={fmt.peso(deal.lines.reduce((t, l) => t + l.totalCentavos, 0))} />
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             )}
           </Sheet>
@@ -164,7 +245,7 @@ export default async function DealPage({ params }: { params: Params }) {
               icon="quotes"
               action={
                 deal.can.quote && (
-                  <LinkButton href={`/crm/companies/${deal.company.id}/quotes/new?deal=${deal.id}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
+                  <LinkButton href={`/crm/customers/${deal.company.id}/quotes/new?deal=${deal.id}`} size="sm" variant="quiet" icon={<Plus className="size-3.5" aria-hidden />}>
                     Add
                   </LinkButton>
                 )
@@ -181,8 +262,16 @@ export default async function DealPage({ params }: { params: Params }) {
                     <Link href={`/crm/quotes/${q.id}`} className="font-medium text-ink hover:underline">
                       {q.number}
                     </Link>
-                    <span className="text-meta text-ink-3">
-                      {APPROVAL[q.approvalStatus] ?? q.approvalStatus} · {fmt.peso(q.totalCentavos)}
+                    <span className="inline-flex items-center gap-3 text-sm">
+                      {(() => {
+                        const mark = APPROVAL_MARK[q.approvalStatus] ?? APPROVAL_MARK.none;
+                        return (
+                          <Tip tip={APPROVAL[q.approvalStatus] ?? q.approvalStatus} className={`inline-flex ${mark.tone}`}>
+                            <mark.icon className="size-4" aria-hidden />
+                          </Tip>
+                        );
+                      })()}
+                      <Amount className="font-medium text-ink tabular-nums" text={fmt.peso(q.totalCentavos)} />
                     </span>
                   </li>
                 ))}

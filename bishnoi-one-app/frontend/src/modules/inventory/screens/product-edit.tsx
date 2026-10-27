@@ -29,7 +29,7 @@ export async function NewProductPage({ searchParams }: { searchParams: Search })
   const { ref, parents } = await formData();
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/products", label: "Products" }]} title="Add product">
+      <PageHeader crumbs={[{ href: "/inventory/products", label: "Items" }]} title="New item">
         Product details, pricing, reorder levels and tracking. Stock is added through goods receipts.
       </PageHeader>
       <ProductForm org={me.org} reference={ref} parents={parents} locked={false} canAdd={canAddFrom(may)} preset={{ parentId: typeof parent === "string" ? parent : undefined }} />
@@ -47,7 +47,7 @@ export async function EditProductPage({ params }: { params: Params<{ id: string 
   const locked = product.recentMovements.length > 0;
   return (
     <>
-      <PageHeader crumbs={[{ href: "/inventory/products", label: "Products" }, { href: `/inventory/products/${product.id}`, label: product.name }]} title={`Edit ${product.name}`} />
+      <PageHeader crumbs={[{ href: "/inventory/products", label: "Items" }, { href: `/inventory/products/${product.id}`, label: product.name }]} title={`Edit ${product.name}`} />
       <ProductForm key={product.updatedAt} org={me.org} reference={ref} product={product} parents={parents} locked={locked} canAdd={canAddFrom(may)} />
     </>
   );

@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
-import { CellInput, Field, FormError, Input, Select } from "@/src/modules/finance/platform/ui/field";
+import { CellInput, Field, FormError, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { postEntry, reverseEntry, saveAccount, savePosting } from "@/src/modules/finance/ledger/actions";
@@ -329,11 +329,11 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
           )}
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Description" optional error={fields.description}>
+      <FormGrid>
+        <Field label="Description" size="md" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
         </Field>
-        <Field label="Sits under" optional error={fields.parentId} hint="The account it's grouped under, as in Oojeema's chart.">
+        <Field label="Sits under" size="md" optional error={fields.parentId} hint="The account it's grouped under, as in Oojeema's chart.">
           {(p) => (
             <Select {...p} value={parentId} onChange={(e) => setParentId(e.target.value)}>
               <option value="">Nothing (at the top)</option>
@@ -341,7 +341,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
             </Select>
           )}
         </Field>
-      </div>
+      </FormGrid>
       <label className="flex items-center gap-2 text-sm">
         <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />
         Active (available for new entries)
@@ -384,9 +384,9 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
       }}
       className="space-y-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormGrid>
         {posting.items.map((i) => (
-          <Field key={i.key} label={i.label} error={fields[i.key]}>
+          <Field key={i.key} label={i.label} size="md" error={fields[i.key]}>
             {(p) => (
               <Select {...p} value={values[i.key]} disabled={!posting.canEdit} onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}>
                 <option value="">Not set</option>
@@ -395,7 +395,7 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
             )}
           </Field>
         ))}
-      </div>
+      </FormGrid>
       <FormError message={error} />
       {posting.canEdit && (
         <Button type="submit" variant="primary" loading={pending}>

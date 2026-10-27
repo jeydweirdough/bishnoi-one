@@ -1,130 +1,41 @@
 "use client";
 
-import { KeyRound, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/inventory/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/inventory/platform/ui/confirm";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/inventory/platform/ui/field";
 import { PickList, SaveBar } from "@/src/modules/inventory/platform/ui/pick-list";
 import { SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
-import { deleteRole, saveRole, saveUser, setUserPassword } from "@/src/modules/inventory/actions/inventory";
+import { deleteRole, saveRole } from "@/src/modules/inventory/actions/inventory";
 import type { AdminUsers, PermissionArea, RolesData } from "@/src/modules/inventory/lib/types";
-import { useSave } from "@/src/modules/inventory/components/lines";
 
-/** Everyone who can sign in here: their role, on or off, and a new password when they need one. */
+/**
+ * Who opens Inventory, and the role each has here. Adding people, their role, their password and
+ * switching them off are done once for every module in Bishnoi One's People (R2, decided
+ * 2026-10-26), so this list only shows them.
+ */
 export function UsersEditor({ data, meId, when }: { data: AdminUsers; meId: string; when: Record<string, string> }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [adding, setAdding] = useState(false);
-  const { pending: saving, error, fields, save } = useSave();
-  const [d, setD] = useState({ fullName: "", email: "", roleId: data.roles.find((r) => r.name === "Warehouse")?.id ?? data.roles[0]?.id ?? "", password: "" });
-
-  function change(id: string, input: Record<string, unknown>, done: string) {
-    start(async () => {
-      const r = await saveUser(id, input);
-      if (!r.ok) toast.error(r.error);
-      else {
-        toast.success(done);
-        router.refresh();
-      }
-    });
-  }
-
   return (
-    <div className="space-y-5">
-      {adding ? (
-        <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="addRole">Add user</SectionTitle>
-          <form
-            noValidate
-            className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save(() => saveUser(null, { ...d, fullName: d.fullName.trim(), email: d.email.trim() }), () => {
-                setAdding(false);
-                setD({ ...d, fullName: "", email: "", password: "" });
-                return { message: `${d.fullName.trim()} added` };
-              });
-            }}
-          >
-            <Field label="Full name" error={fields.fullName}>{(p) => <Input {...p} value={d.fullName} onChange={(e) => setD({ ...d, fullName: e.target.value })} autoFocus />}</Field>
-            <Field label="Work email" error={fields.email}>{(p) => <Input {...p} type="email" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} />}</Field>
-            <Field label="Role" error={fields.roleId} hint={data.roles.find((r) => r.id === d.roleId)?.description ?? undefined}>
-              {(p) => <Select {...p} value={d.roleId} onChange={(e) => setD({ ...d, roleId: e.target.value })}>{data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select>}
-            </Field>
-            <Field label="Initial password" error={fields.password} hint="At least 8 characters. Share it with the user directly.">
-              {(p) => <Input {...p} type="password" autoComplete="new-password" value={d.password} onChange={(e) => setD({ ...d, password: e.target.value })} />}
-            </Field>
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-              <Button type="submit" variant="primary" loading={saving}>Add user</Button>
-              <Button variant="quiet" onClick={() => setAdding(false)}>Cancel</Button>
-            </div>
-            {error && <div className="sm:col-span-2 lg:col-span-4"><FormError message={error} /></div>}
-          </form>
-        </Sheet>
-      ) : (
-        <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)}>Add user</Button>
-      )}
-
-      <Sheet>
-        <ul className="divide-y divide-rule">
-          {data.items.map((u) => (
-            <li key={u.id} className="grid gap-3 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-center">
-              <span className="min-w-0 text-sm">
-                <span className={`font-semibold ${u.isActive ? "" : "text-ink-3 line-through"}`}>{u.fullName}</span>
-                {u.id === meId && <span className="ml-2 text-meta text-ink">You</span>}
-                <span className="block text-meta text-ink-3">{u.email} · {u.lastSignInAt ? `last signed in ${when[u.id]}` : "never signed in"}{!u.isActive && " · switched off"}</span>
+    <Sheet>
+      <ul className="divide-y divide-rule">
+        {data.items.map((u) => (
+          <li key={u.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-center">
+            <span className="min-w-0 text-sm">
+              <span className={`font-semibold ${u.isActive ? "" : "text-ink-3 line-through"}`}>{u.fullName}</span>
+              {u.id === meId && <span className="ml-2 text-meta text-ink">You</span>}
+              <span className="block text-meta text-ink-3">
+                {u.email} · {u.lastSignInAt ? `last signed in ${when[u.id]}` : "never signed in"}
+                {!u.isActive && " · switched off"}
               </span>
-              <Select aria-label={`${u.fullName}'s role`} value={u.role.id} disabled={pending} onChange={(e) => change(u.id, { roleId: e.target.value }, `${u.fullName}'s role changed to ${data.roles.find((r) => r.id === e.target.value)?.name}`)}>
-                {data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </Select>
-              <span className="flex items-center gap-1 justify-self-end">
-                <NewPassword id={u.id} name={u.fullName} />
-                {u.id !== meId && (
-                  <Button size="sm" variant="quiet" disabled={pending} onClick={() => change(u.id, { isActive: !u.isActive }, u.isActive ? `${u.fullName} deactivated` : `${u.fullName} activated`)}>
-                    {u.isActive ? "Deactivate" : "Activate"}
-                  </Button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
-    </div>
-  );
-}
-
-function NewPassword({ id, name }: { id: string; name: string }) {
-  const [password, setPassword] = useState("");
-  return (
-    <ConfirmButton
-      label={<span className="sr-only">New password for {name}</span>}
-      icon={<KeyRound className="size-4" aria-hidden />}
-      triggerVariant="quiet"
-      triggerSize="sm"
-      triggerTitle={`Reset password for ${name}`}
-      title={`Reset password for ${name}`}
-      body={
-        <div className="space-y-2">
-          <p>The user is signed out of all sessions and signs in with this password. Share it with the user directly.</p>
-          <Input type="password" autoComplete="new-password" aria-label="New password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-      }
-      confirmLabel="Set password"
-      danger={false}
-      onConfirm={async () => {
-        const r = await setUserPassword(id, password);
-        if (!r.ok) {
-          toast.error(r.error);
-          return false;
-        }
-        toast.success(`New password set for ${name}`);
-        setPassword("");
-        return true;
-      }}
-    />
+            </span>
+            <span className="text-sm text-ink-2 sm:text-right">{u.role.name}</span>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
   );
 }
 
@@ -222,10 +133,10 @@ export function RolesEditor({ data }: { data: RolesData }) {
           {locked ? (
             <p className="mt-2 text-meta text-ink-2">The Administrator role has all permissions, including those added later. It cannot be changed or deleted. To grant fewer permissions, create a new role.</p>
           ) : (
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              <Field label="Name" error={errors.fields.name}>{(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}</Field>
-              <Field label="Description" optional error={errors.fields.description}>{(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}</Field>
-            </div>
+            <FormGrid className="mt-4">
+              <Field label="Name" size="md" error={errors.fields.name}>{(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}</Field>
+              <Field label="Description" size="full" optional error={errors.fields.description}>{(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}</Field>
+            </FormGrid>
           )}
         </Sheet>
         <Permissions catalogue={data.catalogue} granted={draft.permissions} locked={locked} onChange={(permissions) => edit({ permissions })} />

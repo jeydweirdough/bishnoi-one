@@ -8,6 +8,11 @@ export const ACCOUNT_COOKIE = "bishnoi_account";
 /** A module's own session with its API, opened from the account with a Platform pass. */
 export const moduleCookie = (key: string) => `bishnoi_${key}_session`;
 
+/** Whom an administrator is viewing a module as (decided 2026-10-26): "<id>|<name>|<role>", per module. */
+export const viewAsCookie = (key: string) => `bishnoi_${key}_view_as`;
+/** Sent to the module's API with that person's id; the API checks the sender may (app/platform_roles.py). */
+export const VIEW_AS_HEADER = "X-Bishnoi-View-As";
+
 /** Where the person was in a module, so an ended module session reopens and comes back there (app/auth/renew). */
 export const HERE_COOKIE = "bishnoi_here";
 

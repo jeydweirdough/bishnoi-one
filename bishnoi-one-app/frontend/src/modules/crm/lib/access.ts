@@ -28,7 +28,6 @@ export const SETTINGS_PAGES = [
   { href: "/crm/admin/settings/company", label: "Company and quotes", permission: "admin.settings" },
   { href: "/crm/admin/settings/quote-templates", label: "Quotation templates", permission: DEPARTMENT },
   { href: "/crm/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
-  { href: "/crm/admin/settings/terms", label: "Terms", permission: "admin.settings" },
   { href: "/crm/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
   { href: "/crm/admin/settings/performance", label: "Performance", permission: "admin.settings" },
   { href: "/crm/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },

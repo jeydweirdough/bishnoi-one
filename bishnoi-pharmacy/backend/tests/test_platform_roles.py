@@ -111,3 +111,38 @@ def test_the_sign_in_pass_brings_the_role_with_it(app, client, linked):
     r = take(client, make_pass(role="Night shift", roleDef={"name": "Night shift", "description": None, "scope": "own", "permissions": PERMS, "admin": False}))
     assert r.status_code == 200, r.text
     assert role_of(app, "jade@getmeds.test") == "Night shift" and role_named(app, "Night shift")[1] == PERMS
+
+
+def test_switched_off_on_the_platform_is_switched_off_here(app, client, linked):
+    """R2: the Platform's note says who is switched off; their account here is too, and their sessions end."""
+    from app.models import SignInSession
+
+    with database(app)() as db:
+        user = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        uid = user.id
+    r = client.post("/platform/roles", json={"pass": note(people=[{"email": WHO, "role": None, "admin": False, "active": False}])})
+    assert r.status_code == 204, r.text
+    with database(app)() as db:
+        assert db.get(User, uid).is_active is False
+        assert db.scalar(select(func.count()).select_from(SignInSession).where(SignInSession.user_id == uid)) == 0
+    time.sleep(1)
+    client.post("/platform/roles", json={"pass": note(people=[{"email": WHO, "role": None, "admin": False, "active": True}])})
+    with database(app)() as db:
+        assert db.get(User, uid).is_active is True  # switched on again there: on here
+
+
+def test_once_connected_people_are_kept_on_the_platform(app, client):
+    """R2: connected to the Platform, this application doesn't add people, set passwords, change roles
+    or switch people off, and its own password sign-in is closed. What is its own about a person still saves."""
+    app.state.settings.platform_api_url = "http://platform.test"
+    try:
+        assert client.post("/auth/login", json={"email": WHO, "password": "anything-at-all"}).status_code == 403
+        assert client.post("/admin/users", json={}).status_code == 409
+        assert client.post("/admin/users/x/password", json={"password": "x" * 12}).status_code == 409
+        assert client.patch("/admin/users/x", json={"roleId": "r"}).status_code == 409
+        assert client.patch("/admin/users/x", json={"isActive": False}).status_code == 409
+        assert client.post("/admin/roles", json={}).status_code == 409
+        # not the Platform's: answered by the endpoint itself (here, no one is signed in)
+        assert client.patch("/admin/users/x", json={"licenseNo": "PRC-1"}).status_code != 409
+    finally:
+        app.state.settings.platform_api_url = None

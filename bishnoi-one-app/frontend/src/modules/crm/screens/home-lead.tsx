@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import Link from "next/link";
 import { Suspense } from "react";
 import { FollowUpItem } from "@/src/modules/crm/components/follow-up-item";
@@ -161,7 +162,7 @@ export function LeadHome({ me }: { me: Me & { org: Org } }) {
           </>
         }
       >
-        {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. You lead {me.team?.name ?? "your team"}
+        You lead {me.team?.name ?? "your team"}
         <Later data={answer} fallback=".">
           {({ data }) => {
             const others = (data.insights?.people ?? []).filter((p) => !p.isMe);
@@ -169,6 +170,7 @@ export function LeadHome({ me }: { me: Me & { org: Org } }) {
           }}
         </Later>
       </PageHeader>
+      <Welcome module="crm" name={me.user.fullName.split(" ")[0]} greeting={fmt.greeting()} team={me.team?.name} lead />
       <Suspense fallback={null}>
         <AttentionPanel />
       </Suspense>

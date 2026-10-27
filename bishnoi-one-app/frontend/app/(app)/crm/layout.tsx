@@ -22,10 +22,10 @@ function menuActions(me: Me): MenuAction[] {
   const terms = termsOf(me);
   const all: (MenuAction & { allowed: boolean })[] = [
     { group: "Go to", label: "Home", href: "/crm", keywords: "dashboard", allowed: true },
-    { group: "Go to", label: "Customers", href: "/crm/companies", keywords: "companies accounts", allowed: may("customers.view") },
+    { group: "Go to", label: "Customers", href: "/crm/customers", keywords: "companies accounts", allowed: may("customers.view") },
     { group: "Go to", label: "Contacts", href: "/crm/contacts", keywords: "people", allowed: may("customers.view") },
     { group: "Go to", label: "Lead inbox", href: "/crm/inbox", keywords: "facebook messenger whatsapp viber tawk website enquiries", allowed: may("customers.inbox") },
-    { group: "Go to", label: "Find leads with AI", href: "/crm/companies/find", keywords: "chatgpt claude deepseek prospects", allowed: may("customers.create") },
+    { group: "Go to", label: "Find leads with AI", href: "/crm/customers/find", keywords: "chatgpt claude deepseek prospects", allowed: may("customers.create") },
     { group: "Go to", label: "Deals", href: "/crm/deals", keywords: "pipeline opportunities", allowed: may("deals.view") },
     { group: "Go to", label: "Quotes", href: "/crm/quotes", keywords: "quotations", allowed: may("quotes.view") },
     { group: "Go to", label: "Activities", href: "/crm/activities", keywords: "to do tasks calls", allowed: may("activities.view") && !field },
@@ -35,7 +35,7 @@ function menuActions(me: Me): MenuAction[] {
     { group: "Go to", label: terms.visited.many, href: "/crm/field/doctors", keywords: "doctors field plan zones", allowed: may("visits.view") },
     { group: "Go to", label: "Visits", href: "/crm/visits", keywords: "field", allowed: may("visits.view") },
     { group: "Go to", label: "Your profile", href: "/crm/account", keywords: "account password performance", allowed: true },
-    { group: "Create", label: "Add customer", href: "/crm/companies/new", keywords: "new company", allowed: may("customers.create") },
+    { group: "Create", label: "Add customer", href: "/crm/customers/new", keywords: "new company", allowed: may("customers.create") },
     { group: "Create", label: "Add contact", href: "/crm/contacts/new", keywords: "new person", allowed: may("customers.create") },
     { group: "Create", label: "New deal", href: "/crm/deals/new", keywords: "opportunity", allowed: may("deals.create") },
     { group: "Create", label: "Log activity", href: "/crm/activities/new", keywords: "call meeting note task", allowed: may("activities.create") && !field },

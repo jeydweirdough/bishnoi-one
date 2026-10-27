@@ -1,3 +1,4 @@
+import { Welcome } from "@/src/platform/ui/welcome";
 import Link from "next/link";
 import { Suspense } from "react";
 import { FollowUpItem } from "@/src/modules/crm/components/follow-up-item";
@@ -103,9 +104,10 @@ export async function SalespersonHome() {
           </>
         }
       >
-        {fmt.greeting()}, {me.user.fullName.split(" ")[0]}. {me.role?.name}
+        {me.role?.name}
         {me.team ? ` · ${me.team.name}` : ""} · {fmt.monthLabel(dayOf(new Date().toISOString(), me.org.timezone).slice(0, 7))}
       </PageHeader>
+      <Welcome module="crm" name={me.user.fullName.split(" ")[0]} greeting={fmt.greeting()} team={me.team?.name} />
       <Suspense fallback={null}>
         <AttentionPanel skip={seesDeals ? ["target"] : []} />
       </Suspense>

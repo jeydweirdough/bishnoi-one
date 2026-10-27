@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Button, LinkButton } from "@/src/modules/inventory/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/modules/inventory/platform/ui/field";
 import { Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { makeFormat } from "@/src/modules/inventory/platform/lib/format";
 import type { Org } from "@/src/modules/inventory/platform/lib/types";
@@ -264,16 +264,16 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
         details={
           <Sheet className="px-5 pt-4 pb-5 sm:px-6">
             <Heading>Details</Heading>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Source warehouse" error={fields.fromWarehouseId}>
+            <FormGrid>
+              <Field label="Source warehouse" size="md" error={fields.fromWarehouseId}>
                 {(p) => <Select {...p} value={from} onChange={(e) => { const next = e.target.value; setFrom(next); /* From and To can't be one warehouse: To moves to the next one. */ if (next === to) setTo(warehouses.find((w) => w.value !== next)?.value ?? ""); }}>{options(warehouses)}</Select>}
               </Field>
-              <WithAdd can={canAdd.warehouse} add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setTo(a.value); }} />}>
-                <Field label="Destination warehouse" error={fields.toWarehouseId}>
+              <WithAdd can={canAdd.warehouse} className="sm:col-span-3" add={<QuickAdd kind="warehouse" label="New" onAdded={(a) => { remember(a); setTo(a.value); }} />}>
+                <Field label="Destination warehouse" size="md" error={fields.toWarehouseId}>
                   {(p) => <Select {...p} value={to} onChange={(e) => setTo(e.target.value)}>{warehouses.map((w) => <option key={w.value} value={w.value} disabled={w.value === from}>{w.label}</option>)}</Select>}
                 </Field>
               </WithAdd>
-            </div>
+            </FormGrid>
             <div className="mt-5">
               <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
             </div>

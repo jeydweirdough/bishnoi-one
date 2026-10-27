@@ -295,3 +295,22 @@ def test_without_storage_uploads_go_with_the_order(client, crew, ids):
     link = make_link(client, crew["ria"], acme)
     r = client.post(f"/public/quote-links/{link['token']}/uploads", json={"kind": "prescription", "contentType": "image/png"}, headers=PUBLIC)
     assert r.status_code == 409
+
+
+def test_after_ordering_the_customer_gets_their_quotation(client, crew, ids):
+    """Decided 2026-10-26: the link, once used, still shows its quotation: where it stands while it's
+    reviewed, then the quotation with its prices. Nothing before an order; nothing without the link."""
+    acme = company(client, crew["ria"], "Acme Pharmacy")
+    link = make_link(client, crew["ria"], acme, priceType="PATIENT")
+    assert client.get(f"/public/quote-links/{link['token']}/quotation", headers=PUBLIC).status_code == 404  # no order yet
+    assert send(client, link["token"], {"lines": [{"productId": ids["AMX-500"], "quantity": 2}], "privacyAccepted": True}).status_code == 201
+
+    got = client.get(f"/public/quote-links/{link['token']}/quotation", headers=PUBLIC)
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert body["number"].startswith("Q-") and body["rep"] == "Ria"
+    assert body["state"] == "ready" and all(s["done"] for s in body["steps"])
+    quotation = body["standard"]
+    assert quotation["customerName"] == "Acme Pharmacy" and quotation["totalCentavos"] == 290000
+    assert quotation["lines"][0]["quantity"] == 2 and quotation["lines"][0]["unitPriceCentavos"]
+    assert client.get("/public/quote-links/not-a-real-token/quotation", headers=PUBLIC).status_code == 404

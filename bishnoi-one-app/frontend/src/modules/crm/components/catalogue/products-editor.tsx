@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, buttonClass } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, type Format } from "@/src/platform/lib/format";
 import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules, StockLevel } from "@/src/platform/lib/types";
@@ -223,13 +223,14 @@ function ProposePrices({ fmt, product, types, onDone }: { fmt: Format; product: 
         Each price goes to Finance for approval; until then, salespeople keep the approved one. The SRP is set by Finance.
         {product.prices.SRP !== undefined && ` SRP: ${fmt.peso(product.prices.SRP)}.`}
       </p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormGrid>
         {types.map((t) => {
           const a = product.priceApprovals?.[t.code];
           return (
             <Field
               key={t.code}
               label={t.name}
+              size="sm"
               error={fields[t.code]}
               hint={a?.status === "pending" ? "For approval" : a?.status === "rejected" ? `Rejected${a.rejectionReason ? `: ${a.rejectionReason}` : ""}` : product.prices[t.code] === undefined ? "Not set" : undefined}
             >
@@ -237,7 +238,7 @@ function ProposePrices({ fmt, product, types, onDone }: { fmt: Format; product: 
             </Field>
           );
         })}
-      </div>
+      </FormGrid>
       <FormError message={error} />
     </Modal>
   );
@@ -387,7 +388,7 @@ function ProductForm({
                   key={t.code}
                   label={`${t.name} (${fmt.symbol})`}
                   optional={!(fromInventory && t.code === SRP)}
-                  hint={fromInventory && t.code === SRP ? "From Inventory. A team's own price goes in Special prices." : undefined}
+                  hint={fromInventory && t.code === SRP ? "From Inventory. A team's own price goes in Price books." : undefined}
                   error={fields[`price.${t.code}`] ?? fields.prices}
                 >
                   {(p) => (

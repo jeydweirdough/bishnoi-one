@@ -124,9 +124,11 @@ def test_giving_a_role_tells_every_module_signed(client, getmeds, modules):
     crm = notes["https://crm-api.example.com/platform/roles"]
     assert crm["kind"] == "roles" and crm["aud"] == "crm" and crm["slug"] == getmeds["company"]["slug"]
     assert {"name": "Medical rep", "description": None, "scope": "own", "permissions": ["customers.view"], "admin": False} in crm["roles"]
-    assert crm["people"] == [{"email": "jade@getmeds.test", "role": "Medical rep", "admin": False}]
-    # Pharmacy is told the roles too, with nobody holding one there (Jade doesn't have it)
-    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == []
+    # Everyone who may open the module, with their role here (if any) and whether they're switched on (R2).
+    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True} in crm["people"]
+    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True} in crm["people"]
+    # Pharmacy is told the roles too: only Rio may open it, with no role from here yet.
+    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True}]
 
 
 def test_the_pass_carries_the_role_given_here(client, getmeds):
@@ -187,3 +189,56 @@ def test_staff_open_the_console_with_their_bishnoi_one_account(client, ana, getm
     # someone who isn't staff gets nothing of the console's
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["staff"] is None
     assert client.get("/platform/companies", headers=getmeds["jade"]["h"]).status_code == 401
+
+
+def test_a_company_administrator_adds_and_keeps_their_people(client, getmeds):
+    """R2 (decided 2026-10-26): people are added, changed, switched off and given a password on the
+    Platform by their company's own administrators, once for every module."""
+    owner = getmeds["owner"]["h"]
+    r = client.post("/identity/access/people", json={"fullName": "Nina New", "email": "nina@getmeds.test", "title": "Pharmacist", "apps": ["crm"]}, headers=owner)
+    assert r.status_code == 201, r.text
+    nina = r.json()["person"]
+    assert nina["status"] == "active" and r.json()["hasPassword"] is False
+    assert client.post("/identity/access/people", json={"fullName": "Again", "email": "NINA@getmeds.test"}, headers=owner).status_code == 422  # one email, once
+
+    made = client.post(f"/identity/access/people/{nina['id']}/password", json={}, headers=owner).json()["password"]
+    assert made and client.post("/identity/login", json={"email": "nina@getmeds.test", "password": made}).status_code == 200
+
+    assert client.patch(f"/identity/access/people/{nina['id']}", json={"title": "Head pharmacist"}, headers=owner).json()["person"]["title"] == "Head pharmacist"
+    assert client.patch(f"/identity/access/people/{nina['id']}", json={"status": "suspended"}, headers=owner).json()["person"]["status"] == "suspended"
+    assert client.post("/identity/login", json={"email": "nina@getmeds.test", "password": made}).status_code != 200  # switched off: no sign-in
+    # Not themselves, and not by someone who isn't a company administrator.
+    assert client.patch(f"/identity/access/people/{getmeds['owner']['id']}", json={"status": "suspended"}, headers=owner).status_code == 409
+    others = [k for k in getmeds if k not in ("company", "owner")]
+    if others:
+        assert client.post("/identity/access/people", json={"fullName": "X Y", "email": "xy@getmeds.test"}, headers=getmeds[others[0]]["h"]).status_code == 403
+
+
+
+def test_switching_someone_off_tells_every_module(client, getmeds, modules):
+    """R2: switched off on the Platform, switched off in each module they may open (which ends their sessions there)."""
+    h = getmeds["owner"]["h"]
+    modules.clear()
+    assert client.patch(f"/identity/access/people/{getmeds['rio']['id']}", json={"status": "suspended"}, headers=h).status_code == 200
+    key = client.get("/pass/key").json()["publicKey"]
+    notes = {url: claims_of(body["pass"], key) for url, body in modules}
+    for url in ("https://crm-api.example.com/platform/roles", "https://pharmacy-api.example.com/platform/roles"):
+        rio = next(p for p in notes[url]["people"] if p["email"] == "rio@getmeds.test")
+        assert rio["active"] is False, url
+
+
+def test_saved_reports_are_kept_once_and_shared_safely(client, getmeds):
+    """Saved reports (app/routers/saved_reports.py): the owner keeps their choices; shared ones show
+    to the company; only the owner changes them; a company administrator may remove one."""
+    jade, owner = getmeds["jade"]["h"], getmeds["owner"]["h"]
+    made = client.post("/identity/reports", json={"app": "crm", "baseKey": "pipeline", "name": "My pipeline", "definition": {"columns": ["stage"]}}, headers=jade)
+    assert made.status_code == 201, made.text
+    rid = made.json()["id"]
+    assert [r["name"] for r in client.get("/identity/reports?app=crm", headers=jade).json()] == ["My pipeline"]
+    assert client.get("/identity/reports?app=crm", headers=owner).json() == []  # not shared yet
+    assert client.patch(f"/identity/reports/{rid}", json={"shared": True}, headers=jade).json()["shared"] is True
+    seen = client.get("/identity/reports?app=crm", headers=owner).json()
+    assert seen[0]["name"] == "My pipeline" and seen[0]["mine"] is False and seen[0]["owner"] == "Jade Madigal"
+    assert client.patch(f"/identity/reports/{rid}", json={"name": "Theirs"}, headers=owner).status_code == 404  # not the owner
+    assert client.get("/identity/reports?app=finance", headers=jade).json() == []  # one module's reports only
+    assert client.delete(f"/identity/reports/{rid}", headers=owner).status_code == 204  # a company administrator may

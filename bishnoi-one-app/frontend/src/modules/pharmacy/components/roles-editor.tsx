@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/pharmacy/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/pharmacy/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/modules/pharmacy/platform/ui/field";
+import { Field, FormError, FormGrid, Input } from "@/src/modules/pharmacy/platform/ui/field";
 import { createRole, deleteRole, updateRole } from "@/src/modules/pharmacy/actions/pharmacy";
 import type { PermissionArea, RoleRow } from "@/src/modules/pharmacy/lib/types";
 
@@ -72,12 +72,12 @@ function RoleCard({ role, catalogue, onDone }: { role?: RoleRow; catalogue: Perm
     <section className="rounded-[3px] bg-sheet shadow-sheet">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-rule px-5 py-4">
         {naming ? (
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <Field label="Role name">{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}</Field>
-            <Field label="What it's for" optional>
+          <FormGrid className="w-full">
+            <Field label="Role name" size="md">{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}</Field>
+            <Field label="What it's for" size="md" optional>
               {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
             </Field>
-          </div>
+          </FormGrid>
         ) : (
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

@@ -126,7 +126,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
         {kind === "customers" && !file && (
           <p className="mt-3 text-meta text-ink-3">
             Starting from nothing?{" "}
-            <a href="/crm/companies/export?template=true" download className="font-semibold text-ink underline">
+            <a href="/crm/customers/export?template=true" download className="font-semibold text-ink underline">
               Download a blank sheet
             </a>{" "}
             with our columns. To change many customers at once, export them from Customers, edit the file, and import it here.

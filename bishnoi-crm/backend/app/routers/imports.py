@@ -37,6 +37,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import platform_roles
 from app.access import Access, CurrentAccess, keep_an_administrator
 from app.api import Api, email_address
 from app.audit import audit
@@ -471,6 +472,9 @@ def import_people(db: Session, me: User, body: ImportIn, get) -> tuple[int, int,
 @router.post("/{kind}")
 def run_import(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, kind: Kind, body: ImportIn) -> dict:
     allowed(access, kind)
+    # People come from Bishnoi One's People once connected to the Platform (R2): no accounts made here.
+    if kind == "people" and platform_roles.managed(settings):
+        raise HTTPException(status.HTTP_409_CONFLICT, platform_roles.ON_PLATFORM)
     keys = {f["key"]: f for f in fields_of(db, kind)}
     missing = [f["label"] for f in keys.values() if f["required"] and body.mapping.get(f["key"]) is None]
     if kind == "prices" and body.mapping.get("code") is None:

@@ -141,16 +141,34 @@ def logout(signed: Signed, db: DB) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def admin_grant(person: Identity, app: Application) -> IdentityApp:
+    """A company administrator's standing grant to an application their company has: Administrator
+    there, given or not (decided 2026-10-25). Never saved; made fresh each time it's asked for."""
+    return IdentityApp(identity_id=person.id, application_id=app.id, role="Administrator", is_app_admin=True, granted_at=None)
+
+
+def grant_of(db: Session, person: Identity, app: Application) -> IdentityApp | None:
+    """What this person holds on an application: their grant, or a company administrator's standing one."""
+    grant = db.get(IdentityApp, (person.id, app.id))
+    if person.is_company_admin and (grant is None or not grant.is_app_admin):
+        return admin_grant(person, app) if grant is None else IdentityApp(
+            identity_id=person.id, application_id=app.id, role=grant.role or "Administrator", is_app_admin=True, granted_at=grant.granted_at)
+    return grant
+
+
 def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityApp]]:
-    """The applications this person may open: given to them, and their company has it."""
+    """The applications this person may open: given to them, and their company has it. A company's
+    administrator opens every application the company has."""
     rows = db.execute(
         select(Application, IdentityApp)
-        .join(IdentityApp, IdentityApp.application_id == Application.id)
         .join(CompanyApp, (CompanyApp.application_id == Application.id) & (CompanyApp.company_id == person.company_id))
-        .where(IdentityApp.identity_id == person.id, Application.is_active)
+        .outerjoin(IdentityApp, (IdentityApp.application_id == Application.id) & (IdentityApp.identity_id == person.id))
+        .where(Application.is_active)
         .order_by(Application.sort_order, Application.name)
     ).all()
-    return [(a, g) for a, g in rows]
+    if person.is_company_admin:
+        return [(a, grant_of(db, person, a)) for a, _ in rows]
+    return [(a, g) for a, g in rows if g is not None]
 
 
 @router.get("/identity/me")
@@ -251,7 +269,7 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     if db.get(CompanyApp, (company.id, app.id)) is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} doesn't have {app.name}. Ask your company's administrator.")
-    grant = db.get(IdentityApp, (person.id, app.id))
+    grant = grant_of(db, person, app)
     if grant is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")
     try:

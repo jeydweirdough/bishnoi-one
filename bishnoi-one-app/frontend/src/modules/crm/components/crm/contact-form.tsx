@@ -176,7 +176,7 @@ export function ContactForm({
     );
   }
 
-  const cancel = contact ? `/crm/contacts/${contact.id}` : companyId ? `/crm/companies/${companyId}` : "/crm/contacts";
+  const cancel = contact ? `/crm/contacts/${contact.id}` : companyId ? `/crm/customers/${companyId}` : "/crm/contacts";
 
   return (
     <form

@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/console/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/console/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/modules/console/platform/ui/field";
+import { Field, FormError, FormGrid, Input } from "@/src/modules/console/platform/ui/field";
 import { Empty, SectionTitle, Sheet } from "@/src/modules/console/platform/ui/sheet";
 import { Count } from "@/src/modules/console/components/marks";
 import { addUnit, deleteUnit, updateUnit } from "@/src/modules/console/actions/organizations";
@@ -142,14 +142,14 @@ function UnitForm({ kind, companyId, unit, onDone }: { kind: Unit["kind"]; compa
         }}
         className="space-y-4"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={`${w.one === "branch" ? "Branch" : "Department"} name`} error={fields.name}>
+        <FormGrid>
+          <Field label={`${w.one === "branch" ? "Branch" : "Department"} name`} size="md" error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus required />}
           </Field>
-          <Field label={w.place} optional error={fields.location}>
+          <Field label={w.place} size="md" optional error={fields.location}>
             {(p) => <Input {...p} value={location} onChange={(e) => setLocation(e.target.value)} />}
           </Field>
-        </div>
+        </FormGrid>
         <FormError message={error} />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="sm" variant="primary" loading={pending}>

@@ -14,7 +14,7 @@ import time
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import Depends, APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import delete, func, select
@@ -77,7 +77,7 @@ class Attempts:
 attempts = Attempts()
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(platform_roles.signs_in_here)])
 def login(body: LoginIn, db: DB, settings: SettingsDep, tenant: CurrentTenant, response: Response) -> dict:
     """At the company the sign-in page names (X-Bishnoi-Company), which must be
     registered on the platform (CurrentTenant refuses it otherwise)."""
@@ -271,7 +271,6 @@ def demo_accounts(request: Request) -> dict:
 
 
 @router.post("/switch-org")
-@router.post("/view-as")
 @router.post("/leave")
 def not_here() -> None:
     raise HTTPException(status.HTTP_404_NOT_FOUND, "This app has one company and its own accounts, so there's nothing to switch to.")
@@ -284,3 +283,27 @@ def company_status(request: Request) -> dict:
     slug = company_of(request)
     found = company_standing(request.app.state.settings, slug)
     return {"ok": found.ok, "message": found.message, "name": found.name, "slug": slug}
+
+
+# ---- View as (app/platform_roles.py says how) --------------------------------------------------
+
+
+@router.get("/view-as")
+def view_as_people(user: CurrentUser, db: DB) -> dict:
+    """Whom an administrator may view as: everyone switched on, by role, most permissions first."""
+    if not platform_roles.may_view_as(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can view as someone else.")
+    return {"roles": platform_roles.people_by_role(db)}
+
+
+@router.post("/view-as")
+def start_view_as(body: dict, user: CurrentUser, db: DB) -> dict:
+    """Starting to view as someone: checked, and kept in the activity log (who, as whom)."""
+    if not platform_roles.may_view_as(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can view as someone else.")
+    other = db.get(User, str(body.get("userId") or ""))
+    if other is None or not other.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That person isn't here, or is switched off.")
+    audit(db, user, "auth.viewed_as", target=other.email, target_type="user", target_id=other.id)
+    db.commit()
+    return {"id": other.id, "fullName": other.full_name, "role": other.role.name}

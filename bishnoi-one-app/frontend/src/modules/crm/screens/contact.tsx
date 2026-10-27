@@ -90,7 +90,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pa
         {contact.jobTitle}
         {contact.jobTitle && contact.company ? " at " : ""}
         {contact.company ? (
-          <Link href={`/crm/companies/${contact.company.id}`} className="text-ink hover:underline">
+          <Link href={`/crm/customers/${contact.company.id}`} className="text-ink hover:underline">
             {contact.company.name}
           </Link>
         ) : (

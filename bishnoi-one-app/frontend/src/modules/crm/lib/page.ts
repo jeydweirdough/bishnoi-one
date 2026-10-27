@@ -11,7 +11,9 @@ export function crmPage(href: string | null | undefined): string | null | undefi
 export function crmPage(href: string | null | undefined) {
   if (!href || !href.startsWith("/") || href.startsWith("//")) return href;
   if (href === "/crm" || href.startsWith("/crm/") || href.startsWith("/crm?")) return href;
-  return href === "/" ? "/crm" : `/crm${href}`;
+  // The API's /companies is the one app's /customers (decided 2026-10-26).
+  const path = /^\/companies(?=$|[/?#])/.test(href) ? href.replace(/^\/companies/, "/customers") : href;
+  return path === "/" ? "/crm" : `/crm${path}`;
 }
 
 /** The same for each of a list's `href`s (attention prompts). */

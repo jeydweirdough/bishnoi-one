@@ -3,8 +3,11 @@
 Mail goes out through an email delivery service's SMTP server (its host,
 port, user name and password in the settings); nothing is hosted here.
 
-Switches, as with Discord (app/discord.py):
-    EMAIL_ENABLED  true, or nothing is sent
+Where the SMTP details come from (decided 2026-10-27): the company's "Email
+sending" service on Bishnoi One Platform (Brevo or any SMTP service, filled in
+on the company's Connections tab), so nothing is set on this server. The
+settings below still win when EMAIL_ENABLED is set:
+    EMAIL_ENABLED  true: send with the SMTP_* settings here
     EMAIL_MODE     smtp = really send; mock = keep it on this machine (logged,
                    and kept in OUTBOX for the tests)
 
@@ -80,24 +83,55 @@ def send(settings: Settings, to: list[str], subject: str, heading: str, lines: l
     """Sends one email to each address (never one email to all: people's
     addresses aren't shown to each other). Does nothing while switched off."""
     to = sorted({a for a in to if a})
-    if not settings.email_enabled or not to:
+    relay = _relay(settings)
+    if relay is None or not to:
         return
     page, text = layout(heading, lines, button, settings.org_name)
-    if settings.email_mode != "smtp":
+    if relay.mock:
         OUTBOX.append(Sent(to=to, subject=subject, text=text, html=page))
         log.info("email (mock) to %d: %s", len(to), subject)
         return
-    threading.Thread(target=_deliver, args=(settings, to, subject, text, page), daemon=True).start()
+    threading.Thread(target=_deliver, args=(settings, relay, to, subject, text, page), daemon=True).start()
 
 
-def _deliver(settings: Settings, to: list[str], subject: str, text: str, page: str) -> None:
-    sender = settings.email_from or settings.smtp_username or ""
+@dataclass
+class Relay:
+    host: str
+    port: int
+    starttls: bool
+    username: str | None
+    password: str | None
+    sender: str
+    mock: bool = False
+
+
+def _relay(settings: Settings) -> Relay | None:
+    """The SMTP server to send through: this server's settings when EMAIL_ENABLED
+    is set, else the company's Email sending service on the platform, else none."""
+    if settings.email_enabled:
+        password = settings.smtp_password.get_secret_value() if settings.smtp_password else None
+        return Relay(settings.smtp_host or "", settings.smtp_port, settings.smtp_starttls, settings.smtp_username, password,
+                     settings.email_from or settings.smtp_username or "", mock=settings.email_mode != "smtp")
+    from app import connections  # here: app.connections reads the settings module first
+
+    found = connections.service(settings, "smtp")
+    if not found or not found.get("host"):
+        return None
     try:
-        with smtplib.SMTP(settings.smtp_host or "", settings.smtp_port, timeout=20) as smtp:
-            if settings.smtp_starttls:
+        port = int(found.get("port") or 587)
+    except ValueError:
+        port = 587
+    return Relay(found["host"], port, True, found.get("username"), found.get("password"), found.get("from_email") or found.get("username") or "")
+
+
+def _deliver(settings: Settings, relay: Relay, to: list[str], subject: str, text: str, page: str) -> None:
+    sender = relay.sender
+    try:
+        with smtplib.SMTP(relay.host, relay.port, timeout=20) as smtp:
+            if relay.starttls:
                 smtp.starttls()
-            if settings.smtp_username and settings.smtp_password:
-                smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
+            if relay.username and relay.password:
+                smtp.login(relay.username, relay.password)
             for address in to:
                 message = EmailMessage()
                 message["From"] = formataddr((f"{settings.org_name} CRM", sender))

@@ -257,10 +257,10 @@ export function QuickAdd({ kind, onAdded, context = {}, label }: { kind: QuickKi
  * A picker's label row with "+ New …" at its end, for a Field whose list may
  * lack what's needed. Shown only when `can` says the person may add one.
  */
-export function WithAdd({ can, children, add }: { can: boolean | undefined; children: ReactNode; add: ReactNode }) {
+export function WithAdd({ can, children, add, className = "" }: { can: boolean | undefined; children: ReactNode; add: ReactNode; className?: string }) {
   if (!can) return <>{children}</>;
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <div className="absolute top-0 right-0 z-10">{add}</div>
       {children}
     </div>

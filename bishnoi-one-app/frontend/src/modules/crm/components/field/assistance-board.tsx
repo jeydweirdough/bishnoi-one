@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { attachAssistance, decideAssistance, fileAssistance, removeAssistanceFile, withdrawAssistance } from "@/src/modules/crm/actions/field";
 import { FileDrop } from "@/src/platform/ui/file-drop";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
 import { Combobox, DateInput } from "@/src/platform/ui/pickers";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import type { Assistance, AssistanceList, AssistanceProgram } from "@/src/modules/crm/components/field/types";
@@ -87,7 +87,7 @@ export function AssistanceBoard({ data, doctors, today, dateLabel }: { data: Ass
                     </p>
                     <p className="text-meta text-ink-2">
                       {program(a.program)} · {a.products.map((p) => p.name).join(", ")} ·{" "}
-                      <a href={`/crm/companies/${a.doctor.id}`} className="hover:underline">
+                      <a href={`/crm/customers/${a.doctor.id}`} className="hover:underline">
                         {a.doctor.name}
                       </a>
                     </p>
@@ -204,17 +204,17 @@ function FileForm({ data, doctors, today, onClose }: { data: AssistanceList; doc
 
   return (
     <Modal open title="New application" onCancel={() => !saving && onClose()} onOk={save} okText="Submit" cancelText="Cancel" confirmLoading={saving} width={560} destroyOnHidden>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">
-        <Field label="Program" error={fields.program} hint={chosen ? `${chosen.gives}; ${chosen.days}.` : undefined} className="sm:col-span-2">
+      <FormGrid className="mt-3">
+        <Field label="Program" size="md" error={fields.program} hint={chosen ? `${chosen.gives}; ${chosen.days}.` : undefined}>
           {(p) => <Combobox {...p} value={program || undefined} onChange={(v) => setProgram(v as AssistanceProgram)} options={data.programs.map((x) => ({ value: x.key, label: x.name }))} placeholder="Select a program" />}
         </Field>
-        <Field label="Patient name" error={fields.patientName} hint="As on the form. The diagnosis stays on the paper form." className="sm:col-span-2">
+        <Field label="Patient name" error={fields.patientName} hint="As on the form. The diagnosis stays on the paper form." size="md">
           {(p) => <Input {...p} value={patient} onChange={(e) => setPatient(e.target.value)} maxLength={120} autoFocus />}
         </Field>
-        <Field label="Prescribing doctor" error={fields.companyId} className="sm:col-span-2">
+        <Field label="Prescribing doctor" size="md" error={fields.companyId}>
           {(p) => <Combobox {...p} value={doctor || undefined} onChange={(v) => setDoctor(String(v))} options={doctors.map((d) => ({ value: d.id, label: d.name }))} placeholder="Select a doctor" />}
         </Field>
-        <Field label="GetMeds products" error={fields.productIds ?? fields["productIds.0"]} hint="Every product on the application." className="sm:col-span-2">
+        <Field label="GetMeds products" error={fields.productIds ?? fields["productIds.0"]} hint="Every product on the application." size="md">
           {(p) => (
             <Combobox<string[]>
               {...p}
@@ -227,25 +227,25 @@ function FileForm({ data, doctors, today, onClose }: { data: AssistanceList; doc
             />
           )}
         </Field>
-        <Field label="Date submitted" error={fields.submittedOn}>
+        <Field label="Date submitted" size="sm" error={fields.submittedOn}>
           {(p) => <DateInput {...p} type="date" value={submittedOn} max={today} onChange={(e) => setSubmittedOn(e.target.value || today)} />}
         </Field>
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-6">
           <p className="mb-1.5 text-sm font-medium text-ink">
             Patient IDs <span className="font-normal text-ink-3">(optional)</span>
           </p>
           <FileDrop multiple accept={FILE_TYPES} maxBytes={MAX_FILE} note={`PhilHealth, Senior Citizen, PWD, a government ID. ${FILE_NOTE}`} onFiles={setIds} busy={saving} />
         </div>
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-6">
           <p className="mb-1.5 text-sm font-medium text-ink">
             Other attachments <span className="font-normal text-ink-3">(optional)</span>
           </p>
           <FileDrop multiple accept={FILE_TYPES} maxBytes={MAX_FILE} note={`The application form, the prescription, the indigency certificate. ${FILE_NOTE}`} onFiles={setDocs} busy={saving} />
         </div>
-        <Field label="Notes" optional error={fields.notes} className="sm:col-span-2">
+        <Field label="Notes" optional error={fields.notes} size="full">
           {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} placeholder="Submission location and follow-up contact" />}
         </Field>
-      </div>
+      </FormGrid>
       <FormError message={error} />
     </Modal>
   );

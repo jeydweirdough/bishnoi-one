@@ -30,9 +30,9 @@ export const KINDS: KindInfo[] = [
   {
     kind: "sale",
     slug: "customer",
-    plural: "Customer orders",
-    one: "customer order",
-    newLabel: "New customer order",
+    plural: "Sales orders",
+    one: "sales order",
+    newLabel: "New sales order",
     intro: "Stock sold to a customer: hospitals, pharmacies, clinics and doctors. Priced per line.",
     icon: "issuance",
     recipient: { label: "Customer", placeholder: "St. Luke's Family Clinic", hint: "The customer buying the stock." },

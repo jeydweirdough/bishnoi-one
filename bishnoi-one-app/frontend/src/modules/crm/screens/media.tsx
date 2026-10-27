@@ -5,7 +5,7 @@ import type { CompanyDetail } from "@/src/platform/lib/types";
 import type { Material } from "@/src/modules/crm/actions/media";
 import { Materials } from "@/src/modules/crm/components/media/materials";
 
-export const metadata = { title: "Media" };
+export const metadata = { title: "Documents" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
@@ -27,7 +27,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Search
     : [{ items: [] }, []];
   return (
     <>
-      <PageHeader title="Media" crumbs={customer ? [{ href: `/crm/companies/${customer.id}`, label: customer.name }] : undefined}>
+      <PageHeader title="Documents" crumbs={customer ? [{ href: `/crm/customers/${customer.id}`, label: customer.name }] : undefined}>
         {customer ? (
           <>
             Approved materials to show <b>{customer.name}</b>. What you open is counted for them.{" "}

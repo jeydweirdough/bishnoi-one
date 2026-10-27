@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useAnticipation } from "@/src/platform/lib/anticipation";
 import { toast } from "sonner";
 import { Button, LinkButton, IconButton } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { BundleTag, PromoTags, bundlesWith, promosFor, startingPromo, withPromoFlag } from "@/src/modules/crm/components/catalogue/promo-tag";
@@ -240,7 +240,7 @@ export function DealForm({
   }
 
   const nameField = (
-    <Field label="Deal name" error={fields.name} hint={named ? "What's being bought, e.g. 'Q4 antibiotics restock'." : "Made from the products and the customer; type to change it."} className="sm:col-span-2">
+    <Field label="Deal name" error={fields.name} hint={named ? "What's being bought, e.g. 'Q4 antibiotics restock'." : "Made from the products and the customer; type to change it."} size="md">
       {(p) => (
         <Input
           {...p}
@@ -364,10 +364,10 @@ export function DealForm({
 
       {!deal && value_}
 
-      <div className={`grid gap-5 sm:grid-cols-2 ${deal ? "" : "border-t border-rule pt-5"}`}>
+      <FormGrid className={deal ? "" : "border-t border-rule pt-5"}>
         {deal && nameField}
         {deal && (
-          <div>
+          <div className="sm:col-span-3">
             <p className="mb-1 text-meta font-medium text-ink-2">Customer</p>
             <p className="flex h-9 items-center border-b border-rule text-sm">{company.name}</p>
           </div>
@@ -375,6 +375,7 @@ export function DealForm({
         {isOpen && (
           <Field
             label="Stage"
+            size="lg"
             error={fields.stageCode}
             hint={likely ? `Likely: ${likely.probability}%. ${likely.why}` : stage ? `Likely: ${stage.probability}%, the stage's own.` : undefined}
           >
@@ -389,10 +390,10 @@ export function DealForm({
             )}
           </Field>
         )}
-        <Field label="Expected close date" error={fields.expectedCloseOn} hint={deal ? undefined : `${CLOSE_IN_DAYS} days from today, to start.`}>
+        <Field label="Expected close date" size="sm" error={fields.expectedCloseOn} hint={deal ? undefined : `${CLOSE_IN_DAYS} days from today, to start.`}>
           {(p) => <Input {...p} type="date" value={closeOn} onChange={(e) => setCloseOn(e.target.value)} />}
         </Field>
-      </div>
+      </FormGrid>
 
       {!deal && !details && (
         <section aria-labelledby="filled-in" className="rounded-xl bg-mint px-5 py-4">
@@ -425,9 +426,9 @@ export function DealForm({
       )}
 
       {details && (
-        <div className="grid gap-5 sm:grid-cols-2">
+        <FormGrid>
           {!deal && nameField}
-          <Field label="Contact" optional error={fields.contactId}>
+          <Field label="Contact" size="md" optional error={fields.contactId}>
             {(p) => (
               <Select {...p} value={contactId} onChange={(e) => setContactId(e.target.value)}>
                 <option value="">None</option>
@@ -439,11 +440,11 @@ export function DealForm({
               </Select>
             )}
           </Field>
-          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} />
-          <Field label="Notes" optional error={fields.notes} className="sm:col-span-2">
+          <OwnerField people={people} value={ownerId} onChange={setOwnerId} error={fields.ownerId} size="md" />
+          <Field label="Notes" optional error={fields.notes} size="full">
             {(p) => <Textarea {...p} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />}
           </Field>
-        </div>
+        </FormGrid>
       )}
 
       {deal && <div className="border-t border-rule pt-5">{value_}</div>}
@@ -452,7 +453,7 @@ export function DealForm({
         <Button type="submit" variant="primary" loading={pending}>
           {deal ? "Save changes" : "Add deal"}
         </Button>
-        <LinkButton href={deal ? `/crm/deals/${deal.id}` : `/crm/companies/${company.id}`} variant="quiet">
+        <LinkButton href={deal ? `/crm/deals/${deal.id}` : `/crm/customers/${company.id}`} variant="quiet">
           Cancel
         </LinkButton>
       </div>

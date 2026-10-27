@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, IconButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Choice, Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { Sheet } from "@/src/platform/ui/sheet";
 import type { KpiCatalogue, KpiDef, KpiUnit } from "@/src/platform/lib/types";
 import { deleteKpi, orderKpis, saveKpi, type KpiInput } from "@/src/modules/crm/actions/kpis";
@@ -148,14 +148,14 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
       }}
       className="space-y-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name" error={fields.name}>
+      <FormGrid>
+        <Field label="Name" size="md" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="e.g. Calls made" />}
         </Field>
-        <Field label="Description" optional error={fields.description}>
+        <Field label="Description" size="md" optional error={fields.description}>
           {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} placeholder="Shown next to it" />}
         </Field>
-        <Field label="Measure" error={fields.measure} hint={fixed ? "A built-in measure keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
+        <Field label="Measure" size="md" error={fields.measure} hint={fixed ? "A built-in measure keeps what it measures." : picked?.about ?? "Typed in each month under Targets."}>
           {(p) => (
             <Select
               {...p}
@@ -176,7 +176,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
           )}
         </Field>
         {takes ? (
-          <Field label={FILTER_WORDS[takes]} optional error={fields.filters}>
+          <Field label={FILTER_WORDS[takes]} size="md" optional error={fields.filters}>
             {(p) => (
               <Select {...p} value={filter} disabled={fixed} onChange={(e) => setFilter(e.target.value)}>
                 <option value="">All</option>
@@ -195,7 +195,7 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
             )}
           </Field>
         ) : measure === "manual" ? (
-          <Field label="Entered as" error={fields.unit}>
+          <Field label="Entered as" size="md" error={fields.unit}>
             {(p) => (
               <Select {...p} value={unit} onChange={(e) => setUnit(e.target.value as KpiUnit)}>
                 {(Object.keys(UNIT_LABELS) as KpiUnit[]).map((u) => (
@@ -207,9 +207,9 @@ function KpiForm({ catalogue, products, kpi, onDone }: { catalogue: KpiCatalogue
             )}
           </Field>
         ) : (
-          <div />
+          <div className="sm:col-span-3" />
         )}
-      </div>
+      </FormGrid>
       <div className="grid gap-4 sm:grid-cols-[auto_12rem_12rem]">
         <Choice<"higher" | "lower">
           name={`better-${kpi?.id ?? "new"}`}

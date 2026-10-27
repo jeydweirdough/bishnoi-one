@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { plural } from "../lib/format";
 import type { Job } from "../lib/types";
+import { moduleOfPath } from "../lib/modules";
 
 // Picking several records and acting on them at once, the way a mail app does:
 // tick rows, a bar rises from the bottom with what can be done to them, and the
@@ -132,8 +133,13 @@ export function useSelection(): Selection {
 export function SelectBox({ id, label }: { id: string; label: string }) {
   const s = useSelection();
   if (!s.selecting) return null;
+  const isChecked = s.isSelected(id);
+  const anySelected = s.ids.length > 0;
+  const visibility = isChecked || anySelected
+    ? "opacity-100"
+    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100";
   return (
-    <label className="relative z-10 -m-3 inline-flex cursor-pointer p-3">
+    <label className={`relative z-10 -m-3 inline-flex cursor-pointer p-3 transition-opacity duration-150 ${visibility}`}>
       <input suppressHydrationWarning
         type="checkbox"
         checked={s.isSelected(id)}
@@ -155,7 +161,7 @@ export function SelectAllBox({ label = "Select all on this page", children }: { 
   }, [s.pageState]);
   if (!s.selecting) return null;
   return (
-    <label className={`relative z-10 inline-flex cursor-pointer items-center gap-3 ${children ? "py-2" : "-m-3 p-3"}`}>
+    <label className={`relative z-10 inline-flex cursor-pointer items-center gap-3 transition-opacity duration-150 ${children ? "py-2" : "-m-3 p-3"} ${s.pageState !== "none" || children ? "opacity-100" : "opacity-60 hover:opacity-100 focus-within:opacity-100"}`}>
       <input suppressHydrationWarning
         ref={box}
         type="checkbox"
@@ -189,7 +195,7 @@ export function SelectableRow({
     <Tag
       data-selected={selected || undefined}
       aria-busy={busy || undefined}
-      className={`${className} transition-opacity ${selected ? "bg-hema-tint/60" : ""} ${busy ? "opacity-45" : ""}`}
+      className={`group ${className} transition-colors ${selected ? "bg-hema-tint/60" : ""} ${busy ? "opacity-45" : ""}`}
     >
       {children}
     </Tag>
@@ -296,14 +302,17 @@ export function BulkStep({
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Follows a queued job through /jobs/[id] until it's done; null when it can't be followed. */
+/** Follows a queued job through its module's /<module>/jobs/[id] until it's done; null when it can't be followed.
+ *  The job route sits under each module in the one app (app/(app)/<module>/jobs/[id]), so the address
+ *  takes the module the page is in: a bare /jobs/[id] doesn't exist (found by a REA pass, 2026-10-25). */
 async function follow(job: Job, onProgress: (job: Job) => void): Promise<Job | null> {
   let misses = 0;
   while (job.status !== "done") {
     onProgress(job);
     await pause(job.status === "queued" ? 1000 : 700);
     try {
-      const response = await fetch(`/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
+      const base = moduleOfPath(window.location.pathname)?.path ?? "";
+      const response = await fetch(`${base}/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" });
       if (response.ok) {
         job = (await response.json()) as Job;
         misses = 0;

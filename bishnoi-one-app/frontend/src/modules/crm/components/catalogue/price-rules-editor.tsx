@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, IconButton, TextButton } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { CellInput, Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { CellInput, Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { makeFormat, percentText, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
@@ -277,11 +277,11 @@ function RuleForm({
         }}
         className="space-y-5"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" error={fields.name}>
+        <FormGrid>
+          <Field label="Name" size="md" error={fields.name}>
             {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "volume" ? "Bulk orders" : kind === "surcharge" ? "Cold chain" : "Brand X for distributors"} autoFocus />}
           </Field>
-          <Field label="Product" optional={kind !== "group_price"} error={fields.productId}>
+          <Field label="Product" size="md" optional={kind !== "group_price"} error={fields.productId}>
             {(p) => (
               <Select {...p} value={productId} onChange={(e) => setProductId(e.target.value)}>
                 <option value="">{kind === "group_price" ? "Select a product" : "All products"}</option>
@@ -293,7 +293,7 @@ function RuleForm({
               </Select>
             )}
           </Field>
-          <Field label="Price group" optional={kind !== "group_price"} error={fields.priceGroupCode}>
+          <Field label="Price group" size="md" optional={kind !== "group_price"} error={fields.priceGroupCode}>
             {(p) => (
               <Select {...p} value={group} onChange={(e) => setGroup(e.target.value)}>
                 <option value="">{kind === "group_price" ? "Select a group" : "All customers"}</option>
@@ -309,10 +309,10 @@ function RuleForm({
           </Field>
           {kind === "group_price" && (
             <>
-              <Field label={`Price each (${fmt.symbol})`} error={fields.amountCentavos}>
+              <Field label={`Price each (${fmt.symbol})`} size="sm" error={fields.amountCentavos}>
                 {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1250.00" />}
               </Field>
-              <Field label="At price type" optional hint="Empty: at every price type." error={fields.priceTypeCode}>
+              <Field label="At price type" size="lg" optional hint="Empty: at every price type." error={fields.priceTypeCode}>
                 {(p) => (
                   <Select {...p} value={priceType} onChange={(e) => setPriceType(e.target.value)}>
                     <option value="">Every price type</option>
@@ -327,7 +327,7 @@ function RuleForm({
             </>
           )}
           {kind === "surcharge" && (
-            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-3 sm:col-span-2">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-3 sm:col-span-6">
               <Select aria-label="Surcharge by" value={by} onChange={(e) => setBy(e.target.value as "amount" | "percent")}>
                 <option value="amount">An amount per unit</option>
                 <option value="percent">A percent of the line</option>
@@ -343,7 +343,7 @@ function RuleForm({
               )}
             </div>
           )}
-        </div>
+        </FormGrid>
         {kind === "volume" && (
           <fieldset>
             <legend className="mb-2 text-sm font-semibold">Tiers</legend>

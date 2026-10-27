@@ -24,7 +24,7 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title="Possible duplicates" crumbs={[{ href: kind === "company" ? "/crm/companies" : "/crm/contacts", label: kind === "company" ? "Customers" : "Contacts" }]}>
+      <PageHeader title="Possible duplicates" crumbs={[{ href: kind === "company" ? "/crm/customers" : "/crm/contacts", label: kind === "company" ? "Customers" : "Contacts" }]}>
         {kind === "company" ? "Customers" : "Contacts"} that look like one entered twice, most likely first.{" "}
         {mayMerge ? "Merge them into one, or mark them as not the same." : "Your role can't merge; ask your team lead or an administrator."}
       </PageHeader>
@@ -32,8 +32,8 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
         <ToggleLinks
           current={kind}
           options={[
-            { value: "company", label: "Customers", href: "/crm/companies/duplicates" },
-            { value: "contact", label: "Contacts", href: "/crm/companies/duplicates?kind=contact" },
+            { value: "company", label: "Customers", href: "/crm/customers/duplicates" },
+            { value: "contact", label: "Contacts", href: "/crm/customers/duplicates?kind=contact" },
           ]}
         />
       </div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/src/modules/finance/platform/ui/button";
-import { Field, Input, Select } from "@/src/modules/finance/platform/ui/field";
+import { Field, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { Drop } from "@/src/modules/finance/bir/sales-dat/drop";
 import { csvName, saveBlob, saveText } from "@/src/modules/finance/bir/sales-dat/download";
@@ -253,11 +253,11 @@ function CompanySettings({ company, sellerTin, rdo, fy, fromDat, onRdo, onFy }: 
         {known ? <b>{company!.name}</b> : <b className="text-danger">A company Finance has no details for</b>}
         {sellerTin && <span className="text-ink-3"> · seller TIN {sellerTin}</span>}
       </p>
-      <div className="grid max-w-xl gap-4 sm:grid-cols-2">
-        <Field label="RDO code" hint="The BIR office the company is registered at, as on its Certificate of Registration (BIR Form 2303).">
+      <FormGrid className="max-w-xl">
+        <Field label="RDO code" size="sm" hint="The BIR office the company is registered at, as on its Certificate of Registration (BIR Form 2303).">
           {(p) => <Input {...p} value={rdo} onChange={(e) => onRdo(e.target.value)} className="font-mono" placeholder="e.g. 53A" />}
         </Field>
-        <Field label="Year-end month" hint="The month the company's accounting year ends. Most use December (a January–December year).">
+        <Field label="Year-end month" size="lg" hint="The month the company's accounting year ends. Most use December (a January–December year).">
           {(p) => (
             <Select {...p} value={fy} onChange={(e) => onFy(e.target.value)}>
               <option value="">Choose…</option>
@@ -267,7 +267,7 @@ function CompanySettings({ company, sellerTin, rdo, fy, fromDat, onRdo, onFy }: 
             </Select>
           )}
         </Field>
-      </div>
+      </FormGrid>
       <p className="text-meta text-ink-3">
         {fromDat
           ? "Taken from the Oojeema DAT you added; change them only if they're wrong."
@@ -551,9 +551,9 @@ function GlRoles({ L, roles, onChange }: { L: Loaded; roles: Record<string, Role
     <div>
       <p className="font-medium">What each General Ledger account is used for</p>
       <p className="text-meta text-ink-3">Set automatically from the account name. Change only if an account was recognised wrongly.</p>
-      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+      <FormGrid className="mt-2">
         {names.map((n) => (
-          <Field key={n} label={`${n} (${L.gl.accounts[n].n} entries)`}>
+          <Field key={n} size="md" label={`${n} (${L.gl.accounts[n].n} entries)`}>
             {(p) => (
               <Select {...p} value={roles[n] || "ignore"} onChange={(e) => onChange(n, e.target.value as Role)}>
                 {ROLE_LABEL.map(([v, label]) => (
@@ -563,7 +563,7 @@ function GlRoles({ L, roles, onChange }: { L: Loaded; roles: Record<string, Role
             )}
           </Field>
         ))}
-      </div>
+      </FormGrid>
     </div>
   );
 }

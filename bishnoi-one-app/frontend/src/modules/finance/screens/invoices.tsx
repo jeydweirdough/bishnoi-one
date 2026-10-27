@@ -1,4 +1,6 @@
-import { Plus } from "lucide-react";
+import { ExternalLink, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteInvoice } from "@/src/modules/finance/invoices/actions";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
@@ -9,6 +11,8 @@ import { AddSeries, SwitchSeries } from "@/src/modules/finance/invoices/series-e
 import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, ReissueInvoice, RemovePayment, VoidInvoice } from "@/src/modules/finance/invoices/steps";
 import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "@/src/modules/finance/invoices/types";
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
+import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
+import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 
 // Sales invoices (app/routers/invoices.py): drafts, issued with the next
 // number of the BIR's series, and voided rather than changed once issued.
@@ -37,6 +41,31 @@ function StatusMark({ status }: { status: InvoiceStatus }) {
   return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{STATUS_LABELS[status]}</span>;
 }
 
+type Listing = {
+  items: InvoiceSummary[];
+  counts: Record<InvoiceStatus, number>;
+  figures: { invoicedCentavos: number; invoicedLastMonthCentavos: number; collectedCentavos: number; collectedLastMonthCentavos: number };
+  methods: { key: string; label: string }[];
+};
+
+/** Where an invoice stands, as one word: paid, part paid, overdue or unpaid once issued. */
+function standing(i: InvoiceSummary, today: string): { tone: PillTone; label: string } {
+  if (i.status === "draft") return { tone: "plain", label: "Draft" };
+  if (i.status === "void") return { tone: "bad", label: "Void" };
+  if (i.balanceCentavos <= 0) return { tone: "good", label: "Paid" };
+  if (i.dueDate < today) return { tone: "bad", label: i.paidCentavos > 0 ? "Partly paid, overdue" : "Overdue" };
+  return i.paidCentavos > 0 ? { tone: "warn", label: "Partly paid" } : { tone: "info", label: "Unpaid" };
+}
+
+/** This month against last, in words: "12% vs last month". */
+function change(now: number, before: number): Figure["change"] {
+  if (!before) return now ? { text: "New this month", tone: "flat" } : undefined;
+  const pct = Math.round(((now - before) / before) * 100);
+  return { text: `${Math.abs(pct)}% vs last month`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+}
+
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+
 export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
@@ -46,7 +75,18 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
   const query = new URLSearchParams();
   if (status) query.set("status", status);
   if (q) query.set("q", q);
-  const list = await load<{ items: InvoiceSummary[]; counts: Record<InvoiceStatus, number> }>(`/finance/invoices?${query}`);
+  const list = await load<Listing>(`/finance/invoices?${query}`);
+  const today = fmt.todayKey();
+  const f = list.figures;
+  const collect = may(me, "invoices.collect");
+  const total = list.counts.draft + list.counts.issued + list.counts.void;
+  const href = (s: string) => {
+    const next = new URLSearchParams();
+    if (s) next.set("status", s);
+    if (q) next.set("q", q);
+    const text = next.toString();
+    return text ? `/finance/invoices?${text}` : "/finance/invoices";
+  };
   return (
     <>
       <PageHeader
@@ -59,73 +99,123 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
           )
         }
       >
-        Invoices to customers, with their VAT worked out. A draft takes its number when it&apos;s issued, from the BIR&apos;s series, and is posted to the
-        books; an issued invoice is voided, never changed.
+        Invoices to customers, numbered from the BIR&apos;s series when issued and posted to the books. Open a row to see its payments.
       </PageHeader>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Show" className="flex flex-wrap gap-1.5">
-          {TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={t.key ? `/finance/invoices?status=${t.key}` : "/finance/invoices"}
-              aria-current={status === t.key ? "page" : undefined}
-              className={`rounded-[3px] border px-3 py-1 text-meta ${status === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
-            >
-              {t.label}
-              {t.key && list.counts[t.key] ? <span className="text-ink-3"> {list.counts[t.key]}</span> : null}
-            </Link>
-          ))}
-        </nav>
-        <form className="flex gap-2">
-          {status && <input suppressHydrationWarning type="hidden" name="status" value={status} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Customer, number or reference" aria-label="Find an invoice" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
-        </form>
-      </div>
-      <Sheet>
+      <ListFrame>
+        <FigureStrip
+          figures={[
+            { label: "Invoiced this month", value: fmt.peso(f.invoicedCentavos), icon: <ReceiptText className="size-5" aria-hidden />, change: change(f.invoicedCentavos, f.invoicedLastMonthCentavos) },
+            { label: "Collected this month", value: fmt.peso(f.collectedCentavos), icon: <Wallet className="size-5" aria-hidden />, change: change(f.collectedCentavos, f.collectedLastMonthCentavos) },
+          ]}
+        />
+        <UnderlineTabs
+          tabs={[
+            ...TABS.map((t) => ({ href: href(t.key), label: t.label, count: t.key ? list.counts[t.key] : total, current: status === t.key })),
+            { href: "/finance/invoices/receivables", label: "Receivables", current: false },
+          ]}
+        />
+        <ListToolbar q={q} placeholder="Search customer, number or reference" keep={{ status }} />
         {list.items.length === 0 ? (
           <Empty title={q || status ? "No matching invoices" : "No invoices yet"} icon="lists">
             {!q && !status && may(me, "invoices.create") ? "Make the first one with New invoice." : null}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-sm">
-              <thead>
-                <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th className="py-2 pr-3 pl-5 font-semibold">Number</th>
-                  <th className="px-3 py-2 font-semibold">Customer</th>
-                  <th className="px-3 py-2 font-semibold">Date</th>
-                  <th className="px-3 py-2 font-semibold">Due date</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  <th className="py-2 pr-5 pl-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {list.items.map((i) => (
-                  <tr key={i.id} className="relative hover:bg-bench/40">
-                    <td className="py-2.5 pr-3 pl-5 font-mono text-meta">
-                      <Link href={`/finance/invoices/${i.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
-                        {i.number ?? "Draft"}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {i.customer.name}
-                      {i.reference && <span className="text-ink-3"> · Ref. {i.reference}</span>}
-                      {i.replaces && <span className="block text-meta text-ink-3">Replaces {i.replaces.number}</span>}
-                      {i.replacedBy && <span className="block text-meta text-ink-3">Replaced by {i.replacedBy.number ?? "a draft"}</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-ink-2">{fmt.dateLabel(i.date)}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{i.status === "issued" ? fmt.dateLabel(i.dueDate) : ""}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{i.status === "draft" ? "" : fmt.peso(i.totalCentavos)}</td>
-                    <td className="py-2.5 pr-5 pl-3">
-                      <StatusMark status={i.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ExpandableTable
+            columns={[
+              { key: "number", label: "Number" },
+              { key: "customer", label: "Customer" },
+              { key: "date", label: "Date" },
+              { key: "due", label: "Due date" },
+              { key: "total", label: "Total", align: "right" },
+              { key: "status", label: "Payment" },
+            ]}
+            rows={list.items.map((i) => {
+              const s = standing(i, today);
+              const payments = i.payments.filter((p) => !p.removedAt);
+              return {
+                id: i.id,
+                muted: i.status === "void",
+                actions: (
+                  <RowMenu
+                    label={`Actions for invoice ${i.number ?? `draft for ${i.customer.name}`}`}
+                    items={[
+                      { label: "Open", icon: <ExternalLink />, href: `/finance/invoices/${i.id}` },
+                      ...(i.status === "draft" && may(me, "invoices.create")
+                        ? [
+                            { label: "Edit", icon: <Pencil />, href: `/finance/invoices/${i.id}?edit=1` },
+                            "divider" as const,
+                            { label: "Delete draft", icon: <Trash2 />, run: deleteInvoice.bind(null, i.id), danger: true, confirm: `Delete this draft invoice for ${i.customer.name}? This can't be undone.`, done: "Draft deleted" },
+                          ]
+                        : []),
+                    ]}
+                  />
+                ),
+                cells: [
+                  <Link key="n" href={`/finance/invoices/${i.id}`} className="font-mono text-meta font-semibold text-ink hover:text-sage-deep hover:underline">
+                    {i.number ?? "Draft"}
+                  </Link>,
+                  <span key="c" className="flex min-w-0 items-center gap-2.5">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-mint-2 text-[0.6875rem] font-semibold text-sage-deep" aria-hidden>{initials(i.customer.name)}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-ink">{i.customer.name}</span>
+                      {(i.reference || i.replaces || i.replacedBy) && (
+                        <span className="block truncate text-meta text-ink-3">
+                          {[i.reference && `Ref. ${i.reference}`, i.replaces && `Replaces ${i.replaces.number}`, i.replacedBy && `Replaced by ${i.replacedBy.number ?? "a draft"}`].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
+                    </span>
+                  </span>,
+                  <span key="d" className="text-ink-2">{fmt.dateLabel(i.date)}</span>,
+                  <span key="u" className={i.status === "issued" && i.balanceCentavos > 0 && i.dueDate < today ? "font-medium text-danger" : "text-ink-2"}>{i.status === "issued" ? fmt.dateLabel(i.dueDate) : ""}</span>,
+                  <span key="t" className="font-medium">{i.status === "draft" ? "" : fmt.peso(i.totalCentavos)}</span>,
+                  <StatusPill key="s" tone={s.tone}>{s.label}</StatusPill>,
+                ],
+                detail:
+                  i.status === "draft" ? undefined : (
+                    <div className="space-y-3">
+                      {payments.length === 0 ? (
+                        <p className="text-meta text-ink-3">No payments recorded{i.status === "issued" ? "." : " (void)."}</p>
+                      ) : (
+                        <table className="w-full text-meta">
+                          <thead>
+                            <tr className="text-left text-ink-3">
+                              <th className="py-1 pr-3 font-medium">Paid on</th>
+                              <th className="px-3 py-1 font-medium">Method</th>
+                              <th className="px-3 py-1 font-medium">Reference</th>
+                              <th className="px-3 py-1 text-right font-medium">Tax withheld (2307)</th>
+                              <th className="py-1 pl-3 text-right font-medium">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {payments.map((p) => (
+                              <tr key={p.id} className="border-t border-rule/70">
+                                <td className="py-1.5 pr-3 text-ink-2">{fmt.dateLabel(p.paidOn)}</td>
+                                <td className="px-3 py-1.5 text-ink-2">{p.methodLabel}</td>
+                                <td className="px-3 py-1.5 text-ink-2">{p.reference ?? ""}</td>
+                                <td className="px-3 py-1.5 text-right text-ink-2 tabular-nums">{p.cwtCentavos ? fmt.peso(p.cwtCentavos) : ""}</td>
+                                <td className="py-1.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(p.amountCentavos)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule/70 pt-3">
+                        <p className="text-meta text-ink-2">
+                          Total <strong className="text-ink tabular-nums">{fmt.peso(i.totalCentavos)}</strong> · Paid <strong className="text-ink tabular-nums">{fmt.peso(i.paidCentavos)}</strong> · Balance{" "}
+                          <strong className={`tabular-nums ${i.balanceCentavos > 0 ? "text-danger" : "text-sage-deep"}`}>{fmt.peso(i.balanceCentavos)}</strong>
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {collect && i.status === "issued" && i.balanceCentavos > 0 && <RecordPayment id={i.id} owed={i.balanceCentavos} methods={list.methods} org={me.org} today={today} />}
+                          <LinkButton href={`/finance/invoices/${i.id}`}>Open invoice</LinkButton>
+                        </div>
+                      </div>
+                    </div>
+                  ),
+              };
+            })}
+          />
         )}
-      </Sheet>
+      </ListFrame>
     </>
   );
 }
@@ -387,7 +477,7 @@ export async function SeriesPage() {
   const [series, { today }] = await Promise.all([load<SeriesList>("/finance/invoices/series"), taxChoices()]);
   return (
     <>
-      <PageHeader title="Invoice numbers" crumbs={[{ href: "/finance/invoices", label: "Sales invoices" }]}>
+      <PageHeader title="Transaction number series" crumbs={[{ href: "/finance/invoices", label: "Sales invoices" }]}>
         Each series is a run of numbers the BIR authorized, from its Authority to Print. Invoices take them in order and never go past the last; when a
         series runs low, apply for the next and add it here.
       </PageHeader>

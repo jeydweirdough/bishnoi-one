@@ -77,7 +77,7 @@ export function SearchChoice({ field, value, onChange, error }: { field: FormFie
           allowClear
           value={value || undefined}
           onChange={(v) => onChange(v ?? "")}
-          placeholder={field.placeholder ?? "Type to search"}
+          placeholder={choosePrompt(field.placeholder)}
           options={options}
           showSearch={{ filterOption: (input, option) => (option?.search ?? "").includes(input.trim().toLowerCase()) }}
           optionRender={(o) => (
@@ -128,7 +128,7 @@ export function FieldInput({
     const picked = Array.isArray(value) ? value : [];
     return (
       <fieldset>
-        <legend className="mb-1 text-meta font-medium text-ink-2">
+        <legend className="mb-1.5 text-sm font-medium text-ink">
           {f.label} {!f.required && <span className="font-normal text-ink-3">(optional)</span>}
         </legend>
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -241,6 +241,9 @@ export function FieldInput({
 
 /** A dropdown for a built-in pick-list field (Industry, Form, Unit). A value the
  *  record already had stays offered even if it's no longer an option. */
+/** An empty choice's prompt: the layout's own, unless it's only a dash ("—" says nothing); else "Choose". */
+const choosePrompt = (placeholder: string | null | undefined) => (placeholder && !/^[\s—–-]*$/.test(placeholder) ? placeholder : "Choose");
+
 export function ChoiceSelect({ field, value, onChange, error }: { field: FormFieldDef; value: string; onChange: (v: string) => void; error?: string }) {
   if (searchable(field)) {
     return (
@@ -255,7 +258,7 @@ export function ChoiceSelect({ field, value, onChange, error }: { field: FormFie
     <Field label={field.label} optional={!field.required} error={error} hint={field.helpText ?? undefined}>
       {(p) => (
         <Select {...p} value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">{field.placeholder ?? "—"}</option>
+          <option value="">{choosePrompt(field.placeholder)}</option>
           {field.options.map((o) => (
             <option key={o} value={o}>
               {o}
@@ -297,34 +300,64 @@ export function LayoutForm({
         // space, and a section left with nothing to ask isn't shown at all.
         const asked = s.fields.filter((f) => !f.standard || standard(f) != null);
         if (asked.length === 0) return null;
+        const spans = balance(asked, s.columns);
         return (
-        <fieldset key={s.id} className={`grid gap-5 ${s.columns === 2 ? "sm:grid-cols-2" : ""}`}>
-          <legend className="mb-3 text-sm font-semibold text-ink">{s.title}</legend>
-          {asked.map((f) => {
-            const wide = f.type === "long_text" || f.type === "multi_choice" || f.type === "products" || f.type === "status";
-            const cell = s.columns === 2 && wide ? "sm:col-span-2" : "";
-            const built = f.standard ? standard(f) : null;
-            return (
-              <div key={f.key} className={`min-w-0 ${cell}`}>
-                {f.standard ? (
-                  built
-                ) : (
-                  <FieldInput
-                    field={f}
-                    value={draft[f.key] ?? ""}
-                    onChange={(v) => onChange({ ...draft, [f.key]: v })}
-                    error={errors[f.key]}
-                    linkName={linkNames[f.key]}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </fieldset>
+          <fieldset key={s.id} className="border-t border-rule pt-5 first:border-t-0 first:pt-0">
+            <legend className="float-left mb-4 w-full text-base font-semibold text-ink">{s.title}</legend>
+            <div className="clear-both grid gap-x-4 gap-y-5 sm:grid-cols-6">
+              {asked.map((f, i) => {
+                const built = f.standard ? standard(f) : null;
+                return (
+                  <div key={f.key} className={`min-w-0 ${spans[i]}`}>
+                    {f.standard ? (
+                      built
+                    ) : (
+                      <FieldInput
+                        field={f}
+                        value={draft[f.key] ?? ""}
+                        onChange={(v) => onChange({ ...draft, [f.key]: v })}
+                        error={errors[f.key]}
+                        linkName={linkNames[f.key]}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </fieldset>
         );
       })}
     </FormEntityProvider>
   );
+}
+
+// How wide each field of a section is (decided 2026-10-25), on six columns: long text, ticks and
+// product lists take the row; dates, numbers and amounts are short and go beside a longer field
+// (two and four); two of a kind share the row (three and three). A one-column section keeps its
+// fields to two thirds of the row, so they don't stretch.
+const LONG = new Set(["long_text", "multi_choice", "products"]);
+const SHORT = new Set(["date", "number", "money", "yes_no"]);
+const COL = { 2: "sm:col-span-2", 3: "sm:col-span-3", 4: "sm:col-span-4", 6: "sm:col-span-6" } as const;
+
+function balance(fields: FormFieldDef[], columns: number): string[] {
+  if (columns !== 2) return fields.map((f) => (LONG.has(f.type) ? COL[6] : COL[4]));
+  const out: string[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const a = fields[i];
+    if (LONG.has(a.type)) {
+      out.push(COL[6]);
+      continue;
+    }
+    const b = fields[i + 1];
+    if (!b || LONG.has(b.type)) {
+      out.push(COL[3]);
+      continue;
+    }
+    const sa = SHORT.has(a.type), sb = SHORT.has(b.type);
+    out.push(sa === sb ? COL[3] : sa ? COL[2] : COL[4], sa === sb ? COL[3] : sb ? COL[2] : COL[4]);
+    i++;
+  }
+  return out;
 }
 
 /** Kept for forms that show only the added fields, without the layout's sections. */

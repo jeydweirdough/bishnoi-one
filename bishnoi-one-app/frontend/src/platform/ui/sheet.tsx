@@ -1,3 +1,4 @@
+import { AboutTip, plainText } from "@/src/platform/ui/about-tip";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -7,8 +8,8 @@ import { EmptyDrawing } from "./empty-drawings";
 export type Crumb = { href: string; label: string };
 
 /** A white sheet on the bench. The only thing that lifts. */
-export function Sheet({ children, className = "", as: Tag = "section" }: { children: ReactNode; className?: string; as?: "section" | "div" | "article" }) {
-  return <Tag className={`rounded-xl border border-rule bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
+export function Sheet({ children, className = "", as: Tag = "section", id }: { children: ReactNode; className?: string; as?: "section" | "div" | "article"; /** To link to it (#lines). */ id?: string }) {
+  return <Tag id={id} className={`rounded-xl border border-rule bg-sheet shadow-sheet ${className}`}>{children}</Tag>;
 }
 
 /** A sheet's heading. Every sheet gets one, in the same style, so sections are found at a glance. */
@@ -69,14 +70,16 @@ export function PageHeader({
         {tools ? (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <h1 className="text-title text-ink">{title}</h1>
+            <AboutTip>{children}</AboutTip>
             <div className="flex items-center">{tools}</div>
           </div>
         ) : (
-          <h1 className="text-title text-ink">
-            {title}
-          </h1>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="text-title text-ink">{title}</h1>
+            <AboutTip>{children}</AboutTip>
+          </div>
         )}
-        {children && <div className="mt-1.5 text-ink-2">{children}</div>}
+        {children && !plainText(children) && <div className="mt-1.5 text-ink-2">{children}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>

@@ -1,15 +1,15 @@
 "use client";
 
-import { KeyRound, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
-import { Field, FormError, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/finance/platform/ui/field";
 import { PickList, SaveBar } from "@/src/modules/finance/platform/ui/pick-list";
 import { SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
-import { deleteRole, saveRole, saveUser, setUserPassword } from "@/src/modules/finance/actions/admin";
+import { deleteRole, saveRole, saveUser } from "@/src/modules/finance/actions/admin";
 import { removeUserSignature } from "@/src/modules/finance/signature/actions";
 import type { AdminUsers, PermissionArea, RolesData } from "@/src/modules/finance/lib/types";
 
@@ -41,6 +41,11 @@ function useSave() {
 }
 
 /** Everyone who can sign in to Finance: their role, on or off, and password reset. */
+/**
+ * Who opens this module, and the role each has here. Adding people, their role, password and
+ * switching them off are done once for every module in Bishnoi One's People (R2, decided
+ * 2026-10-26); this page keeps what is the module's own.
+ */
 export function UsersEditor({
   data,
   meId,
@@ -74,99 +79,6 @@ export function UsersEditor({
 
   return (
     <div className="space-y-5">
-      {adding ? (
-        <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle icon="addRole">Add user</SectionTitle>
-          <form
-            noValidate
-            className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save(
-                () => saveUser(null, { ...d, fullName: d.fullName.trim(), email: d.email.trim() }),
-                () => {
-                  setAdding(false);
-                  setD({ ...d, fullName: "", email: "", password: "" });
-                  return { message: `${d.fullName.trim()} added` };
-                },
-              );
-            }}
-          >
-            <Field label="Full name" error={fields.fullName}>
-              {(p) => (
-                <Input
-                  {...p}
-                  value={d.fullName}
-                  onChange={(e) => setD({ ...d, fullName: e.target.value })}
-                  autoFocus
-                />
-              )}
-            </Field>
-            <Field label="Work email" error={fields.email}>
-              {(p) => (
-                <Input
-                  {...p}
-                  type="email"
-                  value={d.email}
-                  onChange={(e) => setD({ ...d, email: e.target.value })}
-                />
-              )}
-            </Field>
-            <Field
-              label="Role"
-              error={fields.roleId}
-              hint={data.roles.find((r) => r.id === d.roleId)?.description ?? undefined}
-            >
-              {(p) => (
-                <Select {...p} value={d.roleId} onChange={(e) => setD({ ...d, roleId: e.target.value })}>
-                  {data.roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field
-              label="Initial password"
-              error={fields.password}
-              hint="At least 8 characters. Share it with the user directly."
-            >
-              {(p) => (
-                <Input
-                  {...p}
-                  type="password"
-                  autoComplete="new-password"
-                  value={d.password}
-                  onChange={(e) => setD({ ...d, password: e.target.value })}
-                />
-              )}
-            </Field>
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-              <Button type="submit" variant="primary" loading={saving}>
-                Add user
-              </Button>
-              <Button variant="quiet" onClick={() => setAdding(false)}>
-                Cancel
-              </Button>
-            </div>
-            {error && (
-              <div className="sm:col-span-2 lg:col-span-4">
-                <FormError message={error} />
-              </div>
-            )}
-          </form>
-        </Sheet>
-      ) : (
-        <Button
-          variant="primary"
-          icon={<Plus className="size-4" aria-hidden />}
-          onClick={() => setAdding(true)}
-        >
-          Add user
-        </Button>
-      )}
-
       <Sheet>
         <ul className="divide-y divide-rule">
           {data.items.map((u) => (
@@ -184,24 +96,7 @@ export function UsersEditor({
                   {!u.isActive && " · inactive"}
                 </span>
               </span>
-              <Select
-                aria-label={`${u.fullName}'s role`}
-                value={u.role.id}
-                disabled={pending}
-                onChange={(e) =>
-                  change(
-                    u.id,
-                    { roleId: e.target.value },
-                    `${u.fullName} is now ${data.roles.find((r) => r.id === e.target.value)?.name}`,
-                  )
-                }
-              >
-                {data.roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </Select>
+              <span className="text-sm text-ink-2">{u.role.name}</span>
               <span className="flex items-center gap-1 justify-self-end">
                 {/* The calendar is switched on per person, not given with a role. */}
                 <Button
@@ -239,23 +134,6 @@ export function UsersEditor({
                     }}
                   />
                 )}
-                <NewPassword id={u.id} name={u.fullName} />
-                {u.id !== meId && (
-                  <Button
-                    size="sm"
-                    variant="quiet"
-                    disabled={pending}
-                    onClick={() =>
-                      change(
-                        u.id,
-                        { isActive: !u.isActive },
-                        u.isActive ? `${u.fullName} deactivated` : `${u.fullName} reactivated`,
-                      )
-                    }
-                  >
-                    {u.isActive ? "Deactivate" : "Activate"}
-                  </Button>
-                )}
               </span>
             </li>
           ))}
@@ -265,57 +143,6 @@ export function UsersEditor({
   );
 }
 
-function NewPassword({ id, name }: { id: string; name: string }) {
-  const [password, setPassword] = useState("");
-  const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
-
-  if (!open) {
-    return (
-      <Button
-        size="sm"
-        variant="quiet"
-        icon={<KeyRound className="size-3.5" aria-hidden />}
-        onClick={() => setOpen(true)}
-      >
-        Set password
-      </Button>
-    );
-  }
-
-  return (
-    <form
-      className="flex items-center gap-1.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        start(async () => {
-          const r = await setUserPassword(id, password);
-          if (!r.ok) toast.error(r.error);
-          else {
-            toast.success(`Password set for ${name}`);
-            setOpen(false);
-            setPassword("");
-          }
-        });
-      }}
-    >
-      <Input
-        type="password"
-        value={password}
-        autoFocus
-        placeholder="New password"
-        className="w-36 !py-1 text-xs"
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <Button size="sm" variant="primary" type="submit" loading={pending} disabled={password.length < 8}>
-        Save
-      </Button>
-      <Button size="sm" variant="quiet" onClick={() => setOpen(false)}>
-        Cancel
-      </Button>
-    </form>
-  );
-}
 
 // --- Roles & Permissions ---------------------------------------------------
 
@@ -455,8 +282,8 @@ export function RolesEditor({ data }: { data: RolesData }) {
               someone less, make a new role.
             </p>
           ) : (
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              <Field label="Name" error={errors.fields.name}>
+            <FormGrid className="mt-4">
+              <Field label="Name" size="md" error={errors.fields.name}>
                 {(p) => (
                   <Input
                     {...p}
@@ -466,7 +293,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
                   />
                 )}
               </Field>
-              <Field label="Description" optional error={errors.fields.description}>
+              <Field label="Description" size="full" optional error={errors.fields.description}>
                 {(p) => (
                   <Textarea
                     {...p}
@@ -476,7 +303,7 @@ export function RolesEditor({ data }: { data: RolesData }) {
                   />
                 )}
               </Field>
-            </div>
+            </FormGrid>
           )}
         </Sheet>
         <Permissions

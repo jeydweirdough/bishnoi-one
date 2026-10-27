@@ -18,6 +18,7 @@ from app.tenants import HEADER, Tenants, clean
 from app import graphql_api
 from app.routers import activities, admin, auth, bulk, catalogue, companies, customer_types, contacts, deals, duplicates, exports, field, imports, insights, kpis, people, price_rules, prices, quote_templates, quotes, retention, sales, crm, unset, integration, integration_prices, connections, attention, media, associations, mailbox
 from app.routers import settings as settings_router
+from app.routers import reports as reports_router
 from app.routers import assistance, field_plan, inbox, lead_finder, profile, quote_links, search, sharing, views
 from app.guard import install as install_guard
 
@@ -110,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sales.router)
     app.include_router(people.router)
     app.include_router(insights.router)
+    app.include_router(reports_router.router)
     app.include_router(kpis.router)
     app.include_router(imports.router)
     app.include_router(exports.router)

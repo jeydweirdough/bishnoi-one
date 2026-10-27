@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveTemplate, uploadTemplateFile } from "@/src/modules/crm/actions/quote-templates";
 import { Button } from "@/src/platform/ui/button";
-import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { CodeTemplate } from "@/src/modules/crm/quote-templates/code-editor";
 import { TemplateImage } from "@/src/modules/crm/quote-templates/images";
@@ -74,11 +74,11 @@ export function TemplateEditor({ initial, options }: Props) {
       <div className="space-y-5">
         <Sheet className="px-5 pt-4 pb-5">
           <SectionTitle icon="quotes">Template</SectionTitle>
-          <div className="mt-3 grid gap-5 sm:grid-cols-2">
-            <Field label="Name" className="sm:col-span-2">
+          <FormGrid className="mt-3">
+            <Field label="Name" size="md">
               {(p) => <Input {...p} value={v.name} onChange={set("name")} maxLength={120} />}
             </Field>
-            <Field label="Used for" hint="Quotes paid this way offer this template first.">
+            <Field label="Used for" size="md" hint="Quotes paid this way offer this template first.">
               {(p) => (
                 <Select {...p} value={v.payer} onChange={set("payer")}>
                   <option value="">Any quote</option>
@@ -91,7 +91,7 @@ export function TemplateEditor({ initial, options }: Props) {
                 </Select>
               )}
             </Field>
-            <Field label="Team" hint="For example, a Getmeds team and a 2MG team with their own forms.">
+            <Field label="Team" size="md" hint="For example, a Getmeds team and a 2MG team with their own forms.">
               {(p) => (
                 <Select {...p} value={v.teamId} onChange={set("teamId")}>
                   {options.anyTeam !== false && <option value="">Any team</option>}
@@ -103,7 +103,7 @@ export function TemplateEditor({ initial, options }: Props) {
                 </Select>
               )}
             </Field>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-6">
               <Choice
                 name="kind"
                 legend="Template type"
@@ -116,11 +116,11 @@ export function TemplateEditor({ initial, options }: Props) {
                 ]}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm sm:col-span-6">
               <input suppressHydrationWarning type="checkbox" checked={v.isActive} onChange={(e) => setV({ ...v, isActive: e.target.checked })} className="size-4 accent-hema" />
               In use (reps can print with it)
             </label>
-          </div>
+          </FormGrid>
         </Sheet>
 
         <Sheet className="px-5 pt-4 pb-5">
@@ -152,23 +152,23 @@ export function TemplateEditor({ initial, options }: Props) {
               name goes.
               {v.kind === "code" ? " Your code shows these where it has their fields, for example %company_name% and %certification%." : ""}
             </p>
-            <div className="mt-3 grid gap-5 sm:grid-cols-2">
-              <Field label="Company name" optional>
+            <FormGrid className="mt-3">
+              <Field label="Company name" size="md" optional>
                 {(p) => <Input {...p} value={d.companyName} onChange={setDesign("companyName")} />}
               </Field>
-              <Field label="Check payable to" optional>
+              <Field label="Check payable to" size="md" optional>
                 {(p) => <Input {...p} value={d.payableTo} onChange={setDesign("payableTo")} />}
               </Field>
-              <Field label="Address" optional className="sm:col-span-2">
+              <Field label="Address" size="full" optional>
                 {(p) => <Textarea {...p} rows={2} value={d.address} onChange={setDesign("address")} />}
               </Field>
-              <Field label="Telephone and mobile" optional>
+              <Field label="Telephone and mobile" size="lg" optional>
                 {(p) => <Input {...p} value={d.phone} onChange={setDesign("phone")} />}
               </Field>
-              <Field label="TIN" optional>
+              <Field label="TIN" size="sm" optional>
                 {(p) => <Input {...p} value={d.tin} onChange={setDesign("tin")} placeholder="000-000-000-00000" />}
               </Field>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-6">
                 <Choice
                   name="vat"
                   legend="Tax"
@@ -180,22 +180,22 @@ export function TemplateEditor({ initial, options }: Props) {
                   ]}
                 />
               </div>
-              <Field label="Title" optional>
+              <Field label="Title" size="md" optional>
                 {(p) => <Input {...p} value={d.heading} onChange={setDesign("heading")} />}
               </Field>
-              <Field label="Customer is called" optional hint="For example Patient name or Beneficiary.">
+              <Field label="Customer is called" size="md" optional hint="For example Patient name or Beneficiary.">
                 {(p) => <Input {...p} value={d.customerLabel} onChange={setDesign("customerLabel")} />}
               </Field>
-              <Field label="Certification" optional className="sm:col-span-2">
+              <Field label="Certification" size="full" optional>
                 {(p) => <Textarea {...p} rows={3} value={d.certification} onChange={setDesign("certification")} />}
               </Field>
-              <Field label="Guarantee letter statement" optional className="sm:col-span-2">
+              <Field label="Guarantee letter statement" size="full" optional>
                 {(p) => <Input {...p} value={d.acceptance} onChange={setDesign("acceptance")} />}
               </Field>
-              <Field label="Notes at the bottom" optional className="sm:col-span-2">
+              <Field label="Notes at the bottom" size="full" optional>
                 {(p) => <Textarea {...p} rows={3} value={d.notes} onChange={setDesign("notes")} />}
               </Field>
-            </div>
+            </FormGrid>
           </Sheet>
         )}
       </div>

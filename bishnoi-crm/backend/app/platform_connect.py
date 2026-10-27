@@ -190,12 +190,25 @@ def connect_now(settings: Settings) -> None:
         return
 
     def run() -> None:
+        import time
+
         from app import platform_links
 
-        try:
-            platform_links.answer(settings)
-        except Exception:
-            log.exception("Links: couldn't ask the Platform.")
+        # The Platform may still be starting (both start together with npm run one): a few quick tries,
+        # quiet but for the last, before leaving it to the usual retry every half minute.
+        tries = (0, 3, 8, 15)
+        for n, wait in enumerate(tries):
+            time.sleep(wait)
+            platform_links._quiet = n < len(tries) - 1
+            try:
+                platform_links.forget()
+                if platform_links.answer(settings) is not None:
+                    break
+            except Exception:
+                log.exception("Links: couldn't ask the Platform.")
+                break
+            finally:
+                platform_links._quiet = False
 
     threading.Thread(target=run, name="platform-connect", daemon=True).start()
 

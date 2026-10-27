@@ -39,7 +39,7 @@ export default async function NewActivityPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Log activity"
-        crumbs={company ? [{ href: `/crm/companies/${company.id}`, label: company.name }] : [{ href: "/crm/activities", label: "Activities" }]}
+        crumbs={company ? [{ href: `/crm/customers/${company.id}`, label: company.name }] : [{ href: "/crm/activities", label: "Activities" }]}
       >
         {company ? `With ${company.name}: it's kept on their page, with the rest of their history.` : "A call, meeting, email, note or task: it's kept on the customer's page."}
       </PageHeader>

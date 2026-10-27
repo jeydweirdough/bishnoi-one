@@ -56,6 +56,8 @@ export type InvoiceSummary = {
   taxCentavos: number;
   paidCentavos: number;
   balanceCentavos: number;
+  /** Its payments, oldest first (removed ones carry removedAt). */
+  payments: Payment[];
   createdBy: string;
   issuedBy: string | null;
   issuedAt: string | null;
@@ -94,7 +96,6 @@ export type Invoice = InvoiceSummary & {
   problem: string | null;
   /** The form fields it's about, for marking them in the editor (e.g. customerTin, lines.1.category). */
   problemFields?: Record<string, string>;
-  payments: Payment[];
   methods: { key: string; label: string }[];
 };
 

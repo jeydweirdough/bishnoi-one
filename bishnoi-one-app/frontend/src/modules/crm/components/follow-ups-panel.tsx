@@ -6,7 +6,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { FollowUpItem } from "@/src/modules/crm/components/follow-up-item";
 import { Button } from "@/src/platform/ui/button";
-import { Field, FormError, Input, Select } from "@/src/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Select } from "@/src/platform/ui/field";
 import { addFollowUp } from "@/src/modules/crm/actions/customers";
 import type { FollowUp, Org, Person } from "@/src/platform/lib/types";
 
@@ -112,11 +112,11 @@ export function FollowUpsPanel({
           <Field label="Follow-up" error={fields.title}>
             {(p) => <Input {...p} name="title" defaultValue={draft?.title} maxLength={160} placeholder="e.g. Send price list" autoFocus />}
           </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Due" error={fields.dueOn}>
+          <FormGrid>
+            <Field label="Due" size="sm" error={fields.dueOn}>
               {(p) => <Input {...p} name="dueOn" type="date" defaultValue={draft?.dueOn ?? today} min={today} />}
             </Field>
-            <Field label="For" error={fields.assigneeId}>
+            <Field label="For" size="lg" error={fields.assigneeId}>
               {(p) => (
                 <Select {...p} name="assigneeId" defaultValue={draft?.assigneeId ?? me.id ?? ""}>
                   {people.map((person) => (
@@ -127,7 +127,7 @@ export function FollowUpsPanel({
                 </Select>
               )}
             </Field>
-          </div>
+          </FormGrid>
           <FormError message={error} />
           <div className="flex gap-2">
             <Button type="submit" variant="primary" size="sm" loading={pending}>

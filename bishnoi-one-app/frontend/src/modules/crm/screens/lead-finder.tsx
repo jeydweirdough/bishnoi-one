@@ -13,7 +13,7 @@ export default async function LeadFinderPage() {
   const finder = await load<{ team: string | null; types: { code: string; name: string }[] }>("/leads/finder");
   return (
     <>
-      <PageHeader title="Find leads with AI" crumbs={[{ href: "/crm/companies", label: "Customers" }]}>
+      <PageHeader title="Find leads with AI" crumbs={[{ href: "/crm/customers", label: "Customers" }]}>
         Your AI (ChatGPT, Claude or DeepSeek) searches the internet; you check what it found and add the good ones to your customers.
       </PageHeader>
       <LeadFinder company={me.org.name} team={finder.team} types={finder.types} defaultWhere="" />

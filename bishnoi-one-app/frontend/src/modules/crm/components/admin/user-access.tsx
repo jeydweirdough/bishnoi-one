@@ -1,90 +1,21 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
-import { Button } from "@/src/platform/ui/button";
-import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Field, FormError, Input } from "@/src/platform/ui/field";
-import { resetPassword, updateUser } from "@/src/modules/crm/actions/admin";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { AdminUserRow } from "@/src/platform/lib/types";
 
-/** Switching a person off (or back on), and giving them a new password. */
-export function UserAccess({ user, isMe }: { user: AdminUserRow; isMe: boolean }) {
-  const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, start] = useTransition();
-
-  async function toggle(): Promise<boolean> {
-    const result = await updateUser(user.id, { isActive: !user.isActive });
-    if (!result.ok) {
-      toast.error(result.error);
-      return false;
-    }
-    toast.success(user.isActive ? "Deactivated" : "Reactivated", { description: user.fullName });
-    router.refresh();
-    return true;
-  }
-
-  function setNew() {
-    start(async () => {
-      const result = await resetPassword(user.id, password);
-      if (!result.ok) {
-        setError(result.fields?.password ?? result.error);
-        return;
-      }
-      setPassword("");
-      setError(null);
-      toast.success("New password set", { description: `${user.fullName} is signed out everywhere and uses it from now on.` });
-    });
-  }
-
+/**
+ * A person's sign-in: their password and switching them off (or on) are kept once for every module
+ * in Bishnoi One's People (R2, decided 2026-10-26), so here it says where, and how they stand.
+ */
+export function UserAccess({ user }: { user: AdminUserRow; isMe?: boolean }) {
   return (
-    <div className="space-y-6">
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          setNew();
-        }}
-        className="space-y-3"
-      >
-        <Field label="New password" hint="At least 8 characters. They're signed out everywhere and use it from their next sign-in.">
-          {(p) => <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />}
-        </Field>
-        <FormError message={error} />
-        <Button type="submit" size="sm" loading={saving} disabled={password.length === 0}>
-          Set new password
-        </Button>
-      </form>
-
-      <div className="border-t border-rule pt-5">
-        {user.isActive ? (
-          isMe ? (
-            <p className="text-meta text-ink-3">You can't deactivate your own account. Another administrator can.</p>
-          ) : (
-            <ConfirmButton
-              label="Deactivate"
-              title={`Deactivate ${user.fullName}?`}
-              body="They're signed out at once and can't sign in again until the account is reactivated. Their history stays."
-              confirmLabel="Deactivate"
-              triggerSize="sm"
-              onConfirm={toggle}
-            />
-          )
-        ) : (
-          <ConfirmButton
-            label="Reactivate"
-            title={`Reactivate ${user.fullName}?`}
-            body="They can sign in again with their last password."
-            confirmLabel="Reactivate"
-            danger={false}
-            triggerSize="sm"
-            onConfirm={toggle}
-          />
-        )}
-      </div>
+    <div className="space-y-3 text-sm">
+      <p className="text-ink-2">
+        {user.isActive ? "Can sign in." : "Switched off: can't sign in."} Passwords and switching people off are done in People, once for every module.
+      </p>
+      <Link href="/platform/roles/people" className="inline-flex items-center gap-1.5 font-medium text-ink hover:underline">
+        Open People
+        <ArrowRight className="size-4" aria-hidden />
+      </Link>
     </div>
   );
 }

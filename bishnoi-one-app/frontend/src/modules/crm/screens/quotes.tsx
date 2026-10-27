@@ -1,4 +1,6 @@
-import { Users } from "lucide-react";
+import { Building2, ExternalLink, Printer, Trash2, Users } from "lucide-react";
+import { RowMenu } from "@/src/platform/ui/row-menu";
+import { deleteQuote } from "@/src/modules/crm/actions/customers";
 import { Board as KanbanBoard } from "@/src/platform/ui/board";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { ListViews } from "@/src/modules/crm/components/crm/list-views";
@@ -15,6 +17,8 @@ import type { CompanyRow, Paged, Quote } from "@/src/platform/lib/types";
 import { NewQuoteButton } from "@/src/modules/crm/components/crm/new-quote-button";
 import { NoAccess } from "@/src/modules/crm/components/admin/words";
 import { Filters, Pager } from "@/src/modules/crm/components/crm/list-controls";
+import { ListFrame, StatusPill, UnderlineTabs, type PillTone } from "@/src/platform/ui/list-layout";
+import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 
 export const metadata = { title: "Quotes" };
 
@@ -27,6 +31,15 @@ const TASKS = [
   { key: "letters", label: "Letters to check", empty: "No guarantee letters waiting to be checked." },
   { key: "payments", label: "Letter payments", empty: "No verified letters waiting on payment." },
 ] as const;
+
+/** Where a quote stands, as one word: ordered, credit on hold, or its approval state. */
+function standing(x: Quote): { tone: PillTone; label: string } {
+  if (x.order) return { tone: "info", label: "Ordered" };
+  if (x.credit?.decision === "hold") return { tone: "bad", label: "Credit on hold" };
+  if (x.state === "ready") return { tone: "good", label: "Ready" };
+  if (x.state === "rejected") return { tone: "bad", label: "Rejected" };
+  return { tone: "warn", label: "Waiting for approval" };
+}
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
@@ -53,22 +66,6 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   const customers = quotes && can(me, "customers.view") ? load<Paged<CompanyRow>>("/companies?limit=200") : Promise.resolve({ items: [], total: 0 } as Paged<CompanyRow>);
   const waiting = Promise.all(approver ? tasks.map((t) => load<Paged<Quote>>(`/quotes?task=${t.key}&limit=1`)) : []);
   const tab = (key: string) => (key ? `/crm/quotes?task=${key}` : "/crm/quotes");
-  const chip = (key: string, label: string, count?: number) => {
-    const current = (task?.key ?? "") === key;
-    return (
-      <Link
-        key={key || "all"}
-        href={tab(key)}
-        aria-current={current ? "page" : undefined}
-        className={`rounded-md border px-3 py-1 text-meta ${
-          current ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema hover:text-ink"
-        }`}
-      >
-        {label}
-        {count ? <span className="text-ink-3"> {count}</span> : null}
-      </Link>
-    );
-  };
   const here = new URLSearchParams(Object.entries({ task: task?.key ?? "", q, state, owner }).filter(([, v]) => v));
   const layoutHref = (l: string) => {
     const next = new URLSearchParams(here);
@@ -76,12 +73,10 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
     return `/crm/quotes${next.size ? `?${next}` : ""}`;
   };
   const pickerOf = (c: Paged<CompanyRow>) => (quotes ? c.items.map((x) => ({ id: x.id, name: x.name })) : null);
-  const chips = (counts: Paged<Quote>[]) => (
-    <nav aria-label="Show" className="mb-4 flex flex-wrap gap-1.5">
-      {chip("", "All quotes")}
-      {tasks.map((t, i) => chip(t.key, t.label, counts[i]?.total))}
-    </nav>
-  );
+  const tabsOf = (counts: Paged<Quote>[]) => [
+    { href: tab(""), label: "All quotes", current: !task },
+    ...tasks.map((t, i) => ({ href: tab(t.key), label: t.label, count: counts[i]?.total, current: task?.key === t.key })),
+  ];
 
   return (
     <>
@@ -99,60 +94,54 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
       </PageHeader>
       <ListViews list="quotes" />
 
-      {approver && (
-        <Later data={waiting} fallback={chips([])}>
-          {chips}
-        </Later>
-      )}
+      <ListFrame>
+        {approver && (
+          <Later data={waiting} fallback={<UnderlineTabs tabs={tabsOf([])} />}>
+            {(counts) => <UnderlineTabs tabs={tabsOf(counts)} />}
+          </Later>
+        )}
+        {/* One toolbar row: the live search and filters, the table or board on the right. */}
+        <div className="flex flex-wrap items-end justify-between gap-3 px-5 pt-3 pb-3 [&_.mb-4]:mb-0">
+          <div className="min-w-0 flex-1">
+            <Filters
+              search="Search number or customer"
+              selects={[
+                ...(task
+                  ? []
+                  : [
+                      {
+                        name: "state",
+                        label: "State",
+                        options: [
+                          { value: "", label: "Any state" },
+                          { value: "waiting", label: "Waiting for approval" },
+                          { value: "ready", label: "Ready" },
+                          { value: "rejected", label: "Rejected" },
+                        ],
+                      },
+                    ]),
+                ...(me.role?.scope !== "own"
+                  ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Created by me" }] }]
+                  : []),
+              ]}
+            />
+          </div>
+          <ToggleLinks
+            current={layout}
+            options={[
+              { value: "table", label: "Table", href: layoutHref("table") },
+              { value: "board", label: "Board", href: layoutHref("board") },
+            ]}
+          />
+        </div>
 
-      <Filters
-        search="Number or customer"
-        selects={[
-          ...(task
-            ? []
-            : [
-                {
-                  name: "state",
-                  label: "State",
-                  options: [
-                    { value: "", label: "Any state" },
-                    { value: "waiting", label: "Waiting for approval" },
-                    { value: "ready", label: "Ready" },
-                    { value: "rejected", label: "Rejected" },
-                  ],
-                },
-              ]),
-          ...(me.role?.scope !== "own"
-            ? [{ name: "owner", label: "Owner", options: [{ value: "", label: "All" }, { value: "me", label: "Created by me" }] }]
-            : []),
-        ]}
-      />
-
-      <div className="mb-3">
-        <ToggleLinks
-          current={layout}
-          options={[
-            { value: "table", label: "Table", href: layoutHref("table") },
-            { value: "board", label: "Board", href: layoutHref("board") },
-          ]}
-        />
-      </div>
-
-      <Later
-        data={Promise.all([listing, customers])}
-        fallback={
-          <Sheet className="overflow-hidden">
-            <ListRows columns={2} />
-          </Sheet>
-        }
-      >
-        {([list, c]) => {
-          if (layout === "board") return <QuotesBoard list={list} fmt={fmt} task={task?.key} />;
-          const picker = pickerOf(c);
-          return (
-            <>
-              <Sheet className="overflow-hidden">
-                {list.items.length === 0 ? (
+        <Later data={Promise.all([listing, customers])} fallback={<ListRows columns={2} />}>
+          {([list, c]) => {
+            if (layout === "board") return <div className="border-t border-rule p-4"><QuotesBoard list={list} fmt={fmt} task={task?.key} /></div>;
+            const picker = pickerOf(c);
+            if (list.items.length === 0)
+              return (
+                <div className="border-t border-rule">
                   <Empty
                     icon="quotes"
                     title={task ? task.empty : q || state || owner ? "No quotes match." : "No quotes yet."}
@@ -166,7 +155,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
                         picker && (
                           <>
                             <NewQuoteButton customers={picker} label="Create first quote" />
-                            <LinkButton href="/crm/companies" variant="quiet" icon={<Users className="size-4" aria-hidden />}>
+                            <LinkButton href="/crm/customers" variant="quiet" icon={<Users className="size-4" aria-hidden />}>
                               Go to customers
                             </LinkButton>
                           </>
@@ -176,46 +165,121 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
                   >
                     {!task && !q && !state && !owner && "A quote is always for a customer: pick one, then add the products."}
                   </Empty>
-                ) : (
-                  <ul className="divide-y divide-rule">
-                    {list.items.map((x) => (
-                      <li key={x.id} className="flex items-start justify-between gap-4 px-5 py-3">
-                        <div className="min-w-0">
-                          <Link href={`/crm/quotes/${x.id}${task ? `?from=${task.key}` : ""}`} className="font-semibold text-ink hover:underline">
-                            {x.number}
-                          </Link>
-                          <span className="text-ink-2"> · {x.customerName}</span>
-                          <p className="text-meta text-ink-3">
-                            {[
-                              fmt.whenLabel(x.createdAt),
-                              x.priceTypeName + (x.rx ? " · Rx" : ""),
-                              x.payerName && `${x.payerName} letter`,
-                              x.createdBy.id === me.user.id ? "by you" : `by ${x.createdBy.name}`,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
+                </div>
+              );
+            return (
+              <div className="border-t border-rule">
+                <ExpandableTable
+                  minWidth="50rem"
+                  columns={[
+                    { key: "number", label: "Quote" },
+                    { key: "customer", label: "Customer" },
+                    { key: "made", label: "Created" },
+                    { key: "price", label: "Price type" },
+                    { key: "total", label: "Total", align: "right" },
+                    { key: "state", label: task?.key === "payments" ? "Letter paid" : "Status" },
+                  ]}
+                  rows={list.items.map((x) => {
+                    const st = standing(x);
+                    return {
+                      id: x.id,
+                      muted: x.state === "rejected",
+                      actions: (
+                        <RowMenu
+                          label={`Actions for quote ${x.number}`}
+                          items={[
+                            { label: "Open", icon: <ExternalLink />, href: `/crm/quotes/${x.id}${task ? `?from=${task.key}` : ""}` },
+                            { label: "Print", icon: <Printer />, href: `/crm/print/quotes/${x.id}` },
+                            ...(x.customerHref ? ["divider" as const, { label: "Open customer", icon: <Building2 />, href: x.customerHref }] : []),
+                            ...(x.can.delete
+                              ? [
+                                  "divider" as const,
+                                  {
+                                    label: "Delete",
+                                    icon: <Trash2 />,
+                                    run: deleteQuote.bind(null, x.id),
+                                    danger: true,
+                                    confirm: `Delete quote ${x.number}? This can't be undone.`,
+                                    done: `Quote ${x.number} deleted`,
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
+                      ),
+                      cells: [
+                        <Link key="n" href={`/crm/quotes/${x.id}${task ? `?from=${task.key}` : ""}`} className="font-mono text-meta font-semibold text-ink hover:text-sage-deep hover:underline">{x.number}</Link>,
+                        <span key="c" className="min-w-0">
+                          <span className="block truncate font-medium text-ink">{x.customerName}</span>
+                          <span className="block truncate text-meta text-ink-3">{x.createdBy.id === me.user.id ? "By you" : `By ${x.createdBy.name}`}{x.payerName ? ` · ${x.payerName} letter` : ""}</span>
+                        </span>,
+                        <span key="m" className="text-ink-2">{fmt.whenLabel(x.createdAt)}</span>,
+                        <span key="p" className="text-ink-2">{x.priceTypeName}{x.rx ? " · Rx" : ""}</span>,
+                        <span key="t" className="font-medium">{fmt.peso(x.totalCentavos)}</span>,
+                        task?.key === "payments" && x.letter ? (
+                          <span key="s" className="text-meta text-ink-2">{fmt.peso(x.payment.paidCentavos)} of {fmt.peso(x.letter.amountCentavos)}</span>
+                        ) : (
+                          <StatusPill key="s" tone={st.tone}>{st.label}</StatusPill>
+                        ),
+                      ],
+                      detail: (
+                        <div className="space-y-3">
+                          <table className="w-full text-meta">
+                            <thead>
+                              <tr className="text-left text-ink-3">
+                                <th className="py-1 pr-3 font-medium">Code</th>
+                                <th className="px-3 py-1 font-medium">Product</th>
+                                <th className="px-3 py-1 text-right font-medium">Quantity</th>
+                                <th className="px-3 py-1 text-right font-medium">Unit price</th>
+                                <th className="py-1 pl-3 text-right font-medium">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {x.lines.map((l, i) => (
+                                <tr key={`${l.productId || l.bundleId}-${i}`} className="border-t border-rule/70">
+                                  <td className="py-1.5 pr-3 font-mono text-ink-2">{l.productCode}</td>
+                                  <td className="px-3 py-1.5 text-ink">
+                                    {l.bundleName ?? l.productName}
+                                    {l.promoName && <span className="text-ink-3"> · {l.promoName}</span>}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums">
+                                    {l.quantity} {l.unit}
+                                    {l.freeQuantity ? <span className="text-sage-deep"> +{l.freeQuantity} free</span> : null}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums text-ink-2">{fmt.peso(l.unitPriceCentavos)}</td>
+                                  <td className="py-1.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(l.totalCentavos)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule/70 pt-3">
+                            <p className="text-meta text-ink-2">
+                              {x.credit ? (
+                                <>
+                                  Credit: <strong className="text-ink">{x.credit.label}</strong>
+                                  {x.credit.decision ? ` · Finance ${x.credit.decision === "hold" ? "put it on hold" : "confirmed it"}` : " · waiting for Finance"}
+                                </>
+                              ) : x.letter ? (
+                                <>Guarantee letter: <strong className="text-ink">{fmt.peso(x.letter.amountCentavos)}</strong></>
+                              ) : (
+                                <>Total <strong className="text-ink tabular-nums">{fmt.peso(x.totalCentavos)}</strong></>
+                              )}
+                            </p>
+                            <LinkButton href={`/crm/quotes/${x.id}${task ? `?from=${task.key}` : ""}`}>Open quote</LinkButton>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="font-semibold tabular-nums">{fmt.peso(x.totalCentavos)}</span>
-                          {task?.key === "payments" && x.letter ? (
-                            <span className="text-meta text-ink-2">
-                              {fmt.peso(x.payment.paidCentavos)} of {fmt.peso(x.letter.amountCentavos)} paid
-                            </span>
-                          ) : (
-                            <QuoteStateMark state={x.state} />
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Sheet>
-              <Pager total={list.total} page={page} size={SIZE} base={`/crm/quotes${here.size ? `?${here}` : ""}`} />
-            </>
-          );
-        }}
-      </Later>
+                      ),
+                    };
+                  })}
+                />
+                <div className="border-t border-rule px-5 py-3">
+                  <Pager total={list.total} page={page} size={SIZE} base={`/crm/quotes${here.size ? `?${here}` : ""}`} />
+                </div>
+              </div>
+            );
+          }}
+        </Later>
+      </ListFrame>
     </>
   );
 }

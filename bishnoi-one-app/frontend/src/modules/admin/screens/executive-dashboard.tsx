@@ -1,3 +1,5 @@
+import { Welcome } from "@/src/platform/ui/welcome";
+import { greeting } from "@/src/modules/admin/platform/lib/format";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Clock, HomeCalendar } from "@/src/modules/admin/components/home-attention";
@@ -37,6 +39,7 @@ export default async function ExecutiveDashboardPage() {
       >
         <Clock /> · what&apos;s due, a day at a time
       </PageHeader>
+      <Welcome module="admin" name={me.user.fullName.split(" ")[0]} greeting={greeting()} />
 
       <div className="grid gap-5 lg:min-h-[calc(100dvh-15rem)] lg:grid-cols-[minmax(0,1.3fr)_minmax(26rem,1fr)]">
         <HomeCalendar items={countdownHighlights} canLog={may("vehicles.edit")} />

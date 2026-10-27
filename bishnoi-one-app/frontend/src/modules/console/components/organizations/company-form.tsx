@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button, LinkButton } from "@/src/modules/console/platform/ui/button";
-import { Field, FormError, Input, Textarea } from "@/src/modules/console/platform/ui/field";
+import { Field, FormError, FormGrid, Input, Textarea } from "@/src/modules/console/platform/ui/field";
 import { Subheading } from "@/src/modules/console/platform/ui/sheet";
 import { addCompany, updateCompany, type CompanyPatch } from "@/src/modules/console/actions/organizations";
 import type { Company, Options } from "@/src/modules/console/lib/types";
@@ -98,12 +98,12 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
       }}
       className="space-y-7"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
+      <FormGrid>
         <Field
           label="Name"
           error={fields.name}
           hint={!company && (slug ? <>Company code: <b className="font-semibold text-ink-2">{slug}</b>.</> : "The company code is generated from the name.")}
-          className="sm:col-span-2"
+          size={company ? "lg" : "full"}
         >
           {(p) => <Input {...p} value={values.name} onChange={set("name")} autoFocus={!company} required />}
         </Field>
@@ -112,24 +112,24 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
             label="Company code"
             error={fields.slug}
             hint="Other applications identify the company by this code. Change it only after informing them."
-            className="sm:col-span-2"
+            size="sm"
           >
             {(p) => <Input {...p} value={values.slug} onChange={set("slug")} autoCapitalize="none" spellCheck={false} />}
           </Field>
         )}
-        <Field label="Currency" error={fields.currency} hint="Three-letter code, e.g. PHP.">
+        <Field label="Currency" size="sm" error={fields.currency} hint="Three-letter code, e.g. PHP.">
           {(p) => <Input {...p} value={values.currency} onChange={set("currency")} maxLength={3} autoCapitalize="characters" />}
         </Field>
-        <Field label="Time zone" error={fields.timezone} hint="E.g. Asia/Manila.">
+        <Field label="Time zone" size="lg" error={fields.timezone} hint="E.g. Asia/Manila.">
           {(p) => <Input {...p} value={values.timezone} onChange={set("timezone")} spellCheck={false} />}
         </Field>
-        <Field label="Contact email" optional error={fields.contactEmail} className="sm:col-span-2">
+        <Field label="Contact email" optional error={fields.contactEmail} size="md">
           {(p) => <Input {...p} type="email" inputMode="email" value={values.contactEmail} onChange={set("contactEmail")} />}
         </Field>
-        <Field label="Notes" optional error={fields.notes} className="sm:col-span-2">
+        <Field label="Notes" optional error={fields.notes} size="full">
           {(p) => <Textarea {...p} rows={3} value={values.notes} onChange={set("notes")} />}
         </Field>
-      </div>
+      </FormGrid>
 
       {!company && (
         <>
@@ -163,14 +163,14 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
               <Subheading>Company admin</Subheading>
             </legend>
             <p className="text-meta text-ink-3">Optional. Added as the first company admin. Enter both, or leave both blank.</p>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Admin name" optional error={fields.adminName}>
+            <FormGrid>
+              <Field label="Admin name" size="md" optional error={fields.adminName}>
                 {(p) => <Input {...p} value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} />}
               </Field>
-              <Field label="Admin email" optional error={fields.adminEmail}>
+              <Field label="Admin email" size="md" optional error={fields.adminEmail}>
                 {(p) => <Input {...p} type="email" inputMode="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} />}
               </Field>
-            </div>
+            </FormGrid>
           </fieldset>
         </>
       )}

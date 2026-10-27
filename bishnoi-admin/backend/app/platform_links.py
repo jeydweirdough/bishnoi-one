@@ -35,6 +35,8 @@ USES: dict[str, tuple[str, str, str | None]] = {
 OWN_APP_URL: str | None = None
 
 _lock = threading.Lock()
+# True while a module that is starting tries again quickly: a failure then isn't an error yet.
+_quiet = False
 # By connect key: (the last answer, when it was had, when to ask again)
 _known: dict[str, tuple[dict | None, float, float]] = {}
 
@@ -46,7 +48,8 @@ def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
     try:
         r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/connect/links", headers={"X-Bishnoi-App-Key": key}, timeout=5)
     except httpx.HTTPError as e:
-        log.error("Links: can't reach the platform at %s (%s).", settings.platform_api_url, e.__class__.__name__)
+        # While starting, the Platform may be starting too: said quietly until the last try (platform_connect.connect_now).
+        (log.info if _quiet else log.error)("Links: can't reach the platform at %s (%s)%s.", settings.platform_api_url, e.__class__.__name__, ", trying again shortly" if _quiet else "")
         return None, RETRY
     if r.status_code == 401:
         # Replaced or disconnected on the platform: no links until a new key is set here.

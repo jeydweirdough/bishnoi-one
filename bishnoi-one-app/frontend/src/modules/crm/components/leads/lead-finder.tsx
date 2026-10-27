@@ -205,7 +205,7 @@ export function LeadFinder({ company, team, types, defaultWhere }: { company: st
               Added: {saved.map((s, i) => (
                 <span key={s.id}>
                   {i > 0 && ", "}
-                  <Link href={`/crm/companies/${s.id}`} className="font-medium underline-offset-4 hover:underline">
+                  <Link href={`/crm/customers/${s.id}`} className="font-medium underline-offset-4 hover:underline">
                     {s.name}
                   </Link>
                 </span>
@@ -252,7 +252,7 @@ export function LeadFinder({ company, team, types, defaultWhere }: { company: st
                           <span>
                             Already in the CRM:{" "}
                             {m.id ? (
-                              <Link href={`/crm/companies/${m.id}`} className="font-medium underline-offset-4 hover:underline">
+                              <Link href={`/crm/customers/${m.id}`} className="font-medium underline-offset-4 hover:underline">
                                 {m.name}
                               </Link>
                             ) : (

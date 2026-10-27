@@ -10,6 +10,7 @@ import { Select } from "@/src/platform/ui/pickers";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { givePersonRole, importRoles, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
+import { AddPerson, PersonMenu } from "./person-dialogs";
 import type { AccessData, AccessPerson } from "./types";
 
 const NONE = "";
@@ -79,6 +80,7 @@ export function PeopleList({ data }: { data: AccessData }) {
           <span className="ml-auto text-meta text-ink-3">
             {shown.length} of {data.people.length}
           </span>
+          <AddPerson data={data} />
         </div>
 
         {shown.length === 0 ? (
@@ -118,7 +120,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
   }
 
   return (
-    <li className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_15rem_minmax(0,1.6fr)] lg:items-center">
+    <li className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_15rem_minmax(0,1.6fr)_auto] lg:items-center">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink">
           {person.fullName}
@@ -163,6 +165,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
           );
         })}
       </div>
+      <PersonMenu person={person} isMe={false} />
     </li>
   );
 }

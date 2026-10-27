@@ -3,5 +3,5 @@
 import { ListSkeleton } from "@/src/platform/ui/skeleton";
 
 export default function Loading() {
-  return <ListSkeleton title="Media" />;
+  return <ListSkeleton title="Documents" />;
 }

@@ -16,7 +16,7 @@ export function bucketOf(dueOn: string, today: string): Bucket {
 /** Where a task's customer is: the contact if it names one, else the company. */
 export function customerOf(a: ActivityItem): { name: string | null; href: string | null } {
   if (a.contact) return { name: a.company ? `${a.contact.name}, ${a.company.name}` : a.contact.name, href: `/crm/contacts/${a.contact.id}` };
-  if (a.company) return { name: a.company.name, href: `/crm/companies/${a.company.id}` };
+  if (a.company) return { name: a.company.name, href: `/crm/customers/${a.company.id}` };
   return { name: null, href: null };
 }
 

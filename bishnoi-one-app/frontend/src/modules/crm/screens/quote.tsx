@@ -46,7 +46,7 @@ export default async function QuotePage({ params, searchParams }: { params: Para
       ]
     : customer && quote.customerHref
       ? [
-          { href: quote.contact ? "/crm/contacts" : "/crm/companies", label: quote.contact ? "Contacts" : "Customers" },
+          { href: quote.contact ? "/crm/contacts" : "/crm/customers", label: quote.contact ? "Contacts" : "Customers" },
           { href: quote.customerHref, label: customer.name },
         ]
       : [{ href: "/crm/quotes", label: "Quotes" }];

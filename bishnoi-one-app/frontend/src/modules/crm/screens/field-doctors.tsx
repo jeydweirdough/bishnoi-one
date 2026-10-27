@@ -144,7 +144,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
                 {shown.rows.map((d) => (
                   <tr key={d.id}>
                     <th scope="row" className="py-2.5 pr-3 text-left font-medium">
-                      <Link href={`/crm/companies/${d.id}`} className="text-ink hover:underline">
+                      <Link href={`/crm/customers/${d.id}`} className="text-ink hover:underline">
                         {d.name}
                       </Link>
                       {(d.city || d.careGroupAt) && (

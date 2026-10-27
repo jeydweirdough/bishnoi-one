@@ -71,6 +71,19 @@ Order: scaffold → Platform → CRM → Inventory → Finance → Admin → Pha
 
 Finance takes **Oojeema**'s BIR features (a Philippine cloud accounting system built around BIR compliance) as the standard for what a company needs to file. Decided with the user: **books and VAT first**, from what Finance already keeps, then purchases, then the withholding forms (2307, 0619E, 1601EQ with QAP, 1604E) and SLP, then bank reconciliation. Every figure is read from posted records, never typed in again. The summary lists come as screens and CSV in the BIR template's columns; the **DAT files** (RELIEF SLS/SLP, SAWT, QAP) wait for BIR's official layout, since a field out of place fails the BIR's validation module. We prepare and print; the company files in eBIRForms or eFPS, as Oojeema does. **Merged with the Finance team's work the same day:** their supplier bills, approval flow and payment vouchers are the bills (ours were dropped), and the purchase-side reports read them; suppliers are **Finance's list for now** (Inventory keeps its supplier tax fields; linking the two lists comes later); the BIR screens are one sidebar group with their Sales DAT.
 
+## Navigation, trails and tracks, decided on 2026-10-24
+
+Every module is laid out the same way, after Zoho: the **module switcher** at
+the top of the sidebar lists only the modules the person's company and role
+give them; under it the module's
+menu **grouped by process**, in the order the work happens, with counts on
+the steps and red marks on missing set-up; set-up at the foot. One shared
+sidebar for every module (`src/platform/shell/sidebar.tsx`), each module's menu
+in its `shell/nav.tsx`. Every record shows its **trail** (who did what, when) and, when it moves
+through steps, its **track** (where it stands, who has it, time in each
+step). What we add to beat each benchmark, and the reports, are listed in
+surpass.md; each is decided as its own row when taken up.
+
 ## Product registrations (CPR), decided on 2026-10-24
 
 Each product carries its FDA **Certificate of Product Registration**: the number as printed (letters, a hyphen, digits: the shape is checked, not the prefix, since the FDA's prefixes change) and the day it's valid until. **Inventory keeps it**; the CRM brings it over with the product list. **Every active stock product needs one** (services, assets, consumables, inactive products and products that only group variants don't). It's flagged when missing, without a date, expired, or expiring within Inventory's expiry warning (90 days, the same window as batches), on the product list, as alerts and in a report. Existing products are filled in through **Update CPR numbers** (a CSV or cells pasted from a spreadsheet, by SKU, checked before saving). An expired CPR is flagged, **not yet blocked** from quotes or orders: that's for the business to decide.
@@ -174,3 +187,50 @@ channel's secrets are kept on Platform (Companies → Connections), never on the
 CRM's server; the CRM shows each channel's address to give it. Handling the
 inbox is its own permission (customers.inbox), given to roles wider than their
 own records (benchmark C8). Replying from the CRM comes later.
+
+## Plain, guided screens (P18), decided on 2026-10-25
+
+The user: the system works, the UX doesn't; too much text. Every screen now follows five UX rules
+(Jakob, Hick, Fitts, proximity, Doherty; patterns-to-adopt.md P18): explanations go behind an ⓘ,
+icons carry their meaning in one shared tooltip instead of repeating it in words, amounts are short
+with the whole on hover, and record pages show a "To do" strip leading to what still needs filling.
+
+## People kept once, on the Platform (R2), decided on 2026-10-26
+
+People are added, given their role and modules, given a password and switched off only on the
+Platform's People screen. Connected module APIs refuse doing any of it locally and close their own
+password sign-in; a switch-off on the Platform ends the person's sessions in every module. Modules
+keep a copy of the roles to check requests against, and edit only what is their own about a person.
+
+## View as, for administrators, decided on 2026-10-26
+
+An administrator already sees everything in every module (the built-in Administrator role: every
+permission, every record, every team). To see what each user type sees, from the biggest role to the
+smallest, they use View as (the eye in the top bar): pick a person, grouped by role from the role with
+the most permissions to the fewest; the module is then answered as that person (menus, home, records,
+actions), read-only, with a bar across the top and Stop viewing. Each start is in the module's activity
+log. Every module API: X-Bishnoi-View-As header, honoured only for someone with admin.users
+(app/platform_roles.py viewed_as); GET/POST /auth/view-as.
+
+## Report builder, saved custom reports and fixed statutory definitions, decided on 2026-10-26
+
+Following international benchmarks (Zoho Inventory's report customization, Salesforce report builder)
+and Philippine pharmaceutical/accounting statutory compliance:
+1. **Configurable report builder**: Users can customize base operational reports via a modal wizard:
+   reorder/toggle columns, apply type-aware filters (`is`, `is_not`, `contains`, `greater_than`,
+   `less_than`, `between`, `in`, `empty`, `not_empty`), group by any dimension with measure aggregation
+   (`sum`, `avg`, `min`, `max`, `count`), sort by multiple columns, choose chart presentation
+   (none, bar, line), and name and share the report with their company.
+2. **Platform definition persistence**: Saved reports persist only the report definition (JSON
+   configuration), never data copies, on the Platform backend (`/identity/reports`, table `nbpl_saved_reports`).
+   Execution happens live against the user's tenant-scoped, permission-checked module API query,
+   preventing stale data copies and maintaining strict row-level security.
+3. **Statutory boundary (Fixed vs. Template)**: Statutory accounting statements (Finance: P&L,
+   Balance Sheet, Cash Flow, Trial Balance, General Ledger, BIR books) and statutory pharmaceutical
+   compliance registers (Inventory & Pharmacy: batch expiry, FDA CPR status, stock movement audit trail,
+   adjustments; Admin: permits and leases) are marked `fixed: true`. Their calculations, grouping, and
+   columns are tamper-proof and locked against customization, while still supporting display period
+   selection and CSV export.
+4. **Unified Reports Center**: Reports Center features "My custom reports" and "Shared reports" in the
+   navigation rail across all modules (Finance, CRM, Inventory, Admin, Pharmacy) with creator attribution,
+   custom badges, and cell drill-downs to source records.

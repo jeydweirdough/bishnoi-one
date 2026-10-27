@@ -524,6 +524,10 @@ after you change a file.
 
 ### Linking apps
 
+> Online, nothing here is set by hand (2026-10-27): connected to the Platform, each app is given its
+> links and keys from **Admin Console > Applications** and **Connections**. What follows is for apps run
+> without the Platform.
+
 Some apps ask others for data: the CRM asks **Inventory** for products and
 stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx; **Finance** asks the
 **CRM** for customers to invoice (`CRM_API_URL`, `CRM_API_KEY` in Finance, and
@@ -554,6 +558,9 @@ CRM → Finance, another for CRM → Pharmacy. Restart both APIs. If the key is 
 the CRM tells its users the other app can't be reached; nothing breaks.
 
 ### Screens settings (the one app)
+
+> Online, only `PLATFORM_API_URL` (2026-10-27): each module's API address comes from Admin Console >
+> Applications, and the site's own address from the address it's reached at.
 
 The screens are one app, so they have one settings file:
 `bishnoi-one-app/frontend/.env.local`. Only the one app's server talks to the

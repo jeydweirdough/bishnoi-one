@@ -1,5 +1,6 @@
 """Settings, read from backend/.env (see .env.example)."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = API_DIR / ".data"
+
+
+def on_a_server() -> bool:
+    """Whether this runs on a hosting service, which says so in its own settings."""
+    return bool(os.environ.get("VERCEL_ENV")) or any(name.startswith("COOLIFY_") for name in os.environ)
 
 
 class Settings(BaseSettings):
@@ -29,8 +35,9 @@ class Settings(BaseSettings):
     aws_secret_access_key: SecretStr | None = None
     aws_region: str = "ap-southeast-1"
     s3_bucket: str = "assets"
-    # Where the screens run, allowed to upload into the bucket from the browser.
-    s3_browser_origins: list[str] = ["http://localhost:4302", "http://127.0.0.1:4302"]
+    # Where the screens run, allowed to upload into the bucket from the browser: the one app
+    # (4301, since 2026-10-24) and the old CRM screens (4302). CRM_APP_URL is added on its own.
+    s3_browser_origins: list[str] = ["http://localhost:4301", "http://127.0.0.1:4301", "http://localhost:4302", "http://127.0.0.1:4302"]
     # The first administrator, made when the database has no accounts at all:
     # for a host you can't run the users tool against (Vercel + a database it
     # can reach and you can't). Once they exist these are ignored; remove the
@@ -97,6 +104,19 @@ class Settings(BaseSettings):
             if name and name not in out:
                 out.append(name)
         return out
+
+    @model_validator(mode="after")
+    def _where_it_runs(self):
+        """Nothing to set for where it runs (decided 2026-10-27). On a server
+        (Vercel, Coolify) it's production unless ENVIRONMENT says otherwise; on
+        this computer, development. In production with no ALLOWED_HOSTS it
+        answers to whatever name it's reached by: nothing here is built from that
+        name, and every request is checked by its sign-in or key."""
+        if "environment" not in self.model_fields_set and on_a_server():
+            self.environment = "production"
+        if "allowed_hosts" not in self.model_fields_set and self.environment == "production":
+            self.allowed_hosts = ["*"]
+        return self
 
     @model_validator(mode="after")
     def _this_computer_always(self):

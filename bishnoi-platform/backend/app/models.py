@@ -356,6 +356,26 @@ class AccessRoleScope(Base):
     scope: Mapped[str] = mapped_column(String(16))
 
 
+class SavedReport(Base):
+    """A report someone built from one of a module's reports (decided 2026-10-26): which report it
+    starts from, and what was chosen (columns, filters, grouping, sorting, chart). Only the choices
+    are kept, never data: it always runs with the viewer's own access, so sharing it with the
+    company can't show anyone more than they may already see."""
+
+    __tablename__ = "nbpl_saved_reports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), index=True)
+    app_key: Mapped[str] = mapped_column(String(40), index=True)
+    base_key: Mapped[str] = mapped_column(String(80))
+    name: Mapped[str] = mapped_column(String(120))
+    definition: Mapped[dict] = mapped_column(JSON, default=dict)
+    shared: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class IdentitySession(Base):
     """One sign-in to a Bishnoi One account (not the console's staff sign-in). The
     browser or Bishnoi One.exe holds the token; only its hash is kept here."""

@@ -3,7 +3,7 @@
 import { Calculator, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/src/modules/finance/platform/ui/button";
-import { CellInput, Field, FormError, Input, Select } from "@/src/modules/finance/platform/ui/field";
+import { CellInput, Field, FormError, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import { Flag } from "@/src/modules/finance/platform/ui/marks";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
@@ -130,8 +130,8 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
           Add a line
         </Button>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Buyer type" error={fields.treatment}>
+        <FormGrid>
+          <Field label="Buyer type" size="lg" error={fields.treatment}>
             {(f) => (
               <Select {...f} value={treatment} onChange={(e) => setTreatment(e.target.value)}>
                 {setup.pack.treatments.map((t) => (
@@ -142,20 +142,20 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
               </Select>
             )}
           </Field>
-          <Field label="Sale date" error={fields.on} hint="Uses the rates in effect on this date.">
+          <Field label="Sale date" size="sm" error={fields.on} hint="Uses the rates in effect on this date.">
             {(f) => <Input {...f} type="date" value={on} onChange={(e) => setOn(e.target.value)} />}
           </Field>
           {needsId && (
             <>
-              <Field label="Buyer name" optional>
+              <Field label="Buyer name" size="md" optional>
                 {(f) => <Input {...f} value={buyerName} onChange={(e) => setBuyerName(e.target.value)} />}
               </Field>
-              <Field label="OSCA or PWD ID number" error={fields.idNumber}>
+              <Field label="OSCA or PWD ID number" size="md" error={fields.idNumber}>
                 {(f) => <Input {...f} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />}
               </Field>
             </>
           )}
-        </div>
+        </FormGrid>
         <FormError message={error} />
         <Button type="submit" variant="primary" loading={pending} icon={<Calculator className="size-4" aria-hidden />}>
           Calculate

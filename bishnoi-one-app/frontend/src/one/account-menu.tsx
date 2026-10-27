@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, ChevronDown, LogOut } from "lucide-react";
+import { Check, ChevronDown, Eye, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { signOut, switchCompany } from "./actions";
+import { VIEW_AS_EVENT } from "./view-as";
 
 type Company = { slug: string; name: string; current: boolean };
 
@@ -17,7 +18,7 @@ export type AccountLink = { href: string; label: string };
  * move to), their own pages in the module they're in, and sign out. `compact`:
  * just the picture, at the top right of a module's pages (as before the one app).
  */
-export function AccountMenu({ id, name, email, companies, links = [], compact = false }: { id: string; name: string; email: string; companies: Company[]; links?: AccountLink[]; compact?: boolean }) {
+export function AccountMenu({ id, name, email, companies, links = [], compact = false, viewAs = false }: { id: string; name: string; email: string; companies: Company[]; links?: AccountLink[]; compact?: boolean; /** Offer View as (src/one/view-as.tsx) under their own pages. */ viewAs?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -74,6 +75,22 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
                 </Link>
               ))}
             </>
+          )}
+          {/* View as, with your own things (decided 2026-10-26): the dialog lives outside this menu (view-as.tsx). */}
+          {viewAs && (
+            <button
+              suppressHydrationWarning
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event(VIEW_AS_EVENT));
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench"
+            >
+              <Eye className="size-4 text-ink-3" aria-hidden />
+              View as
+            </button>
           )}
           {companies.length > 1 && (
             <>
