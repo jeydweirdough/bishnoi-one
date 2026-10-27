@@ -13,9 +13,20 @@ import psycopg
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-CRM_GETMEDS_URL = "postgresql://neondb_owner:npg_K4FmOfRkalv9@ep-jolly-sun-b3r8zkb6-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb_getmeds?sslmode=require"
-CRM_BASE_URL = "postgresql://neondb_owner:npg_K4FmOfRkalv9@ep-jolly-sun-b3r8zkb6-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+def _neon(setting: str, database: str) -> str:
+    """A Neon database's address, from a setting (never written here: decided 2026-10-27,
+    when the passwords were found in these files). The setting is the project's base
+    address (…/neondb?sslmode=require); the company's database is beside it."""
+    import os
 
+    base = os.environ.get(setting)
+    if not base:
+        raise SystemExit(f"Set {setting} to the Neon project's address (…/neondb?sslmode=require), e.g. in this shell only.")
+    return base.replace("/neondb?", f"/{database}?")
+
+
+CRM_GETMEDS_URL = _neon("CRM_NEON_URL", "neondb_getmeds")
+CRM_BASE_URL = _neon("CRM_NEON_URL", "neondb")
 CRM_GETMEDS_SQLITE = r"C:\Users\Getmeds Backend\Desktop\bishnoi-one\bishnoi-crm\backend\.data\crm-getmeds.db"
 CRM_BASE_SQLITE = r"C:\Users\Getmeds Backend\Desktop\bishnoi-one\bishnoi-crm\backend\.data\crm.db"
 

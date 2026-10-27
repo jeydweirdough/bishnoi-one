@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from app.api import Api
 from app.access_roles import role_for_pass
 from app.audit import audit
+from app import passwords, platform_admins
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
 from app.models import AccessRole, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
 from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
@@ -112,6 +113,12 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
             f"Too many wrong passwords. Try again in {max(1, wait // 60)} minute(s).",
             headers={"Retry-After": str(wait)},
         )
+    # A Platform Admin needn't be added to a company: they have an account at every one
+    # (app/platform_admins.py), made here once their staff password is right.
+    staff = platform_admins.admin_staff(db, email)
+    if staff is not None and verify_password(body.password, passwords.hash_for_sign_in(db, staff)):
+        platform_admins.everywhere(db, staff)
+        db.flush()
     rows = same_person(db, email)
     # One password for all their companies (kept the same at each row).
     person = next((r for r in rows if r.password_hash), rows[0] if rows else None)
@@ -298,10 +305,8 @@ def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
     now = datetime.now(UTC)
     password = hash_password(body.new_password)
-    # One password at every company of theirs.
-    for row in same_person(db, person.email):
-        row.password_hash = password
-        row.password_changed_at = now
+    # One password at every company of theirs, and in the Admin Console (app/passwords.py).
+    passwords.set_for(db, person.email, password, now)
     # this sign-in carries on; every other one ends
     record.created_at = now
     audit(db, person.email, "identity.password_changed", category="security", target=person.email, target_type="identity", target_id=person.id)

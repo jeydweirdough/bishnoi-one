@@ -136,8 +136,9 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     user = db.scalar(select(User).where(User.platform_identity_id == claims["sub"]))
     if user is None:
         user = db.scalar(select(User).where(func.lower(User.email) == email))
-        if user is not None and user.platform_identity_id not in (None, claims["sub"]):
-            raise HTTPException(status.HTTP_409_CONFLICT, "This email is already linked to another Bishnoi One account here. Ask your administrator.")
+        # Linked to an account that's gone (it was deleted and added again): the Platform vouches
+        # for this email, which is one person at one company there, so it's re-linked below
+        # rather than refused (decided 2026-10-27, when ai4 was locked out that way).
     if user is None:
         if role is None:
             what = f" ({wanted})" if wanted else ""

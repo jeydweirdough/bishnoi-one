@@ -51,3 +51,7 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Vercel CLI links (scripts/deploy.mjs)
+.vercel
+.env*

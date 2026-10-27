@@ -179,3 +179,11 @@ def test_the_platforms_key_is_fetched_from_the_platform(app, client, monkeypatch
     assert len(asked) == 2
     platform_pass.forget_key()
     company.forget()
+
+
+def test_an_account_deleted_and_added_again_is_relinked(client, linked):
+    """2026-10-27: ai4's account was deleted and added back with a new id; the CRM refused it as 'linked to another account'."""
+    first = me(client, take(client, make_pass(sub="identity-old")))
+    r = take(client, make_pass(sub="identity-new"))
+    assert r.status_code == 200, r.text
+    assert me(client, r)["user"]["id"] == first["user"]["id"]  # the same person here, with their records

@@ -14,6 +14,7 @@
     "bishnoi-pharmacy": "node scripts/run-app.mjs bishnoi-pharmacy",
     "bishnoi-platform": "node scripts/run-app.mjs bishnoi-platform",
     "bishnoi-regulatory": "node scripts/run-app.mjs bishnoi-regulatory",
-    "setup": "node scripts/setup-all.mjs"
+    "setup": "node scripts/setup-all.mjs",
+    "deploy": "node scripts/deploy.mjs"
   }
 }

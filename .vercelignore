@@ -1,0 +1,17 @@
+# Deploy with `npm run deploy -- <app>`: it writes this file for the app being
+# deployed (only its folder is sent) and puts this back. As it stands, it only
+# keeps secrets, local data and installed packages off Vercel: the CLI doesn't
+# read .gitignore (decided 2026-10-27).
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/.data
+**/*.db
+**/*.db-*
+**/.venv
+**/__pycache__
+**/node_modules
+**/.next

@@ -21,6 +21,7 @@ from sqlalchemy import func, select
 from app import platform_settings
 from app.api import Api
 from app.audit import audit
+from app import passwords
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
 from app.deps import DB, Address, CurrentSession, CurrentUser, SettingsDep
 from app.identity import me_out
@@ -87,7 +88,8 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
             headers={"Retry-After": str(wait)},
         )
     user = db.scalar(select(User).where(func.lower(User.email) == email))
-    ok = verify_password(body.password, user.password_hash if user else DUMMY_HASH)
+    # One password: their Bishnoi One account's, when they have one (app/passwords.py).
+    ok = verify_password(body.password, passwords.hash_for_sign_in(db, user) if user else DUMMY_HASH)
     if user is None or not ok or not user.is_active:
         attempts.failed(email, window)
         reason = "no such account" if user is None else "switched off" if ok else "wrong password"
@@ -160,7 +162,7 @@ def change_me(body: MeIn, user: CurrentUser, db: DB, settings: SettingsDep, addr
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
 def change_password(body: PasswordIn, user: CurrentUser, record: CurrentSession, db: DB, address: Address) -> Response:
     """Changes your own password. Every other session of yours ends; this one carries on."""
-    if not verify_password(body.current_password, user.password_hash):
+    if not verify_password(body.current_password, passwords.hash_for_sign_in(db, user)):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             [{"type": "value_error", "loc": ["body", "currentPassword"], "msg": "That isn't your current password."}],
@@ -171,8 +173,8 @@ def change_password(body: PasswordIn, user: CurrentUser, record: CurrentSession,
             status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "newPassword"], "msg": problem}]
         )
     now = datetime.now(UTC)
-    user.password_hash = hash_password(body.new_password)
-    user.password_changed_at = now
+    # The same password for their account at every company, and here.
+    passwords.set_for(db, user.email, hash_password(body.new_password), now)
     # This session was made before the change; move it past it so it survives.
     record.created_at = now
     audit(db, user, "auth.password_changed", category="security", target=user.email, target_type="staff", target_id=user.id, address=address)
