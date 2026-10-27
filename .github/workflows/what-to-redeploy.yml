@@ -1,15 +1,17 @@
 # Says which apps need redeploying, and deploys nothing (decided 2026-10-27):
 # deployment stays by hand, so Vercel's deployments are only spent on what changed.
 #
-# The run's summary has two lists, each with only the apps that have changes:
-#   In this push        the apps the pushed commits changed
-#   Not live on Vercel  the apps whose code changed after their last production
-#                       deployment on Vercel (asked from Vercel itself)
+# The run's summary:
+#   Changed in this push  the apps the pushed commits changed
+#   Behind on Vercel      the apps whose live production deployment is older than
+#                         their code here: by the commit it was built from when
+#                         Vercel knows it, else by when it was deployed
+#   Up to date            the rest
 # Tests, README files and the command-line tools (app/tools/) don't count: they
 # aren't part of what runs online.
 #
 # Needs, in GitHub (Settings -> Secrets and variables -> Actions):
-#   secret   VERCEL_TOKEN    a Vercel token (vercel.com/account/tokens); the Deploy workflow uses it too
+#   secret   VERCEL_TOKEN    a Vercel token (vercel.com/account/settings/tokens)
 #   variable VERCEL_TEAM_ID  only if the projects are in a Vercel team (team_...)
 # Without the token, only the first list is shown.
 name: What to redeploy
@@ -35,7 +37,7 @@ jobs:
       - name: List what to redeploy
         env:
           TZ: Asia/Manila
-          PUSHED_BY: ${{ github.actor }}
+          ACTOR: ${{ github.actor }}
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -45,135 +47,127 @@ jobs:
           import json, os, subprocess, urllib.request
           from datetime import datetime, timezone
 
-          # app, its folder, its Vercel project, deploy order
+          # In the order they're deployed: the Platform, then the APIs, then the one app.
           APPS = [
-              ("Platform", "bishnoi-platform/backend", "bishnoione-platform-backend", 1),
-              ("CRM", "bishnoi-crm/backend", "bishnoione-crm-backend", 2),
-              ("Inventory", "bishnoi-inventory/backend", "bishnoione-inventory-backend", 2),
-              ("Finance", "bishnoi-finance/backend", "bishnoione-finance-backend", 3),
-              ("Executive Admin", "bishnoi-admin/backend", "bishnoi-one-admin-backend", 3),
-              ("Pharmacy", "bishnoi-pharmacy/backend", None, 3),
-              ("In-Licensing", "bishnoi-in-licensing/backend", None, 3),
-              ("Regulatory", "bishnoi-regulatory/backend", None, 3),
-              ("The one app (screens)", "bishnoi-one-app/frontend", "bishnoi-one-app", 4),
+              ("Platform", "bishnoi-platform/backend", "bishnoione-platform-backend"),
+              ("CRM", "bishnoi-crm/backend", "bishnoione-crm-backend"),
+              ("Inventory", "bishnoi-inventory/backend", "bishnoione-inventory-backend"),
+              ("Finance", "bishnoi-finance/backend", "bishnoione-finance-backend"),
+              ("Executive Admin", "bishnoi-admin/backend", "bishnoi-one-admin-backend"),
+              ("Pharmacy", "bishnoi-pharmacy/backend", None),
+              ("In-Licensing", "bishnoi-in-licensing/backend", None),
+              ("Regulatory", "bishnoi-regulatory/backend", None),
+              ("One app (screens)", "bishnoi-one-app/frontend", "bishnoi-one-app"),
           ]
           SKIP = [":(exclude)*/tests/*", ":(exclude)*/app/tools/*", ":(exclude)*.md", ":(exclude)*/.env.example"]
-          WHEN = "%Y-%m-%d %H:%M"
 
           def git(*args):
               return subprocess.run(["git", *args], capture_output=True, text=True).stdout.strip()
 
-          def changes(folder, since=None, after=None):
-              """The commits (and files) that changed what runs online in this folder."""
-              rng = [f"{since}..HEAD"] if since else ["HEAD"]
-              when = [f"--since={datetime.fromtimestamp(after, timezone.utc):%Y-%m-%dT%H:%M:%SZ}"] if after else []
-              log = git("log", "--format=%H|%ct|%an", *when, *rng, "--", folder, *SKIP)
-              commits = [line.split("|", 2) for line in log.splitlines() if line]
-              if not commits:
-                  return None
-              base = since or (commits[-1][0] + "^")
-              files = git("diff", "--name-only", base, "HEAD", "--", folder, *SKIP).splitlines()
-              people = []
-              for _, _, name in commits:
-                  if name not in people:
-                      people.append(name)
-              times = sorted(int(t) for _, t, _ in commits)
-              return {"commits": len(commits), "first": times[0], "last": times[-1], "by": ", ".join(people), "files": len(files)}
+          def when(seconds):
+              return datetime.fromtimestamp(seconds).strftime("%Y-%m-%d %H:%M")
 
-          def stamp(seconds):
-              return datetime.fromtimestamp(seconds).strftime(WHEN)
+          def changes(folder, since=None, after=None):
+              """What changed in the code that runs online, after a commit or a moment; None if nothing."""
+              since_time = [f"--since={datetime.fromtimestamp(after, timezone.utc):%Y-%m-%dT%H:%M:%SZ}"] if after else []
+              span = [f"{since}..HEAD"] if since else ["HEAD"]
+              rows = [l.split("|", 2) for l in git("log", "--format=%H|%ct|%an", *since_time, *span, "--", folder, *SKIP).splitlines() if l]
+              if not rows:
+                  return None
+              files = git("diff", "--name-only", since or f"{rows[-1][0]}^", "HEAD", "--", folder, *SKIP).splitlines()
+              authors = list(dict.fromkeys(name for _, _, name in rows))
+              return {"latest": rows[0][0][:7], "last": when(int(rows[0][1])), "commits": len(rows), "files": len(files), "authors": ", ".join(authors)}
+
+          def table(header, rows):
+              lines = ["| " + " | ".join(header) + " |", "|" + "|".join(" --- " for _ in header) + "|"]
+              return lines + ["| " + " | ".join(r) + " |" for r in rows]
 
           out = ["## What to redeploy", ""]
-          head = git("log", "-1", "--format=%h: %s")[:100]
-          out.append(f"{'Pushed' if os.environ['EVENT'] == 'push' else 'Run'} by **{os.environ['PUSHED_BY']}** on {datetime.now().strftime(WHEN)} (Manila time), at {head}")
-          out.append("")
+          action = "Pushed" if os.environ["EVENT"] == "push" else "Run"
+          out += [f"{action} by **{os.environ['ACTOR']}** on {datetime.now():%Y-%m-%d %H:%M} (Manila time)", ""]
+          out += [f"Commit `{git('rev-parse', '--short', 'HEAD')}`: {git('log', '-1', '--format=%s')[:100]}", ""]
 
-          # 1. What this push changed.
+          # --- changed in this push ---
           before = os.environ.get("BEFORE") or ""
-          if not before or set(before) == {"0"} or not git("cat-file", "-t", before):
+          if not before.strip("0") or not git("cat-file", "-t", before):
               before = git("rev-parse", "HEAD~1")
-          pushed = [(a, c) for a in APPS if (c := changes(a[1], since=before))]
-          out += ["### In this push", ""]
+          pushed = [(name, project, c) for name, folder, project in APPS if (c := changes(folder, since=before))]
+          out += ["### Changed in this push", ""]
           if pushed:
-              out += ["| Order | App | Vercel project | Commits | By | Files |", "|---|---|---|---|---|---|"]
-              for (name, _, project, order), c in sorted(pushed, key=lambda x: x[0][3]):
-                  out.append(f"| {order} | **{name}** | {f'`{project}`' if project else 'not on Vercel'} | {c['commits']} | {c['by']} | {c['files']} |")
+              out += table(["App", "Vercel project", "Commits", "Files"], [[f"**{n}**", f"`{p}`" if p else "_not on Vercel_", str(c["commits"]), str(c["files"])] for n, p, c in pushed])
           else:
-              out.append("No app changed: nothing to redeploy for this push.")
+              out.append("No app changed.")
           out.append("")
 
-          # 2. What isn't live on Vercel yet.
-          out += ["### Not live on Vercel yet", ""]
-          token = os.environ.get("VERCEL_TOKEN")
+          # --- compared with what's live on Vercel ---
+          token, team = os.environ.get("VERCEL_TOKEN"), os.environ.get("VERCEL_TEAM_ID")
+
+          def vercel(path):
+              url = f"https://api.vercel.com{path}" + (f"{'&' if '?' in path else '?'}teamId={team}" if team else "")
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}), timeout=20) as r:
+                      return json.load(r)
+              except Exception as e:
+                  return {"error": str(e)}
+
+          def commit_of(d):
+              """The commit a deployment was built from, when Vercel was told (Git link, or the CLI in a checkout)."""
+              for k, v in (d.get("meta") or {}).items():
+                  if k.lower().endswith("commitsha") and v:
+                      return v
+              return (d.get("gitSource") or {}).get("sha")
+
+          def live_deployment(project_id, target):
+              """What production serves now (after a rollback too), else the newest ready production deployment."""
+              d = vercel(f"/v13/deployments/{target}") if target else {}
+              if "id" in d:
+                  return d
+              found = vercel(f"/v6/deployments?projectId={project_id}&target=production&state=READY&limit=1").get("deployments") or []
+              return found[0] if found else None
+
           if not token:
-              out.append("Add the `VERCEL_TOKEN` secret to compare with what's live on Vercel (see the top of this workflow).")
+              out += ["### Compared with Vercel", "", "> Add the `VERCEL_TOKEN` secret to compare with what's live (see the top of this workflow).", ""]
           else:
-              team = os.environ.get("VERCEL_TEAM_ID")
-              def vercel(path):
-                  url = f"https://api.vercel.com{path}" + (f"{'&' if '?' in path else '?'}teamId={team}" if team else "")
-                  req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-                  try:
-                      with urllib.request.urlopen(req, timeout=20) as r:
-                          return json.load(r)
-                  except Exception as e:
-                      return {"error": str(e)}
-              def commit_of(d):
-                  """The commit a deployment was built from: recorded by the Deploy workflow
-                  (gitCommitSha), by Vercel's Git link, or by the CLI run in a checkout."""
-                  meta = d.get("meta") or {}
-                  for k, v in meta.items():
-                      if k.lower().endswith("commitsha") and v:
-                          return v
-                  return (d.get("gitSource") or {}).get("sha")
-
-              def candidates(word):
-                  names = [x.get("name", "") for x in (vercel("/v9/projects?limit=100").get("projects") or [])]
-                  return [n for n in names if word in n]
-
-              behind, current, problems = [], [], []
-              for name, folder, project, order in APPS:
+              behind, current, problems, by_date = [], [], [], False
+              for name, folder, project in APPS:
                   if not project:
                       continue
-                  found = vercel(f"/v9/projects/{project}")
-                  if "id" not in found:
-                      near = candidates(folder.split("/")[0].removeprefix("bishnoi-").split("-")[0])
-                      problems.append(f"- {name}: Vercel has no project `{project}`" + (f"; its projects with that word: {', '.join(f'`{n}`' for n in near)}" if near else "") + ".")
+                  info = vercel(f"/v9/projects/{project}")
+                  if "id" not in info:
+                      word = folder.split("/")[0].removeprefix("bishnoi-").split("-")[0]
+                      near = [p.get("name", "") for p in (vercel("/v9/projects?limit=100").get("projects") or []) if word in p.get("name", "")]
+                      problems.append(f"- **{name}**: no Vercel project named `{project}`." + (f" Similar: {', '.join(f'`{n}`' for n in near)}." if near else ""))
                       continue
-                  # What production serves now (after a rollback too), else the newest ready production deployment.
-                  live_id = ((found.get("targets") or {}).get("production") or {}).get("id")
-                  d = vercel(f"/v13/deployments/{live_id}") if live_id else {}
-                  if "id" not in d:
-                      d = (vercel(f"/v6/deployments?projectId={found['id']}&target=production&state=READY&limit=1").get("deployments") or [{}])[0]
-                  if not (d.get("created") or d.get("createdAt")):
-                      problems.append(f"- {name}: `{project}` has no production deployment yet.")
+                  d = live_deployment(info["id"], ((info.get("targets") or {}).get("production") or {}).get("id"))
+                  if not d:
+                      problems.append(f"- **{name}**: `{project}` has no production deployment yet.")
                       continue
-                  deployed_at = int((d.get("created") or d.get("createdAt")) / 1000)
-                  who = (d.get("creator") or {}).get("username", "")
+                  deployed = int((d.get("created") or d.get("createdAt")) / 1000)
                   sha = commit_of(d)
-                  known = bool(sha and git("cat-file", "-t", sha))
-                  # By commit when Vercel knows it; else everything committed after it was deployed.
-                  c = changes(folder, since=sha) if known else changes(folder, after=deployed_at)
-                  live = f"`{sha[:7]}`" if known else f"{stamp(deployed_at)} (by date)"
-                  live += f" by {who}" if who else ""
+                  exact = bool(sha and git("cat-file", "-t", sha))
+                  c = changes(folder, since=sha) if exact else changes(folder, after=deployed)
+                  live = f"`{sha[:7]}`" if exact else f"{when(deployed)} ¹"
+                  by_date = by_date or not exact
                   if c:
-                      behind.append((order, f"| {order} | **{name}** | `{project}` | {live} | {c['commits']} commit(s), {stamp(c['first'])} to {stamp(c['last'])} | {c['by']} | {c['files']} |"))
+                      behind.append([f"**{name}**", f"`{project}`", live, f"`{c['latest']}`", str(c["commits"]), c["last"], c["authors"]])
                   else:
-                      current.append(f"{name} ({live})")
-              if behind:
-                  out += ["| Order | App | Vercel project | Live (commit, or date) | Waiting | By | Files |", "|---|---|---|---|---|---|---|"]
-                  out += [r for _, r in sorted(behind)]
-                  server = os.environ.get("GITHUB_SERVER_URL", "https://github.com") + "/" + os.environ.get("GITHUB_REPOSITORY", "")
-                  out += ["", f"Redeploy these {len(behind)}: [Deploy]({server}/actions/workflows/deploy.yml) -> Run workflow, and tick them. They go in order: the Platform, then the APIs, then the one app."]
-              else:
-                  out.append("Everything on Vercel is up to date.")
-              if current:
-                  out += ["", "Up to date: " + "; ".join(current) + "."]
-              if any("(by date)" in r for _, r in behind) or any("(by date)" in c for c in current):
-                  out += ["", "_(by date)_: deployed by hand, so Vercel doesn't know its commit; judged by when it was deployed. Deploying with the Deploy workflow records the commit."]
-              if problems:
-                  out += ["", *problems]
+                      current.append(f"- **{name}**: {live}")
 
-          text = "\n".join(out) + "\n"
+              out += [f"### Behind on Vercel ({len(behind)})", ""]
+              if behind:
+                  out += table(["App", "Vercel project", "Live", "Latest here", "Commits behind", "Last change", "By"], behind)
+                  out += ["", "Redeploy them in the order listed: the Platform first, then the APIs, then the one app."]
+              else:
+                  out.append("Nothing: everything on Vercel is up to date.")
+              out.append("")
+              if current:
+                  out += [f"### Up to date ({len(current)})", "", *current, ""]
+              if problems:
+                  out += ["### Needs a look", "", *problems, ""]
+              if by_date:
+                  out += ["> ¹ Vercel doesn't know which commit this was built from, so it's compared by when it was deployed.", ""]
+
+          text = "\n".join(out)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
-              f.write(text)
+              f.write(text + "\n")
           print(text)
