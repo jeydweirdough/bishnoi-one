@@ -53,9 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -139,7 +139,9 @@ jobs:
                   results.append((name, "❌ Not deployed", "Couldn't link to the project: " + (link.stderr.strip().splitlines() or ["no reason given"])[-1], None))
                   failed = True
                   continue
-              run = subprocess.run(["vercel", "deploy", "--prod", "--yes", "--token", token, *scope], cwd=where, capture_output=True, text=True)
+              # The commit goes with it, so "What to redeploy" knows exactly what's live.
+              commit = ["--meta", f"gitCommitSha={os.environ['GITHUB_SHA']}", "--meta", f"gitCommitRef={os.environ.get('GITHUB_REF_NAME', 'main')}", "--meta", f"deployedBy={os.environ['BY']}"]
+              run = subprocess.run(["vercel", "deploy", "--prod", "--yes", "--token", token, *scope, *commit], cwd=where, capture_output=True, text=True)
               # The deployment's own address, from what the CLI printed (on a failure, it may be only in its messages).
               found = re.search(r"https://[\w.-]+\.vercel\.app", run.stdout) or re.search(r"https://[\w.-]+\.vercel\.app", run.stderr)
               url = found.group(0) if found else None

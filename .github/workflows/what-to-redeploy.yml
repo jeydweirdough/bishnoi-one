@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -117,34 +117,59 @@ jobs:
                           return json.load(r)
                   except Exception as e:
                       return {"error": str(e)}
-              rows, problems = [], []
+              def commit_of(d):
+                  """The commit a deployment was built from: recorded by the Deploy workflow
+                  (gitCommitSha), by Vercel's Git link, or by the CLI run in a checkout."""
+                  meta = d.get("meta") or {}
+                  for k, v in meta.items():
+                      if k.lower().endswith("commitsha") and v:
+                          return v
+                  return (d.get("gitSource") or {}).get("sha")
+
+              def candidates(word):
+                  names = [x.get("name", "") for x in (vercel("/v9/projects?limit=100").get("projects") or [])]
+                  return [n for n in names if word in n]
+
+              behind, current, problems = [], [], []
               for name, folder, project, order in APPS:
                   if not project:
                       continue
                   found = vercel(f"/v9/projects/{project}")
                   if "id" not in found:
-                      problems.append(f"- {name}: Vercel has no project `{project}` ({found.get('error', 'not found')}).")
+                      near = candidates(folder.split("/")[0].removeprefix("bishnoi-").split("-")[0])
+                      problems.append(f"- {name}: Vercel has no project `{project}`" + (f"; its projects with that word: {', '.join(f'`{n}`' for n in near)}" if near else "") + ".")
                       continue
-                  live = vercel(f"/v6/deployments?projectId={found['id']}&target=production&state=READY&limit=1").get("deployments") or []
-                  if not live:
+                  # What production serves now (after a rollback too), else the newest ready production deployment.
+                  live_id = ((found.get("targets") or {}).get("production") or {}).get("id")
+                  d = vercel(f"/v13/deployments/{live_id}") if live_id else {}
+                  if "id" not in d:
+                      d = (vercel(f"/v6/deployments?projectId={found['id']}&target=production&state=READY&limit=1").get("deployments") or [{}])[0]
+                  if not (d.get("created") or d.get("createdAt")):
                       problems.append(f"- {name}: `{project}` has no production deployment yet.")
                       continue
-                  d = live[0]
-                  meta = d.get("meta") or {}
-                  sha = meta.get("githubCommitSha") or meta.get("gitCommitSha")
                   deployed_at = int((d.get("created") or d.get("createdAt")) / 1000)
-                  # The commit it was deployed from, when Vercel knows it; else everything after it was deployed.
-                  c = changes(folder, since=sha) if sha and git("cat-file", "-t", sha) else changes(folder, after=deployed_at)
+                  who = (d.get("creator") or {}).get("username", "")
+                  sha = commit_of(d)
+                  known = bool(sha and git("cat-file", "-t", sha))
+                  # By commit when Vercel knows it; else everything committed after it was deployed.
+                  c = changes(folder, since=sha) if known else changes(folder, after=deployed_at)
+                  live = f"`{sha[:7]}`" if known else f"{stamp(deployed_at)} (by date)"
+                  live += f" by {who}" if who else ""
                   if c:
-                      who = (d.get("creator") or {}).get("username", "")
-                      rows.append((order, f"| {order} | **{name}** | `{project}` | {stamp(deployed_at)}{f' by {who}' if who else ''} | {c['commits']} commit(s), {stamp(c['first'])} to {stamp(c['last'])} | {c['by']} | {c['files']} |"))
-              if rows:
-                  out += ["| Order | App | Vercel project | Live since | Waiting | By | Files |", "|---|---|---|---|---|---|---|"]
-                  out += [r for _, r in sorted(rows)]
+                      behind.append((order, f"| {order} | **{name}** | `{project}` | {live} | {c['commits']} commit(s), {stamp(c['first'])} to {stamp(c['last'])} | {c['by']} | {c['files']} |"))
+                  else:
+                      current.append(f"{name} ({live})")
+              if behind:
+                  out += ["| Order | App | Vercel project | Live (commit, or date) | Waiting | By | Files |", "|---|---|---|---|---|---|---|"]
+                  out += [r for _, r in sorted(behind)]
                   server = os.environ.get("GITHUB_SERVER_URL", "https://github.com") + "/" + os.environ.get("GITHUB_REPOSITORY", "")
-                  out += ["", f"Redeploy these {len(rows)}: [Deploy]({server}/actions/workflows/deploy.yml) -> Run workflow, and tick them. They go in order: the Platform, then the APIs, then the one app."]
+                  out += ["", f"Redeploy these {len(behind)}: [Deploy]({server}/actions/workflows/deploy.yml) -> Run workflow, and tick them. They go in order: the Platform, then the APIs, then the one app."]
               else:
                   out.append("Everything on Vercel is up to date.")
+              if current:
+                  out += ["", "Up to date: " + "; ".join(current) + "."]
+              if any("(by date)" in r for _, r in behind) or any("(by date)" in c for c in current):
+                  out += ["", "_(by date)_: deployed by hand, so Vercel doesn't know its commit; judged by when it was deployed. Deploying with the Deploy workflow records the commit."]
               if problems:
                   out += ["", *problems]
 
