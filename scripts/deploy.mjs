@@ -22,12 +22,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IGNORE = join(ROOT, ".vercelignore");
+// The Vercel team the projects are in (Bishnoi One): an id, not a secret.
+const TEAM = "team_b2WfnQMXHYWEYeNmt6da6inl";
 
 // name: [its folder (the Vercel project's Root Directory), its Vercel project]
 // Executive Admin, Pharmacy, In-Licensing and Regulatory have no Vercel project yet.
@@ -59,8 +61,8 @@ function filterFor(folder) {
 
 const windows = process.platform === "win32";
 
-function vercel(args) {
-  const r = spawnSync("vercel", args, { cwd: ROOT, shell: windows, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"] });
+function vercel(args, env = {}) {
+  const r = spawnSync("vercel", args, { cwd: ROOT, shell: windows, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"], env: { ...process.env, ...env } });
   process.stdout.write(r.stdout ?? "");
   process.stderr.write(r.stderr ?? "");
   const text = [r.stdout ?? "", r.stderr ?? ""].join("\n");
@@ -69,15 +71,34 @@ function vercel(args) {
   return { ok: r.status === 0, text, missing };
 }
 
+/** The project's id and Root Directory, as Vercel has them. */
+function inspect(project) {
+  const r = spawnSync("vercel", ["project", "inspect", project], { cwd: ROOT, shell: windows, encoding: "utf8" });
+  const text = `${r.stdout ?? ""}\n${r.stderr ?? ""}`;
+  return { id: text.match(/^\s*ID\s+(prj_\w+)/m)?.[1], root: text.match(/^\s*Root Directory\s+(\S+)/m)?.[1], text };
+}
+
 function deploy(name) {
   const [folder, project] = APPS[name];
-  console.log(`\nLinking to ${project}…`);
-  if (!vercel(["link", "--yes", "--project", project]).ok) return false;
+  // Linked by writing the link file for this project, not with `vercel link`: at the
+  // repository's top that links several projects at once and deploy may pick another.
+  const found = inspect(project);
+  if (!found.id) {
+    console.error(`\nVercel has no project ${project}, or you're not signed in (vercel login).\n${found.text.trim()}`);
+    return false;
+  }
+  if (found.root !== folder) {
+    console.error(`\n${project} builds from "${found.root ?? "(the top)"}" in Vercel, not ${folder}. Set its Root Directory to ${folder} (Settings → Build and Deployment).`);
+    return false;
+  }
+  mkdirSync(join(ROOT, ".vercel"), { recursive: true });
+  writeFileSync(join(ROOT, ".vercel", "project.json"), JSON.stringify({ projectId: found.id, orgId: TEAM, projectName: project }));
   const kept = existsSync(IGNORE) ? readFileSync(IGNORE, "utf8") : null;
   writeFileSync(IGNORE, filterFor(folder));
   try {
     console.log(`\nDeploying ${name} (${folder} -> ${project})…`);
-    return vercel(["deploy", "--prod", "--yes"]).ok;
+    // The project named outright too, so the CLI can't pick another.
+    return vercel(["deploy", "--prod", "--yes", "--project", project, "--scope", TEAM], { VERCEL_ORG_ID: TEAM, VERCEL_PROJECT_ID: found.id }).ok;
   } finally {
     if (kept === null) writeFileSync(IGNORE, "");
     else writeFileSync(IGNORE, kept);
