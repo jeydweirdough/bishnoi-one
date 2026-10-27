@@ -16,7 +16,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api import Api, camel, changed, check_email, field_error, iso, not_found
+from app.api import Api, camel, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, AdminUser, CurrentUser
 from app.models import (
@@ -311,6 +311,14 @@ def delete_user(user_id: str, db: DB, me: AdminUser) -> Response:
     """Gone from the platform: their applications and sign-ins go with them;
     tickets they raised stay, with nobody on them. Suspending keeps the person."""
     p = _person(db, user_id)
+    # Never your own account, nor a company's last administrator: either locks people out
+    # with nobody left to let them back in (2026-10-27, an administrator deleted their own).
+    if p.email.lower() == me.email.lower():
+        raise conflict("That's your own account. Another administrator can delete it, or suspend it instead.")
+    if p.is_company_admin and not db.scalar(
+        select(func.count()).select_from(Identity).where(Identity.company_id == p.company_id, Identity.is_company_admin, Identity.id != p.id, Identity.status == "active")
+    ):
+        raise conflict(f"{p.email} is the company's only administrator. Make someone else its administrator first.")
     audit(db, me, "user.deleted", category="security", target=p.email, target_type="user", target_id=p.id, company_id=p.company_id)
     db.delete(p)
     db.commit()
