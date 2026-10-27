@@ -53,7 +53,7 @@ jobs:
               ("CRM", "bishnoi-crm/backend", "bishnoione-crm-backend"),
               ("Inventory", "bishnoi-inventory/backend", "bishnoione-inventory-backend"),
               ("Finance", "bishnoi-finance/backend", "bishnoione-finance-backend"),
-              ("Executive Admin", "bishnoi-admin/backend", "bishnoi-one-admin-backend"),
+              ("Executive Admin", "bishnoi-admin/backend", None),
               ("Pharmacy", "bishnoi-pharmacy/backend", None),
               ("In-Licensing", "bishnoi-in-licensing/backend", None),
               ("Regulatory", "bishnoi-regulatory/backend", None),

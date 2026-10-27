@@ -9,38 +9,58 @@
  *   npm run deploy                     lists the apps
  *
  * Needs the Vercel CLI, once: npm install --global vercel, then vercel login.
- * The first time an app is deployed it's linked to its Vercel project (saved in
- * a .vercel folder, which git ignores). Each is deployed from where its Vercel
- * project expects it: the one app from the repository's top (its project's Root
- * Directory is bishnoi-one-app/frontend), each API from its own folder. What's
- * uploaded is filtered by the .vercelignore there: never settings or local data.
+ *
+ * Every Vercel project builds from its folder (its Root Directory, e.g.
+ * bishnoi-crm/backend), so each is sent from the repository's top. What's sent
+ * is only that app's folder: for the run, the top .vercelignore is written for
+ * that app (every other app, documents and tools left out, and never settings,
+ * local databases or installed packages), then put back as it was. The CLI
+ * doesn't read .gitignore, so this is what keeps secrets off Vercel.
  *
  * Deploy the Platform first, then the APIs, then the one app.
  * "What to redeploy" (GitHub Actions) says which apps have changes waiting.
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const IGNORE = join(ROOT, ".vercelignore");
 
-// name: [its folder, its Vercel project, where it's deployed from]
+// name: [its folder (the Vercel project's Root Directory), its Vercel project]
+// Executive Admin, Pharmacy, In-Licensing and Regulatory have no Vercel project yet.
 const APPS = {
-  platform: ["bishnoi-platform/backend", "bishnoione-platform-backend", "bishnoi-platform/backend"],
-  crm: ["bishnoi-crm/backend", "bishnoione-crm-backend", "bishnoi-crm/backend"],
-  inventory: ["bishnoi-inventory/backend", "bishnoione-inventory-backend", "bishnoi-inventory/backend"],
-  finance: ["bishnoi-finance/backend", "bishnoione-finance-backend", "bishnoi-finance/backend"],
-  admin: ["bishnoi-admin/backend", "bishnoi-one-admin-backend", "bishnoi-admin/backend"],
-  // Its project's Root Directory is bishnoi-one-app/frontend: from the top (the root .vercelignore keeps the rest out).
-  "one-app": ["bishnoi-one-app/frontend", "bishnoi-one-app", "."],
+  platform: ["bishnoi-platform/backend", "bishnoione-platform-backend"],
+  crm: ["bishnoi-crm/backend", "bishnoione-crm-backend"],
+  inventory: ["bishnoi-inventory/backend", "bishnoione-inventory-backend"],
+  finance: ["bishnoi-finance/backend", "bishnoione-finance-backend"],
+  "one-app": ["bishnoi-one-app/frontend", "bishnoi-one-app"],
 };
+
+// Never sent, wherever they are.
+const NEVER = [
+  ".env", ".env.*", "!.env.example", "**/.env", "**/.env.*", "!**/.env.example",
+  "**/.data", "**/*.db", "**/*.db-*", "**/.venv", "**/__pycache__", "**/.pytest_cache", "**/.ruff_cache",
+  "**/node_modules", "**/.next", "**/tests",
+];
+
+/** The upload filter for one app: everything at the top but its folder, and never the secrets. */
+function filterFor(folder) {
+  const [top, inside] = folder.split("/");
+  const others = readdirSync(ROOT).filter((n) => n !== top && n !== ".vercelignore").map((n) => `/${n}`);
+  const siblings = readdirSync(join(ROOT, top)).filter((n) => n !== inside).map((n) => `/${top}/${n}`);
+  return [
+    `# Written by scripts/deploy.mjs for ${folder}, and put back afterwards.`,
+    ...others, ...siblings, ...NEVER, "",
+  ].join("\n");
+}
 
 const windows = process.platform === "win32";
 
-function vercel(args, cwd) {
-  const r = spawnSync("vercel", args, { cwd, shell: windows, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"] });
+function vercel(args) {
+  const r = spawnSync("vercel", args, { cwd: ROOT, shell: windows, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"] });
   process.stdout.write(r.stdout ?? "");
   process.stderr.write(r.stderr ?? "");
   const text = [r.stdout ?? "", r.stderr ?? ""].join("\n");
@@ -50,21 +70,17 @@ function vercel(args, cwd) {
 }
 
 function deploy(name) {
-  const [, project, from] = APPS[name];
-  const where = join(ROOT, from);
-  if (!existsSync(join(where, ".vercel", "project.json")) || !linkedTo(where, project)) {
-    console.log(`\nLinking ${where} to ${project}…`);
-    if (!vercel(["link", "--yes", "--project", project], where).ok) return false;
-  }
-  console.log(`\nDeploying ${name} (${project}) from ${where}…`);
-  return vercel(["deploy", "--prod", "--yes"], where).ok;
-}
-
-function linkedTo(where, project) {
+  const [folder, project] = APPS[name];
+  console.log(`\nLinking to ${project}…`);
+  if (!vercel(["link", "--yes", "--project", project]).ok) return false;
+  const kept = existsSync(IGNORE) ? readFileSync(IGNORE, "utf8") : null;
+  writeFileSync(IGNORE, filterFor(folder));
   try {
-    return JSON.parse(readFileSync(join(where, ".vercel", "project.json"), "utf8")).projectName === project;
-  } catch {
-    return false;
+    console.log(`\nDeploying ${name} (${folder} -> ${project})…`);
+    return vercel(["deploy", "--prod", "--yes"]).ok;
+  } finally {
+    if (kept === null) writeFileSync(IGNORE, "");
+    else writeFileSync(IGNORE, kept);
   }
 }
 
@@ -77,10 +93,10 @@ if (!asked.length) {
 }
 const unknown = asked.filter((a) => !APPS[a]);
 if (unknown.length) {
-  console.error(`Not an app: ${unknown.join(", ")}. One of: ${Object.keys(APPS).join(", ")}.`);
+  console.error(`Not an app on Vercel: ${unknown.join(", ")}. One of: ${Object.keys(APPS).join(", ")}.`);
   process.exit(1);
 }
-if (vercel(["--version"], ROOT).missing) {
+if (vercel(["--version"]).missing) {
   console.error("The Vercel CLI isn't installed: npm install --global vercel, then vercel login.");
   process.exit(1);
 }
