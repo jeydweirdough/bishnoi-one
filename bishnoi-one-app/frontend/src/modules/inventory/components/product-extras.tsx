@@ -215,7 +215,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
     start(async () => {
       const price = fmt.toCentavos(adding.price);
       if (!adding.supplierId || price === null) {
-        setError("Select a supplier and enter the price.");
+        setError("Select a vendor and enter the price.");
         return;
       }
       const result = await setSupplierPrice(product.id, adding.supplierId, { price, supplierSku: adding.sku || null, leadTimeDays: adding.lead ? Number(adding.lead) : null });
@@ -229,14 +229,14 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
   return (
     <div>
       {product.supplierPrices.length === 0 ? (
-        <p className="py-2 text-meta text-ink-3">No supplier prices yet. Add one below, or one is recorded when a purchase order is placed.</p>
+        <p className="py-2 text-meta text-ink-3">No vendor prices yet. Add one below, or one is recorded when a purchase order is placed.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>
               <tr className="border-b border-rule text-left text-meta text-ink-3">
-                <th scope="col" className="py-2 pr-3 font-medium">Supplier</th>
-                <th scope="col" className="px-3 py-2 font-medium">Supplier code</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Vendor</th>
+                <th scope="col" className="px-3 py-2 font-medium">Vendor code</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">Lead time</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">Price</th>
                 {canEdit && <th scope="col" className="w-10 py-2"><span className="sr-only">Remove</span></th>}
@@ -273,13 +273,13 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
       )}
       {canEdit && (
         <div className="mt-4 border-t border-rule pt-4">
-          <p className="mb-2 text-sm font-semibold text-ink">Add a supplier price</p>
+          <p className="mb-2 text-sm font-semibold text-ink">Add a vendor price</p>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
             <label className="block min-w-0">
-              <span className="mb-1 block text-meta text-ink-3">Supplier</span>
+              <span className="mb-1 block text-meta text-ink-3">Vendor</span>
               <span className="flex items-center gap-2">
-                <Select aria-label="Supplier" value={adding.supplierId} onChange={(e) => setAdding({ ...adding, supplierId: e.target.value })} className="min-w-0 flex-1">
-                  <option value="">Select a supplier</option>
+                <Select aria-label="Vendor" value={adding.supplierId} onChange={(e) => setAdding({ ...adding, supplierId: e.target.value })} className="min-w-0 flex-1">
+                  <option value="">Select a vendor</option>
                   {suppliers.filter((s) => s.isActive && !listed.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   {newSuppliers.filter((n) => !suppliers.some((s) => s.id === n.id)).map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
                 </Select>
@@ -289,8 +289,8 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
               </span>
             </label>
             <label className="block min-w-0">
-              <span className="mb-1 block text-meta text-ink-3">Supplier code</span>
-              <CellInput aria-label="Supplier code" placeholder="Optional" value={adding.sku} onChange={(e) => setAdding({ ...adding, sku: e.target.value })} className="w-full !text-left" />
+              <span className="mb-1 block text-meta text-ink-3">Vendor code</span>
+              <CellInput aria-label="Vendor code" placeholder="Optional" value={adding.sku} onChange={(e) => setAdding({ ...adding, sku: e.target.value })} className="w-full !text-left" />
             </label>
             <label className="block min-w-0">
               <span className="mb-1 block text-meta text-ink-3">Lead time (days)</span>
@@ -298,7 +298,7 @@ export function SupplierPrices({ org, product, suppliers, canEdit, canAddSupplie
             </label>
             <label className="block min-w-0">
               <span className="mb-1 block text-meta text-ink-3">Price</span>
-              <CellInput aria-label="Supplier price" placeholder="0.00" inputMode="decimal" value={adding.price} onChange={(e) => setAdding({ ...adding, price: e.target.value })} className="w-full" />
+              <CellInput aria-label="Vendor price" placeholder="0.00" inputMode="decimal" value={adding.price} onChange={(e) => setAdding({ ...adding, price: e.target.value })} className="w-full" />
             </label>
             <Button variant="primary" loading={pending} onClick={add}>
               Add price

@@ -22,7 +22,7 @@ const rate = (r: number | null | undefined) => (r == null ? "—" : `${Math.roun
 
 export async function SuppliersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may } = await context();
-  if (!may("suppliers.view")) return <NoAccess what="suppliers" />;
+  if (!may("suppliers.view")) return <NoAccess what="vendors" />;
   const s = await searchParams;
   const f = { q: param(s, "q"), state: param(s, "state") || "active" };
   const { page, size, vars } = paging(s);
@@ -38,7 +38,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
     <>
       <PageHeader
         title="Vendors"
-        actions={may("suppliers.create") && <LinkButton href="/inventory/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add supplier</LinkButton>}
+        actions={may("suppliers.create") && <LinkButton href="/inventory/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add vendor</LinkButton>}
       >
         Vendors you buy from, with contact details, payment terms and delivery performance.
       </PageHeader>
@@ -46,9 +46,9 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
       <Filters q={f.q} placeholder="Name, code or contact" keep={{ state: f.state }} />
       <Sheet>
         {suppliers.length === 0 ? (
-          <FirstStep icon="suppliers" title="No vendors" body="Vendors you buy from, with their payment terms and lead times." href="/inventory/suppliers/new" action="Add supplier" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/inventory/suppliers" may={may} />
+          <FirstStep icon="suppliers" title="No vendors" body="Vendors you buy from, with their payment terms and lead times." href="/inventory/suppliers/new" action="Add vendor" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/inventory/suppliers" may={may} />
         ) : (
-          <Table head={["Supplier", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received", <span key="a" className="sr-only">Actions</span>]} min="56rem">
+          <Table head={["Vendor", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received", <span key="a" className="sr-only">Actions</span>]} min="56rem">
             {suppliers.map((x) => (
               <tr key={x.id} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/inventory/suppliers/${x.id}`} sub={x.code}>{x.name}</RowLink></Td>
@@ -70,7 +70,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
                       ...(may("suppliers.delete")
                         ? [
                             "divider" as const,
-                            { label: "Delete", icon: <Trash2 />, run: deleteSupplier.bind(null, x.id), danger: true, confirm: `Delete ${x.name}? A supplier with purchase orders cannot be deleted; deactivate it instead.`, done: `${x.name} deleted` },
+                            { label: "Delete", icon: <Trash2 />, run: deleteSupplier.bind(null, x.id), danger: true, confirm: `Delete ${x.name}? A vendor with purchase orders cannot be deleted; deactivate it instead.`, done: `${x.name} deleted` },
                           ]
                         : []),
                     ]}
@@ -81,7 +81,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
           </Table>
         )}
       </Sheet>
-      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "supplier" : "suppliers"} />
+      <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "vendor" : "vendors"} />
     </>
   );
 }
@@ -89,7 +89,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
 export async function SupplierPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { fmt, may, day } = await context();
-  if (!may("suppliers.view")) return <NoAccess what="suppliers" />;
+  if (!may("suppliers.view")) return <NoAccess what="vendors" />;
   const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   const perf = x.performance;
   return (
@@ -99,12 +99,12 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
         title={x.name}
         tools={
           <RecordTools
-            what="supplier"
+            what="vendor"
             name={x.name}
             editHref={may("suppliers.edit") ? `/inventory/suppliers/${x.id}/edit` : undefined}
             remove={may("suppliers.delete") ? deleteSupplier.bind(null, x.id) : undefined}
             after="/inventory/suppliers"
-            removeNote="A supplier with purchase orders cannot be deleted. Deactivate it instead from its Edit page."
+            removeNote="A vendor with purchase orders cannot be deleted. Deactivate it instead from its Edit page."
           />
         }
         actions={may("purchasing.create") && x.isActive && <LinkButton href={`/inventory/purchase-orders/new?supplier=${x.id}`} variant="primary" icon={<Plus className="size-4" aria-hidden />}>New purchase order</LinkButton>}
@@ -125,7 +125,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
             icon="info"
             title="Basic information"
             items={[
-              ["Supplier name", x.name],
+              ["Vendor name", x.name],
               ["Code", <span key="code" className="font-mono">{x.code}</span>],
               ["Contact", x.contactPerson],
               ["Phone", x.phone],
@@ -163,7 +163,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
             pill: <span className="text-sm font-semibold text-ink tabular-nums">{fmt.peso(p.price)}</span>,
             share: p.price / Math.max(1, ...x.prices.map((q) => q.price)),
           }))}
-          empty="No supplier prices. Prices are recorded when an order is placed, or on the product page."
+          empty="No vendor prices. Prices are recorded when an order is placed, or on the product page."
         />
       </DetailPanel>
 
@@ -192,7 +192,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
 
 export async function NewSupplierPage() {
   const { may } = await context();
-  if (!may("suppliers.create")) return <NoAccess what="adding suppliers" />;
+  if (!may("suppliers.create")) return <NoAccess what="adding vendors" />;
   return (
     <>
       <PageHeader crumbs={[{ href: "/inventory/suppliers", label: "Vendors" }]} title="New vendor" />
@@ -204,7 +204,7 @@ export async function NewSupplierPage() {
 export async function EditSupplierPage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
   const { may } = await context();
-  if (!may("suppliers.edit")) return <NoAccess what="editing suppliers" />;
+  if (!may("suppliers.edit")) return <NoAccess what="editing vendors" />;
   const { supplier: x } = await loadQuery<{ supplier: Supplier }>(`query Supplier($id: String!) { supplier(id: $id) }`, { id }, ["supplier"]);
   return (
     <>
@@ -221,8 +221,8 @@ function SupplierActive({ supplier }: { supplier: Supplier }) {
     <div className="mt-8 border-t border-rule pt-4">
       <StepButton
         run={saveSupplier.bind(null, supplier.id, { isActive: !supplier.isActive })}
-        label={supplier.isActive ? "Deactivate supplier" : "Activate supplier"}
-        done={supplier.isActive ? "Supplier deactivated" : "Supplier activated"}
+        label={supplier.isActive ? "Deactivate vendor" : "Activate vendor"}
+        done={supplier.isActive ? "Vendor deactivated" : "Vendor activated"}
         variant="quiet"
       />
     </div>

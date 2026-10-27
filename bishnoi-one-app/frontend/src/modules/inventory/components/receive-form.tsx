@@ -90,7 +90,7 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
         <div className="grid gap-5 sm:grid-cols-4">
           {!order && (
             <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
-              <Field label="Supplier" optional error={fields.supplierId}>
+              <Field label="Vendor" optional error={fields.supplierId}>
                 {(p) => (
                   <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                     <option value="">None</option>

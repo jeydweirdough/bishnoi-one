@@ -96,7 +96,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       <Filters q={f.q} placeholder="Name, SKU or barcode">
         <FilterSelect name="category" label="Category" value={f.category} options={[{ value: "", label: "All categories" }, ...ref.categories.map((c) => ({ value: c.id, label: c.path }))]} />
         <FilterSelect name="brand" label="Brand" value={f.brand} options={[{ value: "", label: "All brands" }, ...ref.brands.map((b) => ({ value: b.id, label: b.name }))]} />
-        <FilterSelect name="supplier" label="Supplier" value={f.supplier} options={[{ value: "", label: "All suppliers" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
+        <FilterSelect name="supplier" label="Vendor" value={f.supplier} options={[{ value: "", label: "All vendors" }, ...ref.suppliers.map((x) => ({ value: x.id, label: x.name }))]} />
         <FilterSelect name="stock" label="Stock" value={f.stock} options={[{ value: "", label: "Any" }, { value: "low", label: "Low" }, { value: "out", label: "Out of stock" }, { value: "over", label: "Over maximum" }]} />
         {/* The same list as the sidebar's red count on Products. */}
         <FilterSelect name="missing" label="Prices" value={f.missing} options={[{ value: "", label: "Any" }, { value: "true", label: "Missing price" }]} />

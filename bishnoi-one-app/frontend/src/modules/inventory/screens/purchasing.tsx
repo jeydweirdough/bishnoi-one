@@ -95,12 +95,12 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
       )}
       {board ? (
         <>
-          <Filters q={f.q} placeholder="PO number or supplier" keep={{ status: f.status, view: "" }} />
+          <Filters q={f.q} placeholder="PO number or vendor" keep={{ status: f.status, view: "" }} />
           {orders.length > 0 ? (
             <PurchaseOrdersBoard orders={orders} fmt={fmt} day={day} may={may} />
           ) : (
             <Sheet>
-              <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q)} clear="/inventory/purchase-orders" may={may} />
+              <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a vendor. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q)} clear="/inventory/purchase-orders" may={may} />
             </Sheet>
           )}
         </>
@@ -115,7 +115,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
             />
           )}
           <UnderlineTabs tabs={STATUS_TABS.map(([value, label]) => ({ href: `/inventory/purchase-orders${query({ q: f.q, status: value, view: "list" })}`, label, current: f.status === value }))} />
-          <ListToolbar q={f.q} placeholder="Search PO number or supplier" keep={{ status: f.status, view: "list" }}>
+          <ListToolbar q={f.q} placeholder="Search PO number or vendor" keep={{ status: f.status, view: "list" }}>
             <ToggleLinks
               current="list"
               options={[
@@ -126,7 +126,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
             />
           </ListToolbar>
           {orders.length === 0 ? (
-            <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a supplier. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/inventory/purchase-orders?view=list" may={may} />
+            <FirstStep icon="purchaseOrders" title="No purchase orders" body="Order stock from a vendor. Goods receipts are recorded against the order." needs={["warehouse", "supplier", "product"]} href="/inventory/purchase-orders/new" action="New purchase order" permission="purchasing.create" filtered={Boolean(f.q || f.status)} clear="/inventory/purchase-orders?view=list" may={may} />
           ) : (
             <ExpandableTable
               minWidth="56rem"
@@ -319,7 +319,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
 
 function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]; at: (iso: string | null) => string; count: (n: number) => string; peso: (n: number) => string }) {
   return (
-    <Table head={["Receipt", "Received date", "Supplier", "Warehouse", "Order", " Units", " Value", <span key="a" className="sr-only">Actions</span>]} min="52rem">
+    <Table head={["Receipt", "Received date", "Vendor", "Warehouse", "Order", " Units", " Value", <span key="a" className="sr-only">Actions</span>]} min="52rem">
       {receipts.map((r) => (
         <tr key={r.id} className="relative hover:bg-bench/40">
           <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink></Td>
@@ -475,7 +475,7 @@ export async function BackordersPage({ searchParams }: { searchParams: Search })
         {rows.length === 0 ? (
           <Empty icon="purchaseOrders" title="No backorders" />
         ) : (
-          <Table head={["Product", "Order", "Supplier", "Expected", " Ordered", " Received", " Outstanding", " Value"]} min="56rem">
+          <Table head={["Product", "Order", "Vendor", "Expected", " Ordered", " Received", " Outstanding", " Value"]} min="56rem">
             {rows.map((b, i) => (
               <tr key={i} className="relative hover:bg-bench/40">
                 <Td><Link href={`/inventory/products/${b.product.id}`} className="font-semibold hover:text-ink hover:underline">{b.product.name}</Link><span className="block text-meta text-ink-3">{b.product.sku}</span></Td>

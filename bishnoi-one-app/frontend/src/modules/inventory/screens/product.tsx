@@ -188,7 +188,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
             items={[
               ["Type", PRODUCT_TYPES[p.productType]],
               ["Unit", `${p.unitName} (${p.unit})`],
-              ["Preferred supplier", p.supplier ? <Link key="supplier" href={`/inventory/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
+              ["Preferred vendor", p.supplier ? <Link key="supplier" href={`/inventory/suppliers/${p.supplier.id}`} className="hover:text-ink hover:underline">{p.supplier.name}</Link> : null],
               ...(p.variantLabel ? [["Variant", p.variantLabel] as [string, string]] : []),
               ...details,
             ]}
@@ -278,7 +278,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
 
         {/* What each supplier charges: the full width, a row each, and a row to add one. */}
         <Card className="mt-5 px-5 pt-4 pb-4">
-          <SectionTitle icon="suppliers">Supplier prices</SectionTitle>
+          <SectionTitle icon="suppliers">Vendor prices</SectionTitle>
           <SupplierPrices org={me.org} product={p} suppliers={ref.suppliers} canEdit={may("products.edit")} canAddSupplier={may("suppliers.create")} />
         </Card>
 
