@@ -21,10 +21,21 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 STRUCTURE_XLSX = r"C:\Users\Getmeds Backend\Downloads\STRUCTURE UPDATED.xlsx"
 EMPLOYEES_XLSX = r"C:\Users\Getmeds Backend\Downloads\employees_2026-10-10.xlsx"
 
-CRM_NEON_GETMEDS_URL = "postgresql://neondb_owner:npg_K4FmOfRkalv9@ep-jolly-sun-b3r8zkb6-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb_getmeds?sslmode=require"
-CRM_NEON_BASE_URL = "postgresql://neondb_owner:npg_K4FmOfRkalv9@ep-jolly-sun-b3r8zkb6-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-PLATFORM_NEON_URL = "postgresql://neondb_owner:npg_6EzWjIiafN8H@ep-bold-scene-b3exva3n-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+def _neon(setting: str, database: str) -> str:
+    """A Neon database's address, from a setting (never written here: decided 2026-10-27,
+    when the passwords were found in these files). The setting is the project's base
+    address (…/neondb?sslmode=require); the company's database is beside it."""
+    import os
 
+    base = os.environ.get(setting)
+    if not base:
+        raise SystemExit(f"Set {setting} to the Neon project's address (…/neondb?sslmode=require), e.g. in this shell only.")
+    return base.replace("/neondb?", f"/{database}?")
+
+
+CRM_NEON_GETMEDS_URL = _neon("CRM_NEON_URL", "neondb_getmeds")
+CRM_NEON_BASE_URL = _neon("CRM_NEON_URL", "neondb")
+PLATFORM_NEON_URL = _neon("PLATFORM_NEON_URL", "neondb")
 GETMEDS_COMPANY_ID = "724d4179-c200-4be9-9567-07f7c7b811f4"
 DEFAULT_PASSWORD = "2.4Billion"
 

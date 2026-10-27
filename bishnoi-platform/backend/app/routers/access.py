@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.api import Api, camel, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
+from app import passwords
 from app.deps import DB, Address, AdminUser, CurrentSession, CurrentUser
 from app.identity import ROLE_NAMES
 from app.models import AccessRequest, Application, Company, CompanyApp, Identity, IdentityApp, SignInSession, User
@@ -316,9 +317,11 @@ def create_staff(body: StaffIn, db: DB, me: AdminUser, address: Address) -> dict
     email = _email(body.email)
     if _email_taken(db, email):
         raise field_error("email", "There's already a staff account with this email.")
-    password, made = _password(body.password)
+    # Someone with a Bishnoi One account signs in here with it: no password of their own to hand over.
+    existing = passwords.account_hash(db, email)
+    password, made = (None, False) if existing else _password(body.password)
     first, last = split_name(body.full_name.strip())
-    u = User(email=email, full_name=body.full_name.strip(), first_name=first or None, last_name=last or None, password_hash=hash_password(password), role=body.role)
+    u = User(email=email, full_name=body.full_name.strip(), first_name=first or None, last_name=last or None, password_hash=existing or hash_password(password), role=body.role)
     db.add(u)
     db.flush()
     audit(db, me, "staff.created", category="security", target=u.email, target_type="staff", target_id=u.id, fields=["role"], address=address)
@@ -373,7 +376,8 @@ def reset_staff_password(staff_id: str, body: StaffPasswordIn, db: DB, me: Admin
     if u.id == me.id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Change your own password under Account.")
     password, made = _password(body.password)
-    u.password_hash, u.password_changed_at = hash_password(password), datetime.now(UTC)
+    # Their one password: their Bishnoi One account's too, at every company.
+    passwords.set_for(db, u.email, hash_password(password), datetime.now(UTC))
     audit(db, me, "staff.password_reset", category="security", target=u.email, target_type="staff", target_id=u.id, address=address)
     db.commit()
     return {"password": password if made else None}

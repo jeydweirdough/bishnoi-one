@@ -41,3 +41,25 @@ def test_the_platform_keeps_an_admin(client, ana):
     r = client.post("/platform/staff", json={"fullName": "Eve", "email": "eve@example.com", "role": "admin", "password": "another long one"}, headers=ana)
     eve = r.json()["staff"]["id"]
     assert client.patch(f"/platform/staff/{eve}", json={"role": "member"}, headers=ana).status_code == 200
+
+
+def test_staff_have_one_password_their_bishnoi_one_accounts(client, ana):
+    """2026-10-27: a staff password reset left the person's account password as it was."""
+    from tests.conftest import make_company
+
+    getmeds = make_company(client, ana)
+    person = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ai Four", "email": "ai4@getmeds.ph", "isCompanyAdmin": True}, headers=ana).json()["user"]
+    assert client.post(f"/platform/users/{person['id']}/password", json={"password": "account password 1"}, headers=ana).status_code == 200
+
+    # Made staff afterwards: no password of their own; the account's signs them in here.
+    staff = client.post("/platform/staff", json={"fullName": "Ai Four", "email": "ai4@getmeds.ph", "role": "admin"}, headers=ana)
+    assert staff.status_code == 201, staff.text
+    assert staff.json()["password"] is None
+    assert client.post("/auth/login", json={"email": "ai4@getmeds.ph", "password": "account password 1"}).status_code == 200
+
+    # A staff reset is the account's password too.
+    r = client.post(f"/platform/staff/{staff.json()['staff']['id']}/password", json={"password": "one password 2"}, headers=ana)
+    assert r.status_code == 200, r.text
+    assert client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "one password 2"}).status_code == 200
+    assert client.post("/auth/login", json={"email": "ai4@getmeds.ph", "password": "one password 2"}).status_code == 200
+    assert client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "account password 1"}).status_code == 401

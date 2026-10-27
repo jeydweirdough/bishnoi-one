@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.api import Api, camel, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
+from app import passwords
 from app.deps import DB, AdminUser, CurrentUser
 from app.models import (
     TICKET_STATUSES,
@@ -345,9 +346,8 @@ def set_password(user_id: str, body: FirstPasswordIn, me: AdminUser, db: DB) -> 
     if problem:
         raise field_error("password", problem)
     hashed, now = hash_password(password), datetime.now(UTC)
-    # One password at every company of theirs.
-    for row in db.scalars(select(Identity).where(func.lower(Identity.email) == person.email.lower())):
-        row.password_hash, row.password_changed_at = hashed, now
+    # One password at every company of theirs, and in the Admin Console (app/passwords.py).
+    passwords.set_for(db, person.email, hashed, now)
     audit(db, me, "identity.password_set", category="security", target=person.email, target_type="identity", target_id=person.id, company_id=person.company_id)
     db.commit()
     return {"password": password if made else None}

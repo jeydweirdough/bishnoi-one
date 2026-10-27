@@ -25,6 +25,7 @@ from app import access_roles
 from app.access_roles import ADMINISTRATOR
 from app.api import Api, changed, check_email, conflict, field_error, not_found
 from app.audit import audit
+from app import passwords
 from app.deps import DB, SettingsDep
 from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp
 from app.routers.identity import Signed
@@ -373,9 +374,8 @@ def set_person_password(person_id: str, body: PasswordIn, db: DB, me: Admin) -> 
     if problem:
         raise field_error("password", problem)
     hashed, now = hash_password(password), datetime.now(UTC)
-    # One password at every company of theirs.
-    for row in db.scalars(select(Identity).where(func.lower(Identity.email) == p.email.lower())):
-        row.password_hash, row.password_changed_at = hashed, now
+    # One password at every company of theirs, and in the Admin Console (app/passwords.py).
+    passwords.set_for(db, p.email, hashed, now)
     audit(db, me.email, "access.password_set", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
     db.commit()
     return {"password": password if made else None}

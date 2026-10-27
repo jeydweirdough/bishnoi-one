@@ -96,7 +96,11 @@ def main() -> int:
         if user is None:
             sys.exit(f"No account for {email}.")
         if args.command == "password":
-            user.password_hash = hash_password(ask_password())
+            from datetime import UTC, datetime
+
+            from app import passwords
+
+            passwords.set_for(db, user.email, hash_password(ask_password()), datetime.now(UTC))
             user.password_changed_at = datetime.now(UTC)  # ends every session it had
             audit(db, TOOL, "staff.password_reset", category="security", target=email, target_type="staff", target_id=user.id)
         else:
