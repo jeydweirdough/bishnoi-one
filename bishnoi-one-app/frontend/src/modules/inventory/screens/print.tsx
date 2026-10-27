@@ -165,9 +165,9 @@ export async function PurchaseOrderPrint({ params, searchParams }: { params: Par
       />
       <Parties
         items={[
-          { label: "Supplier", lines: [po.supplier.name, supplier?.address, ...contactOf(supplier)] },
+          { label: "Vendor", lines: [po.supplier.name, supplier?.address, ...contactOf(supplier)] },
           { label: "Deliver to", lines: [po.warehouse.name, warehouse?.address] },
-          { label: "Terms", lines: [supplier?.paymentTerms ? `Payment: ${supplier.paymentTerms}` : "Payment: as agreed", supplier?.code ? `Supplier code: ${supplier.code}` : null] },
+          { label: "Terms", lines: [supplier?.paymentTerms ? `Payment: ${supplier.paymentTerms}` : "Payment: as agreed", supplier?.code ? `Vendor code: ${supplier.code}` : null] },
         ]}
       />
       <table className="mt-5 w-full border-collapse">
@@ -203,7 +203,7 @@ export async function PurchaseOrderPrint({ params, searchParams }: { params: Par
         </p>
       </section>
       <Notes notes={po.notes} />
-      <Signatures items={[["Prepared by", po.createdBy?.name], ["Approved by", po.orderedBy?.name], ["Conforme (supplier)", ""]]} />
+      <Signatures items={[["Prepared by", po.createdBy?.name], ["Approved by", po.orderedBy?.name], ["Conforme (vendor)", ""]]} />
       <Foot ctx={ctx}>Please quote {po.number} on the delivery receipt and invoice.</Foot>
     </Frame>
   );
@@ -276,7 +276,7 @@ export async function ReceiptPrint({ params, searchParams }: { params: Params<{ 
         </p>
       </section>
       <Notes notes={r.notes} />
-      <Signatures items={[["Delivered by (supplier)", ""], ["Received by", r.receivedBy?.name], ["Checked by", ""]]} />
+      <Signatures items={[["Delivered by (vendor)", ""], ["Received by", r.receivedBy?.name], ["Checked by", ""]]} />
       <Foot ctx={ctx}>Received in good order and condition unless noted above.</Foot>
     </Frame>
   );

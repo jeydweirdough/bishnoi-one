@@ -92,7 +92,7 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
   const shown = orders.filter((o) => o.status !== "cancelled" && (o.status !== "received" || keep.has(o.id)));
   const worth = (status: string) => fmt.peso(shown.filter((o) => o.status === status).reduce((n, o) => n + o.total, 0));
   const columns: BoardColumn[] = [
-    { key: "draft", label: "Draft", dot: DOT.waiting, icon: <FilePenLine />, note: worth("draft"), hint: "Not yet placed with the supplier" },
+    { key: "draft", label: "Draft", dot: DOT.waiting, icon: <FilePenLine />, note: worth("draft"), hint: "Not yet placed with the vendor" },
     { key: "ordered", label: "Ordered", dot: DOT.under, icon: <Send />, note: worth("ordered"), hint: "Placed; awaiting delivery" },
     { key: "partial", label: "Partially received", dot: DOT.moving, icon: <PackageOpen />, note: worth("partial"), hint: "Balance outstanding" },
     { key: "received", label: "Received", dot: DOT.done, icon: <PackageCheck />, note: "Recent", hint: "Fully received" },
@@ -112,7 +112,7 @@ export function PurchaseOrdersBoard({ orders, fmt, day, may }: { orders: POBrief
   }));
   const receive = may("receiving.receive");
   const moves = allowed([
-    { from: "draft", to: "ordered", step: "place", label: "Place order", confirm: "Place this order with the supplier? Once placed, it cannot be edited, only received or cancelled.", may: may("purchasing.approve") },
+    { from: "draft", to: "ordered", step: "place", label: "Place order", confirm: "Place this order with the vendor? Once placed, it cannot be edited, only received or cancelled.", may: may("purchasing.approve") },
     { from: "ordered", to: "partial", open: "/inventory/purchase-orders/{id}#receive", label: "Receive", may: receive },
     { from: "ordered", to: "received", open: "/inventory/purchase-orders/{id}#receive", label: "Receive", may: receive },
     { from: "partial", to: "received", open: "/inventory/purchase-orders/{id}#receive", label: "Receive remaining", may: receive },

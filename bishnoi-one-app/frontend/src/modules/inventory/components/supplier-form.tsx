@@ -47,13 +47,13 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       currency: d.currency.trim().toUpperCase() || "PHP",
       contacts: contacts.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), role: c.role?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null })),
     };
-    save(() => saveSupplier(supplier?.id ?? null, input), (out) => ({ message: supplier ? "Supplier saved" : `${input.name} added`, go: `/inventory/suppliers/${supplier?.id ?? out.id}` }));
+    save(() => saveSupplier(supplier?.id ?? null, input), (out) => ({ message: supplier ? "Vendor saved" : `${input.name} added`, go: `/inventory/suppliers/${supplier?.id ?? out.id}` }));
   }
 
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); submit(); }} className={`space-y-5 rounded-xl transition-all duration-300 ${shakeClass} ${anticipateClass}`}>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
-        <SectionTitle icon="suppliers">Supplier details</SectionTitle>
+        <SectionTitle icon="suppliers">Vendor details</SectionTitle>
         <div className="mt-4 grid gap-5 sm:grid-cols-3">
           <Field label="Code" error={fields.code}>{(p) => <Input {...p} {...text("code")} placeholder="ABC" autoFocus={!supplier} />}</Field>
           <Field label="Name" error={fields.name} className="sm:col-span-2">{(p) => <Input {...p} {...text("name")} placeholder="ABC Medical Supply" />}</Field>
@@ -65,7 +65,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
           <Field label="Lead time (days)" optional error={fields.leadTimeDays} hint="Days from order to delivery.">
             {(p) => <Input {...p} inputMode="numeric" value={d.leadTimeDays} onChange={(e) => setD({ ...d, leadTimeDays: e.target.value.replace(/\D/g, "") })} />}
           </Field>
-          <Field label="Currency" error={fields.currency} hint="What it bills in: PHP, or USD for suppliers abroad.">
+          <Field label="Currency" error={fields.currency} hint="What it bills in: PHP, or USD for vendors abroad.">
             {(p) => <Input {...p} value={d.currency} onChange={(e) => setD({ ...d, currency: e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() })} maxLength={3} />}
           </Field>
           <Field label="Notes" optional error={fields.notes} className="sm:col-span-3">{(p) => <Textarea {...p} rows={2} {...text("notes")} />}</Field>
@@ -73,7 +73,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       </Sheet>
       <Sheet className="px-5 pt-4 pb-5 sm:px-6">
         <SectionTitle icon="settings">Tax registration</SectionTitle>
-        <p className="mt-1 text-meta text-ink-3">For Finance: its bills to this supplier, the input VAT, and the tax withheld (BIR Form 2307).</p>
+        <p className="mt-1 text-meta text-ink-3">For Finance: its bills to this vendor, the input VAT, and the tax withheld (BIR Form 2307).</p>
         <div className="mt-4 grid gap-5 sm:grid-cols-3">
           <Field label="TIN" optional error={fields.tin} hint="123-456-789-00000, as on its invoices.">{(p) => <Input {...p} {...text("tin")} placeholder="123-456-789-00000" />}</Field>
           <Field label="VAT" error={fields.vatStatus}>

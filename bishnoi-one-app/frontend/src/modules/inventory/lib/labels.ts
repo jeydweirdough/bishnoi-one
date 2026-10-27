@@ -11,7 +11,7 @@ export const MOVEMENT_KINDS: Record<MovementKind, string> = {
   transfer_in: "Transferred in",
   adjust: "Adjustment",
   return_in: "Customer return",
-  return_out: "Returned to supplier",
+  return_out: "Returned to vendor",
   damage: "Marked damaged",
   write_off: "Written off",
   expired: "Expired",

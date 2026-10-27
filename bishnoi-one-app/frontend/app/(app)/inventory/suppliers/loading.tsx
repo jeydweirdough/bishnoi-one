@@ -3,5 +3,5 @@
 import { ListSkeleton } from "@/src/modules/inventory/platform/ui/skeleton";
 
 export default function Loading() {
-  return <ListSkeleton title="Suppliers" />;
+  return <ListSkeleton title="Vendors" />;
 }

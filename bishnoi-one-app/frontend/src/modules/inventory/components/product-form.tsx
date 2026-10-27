@@ -225,7 +225,7 @@ export function ProductForm({ org, reference, product, parents, locked, preset, 
         <FormGrid className="mt-4">
           <div className="sm:col-span-4">
             <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" onAdded={took("supplierId")} label="New" />}>
-              <Field label="Preferred supplier" optional error={fields.supplierId}>
+              <Field label="Preferred vendor" optional error={fields.supplierId}>
                 {(p) => (
                   <Select {...p} value={d.supplierId} onChange={(e) => set({ supplierId: e.target.value })}>
                     <option value="">None</option>

@@ -118,10 +118,10 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
             <Heading>Details</Heading>
             <div className="grid gap-5 sm:grid-cols-3">
               <WithAdd can={canAdd.supplier} add={<QuickAdd kind="supplier" label="New" onAdded={(a) => { remember(a); setSupplierId(a.value); }} />}>
-                <Field label="Supplier" error={fields.supplierId}>
+                <Field label="Vendor" error={fields.supplierId}>
                   {(p) => (
                     <Select {...p} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                      <option value="">Select a supplier</option>
+                      <option value="">Select a vendor</option>
                       {options(supplierOptions)}
                     </Select>
                   )}
@@ -141,7 +141,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
               </Field>
             </div>
             <div className="mt-5">
-              <Field label="Notes" optional hint="For the supplier or the people receiving it." error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+              <Field label="Notes" optional hint="For the vendor or the people receiving it." error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
             </div>
           </Sheet>
         }
@@ -152,7 +152,7 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
           </Sheet>
         }
         summary={
-          <Summary fmt={fmt} counts={figures(lines, fmt, true)} error={error ?? fields.lines} note="A draft can be edited until an approver places the order with the supplier.">
+          <Summary fmt={fmt} counts={figures(lines, fmt, true)} error={error ?? fields.lines} note="A draft can be edited until an approver places the order with the vendor.">
             <Button type="submit" variant="primary" loading={pending} className="w-full">{order ? "Save draft" : "Save as draft"}</Button>
             <LinkButton href={order ? `/inventory/purchase-orders/${order.id}` : "/inventory/purchase-orders"} variant="quiet" className="w-full">Cancel</LinkButton>
           </Summary>

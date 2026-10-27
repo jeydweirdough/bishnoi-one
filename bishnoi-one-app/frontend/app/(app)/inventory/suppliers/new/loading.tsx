@@ -3,5 +3,5 @@
 import { FormSkeleton } from "@/src/modules/inventory/platform/ui/skeleton";
 
 export default function Loading() {
-  return <FormSkeleton title="Add supplier" />;
+  return <FormSkeleton title="Add vendor" />;
 }
