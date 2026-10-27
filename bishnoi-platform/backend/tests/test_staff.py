@@ -63,3 +63,24 @@ def test_staff_have_one_password_their_bishnoi_one_accounts(client, ana):
     assert client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "one password 2"}).status_code == 200
     assert client.post("/auth/login", json={"email": "ai4@getmeds.ph", "password": "one password 2"}).status_code == 200
     assert client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "account password 1"}).status_code == 401
+
+
+def test_a_platform_admin_signs_in_without_being_added_to_a_company(client, ana):
+    """2026-10-27: ai4, a Platform Admin whose company account was deleted, couldn't sign in at all."""
+    from tests.conftest import make_company
+
+    getmeds = make_company(client, ana)
+    northwind = make_company(client, ana, name="Northwind")
+    staff = client.post("/platform/staff", json={"fullName": "Jade Madigal", "email": "ai4@getmeds.ph", "role": "admin", "password": "staff password 1"}, headers=ana)
+    assert staff.status_code == 201, staff.text
+
+    assert client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "wrong password"}).status_code == 401
+    r = client.post("/identity/login", json={"email": "ai4@getmeds.ph", "password": "staff password 1"})
+    assert r.status_code == 200, r.text
+    me = client.get("/identity/me", headers={"Authorization": f"Bearer {r.json()['accessToken']}"}).json()
+    assert me["isCompanyAdmin"] is True
+    assert {c["slug"] for c in me["companies"]} == {getmeds["slug"], northwind["slug"]}
+
+    # Support isn't: a company adds them like anyone else.
+    client.post("/platform/staff", json={"fullName": "Sam Support", "email": "sam@bishnoi.test", "role": "member", "password": "staff password 2"}, headers=ana)
+    assert client.post("/identity/login", json={"email": "sam@bishnoi.test", "password": "staff password 2"}).status_code == 401
