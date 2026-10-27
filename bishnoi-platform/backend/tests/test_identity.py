@@ -208,3 +208,20 @@ def test_a_company_administrator_opens_every_application_the_company_has(client,
     assert (claims["role"], claims["appAdmin"], claims["companyAdmin"]) == ("Administrator", True, True)
     inventory = client.post("/identity/pass", json={"app": "inventory", "returnTo": "http://localhost:4304/auth/platform"}, headers=h)
     assert inventory.status_code == 403  # still only what the company has
+
+
+def test_nobody_deletes_their_own_account_or_a_companys_last_administrator(client, ana):
+    """2026-10-27: an administrator deleted their own Bishnoi One account from the Admin Console."""
+    from tests.conftest import make_company
+
+    getmeds = make_company(client, ana)
+    own = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ana Reyes", "email": "ana@example.com"}, headers=ana).json()["user"]
+    r = client.delete(f"/platform/users/{own['id']}", headers=ana)
+    assert r.status_code == 409 and "your own account" in r.text
+
+    boss = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ai Four", "email": "ai4@getmeds.ph", "isCompanyAdmin": True}, headers=ana).json()["user"]
+    r = client.delete(f"/platform/users/{boss['id']}", headers=ana)
+    assert r.status_code == 409 and "only administrator" in r.text
+    # With another administrator there, they can go.
+    client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ai Two", "email": "ai2@getmeds.ph", "isCompanyAdmin": True}, headers=ana)
+    assert client.delete(f"/platform/users/{boss['id']}", headers=ana).status_code == 204
