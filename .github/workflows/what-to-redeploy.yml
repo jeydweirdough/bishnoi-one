@@ -1,14 +1,17 @@
 # Says which apps need redeploying, and deploys nothing (decided 2026-10-27):
 # deployment stays by hand, so Vercel's deployments are only spent on what changed.
 #
-# After every push to main, the run's summary lists each app that changed since it
-# was last marked deployed (its tag deployed/<app>), with the order to deploy them.
+# The run's summary has two lists, each with only the apps that have changes:
+#   In this push        the apps the pushed commits changed
+#   Not live on Vercel  the apps whose code changed after their last production
+#                       deployment on Vercel (asked from Vercel itself)
 # Tests, README files and the command-line tools (app/tools/) don't count: they
 # aren't part of what runs online.
 #
-# After deploying by hand: Actions -> What to redeploy -> Run workflow, with the
-# apps deployed (e.g. "platform inventory one-app", or "all"). That moves their
-# tags to this commit, so the next run starts from there.
+# Needs, in GitHub (Settings -> Secrets and variables -> Actions):
+#   secret   VERCEL_TOKEN    a Vercel token (vercel.com/account/tokens); the Deploy workflow uses it too
+#   variable VERCEL_TEAM_ID  only if the projects are in a Vercel team (team_...)
+# Without the token, only the first list is shown.
 name: What to redeploy
 
 on:
@@ -16,14 +19,9 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      deployed:
-        description: 'Mark as deployed (e.g. "platform inventory one-app", or "all"). Empty: only show the list.'
-        required: false
-        default: ""
 
 permissions:
-  contents: write # only to move the deployed/<app> tags when asked
+  contents: read
 
 jobs:
   list:
@@ -34,88 +32,123 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Mark the apps deployed
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deployed != ''
+      - name: List what to redeploy
         env:
-          DEPLOYED: ${{ github.event.inputs.deployed }}
-          MARKED_BY: ${{ github.actor }}
-        run: |
-          all="platform crm inventory finance pharmacy admin in-licensing regulatory one-app"
-          [ "$DEPLOYED" = "all" ] && DEPLOYED="$all"
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          for app in $DEPLOYED; do
-            case " $all " in *" $app "*) ;; *) echo "::error::$app isn't an app (one of: $all)"; exit 1;; esac
-            # An annotated tag: it keeps when it was marked, and by whom.
-            git tag -f -a "deployed/$app" -m "Deployed by $MARKED_BY" HEAD
-            git push -f origin "deployed/$app"
-            echo "Marked $app deployed at $(git rev-parse --short HEAD)."
-          done
-
-      - name: List what changed since each app was deployed
-        env:
+          TZ: Asia/Manila
           PUSHED_BY: ${{ github.actor }}
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+        shell: python
         run: |
-          export TZ=Asia/Manila
-          # app | its folder | its Vercel project | deploy order
-          apps=(
-            "platform|bishnoi-platform/backend|bishnoione-platform-backend|1"
-            "crm|bishnoi-crm/backend|bishnoione-crm-backend|2"
-            "inventory|bishnoi-inventory/backend|bishnoione-inventory-backend|2"
-            "finance|bishnoi-finance/backend|bishnoione-finance-backend|3"
-            "pharmacy|bishnoi-pharmacy/backend|(not on Vercel yet)|3"
-            "admin|bishnoi-admin/backend|bishnoi-one-admin-backend|3"
-            "in-licensing|bishnoi-in-licensing/backend|(not on Vercel yet)|3"
-            "regulatory|bishnoi-regulatory/backend|(not on Vercel yet)|3"
-            "one-app|bishnoi-one-app/frontend|bishnoi-one-app|4"
-          )
-          git fetch --tags --force --quiet
-          {
-            echo "## What to redeploy"
-            echo
-            if [ "$EVENT" = "push" ]; then what="Pushed"; else what="Run"; fi
-            echo "$what by **$PUSHED_BY** on $(date '+%Y-%m-%d %H:%M') (Manila time), at $(git rev-parse --short HEAD): $(git log -1 --format='%s' | cut -c1-90)"
-            echo
-            echo "Deploy in this order: the Platform, then the APIs, then the one app. Nothing here deploys by itself."
-            echo
-            echo "| Order | App | Vercel project | Last deployed | Changed since | Last change | By | Files |"
-            echo "|---|---|---|---|---|---|---|---|"
-          } >> "$GITHUB_STEP_SUMMARY"
-          needed=0
-          for row in "${apps[@]}"; do
-            IFS='|' read -r app dir project order <<< "$row"
-            if git rev-parse -q --verify "refs/tags/deployed/$app" >/dev/null; then
-              since="deployed/$app"
-              # When it was marked deployed, by whom, and at which commit (an older plain tag: the commit's date).
-              when=$(git for-each-ref "refs/tags/deployed/$app" --format='%(taggerdate:format-local:%Y-%m-%d %H:%M)')
-              by=$(git for-each-ref "refs/tags/deployed/$app" --format='%(contents:subject)' | sed -n 's/^Deployed by //p')
-              [ -z "$when" ] && when=$(git log -1 --format='%cd' --date='format-local:%Y-%m-%d %H:%M' "deployed/$app")
-              label="$when${by:+ by $by} ($(git rev-parse --short "deployed/$app^{commit}"))"
-            else
-              # Never marked: the last day's changes, until it's marked once.
-              since="$(git rev-list -n1 --before='1 day ago' HEAD || true)"
-              label="not marked yet"
-            fi
-            [ -z "$since" ] && continue
-            only=(-- "$dir" ':(exclude)*/tests/*' ':(exclude)*/app/tools/*' ':(exclude)*.md' ':(exclude)*/.env.example')
-            changed=$(git diff --name-only "$since" HEAD "${only[@]}" | wc -l)
-            if [ "$changed" -gt 0 ]; then
-              commits=$(git rev-list --count "$since..HEAD" "${only[@]}")
-              first=$(git log --reverse --format='%cd' --date='format-local:%Y-%m-%d' "$since..HEAD" "${only[@]}" | head -1)
-              last=$(git log -1 --format='%cd' --date='format-local:%Y-%m-%d %H:%M' "$since..HEAD" "${only[@]}")
-              # Everyone whose changes are in it, most changes first.
-              who=$(git log --format='%an' "$since..HEAD" "${only[@]}" | sort | uniq -c | sort -rn | awk '{ $1=""; sub(/^ /, ""); print }' | paste -sd ',' - | sed 's/,/, /g')
-              echo "| $order | **$app** | \`$project\` | $label | $commits commit(s) from $first | $last | $who | $changed |" >> "$GITHUB_STEP_SUMMARY"
-              needed=$((needed + 1))
-            fi
-          done
-          {
-            echo
-            if [ "$needed" -eq 0 ]; then
-              echo "Nothing to redeploy: no app changed since it was last marked deployed."
-            else
-              echo "$needed app(s) to redeploy. Afterwards: Actions -> What to redeploy -> Run workflow, with the apps you deployed."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-          cat "$GITHUB_STEP_SUMMARY"
+          import json, os, subprocess, urllib.request
+          from datetime import datetime, timezone
+
+          # app, its folder, its Vercel project, deploy order
+          APPS = [
+              ("Platform", "bishnoi-platform/backend", "bishnoione-platform-backend", 1),
+              ("CRM", "bishnoi-crm/backend", "bishnoione-crm-backend", 2),
+              ("Inventory", "bishnoi-inventory/backend", "bishnoione-inventory-backend", 2),
+              ("Finance", "bishnoi-finance/backend", "bishnoione-finance-backend", 3),
+              ("Executive Admin", "bishnoi-admin/backend", "bishnoi-one-admin-backend", 3),
+              ("Pharmacy", "bishnoi-pharmacy/backend", None, 3),
+              ("In-Licensing", "bishnoi-in-licensing/backend", None, 3),
+              ("Regulatory", "bishnoi-regulatory/backend", None, 3),
+              ("The one app (screens)", "bishnoi-one-app/frontend", "bishnoi-one-app", 4),
+          ]
+          SKIP = [":(exclude)*/tests/*", ":(exclude)*/app/tools/*", ":(exclude)*.md", ":(exclude)*/.env.example"]
+          WHEN = "%Y-%m-%d %H:%M"
+
+          def git(*args):
+              return subprocess.run(["git", *args], capture_output=True, text=True).stdout.strip()
+
+          def changes(folder, since=None, after=None):
+              """The commits (and files) that changed what runs online in this folder."""
+              rng = [f"{since}..HEAD"] if since else ["HEAD"]
+              when = [f"--since={datetime.fromtimestamp(after, timezone.utc):%Y-%m-%dT%H:%M:%SZ}"] if after else []
+              log = git("log", "--format=%H|%ct|%an", *when, *rng, "--", folder, *SKIP)
+              commits = [line.split("|", 2) for line in log.splitlines() if line]
+              if not commits:
+                  return None
+              base = since or (commits[-1][0] + "^")
+              files = git("diff", "--name-only", base, "HEAD", "--", folder, *SKIP).splitlines()
+              people = []
+              for _, _, name in commits:
+                  if name not in people:
+                      people.append(name)
+              times = sorted(int(t) for _, t, _ in commits)
+              return {"commits": len(commits), "first": times[0], "last": times[-1], "by": ", ".join(people), "files": len(files)}
+
+          def stamp(seconds):
+              return datetime.fromtimestamp(seconds).strftime(WHEN)
+
+          out = ["## What to redeploy", ""]
+          head = git("log", "-1", "--format=%h: %s")[:100]
+          out.append(f"{'Pushed' if os.environ['EVENT'] == 'push' else 'Run'} by **{os.environ['PUSHED_BY']}** on {datetime.now().strftime(WHEN)} (Manila time), at {head}")
+          out.append("")
+
+          # 1. What this push changed.
+          before = os.environ.get("BEFORE") or ""
+          if not before or set(before) == {"0"} or not git("cat-file", "-t", before):
+              before = git("rev-parse", "HEAD~1")
+          pushed = [(a, c) for a in APPS if (c := changes(a[1], since=before))]
+          out += ["### In this push", ""]
+          if pushed:
+              out += ["| Order | App | Vercel project | Commits | By | Files |", "|---|---|---|---|---|---|"]
+              for (name, _, project, order), c in sorted(pushed, key=lambda x: x[0][3]):
+                  out.append(f"| {order} | **{name}** | {f'`{project}`' if project else 'not on Vercel'} | {c['commits']} | {c['by']} | {c['files']} |")
+          else:
+              out.append("No app changed: nothing to redeploy for this push.")
+          out.append("")
+
+          # 2. What isn't live on Vercel yet.
+          out += ["### Not live on Vercel yet", ""]
+          token = os.environ.get("VERCEL_TOKEN")
+          if not token:
+              out.append("Add the `VERCEL_TOKEN` secret to compare with what's live on Vercel (see the top of this workflow).")
+          else:
+              team = os.environ.get("VERCEL_TEAM_ID")
+              def vercel(path):
+                  url = f"https://api.vercel.com{path}" + (f"{'&' if '?' in path else '?'}teamId={team}" if team else "")
+                  req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+                  try:
+                      with urllib.request.urlopen(req, timeout=20) as r:
+                          return json.load(r)
+                  except Exception as e:
+                      return {"error": str(e)}
+              rows, problems = [], []
+              for name, folder, project, order in APPS:
+                  if not project:
+                      continue
+                  found = vercel(f"/v9/projects/{project}")
+                  if "id" not in found:
+                      problems.append(f"- {name}: Vercel has no project `{project}` ({found.get('error', 'not found')}).")
+                      continue
+                  live = vercel(f"/v6/deployments?projectId={found['id']}&target=production&state=READY&limit=1").get("deployments") or []
+                  if not live:
+                      problems.append(f"- {name}: `{project}` has no production deployment yet.")
+                      continue
+                  d = live[0]
+                  meta = d.get("meta") or {}
+                  sha = meta.get("githubCommitSha") or meta.get("gitCommitSha")
+                  deployed_at = int((d.get("created") or d.get("createdAt")) / 1000)
+                  # The commit it was deployed from, when Vercel knows it; else everything after it was deployed.
+                  c = changes(folder, since=sha) if sha and git("cat-file", "-t", sha) else changes(folder, after=deployed_at)
+                  if c:
+                      who = (d.get("creator") or {}).get("username", "")
+                      rows.append((order, f"| {order} | **{name}** | `{project}` | {stamp(deployed_at)}{f' by {who}' if who else ''} | {c['commits']} commit(s), {stamp(c['first'])} to {stamp(c['last'])} | {c['by']} | {c['files']} |"))
+              if rows:
+                  out += ["| Order | App | Vercel project | Live since | Waiting | By | Files |", "|---|---|---|---|---|---|---|"]
+                  out += [r for _, r in sorted(rows)]
+                  server = os.environ.get("GITHUB_SERVER_URL", "https://github.com") + "/" + os.environ.get("GITHUB_REPOSITORY", "")
+                  out += ["", f"Redeploy these {len(rows)}: [Deploy]({server}/actions/workflows/deploy.yml) -> Run workflow, and tick them. They go in order: the Platform, then the APIs, then the one app."]
+              else:
+                  out.append("Everything on Vercel is up to date.")
+              if problems:
+                  out += ["", *problems]
+
+          text = "\n".join(out) + "\n"
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write(text)
+          print(text)
