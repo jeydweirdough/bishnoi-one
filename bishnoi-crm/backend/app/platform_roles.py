@@ -268,7 +268,10 @@ def viewed_as(request: Request, db, user: User) -> User:
     other = db.get(User, wanted)
     if other is None or not other.is_active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That person isn't here, or is switched off.")
-    if request.method not in READ_ONLY and not request.url.path.endswith(("/auth/logout", "/auth/view-as")):
+    # /graphql is a read-only schema (graphql_core.graphql_router has no mutations).
+    # Pages use POST for queries, so the HTTP verb alone cannot identify a write.
+    reading_graphql = request.method == "POST" and request.url.path.rstrip("/") == "/graphql"
+    if request.method not in READ_ONLY and not reading_graphql and not request.url.path.endswith(("/auth/logout", "/auth/view-as")):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"You're viewing as {other.full_name}: changes are off. Stop viewing to make changes.")
     request.state.viewed_by = user
     return other

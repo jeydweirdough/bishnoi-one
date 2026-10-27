@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AccountError, PLATFORM_API, accountCall, accountToken } from "@/src/platform/lib/account";
 import { MODULES } from "@/src/platform/lib/modules";
-import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie } from "@/src/platform/lib/session-cookie";
+import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie, viewAsCookie } from "@/src/platform/lib/session-cookie";
 
 // Signing in to the one app with the Bishnoi One account, signing out, and
 // moving to another company. One person per browser: a new sign-in (or a new
@@ -28,7 +28,10 @@ async function forwardedFor(): Promise<string | null> {
 /** Each module's session, and where they were, dropped: they open again from the account. */
 async function dropModuleSessions(): Promise<void> {
   const jar = await cookies();
-  for (const m of MODULES) jar.delete(moduleCookie(m.key));
+  for (const m of MODULES) {
+    jar.delete(moduleCookie(m.key));
+    jar.delete(viewAsCookie(m.key));
+  }
   jar.delete(HERE_COOKIE);
 }
 
