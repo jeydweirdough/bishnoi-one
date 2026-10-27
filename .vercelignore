@@ -1,12 +1,41 @@
 # The one app is deployed from here (its Vercel project's Root Directory is
-# bishnoi-one-app/frontend): only that folder is uploaded, never the APIs, their
-# settings or local databases. The CLI doesn't read .gitignore (decided 2026-10-27).
-/*
-!/bishnoi-one-app/
-/bishnoi-one-app/*
-!/bishnoi-one-app/frontend/
-**/node_modules/
-**/.next/
+# bishnoi-one-app/frontend), so this keeps everything else out: the APIs, their
+# settings and local databases, documents and tools. The CLI doesn't read
+# .gitignore (decided 2026-10-27). Listed one by one: Vercel's matching can't
+# add a folder back after "ignore everything", which uploaded nothing.
+
+# Every other app
+/bishnoi-admin
+/bishnoi-crm
+/bishnoi-finance
+/bishnoi-in-licensing
+/bishnoi-inventory
+/bishnoi-pharmacy
+/bishnoi-platform
+/bishnoi-regulatory
+
+# Everything else at the top
+/.claude
+/.github
+/benchmarks
+/brand
+/desktop
+/docs
+/scripts
+/*.docx
+/*.md
+/package.json
+
+# Anywhere: secrets, local data, what Vercel installs and builds itself
+.env
+.env.*
+!.env.example
 **/.env
 **/.env.*
 !**/.env.example
+**/.data
+**/*.db
+**/.venv
+**/__pycache__
+**/node_modules
+**/.next
