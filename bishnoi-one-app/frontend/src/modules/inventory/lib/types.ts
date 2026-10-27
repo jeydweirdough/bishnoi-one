@@ -219,6 +219,8 @@ export type SupplierRow = Ref & {
   tin: string | null;
   vatStatus: "vat" | "non_vat";
   defaultAtc: string | null;
+  /** What it bills in: PHP, or USD for suppliers abroad. */
+  currency: string;
   performance: Performance;
 };
 export type Supplier = SupplierRow & {

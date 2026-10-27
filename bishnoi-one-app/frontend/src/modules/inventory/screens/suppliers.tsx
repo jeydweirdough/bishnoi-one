@@ -140,6 +140,7 @@ export async function SupplierPage({ params }: { params: Params<{ id: string }> 
             title="Purchasing"
             items={[
               ["Payment terms", x.paymentTerms],
+              ["Currency", x.currency !== "PHP" ? x.currency : null],
               ["Lead time", x.leadTimeDays == null ? null : `${x.leadTimeDays} days`],
               ["Average lead time", perf?.averageLeadDays == null ? null : `${perf.averageLeadDays} days`],
               ["Received value", fmt.peso(perf?.spend ?? 0)],

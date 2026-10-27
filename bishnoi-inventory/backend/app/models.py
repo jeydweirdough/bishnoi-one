@@ -283,6 +283,8 @@ class Supplier(Stamped, Base):
     tin: Mapped[str | None] = mapped_column(String(20), default=None)
     vat_status: Mapped[str] = mapped_column(String(8), default="vat")
     default_atc: Mapped[str | None] = mapped_column(String(8), default=None)
+    # What it bills in: PHP, or USD for the suppliers abroad (migration 0008).
+    currency: Mapped[str] = mapped_column(String(3), default="PHP")
 
 
 class SupplierProduct(Base):

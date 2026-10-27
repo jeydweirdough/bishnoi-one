@@ -116,6 +116,7 @@ def supplier_tax_out(s: Supplier) -> dict:
     return {
         "id": s.id, "code": s.code, "name": s.name, "address": s.address, "tin": s.tin,
         "vatStatus": s.vat_status, "defaultAtc": s.default_atc, "paymentTerms": s.payment_terms, "isActive": s.is_active,
+        "currency": s.currency,
     }
 
 

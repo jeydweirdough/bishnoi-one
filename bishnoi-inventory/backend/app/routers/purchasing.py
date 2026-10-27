@@ -55,8 +55,15 @@ class SupplierFields(Api):
     tin: str | None = Field(None, max_length=20)
     vat_status: str | None = None
     default_atc: str | None = Field(None, max_length=8)
+    # What it bills in (ISO code): PHP unless said.
+    currency: str | None = Field(None, pattern=r"^[A-Za-z]{3}$")
 
     _email = field_validator("email")(check_email)
+
+    @field_validator("currency")
+    @classmethod
+    def _currency(cls, value: str | None) -> str | None:
+        return value.upper() if value else value
 
     @field_validator("tin")
     @classmethod
@@ -144,6 +151,7 @@ def supplier_out(s: Supplier, perf: dict | None = None) -> dict:
         "tin": s.tin,
         "vatStatus": s.vat_status,
         "defaultAtc": s.default_atc,
+        "currency": s.currency,
         "performance": perf,
     }
 
@@ -205,7 +213,7 @@ def read_supplier(_: allowed("suppliers.view"), db: DB, supplier_id: str) -> dic
 def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, supplier_id: str, body: SupplierPatch) -> dict:
     s = found(db, Supplier, supplier_id, "supplier")
     wanted = changed(body)
-    for key in ("code", "name", "is_active", "vat_status"):
+    for key in ("code", "name", "is_active", "vat_status", "currency"):
         if key in wanted and wanted[key] is None:
             raise field_error(key, "This can't be empty.")
     if "code" in wanted:

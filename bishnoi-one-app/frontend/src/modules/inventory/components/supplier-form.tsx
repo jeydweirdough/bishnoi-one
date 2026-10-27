@@ -25,6 +25,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
     tin: supplier?.tin ?? "",
     vatStatus: supplier?.vatStatus ?? "vat",
     defaultAtc: supplier?.defaultAtc ?? "",
+    currency: supplier?.currency ?? "PHP",
   });
   const [contacts, setContacts] = useState<Contact[]>(supplier?.contacts ?? []);
   const text = (k: keyof typeof d) => ({ value: d[k], onChange: (e: { target: { value: string } }) => setD({ ...d, [k]: e.target.value }) });
@@ -43,6 +44,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       tin: d.tin.trim() || null,
       vatStatus: d.vatStatus,
       defaultAtc: d.defaultAtc.trim().toUpperCase() || null,
+      currency: d.currency.trim().toUpperCase() || "PHP",
       contacts: contacts.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), role: c.role?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null })),
     };
     save(() => saveSupplier(supplier?.id ?? null, input), (out) => ({ message: supplier ? "Supplier saved" : `${input.name} added`, go: `/inventory/suppliers/${supplier?.id ?? out.id}` }));
@@ -62,6 +64,9 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
           <Field label="Payment terms" optional error={fields.paymentTerms} hint="Net 30, COD…">{(p) => <Input {...p} {...text("paymentTerms")} />}</Field>
           <Field label="Lead time (days)" optional error={fields.leadTimeDays} hint="Days from order to delivery.">
             {(p) => <Input {...p} inputMode="numeric" value={d.leadTimeDays} onChange={(e) => setD({ ...d, leadTimeDays: e.target.value.replace(/\D/g, "") })} />}
+          </Field>
+          <Field label="Currency" error={fields.currency} hint="What it bills in: PHP, or USD for suppliers abroad.">
+            {(p) => <Input {...p} value={d.currency} onChange={(e) => setD({ ...d, currency: e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() })} maxLength={3} />}
           </Field>
           <Field label="Notes" optional error={fields.notes} className="sm:col-span-3">{(p) => <Textarea {...p} rows={2} {...text("notes")} />}</Field>
         </div>
