@@ -27,7 +27,14 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/roles/people", label: "People", icon: "teams" },
       ],
     });
-  if (me.isCompanyAdmin) groups.push({ label: "Reports", pages: [{ href: "/platform/reports", label: "Reports Center", icon: "reports" }] });
+  if (me.isCompanyAdmin)
+    groups.push({
+      label: "Reports",
+      pages: [
+        { href: "/platform/reports", label: "Reports Center", icon: "reports" },
+        { href: "/platform/reports/kpis", label: "Company KPIs", icon: "goals" },
+      ],
+    });
   return groups;
 }
 
