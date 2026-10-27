@@ -50,7 +50,7 @@ export async function AdminConsoleFrame({ children }: { children: ReactNode }) {
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   const actions = (
     <div className="flex items-center gap-1">
-      <OneActions />
+      <OneActions links={[{ href: "/platform/account", label: "Your profile" }]} />
     </div>
   );
   return (

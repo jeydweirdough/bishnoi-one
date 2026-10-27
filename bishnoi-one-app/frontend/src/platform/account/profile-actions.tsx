@@ -153,6 +153,15 @@ function EditProfile({ profile, today, onClose }: { profile: Profile; today: str
   );
 }
 
+/** Account-only pages share the same password flow as module profiles. */
+export function ChangePasswordButton() {
+  const [open, setOpen] = useState(false);
+  return <>
+    <Button icon={<KeyRound className="size-4" aria-hidden />} onClick={() => setOpen(true)}>Change password</Button>
+    {open && <ChangePassword onClose={() => setOpen(false)} />}
+  </>;
+}
+
 function ChangePassword({ onClose }: { onClose: () => void }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
