@@ -10,6 +10,7 @@ dependencies = [
     "holidays>=0.107",
     "httpx>=0.28.1",
     "psycopg[binary]>=3.2",
+    "pg8000>=1.31.6,<2",
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.0",
     "tzdata>=2026.4",

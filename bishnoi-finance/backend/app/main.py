@@ -32,7 +32,7 @@ SECURITY_HEADERS = {
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    engine = make_engine(settings.database_url)
+    engine = make_engine(settings.database_url, postgres_driver=settings.postgres_driver)
     upgrade(engine)
 
     # The interactive docs map every endpoint; nobody outside development needs them.
@@ -69,10 +69,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "finance"}
 
-    from app import platform_connect, platform_roles
+    from app import business_events, platform_connect, platform_roles
 
     app.include_router(platform_connect.router)
     app.include_router(platform_roles.router)
+    business_events.install(app)
     # Connected on the Platform as soon as this runs, not when someone first uses it.
     platform_connect.connect_now(settings)
     app.include_router(auth.router)
@@ -94,4 +95,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(integration.funds_router)
     app.include_router(integration.customers_router)
     app.include_router(integration.sales_router)
+    from app.routers import zoho
+    app.include_router(zoho.router)
+    from app.routers import zoho_source
+    app.include_router(zoho_source.router)
+    from app.routers import zoho_invoices
+    app.include_router(zoho_invoices.router)
+    from app.routers import zoho_deliveries
+    app.include_router(zoho_deliveries.router)
+    from app.routers import import_review
+    app.include_router(import_review.router)
     return app

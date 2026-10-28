@@ -1,4 +1,4 @@
-﻿from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy import select,func
 from app.models import SalesOrder,JournalEntry,Invoice,Notification,RolePermission
 from .test_tax_api import app,ana,ben,client  # noqa: F401
@@ -36,7 +36,7 @@ def test_approval_history_queues_notifications_and_no_financial_side_effects(cli
  assert len(client.get('/finance/sales-orders?queue=to_approve',headers=approver).json()['items'])==1
  assert len(client.get('/finance/sales-orders?queue=waiting',headers=maker).json()['items'])==1
  approved=step(client,approver,sent,'approve');assert approved.status_code==200,approved.text;approved=approved.json()
- assert approved['status']=='approved' and approved['zohoStatus'].startswith('Not connected')
+ assert approved['status']=='approved' and approved['zohoStatus']=='Finance-only order: not sent to Zoho'
  assert [e['kind'] for e in approved['events']]==['created','submitted','approved']
  assert step(client,approver,sent,'approve').status_code==409
  assert client.put(f"/finance/sales-orders/{order['id']}",headers=maker,json=BODY|{'version':approved['version']}).status_code==409
@@ -74,3 +74,30 @@ def test_input_totals_and_concurrent_approval(client,ana):
  assert sorted(codes)==[200,409]
  history=client.get(f"/finance/sales-orders/{order['id']}",headers=ana).json()['events']
  assert sum(e['kind']=='approved' for e in history)==1
+
+def test_editor_cannot_approve_someone_elses_draft_they_changed(client,ana):
+ maker=person(client,ana,'Original maker',PERMS)
+ editor=person(client,ana,'Order editor',PERMS)
+ order=make(client,maker)
+ result=client.put(f"/finance/sales-orders/{order['id']}",headers=editor,json=BODY|{'version':order['version'],'notes':'Corrected details'})
+ assert result.status_code==200,result.text
+ sent=step(client,maker,result.json(),'submit').json()
+ assert step(client,editor,sent,'approve').status_code==403
+ assert step(client,ana,sent,'approve').status_code==200
+
+def test_restoration_cannot_edit_source_ids_or_write_source_routes(client,ana,app):
+ from app.models import ZohoSourceDocument
+ with app.state.sessions() as db:
+  db.add(ZohoSourceDocument(organization_id='test-org',kind='salesorder',source_id='source-only-id',data={'id':'source-only-id','number':'SO-SOURCE'}))
+  db.commit()
+ assert client.put('/finance/sales-orders/source-only-id',headers=ana,json=BODY).status_code==404
+ assert client.put('/finance/zoho-sales-orders/source-only-id',headers=ana,json=BODY).status_code==405
+ assert client.post('/finance/zoho-sales-orders',headers=ana,json=BODY).status_code==405
+ with app.state.sessions() as db:
+  assert db.get(ZohoSourceDocument,('test-org','salesorder','source-only-id')).data=={'id':'source-only-id','number':'SO-SOURCE'}
+  for model in (SalesOrder,Invoice,JournalEntry):assert db.scalar(select(func.count()).select_from(model))==0
+
+def test_blank_and_zero_total_orders_rejected_without_partial_records(client,ana,app):
+ for body in (BODY|{'customerName':'   '},BODY|{'lines':[BODY['lines'][0]|{'description':'   '}]},BODY|{'lines':[BODY['lines'][0]|{'unitPriceCentavos':0}]}):
+  assert client.post('/finance/sales-orders',headers=ana,json=body).status_code==422
+ with app.state.sessions() as db:assert db.scalar(select(func.count()).select_from(SalesOrder))==0

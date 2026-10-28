@@ -112,6 +112,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
           tabs={[
             ...TABS.map((t) => ({ href: href(t.key), label: t.label, count: t.key ? list.counts[t.key] : total, current: status === t.key })),
             { href: "/finance/invoices/receivables", label: "Receivables", current: false },
+            { href: "/finance/invoices/zoho", label: "Zoho records", current: false },
           ]}
         />
         <ListToolbar q={q} placeholder="Search customer, number or reference" keep={{ status }} />

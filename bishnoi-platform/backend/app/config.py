@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15
+    # A scheduler's key for the nightly check of business events (GET /cron/events-check; Vercel
+    # sends it as CRON_SECRET). Unset: run `python -m app.tools.events check` on a schedule instead.
+    cron_secret: SecretStr | None = None
 
     # The platform, as its screens show it.
     org_name: str = "Bishnoi One"

@@ -1,3 +1,5 @@
+import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
+import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Ban, ExternalLink, FileText, PackageCheck, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
@@ -383,9 +385,14 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
   if (!may("receiving.view")) return <NoAccess what="receiving" />;
   const s = await searchParams;
   const q = param(s, "q");
+  const h = { operationType: param(s, "operationType"), timing: param(s, "timing") };
   const { page, size, vars } = paging(s);
-  const base = `/inventory/receipts${query({ q })}`;
-  const { receipts: list } = await loadQuery<{ receipts: Paged<ReceiptBrief> }>(`query Receipts($q: String, $limit: Int, $offset: Int) { receipts(q: $q, limit: $limit, offset: $offset) }`, { ...given({ q }), ...vars }, ["receipts"]);
+  const base = `/inventory/receipts${query({ q, ...h })}`;
+  const { receipts: list, operationTypes } = await loadQuery<{ receipts: Paged<ReceiptBrief>; operationTypes: OperationTypeRow[] }>(
+    `query Receipts($q: String, $operationType: String, $timing: String, $limit: Int, $offset: Int) { receipts(q: $q, operationType: $operationType, timing: $timing, limit: $limit, offset: $offset) operationTypes }`,
+    { ...given({ q, ...h }), ...vars },
+    ["receipts", "operationTypes"],
+  );
   keepInRange(list.items.length, list.total, page, base);
   const receipts = list.items;
   return (
@@ -396,7 +403,9 @@ export async function ReceiptsPage({ searchParams }: { searchParams: Search }) {
       >
         All goods receipts. To receive against a purchase order, open the order.
       </PageHeader>
-      <Filters q={q} placeholder="Receipt or delivery number" />
+      <Filters q={q} placeholder="Receipt or delivery number">
+        <HeaderFilters types={operationTypes} kinds={["receipt", "return"]} operationType={h.operationType} timing={h.timing} />
+      </Filters>
       <Sheet>
         {receipts.length === 0 ? <FirstStep icon="receiving" title="No purchase receives" body="Stock is received through a goods receipt, with or without a purchase order." needs={["warehouse", "product"]} href="/inventory/receipts/new" action="Receive stock" permission="receiving.receive" filtered={Boolean(q)} clear="/inventory/receipts" may={may} /> : <ReceiptsTable receipts={receipts} at={at} count={fmt.count} peso={fmt.peso} />}
       </Sheet>
@@ -418,6 +427,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
         {r.order && <> against <Link href={`/inventory/purchase-orders/${r.order.id}`} className="text-ink hover:underline">{r.order.number}</Link></>}
         {r.deliveryRef && <> · delivery {r.deliveryRef}</>}
       </PageHeader>
+      <DocumentHeaderStrip header={r.header} source={r.order && <Link href={`/inventory/purchase-orders/${r.order.id}`} className="hover:underline">{r.order.number}</Link>} />
       <Sheet>
         <Table head={["Product", "Batch", "Expires", "Serial numbers", " Quantity", " Unit cost", " Amount"]} min="52rem">
           {r.lines.map((l) => (
@@ -443,7 +453,8 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
   );
 }
 
-export async function NewReceiptPage() {
+export async function NewReceiptPage({ searchParams }: { searchParams: Search }) {
+  const productId = param(await searchParams, "product");
   const { me, may } = await context();
   if (!may("receiving.receive")) return <NoAccess what="receiving stock" />;
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
@@ -455,7 +466,7 @@ export async function NewReceiptPage() {
       <PageHeader crumbs={[{ href: "/inventory/receipts", label: "Purchase receives" }]} title="Receive stock">
         For deliveries without a purchase order, such as donations, returns or found stock. To receive against a purchase order, open the order.
       </PageHeader>
-      <ReceiveForm org={me.org} reference={ref} canAdd={canAddFrom(may)} />
+      <ReceiveForm org={me.org} reference={ref} canAdd={canAddFrom(may)} productId={productId} />
     </>
   );
 }

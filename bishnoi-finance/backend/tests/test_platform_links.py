@@ -33,5 +33,5 @@ def test_a_replaced_key_drops_the_links_and_no_key_keeps_env(monkeypatch):
     s = platform_links.effective(connected(monkeypatch, Answer(401)))
     assert s.integration_keys == []
     platform_links.forget()
-    plain = Settings(integration_keys=[SecretStr("crm:in-env-0123456789abcdefghijkl")])
+    plain = Settings(_env_file=None, platform_api_url=None, integration_keys=[SecretStr("crm:in-env-0123456789abcdefghijkl")])
     assert platform_links.effective(plain) is plain

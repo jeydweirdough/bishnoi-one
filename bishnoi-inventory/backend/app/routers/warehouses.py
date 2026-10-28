@@ -10,12 +10,13 @@ from fastapi import APIRouter, Response, status
 from pydantic import Field
 from sqlalchemy import func, select
 
+from app import documents
 from app.access import allowed
 from app.api import Api, changed, conflict, field_error, found, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.levels import ZERO, by_warehouse
-from app.models import Location, Movement, Product, Stock, Warehouse
+from app.models import OPERATION_KINDS, Location, Movement, OperationType, Product, Stock, Warehouse
 from app.out import warehouse_ref
 
 router = APIRouter(prefix="/inventory", tags=["warehouses"])
@@ -281,3 +282,67 @@ def delete_location(_: Manage, me: CurrentUser, db: DB, warehouse_id: str, locat
     db.delete(location)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- operation types (feature plan step 8): the kinds of stock document, as the company names them ---
+
+
+class OperationTypeIn(Api):
+    code: str = Field(min_length=1, max_length=20)
+    name: str = Field(min_length=1, max_length=80)
+    kind: str = Field(max_length=16)
+    warehouse_id: str | None = Field(None, max_length=36)
+    is_default: bool = False
+
+
+class OperationTypePatch(Api):
+    name: str | None = Field(None, min_length=1, max_length=80)
+    is_default: bool | None = None
+    is_active: bool | None = None
+
+
+@router.get("/operation-types")
+def operation_types(_: CurrentUser, db: DB) -> list[dict]:
+    return [documents.type_out(t) for t in db.scalars(select(OperationType).order_by(OperationType.kind, OperationType.name))]
+
+
+def _one_default(db: DB, t: OperationType) -> None:
+    """Only one default per kind and warehouse."""
+    for other in db.scalars(select(OperationType).where(OperationType.kind == t.kind, OperationType.id != t.id, OperationType.is_default)):
+        if other.warehouse_id == t.warehouse_id:
+            other.is_default = False
+
+
+@router.post("/operation-types", status_code=status.HTTP_201_CREATED)
+def add_operation_type(_: Manage, me: CurrentUser, db: DB, body: OperationTypeIn) -> dict:
+    if body.kind not in OPERATION_KINDS:
+        raise field_error("kind", "Pick what kind of operation it is.")
+    code = body.code.strip().upper()
+    if db.scalar(select(OperationType.id).where(func.upper(OperationType.code) == code)):
+        raise field_error("code", "There's already an operation type with that code.")
+    if body.warehouse_id and db.get(Warehouse, body.warehouse_id) is None:
+        raise field_error("warehouseId", "Pick a warehouse that exists.")
+    t = OperationType(code=code, name=body.name.strip(), kind=body.kind, warehouse_id=body.warehouse_id, is_default=body.is_default)
+    db.add(t)
+    db.flush()
+    if t.is_default:
+        _one_default(db, t)
+    audit(db, me, "operation_type.created", target=t.name, target_type="operation_type", target_id=t.id)
+    db.commit()
+    return documents.type_out(t)
+
+
+@router.patch("/operation-types/{type_id}")
+def change_operation_type(_: Manage, me: CurrentUser, db: DB, type_id: str, body: OperationTypePatch) -> dict:
+    t = found(db, OperationType, type_id, "operation type")
+    fields = {k: v for k, v in changed(body).items() if v is not None and getattr(t, k) != v}
+    if fields.get("is_active") is False and t.is_default:
+        raise conflict("This is the default for its kind. Make another one the default first.")
+    for k, v in fields.items():
+        setattr(t, k, v.strip() if isinstance(v, str) else v)
+    if fields.get("is_default"):
+        _one_default(db, t)
+    if fields:
+        audit(db, me, "operation_type.updated", target=t.name, target_type="operation_type", target_id=t.id, fields=sorted(fields))
+        db.commit()
+    return documents.type_out(t)

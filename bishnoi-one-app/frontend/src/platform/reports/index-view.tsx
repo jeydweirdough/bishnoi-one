@@ -194,7 +194,7 @@ export function ReportsIndex({
       title: r.title,
       about: r.about,
       group: r.group,
-      href: `${base}/${r.key}`,
+      href: r.href ?? `${base}/${r.key}`,
       fixed: r.fixed,
       isCustom: false,
     }));

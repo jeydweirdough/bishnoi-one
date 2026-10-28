@@ -60,6 +60,7 @@ export type VoucherLine = {
 export type VoucherEvent = { at: string; kind: string; who: string; text: string | null };
 
 export type Voucher = Omit<VoucherSummary, "supplier"> & {
+  zohoSync?: {label:string;message:string|null}|null;
   supplier: {
     id: string;
     name: string;

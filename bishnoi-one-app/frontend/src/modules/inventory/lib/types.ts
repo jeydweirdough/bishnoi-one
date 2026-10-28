@@ -1,3 +1,4 @@
+import type { DocumentHeader } from "@/src/platform/ui/document-header";
 // What Inventory's API sends, as the screens read it. Money is in minor units
 // (centavos); quantities are whole units of the product's unit of measure.
 
@@ -268,6 +269,8 @@ export type Backorder = {
 
 export type ReceiptBrief = {
   id: string;
+  /** One document header (step 8). */
+  header: DocumentHeader;
   number: string;
   order: { id: string; number: string } | null;
   supplier: Ref | null;
@@ -290,6 +293,8 @@ export type Pick = { locationId: string; locationCode: string; batchId: string |
 
 export type OrderBrief = {
   id: string;
+  /** One document header (step 8). */
+  header: DocumentHeader;
   number: string;
   kind: OrderKind;
   recipient: string;
@@ -323,6 +328,8 @@ export type Reservation = {
 export type TransferStatus = "draft" | "requested" | "approved" | "in_transit" | "received" | "cancelled";
 export type TransferBrief = {
   id: string;
+  /** One document header (step 8). */
+  header: DocumentHeader;
   number: string;
   status: TransferStatus;
   from: Ref;
@@ -349,6 +356,8 @@ export type AdjustmentReason = "count" | "found" | "other" | "customer_return" |
 export type ReasonOption = { key: AdjustmentReason; label: string; direction: "adds" | "removes" | "either" };
 export type AdjustmentBrief = {
   id: string;
+  /** One document header (step 8). */
+  header: DocumentHeader;
   number: string;
   status: "pending" | "posted" | "rejected";
   reason: AdjustmentReason;
@@ -371,6 +380,8 @@ export type Adjustment = AdjustmentBrief & {
 export type CountStatus = "open" | "submitted" | "approved" | "cancelled";
 export type CountBrief = {
   id: string;
+  /** One document header (step 8). */
+  header: DocumentHeader;
   number: string;
   status: CountStatus;
   warehouse: Ref;
@@ -412,7 +423,8 @@ export type Dashboard = {
 
 export type PurchaseHome = POBrief & { firstItem: string | null; moreItems: number };
 
-export type ReportInfo = { key: string; title: string; group: string; about: string; dated: boolean; byWarehouse: boolean; fixed?: boolean };
+/** href: a page of its own listed among the reports (2026-10-28). */
+export type ReportInfo = { key: string; title: string; group: string; about: string; dated: boolean; byWarehouse: boolean; fixed?: boolean; href?: string };
 export type ReportColumn = { key: string; label: string; kind: "text" | "number" | "money" | "date" | "datetime" | "percent" };
 export type Report = ReportInfo & { from: string; to: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[] };
 

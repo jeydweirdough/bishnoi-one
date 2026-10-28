@@ -7,6 +7,7 @@ import { Button } from "@/src/modules/console/platform/ui/button";
 import { Field, FormError, Input, PasswordInput, Select } from "@/src/modules/console/platform/ui/field";
 import { Sheet } from "@/src/modules/console/platform/ui/sheet";
 import { checkService, saveService, type ServiceInfo } from "@/src/modules/console/actions/services";
+import { checkOwnService, saveOwnService } from "@/src/one/company/actions";
 
 const APP_NAMES: Record<string, string> = { crm: "the CRM", inventory: "Inventory", finance: "Finance", pharmacy: "Pharmacy" };
 
@@ -16,14 +17,15 @@ function Stamp({ children, tone = "plain" }: { children: string; tone?: "plain" 
   return <span className={`inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-stamp whitespace-nowrap uppercase ${look}`}>{children}</span>;
 }
 
-type Props = { companyId: string; service: ServiceInfo; canChange: boolean; checkedWhen: string | null; updatedWhen: string | null };
+/** `mine`: a company administrator keeping their own company's (the company console), not an operator. */
+type Props = { companyId: string; service: ServiceInfo; canChange: boolean; checkedWhen: string | null; updatedWhen: string | null; mine?: boolean };
 
 /**
  * One outside service for one company: what it's for, which application uses
  * it, its details (secrets masked once saved), Save, Test and on/off. The
  * applications are given what's here; nothing is kept on their servers.
  */
-export function ServiceCard({ companyId, service: s, canChange, checkedWhen, updatedWhen }: Props) {
+export function ServiceCard({ companyId, service: s, canChange, checkedWhen, updatedWhen, mine = false }: Props) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
 
   function save(enabled?: boolean) {
     startSave(async () => {
-      const r = await saveService(companyId, s.key, draft, enabled);
+      const r = mine ? await saveOwnService(s.key, draft, enabled) : await saveService(companyId, s.key, draft, enabled);
       if (!r.ok) {
         setError(r.fields ? null : r.error);
         setFields(r.fields ?? {});
@@ -50,7 +52,7 @@ export function ServiceCard({ companyId, service: s, canChange, checkedWhen, upd
 
   function test() {
     startTest(async () => {
-      const r = await checkService(companyId, s.key);
+      const r = mine ? await checkOwnService(s.key) : await checkService(companyId, s.key);
       if (!r.ok) return setError(r.error);
       setError(null);
       if (r.data.check?.ok) toast.success(r.data.check.message);

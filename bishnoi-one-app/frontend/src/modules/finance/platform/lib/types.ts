@@ -103,6 +103,7 @@ export type ListKind = "customer_kind" | "activity_kind" | "outcome";
 export type CompanyLists = Record<ListKind, ListItem[]>;
 
 export type Me = {
+  dataEnvironment?: "official" | "local_test";
   // `photoAt`: when their picture last changed, or null when they have none (initials are drawn instead).
   user: { id: string; email: string; fullName: string; photoAt: string | null };
   // The company this session works in, and null for a Developer Admin who has

@@ -11,6 +11,10 @@ export type Account = {
   isActive: boolean;
   /** The account it sits under (Oojeema's chart groups them); none: at the top. */
   parentId: string | null;
+  /** Assets and liabilities: current (within a year) or long-term; null: worked out from the name. */
+  term: "current" | "non_current" | null;
+  /** What the management figures count it as (term, or worked out from the name); null for other types. */
+  termShown: "current" | "non_current" | null;
 };
 
 /** One row of a chart being imported, as the API would save it (app/routers/ledger.py). */

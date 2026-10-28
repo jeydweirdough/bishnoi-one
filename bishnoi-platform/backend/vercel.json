@@ -5,5 +5,11 @@
   ],
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "crons": [
+    {
+      "path": "/cron/events-check",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }

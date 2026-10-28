@@ -290,6 +290,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   const [description, setDescription] = useState(account?.description ?? "");
   const [isActive, setActive] = useState(account?.isActive ?? true);
   const [parentId, setParentId] = useState(account?.parentId ?? "");
+  const [term, setTerm] = useState<"" | "current" | "non_current">(account?.term ?? "");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -297,7 +298,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   function submit(e: React.FormEvent) {
     e.preventDefault();
     start(async () => {
-      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive, parentId: parentId || null });
+      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive, parentId: parentId || null, term: term || null });
       if (!result.ok) {
         setError(result.error);
         setFields(result.fields ?? {});
@@ -341,6 +342,24 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
             </Select>
           )}
         </Field>
+        {(type === "asset" || type === "liability") && (
+          <Field
+            label="Current or long-term"
+            size="md"
+            error={fields.term}
+            hint="Used for working capital and the current and quick ratios (Key figures). Current: used or due within a year."
+          >
+            {(p) => (
+              <Select {...p} value={term} onChange={(e) => setTerm(e.target.value as "" | "current" | "non_current")}>
+                <option value="">
+                  From its name{account?.termShown ? ` (now: ${account.termShown === "current" ? "current" : "long-term"})` : ""}
+                </option>
+                <option value="current">Current (within a year)</option>
+                <option value="non_current">Long-term</option>
+              </Select>
+            )}
+          </Field>
+        )}
       </FormGrid>
       <label className="flex items-center gap-2 text-sm">
         <input suppressHydrationWarning type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-hema" />

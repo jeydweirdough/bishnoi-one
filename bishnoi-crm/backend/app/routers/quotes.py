@@ -35,7 +35,7 @@ from app.extra import check_extra
 from app.inventory import sync_if_stale
 from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
-from app import mail, pharmacy, trade
+from app import business_events, mail, pharmacy, trade
 from app.orders import OrdersUnavailable
 from app.orders import payload as order_payload
 from app.orders import send as send_order
@@ -447,6 +447,9 @@ def save_quote(
         # Kept in the database, with the quote: saved together or not at all.
         db.add(StoredFile(ref=stored["ref"], content_type=stored["contentType"], data=data))
     audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
+    if deal is not None:  # the chain (step 9): the deal, then its quotes
+        business_events.link(db, getattr(settings, "company", None), business_events.ref("deal", deal.id, deal.name[:60]),
+                             business_events.ref("quote", record.id, record.number))
     db.commit()
     db.refresh(record)
     if record.approval_status == "pending":

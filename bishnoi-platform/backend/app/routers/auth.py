@@ -76,6 +76,10 @@ attempts = Attempts()
 
 @router.post("/login")
 def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
+    # Retired (feature plan step 5, 2026-10-28): operators sign in with their Bishnoi One account
+    # (/identity/login) like everyone else. Kept off a server only, for this API's own tests and tools.
+    if settings.environment == "production":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in with your Bishnoi One account.")
     rules = platform_settings.security(db, settings)
     email = body.email.lower()
     window = rules.lockout_minutes * 60

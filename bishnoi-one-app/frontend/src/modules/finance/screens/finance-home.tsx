@@ -1,4 +1,5 @@
 import { Welcome } from "@/src/platform/ui/welcome";
+import { redirect } from "next/navigation";
 import { greeting } from "@/src/modules/finance/platform/lib/format";
 import { Figure } from "@/src/modules/finance/platform/ui/figure";
 import { PageHeader, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
@@ -19,6 +20,13 @@ export const metadata = { title: "Overview" };
 
 export default async function FinanceHome() {
   const me = await getCompanyMe();
+  // A focused role starts in an allowed workspace, without granting dashboard
+  // or financial actions merely to make the module's starting page usable.
+  if (!me.permissions?.includes("dashboard.view")) {
+    if (me.permissions?.includes("sales_orders.view") && me.permissions?.includes("sales_orders.create")) redirect("/finance/sales-orders");
+    if (me.permissions?.includes("invoices.view")) redirect("/finance/invoices/zoho");
+    if (me.permissions?.includes("sales_orders.view")) redirect("/finance/sales-orders");
+  }
   const dashboard = await load<Dashboard>("/finance/dashboard");
   return (
     <>

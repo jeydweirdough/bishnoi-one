@@ -24,6 +24,16 @@ export type AccessRole = {
   permissions: Record<string, string[]>;
   scopes: Record<string, string>;
   people: number;
+  /** Its abilities in plain words (step 6), each with its limit where it takes one. */
+  abilities: { key: string; limit: number | null }[];
+  /** The ready-made job role it was copied from. */
+  jobRole: string | null;
+};
+
+/** Bishnoi One's abilities and ready-made job roles (/identity/access/abilities, step 6). */
+export type AbilityCatalogue = {
+  groups: { name: string; abilities: { key: string; label: string; limit: string | null; apps: string[] }[] }[];
+  jobRoles: { key: string; name: string; sees: string; abilities: string[]; scopes: Record<string, string>; limits: Record<string, number>; admin: boolean }[];
 };
 
 export type AccessPerson = {

@@ -96,6 +96,8 @@ export type Account = {
   companies: { id: string; name: string; slug: string; current: boolean }[];
   /** The applications given to them, that their company has: a module each (by its Platform key). */
   apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null }[];
+  /** The company's app catalogue (step 6): "app:purchasing", "inventory.batches"… on or off. */
+  features?: Record<string, boolean>;
 };
 
 /**

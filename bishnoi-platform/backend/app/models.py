@@ -15,7 +15,7 @@ should reach what, and what is happening across all of it.
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -82,6 +82,42 @@ class SignInSession(Base):
     address: Mapped[str | None] = mapped_column(String(64), default=None)
 
 
+# ---- Accounts: one per person (feature plan step 4, 2026-10-28) -----------------
+
+ACCOUNT_STATUSES = ("active", "suspended")
+
+
+class Account(Base):
+    """A person, once across Bishnoi One: their email, name, the one password, and
+    whether they are an operator (they run Bishnoi One itself: the Operations area,
+    and administrator at every company). Their standing at each company is a
+    membership (Identity). Suspending the account stops them everywhere; nothing
+    about a person is deleted."""
+
+    __tablename__ = "nbpl_accounts"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (_one_of("status", ACCOUNT_STATUSES, "nbpl_account_status"), Index("nbpl_accounts_no", "no", unique=True))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    email: Mapped[str] = mapped_column(String(254), unique=True)
+    full_name: Mapped[str] = mapped_column(String(120))
+    first_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    middle_initial: Mapped[str | None] = mapped_column(String(4), default=None)
+    last_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    suffix: Mapped[str | None] = mapped_column(String(10), default=None)
+    gender: Mapped[str | None] = mapped_column(String(8), default=None)
+    phone: Mapped[str | None] = mapped_column(String(20), default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
+    # The one password. None until one is set.
+    password_hash: Mapped[str | None] = mapped_column(String(255), default=None)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    is_operator: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # ---- Organizations -------------------------------------------------------------
 
 COMPANY_STATUSES = ("active", "suspended")
@@ -123,6 +159,53 @@ class OrgUnit(Base):
     # A branch's town or address; a department's floor. Free text.
     location: Mapped[str | None] = mapped_column(String(200), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+UNIT_KIND_NAMES = ("division", "department", "team")
+
+
+class Unit(Base):
+    """One box on a company's org chart: a division, a department or a team, under
+    another (or at the top), with the membership that heads it and the areas it
+    covers. Switched off, never deleted. The CRM's teams are a copy of these (same ids)."""
+
+    __tablename__ = "nbpl_units"
+    __table_args__ = (_one_of("kind", UNIT_KIND_NAMES, "nbpl_unit_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    name: Mapped[str] = mapped_column(String(120))
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_units.id", ondelete="SET NULL"), default=None, index=True)
+    manager_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="SET NULL"), default=None)
+    # The areas it covers (the CRM's "places": Commonwealth, Cebu…). Not branches.
+    areas: Mapped[list] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Branch(Base):
+    """Where people work (Main office, Cebu). Warehouse roles are limited to their branch's warehouses."""
+
+    __tablename__ = "nbpl_branches"
+    __table_args__ = (UniqueConstraint("company_id", "name", name="nbpl_branch_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    address: Mapped[str | None] = mapped_column(String(200), default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MembershipUnit(Base):
+    """A unit beyond a membership's main one: widens what they see and approve;
+    reports still count them under their main unit."""
+
+    __tablename__ = "nbpl_membership_units"
+
+    membership_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), primary_key=True)
+    unit_id: Mapped[str] = mapped_column(ForeignKey("nbpl_units.id", ondelete="CASCADE"), primary_key=True, index=True)
 
 
 # ---- Applications --------------------------------------------------------------
@@ -313,6 +396,14 @@ class Identity(Base):
     # Their one role at this company, across every module (app/access_roles.py).
     # None: each application still goes by the role on their grant (IdentityApp.role).
     access_role_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="SET NULL"), default=None, index=True)
+    # Whose membership this is (step 4): the account holds the email, name and password; the
+    # columns above keep a copy for one release (app/accounts.py keeps them the same).
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_accounts.id", ondelete="RESTRICT"), default=None, index=True)
+    # Their place on the org chart, and where they work.
+    main_unit_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_units.id", ondelete="SET NULL"), default=None)
+    branch_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_branches.id", ondelete="SET NULL"), default=None)
+    # Made for an operator (app/platform_admins.py), not added by the company.
+    via_operator: Mapped[bool] = mapped_column(default=False)
 
 
 # ---- Access: one role per person per company, for every module -------------------
@@ -334,6 +425,31 @@ class AccessRole(Base):
     is_admin: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The ready-made job role it was copied from (app/abilities.py JOB_ROLES), if any (step 6).
+    job_role: Mapped[str | None] = mapped_column(String(40), default=None)
+
+
+class AccessRoleAbility(Base):
+    """One ability a role has (app/abilities.py), with its limit where it takes one (step 6). A role
+    with abilities has the permissions they bundle; one without keeps the permissions given it."""
+
+    __tablename__ = "nbpl_access_role_abilities"
+
+    role_id: Mapped[str] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="CASCADE"), primary_key=True)
+    ability: Mapped[str] = mapped_column(String(60), primary_key=True)
+    limit_value: Mapped[int | None] = mapped_column(BigInteger, default=None)
+
+
+class CompanySwitch(Base):
+    """A company's choice in the app catalogue (step 6): "app:purchasing" or "inventory.batches", on or off."""
+
+    __tablename__ = "nbpl_company_switches"
+
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    is_on: Mapped[bool] = mapped_column()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_by: Mapped[str] = mapped_column(String(254))
 
 
 class AccessRolePermission(Base):
@@ -597,6 +713,63 @@ class AuditEntry(Base):
     address: Mapped[str | None] = mapped_column(String(64), default=None)
 
 
+# ---- Business events (feature plan step 7) -------------------------------------------
+
+DELIVERY_STATUSES = ("pending", "delivered", "stuck", "skipped")
+
+
+class BusinessEvent(Base):
+    """Something meaningful one app (or the platform) said happened at a company, kept once by its id."""
+
+    __tablename__ = "nbpl_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    source: Mapped[str] = mapped_column(String(40))
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(60), index=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class EventDelivery(Base):
+    """One event to one app that takes it (app/events.py)."""
+
+    __tablename__ = "nbpl_event_deliveries"
+    __table_args__ = (_one_of("status", DELIVERY_STATUSES, "nbpl_delivery_status"),)
+
+    event_id: Mapped[str] = mapped_column(ForeignKey("nbpl_events.id", ondelete="CASCADE"), primary_key=True)
+    target: Mapped[str] = mapped_column(String(40), primary_key=True)
+    status: Mapped[str] = mapped_column(String(12), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    last_error: Mapped[str | None] = mapped_column(String(300), default=None)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class DocumentLink(Base):
+    """One link in the document chain (step 9, app/document_chain.py): this document came from that one."""
+
+    __tablename__ = "nbpl_document_links"
+    __table_args__ = (
+        UniqueConstraint("company_id", "from_app", "from_kind", "from_id", "to_app", "to_kind", "to_id", name="nbpl_document_link_once"),
+        Index("nbpl_document_links_from", "company_id", "from_app", "from_kind", "from_id"),
+        Index("nbpl_document_links_to", "company_id", "to_app", "to_kind", "to_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    from_app: Mapped[str] = mapped_column(String(40))
+    from_kind: Mapped[str] = mapped_column(String(40))
+    from_id: Mapped[str] = mapped_column(String(36))
+    from_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    to_app: Mapped[str] = mapped_column(String(40))
+    to_kind: Mapped[str] = mapped_column(String(40))
+    to_id: Mapped[str] = mapped_column(String(36))
+    to_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # ---- Communications ------------------------------------------------------------
 
 NOTICE_KINDS = ("announcement", "notification", "maintenance")
@@ -647,4 +820,4 @@ class PlatformSetting(Base):
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, Identity, Company, Application)
+numbered(User, Identity, Company, Application, Account)

@@ -16,7 +16,7 @@ from pydantic.alias_generators import to_camel
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app import platform_pass, platform_roles
+from app import business_events, platform_pass, platform_roles
 from app.access import access_of
 from app.audit import audit
 from app.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
@@ -149,6 +149,8 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
 
     email = str(claims["email"]).strip().lower()
+    # Which company this database is, for the events it sends (app/business_events.py).
+    business_events.remember_company(settings, claims.get("companySlug"))
     # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
     if isinstance(claims.get("roleDef"), dict):
         platform_roles.keep(db, claims["roleDef"])

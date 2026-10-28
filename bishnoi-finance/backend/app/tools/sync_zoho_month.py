@@ -1,0 +1,45 @@
+﻿"""Local background month sync. No business writes; pages read the database independently."""
+import argparse,json,time
+from pathlib import Path
+from fastapi import HTTPException
+from app.config import Settings
+from app.db import make_engine,make_sessions
+from app.migrate import upgrade
+from app.zoho_probe import ZohoReader,ProbeStopped
+from app.zoho_month_sync import sync_month,month_window
+from app.tools.sync_zoho_orders import sync_lock
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--watch',action='store_true')
+    parser.add_argument('--interval',type=int,default=300)
+    parser.add_argument('--requests',type=int,default=100)
+    parser.add_argument('--details',type=int,default=30)
+    parser.add_argument('--daily-limit',type=int,default=500)
+    args=parser.parse_args()
+    if args.interval<300 or not 1<=args.requests<=100 or not 0<=args.details<=60 or not 1<=args.daily_limit<=1000:
+        raise SystemExit('Use interval>=300seconds,1–100requests,0–60details anddailycap1–1000.')
+    settings=Settings();engine=make_engine(settings.database_url, postgres_driver=settings.postgres_driver);upgrade(engine);sessions=make_sessions(engine)
+    # A local stop marker ends this agent-started worker without touching other apps.
+    local=settings.database_url.startswith('sqlite:///')
+    stop=Path(settings.database_url.removeprefix('sqlite:///')).resolve().parent/'zoho-month-worker.stop' if local else None
+    while True:
+        if stop and stop.exists():print('Local Zoho worker stopped by marker.',flush=True);return 0
+        try:
+            with sync_lock(settings):
+                reader=ZohoReader(settings,maximum=args.requests,progress=lambda n:print(f'Background source sync: {n} GET reads.',flush=True) if n%10==0 else None)
+                reader.daily_limit=args.daily_limit
+                start,end=month_window()
+                result=sync_month(sessions,reader,start,end,args.details,args.daily_limit)
+                print(json.dumps(result),flush=True)
+        except (ProbeStopped,HTTPException,ValueError):
+            print('Source sync paused; saved data remains available. Check the connection, quota or sync lock.',flush=True)
+            if not args.watch:return 2
+        if not args.watch:return 0
+        for _ in range(args.interval):
+            if stop and stop.exists():print('Local Zoho worker stopped by marker.',flush=True);return 0
+            time.sleep(1)
+
+
+if __name__=='__main__':raise SystemExit(main())

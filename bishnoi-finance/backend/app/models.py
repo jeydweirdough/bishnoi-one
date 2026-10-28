@@ -62,6 +62,92 @@ class SalesOrder(Base):
     __mapper_args__ = {"version_id_col": version}
 
 
+class ZohoDelivery(Base):
+    __tablename__ = "nbfi_zoho_deliveries"
+    __table_args__ = (UniqueConstraint('environment', 'kind', 'local_id', name='zoho_deliver_once'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    environment: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(30))
+    local_id: Mapped[str] = mapped_column(String(36), index=True)
+    organization_id: Mapped[str] = mapped_column(String(80), default='')
+    reference: Mapped[str] = mapped_column(String(80), unique=True)
+    status: Mapped[str] = mapped_column(String(30), default='waiting_to_send', index=True)
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    owner: Mapped[str | None] = mapped_column(String(80), default=None)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    remote_id: Mapped[str | None] = mapped_column(String(80), default=None)
+    error_code: Mapped[str | None] = mapped_column(String(80), default=None)
+    created_by: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoLink(Base):
+    __tablename__ = 'nbfi_zoho_links'
+    organization_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(30), primary_key=True)
+    local_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    remote_id: Mapped[str | None] = mapped_column(String(80), default=None)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    confirmed: Mapped[bool] = mapped_column(default=False)
+    confirmed_by: Mapped[str] = mapped_column(String(120))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoDeliveryEvent(Base):
+    __tablename__ = 'nbfi_zoho_delivery_events'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    delivery_id: Mapped[str] = mapped_column(ForeignKey('nbfi_zoho_deliveries.id'), index=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    actor: Mapped[str] = mapped_column(String(120))
+    code: Mapped[str | None] = mapped_column(String(80), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoConnection(Base):
+    __tablename__ = "nbfi_zoho_connections"
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    encrypted: Mapped[str] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoRuntime(Base):
+    __tablename__ = "nbfi_zoho_runtime"
+    connection_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    organization_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    owner: Mapped[str | None] = mapped_column(String(80), default=None)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    paused: Mapped[bool] = mapped_column(default=False)
+    quota_day: Mapped[date | None] = mapped_column(Date, default=None)
+    requests: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoSourceDocument(Base):
+    """Read-only source copies; never Finance-issued invoices or ledger entries."""
+    __tablename__ = "nbfi_zoho_source_documents"
+    organization_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZohoSourceRun(Base):
+    __tablename__ = "nbfi_zoho_source_runs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(String(80), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    window_start: Mapped[date] = mapped_column(Date)
+    window_end: Mapped[date] = mapped_column(Date)
+    coverage: Mapped[dict] = mapped_column(JSON)
+
+
 class Role(Base):
     __tablename__ = "nbfi_roles"
 
@@ -307,6 +393,10 @@ class Account(Base):
     # The account it sits under, as Oojeema's chart groups them (e.g. 6915-001 Provision
     # for Expired Medicines under 6915-000 Loss on Expired Medicines). Migration 0017.
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # An asset or liability used or due within a year ("current") or later ("non_current"), for
+    # working capital and the current and quick ratios (app/management.py, migration 0023). None:
+    # worked out from its name.
+    term: Mapped[str | None] = mapped_column(String(12), default=None)
 
 
 class LedgerSettings(Base):
@@ -336,6 +426,10 @@ class LedgerSettings(Base):
     withholding_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     # Creditable withholding a customer deducted from a payment (their Form 2307): credited against our income tax.
     cwt_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # The cost of goods sold, booked with each invoice from Inventory's costs (migration 0024): the
+    # expense, and the stock it comes out of. Either unset: invoices book no cost.
+    cogs_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    inventory_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class JournalEntry(Base):
@@ -561,6 +655,12 @@ class Invoice(Base):
     # The CRM scores its people from these; none: it counts for nobody.
     salesperson_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
     salesperson_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    # The salesperson's division and team on the company's org chart when the invoice was made
+    # (migration 0025): revenue and margin by division. None: not placed, or not from the CRM.
+    division_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    division_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    team_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    team_name: Mapped[str | None] = mapped_column(String(120), default=None)
     # Who is buying, as the tax engine reads it: regular, senior citizen, PWD...
     treatment: Mapped[str] = mapped_column(String(20), default="regular")
     buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -573,6 +673,10 @@ class Invoice(Base):
     lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
     # Kept as issued: the tax engine's answer, for printing it the same forever.
     computed: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # What its goods cost us, booked when it's issued (migration 0024): the total, and each line's
+    # cost per unit as Inventory gave it (None: not known, by its item code).
+    cost_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    line_costs: Mapped[list | None] = mapped_column(JSON, default=None)
     total_centavos: Mapped[int] = mapped_column(Integer, default=0)
     tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
     paid_centavos: Mapped[int] = mapped_column(Integer, default=0)

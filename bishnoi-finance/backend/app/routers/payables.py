@@ -484,6 +484,7 @@ def may_bill(user, b: Bill) -> dict:
 
 
 def bill_out(db: DB, b: Bill, user=None) -> dict:
+    from app.zoho_outbox import summary as delivery_summary
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({ln["accountId"] for ln in b.lines})))} if b.lines else {}
     worked, problem = None, None
     if b.status == "draft" and b.lines:
@@ -496,6 +497,7 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
     totals = worked[1:] if worked else (b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos)
     return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0)) | (may_bill(user, b) if user is not None else {}) | {
         "supplier": supplier_out(db, b.supplier), "taxReviewed": b.tax_reviewed,
+        "zohoSync": delivery_summary(db,'bill',b.id),
         "poNumber": b.po_number, "drNumber": b.dr_number, "checkedPo": b.checked_po, "checkedDr": b.checked_dr,
         "amountsIncludeVat": b.amounts_include_vat, "zohoRef": b.zoho_ref, "oojeemaRef": b.oojeema_ref, "notes": b.notes,
         "lines": [
@@ -783,7 +785,7 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     return bill_out(db, b, user)
 
 
-def clear(db: DB, user, b: Bill) -> None:
+def clear(db: DB, user, b: Bill, settings=None) -> None:
     """Approved (and checked, if tax is withheld): posted to the books. Dr each line's account
     (before VAT) and Input VAT; Cr Accounts payable (what's paid the supplier) and the
     withholding tax payable (Reconciler rule 3). Then ready to pay: Cristal is told."""
@@ -807,13 +809,16 @@ def clear(db: DB, user, b: Bill) -> None:
     b.status, b.stage, b.entry_id, b.recorded_at, b.recorded_by = "recorded", None, e.id, datetime.now(UTC), user.full_name
     b.payables_account_id = payables.id if payables else None  # payment vouchers take it off this same account
     bill_event(b, "cleared", user)
+    if settings is not None:
+        from app.zoho_outbox import enqueue
+        enqueue(db,settings,'bill',b,user.full_name)
     tell(db, holders(db, "vouchers.release"), "bill.ready", f"{bill_name(b)} is approved and posted. Ready to pay, due {b.due_date:%d %b %Y}.",
          link=bill_link(b), not_to=[user.id])
     audit(db, user, "bill.recorded", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
 
 
 @router.post("/bills/{bill_id}/approve")
-def approve_bill(user: permitted("bills.approve"), db: DB, bill_id: str) -> dict:
+def approve_bill(user: permitted("bills.approve"), db: DB, settings: SettingsDep, bill_id: str) -> dict:
     """Malou (Cristal backup). With tax withheld, it goes to be checked (Mel); else it clears."""
     b = found_bill(db, bill_id)
     at_stage(b, "to_approve")
@@ -827,14 +832,14 @@ def approve_bill(user: permitted("bills.approve"), db: DB, bill_id: str) -> dict
         tell(db, holders(db, "bills.check"), "bill.to_check", f"{user.full_name} approved {bill_name(b)}. It has tax withheld: waiting for you to check it.",
              link=bill_link(b), not_to=[b.submitted_by_id, user.id])
     else:
-        clear(db, user, b)
+        clear(db, user, b, settings)
     audit(db, user, "bill.approved", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
     db.commit()
     return bill_out(db, b, user)
 
 
 @router.post("/bills/{bill_id}/check")
-def check_bill(user: permitted("bills.check"), db: DB, bill_id: str) -> dict:
+def check_bill(user: permitted("bills.check"), db: DB, settings: SettingsDep, bill_id: str) -> dict:
     """Mel checks the tax withheld (the BIR code and rate); then it clears."""
     b = found_bill(db, bill_id)
     at_stage(b, "to_check")
@@ -845,7 +850,7 @@ def check_bill(user: permitted("bills.check"), db: DB, bill_id: str) -> dict:
     bill_event(b, "checked", user)
     sign(db, user, "bill", b.id, "checked", bill_content(b))
     done(db, "bill.to_check", bill_link(b))
-    clear(db, user, b)
+    clear(db, user, b, settings)
     audit(db, user, "bill.checked", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
     db.commit()
     return bill_out(db, b, user)
@@ -899,6 +904,8 @@ def void_bill(user: permitted("bills.void"), db: DB, settings: SettingsDep, bill
         post(db, today(settings), f"Void of bill {b.no} ({b.supplier.name}, invoice {b.bill_number}): {reason}"[:300], legs, user.full_name,
              reference=b.bill_number[:80], source="bill", reverses=entry, by_id=user.id)
     b.status, b.void_reason, b.voided_at, b.voided_by = "void", reason, datetime.now(UTC), user.full_name
+    from app.zoho_outbox import invalidate
+    invalidate(db,'bill',b.id,user.full_name)
     bill_event(b, "voided", user, reason)
     done(db, "bill.ready", bill_link(b))
     audit(db, user, "bill.voided", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)

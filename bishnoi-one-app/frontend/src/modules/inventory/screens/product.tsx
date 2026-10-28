@@ -116,6 +116,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         actions={
           <>
             {may("stock.view") && <LinkButton href={`/inventory/movements?product=${p.id}`}>Stock movements</LinkButton>}
+            {!groups && (p.trackBatches || p.trackExpiry) && may("stock.view") && <LinkButton href={`/inventory/products/${p.id}/batches`}>Batches</LinkButton>}
             {groups && may("products.create") && (
               <LinkButton href={`/inventory/products/new?parent=${p.id}`} icon={<Plus className="size-4" aria-hidden />}>
                 Add variant
@@ -331,11 +332,11 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
             Each batch is recorded when stock is received, with its batch number and expiry date, and is issued first-expired, first-out.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <LinkButton href="/inventory/receipts/new" variant="primary" size="sm">
+            <LinkButton href={`/inventory/receipts/new?product=${p.id}`} variant="primary" size="sm">
               Receive stock
             </LinkButton>
-            <LinkButton href="/inventory/batches" size="sm">
-              All batches and expiry
+            <LinkButton href={`/inventory/products/${p.id}/batches`} size="sm">
+              View item batches
             </LinkButton>
           </div>
         </Sheet>
@@ -344,7 +345,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
       {!groups && p.balances.length > 0 && (
         <Sheet className="mt-5">
           <div className="px-5 pt-4">
-            <SectionTitle icon="headquarters">Where it is{p.trackBatches ? ", by batch" : ""}</SectionTitle>
+            <SectionTitle icon="headquarters" action={(p.trackBatches || p.trackExpiry) && may("stock.view") ? <Link href={`/inventory/products/${p.id}/batches`} className="text-meta text-ink hover:underline">View item batches</Link> : undefined}>Where it is{p.trackBatches ? ", by batch" : ""}</SectionTitle>
             {p.trackExpiry && <p className="text-meta text-ink-3">Sorted by expiry date, the order stock is issued in (first-expired, first-out).</p>}
           </div>
           <Table head={["Warehouse · location", ...(p.trackBatches ? ["Batch", "Expiry date"] : []), " On hand", " Damaged"]} min="32rem">

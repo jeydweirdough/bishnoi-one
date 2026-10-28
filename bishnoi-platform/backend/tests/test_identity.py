@@ -166,7 +166,8 @@ def test_suspended_at_one_company_she_still_works_at_the_other(client, ana, jade
     assert me["company"]["slug"] == "northwind" and [c["slug"] for c in me["companies"]] == ["northwind"]
 
 
-def test_a_platform_admin_deletes_a_user(client, ana, ben):
+def test_removing_a_user_suspends_them_and_keeps_the_record(client, ana, ben):
+    """Step 4 (2026-10-28): nobody is deleted; removing someone suspends their membership."""
     from tests.conftest import app_id, make_company
 
     getmeds = make_company(client, ana)
@@ -177,8 +178,8 @@ def test_a_platform_admin_deletes_a_user(client, ana, ben):
     rita = r.json()["user"]["id"]
     assert client.delete(f"/platform/users/{rita}", headers=ben).status_code == 403  # Support can't
     assert client.delete(f"/platform/users/{rita}", headers=ana).status_code == 204
-    assert client.get(f"/platform/users/{rita}", headers=ana).status_code == 404
-    assert client.get("/platform/users", params={"q": "rita"}, headers=ana).json()["total"] == 0
+    assert client.get(f"/platform/users/{rita}", headers=ana).json()["user"]["status"] == "suspended"
+    assert client.get("/platform/users", params={"q": "rita"}, headers=ana).json()["total"] == 1
 
 
 def test_the_one_app_may_take_a_pass_for_any_module(app, client, jade):

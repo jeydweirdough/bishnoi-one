@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import or_, select
 
+from app.accounts import runs_company
 from app.api import Api, changed, not_found
 from app.audit import audit
 from app.deps import DB
@@ -112,7 +113,7 @@ def change_report(report_id: str, body: ReportPatch, signed: Signed, db: DB) -> 
 def delete_report(report_id: str, signed: Signed, db: DB) -> Response:
     _, me = signed
     r = db.get(SavedReport, report_id)
-    if r is None or r.company_id != me.company_id or not (r.owner_id == me.id or me.is_company_admin):
+    if r is None or r.company_id != me.company_id or not (r.owner_id == me.id or runs_company(db, me)):
         raise not_found("report")
     audit(db, me.email, "report.deleted", target=r.name, target_type="saved_report", target_id=r.id, company_id=me.company_id)
     db.delete(r)

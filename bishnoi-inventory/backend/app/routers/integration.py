@@ -76,6 +76,17 @@ def products(db: DB) -> dict:
     }
 
 
+@router.get("/costs")
+def costs(db: DB, skus: str = Query(..., max_length=20000, description="Comma-separated SKUs")) -> dict:
+    """What each product costs us now (its cost price, in centavos), by SKU: Finance books the cost
+    of goods sold with each invoice from it (decided 2026-10-28). SKUs it doesn't know are left out."""
+    wanted = [s.strip() for s in skus.split(",") if s.strip()][:MAX_SKUS]
+    if not wanted:
+        return {"items": {}}
+    found = db.scalars(select(Product).where(func.upper(Product.sku).in_([s.upper() for s in wanted])))
+    return {"items": {p.sku: {"unitCost": p.cost_price, "name": p.name} for p in found}}
+
+
 @router.get("/stock")
 def stock(db: DB, skus: str = Query(..., max_length=20000, description="Comma-separated SKUs")) -> dict:
     """How much of each is available, overall and per warehouse. A SKU not

@@ -67,7 +67,10 @@ def upgrade(engine: Engine) -> None:
     # someone else afterwards.
     with engine.begin() as lock:
         lock.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": MIGRATION_LOCK})
-        _upgrade(engine)
+        # The schema changes must run on the very transaction holding the lock.
+        config = _config(engine)
+        config.attributes["connection"] = lock
+        command.upgrade(config, "head")
 
 
 def _upgrade(engine: Engine) -> None:

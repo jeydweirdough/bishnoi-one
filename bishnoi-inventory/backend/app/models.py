@@ -25,7 +25,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
-from sqlalchemy.orm import Mapped, aliased, column_property, mapped_column, relationship
+from sqlalchemy.orm import Mapped, aliased, column_property, declared_attr, mapped_column, relationship
 
 from app.db import Base
 
@@ -150,6 +150,57 @@ class Sequence(Base):
 class Stamped:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# --- one document header (feature plan step 8, 2026-10-28) ------------------------------
+# Every stock document (receipt, sales order or issue, transfer, adjustment, count) says the same few
+# things in the same place: what kind of operation it is, when it is scheduled, when it was done,
+# the document it came from, and who is responsible (app/documents.py).
+
+OPERATION_KINDS = ("receipt", "delivery", "issue", "internal", "adjustment", "count", "return")
+
+
+class OperationType(Stamped, Base):
+    """A kind of stock operation, as the company names it ("Receipts", "Returns from customers"),
+    optionally for one warehouse. One of each kind is made for every company; it adds its own."""
+
+    __tablename__ = "nbin_operation_types"
+    __table_args__ = (CheckConstraint("kind IN ('receipt', 'delivery', 'issue', 'internal', 'adjustment', 'count', 'return')", name="operation_kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(20), unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    warehouse_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_warehouses.id", ondelete="CASCADE"), default=None)
+    # The one a new document of its kind gets when none is chosen.
+    is_default: Mapped[bool] = mapped_column(default=False)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class DocumentHeader:
+    """The header's columns, on every stock document."""
+
+    @declared_attr
+    def operation_type_id(cls) -> Mapped[str | None]:
+        return mapped_column(ForeignKey("nbin_operation_types.id", ondelete="SET NULL"), index=True, default=None)
+
+    scheduled_on: Mapped[date | None] = mapped_column(Date, default=None, index=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    # The document it came from, by its number: the purchase order behind a receipt, the count behind
+    # an adjustment, a customer's PO behind a sale.
+    source_document: Mapped[str | None] = mapped_column(String(80), default=None)
+
+    @declared_attr
+    def responsible_id(cls) -> Mapped[str | None]:
+        return mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None, index=True)
+
+    @declared_attr
+    def operation_type(cls) -> Mapped[OperationType | None]:
+        return relationship(OperationType, lazy="joined")
+
+    @declared_attr
+    def responsible(cls) -> Mapped["User | None"]:
+        return relationship("User", foreign_keys=lambda: [cls.responsible_id], lazy="joined")
 
 
 # --- the catalogue ---------------------------------------------------------------------
@@ -501,7 +552,7 @@ class PurchaseOrderLine(Base):
     product: Mapped[Product] = relationship(lazy="joined")
 
 
-class Receipt(Base):
+class Receipt(DocumentHeader, Base):
     """One delivery taken in: against a purchase order, or on its own."""
 
     __tablename__ = "nbin_receipts"
@@ -522,7 +573,7 @@ class Receipt(Base):
     supplier: Mapped[Supplier | None] = relationship(lazy="joined")
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
     location: Mapped[Location] = relationship(lazy="joined")
-    received_by: Mapped[User | None] = relationship(lazy="joined")
+    received_by: Mapped[User | None] = relationship(foreign_keys=[received_by_id], lazy="joined")
     lines: Mapped[list["ReceiptLine"]] = relationship(back_populates="receipt", cascade="all, delete-orphan", lazy="selectin")
 
 
@@ -551,7 +602,7 @@ ORDER_KINDS = ("sale", "internal", "department", "project", "distribution")
 ORDER_STATUSES = ("draft", "confirmed", "picking", "issued", "cancelled")
 
 
-class Order(Stamped, Base):
+class Order(DocumentHeader, Stamped, Base):
     """Stock going out: a customer order, or an issue to a department or project."""
 
     __tablename__ = "nbin_orders"
@@ -604,7 +655,7 @@ class OrderLine(Base):
 TRANSFER_STATUSES = ("draft", "requested", "approved", "in_transit", "received", "cancelled")
 
 
-class Transfer(Stamped, Base):
+class Transfer(DocumentHeader, Stamped, Base):
     __tablename__ = "nbin_transfers"
     __table_args__ = (CheckConstraint("from_warehouse_id <> to_warehouse_id", name="transfer_places"),)
 
@@ -671,7 +722,7 @@ ADJUSTMENT_REASONS = {
 ADJUSTMENT_STATUSES = ("pending", "posted", "rejected")
 
 
-class Adjustment(Stamped, Base):
+class Adjustment(DocumentHeader, Stamped, Base):
     """A correction to stock, with its reason. Posted at once by someone who
     may approve adjustments; otherwise waiting for one of them."""
 
@@ -722,7 +773,7 @@ class AdjustmentLine(Base):
 COUNT_STATUSES = ("open", "submitted", "approved", "cancelled")
 
 
-class Count(Stamped, Base):
+class Count(DocumentHeader, Stamped, Base):
     """A physical count of a warehouse. What the system expected is written
     down when it starts; the difference becomes an adjustment on approval."""
 

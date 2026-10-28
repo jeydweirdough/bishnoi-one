@@ -33,6 +33,7 @@ def me_out(user: User, settings: Settings) -> dict:
     admin = access.can("admin.users") or access.can("admin.roles")
     return {
         "user": {"id": user.id, "email": user.email, "fullName": user.full_name, "photoAt": None},
+        "dataEnvironment": settings.data_environment,
         "org": None if DEVELOPER_ADMIN_APP else org_out(settings),
         "role": {"id": user.role.id, "name": user.role.name, "scope": "all"},
         "team": None,

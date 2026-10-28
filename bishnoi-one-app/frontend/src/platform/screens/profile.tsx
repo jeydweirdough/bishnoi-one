@@ -18,10 +18,16 @@ export const metadata = { title: "Your profile" };
 type Search = Promise<Record<string, string | string[] | undefined>>;
 type Account = { role: { name: string; description: string | null }; team: { name: string } | null; memberSince: string };
 type Activity = { days: Record<string, number>; recent: { action: string; target: string; at: string }[] };
+type ProfileContext = Pick<Awaited<ReturnType<typeof getCompanyMe>>, "user" | "org"> & {
+  role?: { name: string };
+  team?: { name: string } | null;
+};
 
 /** `actions`: the app's words for its activity log ("purchase_order.created" → "Created a purchase order"). */
-export default async function ProfilePage({ searchParams, actions = {} }: { searchParams: Search; actions?: Record<string, string> }) {
-  const me = await getCompanyMe();
+export default async function ProfilePage({ searchParams, actions = {}, me: suppliedMe }: { searchParams: Search; actions?: Record<string, string>; me?: ProfileContext }) {
+  // REST-only modules provide their own cached frame; other modules keep the
+  // shared GraphQL frame. Both use this same profile layout and controls.
+  const me = suppliedMe ?? await getCompanyMe();
   const params = await searchParams;
   const fmt = makeFormat(me.org);
   const today = fmt.todayKey();

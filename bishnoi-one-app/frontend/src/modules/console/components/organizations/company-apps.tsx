@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/console/platform/ui/button";
@@ -75,9 +74,7 @@ export function CompanyApps({
               {detail ? (
                 <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <HealthMark status={detail.status} />
-                  <Link href={`/platform/accounts?company=${company.id}&application=${a.id}`} className="text-meta text-ink-2 hover:text-hema hover:underline">
-                    {plural(detail.userCount, "user")}
-                  </Link>
+                  <span className="text-meta text-ink-2">{plural(detail.userCount, "user")}</span>
                 </span>
               ) : (
                 <span className="text-meta text-ink-3">{on ? "Assigned on save" : "Not assigned"}</span>

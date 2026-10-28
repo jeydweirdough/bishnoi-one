@@ -132,6 +132,7 @@ def may(user: User, v: PaymentVoucher) -> dict:
 
 
 def voucher_out(db: DB, v: PaymentVoucher, user: User) -> dict:
+    from app.zoho_outbox import summary as delivery_summary
     held = set_aside(db, [ln.bill_id for ln in v.lines], exclude_voucher=v.id)
     lines = []
     for ln in v.lines:
@@ -153,6 +154,7 @@ def voucher_out(db: DB, v: PaymentVoucher, user: User) -> dict:
         "paidFrom": account_brief(db.get(Account, v.paid_from_id) if v.paid_from_id else None),
         "lines": lines, "amountInWords": in_words(v.total_centavos),
         "zohoRef": v.zoho_ref, "notes": v.notes,
+        "zohoSync": delivery_summary(db,'vendor_payment',v.id),
         "releasedBy": v.released_by,
         "bankReference": v.bank_reference, "checkNumber": v.check_number, "checkDate": v.check_date.isoformat() if v.check_date else None,
         "entryId": v.entry_id,
@@ -424,6 +426,8 @@ def release(user: permitted("vouchers.release"), db: DB, settings: SettingsDep, 
         ln.bill.paid_centavos += ln.amount_centavos
     v.status, v.released_by, v.released_by_id, v.paid_on, v.entry_id = "released", user.full_name[:120], user.id, body.paid_on, e.id
     v.bank_reference, v.check_number, v.check_date = (body.bank_reference or "").strip() or None, (body.check_number or "").strip() or None, body.check_date
+    from app.zoho_outbox import enqueue
+    enqueue(db,settings,'vendor_payment',v,user.full_name)
     event(v, "released", user, (body.note or "").strip() or None)
     sign(db, user, "payment_voucher", v.id, "released", content(v))
     done(db, "voucher.to_release", link(v))
@@ -462,6 +466,8 @@ def void(user: permitted("vouchers.void"), db: DB, settings: SettingsDep, vouche
     for ln in v.lines:
         ln.bill.paid_centavos = max(ln.bill.paid_centavos - ln.amount_centavos, 0)
     v.status = "void"
+    from app.zoho_outbox import invalidate
+    invalidate(db,'vendor_payment',v.id,user.full_name)
     event(v, "voided", user, reason)
     tell(db, [v.prepared_by_id, v.released_by_id], "voucher.voided", f"{user.full_name} voided {v.number}: {reason}", link=link(v), not_to=[user.id])
     audit(db, user, "voucher.voided", target=v.number, target_type="voucher", target_id=v.id, fields=["reason"])

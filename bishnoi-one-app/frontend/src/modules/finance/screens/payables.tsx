@@ -265,6 +265,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         }
       >
         <StatusMark state={b.state} />
+        {b.zohoSync && <p role="status" className="mt-2 text-sm text-ink-2">Zoho: {b.zohoSync.label}. {b.zohoSync.message}</p>}
         {b.status === "void" && (
           <span className="ml-2 text-meta text-danger">
             Voided by {b.voidedBy}: {b.voidReason}

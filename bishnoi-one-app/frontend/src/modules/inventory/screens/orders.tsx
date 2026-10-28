@@ -1,3 +1,5 @@
+import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
+import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Ban, ClipboardList, ExternalLink, PackageOpen, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
@@ -51,16 +53,16 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
   const { fmt, may, day, at } = await context();
   if (!may("orders.view")) return <NoAccess what="orders" />;
   const s = await searchParams;
-  const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind") };
+  const f = { q: param(s, "q"), status: param(s, "status"), kind: param(s, "kind"), operationType: param(s, "operationType"), timing: param(s, "timing") };
   // A board unless asked for the list, or for one status (which is a column, read as a list).
   const board = param(s, "view") !== "list" && !f.status;
   // The board shows every open one in its columns; the list is read a page at a time.
   const { page, size, vars } = paging(s);
   const base = `/inventory/orders${query({ ...f, view: board ? "" : "list" })}`;
-  const { orders: got } = await loadQuery<{ orders: OrderBrief[] | Paged<OrderBrief> }>(
-    `query Orders($q: String, $status: String, $kind: String, $limit: Int, $offset: Int) { orders(q: $q, status: $status, kind: $kind, limit: $limit, offset: $offset) }`,
+  const { orders: got, operationTypes } = await loadQuery<{ orders: OrderBrief[] | Paged<OrderBrief>; operationTypes: OperationTypeRow[] }>(
+    `query Orders($q: String, $status: String, $kind: String, $operationType: String, $timing: String, $limit: Int, $offset: Int) { orders(q: $q, status: $status, kind: $kind, operationType: $operationType, timing: $timing, limit: $limit, offset: $offset) operationTypes }`,
     { ...given(f), ...(board ? {} : vars) },
-    ["orders"],
+    ["orders", "operationTypes"],
   );
   const list: Paged<OrderBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
   const figures = board ? null : (await loadQuery<{ orderFigures: OrderFigures }>("query($kind: String) { orderFigures(kind: $kind) }", { kind: f.kind || null }, ["orderFigures"])).orderFigures;
@@ -92,7 +94,9 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
       <Chips label="Type" current={f.kind} options={[{ value: "", label: "All types", href: `/inventory/orders${query({ ...f, kind: "" })}` }, ...KINDS.map((k) => ({ value: k.kind, label: k.plural, href: `/inventory/orders${query({ ...f, kind: k.kind })}` }))]} />
       {board ? (
         <>
-          <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: "" }} />
+          <Filters q={f.q} placeholder={info ? `Order number or ${info.recipient.label.toLowerCase()}` : "Order number or recipient"} keep={{ status: f.status, kind: f.kind, view: "" }}>
+            <HeaderFilters types={operationTypes} kinds={f.kind === "sale" || !f.kind ? ["delivery", "issue", "return"] : ["issue", "delivery"]} operationType={f.operationType} timing={f.timing} />
+          </Filters>
           {orders.length > 0 ? (
             <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
           ) : (
@@ -253,6 +257,7 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
       >
         <OrderStamp status={o.status} /> <span className="ml-1">{ORDER_KINDS[o.kind]} for <strong>{o.recipient}</strong>, from {o.warehouse.name}{o.neededOn && <>, required by {day(o.neededOn)}</>}</span>
       </PageHeader>
+      <DocumentHeaderStrip header={o.header} />
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
@@ -301,8 +306,8 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
 }
 
 /** The order form's lists, with what's free per product per warehouse ("productId:warehouseId" → units). */
-const ORDER_FORM = `${referenceOf("products", "units", "warehouses")} availability`;
-type OrderFormData = { reference: Pick<Reference, "products" | "units" | "warehouses">; availability: Record<string, number> };
+const ORDER_FORM = `${referenceOf("products", "units", "warehouses")} availability operationTypes`;
+type OrderFormData = { reference: Pick<Reference, "products" | "units" | "warehouses">; availability: Record<string, number>; operationTypes: OperationTypeRow[] };
 
 /** New order with no kind: which one, each with what it's for, as the CRM's Add customer asks the type first. */
 export async function NewOrderChooser() {
@@ -339,13 +344,13 @@ export async function NewOrderPage({ params }: { params: Params<{ kind: string }
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
   const gate = NeedsFirst({ setup: await loadSetup(), needs: ["warehouse", "stock"], then: newHref(info), title: info.newLabel, doing: `create a ${info.one}`, crumbs, may });
   if (gate) return gate;
-  const { reference: ref, availability: available } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability"]);
+  const { reference: ref, availability: available, operationTypes } = await loadQuery<OrderFormData>(`query NewOrder { ${ORDER_FORM} }`, {}, ["reference", "availability", "operationTypes"]);
   return (
     <>
       <PageHeader crumbs={crumbs} title={info.newLabel}>
         {info.intro}
       </PageHeader>
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} kind={info.kind} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} kind={info.kind} operationTypes={operationTypes} />
     </>
   );
 }
@@ -354,15 +359,15 @@ export async function EditOrderPage({ params }: { params: Params<{ id: string }>
   const { id } = await params;
   const { me, may } = await context();
   if (!may("orders.edit")) return <NoAccess what="editing orders" />;
-  const { order: o, reference: ref, availability: available } = await loadQuery<OrderFormData & { order: Order }>(
+  const { order: o, reference: ref, availability: available, operationTypes } = await loadQuery<OrderFormData & { order: Order }>(
     `query EditOrder($id: String!) { order(id: $id) ${ORDER_FORM} }`,
     { id },
-    ["order", "reference", "availability"],
+    ["order", "reference", "availability", "operationTypes"],
   );
   return (
     <>
       <PageHeader crumbs={[{ href: listHref(kindOf(o.kind)!), label: kindOf(o.kind)!.plural }, { href: `/inventory/orders/${o.id}`, label: o.number }]} title={`Edit ${o.number}`} />
-      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} kind={o.kind} />
+      <OrderForm canAdd={canAddFrom(may)} org={me.org} reference={ref} order={o} available={available} kind={o.kind} operationTypes={operationTypes} />
     </>
   );
 }

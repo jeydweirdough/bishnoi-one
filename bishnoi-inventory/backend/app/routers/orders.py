@@ -10,12 +10,14 @@ batch.
 
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 
+from app import business_events
 from app.access import CurrentAccess, allowed
 from app.api import Api, conflict, field_error, found, iso
+from app import documents
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import ORDER_KINDS, Order, OrderLine, Product, Warehouse
@@ -34,7 +36,7 @@ class OrderLineIn(Api):
     unit_price: int | None = Field(None, ge=0, le=10**12)
 
 
-class OrderIn(Api):
+class OrderIn(documents.HeaderIn):
     kind: str = "sale"
     recipient: str = Field(min_length=1, max_length=160)
     warehouse_id: str = Field(max_length=36)
@@ -67,6 +69,7 @@ def order_brief(o: Order) -> dict:
         "number": o.number,
         "kind": o.kind,
         "recipient": o.recipient,
+        "header": documents.header_out(o),
         "status": o.status,
         "warehouse": warehouse_ref(o.warehouse),
         "neededOn": day(o.needed_on),
@@ -129,6 +132,11 @@ def set_lines(db: DB, o: Order, body: OrderIn) -> None:
     ]
 
 
+def kinds_of(order_kind: str) -> tuple[str, ...]:
+    """The operation types an order may have: a sale is a delivery; the rest are issues."""
+    return ("delivery", "return") if order_kind == "sale" else ("issue", "delivery")
+
+
 def ref(o: Order) -> Ref:
     return Ref("order", o.id, o.number)
 
@@ -141,11 +149,13 @@ def list_orders(
     kind: str | None = Query(None, max_length=16),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=100),
+    operation_type: str | None = Query(None, alias="operationType", max_length=36),
+    timing: str | None = Query(None, max_length=10),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 500 (the board's columns)."""
-    query = select(Order).order_by(Order.created_at.desc())
+    query = documents.narrow(select(Order).order_by(Order.created_at.desc()), Order, operation_type, timing)
     if status_:
         query = query.where(Order.status.in_(status_.split(",")))
     if kind:
@@ -203,6 +213,9 @@ def create_order(_: allowed("orders.create"), me: CurrentUser, db: DB, body: Ord
     check_order(db, body)
     o = Order(number=next_number(db, "SO" if body.kind == "sale" else "IS"), kind=body.kind, recipient=body.recipient, warehouse_id=body.warehouse_id, needed_on=body.needed_on, notes=body.notes, created_by_id=me.id)
     set_lines(db, o, body)
+    # Its header (step 8): scheduled for the day it's needed, unless another is given.
+    o.scheduled_on = body.needed_on
+    documents.apply(db, o, kinds_of(o.kind), body, me, o.warehouse_id, new=True)
     db.add(o)
     db.flush()
     audit(db, me, "order.created", target=o.number, target_type="order", target_id=o.id)
@@ -223,6 +236,9 @@ def update_order(_: allowed("orders.edit"), me: CurrentUser, db: DB, order_id: s
     check_order(db, body)
     o.kind, o.recipient, o.warehouse_id, o.needed_on, o.notes = body.kind, body.recipient, body.warehouse_id, body.needed_on, body.notes
     set_lines(db, o, body)
+    if "scheduled_on" not in body.model_fields_set:
+        o.scheduled_on = body.needed_on
+    documents.apply(db, o, kinds_of(o.kind), body, me, o.warehouse_id, new=False)
     audit(db, me, "order.updated", target=o.number, target_type="order", target_id=o.id)
     db.commit()
     return {"id": o.id}
@@ -275,7 +291,7 @@ def start_picking(access: CurrentAccess, me: CurrentUser, db: DB, order_id: str)
 
 
 @router.post("/orders/{order_id}/issue")
-def issue_order(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, body: IssueIn) -> dict:
+def issue_order(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, body: IssueIn, request: Request) -> dict:
     """Takes the order's stock out: its hold is let go, and each line leaves
     first expired, first out (or from the batch it names)."""
     o = found(db, Order, order_id, "order")
@@ -295,7 +311,14 @@ def issue_order(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: s
         line.picks = pick_out(db, me, kind="issue", product=line.product, warehouse_id=o.warehouse_id, quantity=line.quantity, ref=ref(o), batch_id=pick.batch_id if pick else None, note=f"To {o.recipient}", serials=serials)
         line.serials = serials
     o.status, o.issued_by_id, o.issued_at = "issued", me.id, datetime.now(UTC)
+    documents.done(o, o.issued_at)
     audit(db, me, "order.issued", target=o.number, target_type="order", target_id=o.id)
+    # Told to the other apps (step 7): Finance makes the invoice from it in Stage 4.
+    if o.kind == "sale":
+        business_events.emit(db, getattr(request.state, "company", None), "delivery.done", {
+            "orderId": o.id, "number": o.number, "recipient": o.recipient, "warehouseId": o.warehouse_id, "issuedAt": o.issued_at.isoformat(),
+            "lines": [{"sku": line.product.sku, "productId": line.product_id, "quantity": line.quantity, "unitPrice": line.unit_price, "picks": line.picks}
+                      for line in o.lines]})
     db.commit()
     return {"id": o.id, "status": o.status}
 

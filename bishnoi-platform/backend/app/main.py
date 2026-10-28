@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import passes, setup
+from app import accounts, passes, setup  # noqa: F401 (accounts: keeps each person's account in step)
 from app.announcements import import_from_database, make_table
 from app.config import Settings, get_settings
 from app.db import make_engine, make_sessions
@@ -28,6 +28,10 @@ from app.routers import (
     communications,
     companies,
     company_access,
+    company_console,
+    events as events_router,
+    operators,
+    organisation,
     connections,
     dashboard,
     identity,
@@ -113,6 +117,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(company_access.router)
+    app.include_router(organisation.router)
+    app.include_router(company_console.router)
+    app.include_router(operators.router)
+    app.include_router(events_router.router)
     app.include_router(saved_reports.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)

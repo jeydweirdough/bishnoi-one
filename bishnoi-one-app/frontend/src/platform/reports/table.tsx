@@ -1,5 +1,6 @@
 "use client";
 
+import { totalsOf } from "./totals";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -46,23 +47,18 @@ export function ReportTable({ title, columns, rows, totals, canExport }: { title
     URL.revokeObjectURL(a.href);
   }
 
-  // Dynamic totals calculated live over the shown/filtered rows (like Zoho Inventory)
+  // Totals over the rows shown (as the search narrows them, like Zoho Inventory): only what adds up is
+  // added; a percentage is the share of its totals, never their sum (src/platform/reports/totals.ts).
   const dynamicTotals = useMemo(() => {
     if (!totals) return null;
+    const values = totalsOf(columns, shown.map((r) => r.map((c) => (typeof c?.raw === "number" ? c.raw : null))));
     return columns.map((c, i) => {
       if (i === 0) return "Total";
-      if (!numeric(c.kind)) return null;
-      const sum = shown.reduce((acc, r) => acc + (typeof r[i]?.raw === "number" ? (r[i].raw as number) : 0), 0);
-      if (c.kind === "money") {
-        return `₱${(sum / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      }
-      if (c.kind === "number") {
-        return sum.toLocaleString("en-PH");
-      }
-      if (c.kind === "percent") {
-        return `${Math.round(sum * 1000) / 10}%`;
-      }
-      return null;
+      const v = values[i];
+      if (v === null) return null;
+      if (c.kind === "money") return `₱${(v / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (c.kind === "percent") return `${Math.round(v * 1000) / 10}%`;
+      return v.toLocaleString("en-PH");
     });
   }, [totals, shown, columns]);
 

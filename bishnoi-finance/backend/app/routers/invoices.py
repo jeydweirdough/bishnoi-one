@@ -22,6 +22,7 @@ from pydantic import Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app import business_events
 from app.access import access_of, permitted
 from app.audit import audit
 from app.crm import CrmUnavailable, find_customers, read_customer
@@ -138,6 +139,11 @@ class InvoiceIn(Api):
     customer_address: str | None = Field(None, max_length=300)
     salesperson_id: str | None = Field(None, max_length=36)
     salesperson_name: str | None = Field(None, max_length=120)
+    # The salesperson's division and team, as the CRM gives them with the customer's owner.
+    division_id: str | None = Field(None, max_length=36)
+    division_name: str | None = Field(None, max_length=120)
+    team_id: str | None = Field(None, max_length=36)
+    team_name: str | None = Field(None, max_length=120)
     treatment: str = Field("regular", max_length=20)
     buyer_id_number: str | None = Field(None, max_length=40)
     invoice_date: date
@@ -212,12 +218,28 @@ def readable(detail) -> tuple[str, dict[str, str]]:
     return (" ".join(said) or "This draft can't be worked out yet: edit it and check each field."), fields
 
 
+def cost_lines(db: Session, settings, inv: Invoice) -> tuple[list | None, int]:
+    """Each line's cost per unit from Inventory (by its item code), and the invoice's total cost."""
+    from app.inventory import unit_costs
+
+    if not (posting_settings(db).cogs_account_id and posting_settings(db).inventory_account_id):
+        return None, 0
+    lines = inv.lines or []
+    costs = unit_costs(settings, [str(l.get("ref") or "") for l in lines])
+    if costs is None:
+        return None, 0
+    per_unit = [costs.get(str(l.get("ref") or "").strip().upper()) for l in lines]
+    return per_unit, sum((c or 0) * int(l.get("quantity") or 0) for c, l in zip(per_unit, lines))
+
+
 def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linked: dict | None = None) -> dict:
     due = inv.invoice_date + timedelta(days=inv.terms_days)
     out = {
         "id": inv.id, "status": inv.status, "number": inv.number,
         "customer": {"id": inv.customer_id, "name": inv.customer_name, "tin": inv.customer_tin, "address": inv.customer_address},
         "salesperson": {"id": inv.salesperson_id, "name": inv.salesperson_name} if inv.salesperson_id or inv.salesperson_name else None,
+        "division": {"id": inv.division_id, "name": inv.division_name} if inv.division_name else None,
+        "team": {"id": inv.team_id, "name": inv.team_name} if inv.team_name else None,
         "treatment": inv.treatment, "buyerIdNumber": inv.buyer_id_number,
         "date": inv.invoice_date.isoformat(), "termsDays": inv.terms_days, "dueDate": due.isoformat(),
         "reference": inv.reference, "notes": inv.notes, "pricesIncludeTax": inv.prices_include_tax,
@@ -391,13 +413,24 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
     ledger = posting_settings(db)
     old = db.get(Invoice, inv.replaces_id) if inv.replaces_id else None
     replacing = f", replacing {old.number}" if old else ""
-    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}{replacing}", [
+    legs = [
         Leg(account(db, ledger.receivables_account_id), debit=inv.total_centavos),
         Leg(account(db, ledger.sales_account_id), credit=inv.total_centavos - inv.tax_centavos),
         Leg(account(db, ledger.output_tax_account_id), credit=inv.tax_centavos),
-    ], user.full_name, reference=inv.number, source="invoice")
+    ]
+    # The cost of goods sold, from Inventory by each line's item code, in the same entry: a void
+    # reverses the sale and its cost together (decided 2026-10-28). Not linked, or no codes: no cost.
+    inv.line_costs, inv.cost_centavos = cost_lines(db, settings, inv)
+    if inv.cost_centavos and ledger.cogs_account_id and ledger.inventory_account_id:
+        legs += [
+            Leg(account(db, ledger.cogs_account_id), debit=inv.cost_centavos, description="Cost of goods sold"),
+            Leg(account(db, ledger.inventory_account_id), credit=inv.cost_centavos, description="Cost of goods sold"),
+        ]
+    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}{replacing}", legs, user.full_name, reference=inv.number, source="invoice")
     inv.entry_id = entry.id
     audit(db, user, "invoice.issued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
+    # Told to the other apps (step 7): the CRM scores sales from it.
+    business_events.emit(db, None, "invoice.issued", {"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos})
     db.commit()
     return invoice_out(db, inv, settings)
 
@@ -410,6 +443,7 @@ class VoidIn(Api):
 def void(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoice_id: str, body: VoidIn) -> dict:
     inv = found(db, invoice_id)
     cancel(db, settings, user, inv, body.reason)
+    business_events.emit(db, None, "invoice.voided", {**{"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos}, "reason": body.reason})
     db.commit()
     return invoice_out(db, inv, settings)
 
@@ -456,13 +490,16 @@ def reissue(user: permitted("invoices.create"), db: DB, settings: SettingsDep, i
     copy = Invoice(
         created_by=user.full_name, replaces_id=inv.id, invoice_date=today(settings),
         customer_id=inv.customer_id, customer_name=inv.customer_name, customer_tin=inv.customer_tin, customer_address=inv.customer_address,
-        salesperson_id=inv.salesperson_id, salesperson_name=inv.salesperson_name, treatment=inv.treatment, buyer_id_number=inv.buyer_id_number,
+        salesperson_id=inv.salesperson_id, salesperson_name=inv.salesperson_name,
+        division_id=inv.division_id, division_name=inv.division_name, team_id=inv.team_id, team_name=inv.team_name, treatment=inv.treatment, buyer_id_number=inv.buyer_id_number,
         terms_days=inv.terms_days, reference=inv.reference, notes=inv.notes, prices_include_tax=inv.prices_include_tax,
         lines=[dict(line) for line in inv.lines],
     )
     db.add(copy)
     db.flush()
     audit(db, user, "invoice.reissued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=copy.id, fields=[inv.number])
+    # The chain (step 9): the voided invoice, then the one replacing it (numbered when it's issued).
+    business_events.link(db, None, business_events.ref("invoice", inv.id, inv.number), business_events.ref("invoice", copy.id, None))
     db.commit()
     return invoice_out(db, copy, settings)
 
@@ -527,6 +564,9 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
     db.add(p)
     db.flush()
     audit(db, user, "invoice.paid", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
+    business_events.emit(db, None, "payment.recorded", {
+        "invoiceId": inv.id, "number": inv.number, "customerId": inv.customer_id, "paidOn": body.paid_on.isoformat(),
+        "amountCentavos": settled, "paidCentavos": inv.paid_centavos, "totalCentavos": inv.total_centavos})
     db.commit()
     return invoice_out(db, inv, settings)
 

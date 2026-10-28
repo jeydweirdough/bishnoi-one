@@ -82,7 +82,7 @@ def test_migration_defaults_old_json_lines_without_overwriting_explicit_types(mo
     with engine.begin() as db:
         db.execute(bills.insert().values(id="one", lines=original))
         monkeypatch.setattr(op, "get_bind", lambda: db)
-        migration = runpy.run_path(str(Path(__file__).parents[1] / "migrations/versions/0023_bill_purchase_types.py"))
+        migration = runpy.run_path(str(Path(__file__).parents[1] / "migrations/compat/feature_0023_bill_purchase_types.py"))
         migration["upgrade"]()
         migration["upgrade"]()
         result = db.scalar(sa.select(bills.c.lines))

@@ -138,6 +138,7 @@ export type BillLine = BillLineInput & {
 export type BillFile = { id: string; name: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string };
 
 export type Bill = Omit<BillSummary, "supplier"> & {
+  zohoSync?: {label:string;message:string|null}|null;
   taxReviewed: boolean;
   supplier: Supplier;
   poNumber: string | null;

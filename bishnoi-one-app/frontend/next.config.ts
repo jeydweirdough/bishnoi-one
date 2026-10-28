@@ -4,6 +4,11 @@ import type { NextConfig } from "next";
 // site, each under its path (src/platform/lib/modules.ts), each talking to its
 // own API.
 const nextConfig: NextConfig = {
+  // Optional second local Finance site uses a separate dev lock and build cache.
+  ...(process.env.FINANCE_OFFICIAL_PREVIEW === "1" ? { distDir: ".next-finance-official" } : {}),
+  logging: {
+    incomingRequests: { ignore: [/\/finance\/integrations\/zoho\/callback/] },
+  },
   // Everything this app uses is inside this folder. Saying so keeps Next from
   // guessing a root further up the repo.
   turbopack: {

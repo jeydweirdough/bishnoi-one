@@ -141,7 +141,12 @@ export default async function InboxScreen({ searchParams }: { searchParams: Sear
                         : "Ask your administrator to connect Facebook, WhatsApp, Viber, Tawk.to or your website."}
                     </Empty>
                   ) : (
-                    <Empty title={channel ? "Nothing here from this channel" : status.empty}>{channel ? "Try All channels." : undefined}</Empty>
+                    <Empty
+                      title={channel ? "Nothing here from this channel" : status.empty}
+                      source={`Your connected channels: ${d.channels.filter((c) => c.on).map((c) => c.name).join(", ") || "none yet"}. Each customer enquiry arrives here as a lead.`}
+                    >
+                      {channel ? "Try All channels." : undefined}
+                    </Empty>
                   )}
                   {d.total > d.pageSize && (
                     <div className="border-t border-rule px-5 py-3 sm:px-6">

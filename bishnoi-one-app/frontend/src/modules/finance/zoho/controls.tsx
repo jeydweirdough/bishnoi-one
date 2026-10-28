@@ -1,0 +1,17 @@
+﻿"use client";
+import {useState,useTransition} from 'react';
+import {useRouter} from 'next/navigation';
+import {Button} from '../platform/ui/button';
+import {FormError} from '../platform/ui/field';
+import {startZoho,checkZoho,chooseZoho,disconnectZoho,pauseZohoUpdater,type Organization} from './actions';
+export function ZohoControls({configured,authorized,database=false,paused=false,canPause=false}:{configured:boolean;authorized:boolean;database?:boolean;paused?:boolean;canPause?:boolean}){
+ const router=useRouter();
+ const [pending,start]=useTransition(),[error,setError]=useState<string|null>(null),[organizations,setOrganizations]=useState<Organization[]>([]);
+ return <div className="space-y-4"><FormError message={error}/><div className="flex flex-wrap gap-2">
+ <Button variant="primary" disabled={!configured} loading={pending} onClick={()=>start(async()=>{setError(null);const result=await startZoho();if(!result.ok)return setError(result.error);window.location.assign(result.data.url);})}>{authorized?'Reconnect Zoho':'Connect Zoho'}</Button>
+ {database&&<Button disabled={pending||!configured} onClick={()=>{if(!window.confirm('Authorise Finance to read and create approved supplier bills and payment records in Zoho? Sending still requires confirmed mappings and IT activation.'))return;start(async()=>{setError(null);const result=await startZoho(true);if(!result.ok)return setError(result.error);window.location.assign(result.data.url);});}}>Authorise bill and payment sending</Button>}
+ {authorized&&<><Button disabled={pending||!configured} onClick={()=>start(async()=>{setError(null);const result=await checkZoho();if(!result.ok)return setError(result.error);setOrganizations(result.data.organizations);if(!result.data.organizations.length)setError('No Zoho Books organisations were returned. Check this account’s access.');})}>Check connection and organisations</Button>
+ <Button variant="quiet" disabled={pending} onClick={()=>{if(!window.confirm('Remove the saved connection from this Finance environment? No Zoho records will be changed. To revoke access at Zoho too, use Zoho Connected Apps.'))return;start(async()=>{setError(null);const result=await disconnectZoho();if(!result.ok)return setError(result.error);setOrganizations([]);router.refresh();});}}>{database?'Disconnect this environment':'Disconnect locally'}</Button></>}
+ {canPause&&<Button disabled={pending} onClick={()=>start(async()=>{setError(null);const result=await pauseZohoUpdater(!paused);if(!result.ok)return setError(result.error);router.refresh();})}>{paused?'Allow updater to resume':'Pause updater'}</Button>}
+ </div>{organizations.length>0&&<div className="space-y-3 border-t border-rule pt-4"><p className="text-sm text-ink-2">Confirm the organisation Finance should read. If it contains both 2MG and GPI, we still need a reliable 2MG filter before importing any transactions.</p><ul className="divide-y divide-rule">{organizations.map(org=><li key={org.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-medium">{org.name}</p><p className="text-meta text-ink-3">{org.id} · {org.currency}</p></div><Button disabled={pending} onClick={()=>{if(!window.confirm(`Use ${org.name} for this Finance connection? This does not start an import.`))return;start(async()=>{setError(null);const result=await chooseZoho(org.id);if(!result.ok)return setError(result.error);setOrganizations([]);router.refresh();});}}>Use this organisation</Button></li>)}</ul></div>}</div>;
+}

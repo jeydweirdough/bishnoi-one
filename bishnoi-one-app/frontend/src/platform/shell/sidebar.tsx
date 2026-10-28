@@ -1,5 +1,7 @@
 "use client";
 
+import { hiddenByFeature } from "@/src/platform/lib/features";
+import { useFeatures } from "@/src/platform/shell/features";
 import { Check, ChevronDown, ChevronsUpDown, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -307,7 +309,11 @@ function Menu_({ props, current }: { props: Props; current: Step | undefined }) 
   );
 }
 
-function SidebarBody(props: Props) {
+function SidebarBody(given: Props) {
+  // Pages the company switched off in its app catalogue aren't shown (step 6, src/platform/lib/features.ts).
+  const features = useFeatures();
+  const drop = (ps: Process[] | undefined) => (ps ?? []).map((p) => ({ ...p, steps: p.steps.filter((s) => !hiddenByFeature(s.href, features)) }));
+  const props: Props = { ...given, processes: drop(given.processes), foot: given.foot && drop(given.foot) };
   const pathname = usePathname();
   const search = useSearchParams();
   const [rail, setRail] = useState(props.rail ?? false);

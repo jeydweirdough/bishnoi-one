@@ -141,7 +141,11 @@ def post_reimbursed(db: Session, r: FundRequest, amount: int, method: str, refer
 
 
 def account_out(a: Account) -> dict:
-    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id}
+    from app.management import term_of  # here: app.management reads the models first
+
+    shown = term_of(a)[0] if a.type in ("asset", "liability") else None
+    return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id,
+            "term": a.term, "termShown": shown}
 
 
 def entry_out(e: JournalEntry) -> dict:

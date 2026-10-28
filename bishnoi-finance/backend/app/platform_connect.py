@@ -40,7 +40,7 @@ def _engine(settings: Settings):
     with _lock:
         engine = _engines.get(settings.database_url)
         if engine is None:
-            engine = make_engine(settings.database_url)
+            engine = make_engine(settings.database_url, postgres_driver=settings.postgres_driver)
             _meta.create_all(engine, checkfirst=True)
             _engines[settings.database_url] = engine
     return engine
@@ -66,6 +66,20 @@ def save_key(settings: Settings, key: str | None) -> None:
         if key:
             c.execute(insert(_table).values(name="connect_key", value=key))
     _cached[settings.database_url] = (key, time.monotonic())
+
+
+def read_value(settings: Settings, name: str) -> str | None:
+    """Something else the Platform gave, kept in the same table (the company this database is)."""
+    with _engine(settings).connect() as c:
+        return c.execute(select(_table.c.value).where(_table.c.name == name)).scalar()
+
+
+def write_value(settings: Settings, name: str, value: str | None) -> None:
+    """Keeps it (or, with None, lets it go)."""
+    with _engine(settings).begin() as c:
+        c.execute(delete(_table).where(_table.c.name == name))
+        if value is not None:
+            c.execute(insert(_table).values(name=name, value=value))
 
 
 def connect_key(settings: Settings) -> str | None:

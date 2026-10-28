@@ -44,3 +44,27 @@ def test_every_report_answers_in_the_kits_shape(client, ana, monkeypatch):
         assert got["columns"] and isinstance(got["rows"], list) and isinstance(got["summary"], list), r["key"]
     assert client.get("/reports/nope", headers=ana).status_code == 404
     assert client.get("/reports/new-customers?from=2026-10-10&to=2026-10-01", headers=ana).status_code == 422
+
+
+def test_pipeline_coverage_and_lifetime_value(client, crew, ana):  # noqa: F811
+    """The management reports (decided 2026-10-28): what's left of the target against the open deals
+    closing this month, and each customer's yearly and lifetime value from deals won."""
+    from tests.test_deals import deal
+    from tests.test_sales import person_id, target, win
+
+    target(client, ana, person_id(client, ana, "Ria"), 100_000)
+    acme = company(client, crew["ria"], "Acme")
+    win(client, crew["ria"], deal(client, crew["ria"], acme, name="Won", valueCentavos=50_000))
+    open_deal = deal(client, crew["ria"], acme, name="Open", valueCentavos=80_000)
+
+    cover = client.get("/reports/pipeline-coverage", headers=crew["ria"]).json()
+    ria = next(r for r in cover["rows"] if r["person"] == "Ria")
+    weighted = 80_000 * open_deal["probability"] // 100
+    assert (ria["target"], ria["won"], ria["left"], ria["deals"], ria["weighted"]) == (100_000, 50_000, 50_000, 1, weighted)
+    assert ria["coverage"] == weighted / 50_000
+    assert ria["reading"] == ("Covered" if weighted >= 50_000 else "Short")
+
+    clv = client.get("/reports/customer-lifetime-value", headers=crew["ria"]).json()
+    acme_row = next(r for r in clv["rows"] if r["customer"] == "Acme")
+    assert (acme_row["won"], acme_row["deals"], acme_row["yearly"]) == (50_000, 1, 50_000)  # under a year counts as one
+    assert {r["key"] for r in client.get("/reports", headers=ana).json() if r["group"] == "Management"} == {"pipeline-coverage", "customer-lifetime-value"}

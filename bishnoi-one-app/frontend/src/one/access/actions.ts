@@ -83,3 +83,21 @@ export async function changePerson(id: string, change: { fullName?: string; titl
 export async function setPersonPassword(id: string, password?: string): Promise<Result<{ password: string | null }>> {
   return attempt(async () => accountSend<{ password: string | null }>("POST", `/identity/access/people/${enc(id)}/password`, password ? { password } : {}));
 }
+
+// Abilities and job roles (feature plan step 6): roles in plain words; their permissions follow.
+
+export async function roleFromJob(jobRole: string, name: string | null): Promise<Result<AccessRole>> {
+  return attempt(async () => {
+    const role = await accountSend<AccessRole>("POST", "/identity/access/roles/from-job", { jobRole, name });
+    refresh();
+    return role;
+  });
+}
+
+export async function setRoleAbilities(id: string, abilities: { key: string; limit: number | null }[], scopes: Record<string, string>): Promise<Result<AccessRole>> {
+  return attempt(async () => {
+    const role = await accountSend<AccessRole>("PUT", `/identity/access/roles/${enc(id)}/abilities`, { abilities, scopes });
+    refresh();
+    return role;
+  });
+}

@@ -34,7 +34,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.models import AccessRole, AccessRolePermission, AccessRoleScope, Application, Company, CompanyApp, Identity, IdentityApp
+from app.models import AccessRole, AccessRoleAbility, AccessRolePermission, AccessRoleScope, Application, Company, CompanyApp, Identity, IdentityApp
 
 log = logging.getLogger(__name__)
 
@@ -115,11 +115,42 @@ def set_module(db: Session, role: AccessRole, app_key: str, permissions: list[st
         db.add(AccessRoleScope(role_id=role.id, app_key=app_key, scope=scope))
 
 
+def abilities_of(db: Session, role: AccessRole) -> list[dict]:
+    """Its abilities (step 6), each with its limit where it takes one, in the catalogue's order."""
+    from app.abilities import ABILITIES
+
+    have = {a.ability: a.limit_value for a in db.scalars(select(AccessRoleAbility).where(AccessRoleAbility.role_id == role.id))}
+    return [{"key": a.key, "limit": have[a.key]} for a in ABILITIES if a.key in have]
+
+
+def set_abilities(db: Session, role: AccessRole, wanted: list[dict], scopes: dict[str, str]) -> None:
+    """The role's abilities, in place of what it had; its permissions in each of the company's modules
+    follow from them, with the scope given (or kept) for each."""
+    from app.abilities import ABILITY, permissions_for
+
+    db.execute(delete(AccessRoleAbility).where(AccessRoleAbility.role_id == role.id))
+    keys = []
+    for item in wanted:
+        if item["key"] in ABILITY and item["key"] not in keys:
+            keys.append(item["key"])
+            limit = item.get("limit") if ABILITY[item["key"]].limit else None
+            db.add(AccessRoleAbility(role_id=role.id, ability=item["key"], limit_value=limit))
+    kept = scopes_of(db, role)
+    apps = {a.key for a in modules_of(db, role.company_id)}
+    granted = permissions_for(keys, apps)
+    for app in apps:
+        set_module(db, role, app, granted.get(app, []), scopes.get(app) or kept.get(app))
+
+
 def spec(db: Session, role: AccessRole, app_key: str) -> dict:
-    """The role as one module keeps it."""
+    """The role as one module keeps it; its abilities (with their limits) for approval workflows."""
     perms = sorted(db.scalars(select(AccessRolePermission.permission).where(AccessRolePermission.role_id == role.id, AccessRolePermission.app_key == app_key)))
     scope = db.scalar(select(AccessRoleScope.scope).where(AccessRoleScope.role_id == role.id, AccessRoleScope.app_key == app_key))
-    return {"name": role.name, "description": role.description, "scope": scope, "permissions": perms, "admin": role.is_admin}
+    out = {"name": role.name, "description": role.description, "scope": scope, "permissions": perms, "admin": role.is_admin}
+    abilities = abilities_of(db, role)
+    if abilities:
+        out["abilities"] = abilities
+    return out
 
 
 def role_for_pass(db: Session, person: Identity, app: Application) -> dict | None:

@@ -31,6 +31,8 @@ function missingOf(unset: Unset, keys: string[]): Missing {
 
 /** What each page needs, so the menu offers only what the role opens (the API checks the same). */
 const NEEDS: [string, string][] = [
+  ["/finance/import-review", "integrations.manage"],
+  ["/finance/integrations/zoho", "integrations.manage"],
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
   ["/finance/sales-orders", "sales_orders.view"],
@@ -63,7 +65,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
   const keep = (steps: Step[]) => steps.filter((s) => opens(s.href.split("?")[0]));
   // As Zoho Books lays it out: Sales, Expenses, Approvals, Banking, Accountant, Taxes, Reports.
   const processes: Process[] = [
-    { label: "Sales orders", icon: "orders", steps: keep([{ href: "/finance/sales-orders", label: "Sales orders", icon: "orders" }]) },
     { label: "Payables", icon: "orders", steps: keep([
       { href: "/finance/bills", label: "Bills", icon: "orders", exact: true },
       { href: "/finance/bills/aging", label: "Supplier aging", icon: "reports" },
@@ -75,7 +76,9 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "letters",
       flow: true,
       steps: keep([
-        { href: "/finance/invoices", label: "Invoices", icon: "letters", exact: true },
+        { href: "/finance/sales-orders", label: "Sales orders", icon: "orders" },
+        { href: "/finance/invoices/zoho", label: "Zoho invoices", icon: "letters" },
+        { href: "/finance/invoices", label: "Finance invoices", icon: "letters", exact: true },
         { href: "/finance/invoices/receivables", label: "Receivables", icon: "money" },
       ]),
     },
@@ -119,26 +122,21 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Reports",
       icon: "reports",
       steps: keep([
-        { href: "/finance/reports", label: "Reports", icon: "reports", exact: true, also: ["/finance/reports"] },
-        { href: "/finance/bir/statements", label: "Financial statements", icon: "reports" },
-        { href: "/finance/bir", label: "Books of accounts", icon: "reports", exact: true },
+        // One row: the financial statements and the books of accounts are in the Reports Center (2026-10-28).
+        { href: "/finance/reports", label: "Reports", icon: "reports", also: ["/finance/reports", "/finance/bir/statements"] },
       ]),
     },
   ];
   const foot: Process[] = [
     {
-      label: "Users and roles",
-      icon: "people",
-      steps: keep([
-        { href: "/finance/admin/users", label: "Users", icon: "people" },
-        { href: "/platform/roles", label: "Roles", icon: "roles" },
-      ]),
-    },
-    {
       label: "Settings",
       icon: "settings",
       steps: keep([
+        { href: "/finance/integrations/zoho", label: "Zoho connection", icon: "settings" },
+        { href: "/finance/import-review", label: "Import review", icon: "lists" },
         { href: "/finance/tax", label: "Taxes", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
+        // Each person's e-signature and calendar: Finance's own (people themselves are on the Admin Console).
+        { href: "/finance/admin/users", label: "People's details", icon: "people" },
         { href: "/finance/invoices/series", label: "Transaction number series", icon: "letters", missing: missingOf(unset, ["invoiceSeries"]) },
         { href: "/finance/ledger/posting", label: "Default accounts", icon: "settings", missing: missingOf(unset, ["postingAccounts"]) },
         { href: "/finance/ledger/categories", label: "Expense categories", icon: "lists", missing: missingOf(unset, ["categoryAccounts"]) },

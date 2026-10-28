@@ -14,11 +14,17 @@ if not config.get_main_option("sqlalchemy.url"):
 
 
 def run() -> None:
+    supplied = config.attributes.get("connection")
+    if supplied is not None:
+        context.configure(connection=supplied, target_metadata=Base.metadata, version_table=VERSION_TABLE)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
     # The app's own engine when the app runs the migrations (app/migrate.py);
     # one made from the address when alembic is run by hand.
-    engine = config.attributes.get("engine") or engine_from_config(
-        config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool
-    )
+    from app.db import make_engine
+    engine = config.attributes.get("engine") or make_engine(config.get_main_option("sqlalchemy.url"),
+        postgres_driver=get_settings().postgres_driver)
     with engine.connect() as connection:
         # render_as_batch: SQLite can only change a table by rebuilding it.
         context.configure(connection=connection, target_metadata=Base.metadata, render_as_batch=True, version_table=VERSION_TABLE)

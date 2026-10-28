@@ -12,10 +12,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.orm import object_session
 
 from app.api import not_found
 from app.deps import DB, SettingsDep
-from app.models import Company, MergedRecord
+from app.models import Company, MergedRecord, Team
 
 
 def calling_app(
@@ -50,7 +51,20 @@ def customer_out(c: Company) -> dict:
         "phone": c.phone,
         "tin": tin if isinstance(tin, str) and tin.strip() else None,
         # Whose customer it is: Finance puts them on the invoice as the salesperson, whose sale it scores.
-        "owner": {"id": c.owner_id, "name": c.owner.full_name} if c.owner else None,
+        "owner": owner_out(c.owner) if c.owner else None,
+    }
+
+
+def owner_out(user) -> dict:
+    """The salesperson, with their team and the division above it: the company's org chart, whose
+    units the CRM's teams are a copy of (app/platform_org.py). Finance keeps them on the invoice."""
+    team = user.team
+    division = object_session(user).get(Team, team.parent_id) if team is not None and team.parent_id else team
+    return {
+        "id": user.id,
+        "name": user.full_name,
+        "team": {"id": team.id, "name": team.name} if team is not None and team.parent_id else None,
+        "division": {"id": division.id, "name": division.name} if division is not None else None,
     }
 
 

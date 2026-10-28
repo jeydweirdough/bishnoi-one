@@ -1,3 +1,5 @@
+import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
+import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
@@ -8,13 +10,13 @@ import { AdjustmentForm, CountSheet, StartCount } from "@/src/modules/inventory/
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { AdjustmentStamp, CountStamp } from "@/src/modules/inventory/components/stamps";
 import { StepButton } from "@/src/modules/inventory/components/step-button";
-import { Chips, Figures, NoAccess, RowLink, Table, Td, Trail } from "@/src/modules/inventory/components/ui";
+import { Chips, Figures, Filters, NoAccess, RowLink, Table, Td, Trail } from "@/src/modules/inventory/components/ui";
 import { param, query, signed } from "@/src/modules/inventory/lib/labels";
 import { NeedsFirst } from "@/src/modules/inventory/components/setup";
 import { loadSetup } from "@/src/modules/inventory/lib/setup";
 import { Pager } from "@/src/modules/inventory/platform/ui/pager";
 import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "@/src/modules/inventory/lib/page";
-import { referenceOf } from "@/src/modules/inventory/lib/reference";
+import { given, referenceOf } from "@/src/modules/inventory/lib/reference";
 import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, Paged, ReasonOption, Reference } from "@/src/modules/inventory/lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
@@ -22,12 +24,13 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
   if (!may("adjustments.view")) return <NoAccess what="adjustments" />;
   const s = await searchParams;
   const status = param(s, "status");
+  const h = { operationType: param(s, "operationType"), timing: param(s, "timing") };
   const { page, size, vars } = paging(s);
-  const base = `/inventory/adjustments${query({ status })}`;
-  const { adjustments: list } = await loadQuery<{ adjustments: Paged<AdjustmentBrief> }>(
-    `query Adjustments($status: String, $limit: Int, $offset: Int) { adjustments(status: $status, limit: $limit, offset: $offset) }`,
-    { ...(status ? { status } : {}), ...vars },
-    ["adjustments"],
+  const base = `/inventory/adjustments${query({ status, ...h })}`;
+  const { adjustments: list, operationTypes } = await loadQuery<{ adjustments: Paged<AdjustmentBrief>; operationTypes: OperationTypeRow[] }>(
+    `query Adjustments($status: String, $operationType: String, $timing: String, $limit: Int, $offset: Int) { adjustments(status: $status, operationType: $operationType, timing: $timing, limit: $limit, offset: $offset) operationTypes }`,
+    { ...(status ? { status } : {}), ...given(h), ...vars },
+    ["adjustments", "operationTypes"],
   );
   keepInRange(list.items.length, list.total, page, base);
   const rows = list.items;
@@ -42,6 +45,9 @@ export async function AdjustmentsPage({ searchParams }: { searchParams: Search }
         {!may("adjustments.approve") && may("adjustments.create") && " Adjustments you create need approval before they are posted."}
       </PageHeader>
       <Chips label="Status" current={status} options={[chip("", "All"), chip("pending", "Pending approval"), chip("posted", "Posted"), chip("rejected", "Rejected")]} />
+      <Filters keep={{ status }}>
+        <HeaderFilters types={operationTypes} kinds={["adjustment"]} operationType={h.operationType} timing={h.timing} />
+      </Filters>
       <Sheet>
         {rows.length === 0 ? (
           <Empty icon="adjustments" title="No inventory adjustments" />
@@ -90,6 +96,7 @@ export async function AdjustmentPage({ params }: { params: Params<{ id: string }
         <AdjustmentStamp status={a.status} /> <span className="ml-1">{a.reasonLabel} · {a.warehouse.name}</span>
         {a.countId && <> · from <Link href={`/inventory/counts/${a.countId}`} className="text-ink hover:underline">a count</Link></>}
       </PageHeader>
+      <DocumentHeaderStrip header={a.header} source={a.countId && a.header.sourceDocument ? <Link href={`/inventory/counts/${a.countId}`} className="hover:underline">{a.header.sourceDocument}</Link> : undefined} />
       <Sheet className="px-5 py-4">
         <Trail steps={[
           { label: "Created by", who: a.createdBy, when: at(a.createdAt) },
@@ -143,12 +150,13 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
   const s = await searchParams;
   const status = param(s, "status");
+  const h = { operationType: param(s, "operationType"), timing: param(s, "timing") };
   const { page, size, vars } = paging(s);
-  const base = `/inventory/counts${query({ status })}`;
-  const { counts: list, reference: ref } = await loadQuery<{ counts: Paged<CountBrief>; reference: Pick<Reference, "categories" | "warehouses"> }>(
-    `query Counts($status: String, $limit: Int, $offset: Int) { counts(status: $status, limit: $limit, offset: $offset) ${referenceOf("categories", "warehouses")} }`,
-    { ...(status ? { status } : {}), ...vars },
-    ["counts", "reference"],
+  const base = `/inventory/counts${query({ status, ...h })}`;
+  const { counts: list, reference: ref, operationTypes } = await loadQuery<{ counts: Paged<CountBrief>; reference: Pick<Reference, "categories" | "warehouses">; operationTypes: OperationTypeRow[] }>(
+    `query Counts($status: String, $operationType: String, $timing: String, $limit: Int, $offset: Int) { counts(status: $status, operationType: $operationType, timing: $timing, limit: $limit, offset: $offset) ${referenceOf("categories", "warehouses")} operationTypes }`,
+    { ...(status ? { status } : {}), ...given(h), ...vars },
+    ["counts", "reference", "operationTypes"],
   );
   keepInRange(list.items.length, list.total, page, base);
   const rows = list.items;
@@ -157,6 +165,9 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
       <PageHeader title="Inventory counts">
         Physical inventory counts. Counted quantities are compared with system quantities, and on approval each variance is posted as an adjustment.
       </PageHeader>
+      <Filters keep={{ status }}>
+        <HeaderFilters types={operationTypes} kinds={["count"]} operationType={h.operationType} timing={h.timing} />
+      </Filters>
       {may("counts.create") && (
         <Sheet className="mb-5 px-5 py-4">
           <StartCount canAdd={canAddFrom(may)} reference={ref} warehouseId={param(s, "warehouse")} />
@@ -225,6 +236,7 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
         {c.category && <span className="ml-1">{c.category.name} only</span>}
         {c.adjustmentId && <> · posted as <Link href={`/inventory/adjustments/${c.adjustmentId}`} className="text-ink hover:underline">an adjustment</Link></>}
       </PageHeader>
+      <DocumentHeaderStrip header={c.header} />
       <Figures
         items={[
           { label: "Lines", value: c.lineCount },

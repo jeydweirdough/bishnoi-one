@@ -21,6 +21,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import abilities as ab
 from app import access_roles
 from app.access_roles import ADMINISTRATOR
 from app.api import Api, changed, check_email, conflict, field_error, not_found
@@ -28,14 +29,15 @@ from app.audit import audit
 from app import passwords
 from app.deps import DB, SettingsDep
 from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp
+from app.accounts import runs_company
 from app.routers.identity import Signed
 
 router = APIRouter(prefix="/identity/access", tags=["company access"])
 
 
-def company_admin(signed: Signed) -> Identity:
+def company_admin(signed: Signed, db: DB) -> Identity:
     _, person = signed
-    if not person.is_company_admin:
+    if not runs_company(db, person):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only your company's administrators manage access.")
     return person
 
@@ -70,6 +72,9 @@ def role_out(db: Session, role: AccessRole, holders: int = 0) -> dict:
         "permissions": access_roles.grants_of(db, role),
         "scopes": access_roles.scopes_of(db, role),
         "people": holders,
+        # Step 6: its abilities (with limits) and the job role it was copied from.
+        "abilities": access_roles.abilities_of(db, role),
+        "jobRole": role.job_role,
     }
 
 
@@ -86,7 +91,7 @@ def overview(db: DB, me: Admin) -> dict:
     holders = holders_of(db, me.company_id)
     roles = db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name))).all()
     people, to_choose = [], []
-    for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id).order_by(func.lower(Identity.full_name))):
+    for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False)).order_by(func.lower(Identity.full_name))):
         grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
         given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g)} for g in grants if g.application_id in by_id]
         people.append({
@@ -227,6 +232,84 @@ def update_role(role_id: str, body: RolePatch, request: Request, db: DB, me: Adm
 
         role.updated_at = datetime.now(UTC)
         audit(db, me.email, "access.role_updated", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id, fields=fields)
+        db.commit()
+        told(request, settings, me.company_id)
+    return role_out(db, role, holders_of(db, me.company_id).get(role.id, 0))
+
+
+# ---- Abilities and job roles (feature plan step 6): in plain words, defined by Bishnoi One ----------
+
+
+@router.get("/abilities")
+def abilities(_: Admin) -> dict:
+    """What a role can hold, as abilities in business words, and the ready-made job roles to copy."""
+    return {
+        "groups": [{"name": g, "abilities": [{"key": a.key, "label": a.label, "limit": a.limit, "apps": sorted(a.grants)} for a in ab.ABILITIES if a.group == g]}
+                   for g in ab.GROUPS],
+        "jobRoles": [{"key": j.key, "name": j.name, "sees": j.sees, "abilities": list(j.abilities), "scopes": j.scopes, "limits": j.limits, "admin": j.admin}
+                     for j in ab.JOB_ROLES],
+    }
+
+
+class FromJobIn(Api):
+    job_role: str = Field(max_length=40)
+    name: str | None = Field(None, min_length=1, max_length=80)
+
+
+@router.post("/roles/from-job", status_code=status.HTTP_201_CREATED)
+def role_from_job(body: FromJobIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """A copy of one of Bishnoi One's job roles, for the company to adjust (decision 23)."""
+    job = ab.JOB.get(body.job_role)
+    if job is None:
+        raise field_error("job_role", "There's no such job role.")
+    name = (body.name or job.name).strip()
+    check_name(name, job.admin)
+    if name_taken(db, me.company_id, name):
+        raise field_error("name", "There's already a role with that name. Give the copy another name.")
+    role = AccessRole(company_id=me.company_id, name=name, description=f"Who sees: {job.sees.lower()}.", is_admin=job.admin, job_role=job.key)
+    db.add(role)
+    db.flush()
+    if not job.admin:
+        access_roles.set_abilities(db, role, [{"key": k, "limit": job.limits.get(k)} for k in job.abilities], job.scopes)
+    audit(db, me.email, "access.role_created", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id, fields=["from a job role"])
+    db.commit()
+    told(request, settings, me.company_id)
+    return role_out(db, role)
+
+
+class AbilityIn(Api):
+    key: str = Field(max_length=60)
+    limit: int | None = Field(None, ge=0, le=10**12)
+
+
+class AbilitiesIn(Api):
+    abilities: list[AbilityIn] = Field(max_length=100)
+    # By module: whose records the role reaches there (its scopes), when changing them too.
+    scopes: dict[str, str] = Field(default_factory=dict)
+
+
+@router.put("/roles/{role_id}/abilities")
+def set_role_abilities(role_id: str, body: AbilitiesIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """The role's abilities, switched on or off in plain words (decision 22); its permissions follow."""
+    role = get_role(db, me, role_id)
+    if role.is_admin:
+        raise conflict("This role has everything; there's nothing to switch.")
+    unknown = sorted({a.key for a in body.abilities} - set(ab.ABILITY))
+    if unknown:
+        raise field_error("abilities", f"There's no ability {', '.join(unknown)}.")
+    apps = {a.key: a for a in access_roles.modules_of(db, me.company_id)}
+    for key, scope in body.scopes.items():
+        found = access_roles.catalog(apps[key]) if key in apps else None
+        if key not in apps or (found is not None and scope not in access_roles.scopes_in(found)):
+            raise field_error("scopes", f"{key} has no scope {scope}.")
+    before = (access_roles.abilities_of(db, role), access_roles.scopes_of(db, role))
+    access_roles.set_abilities(db, role, [a.model_dump() for a in body.abilities], body.scopes)
+    db.flush()
+    if (access_roles.abilities_of(db, role), access_roles.scopes_of(db, role)) != before:
+        from datetime import UTC, datetime
+
+        role.updated_at = datetime.now(UTC)
+        audit(db, me.email, "access.role_updated", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id, fields=["abilities"])
         db.commit()
         told(request, settings, me.company_id)
     return role_out(db, role, holders_of(db, me.company_id).get(role.id, 0))

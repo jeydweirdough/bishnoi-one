@@ -203,6 +203,7 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
         }
       >
         <StatusMark status={v.status} />
+        {v.zohoSync && <p role="status" className="mt-2 text-sm text-ink-2">Zoho: {v.zohoSync.label}. {v.zohoSync.message}</p>}
         <span className="ml-2 text-meta text-ink-2">
           {v.methodLabel} · {fmt.peso(v.totalCentavos)}
           {v.paidFrom && ` from ${v.paidFrom.code} · ${v.paidFrom.name}`}

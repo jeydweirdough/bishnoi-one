@@ -20,11 +20,21 @@ const reportList = cache(async () => (await loadQuery<{ reports: ReportInfo[] }>
 export async function ReportsPage({ searchParams }: { searchParams: Search }) {
   const group = param(await searchParams, "group");
   const { may } = await context();
-  if (!may("reports.view")) return <NoAccess what="reports" />;
-  const [reports, savedReports] = await Promise.all([
-    reportList(),
+  // Stock access alone opens the report-like stock screens listed here (not the reports themselves).
+  if (!may("reports.view") && !may("stock.view")) return <NoAccess what="reports" />;
+  const [listed, savedReports] = await Promise.all([
+    may("reports.view") ? reportList() : Promise.resolve([]),
     listSavedReports("inventory"),
   ]);
+  // Screens that work like reports, listed here rather than in the sidebar (decided 2026-10-28).
+  const pages: ReportInfo[] = may("stock.view")
+    ? [
+        { key: "batch-expiry-page", title: "Batch and expiry", group: "Stock", about: "Every batch on hand across items, by expiry, with where it's kept.", dated: false, byWarehouse: true, fixed: true, href: "/inventory/reports/batch-expiry" },
+        { key: "serial-lookup", title: "Serial number lookup", group: "Stock", about: "Find one serial-numbered unit: where it is and where it's been.", dated: false, byWarehouse: false, fixed: true, href: "/inventory/serials" },
+        { key: "stock-movements", title: "Stock movements", group: "Activity", about: "Every movement in and out, as it happened, with its document.", dated: true, byWarehouse: true, fixed: true, href: "/inventory/movements" },
+      ]
+    : [];
+  const reports = [...listed, ...pages];
   return (
     <>
       <PageHeader title={group ? `${group} reports` : "Reports"}>
@@ -57,7 +67,7 @@ function drill(column: string, row: ReportData["rows"][number]): string | undefi
   if (column === "order") return `/inventory/orders?q=${q}`;
   if (column === "receipt") return `/inventory/receipts?q=${q}`;
   if (column === "supplier") return `/inventory/suppliers?q=${q}`;
-  if (column === "batch") return `/inventory/batches?q=${q}`;
+  if (column === "batch") return `/inventory/reports/batch-expiry?q=${q}`;
   return undefined;
 }
 

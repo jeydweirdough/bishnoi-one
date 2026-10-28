@@ -22,7 +22,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import Field
+from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 
 from app.access import access_of, permissions_of, permitted
@@ -65,6 +65,14 @@ class AccountIn(Api):
     is_active: bool = True
     # The account it sits under (migration 0017); none: at the top.
     parent_id: str | None = None
+    # Assets and liabilities: current (within a year) or long-term (migration 0023); none: from its name.
+    term: Literal["current", "non_current"] | None = None
+
+    @model_validator(mode="after")
+    def _term_only_where_it_counts(self):
+        if self.type not in ("asset", "liability"):
+            self.term = None
+        return self
 
 
 def check_parent(db: DB, account_id: str | None, parent_id: str | None) -> None:
@@ -275,6 +283,9 @@ POSTING = {
     "input_tax_account_id": ("asset", "VAT on bills (input VAT)"),
     "withholding_account_id": ("liability", "Tax withheld from suppliers (EWT payable)"),
     "cwt_account_id": ("asset", "Tax customers withheld (creditable withholding, Form 2307)"),
+    # The cost of goods sold, with each invoice, from Inventory's costs (2026-10-28).
+    "cogs_account_id": ("expense", "Cost of goods sold (booked with each invoice)"),
+    "inventory_account_id": ("asset", "Inventory (the stock goods sold come out of)"),
 }
 
 

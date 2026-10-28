@@ -10,7 +10,8 @@ import { ACCOUNT_COOKIE, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie
 //    another), and the module's session is opened on first use (app/auth/enter).
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const next = pathname + search;
+  // OAuth codes must never enter login return URLs or the last-page cookie.
+  const next = pathname === "/finance/integrations/zoho/callback" ? pathname : pathname + search;
   const reportModule = pathname.match(/^\/platform\/reports\/(crm|inventory|finance|admin|pharmacy)(?:\/|$)/)?.[1];
   const here = reportModule ? moduleByKey(reportModule) : moduleOfPath(pathname);
   // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer

@@ -48,6 +48,7 @@ class Area:
 
 
 AREAS: tuple[Area, ...] = (
+    Area("integrations", "Finance connections", "Administration", ("manage",)),
     Area("sales_orders", "Sales orders", "Sales", ("view", "create", "submit", "approve", "cancel")),
     Area("dashboard", "Overview", "Finance", ("view",)),
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
@@ -89,7 +90,7 @@ KEYS_TO_ADMINISTRATION = frozenset({"admin.users", "admin.roles"})
 # Where an action means something else in one area, its own label there (the shared one
 # says "Review liquidations" for check, "Prepare BIR files" for prepare).
 AREA_LABELS = {
-    "sales_orders.create": "Make and edit drafts",
+    "sales_orders.create": "Add and edit Finance draft orders",
     "sales_orders.approve": "Approve or return for correction",
     "bills.create": "Make drafts (make, edit, attach, submit)",
     "bills.approve": "Approve or return",

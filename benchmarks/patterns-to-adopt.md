@@ -201,10 +201,14 @@ page and the next step offered after saving. One shared component
 which only lists its processes and steps: the sidebar is fixed once, for all.
 
 **One layout in every module (2026-10-26, following the CRM):** Home; the work areas in the order
-the work happens, 2 to 6 pages each (one page: a plain row); Reports as one row (with only what the
-Reports Center doesn't hold beside it: Finance's statements and books, Inventory's stock movements);
-at the foot **Users and roles** (Users, Roles) then **Settings** (the set-up lists: warehouses,
-categories, brands, units, taxes… and the **Activity log** last). No counts on rows (what waits is on
+the work happens, 2 to 6 pages each (one page: a plain row); Reports as one row, never a group (since
+2026-10-28 report-like screens such as Finance's statements and books and Inventory's stock movements
+are entries in the Reports Center, opening their own page);
+at the foot **Settings** (the set-up lists: warehouses, categories, brands, units, taxes…, what the
+app keeps of its own about people, and the **Activity log** last). Since 2026-10-28 there is no
+Users and roles group in an app: people and roles are kept once, on the Admin Console's People and
+Roles; an app's own details about people (CRM employee ID and teams, Finance e-signatures, Pharmacy
+licences) are a Settings row. No counts on rows (what waits is on
 Home and the bell; the shared sidebar doesn't draw them), no section headings; only a red mark for
 something not set up.
 

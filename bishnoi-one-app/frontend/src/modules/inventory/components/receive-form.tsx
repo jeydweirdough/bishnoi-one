@@ -21,7 +21,7 @@ const cell = "h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm hov
  * filled in; each line takes its batch, expiry and serial numbers as the
  * product needs them.
  */
-export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses">; order?: PO; canAdd?: CanAdd }) {
+export function ReceiveForm({ org, reference, order, productId, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "suppliers" | "units" | "warehouses">; order?: PO; productId?: string; canAdd?: CanAdd }) {
   const fmt = makeFormat(org);
   const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   // Added from here ("+ New …"), listed until the page's own lists have them.
@@ -39,10 +39,11 @@ export function ReceiveForm({ org, reference, order, canAdd = {} }: { org: Org; 
   const [deliveryRef, setDeliveryRef] = useState("");
   const [notes, setNotes] = useState("");
   const blank = (): Row => ({ productId: "", orderLineId: null, quantity: "", cost: "", batchNo: "", manufacturedOn: "", expiresOn: "", serials: "", outstanding: null });
+  const presetProduct = reference.products.find(p => p.id === productId && p.status === "active");
   const [rows, setRows] = useState<Row[]>(() =>
     order
       ? order.lines.filter((l) => l.outstanding > 0).map((l) => ({ ...blank(), productId: l.product.id, orderLineId: l.id, quantity: String(l.outstanding), cost: fmt.pesosText(l.unitCost), outstanding: l.outstanding }))
-      : [blank()],
+      : [{ ...blank(), productId: presetProduct?.id ?? "", cost: presetProduct ? fmt.pesosText(presetProduct.costPrice) : "" }],
   );
   const locations = [
     ...(reference.warehouses.find((w) => w.id === warehouseId)?.locations.filter((l) => l.isActive) ?? []),

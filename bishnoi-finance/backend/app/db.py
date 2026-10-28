@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def make_engine(url: str) -> Engine:
+def make_engine(url: str, postgres_driver: str = "psycopg") -> Engine:
     if url.startswith("sqlite"):
         # The folder the database file lives in, made on first start.
         path = url.removeprefix("sqlite:///")
@@ -31,6 +31,11 @@ def make_engine(url: str) -> Engine:
             cursor.close()
 
         return engine
+    if postgres_driver == "pg8000" or url.startswith("postgresql+pg8000:"):
+        from app.postgres_driver import python_engine
+        return python_engine(url)
+    if postgres_driver != "psycopg":
+        raise ValueError("Choose psycopg or pg8000 for the Finance PostgreSQL driver.")
     # Postgres (on Vercel: Neon). Its providers hand out postgres:// or
     # postgresql:// addresses; the driver installed here is psycopg 3.
     url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", url)

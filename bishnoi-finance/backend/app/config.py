@@ -21,6 +21,23 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     environment: str = "development"
+    # Dedicated Finance OAuth client. Never returned to the browser.
+    zoho_client_id: SecretStr | None = None
+    zoho_client_secret: SecretStr | None = None
+    zoho_encryption_key: SecretStr | None = None
+    zoho_region: str = "com"
+    zoho_redirect_uri: str = "http://localhost:4301/finance/integrations/zoho/callback"
+    # PostgreSQL connections stay disabled until an operator enables this environment.
+    zoho_database_enabled: bool = False
+    zoho_connection_id: str = ""
+    zoho_environment: str = ""
+    zoho_worker_enabled: bool = False
+    zoho_daily_limit: int = 500
+    postgres_driver: str = "psycopg"
+    data_environment: str = "local_test"
+    zoho_outbox_capture_enabled: bool = False
+    zoho_outbound_enabled: bool = False
+    zoho_network_enabled: bool = True
     # This app's own database: its users, sessions and data.
     database_url: str = f"sqlite:///{(DATA_DIR / 'finance.db').as_posix()}"
     # The first administrator, made when the database has no accounts at all:
@@ -129,6 +146,16 @@ class Settings(BaseSettings):
     @property
     def crm_linked(self) -> bool:
         return bool(self.crm_api_url and self.crm_api_key)
+
+    # Bishnoi One Inventory, for what each product costs (the cost of goods sold on each invoice,
+    # app/inventory.py): its API and the key it gave Finance. Given by the Platform once linked.
+    # Unset: invoices post no cost. The company asked about is CRM_COMPANY's, Finance's company.
+    inventory_api_url: str | None = None
+    inventory_api_key: SecretStr | None = None
+
+    @property
+    def inventory_linked(self) -> bool:
+        return bool(self.inventory_api_url and self.inventory_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:

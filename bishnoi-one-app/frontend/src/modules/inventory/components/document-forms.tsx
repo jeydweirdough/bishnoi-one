@@ -11,6 +11,8 @@ import { kindOf } from "@/src/modules/inventory/lib/order-kinds";
 import type { Order, OrderKind, PO, Reference, Transfer } from "@/src/modules/inventory/lib/types";
 import { blankLine, LinesEditor, linesOut, useSave, type Line } from "@/src/modules/inventory/components/lines";
 import { QuickAdd, WithAdd, withAdded, type Added, type CanAdd } from "@/src/modules/inventory/components/quick-add";
+import type { OperationTypeRow } from "@/src/modules/inventory/components/document-header";
+import { HeaderFields, headerOut, headerValue } from "@/src/modules/inventory/components/document-header-fields";
 
 /** Things added from this form, listed until the page's own lists have them. */
 function useAdded() {
@@ -162,8 +164,10 @@ export function PurchaseOrderForm({ org, reference, order, preset, canAdd = {} }
   );
 }
 
-export function OrderForm({ org, reference, order, available, kind: given, canAdd = {} }: {
+export function OrderForm({ org, reference, order, available, kind: given, canAdd = {}, operationTypes = [] }: {
   org: Org;
+  /** The company's operation types, for the document header (step 8). */
+  operationTypes?: OperationTypeRow[];
   /** Which kind of order this form is for (each has its own page); an order being edited keeps its own. */
   kind: OrderKind;
   canAdd?: CanAdd;
@@ -180,13 +184,14 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
   const [warehouseId, setWarehouseId] = useState(order?.warehouse.id ?? reference.warehouses.find((w) => w.isActive)?.id ?? "");
   const [neededOn, setNeededOn] = useState(order?.neededOn ?? "");
   const [notes, setNotes] = useState(order?.notes ?? "");
+  const [header, setHeader] = useState(() => headerValue(order?.header));
   const [lines, setLines] = useState<Line[]>(() => order?.lines.map((l) => ({ productId: l.product.id, quantity: String(l.quantity), money: fmt.pesosText(l.unitPrice) })) ?? [blankLine()]);
   const sale = info.priced;
   const { added, remember } = useAdded();
   const warehouseOptions = withAdded(active(reference.warehouses, warehouseId).map((w) => ({ value: w.id, label: w.name })), added, "warehouse", asOption);
 
   function submit() {
-    const input = { kind, recipient: recipient.trim(), warehouseId, neededOn: neededOn || null, notes: notes.trim() || null, lines: linesOut(lines, fmt, "unitPrice") };
+    const input = { kind, recipient: recipient.trim(), warehouseId, neededOn: neededOn || null, notes: notes.trim() || null, ...headerOut(header, false), lines: linesOut(lines, fmt, "unitPrice") };
     save(() => saveOrder(order?.id ?? null, input), (out) => ({ message: order ? `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} saved` : `${info.one.charAt(0).toUpperCase()}${info.one.slice(1)} created`, go: `/inventory/orders/${order?.id ?? out.id}` }));
   }
 
@@ -210,6 +215,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
                 </Field>
               </WithAdd>
               <Field label="Required date" optional error={fields.neededOn}>{(p) => <Input {...p} type="date" value={neededOn} onChange={(e) => setNeededOn(e.target.value)} />}</Field>
+              <HeaderFields types={operationTypes} kinds={kind === "sale" ? ["delivery", "return"] : ["issue", "delivery"]} value={header} onChange={setHeader} errors={fields} withDate={false} />
             </div>
             <div className="mt-5">
               <Field label={info.notes.label} hint={info.notes.hint} optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
@@ -243,7 +249,7 @@ export function OrderForm({ org, reference, order, available, kind: given, canAd
   );
 }
 
-export function TransferForm({ org, reference, transfer, available, canAdd = {} }: { org: Org; reference: Pick<Reference, "products" | "warehouses">; transfer?: Transfer; available: Record<string, number>; canAdd?: CanAdd }) {
+export function TransferForm({ org, reference, transfer, available, canAdd = {}, operationTypes = [] }: { org: Org; reference: Pick<Reference, "products" | "warehouses">; transfer?: Transfer; available: Record<string, number>; canAdd?: CanAdd; operationTypes?: OperationTypeRow[] }) {
   const fmt = makeFormat(org);
   const { pending, error, fields, save, shakeClass, anticipateClass } = useSave();
   const { added, remember } = useAdded();
@@ -251,10 +257,11 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
   const [from, setFrom] = useState(transfer?.from.id ?? warehouses[0]?.value ?? "");
   const [to, setTo] = useState(transfer?.to.id ?? warehouses[1]?.value ?? "");
   const [notes, setNotes] = useState(transfer?.notes ?? "");
+  const [header, setHeader] = useState(() => headerValue(transfer?.header));
   const [lines, setLines] = useState<Line[]>(() => transfer?.lines.map((l) => ({ productId: l.product.id, quantity: String(l.quantity), money: "" })) ?? [blankLine()]);
 
   function submit(request: boolean) {
-    const input = { fromWarehouseId: from, toWarehouseId: to, notes: notes.trim() || null, lines: linesOut(lines, fmt), request };
+    const input = { fromWarehouseId: from, toWarehouseId: to, notes: notes.trim() || null, ...headerOut(header), lines: linesOut(lines, fmt), request };
     save(() => saveTransfer(transfer?.id ?? null, input), (out) => ({ message: transfer ? "Transfer saved" : request ? "Transfer requested" : "Transfer saved as draft", go: `/inventory/transfers/${transfer?.id ?? out.id}` }));
   }
 
@@ -274,6 +281,9 @@ export function TransferForm({ org, reference, transfer, available, canAdd = {} 
                 </Field>
               </WithAdd>
             </FormGrid>
+            <div className="mt-5 grid gap-5 sm:grid-cols-3">
+              <HeaderFields types={operationTypes} kinds={["internal"]} value={header} onChange={setHeader} errors={fields} />
+            </div>
             <div className="mt-5">
               <Field label="Notes" optional error={fields.notes}>{(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
             </div>

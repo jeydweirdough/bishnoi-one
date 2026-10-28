@@ -51,7 +51,7 @@ def output(order,user):
             'date':order.order_date.isoformat(),'reference':order.reference,'salesperson':order.salesperson,'termsDays':order.terms_days,
             'pricesIncludeTax':order.prices_include_tax,'notes':order.notes,'lines':order.lines,'totalCentavos':order.total_centavos,
             'taxCentavos':order.tax_centavos,'createdBy':order.created_by,'events':order.events,
-            'zohoStatus':'Not connected — local approval only',**permissions(order,user)}
+            'zohoStatus':'Finance-only order: not sent to Zoho',**permissions(order,user)}
 
 def found(db,order_id):
     order=db.get(SalesOrder,order_id)
@@ -75,7 +75,8 @@ def flush(db):
         raise HTTPException(409,'This order changed while you were working. Reload before trying again.') from None
 
 def apply(db,settings,order,body):
-    if any(not (line.description or line.ref) for line in body.lines):raise HTTPException(422,'Give every line an item description or reference.')
+    if not body.customer_name.strip():raise HTTPException(422,'Enter the customer name.')
+    if any(not ((line.description or '').strip() or (line.ref or '').strip()) for line in body.lines):raise HTTPException(422,'Give every line an item description or reference.')
     if body.customer_tin:
         try:split_tin(body.customer_tin)
         except ValueError as error:raise HTTPException(422,str(error)) from None
@@ -84,6 +85,7 @@ def apply(db,settings,order,body):
     if computed['totalDueCentavos']<=0:raise HTTPException(422,'The order total must be greater than zero.')
     for key in ('customer_name','customer_tin','customer_address','order_date','reference','salesperson','terms_days','prices_include_tax','notes'):
         setattr(order,key,getattr(body,key))
+    order.customer_name=order.customer_name.strip()
     order.lines=[line.model_dump(by_alias=True) for line in body.lines]
     order.total_centavos=computed['totalDueCentavos']
     order.tax_centavos=next((line['amountCentavos'] for line in computed['summary'] if line['key']=='tax'),0)
@@ -104,13 +106,13 @@ def listing(user:permitted('sales_orders.view'),db:DB,q:str='',queue:Literal['al
 
 @router.post('',status_code=201)
 def create(user:permitted('sales_orders.create'),db:DB,settings:SettingsDep,body:OrderIn):
-    # Serialise number allocation, including an empty table, without modifying rows.
+    # Number allocation is serialized; this only addresses Finance-owned orders.
     db.execute(text('LOCK TABLE nbfi_sales_orders IN SHARE ROW EXCLUSIVE MODE') if db.get_bind().dialect.name=='postgresql' else text('UPDATE nbfi_sales_orders SET version=version WHERE 1=0'))
     prefix=f'SO-{body.order_date:%Y%m}-'
     last=db.scalar(select(func.max(SalesOrder.number)).where(SalesOrder.number.like(prefix+'%')))
     number=prefix+f'{int(last.rsplit("-",1)[1])+1 if last else 1:06d}'
     order=SalesOrder(number=number,created_by_id=user.id,created_by=user.full_name,status='draft',events=[])
-    apply(db,settings,order,body);event(order,user,'created');db.add(order);db.flush()
+    apply(db,settings,order,body);event(order,user,'created');db.add(order);flush(db)
     audit(db,user,'sales_order.created',target=number,target_type='sales_order',target_id=order.id)
     save(db);return output(order,user)
 
@@ -121,7 +123,7 @@ def read(order_id:str,user:permitted('sales_orders.view'),db:DB):return output(f
 def edit(order_id:str,user:permitted('sales_orders.create'),db:DB,settings:SettingsDep,body:OrderIn):
     order=found(db,order_id)
     if body.version!=order.version or order.status not in ('draft','returned'):raise HTTPException(409,'Only a current draft or returned order can be edited. Reload first.')
-    apply(db,settings,order,body);event(order,user,'edited')
+    apply(db,settings,order,body);event(order,user,'edited');flush(db)
     audit(db,user,'sales_order.edited',target=order.number,target_type='sales_order',target_id=order.id)
     save(db);return output(order,user)
 

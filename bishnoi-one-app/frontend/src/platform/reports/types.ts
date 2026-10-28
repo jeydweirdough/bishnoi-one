@@ -5,7 +5,14 @@
 /** text, number, money, date, datetime, percent (a fraction: 0.25 is 25%). */
 export type ColumnKind = "text" | "number" | "money" | "date" | "datetime" | "percent";
 
-export type ReportColumn = { key: string; label: string; kind: ColumnKind };
+export type ReportColumn = {
+  key: string;
+  label: string;
+  kind: ColumnKind;
+  /** A percentage column: the two columns it is a share of ([part, whole]), for its Total (src/platform/reports/totals.ts).
+   *  Found in the rows when not given. */
+  ratio?: [string, string];
+};
 
 /** A choice the report can be narrowed by (warehouse, team, status). */
 export type ReportFilter = { key: string; label: string; options: { value: string; label: string }[] };
@@ -16,7 +23,8 @@ export type ReportFigure = { label: string; value: number | null; kind: ColumnKi
 /** How to chart it: `x` a column, `series` the number columns drawn against it. */
 export type ReportChart = { kind: "bar" | "line"; x: string; series: string[] };
 
-export type ReportInfo = { key: string; title: string; group: string; about: string; dated?: boolean; fixed?: boolean };
+/** href: a page of its own listed among the reports (e.g. the stock movements screen), opened there instead of the report viewer. */
+export type ReportInfo = { key: string; title: string; group: string; about: string; dated?: boolean; fixed?: boolean; href?: string };
 
 export type ReportData = ReportInfo & {
   from?: string;
