@@ -11,13 +11,14 @@ without an order.
 import re
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Request, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.access import allowed
 from app.api import Api, changed, check_email, conflict, field_error, found, iso
+from app import business_events, documents
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import Product, PurchaseOrder, PurchaseOrderLine, Receipt, ReceiptLine, Supplier, SupplierProduct, Warehouse
@@ -517,7 +518,7 @@ class ReceiptLineIn(Api):
     serials: list[str] = Field(default_factory=list, max_length=10000)
 
 
-class ReceiptIn(Api):
+class ReceiptIn(documents.HeaderIn):
     order_id: str | None = Field(None, max_length=36)
     supplier_id: str | None = Field(None, max_length=36)
     warehouse_id: str | None = Field(None, max_length=36)
@@ -538,6 +539,7 @@ def receipt_brief(r: Receipt) -> dict:
         "deliveryRef": r.delivery_ref,
         "receivedAt": iso(r.received_at),
         "receivedBy": person(r.received_by),
+        "header": documents.header_out(r),
         "units": sum(line.quantity for line in r.lines),
         "total": sum(line.quantity * line.unit_cost for line in r.lines),
     }
@@ -550,11 +552,13 @@ def list_receipts(
     supplier: str | None = Query(None, max_length=36),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=60),
+    operation_type: str | None = Query(None, alias="operationType", max_length=36),
+    timing: str | None = Query(None, max_length=10),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 200; with it, one page and the total."""
-    query = select(Receipt).order_by(Receipt.received_at.desc())
+    query = documents.narrow(select(Receipt).order_by(Receipt.received_at.desc()), Receipt, operation_type, timing)
     if supplier:
         query = query.where(Receipt.supplier_id == supplier)
     if warehouse:
@@ -589,7 +593,7 @@ def read_receipt(_: allowed("receiving.view"), db: DB, settings: SettingsDep, re
 
 
 @router.post("/receipts", status_code=status.HTTP_201_CREATED)
-def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: ReceiptIn) -> dict:
+def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: ReceiptIn, request: Request) -> dict:
     """Takes a delivery in: stock goes up, batches and serials are recorded,
     and the purchase order (if any) fills up."""
     po = None
@@ -618,9 +622,16 @@ def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: Rece
         delivery_ref=body.delivery_ref,
         notes=body.notes,
         received_by_id=me.id,
+        # Its header (step 8): the purchase order it came from, and the day it was expected.
+        source_document=po.number if po else None,
+        scheduled_on=po.expected_on if po else None,
     )
+    documents.apply(db, receipt, ("receipt", "return"), body, me, warehouse.id, new=True)
+    documents.done(receipt)
     db.add(receipt)
     db.flush()
+    if po:  # the chain (step 9): the purchase order, then this receipt
+        business_events.link(db, getattr(request.state, "company", None), business_events.ref("purchase_order", po.id, po.number), business_events.ref("receipt", receipt.id, receipt.number))
     ref = Ref("receipt", receipt.id, receipt.number)
     order_lines = {line.id: line for line in po.lines} if po else {}
     for i, line in enumerate(body.lines):

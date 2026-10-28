@@ -81,6 +81,7 @@ def test_a_platform_admin_signs_in_without_being_added_to_a_company(client, ana)
     assert me["isCompanyAdmin"] is True
     assert {c["slug"] for c in me["companies"]} == {getmeds["slug"], northwind["slug"]}
 
-    # Support isn't: a company adds them like anyone else.
+    # Support isn't: a company adds them like anyone else (they have an account, at no company yet).
     client.post("/platform/staff", json={"fullName": "Sam Support", "email": "sam@bishnoi.test", "role": "member", "password": "staff password 2"}, headers=ana)
-    assert client.post("/identity/login", json={"email": "sam@bishnoi.test", "password": "staff password 2"}).status_code == 401
+    r = client.post("/identity/login", json={"email": "sam@bishnoi.test", "password": "staff password 2"})
+    assert r.status_code == 403 and "isn't at any company" in r.json()["detail"]

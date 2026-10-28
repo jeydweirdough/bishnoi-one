@@ -53,7 +53,15 @@ export default async function MaterialRequestsPage({ searchParams }: { searchPar
       </div>
       <Sheet>
         {items.length === 0 ? (
-          <Empty icon="approvals" title={VIEWS[view].empty} />
+          <Empty
+            icon="approvals"
+            title={VIEWS[view].empty}
+            source={
+              view === "waiting"
+                ? "Executive Admin. When its team wants to give pharmacist-approved leaflets, posters or giveaways to a team you manage, the request waits here for you."
+                : "Your decisions on Executive Admin's requests, kept here once made."
+            }
+          />
         ) : (
           <ul className="divide-y divide-rule">
             {items.map((r) => (

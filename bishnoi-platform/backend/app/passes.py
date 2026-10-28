@@ -110,9 +110,11 @@ def sign(settings: Settings, claims: dict) -> str:
     return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
 
 
-def issue(settings: Settings, identity: Identity, company: Company, app: Application, grant: IdentityApp, role: dict | None = None) -> str:
+def issue(settings: Settings, identity: Identity, company: Company, app: Application, grant: IdentityApp, role: dict | None = None, org: dict | None = None,
+          company_admin: bool | None = None) -> str:
     """`role`: their one role at the company, as this application keeps it
-    (app/access_roles.py spec); without one, the role on their grant."""
+    (app/access_roles.py spec); without one, the role on their grant. `org`: where they
+    sit on the company's org chart (app/org_push.py placement), when they're placed."""
     now = int(time.time())
     header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
     claims = {
@@ -126,11 +128,13 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
         "companyName": company.name,
         "role": role["name"] if role else grant.role,
         "appAdmin": grant.is_app_admin or bool(role and role.get("admin")),
-        "companyAdmin": identity.is_company_admin,
+        "companyAdmin": identity.is_company_admin if company_admin is None else company_admin,
         "iat": now,
         "exp": now + LIFETIME,
         "jti": secrets.token_urlsafe(18),
     }
+    if org:
+        claims["org"] = org
     if role:
         # The role itself, so the application keeps it as the platform has it before matching it by name.
         claims["roleDef"] = role
@@ -145,7 +149,7 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
 COMPANY_LIFETIME = 30 * 24 * 3600  # seconds
 
 
-def company_pass(settings: Settings, company: Company | None, app: Application, granted: bool, gone: dict | None = None) -> str:
+def company_pass(settings: Settings, company: Company | None, app: Application, granted: bool, gone: dict | None = None, features: dict | None = None) -> str:
     """Signed: this company, its status, and whether it may use this application.
     The application checks it with the platform's public key, as a sign-in pass.
     `gone` ({"id", "slug", "name"}): the company has been deleted."""
@@ -159,6 +163,8 @@ def company_pass(settings: Settings, company: Company | None, app: Application, 
         "kind": "company",
         **who,
         "granted": granted and not gone,
+        # Its catalogue apps and features, on or off (step 6): the application hides what's off.
+        **({"features": features} if features is not None else {}),
         "iat": now,
         "exp": now + COMPANY_LIFETIME,
         "jti": secrets.token_urlsafe(12),

@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.models import Identity, IdentitySession, SignInSession, User
+from app.models import Account, Identity, IdentitySession, SignInSession, User
 from app.security import token_hash
 
 _bearer = HTTPBearer(auto_error=False)
@@ -71,11 +71,19 @@ def staff_by_account(db: Session, token: str) -> SignInSession | None:
     person = db.get(Identity, found.identity_id)
     if person is None or person.status != "active":
         return None
-    if person.password_changed_at and as_utc(found.created_at) < as_utc(person.password_changed_at):
+    account = db.get(Account, person.account_id) if person.account_id else None
+    if account is None or account.status != "active":
         return None
-    staff = db.scalar(select(User).where(func.lower(User.email) == person.email.lower(), User.is_active))
+    if account.password_changed_at and as_utc(found.created_at) < as_utc(account.password_changed_at):
+        return None
+    # Operators only (step 5): the switch on their account; their staff record is kept for the history.
+    if not account.is_operator:
+        return None
+    staff = db.scalar(select(User).where(func.lower(User.email) == account.email.lower(), User.is_active))
     if staff is None:
-        return None
+        staff = User(email=account.email, full_name=account.full_name, password_hash=account.password_hash or "!", role="admin")
+        db.add(staff)
+        db.commit()
     record = SignInSession(id=f"account:{found.id}", token_hash=found.token_hash, user_id=staff.id, created_at=found.created_at, expires_at=found.expires_at)
     record.by_account = True
     return record

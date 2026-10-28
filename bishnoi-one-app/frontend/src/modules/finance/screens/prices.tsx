@@ -133,7 +133,7 @@ export default async function PricesPage() {
               Prices set by managers <span className="font-normal text-ink-3">· {waiting.prices.length}</span>
             </h2>
             {waiting.prices.length === 0 ? (
-              <Empty title="No prices for approval" icon="pricing">
+              <Empty title="No prices for approval" icon="pricing" source="The CRM: managers who set a Doctor's, Patient's or Special price.">
                 A Doctor&apos;s, Patient&apos;s or Special price a manager sets in the CRM shows here until you decide it.
               </Empty>
             ) : (
@@ -165,7 +165,7 @@ export default async function PricesPage() {
               Quotes at a requested price <span className="font-normal text-ink-3">· {waiting.quotes.length}</span>
             </h2>
             {waiting.quotes.length === 0 ? (
-              <Empty title="No quotes for approval" icon="quotes">
+              <Empty title="No quotes for approval" icon="quotes" source="The CRM: sales reps who ask for a price of their own on a quote.">
                 A quote where a rep asked for a price of their own waits here, oldest first, before it can go to the customer.
               </Empty>
             ) : (

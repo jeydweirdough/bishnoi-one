@@ -69,10 +69,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "finance"}
 
-    from app import platform_connect, platform_roles
+    from app import business_events, platform_connect, platform_roles
 
     app.include_router(platform_connect.router)
     app.include_router(platform_roles.router)
+    business_events.install(app)
     # Connected on the Platform as soon as this runs, not when someone first uses it.
     platform_connect.connect_now(settings)
     app.include_router(auth.router)

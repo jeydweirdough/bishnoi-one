@@ -79,3 +79,19 @@ def test_one_request_costs_fewer_database_queries_than_a_call_per_piece(ana, wor
     finally:
         event.remove(Engine, "before_cursor_execute", tick)
     assert one < rest, (one, rest)
+
+
+def test_item_batches_stay_scoped_when_searching_and_paging(ana, world):
+    from tests.test_stock import LATER
+
+    other = ana.post("/inventory/products", {"sku": "OTHER-BATCH", "name": "Another tracked item", "trackBatches": True, "trackExpiry": True})["id"]
+    for product in [world["pcm"], other]:
+        receive(ana, world["mnl"], [{"productId": product, "quantity": 10, "batchNo": "SHARED-NUMBER", "expiresOn": LATER}])
+    query = "query($product: String!, $q: String, $offset: Int) { batches(product: $product, q: $q, empty: true, limit: 1, offset: $offset) }"
+    result = gql(ana, query, product=world["pcm"], q="SHARED", offset=0)
+    assert "errors" not in result, result
+    batches = result["data"]["batches"]
+    assert batches["total"] == 1
+    assert [b["product"]["id"] for b in batches["items"]] == [world["pcm"]]
+    next_page = gql(ana, query, product=world["pcm"], q="SHARED", offset=1)["data"]["batches"]
+    assert next_page["total"] == 1 and next_page["items"] == []

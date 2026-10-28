@@ -310,3 +310,19 @@ def test_how_likely_is_worked_out_from_the_record(client, crew, monkeypatch):
     monkeypatch.setattr(how, "_record", lambda db, owner_id, on: (8, 10) if owner_id else (10, 20))
     r = client.get("/deals/likely", params={"stage": first["code"]}, headers=crew["ria"]).json()
     assert r["probability"] == max(1, min(99, round(first["probability"] * 1.6))) and "8 of 10" in r["why"]
+
+
+def test_a_quote_made_for_a_deal_is_linked_into_the_document_chain(app, client, crew, ids):
+    """Feature plan step 9: the deal, then its quotes."""
+    from sqlalchemy import select
+
+    from app.business_events import OutboxEvent
+    from tests.test_platform_roles import database
+
+    acme = company(client, crew["ria"])
+    d = deal(client, crew["ria"], acme)
+    quote = save(client, crew["ria"], acme, [line(ids["AMX-500"])], dealId=d["id"]).json()
+    with database(app)() as db:
+        link = db.scalar(select(OutboxEvent).where(OutboxEvent.kind == "document.linked"))
+    assert link.data == {"from": {"app": "crm", "kind": "deal", "id": d["id"], "number": "Q4 order"},
+                         "to": {"app": "crm", "kind": "quote", "id": quote["id"], "number": quote["number"]}}

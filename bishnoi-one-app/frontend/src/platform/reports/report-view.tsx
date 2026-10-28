@@ -1,3 +1,4 @@
+import { hasTotals, totalsOf } from "./totals";
 import Link from "next/link";
 import { ReportChartView } from "./chart";
 import { applyDefinition, type SavedReport } from "./custom";
@@ -45,8 +46,7 @@ const withQuery = (base: string, q: Search) => {
 const numeric = (k: ColumnKind) => k === "money" || k === "number" || k === "percent";
 
 /** Columns whose total means something: money, and counts that aren't rates, days or levels. */
-const adds = (label: string, kind: ColumnKind) =>
-  kind === "money" || (kind === "number" && !/days|point|per day|cover|lead|rate|average|age|level|price|cost per/i.test(label));
+// What adds up, and how a percentage is totalled: src/platform/reports/totals.ts.
 
 /**
  * One report, as every module shows it: the period (presets and dates) and its filters at
@@ -95,8 +95,8 @@ export function ReportView({
   const rows: Cell[][] = effective.rows.map((r) =>
     effective.columns.map((c) => ({ raw: r[c.key] ?? null, text: show(c.kind, r[c.key] ?? null), href: drill?.(c.key, r) })),
   );
-  const totals = effective.columns.some((c) => adds(c.label, c.kind))
-    ? effective.columns.map((c) => (adds(c.label, c.kind) ? show(c.kind, effective.rows.reduce((n, r) => n + (Number(r[c.key]) || 0), 0)) : null))
+  const totals = hasTotals(effective.columns)
+    ? totalsOf(effective.columns, effective.rows.map((r) => effective.columns.map((c) => r[c.key]))).map((t, i) => (t === null ? null : show(effective.columns[i].kind, t)))
     : null;
   const chart = effective.chart && effective.rows.length > 1 ? effective.chart : null;
   const chartCols = chart ? chart.series.map((k) => effective.columns.find((c) => c.key === k)).filter((c) => c !== undefined) : [];

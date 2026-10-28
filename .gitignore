@@ -55,3 +55,6 @@ Thumbs.db
 # Vercel CLI links (scripts/deploy.mjs)
 .vercel
 .env*
+
+# Local conversation context
+/CLAUDE.md

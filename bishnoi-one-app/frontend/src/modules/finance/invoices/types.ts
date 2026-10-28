@@ -44,6 +44,9 @@ export type InvoiceSummary = {
   customer: { id: string | null; name: string; tin: string | null; address: string | null };
   /** Whose sale it is: the CRM customer's owner when picked from the CRM. */
   salesperson: { id: string | null; name: string | null } | null;
+  /** The salesperson's division and team on the org chart when the invoice was made. */
+  division: { id: string | null; name: string } | null;
+  team: { id: string | null; name: string } | null;
   treatment: string;
   buyerIdNumber: string | null;
   date: string;
@@ -136,8 +139,10 @@ export type Customer = {
   email: string | null;
   phone: string | null;
   tin: string | null;
-  owner?: { id: string; name: string } | null;
+  owner?: { id: string; name: string; team?: Unit | null; division?: Unit | null } | null;
 };
+
+type Unit = { id: string; name: string };
 
 /** What the invoice form picks from: the tax pack's VAT categories and kinds of buyer. */
 export type TaxChoices = {

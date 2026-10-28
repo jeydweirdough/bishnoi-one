@@ -15,6 +15,10 @@ export type InvoiceInput = {
   customerAddress: string | null;
   salespersonId: string | null;
   salespersonName: string | null;
+  divisionId: string | null;
+  divisionName: string | null;
+  teamId: string | null;
+  teamName: string | null;
   treatment: string;
   buyerIdNumber: string | null;
   invoiceDate: string;

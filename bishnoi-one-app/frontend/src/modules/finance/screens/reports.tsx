@@ -19,14 +19,26 @@ const reportList = cache(() => load<ReportInfo[]>("/finance/reports"));
 
 export async function ReportsPage({ searchParams }: { searchParams: Search }) {
   const group = one((await searchParams).group);
-  const [reports, savedReports] = await Promise.all([
+  const [listed, savedReports] = await Promise.all([
     reportList(),
     listSavedReports("finance"),
   ]);
+  // The statements and the books, screens of their own, listed here rather than in the sidebar
+  // (decided 2026-10-28); shown to whoever sees the accounting reports (their pages check again).
+  const books = listed.some((r) => r.group === "Accounting");
+  const reports: ReportInfo[] = [
+    ...listed,
+    ...(books
+      ? [
+          { key: "financial-statements", title: "Financial statements", group: "Accounting", about: "The income statement and balance sheet as the BIR asks for them, for any period.", fixed: true, href: "/finance/bir/statements" },
+          { key: "books-of-accounts", title: "Books of accounts", group: "Accounting", about: "The BIR's books: sales, cash receipts, cash disbursements, general journal and general ledger.", fixed: true, href: "/finance/bir" },
+        ]
+      : []),
+  ];
   return (
     <>
       <PageHeader title={group ? `${group} reports` : "Reports"}>
-        {reports.length} reports on sales, collections, expenses, supplier bills and the books. Pick a period and export any of them to Excel. The BIR&apos;s books and forms are under Taxes.
+        {reports.length} reports on sales, collections, expenses, supplier bills and the books. Pick a period and export any of them to Excel. The BIR&apos;s forms are under Taxes.
       </PageHeader>
       <ReportsIndex
         reports={reports}

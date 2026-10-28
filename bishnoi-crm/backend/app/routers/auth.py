@@ -28,7 +28,7 @@ from app.config import Settings
 from app.tenants import clean, company_of
 from app.access import access_of
 from app.identity import me_out
-from app import platform_pass, platform_roles
+from app import platform_org, platform_pass, platform_roles
 from app.models import PlatformPass, Role, SignInSession, User
 from app.permissions import ACTION_LABELS, ADMINISTRATOR, AREAS, NOT_BUILT
 from app.security import DUMMY_HASH, MAX_PASSWORD, hash_password, new_token, token_hash, verify_password
@@ -205,6 +205,8 @@ def _open_platform_session(db, settings: Settings, slug: str, claims: dict, resp
         if changed:
             audit(db, email, "user.updated", target=email, target_type="user", target_id=user.id, fields=changed)
 
+    # Where they sit on the company's org chart, as the Platform keeps it (app/platform_org.py).
+    platform_org.follow_pass(db, user, claims)
     token = f"{slug}.{new_token()}"
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))

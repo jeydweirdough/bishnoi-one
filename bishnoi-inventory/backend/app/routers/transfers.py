@@ -17,6 +17,7 @@ from sqlalchemy import func, or_, select
 
 from app.access import CurrentAccess, allowed
 from app.api import Api, conflict, field_error, found, iso
+from app import documents
 from app.audit import audit
 from app.deps import DB, CurrentUser
 from app.models import Batch, Product, Transfer, TransferLine, Warehouse
@@ -34,7 +35,7 @@ class TransferLineIn(Api):
     quantity: int = Field(gt=0, le=10**9)
 
 
-class TransferIn(Api):
+class TransferIn(documents.HeaderIn):
     from_warehouse_id: str = Field(max_length=36)
     to_warehouse_id: str = Field(max_length=36)
     notes: str | None = Field(None, max_length=4000)
@@ -61,6 +62,7 @@ class ReceiveIn(Api):
 def transfer_brief(t: Transfer) -> dict:
     return {
         "id": t.id,
+        "header": documents.header_out(t),
         "number": t.number,
         "status": t.status,
         "from": warehouse_ref(t.from_warehouse),
@@ -131,11 +133,13 @@ def list_transfers(
     status_: str | None = Query(None, alias="status", max_length=80),
     warehouse: str | None = Query(None, max_length=36),
     q: str | None = Query(None, max_length=60),
+    operation_type: str | None = Query(None, alias="operationType", max_length=36),
+    timing: str | None = Query(None, max_length=10),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 500 (the board's columns)."""
-    query = select(Transfer).order_by(Transfer.created_at.desc())
+    query = documents.narrow(select(Transfer).order_by(Transfer.created_at.desc()), Transfer, operation_type, timing)
     if status_:
         query = query.where(Transfer.status.in_(status_.split(",")))
     if warehouse:
@@ -186,6 +190,7 @@ def create_transfer(_: allowed("transfers.create"), me: CurrentUser, db: DB, bod
     check_transfer(db, body)
     t = Transfer(number=next_number(db, "TR"), from_warehouse_id=body.from_warehouse_id, to_warehouse_id=body.to_warehouse_id, notes=body.notes, created_by_id=me.id)
     set_lines(t, body)
+    documents.apply(db, t, ("internal",), body, me, body.from_warehouse_id, new=True)
     if body.request:
         t.status, t.requested_by_id, t.requested_at = "requested", me.id, datetime.now(UTC)
     db.add(t)
@@ -208,6 +213,7 @@ def update_transfer(_: allowed("transfers.create"), me: CurrentUser, db: DB, tra
     check_transfer(db, body)
     t.from_warehouse_id, t.to_warehouse_id, t.notes = body.from_warehouse_id, body.to_warehouse_id, body.notes
     set_lines(t, body)
+    documents.apply(db, t, ("internal",), body, me, body.from_warehouse_id, new=False)
     audit(db, me, "transfer.updated", target=t.number, target_type="transfer", target_id=t.id)
     db.commit()
     return {"id": t.id}
@@ -286,6 +292,7 @@ def receive_transfer(_: allowed("transfers.receive"), me: CurrentUser, db: DB, t
             post(db, me, kind="transfer_in", product=line.product, quantity=pick["quantity"], ref=ref(t), location=location, batch=batch, note=f"From {t.from_warehouse.name}", serials=line.serials if i == 0 else None)
         serials_arrive(db, line.product, line.serials or [], location)
     t.status, t.received_by_id, t.received_at = "received", me.id, datetime.now(UTC)
+    documents.done(t, t.received_at)
     audit(db, me, "transfer.received", target=t.number, target_type="transfer", target_id=t.id)
     db.commit()
     return {"id": t.id, "status": t.status}

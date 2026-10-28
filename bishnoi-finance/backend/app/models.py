@@ -280,6 +280,10 @@ class Account(Base):
     # The account it sits under, as Oojeema's chart groups them (e.g. 6915-001 Provision
     # for Expired Medicines under 6915-000 Loss on Expired Medicines). Migration 0017.
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # An asset or liability used or due within a year ("current") or later ("non_current"), for
+    # working capital and the current and quick ratios (app/management.py, migration 0023). None:
+    # worked out from its name.
+    term: Mapped[str | None] = mapped_column(String(12), default=None)
 
 
 class LedgerSettings(Base):
@@ -309,6 +313,10 @@ class LedgerSettings(Base):
     withholding_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     # Creditable withholding a customer deducted from a payment (their Form 2307): credited against our income tax.
     cwt_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    # The cost of goods sold, booked with each invoice from Inventory's costs (migration 0024): the
+    # expense, and the stock it comes out of. Either unset: invoices book no cost.
+    cogs_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    inventory_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
 
 
 class JournalEntry(Base):
@@ -534,6 +542,12 @@ class Invoice(Base):
     # The CRM scores its people from these; none: it counts for nobody.
     salesperson_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
     salesperson_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    # The salesperson's division and team on the company's org chart when the invoice was made
+    # (migration 0025): revenue and margin by division. None: not placed, or not from the CRM.
+    division_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    division_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    team_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    team_name: Mapped[str | None] = mapped_column(String(120), default=None)
     # Who is buying, as the tax engine reads it: regular, senior citizen, PWD...
     treatment: Mapped[str] = mapped_column(String(20), default="regular")
     buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -546,6 +560,10 @@ class Invoice(Base):
     lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
     # Kept as issued: the tax engine's answer, for printing it the same forever.
     computed: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # What its goods cost us, booked when it's issued (migration 0024): the total, and each line's
+    # cost per unit as Inventory gave it (None: not known, by its item code).
+    cost_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    line_costs: Mapped[list | None] = mapped_column(JSON, default=None)
     total_centavos: Mapped[int] = mapped_column(Integer, default=0)
     tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
     paid_centavos: Mapped[int] = mapped_column(Integer, default=0)

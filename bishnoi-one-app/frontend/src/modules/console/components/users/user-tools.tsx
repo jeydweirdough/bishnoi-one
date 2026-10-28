@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, KeyRound, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, KeyRound, Power, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/src/modules/console/platform/ui/confirm";
@@ -74,28 +74,28 @@ export function MakePassword({ id, name, hasPassword }: { id: string; name: stri
   );
 }
 
-/** Deleting a person from the platform, from beside their name: their applications go too. */
+/** Suspending a person at their company, from beside their name (step 4: nobody is deleted). */
 export function DeleteUser({ id, name }: { id: string; name: string }) {
   const router = useRouter();
   return (
     <ConfirmButton
-      label={<span className="sr-only">Delete {name}</span>}
-      icon={<Trash2 className="size-4" aria-hidden />}
-      triggerTitle={`Delete ${name}`}
+      label={<span className="sr-only">Suspend {name}</span>}
+      icon={<Power className="size-4" aria-hidden />}
+      triggerTitle={`Suspend ${name}`}
       triggerVariant="quiet"
       triggerSize="sm"
       triggerClassName={ICON_TRIGGER_DANGER}
-      title={`Delete ${name}?`}
-      body={`${name} is removed from the platform, with all their applications and roles, and can't sign in with their Bishnoi One account any more. It can't be undone; to keep them, suspend them instead.`}
-      confirmLabel="Delete user"
+      title={`Suspend ${name}?`}
+      body={`${name} can't sign in at this company until switched on again. Everything they did stays, and nothing is deleted.`}
+      confirmLabel="Suspend"
       onConfirm={async () => {
         const result = await deleteUser(id);
         if (!result.ok) {
           toast.error(result.error);
           return false;
         }
-        toast.success("User deleted", { description: name });
-        router.push("/platform/accounts");
+        toast.success("Suspended", { description: name });
+        router.push("/platform/roles/people");
       }}
     />
   );

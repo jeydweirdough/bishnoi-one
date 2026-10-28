@@ -109,26 +109,19 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Reports",
       icon: "reports",
       steps: keep([
-        { href: "/finance/reports", label: "Reports", icon: "reports", exact: true, also: ["/finance/reports"] },
-        { href: "/finance/bir/statements", label: "Financial statements", icon: "reports" },
-        { href: "/finance/bir", label: "Books of accounts", icon: "reports", exact: true },
+        // One row: the financial statements and the books of accounts are in the Reports Center (2026-10-28).
+        { href: "/finance/reports", label: "Reports", icon: "reports", also: ["/finance/reports", "/finance/bir/statements"] },
       ]),
     },
   ];
   const foot: Process[] = [
     {
-      label: "Users and roles",
-      icon: "people",
-      steps: keep([
-        { href: "/finance/admin/users", label: "Users", icon: "people" },
-        { href: "/platform/roles", label: "Roles", icon: "roles" },
-      ]),
-    },
-    {
       label: "Settings",
       icon: "settings",
       steps: keep([
         { href: "/finance/tax", label: "Taxes", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
+        // Each person's e-signature and calendar: Finance's own (people themselves are on the Admin Console).
+        { href: "/finance/admin/users", label: "People's details", icon: "people" },
         { href: "/finance/invoices/series", label: "Transaction number series", icon: "letters", missing: missingOf(unset, ["invoiceSeries"]) },
         { href: "/finance/ledger/posting", label: "Default accounts", icon: "settings", missing: missingOf(unset, ["postingAccounts"]) },
         { href: "/finance/ledger/categories", label: "Expense categories", icon: "lists", missing: missingOf(unset, ["categoryAccounts"]) },

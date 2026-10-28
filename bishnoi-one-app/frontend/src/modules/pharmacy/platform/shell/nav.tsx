@@ -51,11 +51,11 @@ function menu(me: Me, unset: Unset): { home: Step | null; processes: Process[]; 
         : [],
     },
   ];
-  // As every module (decided 2026-10-26): Users and roles, then Settings with the Activity log.
+  // As every module: Settings with the Activity log at the foot (people and roles are on the Admin Console, 2026-10-28).
   const admin = adminPagesFor(me).map((p) => ({ href: p.href, label: p.label === "Roles and permissions" ? "Roles" : p.label, icon: p.icon, also: p.also }));
   const foot: Process[] = [
-    { label: "Users and roles", icon: "people", steps: admin.filter((p) => !p.href.endsWith("/audit")) },
-    { label: "Settings", icon: "settings", steps: admin.filter((p) => p.href.endsWith("/audit")) },
+    // People and roles are on the Admin Console; the pharmacists' licence numbers stay here (decided 2026-10-28).
+    { label: "Settings", icon: "settings", steps: admin.filter((p) => !p.href.startsWith("/platform/")).map((p) => (p.href.endsWith("/users") ? { ...p, label: "Licences" } : p)) },
   ];
   return { home: may("dashboard.view") ? { href: "/pharmacy", label: "Home", icon: "home", exact: true } : null, processes, foot };
 }

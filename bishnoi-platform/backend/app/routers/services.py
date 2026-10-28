@@ -100,7 +100,12 @@ class ServiceIn(Api):
 
 @router.put("/platform/companies/{company_id}/services/{key}")
 def save_service(company_id: str, key: str, body: ServiceIn, db: DB, settings: SettingsDep, me: AdminUser) -> dict:
-    company, service = company_for(db, company_id), service_for(key)
+    return save(db, settings, company_for(db, company_id), key, body, me, me.id)
+
+
+def save(db, settings, company: Company, key: str, body: ServiceIn, actor: User | str, actor_id: str | None) -> dict:
+    """Saves what changed (also for a company's own administrator, app/routers/company_console.py)."""
+    service = service_for(key)
     row = row_of(db, company, key) or ServiceConnection(company_id=company.id, service=key, values={}, is_enabled=False)
     known = {d.key: d for d in service.details}
     for name in body.values:
@@ -136,10 +141,10 @@ def save_service(company_id: str, key: str, body: ServiceIn, db: DB, settings: S
         if any(n != "enabled" for n in changed):
             # New details: the last test was of the old ones.
             row.checked_at = row.check_ok = row.check_message = None
-        row.updated_at, row.updated_by_id = datetime.now(UTC), me.id
+        row.updated_at, row.updated_by_id = datetime.now(UTC), actor_id
         db.add(row)
         # Which details changed, never what they are.
-        audit(db, me, "service.updated", category="security", target=f"{company.name} · {service.name}", target_type="company", target_id=company.id, company_id=company.id, fields=changed)
+        audit(db, actor, "service.updated", category="security", target=f"{company.name} · {service.name}", target_type="company", target_id=company.id, company_id=company.id, fields=changed)
         db.commit()
         db.refresh(row)
     return _out(db, settings, service, row if row.id else None)
@@ -147,8 +152,12 @@ def save_service(company_id: str, key: str, body: ServiceIn, db: DB, settings: S
 
 @router.post("/platform/companies/{company_id}/services/{key}/check")
 def check_service(company_id: str, key: str, db: DB, settings: SettingsDep, me: AdminUser) -> dict:
+    return check(db, settings, company_for(db, company_id), key, me)
+
+
+def check(db, settings, company: Company, key: str, actor: User | str) -> dict:
     """Tries the saved details against the service, and keeps the answer."""
-    company, service = company_for(db, company_id), service_for(key)
+    service = service_for(key)
     row = row_of(db, company, key)
     secrets = svc.unseal(settings, row.secrets) if row else {}
     gaps = svc.missing(service, row.values if row else {}, secrets or {})
@@ -161,7 +170,7 @@ def check_service(company_id: str, key: str, db: DB, settings: SettingsDep, me: 
     except svc.CheckFailed as e:
         row.check_message, row.check_ok = str(e)[:300], False
     row.checked_at = datetime.now(UTC)
-    audit(db, me, "service.checked", target=f"{company.name} · {service.name}", target_type="company", target_id=company.id, company_id=company.id)
+    audit(db, actor, "service.checked", target=f"{company.name} · {service.name}", target_type="company", target_id=company.id, company_id=company.id)
     db.commit()
     db.refresh(row)
     return _out(db, settings, service, row)

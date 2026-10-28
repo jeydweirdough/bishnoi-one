@@ -1,8 +1,7 @@
-// Applications: every app on the platform, whether it's working, what was
-// deployed and what each connects to.
+// Services (the Operations area, step 5): each app's service, what was deployed and the
+// links between apps. Health tracking was retired from the screens.
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { Pill } from "@/src/modules/console/platform/ui/figures";
 import { Empty, PageHeader, Sheet } from "@/src/modules/console/platform/ui/sheet";
 import { ToggleLinks } from "@/src/modules/console/platform/ui/toggle-links";
 import { load } from "@/src/modules/console/platform/lib/api";
@@ -11,11 +10,11 @@ import { getStaff } from "@/src/modules/console/components/gate";
 import { HealthMark, Tabs } from "@/src/modules/console/components/marks";
 import { RegisterApplication } from "@/src/modules/console/components/applications/application-forms";
 import { EnvironmentMark } from "@/src/modules/console/components/applications/marks";
-import { checkLine, uptimeText } from "@/src/modules/console/components/applications/words";
+import { checkLine } from "@/src/modules/console/components/applications/words";
 import type { Application, Deployment, Integration } from "@/src/modules/console/lib/types";
 import { HEALTH, ago, plural, when } from "@/src/modules/console/lib/words";
 
-export const metadata = { title: "APIs" };
+export const metadata = { title: "Services" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
@@ -34,8 +33,8 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader title="APIs" actions={staff.canAdminister && <RegisterApplication />}>
-        Every application on the platform. The platform asks each one&apos;s health address itself whether it&apos;s up, so nobody has to report it.
+      <PageHeader title="Services" actions={staff.canAdminister && <RegisterApplication />}>
+        Each app&apos;s service: where its screens and API are, which companies use it, and what was deployed. Health tracking, incidents and support tickets were retired (step 5).
       </PageHeader>
       <Tabs current={tab} tabs={TABS.map((t) => ({ ...t, href: t.key === "registry" ? "/platform/apis" : `/platform/apis?tab=${t.key}` }))} />
       {tab === "registry" && <Registry retired={retired} canAdminister={staff.canAdminister} />}
@@ -45,63 +44,24 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
   );
 }
 
-// What needs attention comes first and stands apart (the Von Restorff effect);
-// each row says only what answers "is it fine?" (Hick's law): its state, uptime
-// and answer time, with what it's used by on one small line and problems only
-// when there are some; things that belong together sit together (proximity);
-// and the whole row opens the application, a big target (Fitts's law).
-const NEEDS: Record<Application["status"], boolean> = { down: true, degraded: true, maintenance: true, unknown: true, operational: false, retired: false };
-const ORDER: Record<Application["status"], number> = { down: 0, degraded: 1, maintenance: 2, unknown: 3, operational: 4, retired: 5 };
-
-function uptimeTone(uptime: number | null | undefined): string {
-  if (uptime == null) return "text-ink-3";
-  return uptime >= 99 ? "text-sage-deep" : uptime >= 95 ? "text-due-today" : "text-danger";
-}
-
+// Each row: the service, its address, and who uses it; the whole row opens it (Fitts's law).
 function AppRow({ a }: { a: Application }) {
-  const attention = NEEDS[a.status] && a.isActive;
-  const problems = [
-    a.activeIncidents ? `${a.activeIncidents} incident${a.activeIncidents === 1 ? "" : "s"} now` : null,
-    a.openTickets ? `${a.openTickets} open ticket${a.openTickets === 1 ? "" : "s"}` : null,
-  ].filter(Boolean) as string[];
-  const ms = a.lastCheck?.ms;
   return (
     <li>
       <Link
         href={`/platform/apis/${a.id}`}
-        className={`group grid gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-mint focus-visible:bg-mint focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto] ${
-          attention ? "border-l-4 border-danger bg-danger-tint/40" : "border-l-4 border-transparent"
-        }`}
+        className="group grid gap-x-6 gap-y-2 border-l-4 border-transparent px-5 py-4 transition-colors hover:bg-mint focus-visible:bg-mint focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto]"
       >
         <span className="min-w-0">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-base font-semibold text-ink group-hover:underline">{a.name}</span>
-            <HealthMark status={a.status} />
-            {problems.map((p) => (
-              <Pill key={p} tone="bad">
-                {p}
-              </Pill>
-            ))}
-          </span>
-          <span className="mt-0.5 block truncate text-meta text-ink-2">
-            {a.statusNote && <span className="text-ink">{a.statusNote} · </span>}
-            {a.isActive ? checkLine(a.lastCheck, Boolean(a.healthUrl)) : "Retired: not monitored."}
-          </span>
+          <span className="text-base font-semibold text-ink group-hover:underline">{a.name}</span>
+          <span className="mt-0.5 block truncate text-meta text-ink-2">{a.isActive ? (a.appUrl ?? "No address yet") : "Retired"}</span>
           <span className="mt-1 block text-meta text-ink-3">
             <span className="font-mono">{a.key}</span>
             {a.no ? ` · No. ${a.no}` : ""} · {plural(a.companyCount ?? 0, "company", "companies")} · {plural(a.userCount ?? 0, "user")}
             {a.version ? ` · version ${a.version}` : ""}
           </span>
         </span>
-        <span className="flex items-center gap-6 sm:justify-end">
-          <span className="text-right">
-            <span className={`block text-lg font-semibold tabular-nums ${uptimeTone(a.uptime)}`}>{uptimeText(a.uptime)}</span>
-            <span className="block text-meta text-ink-3">uptime, 24 h</span>
-          </span>
-          <span className="w-20 text-right">
-            <span className="block text-lg font-semibold text-ink tabular-nums">{ms == null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`}</span>
-            <span className="block text-meta text-ink-3">last response</span>
-          </span>
+        <span className="flex items-center sm:justify-end">
           <ChevronRight className="hidden size-4 text-ink-3 group-hover:text-ink sm:block" aria-hidden />
         </span>
       </Link>
@@ -111,24 +71,10 @@ function AppRow({ a }: { a: Application }) {
 
 async function Registry({ retired, canAdminister }: { retired: boolean; canAdminister: boolean }) {
   const { applications } = await load<{ applications: Application[] }>(`/platform/applications${retired ? "?retired=true" : ""}`);
-  const sorted = [...applications].sort((x, y) => ORDER[x.status] - ORDER[y.status] || x.name.localeCompare(y.name));
-  const attention = sorted.filter((a) => NEEDS[a.status] && a.isActive);
-  const running = sorted.filter((a) => !(NEEDS[a.status] && a.isActive));
+  const sorted = [...applications].sort((x, y) => Number(y.isActive) - Number(x.isActive) || x.name.localeCompare(y.name));
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2" role="status">
-          {applications.length === 0 ? null : attention.length > 0 ? (
-            <>
-              <Pill tone="bad">{attention.length} need attention</Pill>
-              <span>
-                {running.length} running{retired ? ", or retired" : ""}
-              </span>
-            </>
-          ) : (
-            <Pill tone="good">All {applications.length} running</Pill>
-          )}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
         <ToggleLinks
           current={retired ? "all" : "active"}
           options={[
@@ -139,33 +85,14 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
       </div>
       {applications.length === 0 ? (
         <Sheet>
-          <Empty icon="apps" title="No applications yet.">
-            {canAdminister ? "Register one with its health address, and the platform starts checking it." : "A Platform Admin registers them."}
+          <Empty icon="apps" title="No services yet.">
+            {canAdminister ? "Register each app's service with its address." : "An operator registers them."}
           </Empty>
         </Sheet>
       ) : (
-        <div className="space-y-6">
-          {attention.length > 0 && (
-            <section aria-labelledby="needs-attention">
-              <h2 id="needs-attention" className="mb-2 text-caps text-danger uppercase">
-                Needs attention
-              </h2>
-              <Sheet className="overflow-hidden">
-                <ul className="divide-y divide-rule">{attention.map((a) => <AppRow key={a.id} a={a} />)}</ul>
-              </Sheet>
-            </section>
-          )}
-          {running.length > 0 && (
-            <section aria-labelledby="running">
-              <h2 id="running" className="mb-2 text-caps text-ink-3 uppercase">
-                {retired ? "Active and retired" : "Active"}
-              </h2>
-              <Sheet className="overflow-hidden">
-                <ul className="divide-y divide-rule">{running.map((a) => <AppRow key={a.id} a={a} />)}</ul>
-              </Sheet>
-            </section>
-          )}
-        </div>
+        <Sheet className="overflow-hidden">
+          <ul className="divide-y divide-rule">{sorted.map((a) => <AppRow key={a.id} a={a} />)}</ul>
+        </Sheet>
       )}
     </>
   );

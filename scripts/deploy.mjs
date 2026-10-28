@@ -43,6 +43,7 @@ const APPS = {
 
 // Never sent, wherever they are.
 const NEVER = [
+  "CLAUDE.md", "**/CLAUDE.md",
   ".env", ".env.*", "!.env.example", "**/.env", "**/.env.*", "!**/.env.example",
   "**/.data", "**/*.db", "**/*.db-*", "**/.venv", "**/__pycache__", "**/.pytest_cache", "**/.ruff_cache",
   "**/node_modules", "**/.next", "**/tests",

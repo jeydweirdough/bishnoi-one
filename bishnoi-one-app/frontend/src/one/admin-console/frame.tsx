@@ -5,29 +5,34 @@ import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
 
-/** What this person may open here: the Platform's own pages for its staff, roles for a company's administrators. */
+/**
+ * What this person may open here (feature plan step 5, 2026-10-28, laid out like Odoo's and Zoho's
+ * settings): the company console for a company's administrators (Home, Company, People, Reports),
+ * and the small Operations area for Bishnoi One's operators.
+ */
 export function consoleGroups(me: Account): ConsoleGroup[] {
   const groups: ConsoleGroup[] = [];
-  if (me.staff)
+  if (me.isCompanyAdmin) {
+    // The executive Home first: the company in a few figures (decided 2026-10-28).
+    groups.push({ label: "Home", pages: [{ href: "/platform/home", label: "Home", icon: "home" }] });
     groups.push({
-      label: "Platform",
+      label: "Company",
       pages: [
-        { href: "/platform/apis", label: "APIs", icon: "apps" },
-        { href: "/platform/companies", label: "Companies", icon: "companies" },
-        { href: "/platform/accounts", label: "Accounts", icon: "people" },
+        { href: "/platform/company", label: "Company profile", icon: "company" },
+        { href: "/platform/company/apps", label: "Apps", icon: "apps" },
+        { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
+        { href: "/platform/company/security", label: "Security", icon: "password" },
+        { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
       ],
     });
-  if (me.isCompanyAdmin)
     groups.push({
-      label: "Users and roles",
-      // A role is made, then given to people.
-      flow: true,
+      label: "People",
       pages: [
+        { href: "/platform/roles/people", label: "People", icon: "people" },
         { href: "/platform/roles", label: "Roles", icon: "roles" },
-        { href: "/platform/roles/people", label: "People", icon: "teams" },
+        { href: "/platform/organisation", label: "Organisation", icon: "teams" },
       ],
     });
-  if (me.isCompanyAdmin)
     groups.push({
       label: "Reports",
       pages: [
@@ -35,14 +40,24 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/reports/kpis", label: "Company KPIs", icon: "goals" },
       ],
     });
+  }
+  if (me.staff)
+    groups.push({
+      label: "Operations",
+      pages: [
+        { href: "/platform/companies", label: "Companies", icon: "companies" },
+        { href: "/platform/apis", label: "Services", icon: "apps" },
+        { href: "/platform/events", label: "Events", icon: "activity" },
+        { href: "/platform/operators", label: "Operators", icon: "people" },
+      ],
+    });
   return groups;
 }
 
 /**
  * The Admin Console (decided 2026-10-24): the Platform's screens, in its look,
- * for one Bishnoi One sign-in. Bishnoi One's staff (same email as their staff
- * account) see the APIs, companies and accounts; a company's administrators its
- * roles and who holds them. Framed like every module: sidebar, then your
+ * for one Bishnoi One sign-in. Operators (a switch on their account) see the Operations area; a
+ * company's administrators its company console. Framed like every module: sidebar, then your
  * modules and account at the top right.
  */
 export async function AdminConsoleFrame({ children }: { children: ReactNode }) {

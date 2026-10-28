@@ -16,7 +16,7 @@ export async function AccessFrame({ current, children }: { current: "people" | "
           current === "people" ? (
             <>Everyone at {data.company.name}, once for every module: add people, give each one role and the modules they may open, set passwords, switch people off. The modules are told at once.</>
           ) : (
-            <>What each role may do in each module, and whose records it reaches. The modules are told at once.</>
+            <>What each role can do, in plain words, and whose records it sees. Start from one of Bishnoi One&apos;s job roles and adjust it. Every app is told at once.</>
           )
         ) : null}
       </PageHeader>

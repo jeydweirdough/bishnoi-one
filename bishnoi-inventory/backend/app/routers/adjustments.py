@@ -11,12 +11,13 @@ posted as one adjustment, with the count as its source.
 
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Request, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import select
 
 from app.access import CurrentAccess, allowed
 from app.api import Api, conflict, field_error, found, iso
+from app import business_events, documents
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.models import ADJUSTMENT_REASONS, Adjustment, AdjustmentLine, Batch, Category, Count, CountLine, Location, Product, Stock, User, Warehouse
@@ -62,7 +63,7 @@ class AdjustmentLineIn(Api):
         return v
 
 
-class AdjustmentIn(Api):
+class AdjustmentIn(documents.HeaderIn):
     warehouse_id: str = Field(max_length=36)
     reason: str
     notes: str | None = Field(None, max_length=4000)
@@ -79,6 +80,7 @@ class AdjustmentIn(Api):
 def adjustment_brief(a: Adjustment) -> dict:
     return {
         "id": a.id,
+        "header": documents.header_out(a),
         "number": a.number,
         "status": a.status,
         "reason": a.reason,
@@ -167,6 +169,7 @@ def post_adjustment(db: DB, me: User, a: Adjustment) -> None:
                 serials_out(db, product, line.serials or [], a.warehouse_id, "written_off")
         post(db, me, kind=kind, product=product, quantity=line.quantity, ref=ref, location=location, batch=batch, note=REASON_LABELS[a.reason] + (f": {a.notes}" if a.notes else ""), serials=line.serials)
     a.status, a.decided_by_id, a.decided_at = "posted", me.id, datetime.now(UTC)
+    documents.done(a, a.decided_at)
 
 
 @router.get("/adjustments/reasons")
@@ -181,11 +184,13 @@ def list_adjustments(
     status_: str | None = Query(None, alias="status", max_length=40),
     warehouse: str | None = Query(None, max_length=36),
     reason: str | None = Query(None, max_length=20),
+    operation_type: str | None = Query(None, alias="operationType", max_length=36),
+    timing: str | None = Query(None, max_length=10),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 500; with it, one page and the total."""
-    query = select(Adjustment).order_by(Adjustment.created_at.desc())
+    query = documents.narrow(select(Adjustment).order_by(Adjustment.created_at.desc()), Adjustment, operation_type, timing)
     if status_:
         query = query.where(Adjustment.status.in_(status_.split(",")))
     if warehouse:
@@ -204,6 +209,7 @@ def create_adjustment(access: CurrentAccess, _: allowed("adjustments.create"), m
         raise field_error("warehouseId", "Pick a warehouse that's switched on.")
     a = Adjustment(number=next_number(db, "ADJ"), warehouse_id=warehouse.id, reason=body.reason, notes=body.notes, created_by_id=me.id)
     a.lines = build_lines(db, warehouse, body.reason, body.lines)
+    documents.apply(db, a, ("adjustment",), body, me, warehouse.id, new=True)
     db.add(a)
     db.flush()
     # An approver's own adjustment needs nobody else: it's posted now.
@@ -244,7 +250,7 @@ def reject_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: DB
 # --- counts -----------------------------------------------------------------------------
 
 
-class CountIn(Api):
+class CountIn(documents.HeaderIn):
     warehouse_id: str = Field(max_length=36)
     category_id: str | None = Field(None, max_length=36)
     notes: str | None = Field(None, max_length=4000)
@@ -272,6 +278,7 @@ def count_brief(c: Count) -> dict:
     counted = [line for line in c.lines if line.counted is not None]
     return {
         "id": c.id,
+        "header": documents.header_out(c),
         "number": c.number,
         "status": c.status,
         "warehouse": warehouse_ref(c.warehouse),
@@ -314,11 +321,13 @@ def list_counts(
     _: allowed("counts.view"),
     db: DB,
     status_: str | None = Query(None, alias="status", max_length=40),
+    operation_type: str | None = Query(None, alias="operationType", max_length=36),
+    timing: str | None = Query(None, max_length=10),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 200; with it, one page and the total."""
-    query = select(Count).order_by(Count.created_at.desc())
+    query = documents.narrow(select(Count).order_by(Count.created_at.desc()), Count, operation_type, timing)
     if status_:
         query = query.where(Count.status.in_(status_.split(",")))
     if limit is not None:
@@ -340,6 +349,7 @@ def start_count(_: allowed("counts.create"), me: CurrentUser, db: DB, body: Coun
         query = query.where(Product.category_id.in_(in_category(db, body.category_id)))
     c = Count(number=next_number(db, "CNT"), warehouse_id=warehouse.id, category_id=body.category_id, notes=body.notes, created_by_id=me.id)
     c.lines = [CountLine(position=i, product_id=s.product_id, location_id=s.location_id, batch_id=s.batch_id, expected=s.on_hand) for i, s in enumerate(db.scalars(query))]
+    documents.apply(db, c, ("count",), body, me, warehouse.id, new=True)
     db.add(c)
     db.flush()
     audit(db, me, "count.started", target=c.number, target_type="count", target_id=c.id)
@@ -424,7 +434,7 @@ def reopen_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_id
 
 
 @router.post("/counts/{count_id}/approve")
-def approve_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_id: str) -> dict:
+def approve_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_id: str, request: Request) -> dict:
     """Every difference becomes one posted adjustment (reason: count)."""
     c = found(db, Count, count_id, "count")
     if c.status != "submitted":
@@ -438,7 +448,9 @@ def approve_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_i
         )
     adjustment_id = None
     if differences:
-        a = Adjustment(number=next_number(db, "ADJ"), warehouse_id=c.warehouse_id, reason="count", notes=f"From count {c.number}", count_id=c.id, created_by_id=me.id)
+        a = Adjustment(number=next_number(db, "ADJ"), warehouse_id=c.warehouse_id, reason="count", notes=f"From count {c.number}", count_id=c.id, created_by_id=me.id,
+                       source_document=c.number)
+        documents.apply(db, a, ("adjustment",), None, me, c.warehouse_id, new=True)
         a.lines = [
             AdjustmentLine(position=i, product_id=line.product_id, location_id=line.location_id, batch_id=line.batch_id, quantity=line.counted - line.expected)
             for i, line in enumerate(differences)
@@ -447,7 +459,9 @@ def approve_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_i
         db.flush()
         post_adjustment(db, me, a)
         adjustment_id = a.id
+        business_events.link(db, getattr(request.state, "company", None), business_events.ref("count", c.id, c.number), business_events.ref("adjustment", a.id, a.number))
     c.status, c.approved_by_id, c.approved_at = "approved", me.id, datetime.now(UTC)
+    documents.done(c, c.approved_at)
     audit(db, me, "count.approved", target=c.number, target_type="count", target_id=c.id)
     db.commit()
     return {"id": c.id, "status": c.status, "adjustmentId": adjustment_id}

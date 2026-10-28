@@ -231,14 +231,19 @@ class Query:
         return route(warehouses.list_warehouses, info)
 
     @strawberry.field
+    def operation_types(self, info: strawberry.Info) -> JSON | None:
+        """The kinds of stock document, as the company names them (step 8)."""
+        return route(warehouses.operation_types, info)
+
+    @strawberry.field
     def warehouse(self, info: strawberry.Info, id: str) -> JSON | None:
         return route(warehouses.read_warehouse, info, warehouse_id=id)
 
     # --- orders and transfers ---
 
     @strawberry.field
-    def orders(self, info: strawberry.Info, status: str | None = None, kind: str | None = None, warehouse: str | None = None, q: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
-        return route(orders.list_orders, info, status_=status, kind=kind, warehouse=warehouse, q=q, limit=limit, offset=offset)
+    def orders(self, info: strawberry.Info, status: str | None = None, kind: str | None = None, warehouse: str | None = None, q: str | None = None, operation_type: str | None = None, timing: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
+        return route(orders.list_orders, info, status_=status, kind=kind, warehouse=warehouse, q=q, operation_type=operation_type, timing=timing, limit=limit, offset=offset)
 
     @strawberry.field
     def order(self, info: strawberry.Info, id: str) -> JSON | None:
@@ -249,8 +254,8 @@ class Query:
         return route(orders.reservations, info, warehouse=warehouse, limit=limit, offset=offset)
 
     @strawberry.field
-    def transfers(self, info: strawberry.Info, status: str | None = None, warehouse: str | None = None, q: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
-        return route(transfers.list_transfers, info, status_=status, warehouse=warehouse, q=q, limit=limit, offset=offset)
+    def transfers(self, info: strawberry.Info, status: str | None = None, warehouse: str | None = None, q: str | None = None, operation_type: str | None = None, timing: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
+        return route(transfers.list_transfers, info, status_=status, warehouse=warehouse, q=q, operation_type=operation_type, timing=timing, limit=limit, offset=offset)
 
     @strawberry.field
     def transfer(self, info: strawberry.Info, id: str) -> JSON | None:
@@ -287,8 +292,8 @@ class Query:
         return route(purchasing.backorders, info, limit=limit, offset=offset)
 
     @strawberry.field
-    def receipts(self, info: strawberry.Info, supplier: str | None = None, warehouse: str | None = None, q: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
-        return route(purchasing.list_receipts, info, supplier=supplier, warehouse=warehouse, q=q, limit=limit, offset=offset)
+    def receipts(self, info: strawberry.Info, supplier: str | None = None, warehouse: str | None = None, q: str | None = None, operation_type: str | None = None, timing: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
+        return route(purchasing.list_receipts, info, supplier=supplier, warehouse=warehouse, q=q, operation_type=operation_type, timing=timing, limit=limit, offset=offset)
 
     @strawberry.field
     def receipt(self, info: strawberry.Info, id: str) -> JSON | None:
@@ -301,16 +306,16 @@ class Query:
         return route(adjustments.reasons, info)
 
     @strawberry.field
-    def adjustments(self, info: strawberry.Info, status: str | None = None, warehouse: str | None = None, reason: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
-        return route(adjustments.list_adjustments, info, status_=status, warehouse=warehouse, reason=reason, limit=limit, offset=offset)
+    def adjustments(self, info: strawberry.Info, status: str | None = None, warehouse: str | None = None, reason: str | None = None, operation_type: str | None = None, timing: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
+        return route(adjustments.list_adjustments, info, status_=status, warehouse=warehouse, reason=reason, operation_type=operation_type, timing=timing, limit=limit, offset=offset)
 
     @strawberry.field
     def adjustment(self, info: strawberry.Info, id: str) -> JSON | None:
         return route(adjustments.read_adjustment, info, adjustment_id=id)
 
     @strawberry.field
-    def counts(self, info: strawberry.Info, status: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
-        return route(adjustments.list_counts, info, status_=status, limit=limit, offset=offset)
+    def counts(self, info: strawberry.Info, status: str | None = None, operation_type: str | None = None, timing: str | None = None, limit: int | None = None, offset: int | None = None) -> JSON | None:
+        return route(adjustments.list_counts, info, status_=status, operation_type=operation_type, timing=timing, limit=limit, offset=offset)
 
     @strawberry.field
     def count(self, info: strawberry.Info, id: str) -> JSON | None:

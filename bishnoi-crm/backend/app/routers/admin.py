@@ -15,7 +15,7 @@ from pydantic.alias_generators import to_camel
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app import platform_roles
+from app import platform_org, platform_roles
 from app.routers.profile import split_name
 from app.access import Access, keep_an_administrator, permissions_of, require
 from app.api import email_address
@@ -270,7 +270,7 @@ def read_user(access: People, db: DB, user_id: str) -> dict:
     return user_out(user, last)
 
 
-@router.patch("/users/{user_id}", dependencies=[Depends(platform_roles.kept_on_platform)])
+@router.patch("/users/{user_id}", dependencies=[Depends(platform_roles.kept_on_platform), Depends(platform_org.on_platform)])
 def update_user(access: People, me: CurrentUser, db: DB, user_id: str, body: UserPatch) -> dict:
     user = reachable_user(db, access, user_id)
     wanted = changed(body)
@@ -578,7 +578,7 @@ def team_managers(_: Teams, db: DB) -> list[dict]:
     return [{"id": u.id, "name": u.full_name} for u in people]
 
 
-@router.post("/teams", status_code=status.HTTP_201_CREATED)
+@router.post("/teams", status_code=status.HTTP_201_CREATED, dependencies=[Depends(platform_org.on_platform)])
 def create_team(_: Teams, me: CurrentUser, db: DB, body: TeamIn) -> dict:
     if name_taken(db, Team, body.name):
         raise field_error("name", "There's already a team with that name.")
@@ -590,7 +590,7 @@ def create_team(_: Teams, me: CurrentUser, db: DB, body: TeamIn) -> dict:
     return team_out(team)
 
 
-@router.patch("/teams/{team_id}")
+@router.patch("/teams/{team_id}", dependencies=[Depends(platform_org.on_platform)])
 def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch) -> dict:
     team = get_team(db, team_id)
     wanted = changed(body)
@@ -616,7 +616,7 @@ def update_team(_: Teams, me: CurrentUser, db: DB, team_id: str, body: TeamPatch
     return team_out(team, team_members(db).get(team.id, 0), db)
 
 
-@router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(platform_org.on_platform)])
 def delete_team(_: Teams, me: CurrentUser, db: DB, team_id: str) -> Response:
     team = get_team(db, team_id)
     members = (db.scalar(select(func.count()).select_from(User).where(User.team_id == team.id)) or 0) + (db.scalar(select(func.count()).select_from(UserTeam).where(UserTeam.team_id == team.id)) or 0)

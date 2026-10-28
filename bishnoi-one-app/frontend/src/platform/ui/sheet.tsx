@@ -1,5 +1,5 @@
 import { AboutTip, plainText } from "@/src/platform/ui/about-tip";
-import { ChevronRight } from "lucide-react";
+import { ArrowDownToLine as Inbound, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
@@ -99,6 +99,7 @@ export function Empty({
   actions,
   compact = false,
   art,
+  source,
 }: {
   title: string;
   children?: ReactNode;
@@ -107,6 +108,9 @@ export function Empty({
   compact?: boolean;
   /** A drawing of its own, when the icon's isn't the right one (gauge, steps, flag). */
   art?: string;
+  /** Where its items come from, when another app or other people send them ("Executive Admin, when its team…"),
+   *  so nobody wonders whom it waits on. A small line at the foot. */
+  source?: ReactNode;
 }) {
   return (
     <div className={compact ? "px-3 py-4 text-center" : "px-5 py-10 text-center"}>
@@ -118,6 +122,15 @@ export function Empty({
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 empty:hidden [&>.ant-btn:first-child]:!border-ink [&>.ant-btn:first-child]:!bg-ink [&>.ant-btn:first-child]:!text-white [&>:first-child_.ant-btn]:!border-ink [&>:first-child_.ant-btn]:!bg-ink [&>:first-child_.ant-btn]:!text-white">
           {actions}
         </div>
+      )}
+      {source && (
+        <p className={`mx-auto flex max-w-md items-start justify-center gap-1.5 border-t border-rule text-left text-ink-3 ${compact ? "mt-3 pt-2 text-stamp" : "mt-6 pt-3 text-meta"}`}>
+          <Inbound className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>
+            <span className="font-medium text-ink-2">Comes from: </span>
+            {source}
+          </span>
+        </p>
       )}
     </div>
   );

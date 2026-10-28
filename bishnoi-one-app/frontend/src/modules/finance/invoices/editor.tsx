@@ -32,6 +32,8 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
   });
   // Whose sale it is (the CRM scores it): the CRM customer's owner.
   const [salesperson, setSalesperson] = useState(invoice?.salesperson ?? null);
+  // Their division and team (revenue by division), as the CRM gives them with the owner.
+  const [unit, setUnit] = useState({ division: invoice?.division ?? null, team: invoice?.team ?? null });
   const [treatment, setTreatment] = useState(invoice?.treatment ?? "regular");
   const [idNumber, setIdNumber] = useState(invoice?.buyerIdNumber ?? "");
   const [date, setDate] = useState(invoice?.date ?? today);
@@ -81,6 +83,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
   function pick(c: Customer) {
     setCustomer({ id: c.id, name: c.name, tin: c.tin ?? "", address: c.address ?? "" });
     setSalesperson(c.owner ?? null);
+    setUnit({ division: c.owner?.division ?? null, team: c.owner?.team ?? null });
     setFound(null);
     setQ("");
   }
@@ -109,6 +112,10 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         customerAddress: customer.address.trim() || null,
         salespersonId: salesperson?.id ?? null,
         salespersonName: salesperson?.name ?? null,
+        divisionId: unit.division?.id ?? null,
+        divisionName: unit.division?.name ?? null,
+        teamId: unit.team?.id ?? null,
+        teamName: unit.team?.name ?? null,
         treatment,
         buyerIdNumber: idNumber.trim() || null,
         invoiceDate: date,
@@ -195,6 +202,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
             {customer.id && (
               <p className="mt-1 text-meta text-ink-2">
                 Salesperson: <span className="font-medium text-ink">{salesperson?.name ?? "None"}</span>
+                {salesperson?.name && (unit.team ?? unit.division) && <> · {[unit.division?.name, unit.team?.name].filter(Boolean).join(" › ")}</>}
                 {!salesperson?.name && " (assign the customer to someone in the CRM, or this sale counts for nobody)"}
               </p>
             )}

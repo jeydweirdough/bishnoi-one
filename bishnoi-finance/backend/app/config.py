@@ -130,6 +130,16 @@ class Settings(BaseSettings):
     def crm_linked(self) -> bool:
         return bool(self.crm_api_url and self.crm_api_key)
 
+    # Bishnoi One Inventory, for what each product costs (the cost of goods sold on each invoice,
+    # app/inventory.py): its API and the key it gave Finance. Given by the Platform once linked.
+    # Unset: invoices post no cost. The company asked about is CRM_COMPANY's, Finance's company.
+    inventory_api_url: str | None = None
+    inventory_api_key: SecretStr | None = None
+
+    @property
+    def inventory_linked(self) -> bool:
+        return bool(self.inventory_api_url and self.inventory_api_key)
+
     @property
     def discord_mock_dir(self) -> Path:
         """Where mock mode keeps its tables: beside a SQLite database (so each test has its own), else .data/."""

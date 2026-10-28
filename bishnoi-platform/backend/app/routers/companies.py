@@ -234,7 +234,7 @@ def get_company(company_id: str, db: DB, _: CurrentUser) -> dict:
     )
     users = db.scalar(select(func.count()).select_from(Identity).where(Identity.company_id == c.id))
     active = db.scalar(select(func.count()).select_from(Identity).where(Identity.company_id == c.id, Identity.status == "active"))
-    admins = db.scalars(select(Identity).where(Identity.company_id == c.id, Identity.is_company_admin).order_by(Identity.full_name)).all()
+    admins = db.scalars(select(Identity).where(Identity.company_id == c.id, Identity.is_company_admin, Identity.via_operator.is_(False)).order_by(Identity.full_name)).all()
     units = db.scalars(select(OrgUnit).where(OrgUnit.company_id == c.id).order_by(OrgUnit.kind, func.lower(OrgUnit.name))).all()
     open_tickets = db.scalar(select(func.count()).select_from(Ticket).where(Ticket.company_id == c.id, Ticket.status.in_(OPEN)))
     incidents = [i for i in active_incidents(db) if reaches(i, c.id, {a.id for a in app_rows})]

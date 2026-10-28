@@ -1,5 +1,5 @@
 """Finance's reports (decided 2026-10-25, benchmarks/surpass.md §11): one registry, each report in
-a group (Sales, Expenses, Purchases, Accounting) and needing the permission for its data, drawn by
+a group (Sales, Expenses, Purchases, Accounting, Management) and needing the permission for its data, drawn by
 the one app's shared report kit (src/platform/reports/). The BIR's books, statements and forms
 stay under Taxes (app/routers/bir.py).
 
@@ -392,6 +392,231 @@ def cash_flow(c: Ctx):
     )
 
 
+# --- Management: the figures a business manager reads (app/management.py, decided 2026-10-28) ------
+
+
+def _reading(value, good, watch, *, low_is_good: bool = False) -> str:
+    """Healthy / Watch / Low (or Slow) against two thresholds."""
+    if value is None:
+        return "Not enough data"
+    if low_is_good:
+        return "Healthy" if value <= good else "Watch" if value <= watch else "Slow"
+    return "Healthy" if value >= good else "Watch" if value >= watch else "Low"
+
+
+def _pct(v) -> str:
+    return "—" if v is None else f"{v * 100:.1f}%"
+
+
+def _times(v) -> str:
+    return "—" if v is None else f"{v:.2f}×"
+
+
+def _days(v) -> str:
+    return "—" if v is None else f"{v:.0f} days"
+
+
+def _change(a, b) -> str:
+    if a is None or b is None or b == 0:
+        return "—"
+    d = (a - b) / abs(b)
+    return f"{'+' if d >= 0 else '−'}{abs(d) * 100:.0f}%"
+
+
+def key_figures(c: Ctx):
+    """Each figure for the period, the same-length period before, and how it reads."""
+    from app import management as m
+
+    now = m.figures(c.db, c.first, c.last)
+    then = m.figures(c.db, *m.previous(c.first, c.last))
+    margin = now.net_margin
+    roa = now.return_on_assets
+    rows = [
+        ("Revenue", "Invoiced sales, without VAT", m.peso(now.revenue), m.peso(then.revenue), _change(now.revenue, then.revenue),
+         "Growing" if now.revenue > then.revenue else "Flat" if now.revenue == then.revenue else "Down"),
+        ("Net profit", "Income − expenses (profit and loss)", m.peso(now.net_profit), m.peso(then.net_profit), _change(now.net_profit, then.net_profit),
+         "Profit" if now.net_profit > 0 else "Break-even" if now.net_profit == 0 else "Loss"),
+        ("Gross profit", "Revenue − cost of goods sold", m.peso(now.gross_profit) if now.cogs else "—", m.peso(then.gross_profit) if then.cogs else "—",
+         _change(now.gross_profit, then.gross_profit) if now.cogs and then.cogs else "—", "Not enough data" if not now.cogs else "Profit" if now.gross_profit > 0 else "Loss"),
+        ("Gross margin", "Gross profit ÷ revenue", _pct(now.gross_margin), _pct(then.gross_margin), "—",
+         "Not enough data" if now.gross_margin is None else "Healthy" if now.gross_margin >= 0.2 else "Watch" if now.gross_margin >= 0.1 else "Low"),
+        ("Net margin", "Net profit ÷ income", _pct(margin), _pct(then.net_margin), "—",
+         "Not enough data" if margin is None else "Healthy" if margin >= 0.1 else "Watch" if margin >= 0 else "Loss"),
+        ("Return on assets", "Net profit ÷ total assets, for the period", _pct(roa), _pct(then.return_on_assets), "—",
+         "Not enough data" if roa is None else "Positive" if roa > 0 else "Negative"),
+        ("Working capital", "Current assets − current liabilities", m.peso(now.working_capital), m.peso(then.working_capital), _change(now.working_capital, then.working_capital),
+         "Healthy" if now.working_capital > 0 else "Short"),
+        ("Current ratio", "Current assets ÷ current liabilities", _times(now.current_ratio), _times(then.current_ratio), "—", _reading(now.current_ratio, 1.5, 1.0)),
+        ("Quick ratio", "(Current assets − inventory) ÷ current liabilities", _times(now.quick_ratio), _times(then.quick_ratio), "—", _reading(now.quick_ratio, 1.0, 0.7)),
+        ("Days to collect (DSO)", "Receivables ÷ revenue × days in the period", _days(now.days_to_collect), _days(then.days_to_collect), "—",
+         _reading(now.days_to_collect, 45, 60, low_is_good=True)),
+        ("Days to pay (DPO)", "Payables ÷ purchases × days in the period", _days(now.days_to_pay), _days(then.days_to_pay), "—",
+         "Not enough data" if now.days_to_pay is None else "—"),
+        ("Days stock sits (DIO)", "Inventory ÷ cost of goods sold × days in the period", _days(now.days_stock_sits), _days(then.days_stock_sits), "—",
+         _reading(now.days_stock_sits, 60, 90, low_is_good=True)),
+        ("Inventory turnover", "Cost of goods sold ÷ inventory, a year at this pace", _times(now.inventory_turnover), _times(then.inventory_turnover), "—",
+         _reading(now.inventory_turnover, 6, 4)),
+        ("Cash conversion cycle", "Days to collect + days stock sits − days to pay", _days(now.cash_cycle), _days(then.cash_cycle), "—",
+         _reading(now.cash_cycle, 60, 90, low_is_good=True)),
+        ("Cash", "Cash, bank, e-wallet and checks on the last day", m.peso(now.position.cash), m.peso(then.position.cash), _change(now.position.cash, then.position.cash),
+         "Healthy" if now.position.cash > 0 else "None"),
+    ]
+    summary = [
+        fig("Revenue", now.revenue, "money"),
+        *([fig("Gross profit", now.gross_profit, "money", "good" if now.gross_profit >= 0 else "bad")] if now.cogs else []),
+        fig("Net profit", now.net_profit, "money", "good" if now.net_profit >= 0 else "bad"),
+        fig("Working capital", now.working_capital, "money", "good" if now.working_capital >= 0 else "bad"),
+        fig("Cash", now.position.cash, "money"),
+    ]
+    if now.position.guessed:
+        summary.append(fig("Accounts judged by name", now.position.guessed, tone="warn"))
+    return (
+        [col("figure", "Figure"), col("how", "How it's worked out"), col("now", "This period"), col("before", "Period before"), col("change", "Change"), col("reading", "Reading")],
+        [{"figure": f, "how": h, "now": n, "before": b, "change": ch, "reading": rd} for f, h, n, b, ch, rd in rows],
+        summary,
+        None,
+    )
+
+
+NONE_FOR = {"customer": "No customer", "salesperson": "No salesperson", "division": "Not in a division", "team": "Not in a team"}
+
+
+def gross_margin_by(key: str, label: str):
+    """Revenue (without VAT), the cost of goods sold and the gross profit, by product, customer,
+    salesperson, division or team, from the period's issued invoices and the costs booked with them.
+    Division and team are the salesperson's when the invoice was made (migration 0025)."""
+
+    def build(c: Ctx):
+        by: dict[str, dict] = {}
+        unknown = 0
+        for inv in c.db.scalars(issued_in(c)):
+            costs = inv.line_costs or []
+            worked = (inv.computed or {}).get("lines") or []
+            if key == "product":
+                for i, line in enumerate(inv.lines or []):
+                    out = worked[i] if i < len(worked) else {}
+                    name = str(line.get("ref") or line.get("description") or "No item code")
+                    unit = costs[i] if i < len(costs) else None
+                    if unit is None:
+                        unknown += 1
+                    r = by.setdefault(name, {"name": name, "revenue": 0, "cost": 0})
+                    r["revenue"] += int(out.get("totalCentavos", 0)) - int(out.get("taxCentavos", 0))
+                    r["cost"] += (unit or 0) * int(line.get("quantity") or 0)
+            else:
+                name = {"customer": inv.customer_name, "salesperson": inv.salesperson_name, "division": inv.division_name,
+                        "team": inv.team_name}[key] or NONE_FOR[key]
+                if inv.line_costs is None or any(x is None for x in inv.line_costs):
+                    unknown += 1
+                r = by.setdefault(name, {"name": name, "revenue": 0, "cost": 0})
+                r["revenue"] += inv.total_centavos - inv.tax_centavos
+                r["cost"] += inv.cost_centavos
+        rows = []
+        for r in by.values():
+            r["profit"] = r["revenue"] - r["cost"]
+            r["margin"] = r["profit"] / r["revenue"] if r["revenue"] else None
+            rows.append(r)
+        rows.sort(key=lambda r: -r["profit"])
+        revenue, cost = sum(r["revenue"] for r in rows), sum(r["cost"] for r in rows)
+        margin = (revenue - cost) / revenue if revenue else None
+        what = "lines" if key == "product" else "invoices"
+        return (
+            [col("name", label), col("revenue", "Revenue", "money"), col("cost", "Cost of goods sold", "money"), col("profit", "Gross profit", "money"), col("margin", "Gross margin", "percent")],
+            rows,
+            [fig("Revenue", revenue, "money"), fig("Gross profit", revenue - cost, "money", "good" if revenue >= cost else "bad"),
+             fig("Gross margin", margin, "percent"), fig(f"{what.capitalize()} without a known cost", unknown, tone="warn" if unknown else "good")],
+            bar("name", "revenue", "profit") if rows else None,
+        )
+
+    return build
+
+
+def _month(y: int, mo: int) -> tuple[date, date]:
+    first = date(y, mo, 1)
+    nxt = date(y + (mo == 12), mo % 12 + 1, 1)
+    return first, nxt - timedelta(days=1)
+
+
+def _shift(y: int, mo: int, by: int) -> tuple[int, int]:
+    n = y * 12 + (mo - 1) + by
+    return n // 12, n % 12 + 1
+
+
+def _year_earlier(d: date) -> date:
+    return d.replace(year=d.year - 1, day=28) if (d.month, d.day) == (2, 29) else d.replace(year=d.year - 1)
+
+
+def revenue_growth(c: Ctx):
+    """Revenue month by month, against the month before and the same month a year earlier."""
+    from app import management as m
+
+    rows = []
+    y, mo = c.first.year, c.first.month
+    while (y, mo) <= (c.last.year, c.last.month):
+        first, last = _month(y, mo)
+        now = m.revenue(c.db, max(first, c.first), min(last, c.last))
+        before = m.revenue(c.db, *_month(*_shift(y, mo, -1)))
+        year_ago = m.revenue(c.db, *_month(*_shift(y, mo, -12)))
+        rows.append({
+            "month": f"{y}-{mo:02d}", "revenue": now, "previous": before, "vsPrevious": (now - before) / before if before else None,
+            "yearAgo": year_ago, "vsYearAgo": (now - year_ago) / year_ago if year_ago else None,
+        })
+        y, mo = _shift(y, mo, 1)
+    total = m.revenue(c.db, c.first, c.last)
+    earlier = m.revenue(c.db, *m.previous(c.first, c.last))
+    last_year = m.revenue(c.db, _year_earlier(c.first), _year_earlier(c.last))
+    growth = (total - earlier) / earlier if earlier else None
+    yoy = (total - last_year) / last_year if last_year else None
+    return (
+        [col("month", "Month"), col("revenue", "Revenue", "money"), col("previous", "Month before", "money"), col("vsPrevious", "Change", "percent"),
+         col("yearAgo", "Same month last year", "money"), col("vsYearAgo", "Change on last year", "percent")],
+        rows,
+        [fig("Revenue", total, "money"), fig("Period before", earlier, "money"),
+         fig("Growth", growth, "percent", None if growth is None else "good" if growth >= 0 else "bad"),
+         fig("On last year", yoy, "percent", None if yoy is None else "good" if yoy >= 0 else "bad")],
+        {"kind": "line", "x": "month", "series": ["revenue", "yearAgo"]} if rows else None,
+    )
+
+
+def cash_forecast(c: Ctx):
+    """The next 12 weeks from the day: cash now, what customers owe by when it's due, what's owed
+    to suppliers by when it's due, and the cash that leaves."""
+    from app import management as m
+
+    today = c.last
+    weeks = 12
+    start = today - timedelta(days=today.weekday())  # this week's Monday
+    horizon = start + timedelta(weeks=weeks)
+    late = {"week": "Already late", "inflow": 0, "outflow": 0}
+    ahead = [{"week": f"Week of {(start + timedelta(weeks=i)).isoformat()}", "inflow": 0, "outflow": 0} for i in range(weeks)]
+
+    def place(due: date, amount: int, key: str) -> None:
+        if due < today:
+            late[key] += amount
+        elif due < horizon:
+            ahead[(due - start).days // 7][key] += amount
+
+    for i in c.db.scalars(select(Invoice).where(Invoice.status == "issued", Invoice.paid_centavos < Invoice.total_centavos)):
+        place(i.invoice_date + timedelta(days=i.terms_days), i.total_centavos - i.paid_centavos, "inflow")
+    for b in c.db.scalars(select(Bill).where(Bill.status == "recorded", Bill.paid_centavos < Bill.payable_centavos)):
+        place(b.due_date, b.payable_centavos - b.paid_centavos, "outflow")
+
+    cash = m.position(c.db, today).cash
+    rows = ([late] if late["inflow"] or late["outflow"] else []) + ahead
+    running = lowest = cash
+    for row in rows:
+        row["net"] = row["inflow"] - row["outflow"]
+        running += row["net"]
+        row["projected"] = running
+        lowest = min(lowest, running)
+    return (
+        [col("week", "When"), col("inflow", "Expected in", "money"), col("outflow", "Expected out", "money"), col("net", "Net", "money"), col("projected", "Cash after", "money")],
+        rows,
+        [fig("Cash now", cash, "money"), fig("Expected in", sum(r["inflow"] for r in rows), "money", "good"),
+         fig("Expected out", sum(r["outflow"] for r in rows), "money"), fig("Lowest cash ahead", lowest, "money", "good" if lowest >= 0 else "bad")],
+        {"kind": "line", "x": "week", "series": ["projected"]},
+    )
+
+
 REPORTS: tuple[Report, ...] = (
     Report("sales-register", "Sales register", "Sales", "Every invoice issued in the period, with what's been paid and what's still owed.", sales_register, "invoices.view"),
     Report("sales-by-customer", "Sales by customer", "Sales", "What each customer was invoiced in the period, and their share.", sales_by("customer", "Customer"), "invoices.view"),
@@ -410,6 +635,14 @@ REPORTS: tuple[Report, ...] = (
     Report("trial-balance", "Trial balance", "Accounting", "Every account's debit or credit balance as of the period's last day, which must agree.", trial_balance, "journal.view", fixed=True),
     Report("general-ledger", "General ledger", "Accounting", "Every account's opening balance, each entry in the period and the running balance.", general_ledger, "journal.view", fixed=True),
     Report("journal-by-source", "Journal entries by source", "Accounting", "Approved entries in the period, by where they came from.", journal_by_source, "journal.view"),
+    Report("key-figures", "Key figures", "Management", "Revenue, profit, margin, return on assets, working capital, current and quick ratios, days to collect and pay, and cash, against the period before.", key_figures, "journal.view", fixed=True),
+    Report("revenue-growth", "Revenue growth", "Management", "Revenue month by month, against the month before and the same month last year.", revenue_growth, "invoices.view", fixed=True),
+    Report("gross-margin-by-product", "Gross margin by product", "Management", "Revenue, cost of goods sold and gross profit for each product sold in the period.", gross_margin_by("product", "Product"), "invoices.view", fixed=True),
+    Report("gross-margin-by-customer", "Gross margin by customer", "Management", "Revenue, cost of goods sold and gross profit for each customer in the period.", gross_margin_by("customer", "Customer"), "invoices.view", fixed=True),
+    Report("gross-margin-by-salesperson", "Gross margin by salesperson", "Management", "Revenue, cost of goods sold and gross profit for each salesperson in the period.", gross_margin_by("salesperson", "Salesperson"), "invoices.view", fixed=True),
+    Report("revenue-by-division", "Revenue and margin by division", "Management", "Revenue, cost of goods sold and gross profit for each division in the period, by the salesperson's division when each invoice was made.", gross_margin_by("division", "Division"), "invoices.view", fixed=True),
+    Report("revenue-by-team", "Revenue and margin by team", "Management", "Revenue, cost of goods sold and gross profit for each team in the period, by the salesperson's team when each invoice was made.", gross_margin_by("team", "Team"), "invoices.view", fixed=True),
+    Report("cash-forecast", "Cash forecast", "Management", "Cash now, and what customers and suppliers are due to pay and be paid over the next 12 weeks.", cash_forecast, "journal.view", dated=False, fixed=True),
 )
 BY_KEY = {r.key: r for r in REPORTS}
 

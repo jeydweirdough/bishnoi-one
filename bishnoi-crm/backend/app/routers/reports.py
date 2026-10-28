@@ -535,6 +535,89 @@ def top_products(c: Ctx):
     )
 
 
+# --- Management: the figures a business manager reads (decided 2026-10-28, feature plan Track R) -----
+
+
+def pipeline_coverage(c: Ctx):
+    """Each salesperson's month: what's left of their target, the open deals expected to close by the
+    month's end, and whether they cover it (weighted value ÷ what's left)."""
+    r = _results(c)
+    month_end = c.last_day
+    stages = {s.code: s for s in c.db.scalars(select(DealStage))}
+    open_by: dict[str, list[int]] = {}
+    for d in c.db.scalars(c.scoped(select(Deal), Deal)):
+        s = stages.get(d.stage_code)
+        # expected_close_on is kept as text (YYYY-MM-DD), which compares in date order.
+        if s is None or s.outcome != "open" or (d.expected_close_on and str(d.expected_close_on)[:10] > month_end.isoformat()):
+            continue
+        v = open_by.setdefault(d.owner_id or "", [0, 0, 0])
+        v[0] += 1
+        v[1] += d.value_centavos
+        v[2] += d.value_centavos * d.probability // 100
+    rows = []
+    for p in r["people"]:
+        pid = p["person"]["id"]
+        if c.owner and pid != c.owner:
+            continue
+        target = p.get("targetCentavos")
+        won = p["wonCentavos"]
+        deals, value, weighted = open_by.get(pid, [0, 0, 0])
+        left = max((target or 0) - won, 0) if target else None
+        cover = (weighted / left) if left else None
+        reading = "No target" if target is None else "Target met" if left == 0 else "Covered" if cover is not None and cover >= 1 else "Short"
+        rows.append({"person": p["person"]["name"], "target": target, "won": won, "left": left, "deals": deals, "pipeline": value, "weighted": weighted,
+                     "coverage": cover, "reading": reading})
+    rows.sort(key=lambda x: (x["coverage"] is None, x["coverage"] or 0))
+    left_total = sum(x["left"] or 0 for x in rows)
+    weighted_total = sum(x["weighted"] for x in rows)
+    overall = weighted_total / left_total if left_total else None
+    short = sum(1 for x in rows if x["reading"] == "Short")
+    return (
+        [col("person", "Salesperson"), col("target", "Target", "money"), col("won", "Won so far", "money"), col("left", "Still to win", "money"),
+         col("deals", "Open deals", "number"), col("pipeline", "Pipeline", "money"), col("weighted", "Weighted pipeline", "money"),
+         col("coverage", "Coverage", "percent"), col("reading", "Reading")],
+        rows,
+        [fig(f"Coverage, {r['label']}", overall, "percent", None if overall is None else "good" if overall >= 1 else "warn"),
+         fig("Still to win", left_total, "money"), fig("Weighted pipeline", weighted_total, "money"), fig("Short of target", short, tone="warn" if short else "good")],
+        bar("person", "left", "weighted") if rows else None,
+    )
+
+
+def customer_lifetime_value(c: Ctx):
+    """What each customer is worth over the years: their yearly revenue from deals won, times how many
+    years a customer stays (from the retention rate)."""
+    stages = {s.code for s in c.db.scalars(select(DealStage).where(DealStage.outcome == "won"))}
+    by: dict[str, dict] = {}
+    q = c.scoped(select(Deal), Deal).where(Deal.stage_code.in_(stages), Deal.closed_at.is_not(None))
+    for d in c.db.scalars(q):
+        on = d.closed_at.date()
+        if on > c.last_day:
+            continue
+        x = by.setdefault(d.company_id or "", {"customer": d.company.name if d.company else "No customer", "first": on, "last": on, "won": 0, "deals": 0})
+        x["first"], x["last"] = min(x["first"], on), max(x["last"], on)
+        x["won"] += d.value_centavos
+        x["deals"] += 1
+    rate = retention_by_team(c)[2][0]["value"]
+    years_kept = min(1 / (1 - rate), 10.0) if rate is not None and rate < 1 else None
+    rows = []
+    for x in by.values():
+        span = max((x["last"] - x["first"]).days / 365.25, 1.0)  # under a year counts as one
+        yearly = round(x["won"] / span)
+        rows.append({"customer": x["customer"], "since": x["first"].isoformat(), "last": x["last"].isoformat(), "deals": x["deals"], "won": x["won"],
+                     "yearly": yearly, "lifetime": round(yearly * years_kept) if years_kept else None})
+    rows.sort(key=lambda x: -(x["lifetime"] or x["yearly"]))
+    avg_yearly = round(sum(x["yearly"] for x in rows) / len(rows)) if rows else None
+    avg_life = round(avg_yearly * years_kept) if avg_yearly is not None and years_kept else None
+    return (
+        [col("customer", "Customer"), col("since", "Buying since", "date"), col("last", "Last won", "date"), col("deals", "Deals won", "number"),
+         col("won", "Won to date", "money"), col("yearly", "Per year", "money"), col("lifetime", "Lifetime value", "money")],
+        rows,
+        [fig("Average lifetime value", avg_life, "money", "good" if avg_life else None), fig("Average per year", avg_yearly, "money"),
+         fig("Retention rate used", rate, "percent"), fig("Years a customer stays", round(years_kept, 1) if years_kept else None)],
+        bar("customer", "lifetime") if rows and years_kept else None,
+    )
+
+
 REPORTS: tuple[Report, ...] = (
     Report("pipeline", "Pipeline by stage", "Sales", "Open deals in each stage, with their value and weighted value.", pipeline, ("deals.view",), dated=False),
     Report("deals-closed", "Deals won and lost", "Sales", "Deals closed in the period, by owner, with the win rate.", deals_closed, ("deals.view",)),
@@ -556,6 +639,8 @@ REPORTS: tuple[Report, ...] = (
     Report("retention-by-department", "Retention by department", "Retention", "Each department's customers by health, and its retention rate, as of the period's end.", retention_by_team, ("customers.view",), dated=False),
     Report("retention-trend", "Retention trend", "Retention", "The retention rate month by month, for the six months to the period's end.", retention_trend, ("customers.view",), dated=False),
     Report("customers-at-risk", "Customers at risk", "Retention", "Customers slipping away, longest without a quote first, with any follow-up planned.", customers_at_risk, ("customers.view",), dated=False),
+    Report("pipeline-coverage", "Pipeline coverage", "Management", "Each salesperson's month: what's left of the target, and whether the open deals closing this month cover it.", pipeline_coverage, ("deals.view",)),
+    Report("customer-lifetime-value", "Customer lifetime value", "Management", "What each customer is worth over the years: yearly revenue from deals won, times how long customers stay.", customer_lifetime_value, ("deals.view",)),
 )
 BY_KEY = {r.key: r for r in REPORTS}
 

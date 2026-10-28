@@ -29,6 +29,7 @@ from app.models import (
     CompanyApp,
     Identity,
     IdentityApp,
+    IdentitySession,
     Ticket,
 )
 
@@ -145,7 +146,8 @@ def list_users(
     admins: bool = False,
     password: str | None = Query(None, description="none: only people who can't sign in yet"),
 ) -> dict:
-    query = select(Identity, Company).join(Company, Company.id == Identity.company_id).order_by(func.lower(Identity.full_name))
+    # A company's people: an operator's let-in memberships aren't listed (one email, one person; 2026-10-28).
+    query = select(Identity, Company).join(Company, Company.id == Identity.company_id).where(Identity.via_operator.is_(False)).order_by(func.lower(Identity.full_name))
     if q:
         like = f"%{q.strip().lower()}%"
         query = query.where(or_(func.lower(Identity.full_name).like(like), func.lower(Identity.email).like(like)))
@@ -309,19 +311,24 @@ def withdraw_application(user_id: str, app_id: str, db: DB, me: AdminUser) -> Re
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: str, db: DB, me: AdminUser) -> Response:
-    """Gone from the platform: their applications and sign-ins go with them;
-    tickets they raised stay, with nobody on them. Suspending keeps the person."""
+    """Suspended at this company, never deleted (step 4, 2026-10-28): their sign-ins there end and
+    everything they did keeps pointing at them; switching them back on undoes it. (Called delete
+    by older screens.)"""
     p = _person(db, user_id)
     # Never your own account, nor a company's last administrator: either locks people out
     # with nobody left to let them back in (2026-10-27, an administrator deleted their own).
     if p.email.lower() == me.email.lower():
-        raise conflict("That's your own account. Another administrator can delete it, or suspend it instead.")
+        raise conflict("That's your own account. Another administrator can suspend it.")
     if p.is_company_admin and not db.scalar(
         select(func.count()).select_from(Identity).where(Identity.company_id == p.company_id, Identity.is_company_admin, Identity.id != p.id, Identity.status == "active")
     ):
         raise conflict(f"{p.email} is the company's only administrator. Make someone else its administrator first.")
-    audit(db, me, "user.deleted", category="security", target=p.email, target_type="user", target_id=p.id, company_id=p.company_id)
-    db.delete(p)
+    if p.status != "suspended":
+        p.status = "suspended"
+        now = datetime.now(UTC)
+        for s in db.scalars(select(IdentitySession).where(IdentitySession.identity_id == p.id, IdentitySession.revoked_at.is_(None))):
+            s.revoked_at = now
+        audit(db, me, "user.suspended", category="security", target=p.email, target_type="user", target_id=p.id, company_id=p.company_id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

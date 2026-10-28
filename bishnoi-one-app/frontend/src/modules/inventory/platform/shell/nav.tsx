@@ -23,14 +23,15 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
   const count = (keys: string[] = []) => keys.reduce((n, k) => n + (waiting[k] ?? 0), 0) || undefined;
   const keep = (items: Item[]): Step[] => items.filter((i) => i.sees.some(may)).map(({ sees: _s, waits, ...step }) => ({ ...step, count: count(waits) }));
   // As the CRM lays its menu out (decided 2026-10-26): the work in the order it happens (items,
-  // stock, selling, buying), Reports as one row, then Users and roles and Settings at the foot.
+  // stock, selling, buying), Reports as one row, then Settings at the foot (people and roles are on
+  // the Admin Console since 2026-10-28).
   // The lists that only set things up (warehouses, categories, brands, units) are Settings.
   const processes: Process[] = [
     {
       label: "Items",
       icon: "products",
       steps: keep([
-        { href: "/inventory/products", label: "Items", icon: "products", exact: true, sees: ["products.view"], missing: unset.productPrices ? { count: unset.productPrices, says: `${unset.productPrices} ${unset.productPrices === 1 ? "item has" : "items have"} no selling price or cost` } : undefined },
+        { href: "/inventory/products", label: "Items", icon: "products", also: ["/inventory/products"], exact: true, sees: ["products.view"], missing: unset.productPrices ? { count: unset.productPrices, says: `${unset.productPrices} ${unset.productPrices === 1 ? "item has" : "items have"} no selling price or cost` } : undefined },
         // The FDA registrations, many at once (app/cpr.py).
         { href: "/inventory/products/cpr", label: "Item registrations (CPR)", icon: "info", sees: ["products.edit"] },
       ]),
@@ -40,8 +41,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "stock",
       steps: keep([
         { href: "/inventory/stock", label: "Stock on hand", icon: "stock", sees: ["stock.view"] },
-        { href: "/inventory/batches", label: "Batches", icon: "batches", sees: ["stock.view"] },
-        { href: "/inventory/serials", label: "Serial numbers", icon: "serials", sees: ["stock.view"] },
         { href: "/inventory/transfers", label: "Transfer orders", icon: "transfers", sees: ["transfers.view"] },
         { href: "/inventory/adjustments", label: "Inventory adjustments", icon: "adjustments", sees: ["adjustments.view"] },
         { href: "/inventory/counts", label: "Inventory counts", icon: "counts", sees: ["counts.view"] },
@@ -71,20 +70,12 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Reports",
       icon: "report",
       steps: keep([
-        { href: "/inventory/reports", label: "Reports", icon: "report", exact: true, also: ["/inventory/reports", "/inventory/alerts"], sees: ["reports.view"] },
-        { href: "/inventory/movements", label: "Stock movements", icon: "history", sees: ["stock.view"] },
+        // One row: batch and expiry, serial lookup and stock movements are in the Reports Center (2026-10-28).
+        { href: "/inventory/reports", label: "Reports", icon: "report", also: ["/inventory/reports", "/inventory/alerts", "/inventory/serials", "/inventory/movements"], sees: ["reports.view", "stock.view"] },
       ]),
     },
   ];
   const foot: Process[] = [
-    {
-      label: "Users and roles",
-      icon: "people",
-      steps: keep([
-        { href: "/inventory/admin/users", label: "Users", icon: "people", sees: ["admin.users"] },
-        { href: "/platform/roles", label: "Roles", icon: "roles", sees: ["admin.roles"] },
-      ]),
-    },
     {
       label: "Settings",
       icon: "settings",

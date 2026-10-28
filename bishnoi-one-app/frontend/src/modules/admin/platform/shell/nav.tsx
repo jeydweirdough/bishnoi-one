@@ -63,13 +63,6 @@ function menu(me: Me, unset: Unset): { home: Step | null; processes: Process[]; 
   ];
   const foot: Process[] = [
     {
-      label: "Users and roles", icon: "people",
-      steps: keep([
-        { href: "/admin/admin/users", label: "Users", icon: "people", sees: "admin.users" },
-        { href: "/platform/roles", label: "Roles", icon: "roles", sees: "admin.roles" },
-      ]),
-    },
-    {
       label: "Settings", icon: "settings",
       steps: [
         // The Settings page opens for whoever may manage settings (screens/layout.tsx checks the same).

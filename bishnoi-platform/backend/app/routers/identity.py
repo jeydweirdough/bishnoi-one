@@ -9,8 +9,10 @@ application they have been given.
   for the company they're in, or another of theirs when it names one.
 - /identity/password: changing their password (at every company of theirs).
 
-Someone who works for two companies has a row at each (models.Identity), under
-the same email; a sign-in is at one of them at a time.
+A person has one account (models.Account: email, the one password; step 4,
+2026-10-28) and a membership at each company they work for (models.Identity);
+a sign-in is at one of their memberships at a time. Suspending the account
+stops them everywhere; suspending a membership, at that company.
 - /pass/key: the platform's public key, for the applications to check passes.
 
 A pass is refused, in words a person can act on, when the account or its
@@ -22,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from sqlalchemy import func, select
@@ -30,12 +32,15 @@ from sqlalchemy.orm import Session
 
 from app.api import Api
 from app.access_roles import role_for_pass
+from app.org_push import placement
 from app.audit import audit
-from app import passwords, platform_admins
+from app import catalogue, document_chain, platform_admins
+from app.accounts import account_by_email, account_of, memberships, runs_company
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
-from app.models import AccessRole, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
+from app.models import AccessRole, Account, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
 from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
 from app.routers.auth import Attempts
+from app import passwords
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
 
 router = APIRouter(tags=["bishnoi accounts"])
@@ -59,8 +64,9 @@ def current_identity(
     if record is None or record.revoked_at is not None or as_utc(record.expires_at) <= datetime.now(UTC):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
     person = db.get(Identity, record.identity_id)
-    changed = person and person.password_changed_at and as_utc(record.created_at) < as_utc(person.password_changed_at)
-    if person is None or person.status != "active" or changed:
+    account = account_of(db, person) if person else None
+    changed = account and account.password_changed_at and as_utc(record.created_at) < as_utc(account.password_changed_at)
+    if person is None or person.status != "active" or account is None or account.status != "active" or changed:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
     return record, person
 
@@ -74,11 +80,9 @@ class LoginIn(Api):
 
 
 def same_person(db: Session, email: str) -> list[Identity]:
-    """Every company's row for this email: the most recently used first."""
-    return list(db.scalars(
-        select(Identity).where(func.lower(Identity.email) == email.strip().lower())
-        .order_by(Identity.last_active_at.desc().nulls_last(), Identity.created_at)
-    ))
+    """Every company's membership of this person's account: the most recently used first."""
+    account = account_by_email(db, email)
+    return memberships(db, account) if account else []
 
 
 def usable(db: Session, rows: list[Identity]) -> list[tuple[Identity, Company]]:
@@ -113,28 +117,30 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
             f"Too many wrong passwords. Try again in {max(1, wait // 60)} minute(s).",
             headers={"Retry-After": str(wait)},
         )
-    # A Platform Admin needn't be added to a company: they have an account at every one
-    # (app/platform_admins.py), made here once their staff password is right.
-    staff = platform_admins.admin_staff(db, email)
-    if staff is not None and verify_password(body.password, passwords.hash_for_sign_in(db, staff)):
-        platform_admins.everywhere(db, staff)
-        db.flush()
-    rows = same_person(db, email)
-    # One password for all their companies (kept the same at each row).
-    person = next((r for r in rows if r.password_hash), rows[0] if rows else None)
-    ok = verify_password(body.password, person.password_hash if person and person.password_hash else DUMMY_HASH)
-    if person is None or not person.password_hash or not ok:
+    account = account_by_email(db, email)
+    ok = verify_password(body.password, account.password_hash if account and account.password_hash else DUMMY_HASH)
+    if account is None or not account.password_hash or not ok:
         attempts.failed(email, window)
-        audit(db, email, "identity.sign_in_failed", category="security", target=email, target_type="identity", target_id=person.id if person else None, address=address)
+        audit(db, email, "identity.sign_in_failed", category="security", target=email, target_type="identity", target_id=None, address=address)
         db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
+    if account.status != "active":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
+    # An operator needn't be added to a company: they have a membership at every one (app/platform_admins.py).
+    if account.is_operator:
+        platform_admins.everywhere(db, account)
+        db.flush()
+    rows = memberships(db, account)
     # At the company they last worked in, of those they can work in now.
     open_rows = usable(db, rows)
+    if not rows:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your Bishnoi One account isn't at any company yet. Ask your company's administrator to add you.")
     if not open_rows:
         if all(r.status != "active" for r in rows):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     attempts.clear(email)
+    account.last_sign_in_at = datetime.now(UTC)
     response.headers["Cache-Control"] = "no-store"
     return open_session(db, settings, open_rows[0][0], address, "identity.signed_in")
 
@@ -157,7 +163,7 @@ def admin_grant(person: Identity, app: Application) -> IdentityApp:
 def grant_of(db: Session, person: Identity, app: Application) -> IdentityApp | None:
     """What this person holds on an application: their grant, or a company administrator's standing one."""
     grant = db.get(IdentityApp, (person.id, app.id))
-    if person.is_company_admin and (grant is None or not grant.is_app_admin):
+    if runs_company(db, person) and (grant is None or not grant.is_app_admin):
         return admin_grant(person, app) if grant is None else IdentityApp(
             identity_id=person.id, application_id=app.id, role=grant.role or "Administrator", is_app_admin=True, granted_at=grant.granted_at)
     return grant
@@ -173,7 +179,9 @@ def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityAp
         .where(Application.is_active)
         .order_by(Application.sort_order, Application.name)
     ).all()
-    if person.is_company_admin:
+    # A service whose catalogue apps the company switched off isn't opened (step 6).
+    rows = [(a, g) for a, g in rows if catalogue.service_on(db, person.company_id, a.key)]
+    if runs_company(db, person):
         return [(a, grant_of(db, person, a)) for a, _ in rows]
     return [(a, g) for a, g in rows if g is not None]
 
@@ -188,7 +196,8 @@ def me(signed: Signed, db: DB) -> dict:
         "email": person.email,
         "fullName": person.full_name,
         "title": person.title,
-        "isCompanyAdmin": person.is_company_admin,
+        # Administers this company: the company's own choice, or the operator switch (accounts.runs_company).
+        "isCompanyAdmin": runs_company(db, person),
         "company": {"id": company.id, "name": company.name, "slug": company.slug} if company else None,
         # Every company they work for, to switch to (this one too).
         "companies": sorted(
@@ -199,7 +208,12 @@ def me(signed: Signed, db: DB) -> dict:
         "role": role.name if role else None,
         # Also Bishnoi One staff here (same email): "admin" (Platform Admin) or "member" (Support), else None.
         # The one app's Admin Console shows companies, APIs and accounts to them (app/deps.py staff_by_account).
-        "staff": db.scalar(select(User.role).where(func.lower(User.email) == person.email.lower(), User.is_active)),
+        # An operator (step 5: the switch on their account) sees the Operations area: "admin", else None.
+        "staff": "admin" if (account := account_of(db, person)) and account.is_operator else None,
+        # Where they sit on the company's org chart (step 4).
+        "org": placement(db, person),
+        # The company's app catalogue: each catalogue app ("app:purchasing") and feature, on or off (step 6).
+        "features": catalogue.switches(db, person.company_id),
         "apps": [
             {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": role.name if role else g.role, "isAppAdmin": g.is_app_admin or bool(role and role.is_admin),
              # When it was given to them: the first one given is where they start (the one app opens it after sign-in).
@@ -276,11 +290,13 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     if db.get(CompanyApp, (company.id, app.id)) is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} doesn't have {app.name}. Ask your company's administrator.")
+    if not catalogue.service_on(db, company.id, app.key):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} has switched {app.name} off. Ask your company's administrator.")
     grant = grant_of(db, person, app)
     if grant is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")
     try:
-        token = issue(settings, person, company, app, grant, role_for_pass(db, person, app))
+        token = issue(settings, person, company, app, grant, role_for_pass(db, person, app), placement(db, person), company_admin=runs_company(db, person))
     except PassUnavailable as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e
     person.last_active_at = datetime.now(UTC)
@@ -298,7 +314,8 @@ class PasswordIn(Api):
 @router.post("/identity/password", status_code=status.HTTP_204_NO_CONTENT)
 def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
     record, person = signed
-    if not verify_password(body.current_password, person.password_hash or DUMMY_HASH):
+    account = account_of(db, person)
+    if not verify_password(body.current_password, (account.password_hash if account else None) or DUMMY_HASH):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Your current password isn't right.")
     problem = check_password_rules(body.new_password)
     if problem:
@@ -312,6 +329,14 @@ def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
     audit(db, person.email, "identity.password_changed", category="security", target=person.email, target_type="identity", target_id=person.id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/identity/documents/trail")
+def document_trail(signed: Signed, db: DB, app: str = Query(max_length=40), kind: str = Query(max_length=40), id: str = Query(max_length=36)) -> dict:
+    """The documents before and after one, across the company's apps (step 9). References only: each app
+    still decides who may open each document."""
+    _, person = signed
+    return document_chain.trail(db, person.company_id, app, kind, id)
 
 
 @router.get("/pass/key")

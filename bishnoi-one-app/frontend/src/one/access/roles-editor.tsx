@@ -14,7 +14,8 @@ import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { createRole, deleteRole, importRoles, updateRole } from "./actions";
 import { moduleLabel } from "./labels";
-import type { AccessData, AccessModule, AccessRole, RoleInput } from "./types";
+import { AbilitiesSection, CopyJobRole } from "./abilities";
+import type { AbilityCatalogue, AccessData, AccessModule, AccessRole, RoleInput } from "./types";
 
 const NEW = "__new";
 const EMPTY: RoleInput = { name: "", description: null, isAdmin: false, permissions: {}, scopes: {} };
@@ -46,7 +47,7 @@ function summary(role: AccessRole, modules: AccessModule[]): string {
  * the left; on the right its name, then each module's permissions and, where the
  * module has them, whose records it reaches.
  */
-export function AccessRolesEditor({ data }: { data: AccessData }) {
+export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catalogue: AbilityCatalogue | null }) {
   const router = useRouter();
   const [selected, setSelected] = useState(data.roles[0]?.id ?? NEW);
   const [drafts, setDrafts] = useState<Record<string, RoleInput>>({});
@@ -135,6 +136,7 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
           actions={
             <>
               <AsyncButton onRun={bringIn}>Bring in today&apos;s roles</AsyncButton>
+              {catalogue && <CopyJobRole catalogue={catalogue} onMade={pick} />}
               <Button onClick={() => pick(NEW)}>New role</Button>
             </>
           }
@@ -165,6 +167,7 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
         onSelect={pick}
         footer={
           <div className="mt-3 px-2">
+            {catalogue && <CopyJobRole catalogue={catalogue} onMade={pick} />}
             <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => pick(NEW)} disabled={selected === NEW}>
               New role
             </Button>
@@ -226,7 +229,13 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
             </p>
           </Sheet>
         ) : (
-          data.modules.map((m) => (
+          <>
+          {role && catalogue && <AbilitiesSection key={`${role.id}-${JSON.stringify(role.abilities)}-${JSON.stringify(role.scopes)}`} role={role} catalogue={catalogue} modules={data.modules} />}
+          {/* The apps' own permissions, under the abilities (step 6): most roles never need them. */}
+          <details className="group" open={!role || !catalogue}>
+            <summary className="cursor-pointer px-1 text-meta text-ink-3">Technical permissions, app by app</summary>
+            <div className="mt-3 space-y-5">
+          {data.modules.map((m) => (
             <ModuleSection
               key={`${selected}-${m.key}`}
               module={m}
@@ -236,7 +245,10 @@ export function AccessRolesEditor({ data }: { data: AccessData }) {
               onPermissions={(perms) => edit({ permissions: { ...draft.permissions, [m.key]: perms } })}
               onScope={(scope) => edit({ scopes: { ...draft.scopes, [m.key]: scope } })}
             />
-          ))
+          ))}
+            </div>
+          </details>
+          </>
         )}
 
         {dirty && (

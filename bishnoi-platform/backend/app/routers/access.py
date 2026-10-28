@@ -210,7 +210,7 @@ def organization_access(db: DB, _: CurrentUser) -> dict:
         )
     }
     admins: dict[str, list[dict]] = {}
-    for p in db.scalars(select(Identity).where(Identity.is_company_admin).order_by(Identity.full_name)):
+    for p in db.scalars(select(Identity).where(Identity.is_company_admin, Identity.via_operator.is_(False)).order_by(Identity.full_name)):
         admins.setdefault(p.company_id, []).append({"id": p.id, "name": p.full_name})
     return {
         "applications": [{"id": a.id, "key": a.key, "name": a.name} for a in apps],
@@ -297,7 +297,7 @@ def roles(db: DB, _: CurrentUser) -> dict:
         ],
         "permissions": [{"area": area, "action": action, "support": both} for area, action, both in PERMISSIONS],
         "levels": {
-            "companyAdmins": db.scalar(select(func.count()).select_from(Identity).where(Identity.is_company_admin)),
+            "companyAdmins": db.scalar(select(func.count()).select_from(Identity).where(Identity.is_company_admin, Identity.via_operator.is_(False))),
             "applicationAdmins": db.scalar(select(func.count()).select_from(IdentityApp).where(IdentityApp.is_app_admin)),
         },
     }

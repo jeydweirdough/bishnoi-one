@@ -1,43 +1,38 @@
-"""A Platform Admin is everywhere (decided 2026-10-27): they run Bishnoi One itself,
-so they don't wait to be added to a company. When one signs in, they have a Bishnoi
-One account at every active company, as its administrator, with their one password
-(app/passwords.py); a company added since is added for them the next time.
+"""An operator is everywhere (decided 2026-10-27; the operator switch since step 4,
+2026-10-28): they run Bishnoi One itself, so they don't wait to be added to a company.
+When one signs in, they have a membership at every active company where they had none,
+marked as made for an operator (via_operator); a company added since is added for them
+the next time. Such a membership only lets them in: it holds no role of the company's, isn't
+one of its people, and isn't ticked as its administrator. An operator administers every company
+by the switch on their account (accounts.runs_company); a membership the company itself made
+(an operator who also works there) is left exactly as the company set it (2026-10-28).
 
-Support staff (role "member") aren't: a company adds them like anyone else.
+Today an operator is a Platform Admin on the staff list (app/accounts.py keeps the switch
+the same); Support staff aren't operators: a company adds them like anyone else.
 """
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit import audit
-from app.models import Company, Identity, User
-from app.passwords import account_hash
+from app.models import Account, Company, Identity
 
 
-def admin_staff(db: Session, email: str) -> User | None:
-    staff = db.scalar(select(User).where(func.lower(User.email) == email.strip().lower()))
-    return staff if staff is not None and staff.is_active and staff.role == "admin" else None
-
-
-def everywhere(db: Session, staff: User) -> int:
-    """Their account at each active company, as its administrator. Returns how many were added."""
-    password = account_hash(db, staff.email) or staff.password_hash
-    mine = {i.company_id: i for i in db.scalars(select(Identity).where(func.lower(Identity.email) == staff.email.lower()))}
+def everywhere(db: Session, account: Account) -> int:
+    """Their membership at each active company, as its administrator. Returns how many were added."""
+    mine = {i.company_id: i for i in db.scalars(select(Identity).where(Identity.account_id == account.id))}
     added = 0
     for company in db.scalars(select(Company).where(Company.status == "active")):
         person = mine.get(company.id)
         if person is None:
-            person = Identity(company_id=company.id, full_name=staff.full_name, email=staff.email.lower(), is_company_admin=True,
-                              password_hash=password, password_changed_at=datetime.now(UTC))
+            person = Identity(company_id=company.id, account_id=account.id, full_name=account.full_name, email=account.email,
+                              is_company_admin=False, via_operator=True,
+                              password_hash=account.password_hash, password_changed_at=account.password_changed_at or datetime.now(UTC))
             db.add(person)
             db.flush()
             audit(db, "Bishnoi One", "user.created", category="security", target=person.email, target_type="user", target_id=person.id,
-                  company_id=company.id, fields=["isCompanyAdmin", "as a Platform Admin"])
+                  company_id=company.id, fields=["as an operator"])
             added += 1
-        elif not person.is_company_admin:
-            person.is_company_admin = True
-            audit(db, "Bishnoi One", "user.updated", category="security", target=person.email, target_type="user", target_id=person.id,
-                  company_id=company.id, fields=["isCompanyAdmin", "as a Platform Admin"])
     return added

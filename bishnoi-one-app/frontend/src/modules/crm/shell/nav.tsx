@@ -132,14 +132,19 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       ]
     : [];
 
+  // People and roles are kept on the Admin Console (People, Roles); what the CRM keeps of its own
+  // about people (employee ID, teams) is under Settings (decided 2026-10-28).
+  const own: Step[] = people
+    .filter((p) => !p.href.startsWith("/platform/"))
+    .map((p) => ({ href: p.href, label: p.label === "Users" ? "People's details" : p.label, icon: p.href.includes("teams") ? "teams" : "people" }));
   const foot: Process[] = [
-    { label: "Users and roles", icon: "people", steps: people.map((p) => ({ href: p.href, label: p.label === "Roles and permissions" ? "Roles" : p.label, icon: p.href.includes("roles") ? "roles" : p.href.includes("teams") ? "teams" : "people" })) },
     {
       label: fullSettings ? "Settings" : "Department settings",
       section: "Administration",
       icon: "settings",
       steps: [
         ...settingsSteps,
+        ...own,
         ...when(may("admin.audit"), { href: "/crm/admin/audit", label: "Activity log", icon: "auditLog" }),
       ],
     },

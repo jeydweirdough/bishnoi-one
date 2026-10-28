@@ -67,7 +67,11 @@ def test_upgrading_a_database_with_entries_and_invoices_keeps_every_row(tmp_path
         after = c.execute(text("SELECT * FROM nbfi_ledger_settings")).mappings().one()
         assert {k: after[k] for k in before} == dict(before)  # every default account kept
         assert c.execute(text("SELECT count(*) FROM nbfi_expense_categories WHERE account_id IS NOT NULL")).scalar() > 0
-        assert c.execute(text("SELECT version_num FROM nbfi_alembic_version")).scalar() == "0022"
+        # Brought all the way up (whatever the newest migration is now).
+        from alembic.script import ScriptDirectory
+
+        head = ScriptDirectory.from_config(_config(engine)).get_current_head()
+        assert c.execute(text("SELECT version_num FROM nbfi_alembic_version")).scalar() == head
     engine.dispose()
 
 

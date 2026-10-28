@@ -1,3 +1,5 @@
+import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
+import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { ArrowRight, Ban, ExternalLink, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
@@ -26,15 +28,15 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
   const { fmt, may, at, day } = await context();
   if (!may("transfers.view")) return <NoAccess what="transfers" />;
   const s = await searchParams;
-  const f = { q: param(s, "q"), status: param(s, "status") };
+  const f = { q: param(s, "q"), status: param(s, "status"), operationType: param(s, "operationType"), timing: param(s, "timing") };
   const board = param(s, "view") !== "list" && !f.status;
   // The board shows every open one in its columns; the list is read a page at a time.
   const { page, size, vars } = paging(s);
   const base = `/inventory/transfers${query({ ...f, view: board ? "" : "list" })}`;
-  const { transfers: got } = await loadQuery<{ transfers: TransferBrief[] | Paged<TransferBrief> }>(
-    `query Transfers($q: String, $status: String, $limit: Int, $offset: Int) { transfers(q: $q, status: $status, limit: $limit, offset: $offset) }`,
+  const { transfers: got, operationTypes } = await loadQuery<{ transfers: TransferBrief[] | Paged<TransferBrief>; operationTypes: OperationTypeRow[] }>(
+    `query Transfers($q: String, $status: String, $operationType: String, $timing: String, $limit: Int, $offset: Int) { transfers(q: $q, status: $status, operationType: $operationType, timing: $timing, limit: $limit, offset: $offset) operationTypes }`,
     { ...given(f), ...(board ? {} : vars) },
-    ["transfers"],
+    ["transfers", "operationTypes"],
   );
   const list: Paged<TransferBrief> = Array.isArray(got) ? { items: got, total: got.length } : got;
   if (!board) keepInRange(list.items.length, list.total, page, base);
@@ -59,7 +61,9 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
         />
       </div>
       {!board && <Chips label="Status" current={f.status} options={[chip("", "All"), chip("draft", "Drafts"), chip("requested", "Requested"), chip("approved", "Approved"), chip("in_transit", "In transit"), chip("received", "Received"), chip("cancelled", "Cancelled")]} />}
-      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status, view: board ? "" : "list" }} />
+      <Filters q={f.q} placeholder="Transfer number" keep={{ status: f.status, view: board ? "" : "list" }}>
+        <HeaderFilters types={operationTypes} kinds={["internal"]} operationType={f.operationType} timing={f.timing} />
+      </Filters>
       {board && transfers.length > 0 ? (
         <TransfersBoard transfers={transfers} fmt={fmt} day={day} may={may} />
       ) : (
@@ -150,6 +154,7 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
       >
         <TransferStamp status={t.status} /> <span className="ml-1">{t.from.name} → {t.to.name}</span>
       </PageHeader>
+      <DocumentHeaderStrip header={t.header} />
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
@@ -199,8 +204,8 @@ export async function TransferPage({ params }: { params: Params<{ id: string }> 
 }
 
 /** The transfer form's lists, with what's free per product per warehouse. */
-const TRANSFER_FORM = `${referenceOf("products", "warehouses")} availability`;
-type TransferFormData = { reference: Pick<Reference, "products" | "warehouses">; availability: Record<string, number> };
+const TRANSFER_FORM = `${referenceOf("products", "warehouses")} availability operationTypes`;
+type TransferFormData = { reference: Pick<Reference, "products" | "warehouses">; availability: Record<string, number>; operationTypes: OperationTypeRow[] };
 
 export async function NewTransferPage() {
   const { me, may } = await context();
@@ -208,11 +213,11 @@ export async function NewTransferPage() {
   // What this page needs first; if any is missing, that instead of a form that can't be finished.
   const gate = NeedsFirst({ setup: await loadSetup(), needs: ["twoWarehouses", "stock"], then: "/inventory/transfers/new", title: "New transfer", doing: "move stock between warehouses", crumbs: [{ href: "/inventory/transfers", label: "Transfer orders" }], may });
   if (gate) return gate;
-  const { reference: ref, availability: available } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability"]);
+  const { reference: ref, availability: available, operationTypes } = await loadQuery<TransferFormData>(`query NewTransfer { ${TRANSFER_FORM} }`, {}, ["reference", "availability", "operationTypes"]);
   return (
     <>
       <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfer orders" }]} title="New transfer order" />
-      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} />
+      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} available={available} operationTypes={operationTypes} />
     </>
   );
 }
@@ -221,15 +226,15 @@ export async function EditTransferPage({ params }: { params: Params<{ id: string
   const { id } = await params;
   const { me, may } = await context();
   if (!may("transfers.create")) return <NoAccess what="transfers" />;
-  const { transfer: t, reference: ref, availability: available } = await loadQuery<TransferFormData & { transfer: Transfer }>(
+  const { transfer: t, reference: ref, availability: available, operationTypes } = await loadQuery<TransferFormData & { transfer: Transfer }>(
     `query EditTransfer($id: String!) { transfer(id: $id) ${TRANSFER_FORM} }`,
     { id },
-    ["transfer", "reference", "availability"],
+    ["transfer", "reference", "availability", "operationTypes"],
   );
   return (
     <>
       <PageHeader crumbs={[{ href: "/inventory/transfers", label: "Transfer orders" }, { href: `/inventory/transfers/${t.id}`, label: t.number }]} title={`Edit ${t.number}`} />
-      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} transfer={t} available={available} />
+      <TransferForm canAdd={canAddFrom(may)} org={me.org} reference={ref} transfer={t} available={available} operationTypes={operationTypes} />
     </>
   );
 }

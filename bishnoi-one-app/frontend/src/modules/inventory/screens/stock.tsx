@@ -8,7 +8,7 @@ import { MOVEMENT_FILTERS, MOVEMENT_KINDS, param, query, referenceHref, signed }
 import { Pager } from "@/src/modules/inventory/platform/ui/pager";
 import { context, keepInRange, paging, type Search } from "@/src/modules/inventory/lib/page";
 import { given, referenceOf } from "@/src/modules/inventory/lib/reference";
-import type { BatchRow, Movement, Page, Paged, Reference, SerialRow, StockOverview } from "@/src/modules/inventory/lib/types";
+import type { BatchRow, Movement, Page, Paged, Product, Reference, SerialRow, StockOverview } from "@/src/modules/inventory/lib/types";
 
 const warehouseOptions = (ref: Pick<Reference, "warehouses">) => [{ value: "", label: "All warehouses" }, ...ref.warehouses.map((w) => ({ value: w.id, label: w.name }))];
 
@@ -165,32 +165,35 @@ export async function MovementsPage({ searchParams }: { searchParams: Search }) 
   );
 }
 
-export async function BatchesPage({ searchParams }: { searchParams: Search }) {
+export async function BatchesPage({ searchParams, productId }: { searchParams: Search; productId?: string }) {
   const { fmt, may, day } = await context();
   if (!may("stock.view")) return <NoAccess what="batches" />;
   const s = await searchParams;
+  const root = productId ? `/inventory/products/${encodeURIComponent(productId)}/batches` : "/inventory/reports/batch-expiry";
   const f = { q: param(s, "q"), warehouse: param(s, "warehouse"), expiry: param(s, "expiry"), empty: param(s, "empty") };
   const { page, size, vars } = paging(s);
-  const base = `/inventory/batches${query(f)}`;
-  const { batches: list, reference: ref } = await loadQuery<{ batches: Paged<BatchRow>; reference: Pick<Reference, "warehouses"> }>(
-    `query Batches($q: String, $warehouse: String, $expiry: String, $empty: Boolean, $limit: Int, $offset: Int) { batches(q: $q, warehouse: $warehouse, expiry: $expiry, empty: $empty, limit: $limit, offset: $offset) ${referenceOf("warehouses")} }`,
-    { ...given({ ...f, empty: Boolean(f.empty) }), ...vars },
-    ["batches", "reference"],
+  const base = `${root}${query(f)}`;
+  const { batches: list, reference: ref, product } = await loadQuery<{ batches: Paged<BatchRow>; reference: Pick<Reference, "warehouses">; product?: Product | null }>(
+    `query Batches($product: String, $productId: String!, $named: Boolean!, $q: String, $warehouse: String, $expiry: String, $empty: Boolean, $limit: Int, $offset: Int) { batches(product: $product, q: $q, warehouse: $warehouse, expiry: $expiry, empty: $empty, limit: $limit, offset: $offset) ${referenceOf("warehouses")} product(id: $productId) @include(if: $named) }`,
+    { ...given({ ...f, product: productId, empty: f.empty === "true" }), productId: productId ?? "", named: Boolean(productId), ...vars },
+    ["batches", "reference", ...(productId ? ["product" as const] : [])],
   );
   keepInRange(list.items.length, list.total, page, base);
   const batches = list.items;
-  const chip = (expiry: string, label: string) => ({ value: expiry, label, href: `/inventory/batches${query({ ...f, expiry })}` });
+  const chip = (expiry: string, label: string) => ({ value: expiry, label, href: `${root}${query({ ...f, expiry })}` });
 
   return (
     <>
       <PageHeader
-        title="Batches"
-        actions={may("adjustments.create") && <LinkButton href="/inventory/adjustments/new?reason=expired">Write off expired stock</LinkButton>}
+        title={product ? `${product.name} - Batches` : "Batch and expiry report"}
+        crumbs={product ? [{ href: "/inventory/products", label: "Items" }, { href: `/inventory/products/${product.id}`, label: product.name }] : [{ href: "/inventory/reports", label: "Reports" }]}
+        actions={product && may("receiving.receive") ? <LinkButton href={`/inventory/receipts/new?product=${product.id}`}>Receive stock</LinkButton> : undefined}
       >
-        All batches on hand, sorted by expiry date in issue order (first-expired, first-out).
+        {product ? "Batches for this item, including warehouse balances and expiry dates. Batches are recorded through purchase receives; quantity changes use stock transactions." : "Across all items: batch balances and expiry dates in first-expired, first-out order. Open an item to view its own batches."}
       </PageHeader>
+      {product && <nav aria-label="Item sections" className="mb-4 flex gap-4 border-b border-rule pb-3 text-sm"><Link href={`/inventory/products/${product.id}`} className="text-ink-3 hover:underline">Overview</Link><span aria-current="page" className="font-semibold text-ink">Batches</span></nav>}
       <Chips label="Expiry" current={f.expiry} options={[chip("", "All"), chip("expired", "Expired"), chip("expiring", "Expiring soon"), chip("ok", "Not expiring")]} />
-      <Filters q={f.q} placeholder="Batch number or product" keep={{ expiry: f.expiry }}>
+      <Filters q={f.q} placeholder={product ? "Search batch number" : "Batch number or product"} keep={{ expiry: f.expiry }}>
         <FilterSelect name="warehouse" label="Warehouse" value={f.warehouse} options={warehouseOptions(ref)} />
         <FilterSelect name="empty" label="Show" value={f.empty} options={[{ value: "", label: "Batches with stock" }, { value: "true", label: "Include depleted batches" }]} />
       </Filters>
@@ -202,7 +205,7 @@ export async function BatchesPage({ searchParams }: { searchParams: Search }) {
             {batches.map((b) => (
               <tr key={b.id} className="relative hover:bg-bench/40">
                 <Td><span className="font-mono font-semibold">{b.batchNo}</span>{b.manufacturedOn && <span className="block text-meta text-ink-3">Made {day(b.manufacturedOn)}</span>}</Td>
-                <Td><RowLink href={`/inventory/products/${b.product.id}`} sub={b.product.sku}>{b.product.name}</RowLink></Td>
+                <Td><RowLink href={`/inventory/products/${b.product.id}/batches`} sub={b.product.sku}>{b.product.name}</RowLink></Td>
                 <Td>{b.expiresOn ? <ExpiryMark expiry={b.expiry} label={day(b.expiresOn)} /> : <span className="text-ink-3">No expiry</span>}</Td>
                 <Td num className={b.daysLeft != null && b.daysLeft < 0 ? "font-semibold text-eosin" : "text-ink-2"}>{b.daysLeft == null ? "—" : fmt.count(b.daysLeft)}</Td>
                 <Td className="text-meta text-ink-2">{b.warehouses.map((w) => `${w.code} ${fmt.count(w.onHand)}`).join(" · ") || "—"}</Td>
