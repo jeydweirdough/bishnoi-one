@@ -42,6 +42,13 @@ function StatusMark({ status }: { status: InvoiceStatus }) {
   return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{STATUS_LABELS[status]}</span>;
 }
 
+/** The company's active bank accounts and e-wallets, for where a payment went (step 16a). */
+async function banksOf(): Promise<{ id: string; name: string; kind: string }[]> {
+  return load<{ items: { id: string; name: string; kind: string; isActive: boolean }[] }>("/finance/bank-accounts")
+    .then((r) => r.items.filter((b) => b.isActive))
+    .catch(() => []);
+}
+
 type Listing = {
   items: InvoiceSummary[];
   counts: Record<InvoiceStatus, number> & { attention: number };
@@ -79,7 +86,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
   if (status) query.set("status", status);
   if (attention) query.set("attention", "true");
   if (q) query.set("q", q);
-  const list = await load<Listing>(`/finance/invoices?${query}`);
+  const [list, banks] = await Promise.all([load<Listing>(`/finance/invoices?${query}`), banksOf()]);
   const today = fmt.todayKey();
   const f = list.figures;
   const collect = may(me, "invoices.collect");
@@ -212,7 +219,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                           <strong className={`tabular-nums ${i.balanceCentavos > 0 ? "text-danger" : "text-sage-deep"}`}>{fmt.peso(i.balanceCentavos)}</strong>
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
-                          {collect && i.status === "issued" && i.balanceCentavos > 0 && <RecordPayment id={i.id} owed={i.balanceCentavos} methods={list.methods} org={me.org} today={today} />}
+                          {collect && i.status === "issued" && i.balanceCentavos > 0 && <RecordPayment id={i.id} owed={i.balanceCentavos} methods={list.methods} org={me.org} today={today} banks={banks} />}
                           <LinkButton href={`/finance/invoices/${i.id}`}>Open invoice</LinkButton>
                         </div>
                       </div>
@@ -477,7 +484,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             </ul>
           )}
           {inv.balanceCentavos > 0 ? (
-            may(me, "invoices.collect") && <RecordPayment id={inv.id} owed={inv.balanceCentavos} methods={inv.methods} org={me.org} today={fmt.todayKey()} />
+            may(me, "invoices.collect") && <RecordPayment id={inv.id} owed={inv.balanceCentavos} methods={inv.methods} org={me.org} today={fmt.todayKey()} banks={await banksOf()} />
           ) : (
             <p className="text-sm text-ink-2">Paid in full.</p>
           )}

@@ -12,6 +12,8 @@ export type TaxProfile = {
   registeredAddress: string | null;
   pricesIncludeTax: boolean;
   rdoCode: string | null;
+  /** VAT rounded on each line or once per invoice (step 16b). */
+  rounding?: "line" | "invoice";
   fiscalMonthEnd: number;
   complete: boolean;
   /** What an invoice needs and the registration doesn't have yet: "registered name", "TIN", "registered address". */

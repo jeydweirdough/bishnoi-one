@@ -28,6 +28,7 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
     pricesIncludeTax: p.pricesIncludeTax ? "yes" : "no",
     rdoCode: p.rdoCode ?? "",
     fiscalMonthEnd: String(p.fiscalMonthEnd ?? 12),
+    rounding: (p.rounding ?? "line") as "line" | "invoice",
   });
   const [error, setError] = useState<string | null>(null);
   // What an invoice needs and isn't filled in yet, marked on its box (2026-10-22: saving
@@ -49,6 +50,7 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
         pricesIncludeTax: v.pricesIncludeTax === "yes",
         rdoCode: v.rdoCode.trim() || null,
         fiscalMonthEnd: Number(v.fiscalMonthEnd),
+        rounding: v.rounding,
       });
       if (result.ok) {
         const missing = result.data.profile.missing ?? [];
@@ -121,6 +123,16 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           options={[
             { value: "yes", label: "VAT-inclusive (shelf prices)" },
             { value: "no", label: "VAT-exclusive" },
+          ]}
+        />
+        <Choice
+          name="rounding"
+          legend="VAT rounding"
+          value={v.rounding}
+          onChange={(rounding) => set({ rounding })}
+          options={[
+            { value: "line", label: "On each line" },
+            { value: "invoice", label: "Once per invoice" },
           ]}
         />
       </fieldset>

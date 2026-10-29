@@ -149,7 +149,7 @@ def account_out(a: Account) -> dict:
 
     shown = term_of(a)[0] if a.type in ("asset", "liability") else None
     return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id,
-            "term": a.term, "termShown": shown}
+            "term": a.term, "termShown": shown, "costBehaviour": a.cost_behaviour, "reportTag": a.report_tag}
 
 
 def entry_out(e: JournalEntry) -> dict:

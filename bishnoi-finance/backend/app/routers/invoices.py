@@ -31,7 +31,7 @@ from app.deps import DB, SettingsDep
 from app.funds import RELEASE_METHODS as METHODS
 from app.ledger import Leg, account, money_account, post
 from app.ledger import settings as posting_settings
-from app.models import Invoice, InvoicePayment, InvoiceSeries, JournalEntry
+from app.models import BankAccount, Invoice, InvoicePayment, InvoiceSeries, JournalEntry
 from app.routers.funds import today
 from app.routers.tax import (
     Api,
@@ -549,6 +549,7 @@ def payment_out(p: InvoicePayment) -> dict:
     return {
         "id": p.id, "paidOn": p.paid_on.isoformat(), "amountCentavos": p.amount_centavos,
         "method": p.method, "methodLabel": METHODS.get(p.method, p.method), "reference": p.reference,
+        "bankAccountId": p.bank_account_id, "checkNumber": p.check_number, "checkBank": p.check_bank, "checkDate": p.check_date.isoformat() if p.check_date else None,
         "cwtCentavos": p.cwt_centavos, "cwtAtc": p.cwt_atc, "cwtCertificate": p.cwt_certificate,
         "recordedBy": p.recorded_by, "recordedAt": iso(p.recorded_at),
         "removedBy": p.removed_by, "removedAt": iso(p.removed_at),
@@ -564,6 +565,11 @@ class PaymentIn(Api):
     cwt_centavos: int = Field(0, ge=0)
     cwt_atc: str | None = Field(None, max_length=8)
     cwt_certificate: str | None = Field(None, max_length=60)
+    # Where the money went (step 16a), and a check's details.
+    bank_account_id: str | None = Field(None, max_length=36)
+    check_number: str | None = Field(None, max_length=40)
+    check_bank: str | None = Field(None, max_length=60)
+    check_date: date | None = None
 
 
 @router.post("/{invoice_id}/payments", status_code=status.HTTP_201_CREATED)
@@ -587,13 +593,22 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
         raise field_error("cwtAtc", "Give the ATC the customer's Form 2307 shows (e.g. WC158).")
     if atc and not re.fullmatch(r"W[A-Z]\d{3}[A-Z]?", atc):
         raise field_error("cwtAtc", "An ATC looks like WC158 or WI160, as on the Form 2307.")
+    if body.method == "check" and not (body.check_number or "").strip():
+        raise field_error("checkNumber", "Enter the check number.")
+    bank = None
+    if body.bank_account_id:
+        bank = db.get(BankAccount, body.bank_account_id)
+        if bank is None or not bank.is_active:
+            raise field_error("bankAccountId", "Pick one of the company's active bank accounts.")
     ledger = posting_settings(db)
     p = InvoicePayment(invoice=inv, paid_on=body.paid_on, amount_centavos=body.amount_centavos, method=body.method, reference=body.reference, recorded_by=user.full_name,
+                       bank_account_id=bank.id if bank else None, check_number=(body.check_number or "").strip() or None,
+                       check_bank=(body.check_bank or "").strip() or None, check_date=body.check_date,
                        cwt_centavos=body.cwt_centavos, cwt_atc=atc if body.cwt_centavos else None, cwt_certificate=(body.cwt_certificate or "").strip() or None)
     how = METHODS[body.method] + (f" ({body.reference})" if body.reference else "")
     # The withholding settles the invoice as the money does: 1210 Creditable withholding tax, credited against our income tax.
     entry = post(db, body.paid_on, f"{inv.number}: payment from {inv.customer_name}, {how}", [
-        Leg(money_account(db, body.method), debit=body.amount_centavos),
+        Leg(bank.account if bank else money_account(db, body.method), debit=body.amount_centavos),
         *([Leg(account(db, ledger.cwt_account_id), debit=body.cwt_centavos, description=f"Withheld by the customer ({atc})")] if body.cwt_centavos else []),
         Leg(account(db, ledger.receivables_account_id), credit=settled),
     ], user.full_name, reference=body.reference or inv.number, source="invoice")

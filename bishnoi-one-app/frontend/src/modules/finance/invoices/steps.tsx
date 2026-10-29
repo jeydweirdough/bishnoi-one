@@ -174,13 +174,17 @@ export function PrintButton() {
 }
 
 /** Money received against an issued invoice. */
-export function RecordPayment({ id, owed, methods, org, today }: { id: string; owed: number; methods: { key: string; label: string }[]; org: Org; today: string }) {
+export function RecordPayment({ id, owed, methods, org, today, banks = [] }: { id: string; owed: number; methods: { key: string; label: string }[]; org: Org; today: string;
+  /** The company's bank accounts and e-wallets (step 16a): where the money went. */
+  banks?: { id: string; name: string; kind: string }[] }) {
   const fmt = makeFormat(org);
   const [open, setOpen] = useState(false);
   const [paidOn, setPaidOn] = useState(today);
   const [amount, setAmount] = useState(String(owed / 10 ** (org.minorUnits ?? 2)));
   const [method, setMethod] = useState(methods[0]?.key ?? "cash");
   const [reference, setReference] = useState("");
+  const [bankId, setBankId] = useState("");
+  const [check, setCheck] = useState({ number: "", bank: "", date: "" });
   // What the customer withheld and paid the BIR for you (their Form 2307), on top of the money received.
   const [withheld, setWithheld] = useState(false);
   const [cwt, setCwt] = useState("");
@@ -204,6 +208,8 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
           const result = await recordPayment(id, {
             paidOn, amountCentavos: cents, method, reference: reference.trim() || null,
             cwtCentavos: cwtCents, cwtAtc: withheld ? atc.trim() || null : null, cwtCertificate: withheld ? certificate.trim() || null : null,
+            bankAccountId: bankId || null,
+            ...(method === "check" ? { checkNumber: check.number.trim() || null, checkBank: check.bank.trim() || null, checkDate: check.date || null } : {}),
           });
           if (!result.ok) {
             setError(result.error);
@@ -239,6 +245,27 @@ export function RecordPayment({ id, owed, methods, org, today }: { id: string; o
           {(p) => <Input {...p} value={reference} onChange={(e) => setReference(e.target.value)} maxLength={80} />}
         </Field>
       </div>
+      {(banks.length > 0 || method === "check") && (
+        <div className="grid gap-4 sm:grid-cols-4">
+          {banks.length > 0 && method !== "cash" && (
+            <Field label="Deposited to" optional error={fields.bankAccountId} hint="The company account the money went into.">
+              {(p) => (
+                <Select {...p} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+                  <option value="">The usual account for the method</option>
+                  {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </Select>
+              )}
+            </Field>
+          )}
+          {method === "check" && (
+            <>
+              <Field label="Check number" error={fields.checkNumber}>{(p) => <Input {...p} value={check.number} onChange={(e) => setCheck({ ...check, number: e.target.value })} maxLength={40} />}</Field>
+              <Field label="Drawn on" optional error={fields.checkBank}>{(p) => <Input {...p} value={check.bank} onChange={(e) => setCheck({ ...check, bank: e.target.value })} maxLength={60} placeholder="The customer's bank" />}</Field>
+              <Field label="Check date" optional error={fields.checkDate}>{(p) => <Input {...p} type="date" value={check.date} onChange={(e) => setCheck({ ...check, date: e.target.value })} />}</Field>
+            </>
+          )}
+        </div>
+      )}
       <label className="flex items-center gap-2 text-sm text-ink">
         <input suppressHydrationWarning type="checkbox" checked={withheld} onChange={(e) => setWithheld(e.target.checked)} />
         The customer withheld tax from this payment (Form 2307)

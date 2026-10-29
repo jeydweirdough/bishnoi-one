@@ -291,6 +291,8 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   const [isActive, setActive] = useState(account?.isActive ?? true);
   const [parentId, setParentId] = useState(account?.parentId ?? "");
   const [term, setTerm] = useState<"" | "current" | "non_current">(account?.term ?? "");
+  const [behaviour, setBehaviour] = useState<string>(account?.costBehaviour ?? "");
+  const [tag, setTag] = useState<string>(account?.reportTag ?? "");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -298,7 +300,8 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   function submit(e: React.FormEvent) {
     e.preventDefault();
     start(async () => {
-      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive, parentId: parentId || null, term: term || null });
+      const result = await saveAccount(account?.id ?? null, { code: code.trim(), name: name.trim(), type, description: description.trim() || null, isActive, parentId: parentId || null, term: term || null,
+        costBehaviour: type === "expense" ? behaviour || null : null, reportTag: type === "expense" ? tag || null : null });
       if (!result.ok) {
         setError(result.error);
         setFields(result.fields ?? {});
@@ -359,6 +362,31 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
               </Select>
             )}
           </Field>
+        )}
+        {type === "expense" && (
+          <>
+            <Field label="Cost behaviour" size="md" error={fields.costBehaviour} hint="For break-even: fixed costs stay whatever is sold (rent, salaries); variable ones move with sales.">
+              {(p) => (
+                <Select {...p} value={behaviour} onChange={(e) => setBehaviour(e.target.value)}>
+                  <option value="">Not said</option>
+                  <option value="fixed">Fixed</option>
+                  <option value="variable">Variable</option>
+                </Select>
+              )}
+            </Field>
+            <Field label="In the management reports" size="md" error={fields.reportTag} hint="Added back for EBITDA, or counted as sales and marketing spend for customer acquisition cost.">
+              {(p) => (
+                <Select {...p} value={tag} onChange={(e) => setTag(e.target.value)}>
+                  <option value="">Nothing special</option>
+                  <option value="depreciation">Depreciation</option>
+                  <option value="amortisation">Amortisation</option>
+                  <option value="interest">Interest</option>
+                  <option value="income_tax">Income tax</option>
+                  <option value="sales_marketing">Sales and marketing</option>
+                </Select>
+              )}
+            </Field>
+          </>
         )}
       </FormGrid>
       <label className="flex items-center gap-2 text-sm">

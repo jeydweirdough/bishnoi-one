@@ -283,6 +283,10 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # The account it sits under, as Oojeema's chart groups them (e.g. 6915-001 Provision
     # for Expired Medicines under 6915-000 Loss on Expired Medicines). Migration 0017.
+    # For the management reports (step 17, migration 0029): an expense that's fixed or variable (break-even), and
+    # what it is to EBITDA and customer acquisition cost: depreciation, amortisation, interest, income_tax, sales_marketing.
+    cost_behaviour: Mapped[str | None] = mapped_column(String(8), default=None)
+    report_tag: Mapped[str | None] = mapped_column(String(20), default=None)
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     # An asset or liability used or due within a year ("current") or later ("non_current"), for
     # working capital and the current and quick ratios (app/management.py, migration 0023). None:
@@ -378,6 +382,49 @@ class YearClosing(Base):
     net_income_centavos: Mapped[int] = mapped_column(Integer)
     closed_by: Mapped[str] = mapped_column(String(120))
     closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FixedAsset(Base):
+    """An asset the company owns for years (vehicle, equipment), depreciated straight-line each month (step 17)."""
+
+    __tablename__ = "nbfi_fixed_assets"
+    __table_args__ = (CheckConstraint("useful_months > 0", name="fixed_asset_months"), CheckConstraint("status IN ('active', 'disposed')", name="fixed_asset_status"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(160))
+    asset_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    accumulated_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    expense_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    cost_centavos: Mapped[int] = mapped_column(Integer)
+    salvage_centavos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    acquired_on: Mapped[date] = mapped_column(Date)
+    useful_months: Mapped[int] = mapped_column(Integer)
+    # The last month end depreciated; none yet.
+    depreciated_until: Mapped[date | None] = mapped_column(Date, default=None)
+    accumulated_centavos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
+    division_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_by: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Budget(Base):
+    """A fiscal year's budget for one account (and division, when set), month by month (step 17)."""
+
+    __tablename__ = "nbfi_budgets"
+    __table_args__ = (UniqueConstraint("year_end", "account_id", "division_name", name="budget_line"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    year_end: Mapped[date] = mapped_column(Date, index=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    division_name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Twelve amounts in centavos, the fiscal year's first month first.
+    months: Mapped[list[int]] = mapped_column(JSON, default=list)
+    updated_by: Mapped[str] = mapped_column(String(120))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    account: Mapped["Account"] = relationship(lazy="joined")
 
 
 class JournalEntry(Base):

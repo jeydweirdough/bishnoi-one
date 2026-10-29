@@ -75,8 +75,8 @@ CATALOGUE: tuple[CatalogueApp, ...] = (
         Switch("inventory.cpr", "CPR", "The FDA's certificate of product registration on each product."),
         Switch("inventory.warehouses", "Several warehouses"),
         Switch("inventory.counts", "Stock counts"),
-        Switch("inventory.locations", "Locations in a warehouse", later=True),
-        Switch("inventory.units", "Units and packaging", later=True),
+        Switch("inventory.locations", "Locations in a warehouse"),
+        Switch("inventory.units", "Units and packaging"),  # packs with conversions, step 14e
     )),
     CatalogueApp("warehouse", "Warehouse", "Moving goods in and out", "inventory", (
         Switch("warehouse.routes", "Multi-step routes", later=True),
@@ -95,7 +95,7 @@ CATALOGUE: tuple[CatalogueApp, ...] = (
     CatalogueApp("invoicing", "Invoicing", "Bill customers, collect payments", "finance", (
         Switch("invoicing.payments", "Record payments"),
         Switch("invoicing.auto", "Automatic invoices"),  # built in step 13
-        Switch("invoicing.channels", "Payment channels (GCash, Maya)", later=True),
+        Switch("invoicing.channels", "Payment channels (GCash, Maya)"),  # built in step 16a
         Switch("invoicing.statements", "Customer statements", later=True),
     )),
     CatalogueApp("accounting", "Accounting", "The books and the BIR", "finance", (
@@ -103,8 +103,10 @@ CATALOGUE: tuple[CatalogueApp, ...] = (
         Switch("accounting.funds", "Expenses and advances"),
         Switch("accounting.bank", "Bank reconciliation"),
         Switch("accounting.bir", "BIR files"),
-        Switch("accounting.budgets", "Budgets", later=True),
-        Switch("accounting.fixed_assets", "Fixed assets", later=True),
+        Switch("accounting.foreign_currency", "Foreign-currency bills"),  # built in step 16c
+        Switch("accounting.closing", "Owner's equity, closing and period lock"),  # built in step 16d, 16e
+        Switch("accounting.budgets", "Budgets"),  # built in step 17
+        Switch("accounting.fixed_assets", "Fixed assets"),  # built in step 17
     )),
     CatalogueApp("pharmacy", "Pharmacy", "Prescriptions and counter dispensing", "pharmacy", (
         Switch("pharmacy.controlled", "Controlled drugs register"),

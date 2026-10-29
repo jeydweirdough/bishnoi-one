@@ -80,7 +80,8 @@ export async function reissueInvoice(id: string, reason: string | null): Promise
   });
 }
 
-export type PaymentInput = { paidOn: string; amountCentavos: number; method: string; reference: string | null; cwtCentavos?: number; cwtAtc?: string | null; cwtCertificate?: string | null };
+export type PaymentInput = { paidOn: string; amountCentavos: number; method: string; reference: string | null; cwtCentavos?: number; cwtAtc?: string | null; cwtCertificate?: string | null;
+  bankAccountId?: string | null; checkNumber?: string | null; checkBank?: string | null; checkDate?: string | null };
 
 export async function recordPayment(id: string, input: PaymentInput): Promise<Result<Invoice>> {
   return attempt(async () => {

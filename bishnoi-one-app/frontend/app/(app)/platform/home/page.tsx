@@ -61,8 +61,8 @@ const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 1000) 
 const reading = (text: unknown): Figure["pill"] => {
   const t = String(text ?? "");
   if (!t || t === "—" || t === "Not enough data") return undefined;
-  const good = ["Healthy", "Profit", "Growing", "Positive", "Covered", "Target met"].includes(t);
-  const bad = ["Loss", "Short", "Low", "Slow", "Negative", "Down", "None"].includes(t);
+  const good = ["Healthy", "Profit", "Growing", "Positive", "Covered", "Target met", "Above it"].includes(t);
+  const bad = ["Loss", "Short", "Low", "Slow", "Negative", "Down", "None", "Below it"].includes(t);
   return { text: t, tone: good ? "good" : bad ? "bad" : "warn" };
 };
 
@@ -111,6 +111,11 @@ export default async function ExecutiveHome({ searchParams }: { searchParams: Se
       { value: peso(late), label: "Overdue receivables", note: "Owed by customers, past due", alert: (late ?? 0) > 0, href: link("finance", "receivables-ageing") },
       { value: String(row(key, "Return on assets")?.now ?? "—"), label: "Return on assets", note: "Net profit ÷ total assets", href: link("finance", "key-figures"), pill: reading(row(key, "Return on assets")?.reading) },
       { value: String(row(key, "Quick ratio")?.now ?? "—"), label: "Quick ratio", note: "Current assets without inventory ÷ current liabilities", href: link("finance", "key-figures"), pill: reading(row(key, "Quick ratio")?.reading) },
+      // Step 17: from expenses tagged on the chart of accounts, owner's equity and new customers.
+      { value: String(row(key, "EBITDA")?.now ?? "—"), label: "EBITDA", note: "Net profit + depreciation, interest and income tax", href: link("finance", "key-figures"), pill: reading(row(key, "EBITDA")?.reading) },
+      { value: String(row(key, "Return on equity")?.now ?? "—"), label: "Return on equity", note: `Debt to equity ${row(key, "Debt to equity")?.now ?? "—"}`, href: link("finance", "key-figures"), pill: reading(row(key, "Return on equity")?.reading) },
+      { value: String(row(key, "Break-even revenue")?.now ?? "—"), label: "Break-even revenue", note: "Fixed costs ÷ contribution margin", href: link("finance", "key-figures"), pill: reading(row(key, "Break-even revenue")?.reading) },
+      { value: String(row(key, "Customer acquisition cost")?.now ?? "—"), label: "Customer acquisition cost", note: "Sales and marketing spend ÷ new customers", href: link("finance", "key-figures") },
     ];
     if (has.has("crm")) {
       const cover = value(coverage, "Coverage");
