@@ -48,7 +48,9 @@ AREAS: tuple[Area, ...] = (
     Area("suppliers", "Suppliers & supplier prices", "Purchasing", CRUD),
     Area("purchasing", "Purchase orders", "Purchasing", ("view", "create", "edit", "approve")),
     Area("receiving", "Receiving", "Purchasing", ("view", "receive")),
-    Area("orders", "Orders, reservations & issuance", "Orders", ("view", "create", "edit", "approve", "issue")),
+    # The Sales app's sales orders (step 11): approve confirms one and makes its delivery.
+    Area("sales", "Sales orders", "Sales", ("view", "create", "edit", "approve")),
+    Area("orders", "Deliveries, reservations & issuance", "Orders", ("view", "create", "edit", "approve", "issue")),
     Area("reports", "Reports", "Insight", ("view", "export")),
     Area("admin", "Administration", "Administration", ("users", "roles", "audit")),
 )
@@ -114,9 +116,9 @@ STARTING_ROLES: tuple[tuple[str, str, frozenset[str]], ...] = (
         | _grant("suppliers", actions=("create", "edit", "delete"))
         | _grant("purchasing", actions=("create", "edit", "approve"))
         | _grant("receiving", actions=("receive",))
-        | _grant("transfers", "adjustments", "counts", "orders", actions=("approve",))
+        | _grant("transfers", "adjustments", "counts", "orders", "sales", actions=("approve",))
         | _grant("reports", actions=("export",)),
     ),
-    (SALES, "Sees stock, and writes up customer orders.", VIEW_ALL | _grant("orders", actions=("create", "edit"))),
+    (SALES, "Sees stock, and writes up customer orders.", VIEW_ALL | _grant("orders", "sales", actions=("create", "edit"))),
     (AUDITOR, "Sees everything, including the activity log, and changes nothing.", VIEW_ALL | {"reports.export", "admin.audit"}),
 )

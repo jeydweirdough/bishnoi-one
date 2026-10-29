@@ -1,4 +1,14 @@
-"""Both issued migration histories must reach one schema without losing records."""
+"""Every issued Finance migration history must reach one schema without losing records.
+
+Main and the feature branch twice issued the same numbers for different changes (0023-0026 on
+2026-10-27; 0027-0029 on 2026-10-29). The chain keeps main's files; the feature's are in
+migrations/compat; 0029 (feature) and 0032 supply whichever schema a database lacks. A database
+can be at any revision of any of these lines:
+- main: main's 0023-0029 (e.g. a database Jade's code upgraded);
+- feature-old: the feature's 0023-0028, before the first reconciliation;
+- ours: main's 0023-0026, then the feature's 0027-0029, 0030, 0031 (official and the testing site
+  on 2026-10-29).
+"""
 from pathlib import Path
 import json
 import shutil
@@ -9,27 +19,41 @@ from sqlalchemy import create_engine,inspect,text
 from app.config import API_DIR
 from app.migrate import _config
 
+MAIN_0023_0026=('0023_account_term','0024_cost_of_goods_sold','0025_invoice_division','0026_business_events')
+MAIN_0027_0029=('0027_invoices_from_deliveries','0028_banks_payments_equity','0029_management_reports')
 
-@pytest.fixture
-def feature_history(tmp_path):
+
+def history(tmp_path,name,drop,add,last):
+    """A copy of the migrations as a past line had them: main's files in `drop` out, the feature's
+    compat files numbered in `add` in, nothing after `last`."""
     source=API_DIR/'migrations'
-    destination=tmp_path/'legacy_feature_migrations'
+    destination=tmp_path/f'{name}_migrations'
     shutil.copytree(source,destination)
-    for name in ('0023_account_term.py','0024_cost_of_goods_sold.py','0025_invoice_division.py','0026_business_events.py'):
-        (destination/'versions'/name).unlink()
-    # The feature history ended at 0028: 0029 (the reconciliation) and everything after it came later.
-    for file in (destination/'versions').glob('[0-9][0-9][0-9][0-9]_*.py'):
-        if int(file.name[:4])>=29:file.unlink()
-    for file in (source/'compat').glob('feature_*.py'):
-        shutil.copy2(file,destination/'versions'/file.name.removeprefix('feature_'))
+    versions=destination/'versions'
+    for step in drop:
+        (versions/f'{step}.py').unlink()
+    for file in versions.glob('[0-9][0-9][0-9][0-9]_*.py'):
+        if int(file.name[:4])>last:file.unlink()
+    for number in add:
+        [file]=(source/'compat').glob(f'feature_{number:04}_*.py')
+        shutil.copy2(file,versions/file.name.removeprefix('feature_'))
     return destination
 
 
-@pytest.mark.parametrize('history,revision', [('main',n) for n in range(23,27)]+[('feature',n) for n in range(22,29)])
-def test_both_histories_preserve_values_and_relationships(tmp_path,feature_history,history,revision):
+LINES={
+    'main':lambda tmp:None,  # the chain itself, stopped part-way
+    'feature-old':lambda tmp:history(tmp,'feature_old',MAIN_0023_0026+MAIN_0027_0029,range(23,29),28),
+    'ours':lambda tmp:history(tmp,'ours',MAIN_0027_0029,range(27,30),31),
+}
+CASES=[('main',n) for n in range(23,30)]+[('feature-old',n) for n in range(22,29)]+[('ours',n) for n in range(27,32)]
+
+
+@pytest.mark.parametrize('line,revision',CASES)
+def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revision):
     engine=create_engine('sqlite:///'+(tmp_path/'synthetic.db').as_posix())
     old=_config(engine)
-    if history=='feature':old.set_main_option('script_location',str(feature_history))
+    location=LINES[line](tmp_path)
+    if location:old.set_main_option('script_location',str(location))
     command.upgrade(old,'0022')
     with engine.begin() as c:
         c.execute(text("INSERT INTO nbfi_suppliers(id,name,vat_registered,terms_days,is_active,created_at,created_by) VALUES ('s1','Synthetic supplier',1,30,1,'2026-01-01','Synthetic')"))
@@ -45,9 +69,19 @@ def test_both_histories_preserve_values_and_relationships(tmp_path,feature_histo
             assert len(after)==len(rows),table
             assert [{k:r[k] for k in rows[0]} for r in after]==rows if rows else not after
         tables=set(inspect(c).get_table_names())
-        assert {'nbfi_sales_orders','nbfi_zoho_source_documents','nbfi_zoho_source_runs','nbfi_events_in','nbfi_events_out'}<=tables
-        for table,names in {'nbfi_accounts':{'term'},'nbfi_invoices':{'cost_centavos','line_costs','division_id','team_id'},'nbfi_suppliers':{'tax_defaults_confirmed','import_details'},'nbfi_bills':{'tax_reviewed'}}.items():
-            assert names<={x['name'] for x in inspect(c).get_columns(table)}
+        # Both lines' tables: the feature's (sales orders, Zoho cache, connection, delivery queue, imports)
+        # and main's (business events, bank accounts, exchange rates, year closings, fixed assets, budgets).
+        assert {'nbfi_sales_orders','nbfi_zoho_source_documents','nbfi_zoho_source_runs','nbfi_zoho_connections','nbfi_zoho_runtime',
+                'nbfi_zoho_deliveries','nbfi_zoho_links','nbfi_zoho_delivery_events','nbfi_import_matches','nbfi_import_runs',
+                'nbfi_import_records','nbfi_import_rules','nbfi_events_in','nbfi_events_out','nbfi_bank_accounts',
+                'nbfi_exchange_rates','nbfi_year_closings','nbfi_fixed_assets','nbfi_budgets'}<=tables
+        for table,names in {'nbfi_accounts':{'term','cost_behaviour','report_tag'},
+                            'nbfi_invoices':{'cost_centavos','line_costs','division_id','team_id','delivery_id','sales_order_id','attention'},
+                            'nbfi_suppliers':{'tax_defaults_confirmed','import_details'},'nbfi_bills':{'tax_reviewed','currency','rate_e4'},
+                            'nbfi_payment_vouchers':{'rate_e4','exchange_centavos','bank_account_id'},
+                            'nbfi_ledger_settings':{'auto_invoice','locked_until','fx_gain_account_id'},
+                            'nbfi_import_matches':{'per_record'}}.items():
+            assert names<={x['name'] for x in inspect(c).get_columns(table)},table
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
-        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()
+        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0032'
     engine.dispose()

@@ -56,7 +56,8 @@ def test_the_catalogue_turns_apps_and_features_on_and_off(client, getmeds):
     h = getmeds["owner"]["h"]
     apps = {a["key"]: a for a in client.get("/identity/company/catalogue", headers=h).json()["apps"]}
     assert apps["crm"]["on"] and apps["field_sales"]["on"] and not apps["inventory"]["on"]
-    assert apps["sales"]["later"] and not apps["sales"]["on"]
+    assert not apps["warehouse"]["later"] and not apps["warehouse"]["on"]  # quality checks built (step 14a); runs in Inventory, which this company hasn't got
+    assert not apps["sales"]["later"] and not apps["sales"]["on"]  # built (step 11); runs in Inventory, which this company hasn't got
     # A feature of an app the company hasn't got, and a feature not built yet, are refused.
     assert client.put("/identity/company/catalogue/inventory.batches", json={"on": True}, headers=h).status_code == 409
     assert client.put("/identity/company/catalogue/field_sales.samples", json={"on": True}, headers=h).status_code == 409

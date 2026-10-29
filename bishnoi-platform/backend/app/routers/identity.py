@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from sqlalchemy import func, select
@@ -34,7 +34,7 @@ from app.api import Api
 from app.access_roles import role_for_pass
 from app.org_push import placement
 from app.audit import audit
-from app import catalogue, document_chain, platform_admins
+from app import catalogue, document_chain, email_rules, platform_admins, signatures
 from app.accounts import account_by_email, account_of, memberships, runs_company
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
 from app.models import AccessRole, Account, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
@@ -68,7 +68,16 @@ def current_identity(
     changed = account and account.password_changed_at and as_utc(record.created_at) < as_utc(account.password_changed_at)
     if person is None or person.status != "active" or account is None or account.status != "active" or changed:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
+    if email_rules.off_domain(db, person):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, not_at_domain(db, person))
     return record, person
+
+
+def not_at_domain(db: Session, person: Identity) -> str:
+    """Why someone whose email isn't at their company's domain can't sign in (decided 2026-10-29)."""
+    company = db.get(Company, person.company_id)
+    return (f"{company.name} signs in with @{company.email_domain} emails, and yours is {person.email}. "
+            "Ask your company's administrator to change it, then sign in with the new one.")
 
 
 Signed = Annotated[tuple[IdentitySession, Identity], Depends(current_identity)]
@@ -139,6 +148,11 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
         if all(r.status != "active" for r in rows):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
+    # Someone whose email isn't at their company's domain waits for their administrator to change it.
+    at_domain = [(row, c) for row, c in open_rows if not email_rules.off_domain(db, row)]
+    if not at_domain:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, not_at_domain(db, open_rows[0][0]))
+    open_rows = at_domain
     attempts.clear(email)
     account.last_sign_in_at = datetime.now(UTC)
     response.headers["Cache-Control"] = "no-store"
@@ -329,6 +343,83 @@ def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
     audit(db, person.email, "identity.password_changed", category="security", target=person.email, target_type="identity", target_id=person.id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---- One e-signature per person (step 10, app/signatures.py) -------------------------------------
+
+
+class SignatureIn(Api):
+    image: str = Field(min_length=20, max_length=500_000)
+    method: str = Field(pattern="^(drawn|uploaded)$")
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD)
+
+
+class PasswordOnly(Api):
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD)
+
+
+def _signature_out(s) -> dict:
+    return {"has": s is not None, "image": signatures.data_url(s.image) if s else None, "method": s.method if s else None,
+            "setAt": as_utc(s.created_at).isoformat() if s else None}
+
+
+def _check_password(db: Session, person: Identity, password: str) -> Account:
+    account = account_of(db, person)
+    if account is None or not verify_password(password, account.password_hash or DUMMY_HASH):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "password"], "msg": "That password isn't right."}])
+    return account
+
+
+@router.get("/identity/signature")
+def my_signature(signed: Signed, db: DB) -> dict:
+    _, person = signed
+    account = account_of(db, person)
+    return _signature_out(signatures.current(db, account.id) if account else None)
+
+
+@router.put("/identity/signature")
+def set_signature(body: SignatureIn, signed: Signed, db: DB) -> dict:
+    """Your signature, drawn or uploaded (cleaned in the browser). Every app uses it when you sign a step."""
+    _, person = signed
+    account = _check_password(db, person, body.password)
+    try:
+        image = signatures.checked_png(body.image)
+    except signatures.BadImage as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "image"], "msg": str(e)}]) from None
+    s = signatures.keep(db, account.id, image, body.method)
+    audit(db, person.email, "identity.signature_set", category="security", target=person.email, target_type="account", target_id=account.id)
+    db.commit()
+    return _signature_out(s)
+
+
+@router.post("/identity/signature/remove")
+def remove_signature(body: PasswordOnly, signed: Signed, db: DB) -> dict:
+    """Your signature stops being used; documents you signed with it keep it."""
+    _, person = signed
+    account = _check_password(db, person, body.password)
+    if signatures.retire(db, account.id):
+        audit(db, person.email, "identity.signature_removed", category="security", target=person.email, target_type="account", target_id=account.id)
+        db.commit()
+    return _signature_out(None)
+
+
+@router.get("/connect/signature")
+def signature_for_app(db: DB, identity: str = Query(max_length=36), key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
+    """A person's current signature, for an app placing their signed step (its connect key; only for a
+    company that has the app). The app keeps its own copy with what was signed."""
+    from app import links
+
+    app = links.app_of_key(db, key)
+    if app is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That connect key isn't one the platform made, or it was replaced.")
+    person = db.get(Identity, identity)
+    if person is None or db.get(CompanyApp, (person.company_id, app.id)) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such person at a company with this app.")
+    account = account_of(db, person)
+    s = signatures.current(db, account.id) if account else None
+    if s is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This person hasn't set a signature.")
+    return {"id": s.id, "image": signatures.data_url(s.image), "method": s.method, "sha256": s.sha256, "setAt": as_utc(s.created_at).isoformat()}
 
 
 @router.get("/identity/documents/trail")

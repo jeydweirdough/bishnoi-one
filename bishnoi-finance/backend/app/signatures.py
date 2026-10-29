@@ -94,9 +94,56 @@ def fund_content(r: FundRequest) -> dict:
     }
 
 
+def _platform_image(user: User) -> bytes | None | bool:
+    """Their Bishnoi One signature: the PNG, None when they have none, False when it can't be asked."""
+    import httpx
+
+    from app import platform_connect
+    from app.business_events import _state
+
+    settings = _state.get("settings")
+    url = getattr(settings, "platform_api_url", None) if settings else None
+    key = platform_connect.connect_key(settings) if url else None
+    if not url or not key or not user.platform_identity_id:
+        return False
+    try:
+        r = httpx.get(f"{url.rstrip('/')}/connect/signature", params={"identity": user.platform_identity_id}, headers={"X-Bishnoi-App-Key": key}, timeout=5)
+    except httpx.HTTPError:
+        return False
+    if r.status_code == 404:
+        return None
+    try:
+        return checked_png(r.json()["image"]) if r.status_code == 200 else False
+    except (ValueError, KeyError, TypeError, BadImage):
+        return False
+
+
+def from_platform(db: Session, user: User, held: Signature | None = None) -> Signature | None:
+    """Their Bishnoi One signature (feature plan step 10: one signature per person, set on their profile),
+    when they haven't set one here, kept here as a copy so a later change on the Platform never changes
+    what was already signed. A copy that no longer matches the Platform is replaced (or let go, when they
+    removed it there); out of reach, the copy held is used."""
+    image = _platform_image(user)
+    if image is False:
+        return held
+    if held is not None and image == held.image:
+        return held
+    if held is not None:
+        held.replaced_at = datetime.now(UTC)
+    if image is None:
+        return None
+    copy = Signature(user_id=user.id, image=image, method="platform")
+    db.add(copy)
+    db.flush()
+    return copy
+
+
 def sign(db: Session, user: User, record_type: str, record_id: str, step: str, content: dict) -> SignedStep:
-    """This person's step on this document, with their signature as it is now (none if unset)."""
+    """This person's step on this document, with their signature as it is now (none if unset): their own
+    here, else their Bishnoi One one (from_platform)."""
     mine = current(db, user.id)
+    if mine is None or mine.method == "platform":
+        mine = from_platform(db, user, mine)
     signed = SignedStep(
         record_type=record_type, record_id=record_id, step=step, user_id=user.id, signature_id=mine.id if mine else None,
         signer_name=user.full_name[:120], signer_role=user.role.name[:80], fingerprint=fingerprint(content),

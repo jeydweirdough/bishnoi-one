@@ -41,6 +41,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "stock",
       steps: keep([
         { href: "/inventory/stock", label: "Stock on hand", icon: "stock", sees: ["stock.view"] },
+        { href: "/inventory/scan", label: "Scan", icon: "scan", sees: ["stock.view"] },
         { href: "/inventory/transfers", label: "Transfer orders", icon: "transfers", sees: ["transfers.view"] },
         { href: "/inventory/adjustments", label: "Inventory adjustments", icon: "adjustments", sees: ["adjustments.view"] },
         { href: "/inventory/counts", label: "Inventory counts", icon: "counts", sees: ["counts.view"] },
@@ -50,7 +51,9 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Sales",
       icon: "issuance",
       steps: keep([
-        { href: "/inventory/orders", label: "Sales orders", icon: "issuance", sees: ["orders.view"] },
+        // Deliveries (step 11): what the Sales app's approved orders make, and orders typed here.
+        { href: "/inventory/orders", label: "Deliveries", icon: "issuance", sees: ["orders.view"] },
+        { href: "/inventory/waves", label: "Waves", icon: "lists", sees: ["orders.view"] },
         { href: "/inventory/reservations", label: "Reservations", icon: "reservations", sees: ["orders.view"] },
       ]),
     },
@@ -61,8 +64,11 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       flow: true,
       steps: keep([
         { href: "/inventory/suppliers", label: "Vendors", icon: "suppliers", sees: ["suppliers.view"] },
+        { href: "/inventory/replenishment", label: "Replenishment", icon: "reorder", sees: ["purchasing.view"] },
+        { href: "/inventory/consignment", label: "Consignment", icon: "suppliers", sees: ["purchasing.view"] },
         { href: "/inventory/purchase-orders", label: "Purchase orders", icon: "purchaseOrders", also: ["/inventory/backorders"], sees: ["purchasing.view"] },
         { href: "/inventory/receipts", label: "Purchase receives", icon: "receiving", sees: ["receiving.view"] },
+        { href: "/inventory/quality-checks", label: "Quality checks", icon: "approvals", sees: ["receiving.view"] },
       ]),
     },
     // Reports, and the stock movements behind them (what came in and went out, when).
@@ -81,6 +87,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "settings",
       steps: keep([
         { href: "/inventory/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
+        { href: "/inventory/couriers", label: "Couriers", icon: "issuance", sees: ["warehouses.view"] },
         { href: "/inventory/catalog/categories", label: "Categories", icon: "categories", sees: ["products.view"] },
         { href: "/inventory/catalog/brands", label: "Brands", icon: "brands", sees: ["products.view"] },
         { href: "/inventory/catalog/units", label: "Units", icon: "units", sees: ["products.view"] },

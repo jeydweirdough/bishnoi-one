@@ -36,6 +36,8 @@ export function ReceiveForm({ org, reference, order, productId, canAdd = {} }: {
   const [supplierId, setSupplierId] = useState(order?.supplier.id ?? "");
   const [warehouseId, setWarehouseId] = useState(order?.warehouse.id ?? reference.warehouses.find((w) => w.isActive)?.id ?? "");
   const [locationId, setLocationId] = useState("");
+  // On consignment (15d): the vendor's until it sells, kept in its own location.
+  const [consignment, setConsignment] = useState(false);
   const [deliveryRef, setDeliveryRef] = useState("");
   const [notes, setNotes] = useState("");
   const blank = (): Row => ({ productId: "", orderLineId: null, quantity: "", cost: "", batchNo: "", manufacturedOn: "", expiresOn: "", serials: "", outstanding: null });
@@ -81,7 +83,7 @@ export function ReceiveForm({ org, reference, order, productId, canAdd = {} }: {
         expiresOn: r.expiresOn || null,
         serials: r.serials.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean),
       }));
-    const input = { orderId: order?.id ?? null, supplierId: order ? null : supplierId || null, warehouseId, locationId: locationId || null, deliveryRef: deliveryRef.trim() || null, notes: notes.trim() || null, lines };
+    const input = { orderId: order?.id ?? null, supplierId: order ? null : supplierId || null, warehouseId, locationId: consignment ? null : locationId || null, consignment, deliveryRef: deliveryRef.trim() || null, notes: notes.trim() || null, lines };
     save(() => receiveDelivery(input), (out) => ({ message: `${out.number} received${out.orderStatus === "partial" ? "; the remaining quantity is on backorder" : ""}`, go: `/inventory/receipts/${out.id}` }));
   }
 
@@ -121,6 +123,10 @@ export function ReceiveForm({ org, reference, order, productId, canAdd = {} }: {
           </WithAdd>
           <Field label="Delivery receipt or invoice number" optional error={fields.deliveryRef}>{(p) => <Input {...p} value={deliveryRef} onChange={(e) => setDeliveryRef(e.target.value)} />}</Field>
         </div>
+        <label className="mt-4 flex items-center gap-2 text-sm text-ink">
+          <input suppressHydrationWarning type="checkbox" className="size-4" checked={consignment} onChange={(e) => setConsignment(e.target.checked)} />
+          On consignment: the vendor&apos;s until it sells (kept in the vendor&apos;s consignment location, paid for as it sells)
+        </label>
       </Sheet>
 
       <Sheet className="px-5 pt-4 pb-4 sm:px-6">

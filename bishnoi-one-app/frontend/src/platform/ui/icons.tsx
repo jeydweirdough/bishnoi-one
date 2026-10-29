@@ -86,6 +86,8 @@ import {
   Ticket,
   Undo2,
   Warehouse,
+  ScanLine,
+  RefreshCw,
 } from "lucide-react";
 
 // Every icon in the app, by what it means. One library (Lucide) at one stroke,
@@ -153,6 +155,8 @@ export const ICONS = {
   account: UserCog,
   addRole: UserPlus,
   person: CircleUserRound,
+  scan: ScanLine, // scanning barcodes and QR codes (step 14c)
+  reorder: RefreshCw, // replenishment: refill what runs low (step 15a)
 
   // kinds of activity
   call: Phone,

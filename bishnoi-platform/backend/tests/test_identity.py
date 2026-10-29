@@ -7,7 +7,7 @@ import json
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from tests.conftest import app_id, make_company
+from tests.conftest import PASSWORD, app_id, make_company
 
 CRM_RETURN = "http://localhost:4302/auth/platform"
 
@@ -111,32 +111,27 @@ def test_changing_the_password_ends_other_sign_ins(client, jade):
     assert sign_in(client, "jade@getmeds.test", "MyOwnPass2026").status_code == 200
 
 
-@pytest.fixture
-def jade_at_two(client, ana, jade) -> dict:
-    """Jade also works for Northwind (which has the CRM), as its Team Lead there."""
+def test_an_email_is_one_companys(client, ana, jade):
+    """One email, one account (decided 2026-10-29): Jade's email is GetMeds'; another company can't add it."""
     north = make_company(client, ana, name="Northwind", apps=("crm",))
-    person = client.post("/platform/users", json={"companyId": north["id"], "fullName": "Jade Madigal", "email": "jade@getmeds.test"}, headers=ana)
-    assert person.status_code == 201, person.text
-    client.put(f"/platform/users/{person.json()['user']['id']}/applications/{app_id(client, ana, 'crm')}", json={"role": "Team Lead"}, headers=ana)
-    return {**jade, "north": north, "northId": person.json()["user"]["id"]}
+    r = client.post("/platform/users", json={"companyId": north["id"], "fullName": "Jade Madigal", "email": "jade@getmeds.test"}, headers=ana)
+    assert r.status_code == 422 and "isn't available" in r.text
 
 
-def test_one_person_at_two_companies(client, ana, jade_at_two):
-    # Her password from GetMeds works; she's at one company at a time, and sees both.
-    token = sign_in(client, "jade@getmeds.test", jade_at_two["password"]).json()["accessToken"]
+def test_an_operator_works_in_any_company_and_switches_between_them(client, ana, jade):
+    """Operators have no company: they go into any, one at a time, and switch in the sidebar."""
+    make_company(client, ana, name="Northwind", apps=("crm",))
+    token = sign_in(client, "ana@example.com", PASSWORD).json()["accessToken"]
     h = {"Authorization": f"Bearer {token}"}
     me = client.get("/identity/me", headers=h).json()
-    assert sorted((c["slug"], c["current"]) for c in me["companies"]) == [("getmeds", True), ("northwind", False)] or \
-        sorted((c["slug"], c["current"]) for c in me["companies"]) == [("getmeds", False), ("northwind", True)]
-    here = me["company"]["slug"]
-    there = "northwind" if here == "getmeds" else "getmeds"
+    assert sorted(c["slug"] for c in me["companies"]) == ["getmeds", "northwind"]
+    there = "northwind" if me["company"]["slug"] == "getmeds" else "getmeds"
 
-    # A pass for the other company, with her role there, without switching.
+    # A pass for the other company without switching: administrator there by the operator switch.
     key = client.get("/pass/key").json()["publicKey"]
     r = client.post("/identity/pass", json={"app": "crm", "returnTo": CRM_RETURN, "company": "northwind"}, headers=h)
     assert r.status_code == 200, r.text
-    claims = claims_of(r.json()["pass"], key)
-    assert (claims["companySlug"], claims["role"]) == ("northwind", "Team Lead")
+    assert claims_of(r.json()["pass"], key)["companySlug"] == "northwind"
 
     # Switching: a new sign-in there; the old one ends.
     switched = client.post("/identity/switch", json={"company": there}, headers=h)
@@ -144,26 +139,12 @@ def test_one_person_at_two_companies(client, ana, jade_at_two):
     assert client.get("/identity/me", headers=h).status_code == 401
     h2 = {"Authorization": f"Bearer {switched.json()['accessToken']}"}
     assert client.get("/identity/me", headers=h2).json()["company"]["slug"] == there
-    # Not a company of hers: refused.
     assert client.post("/identity/switch", json={"company": "nowhere"}, headers=h2).status_code == 403
-
-    # One password for both: changed at one, it's changed at the other.
-    assert client.post("/identity/password", json={"currentPassword": jade_at_two["password"], "newPassword": "A-new-pass-99"}, headers=h2).status_code == 204
-    assert sign_in(client, "jade@getmeds.test", "A-new-pass-99").status_code == 200
-    assert sign_in(client, "jade@getmeds.test", jade_at_two["password"]).status_code == 401
 
 
 def test_the_same_email_twice_at_one_company_is_refused(client, ana, jade):
     again = client.post("/platform/users", json={"companyId": jade["company"]["id"], "fullName": "Jade M.", "email": "jade@getmeds.test"}, headers=ana)
     assert again.status_code == 422 and "GetMeds already has" in again.text
-
-
-def test_suspended_at_one_company_she_still_works_at_the_other(client, ana, jade_at_two):
-    assert client.patch(f"/platform/users/{jade_at_two['id']}", json={"status": "suspended"}, headers=ana).status_code == 200
-    r = sign_in(client, "jade@getmeds.test", jade_at_two["password"])
-    assert r.status_code == 200, r.text
-    me = client.get("/identity/me", headers={"Authorization": f"Bearer {r.json()['accessToken']}"}).json()
-    assert me["company"]["slug"] == "northwind" and [c["slug"] for c in me["companies"]] == ["northwind"]
 
 
 def test_removing_a_user_suspends_them_and_keeps_the_record(client, ana, ben):
@@ -216,9 +197,9 @@ def test_nobody_deletes_their_own_account_or_a_companys_last_administrator(clien
     from tests.conftest import make_company
 
     getmeds = make_company(client, ana)
-    own = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ana Reyes", "email": "ana@example.com"}, headers=ana).json()["user"]
-    r = client.delete(f"/platform/users/{own['id']}", headers=ana)
-    assert r.status_code == 409 and "your own account" in r.text
+    # An operator's email is never a company's person (one email, one account; 2026-10-29).
+    own = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ana Reyes", "email": "ana@example.com"}, headers=ana)
+    assert own.status_code == 422 and "isn't available" in own.text
 
     boss = client.post("/platform/users", json={"companyId": getmeds["id"], "fullName": "Ai Four", "email": "ai4@getmeds.ph", "isCompanyAdmin": True}, headers=ana).json()["user"]
     r = client.delete(f"/platform/users/{boss['id']}", headers=ana)

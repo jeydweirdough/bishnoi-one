@@ -24,7 +24,7 @@ How stock is kept:
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func, select
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, false as sa_false, func, select, true as sa_true
 from sqlalchemy.orm import Mapped, aliased, column_property, declared_attr, mapped_column, relationship
 
 from app.db import Base
@@ -177,6 +177,25 @@ class OperationType(Stamped, Base):
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
+class Courier(Stamped, Base):
+    """A delivery company we hand parcels to (step 12): LBC, J&T and Lalamove for every company; it adds its own.
+    `tracking_url` opens the courier's tracking page, with {number} for the tracking number."""
+
+    __tablename__ = "nbin_couriers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(20), unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    tracking_url: Mapped[str | None] = mapped_column(String(300), default=None)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+# How a delivery goes, and where it is once issued (step 12).
+DELIVERY_METHODS = ("courier", "own", "pickup")
+DELIVERY_STATES = ("out", "delivered", "failed")
+
+
 class DocumentHeader:
     """The header's columns, on every stock document."""
 
@@ -186,6 +205,8 @@ class DocumentHeader:
 
     scheduled_on: Mapped[date | None] = mapped_column(Date, default=None, index=True)
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    # The day it was done in the company's time zone (migration 0012): what late or on time compares.
+    done_on: Mapped[date | None] = mapped_column(Date, default=None, index=True)
     # The document it came from, by its number: the purchase order behind a receipt, the count behind
     # an adjustment, a customer's PO behind a sale.
     source_document: Mapped[str | None] = mapped_column(String(80), default=None)
@@ -372,6 +393,8 @@ class Warehouse(Stamped, Base):
     latitude: Mapped[float | None] = mapped_column(Float, default=None)
     longitude: Mapped[float | None] = mapped_column(Float, default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Checks what it receives before it can be used: receive → check → store (step 14a, migration 0016).
+    quality_check: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
 
 
 class Location(Base):
@@ -387,6 +410,8 @@ class Location(Base):
     name: Mapped[str] = mapped_column(String(120))
     is_default: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # A vendor's consignment stock: theirs until it sells (15d).
+    consignment_supplier_id: Mapped[str | None] = mapped_column(String(36), default=None)
 
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
 
@@ -427,6 +452,8 @@ class Stock(Base):
     batch_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_batches.id", ondelete="CASCADE"), index=True, default=None)
     on_hand: Mapped[int] = mapped_column(Integer, default=0)
     damaged: Mapped[int] = mapped_column(Integer, default=0)
+    # Received and waiting for its quality check (step 14a): on hand, but not available to reserve or pick.
+    on_hold: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     product: Mapped[Product] = relationship(lazy="joined")
@@ -526,6 +553,13 @@ class PurchaseOrder(Stamped, Base):
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     ordered_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    # Made by replenishment, by hand from its page or at night (step 15a, migration 0020).
+    replenishment: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    # Raised for a sales order (order-on-demand, 15b; dropshipping, 15c), and shipped straight to that customer.
+    sales_order_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    dropship: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    ship_to_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    ship_to_address: Mapped[str | None] = mapped_column(String(400), default=None)
 
     supplier: Mapped[Supplier] = relationship(lazy="joined")
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
@@ -567,6 +601,8 @@ class Receipt(DocumentHeader, Base):
     delivery_ref: Mapped[str | None] = mapped_column(String(60), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    # Received on consignment: the vendor's until it sells (15d).
+    consignment: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
     received_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
 
     order: Mapped[PurchaseOrder | None] = relationship(lazy="joined")
@@ -597,6 +633,88 @@ class ReceiptLine(Base):
 # --- orders and issuance ----------------------------------------------------------------
 
 
+# --- the Sales app (feature plan step 11, 2026-10-29) --------------------------------------
+
+SALES_ORDER_STATUSES = ("draft", "pending", "confirmed", "delivered", "rejected", "cancelled")
+
+
+class SalesOrder(Stamped, Base):
+    """A customer's order (app/sales.py): made from an approved CRM quote, or typed in the Sales app at the
+    price list's prices; waits for approval, then confirmed (which makes its delivery), delivered or cancelled."""
+
+    __tablename__ = "nbin_sales_orders"
+    __table_args__ = (CheckConstraint("status IN ('draft', 'pending', 'confirmed', 'delivered', 'rejected', 'cancelled')", name="sales_order_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    status: Mapped[str] = mapped_column(String(12), default="draft", index=True)
+    # The customer as the CRM has them (the CRM owns customers), as they were when ordered.
+    customer_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    customer_address: Mapped[str | None] = mapped_column(String(400), default=None)
+    customer_tin: Mapped[str | None] = mapped_column(String(30), default=None)
+    # The CRM quote it came from; ordered once.
+    quote_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+    quote_number: Mapped[str | None] = mapped_column(String(30), default=None)
+    salesperson_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    salesperson_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    division_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    division_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    team_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    team_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    # {"kind": "customer"} or {"kind": "guarantee_letter", "issuer", "letterNumber", "amountCentavos"}.
+    payer: Mapped[dict | None] = mapped_column(JSON, default=None)
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey("nbin_warehouses.id"), index=True)
+    scheduled_on: Mapped[date | None] = mapped_column(Date, default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    gross_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    discount_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    tax: Mapped[dict | None] = mapped_column(JSON, default=None)
+    currency: Mapped[str] = mapped_column(String(3), default="PHP")
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    created_by_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    decision_note: Mapped[str | None] = mapped_column(String(500), default=None)
+    # The vendor ships it straight to the customer (15c).
+    dropship: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The invoice Finance made from its delivery, and when it was paid in full (step 13, migration 0015).
+    invoice_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    invoice_number: Mapped[str | None] = mapped_column(String(30), default=None)
+    invoiced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    invoice_total: Mapped[int | None] = mapped_column(Integer, default=None)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    warehouse: Mapped["Warehouse"] = relationship(lazy="joined")
+    decided_by: Mapped["User | None"] = relationship(foreign_keys=[decided_by_id], lazy="joined")
+    lines: Mapped[list["SalesOrderLine"]] = relationship(
+        back_populates="order", cascade="all, delete-orphan", lazy="selectin", order_by="SalesOrderLine.position"
+    )
+
+
+class SalesOrderLine(Base):
+    __tablename__ = "nbin_sales_order_lines"
+    __table_args__ = (CheckConstraint("quantity > 0", name="sales_order_line_quantity"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    order_id: Mapped[str] = mapped_column(ForeignKey("nbin_sales_orders.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    product_id: Mapped[str] = mapped_column(ForeignKey("nbin_products.id"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer)
+    free_quantity: Mapped[int] = mapped_column(Integer, default=0)
+    unit_price: Mapped[int] = mapped_column(Integer, default=0)
+    discount: Mapped[int] = mapped_column(Integer, default=0)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    delivered: Mapped[int] = mapped_column(Integer, default=0)
+    # The product's VAT category as the CRM gave it, for the invoice (step 13).
+    vat_category: Mapped[str] = mapped_column(String(20), default="standard", server_default="standard")
+
+    order: Mapped[SalesOrder] = relationship(back_populates="lines")
+    product: Mapped["Product"] = relationship(lazy="joined")
+
+
 ORDER_KINDS = ("sale", "internal", "department", "project", "distribution")
 # draft → confirmed (reserved) → picking (allocated) → issued; or cancelled.
 ORDER_STATUSES = ("draft", "confirmed", "picking", "issued", "cancelled")
@@ -621,8 +739,35 @@ class Order(DocumentHeader, Stamped, Base):
     issued_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, default=None)
+    # Proof of delivery (step 10, migration 0011): who received it, their signature, when, and a
+    # fingerprint (SHA-256) of the order as it was signed for.
+    received_by_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    received_signature: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
+    received_signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    received_fingerprint: Mapped[str | None] = mapped_column(String(64), default=None)
+    # The sales order it delivers (step 11); none for an issue to a department or project.
+    sales_order_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_sales_orders.id", ondelete="SET NULL"), default=None, index=True)
+    # Shipping (step 12, migration 0014): how it goes, with which courier, its tracking number and fee
+    # (charged to the customer or not); once issued, out for delivery, delivered or failed.
+    delivery_method: Mapped[str | None] = mapped_column(String(12), default=None)
+    courier_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_couriers.id", name="nbin_orders_courier", ondelete="SET NULL"), default=None, index=True)
+    tracking_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    shipping_fee: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    fee_charged: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    delivery_status: Mapped[str | None] = mapped_column(String(12), default=None, index=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The company's day it was delivered, for on time or late.
+    delivered_on: Mapped[date | None] = mapped_column(Date, default=None)
+    failed_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # The courier's proof-of-delivery photo, when the customer signed the courier's device instead.
+    received_photo: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
+    received_photo_type: Mapped[str | None] = mapped_column(String(20), default=None)
+    # The wave it is picked in, with other deliveries (step 14d, migration 0018).
+    wave_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
+    courier: Mapped[Courier | None] = relationship(lazy="joined")
     created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id], lazy="joined")
     confirmed_by: Mapped[User | None] = relationship(foreign_keys=[confirmed_by_id], lazy="joined")
     issued_by: Mapped[User | None] = relationship(foreign_keys=[issued_by_id], lazy="joined")
@@ -647,6 +792,181 @@ class OrderLine(Base):
 
     order: Mapped[Order] = relationship(back_populates="lines")
     product: Mapped[Product] = relationship(lazy="joined")
+
+
+# --- replenishment (step 15a) -------------------------------------------------------------
+
+
+class ReplenishmentSettings(Base):
+    """How refill is worked out (one row): safety days on every lead time, the lead time when the vendor gives
+    none, the days of use the daily average looks back on, and whether drafts are made each night."""
+
+    __tablename__ = "nbin_replenishment_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="one_replenishment_settings"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    safety_days: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    default_lead_days: Mapped[int] = mapped_column(Integer, default=7, server_default="7")
+    history_days: Mapped[int] = mapped_column(Integer, default=90, server_default="90")
+    automatic: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Raise draft purchase orders for what an approved sales order lacks (15b).
+    order_on_demand: Mapped[bool] = mapped_column(default=True, server_default=sa_true())
+
+
+class ConsignmentSettlement(Base):
+    """What sold from a vendor's consignment between two moments, priced at its price, sent to Finance as a bill (15d)."""
+
+    __tablename__ = "nbin_consignment_settlements"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    supplier_id: Mapped[str] = mapped_column(ForeignKey("nbin_suppliers.id"), index=True)
+    from_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    to_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # [{productId, sku, name, quantity, unitCost, total}]
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    supplier: Mapped["Supplier"] = relationship(lazy="joined")
+
+
+class ProductDocument(Base):
+    """A file kept with an item (certificate of analysis, leaflet, CPR) and whether it goes with every sale (15e)."""
+
+    __tablename__ = "nbin_product_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    product_id: Mapped[str] = mapped_column(ForeignKey("nbin_products.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    file_name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(80))
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    size: Mapped[int] = mapped_column(Integer)
+    send_with_sales: Mapped[bool] = mapped_column(default=True, server_default=sa_true())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- units with conversions (step 14e) ----------------------------------------------------
+
+
+class Packaging(Base):
+    """A pack of an item (Box, Strip, Case) and how many of its base unit it holds; stock stays in the base unit."""
+
+    __tablename__ = "nbin_product_packagings"
+    __table_args__ = (CheckConstraint("quantity > 1", name="packaging_quantity"), UniqueConstraint("product_id", "name", name="packaging_name"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    product_id: Mapped[str] = mapped_column(ForeignKey("nbin_products.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(40))
+    quantity: Mapped[int] = mapped_column(Integer)
+    barcode: Mapped[str | None] = mapped_column(String(64), index=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- packages and waves (step 14d): pick → pack → ship -----------------------------------
+
+
+class Package(Base):
+    """One of a delivery's boxes: numbered, with what is in it and its weight."""
+
+    __tablename__ = "nbin_packages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    order_id: Mapped[str] = mapped_column(ForeignKey("nbin_orders.id", ondelete="CASCADE"), index=True)
+    weight_grams: Mapped[int | None] = mapped_column(Integer, default=None)
+    notes: Mapped[str | None] = mapped_column(String(300), default=None)
+    packed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    packed_by: Mapped["User | None"] = relationship(foreign_keys=[packed_by_id], lazy="joined")
+    lines: Mapped[list["PackageLine"]] = relationship(back_populates="package", cascade="all, delete-orphan", lazy="selectin")
+
+
+class PackageLine(Base):
+    __tablename__ = "nbin_package_lines"
+    __table_args__ = (CheckConstraint("quantity > 0", name="package_line_quantity"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    package_id: Mapped[str] = mapped_column(ForeignKey("nbin_packages.id", ondelete="CASCADE"), index=True)
+    order_line_id: Mapped[str] = mapped_column(ForeignKey("nbin_order_lines.id", ondelete="CASCADE"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer)
+
+    package: Mapped[Package] = relationship(back_populates="lines")
+
+
+class Wave(Base):
+    """Several held deliveries from one warehouse, picked together from one pick list."""
+
+    __tablename__ = "nbin_waves"
+    __table_args__ = (CheckConstraint("status IN ('open', 'done')", name="wave_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey("nbin_warehouses.id"), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="open", index=True)
+    notes: Mapped[str | None] = mapped_column(String(300), default=None)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    warehouse: Mapped[Warehouse] = relationship(lazy="joined")
+    created_by: Mapped["User | None"] = relationship(foreign_keys=[created_by_id], lazy="joined")
+
+
+# --- quality checks on receipt (step 14a) -------------------------------------------------
+
+
+QUALITY_REASONS = ("damaged", "expired", "short_expiry", "wrong_item", "short", "other")
+
+
+class QualityCheck(Base):
+    """What a receipt into a checking warehouse holds until someone checks it: passed is released for use,
+    failed is put aside as damaged, with why."""
+
+    __tablename__ = "nbin_quality_checks"
+    __table_args__ = (CheckConstraint("status IN ('waiting', 'done')", name="quality_check_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    receipt_id: Mapped[str] = mapped_column(ForeignKey("nbin_receipts.id", ondelete="CASCADE"), unique=True)
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey("nbin_warehouses.id"), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="waiting", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    checked_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    receipt: Mapped["Receipt"] = relationship(lazy="joined")
+    warehouse: Mapped[Warehouse] = relationship(lazy="joined")
+    checked_by: Mapped[User | None] = relationship(foreign_keys=[checked_by_id], lazy="joined")
+    lines: Mapped[list["QualityCheckLine"]] = relationship(
+        back_populates="check", cascade="all, delete-orphan", lazy="selectin", order_by="QualityCheckLine.position"
+    )
+
+
+class QualityCheckLine(Base):
+    __tablename__ = "nbin_quality_check_lines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    check_id: Mapped[str] = mapped_column(ForeignKey("nbin_quality_checks.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    product_id: Mapped[str] = mapped_column(ForeignKey("nbin_products.id"))
+    location_id: Mapped[str] = mapped_column(ForeignKey("nbin_locations.id"))
+    batch_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_batches.id", ondelete="SET NULL"), default=None)
+    quantity: Mapped[int] = mapped_column(Integer)
+    passed: Mapped[int | None] = mapped_column(Integer, default=None)
+    failed: Mapped[int | None] = mapped_column(Integer, default=None)
+    reason: Mapped[str | None] = mapped_column(String(40), default=None)
+    note: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    check: Mapped[QualityCheck] = relationship(back_populates="lines")
+    product: Mapped["Product"] = relationship(lazy="joined")
+    location: Mapped[Location] = relationship(lazy="joined")
+    batch: Mapped["Batch | None"] = relationship(lazy="joined")
 
 
 # --- transfers --------------------------------------------------------------------------
@@ -790,6 +1110,8 @@ class Count(DocumentHeader, Stamped, Base):
     submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The schedule it was started from (step 14b, migration 0017); approving it sets the next due day.
+    schedule_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
     category: Mapped[Category | None] = relationship(lazy="joined")
@@ -797,6 +1119,26 @@ class Count(DocumentHeader, Stamped, Base):
     submitted_by: Mapped[User | None] = relationship(foreign_keys=[submitted_by_id], lazy="joined")
     approved_by: Mapped[User | None] = relationship(foreign_keys=[approved_by_id], lazy="joined")
     lines: Mapped[list["CountLine"]] = relationship(back_populates="count", cascade="all, delete-orphan", lazy="selectin", order_by="CountLine.position")
+
+
+class CountSchedule(Stamped, Base):
+    """A cycle count that comes round every so many days (step 14b): one warehouse, and one category when set."""
+
+    __tablename__ = "nbin_count_schedules"
+    __table_args__ = (CheckConstraint("every_days > 0", name="count_schedule_every"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120))
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey("nbin_warehouses.id", ondelete="CASCADE"), index=True)
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_categories.id", ondelete="SET NULL"), default=None)
+    every_days: Mapped[int] = mapped_column(Integer)
+    next_on: Mapped[date] = mapped_column(Date, index=True)
+    last_counted_on: Mapped[date | None] = mapped_column(Date, default=None)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+
+    warehouse: Mapped[Warehouse] = relationship(lazy="joined")
+    category: Mapped[Category | None] = relationship(lazy="joined")
 
 
 class CountLine(Base):

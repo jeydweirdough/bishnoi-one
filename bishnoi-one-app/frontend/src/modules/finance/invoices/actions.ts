@@ -8,6 +8,15 @@ import type { Customer, Invoice, InvoiceLine, Series } from "@/src/modules/finan
 // Invoices. The API works each one out, numbers it from the series when it's
 // issued, and checks the person's role for every step.
 
+/** What happens when a delivery leaves the warehouse (step 13): its invoice issued at once, or a draft for Finance. */
+export async function setAutoInvoice(autoInvoice: "issue" | "draft"): Promise<Result<{ autoInvoice: string }>> {
+  return attempt(async () => {
+    const r = await api.put<{ autoInvoice: string }>("/finance/invoices/automatic", { autoInvoice });
+    refresh();
+    return r;
+  });
+}
+
 export type InvoiceInput = {
   customerId: string | null;
   customerName: string;
@@ -71,7 +80,8 @@ export async function reissueInvoice(id: string, reason: string | null): Promise
   });
 }
 
-export type PaymentInput = { paidOn: string; amountCentavos: number; method: string; reference: string | null; cwtCentavos?: number; cwtAtc?: string | null; cwtCertificate?: string | null };
+export type PaymentInput = { paidOn: string; amountCentavos: number; method: string; reference: string | null; cwtCentavos?: number; cwtAtc?: string | null; cwtCertificate?: string | null;
+  bankAccountId?: string | null; checkNumber?: string | null; checkBank?: string | null; checkDate?: string | null };
 
 export async function recordPayment(id: string, input: PaymentInput): Promise<Result<Invoice>> {
   return attempt(async () => {

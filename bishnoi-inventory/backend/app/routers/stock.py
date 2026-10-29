@@ -10,7 +10,7 @@ from sqlalchemy import and_, case, func, or_, select
 from app.access import allowed
 from app.api import iso
 from app.deps import DB, SettingsDep
-from app.levels import by_product, by_warehouse, levels_by_product, levels_by_warehouse, state, state_sql
+from app.levels import by_product, by_warehouse, consigned_sql, levels_by_product, levels_by_warehouse, state, state_sql
 from app.models import Batch, Category, Location, Movement, Product, Serial, Stock, Warehouse
 from app.out import batch_ref, day, location_ref, product_ref, today, warehouse_ref
 from app.paging import Limit, Offset, cut, total
@@ -58,6 +58,8 @@ def stock_overview(
     # is; a warehouse row is flagged out on its own when nothing is free there.
     overall = by_product(db, list(products))
     warehouses = {w.id: w for w in db.scalars(select(Warehouse))}
+    sub = consigned_sql()
+    theirs = {(pid, wid): int(n or 0) for pid, wid, n in db.execute(select(sub.c.product_id, sub.c.warehouse_id, sub.c.consigned))}
     rows = []
     for (pid, wid), level in levels.items():
         p = products.get(pid)
@@ -66,13 +68,14 @@ def stock_overview(
         row_state = "out" if level["available"] <= 0 and state(p, level) is not None else state(p, overall[pid])
         if state_ and row_state != state_:
             continue
-        rows.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[wid]), **level, "reorderPoint": p.reorder_point, "state": row_state, "value": level["onHand"] * p.cost_price})
+        rows.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[wid]), **level, "reorderPoint": p.reorder_point, "state": row_state,
+                     "value": max(0, level["onHand"] - theirs.get((pid, wid), 0)) * p.cost_price})
     rows.sort(key=lambda r: (r["product"]["name"].lower(), r["warehouse"]["code"]))
-    total = {k: sum(r[k] for r in rows) for k in ("onHand", "damaged", "reserved", "allocated", "available", "inTransit", "value")}
+    total = {k: sum(r[k] for r in rows) for k in ("onHand", "damaged", "onHold", "reserved", "allocated", "available", "inTransit", "value")}
     return {"items": rows, "total": total}
 
 
-QUANTITIES = ("onHand", "damaged", "reserved", "allocated", "available", "inTransit")
+QUANTITIES = ("onHand", "damaged", "onHold", "reserved", "allocated", "available", "inTransit")
 
 
 def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | None, state_: str | None, limit: int, offset: int) -> dict:
@@ -85,6 +88,7 @@ def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | Non
         (and_(lv.c.available <= 0, Product.variant_count == 0), "out"),
         else_=state_sql(func.coalesce(overall.c.available, 0), func.coalesce(overall.c.on_hand, 0)),
     )
+    theirs = consigned_sql()
     rows = (
         select(
             Product.id.label("product_id"),
@@ -93,17 +97,20 @@ def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | Non
             Warehouse.code.label("code"),
             lv.c.on_hand,
             lv.c.damaged,
+            lv.c.on_hold,
             lv.c.reserved,
             lv.c.allocated,
             lv.c.available,
             lv.c.in_transit,
-            (lv.c.on_hand * Product.cost_price).label("value"),
+            # Ours only: vendors' consignment stock isn't in value (15d).
+            ((lv.c.on_hand - func.coalesce(theirs.c.consigned, 0)) * Product.cost_price).label("value"),
             row_state.label("state"),
         )
         .select_from(lv)
         .join(Product, Product.id == lv.c.product_id)
         .join(Warehouse, Warehouse.id == lv.c.warehouse_id)
         .outerjoin(overall, overall.c.product_id == lv.c.product_id)
+        .outerjoin(theirs, (theirs.c.product_id == lv.c.product_id) & (theirs.c.warehouse_id == lv.c.warehouse_id))
         .where(Product.product_type != "service")
     )
     if q:
@@ -117,7 +124,7 @@ def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | Non
         matching = matching.where(rows.c.state == state_)
     matching = matching.subquery()
     sums = db.execute(
-        select(*(func.coalesce(func.sum(matching.c[c]), 0) for c in ("on_hand", "damaged", "reserved", "allocated", "available", "in_transit", "value")), func.count())
+        select(*(func.coalesce(func.sum(matching.c[c]), 0) for c in ("on_hand", "damaged", "on_hold", "reserved", "allocated", "available", "in_transit", "value")), func.count())
     ).one()
     page = db.execute(cut(select(matching).order_by(matching.c.name, matching.c.code, matching.c.product_id), limit, offset)).all()
     products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_({r.product_id for r in page})))}
@@ -125,9 +132,9 @@ def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | Non
     items = []
     for r in page:
         p = products[r.product_id]
-        level = dict(zip(QUANTITIES, (int(r.on_hand or 0), int(r.damaged or 0), int(r.reserved or 0), int(r.allocated or 0), int(r.available or 0), int(r.in_transit or 0)), strict=True))
-        items.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[r.warehouse_id]), **level, "reorderPoint": p.reorder_point, "state": r.state, "value": level["onHand"] * p.cost_price})
-    return {"items": items, "total": {k: int(v) for k, v in zip((*QUANTITIES, "value"), sums[:7], strict=True)}, "count": int(sums[7])}
+        level = dict(zip(QUANTITIES, (int(r.on_hand or 0), int(r.damaged or 0), int(r.on_hold or 0), int(r.reserved or 0), int(r.allocated or 0), int(r.available or 0), int(r.in_transit or 0)), strict=True))
+        items.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[r.warehouse_id]), **level, "reorderPoint": p.reorder_point, "state": r.state, "value": int(r.value or 0)})
+    return {"items": items, "total": {k: int(v) for k, v in zip((*QUANTITIES, "value"), sums[:8], strict=True)}, "count": int(sums[8])}
 
 
 def available(_: View, db: DB) -> dict[str, int]:

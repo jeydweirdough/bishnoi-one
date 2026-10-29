@@ -36,9 +36,7 @@ from app.inventory import sync_if_stale
 from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
 from app import business_events, mail, pharmacy, trade
-from app.orders import OrdersUnavailable
 from app.orders import payload as order_payload
-from app.orders import send as send_order
 from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
@@ -692,7 +690,8 @@ Order = Annotated[Access, Depends(require("orders.create"))]
 
 def orderable(quote: Quote, access: Access) -> None:
     if quote.sales_order is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Order {quote.sales_order.get('number')} was already raised from this quote.")
+        number = quote.sales_order.get("number")
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Order {number} was already raised from this quote." if number else "An order was already raised from this quote.")
     if state_of(quote) != "ready":
         raise HTTPException(status.HTTP_409_CONFLICT, "An order is raised once the quote is approved and its letter is checked.")
     if quote.rx and pharmacy.outcome(quote) != "verified":
@@ -709,24 +708,14 @@ def preview_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep,
 
 @router.post("/quotes/{quote_id}/order")
 def raise_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, quote_id: str) -> dict:
-    """Sends the quote to Bishnoi One Order and keeps the order it made on the quote."""
+    """The quote's sales order (feature plan step 11, decided 2026-10-29): the order details go to the Sales
+    app as the business event quote.ordered, with the quote itself saved, through the Platform; the order
+    is made there, waiting for approval, and its number and progress come back (sales_order.updated)."""
     quote = get_quote(db, access, quote_id)
     orderable(quote, access)
-    if not settings.orders_linked:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Bishnoi One Order isn't connected yet: set ORDERS_API_URL and ORDERS_API_KEY.")
-    try:
-        made = send_order(settings, quote.id, order_payload(db, quote, me, settings))
-    except OrdersUnavailable as e:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
-    quote.sales_order = {
-        "id": str(made["id"]),
-        "number": str(made["number"]),
-        "url": made.get("url") if isinstance(made.get("url"), str) and made["url"].startswith(("https://", "http://")) else None,
-        "status": made.get("status") if isinstance(made.get("status"), str) else None,
-        "by": {"id": me.id, "name": me.full_name},
-        "at": iso(datetime.now(UTC)),
-    }
-    audit(db, me, "quote.ordered", target=f"{quote.number} to {quote.sales_order['number']}", target_type="quote", target_id=quote.id)
+    business_events.emit(db, getattr(settings, "company", None), "quote.ordered", order_payload(db, quote, me, settings))
+    quote.sales_order = {"id": None, "number": None, "url": None, "status": "sent", "by": {"id": me.id, "name": me.full_name}, "at": iso(datetime.now(UTC))}
+    audit(db, me, "quote.ordered", target=quote.number, target_type="quote", target_id=quote.id)
     db.commit()
     return quote_out(db, quote, access)
 

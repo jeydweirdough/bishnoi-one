@@ -18,17 +18,19 @@ const CURRENCIES = [
   { value: "EUR", label: "EUR · Euro" },
 ];
 
-/** The company's name, contact email, time zone and currency: saved together. */
+/** The company's name, contact email, email domain, time zone and currency: saved together. */
 export function ProfileForm({ company }: { company: CompanyProfile }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", timezone: company.timezone, currency: company.currency });
-  const dirty = form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") || form.timezone !== company.timezone || form.currency !== company.currency;
+  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency });
+  const dirty =
+    form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") || form.emailDomain !== (company.emailDomain ?? "") ||
+    form.timezone !== company.timezone || form.currency !== company.currency;
 
   function save() {
     start(async () => {
-      const r = await changeCompany({ ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim() || null });
+      const r = await changeCompany({ ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim() || null, emailDomain: form.emailDomain.trim() });
       if (!r.ok) {
         setErrors("fields" in r && r.fields ? r.fields : {});
         return void toast.error(r.error);
@@ -47,6 +49,9 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       </Field>
       <Field label="Contact email" size="md" optional error={errors.contactEmail} hint="Where Bishnoi One writes to the company.">
         {(p) => <Input {...p} type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} maxLength={254} />}
+      </Field>
+      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your people are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
+        {(p) => <Input {...p} prefix="@" value={form.emailDomain} onChange={(e) => setForm({ ...form, emailDomain: e.target.value })} maxLength={253} placeholder="getmeds.ph" />}
       </Field>
       <Field label="Time zone" size="md" error={errors.timezone}>
         {(p) => (
@@ -92,5 +97,86 @@ export function SignOutButton({ id, name, count }: { id: string; name: string; c
     >
       Sign out
     </Button>
+  );
+}
+
+/** The letterhead every printed document carries (step 10): legal name, address, TIN, phone, logo and footer. */
+export function LetterheadForm({ company }: { company: CompanyProfile }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const first = { legalName: company.legalName ?? "", address: company.address ?? "", tin: company.tin ?? "", phone: company.phone ?? "", documentFooter: company.documentFooter ?? "" };
+  const [form, setForm] = useState(first);
+  const [logo, setLogo] = useState<string | null | undefined>(undefined); // undefined: unchanged; null: removed
+  const dirty = JSON.stringify(form) !== JSON.stringify(first) || logo !== undefined;
+  const shown = logo === undefined ? company.logo : logo;
+
+  function pick(file: File | undefined) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg"].includes(file.type)) return void toast.error("Use a PNG or JPEG image.");
+    if (file.size > 400_000) return void toast.error("Keep the logo under 400 KB.");
+    const reader = new FileReader();
+    reader.onload = () => setLogo(String(reader.result));
+    reader.readAsDataURL(file);
+  }
+
+  function save() {
+    start(async () => {
+      const r = await changeCompany({ ...form, ...(logo !== undefined ? { logo: logo ?? "" } : {}) });
+      if (!r.ok) {
+        setErrors("fields" in r && r.fields ? r.fields : {});
+        return void toast.error(r.error);
+      }
+      setErrors({});
+      setLogo(undefined);
+      toast.success("Letterhead saved", { description: "Every printed document uses it from now on." });
+      router.refresh();
+    });
+  }
+
+  return (
+    <FormGrid>
+      <Field label="Legal name" size="md" optional error={errors.legalName} hint="As registered; printed at the top.">
+        {(p) => <Input {...p} value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} maxLength={200} placeholder={company.name} />}
+      </Field>
+      <Field label="TIN" size="md" optional error={errors.tin}>
+        {(p) => <Input {...p} value={form.tin} onChange={(e) => setForm({ ...form, tin: e.target.value })} maxLength={30} placeholder="000-000-000-000" />}
+      </Field>
+      <Field label="Address" size="full" optional error={errors.address}>
+        {(p) => <Input {...p} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={400} />}
+      </Field>
+      <Field label="Phone" size="md" optional error={errors.phone}>
+        {(p) => <Input {...p} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={40} />}
+      </Field>
+      <Field label="Footer" size="md" optional error={errors.documentFooter} hint="A line at the foot of every document.">
+        {(p) => <Input {...p} value={form.documentFooter} onChange={(e) => setForm({ ...form, documentFooter: e.target.value })} maxLength={400} />}
+      </Field>
+      <div className="sm:col-span-6">
+        <p className="mb-1.5 text-sm font-medium text-ink">Logo</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {shown ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={shown} alt="Company logo" className="h-14 max-w-48 rounded border border-rule bg-white object-contain p-1" />
+          ) : (
+            <span className="text-meta text-ink-3">No logo yet</span>
+          )}
+          <label className="cursor-pointer rounded-lg border border-rule-strong bg-sheet px-3 py-1.5 text-sm text-ink hover:border-hema">
+            {shown ? "Change" : "Upload"}
+            <input suppressHydrationWarning type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+          </label>
+          {shown && (
+            <Button size="sm" variant="quiet" onClick={() => setLogo(null)}>
+              Remove
+            </Button>
+          )}
+          {errors.logo && <span className="text-meta text-danger">{errors.logo}</span>}
+        </div>
+      </div>
+      <div className="sm:col-span-6">
+        <Button variant="primary" onClick={save} loading={busy} disabled={!dirty}>
+          Save letterhead
+        </Button>
+      </div>
+    </FormGrid>
   );
 }

@@ -67,11 +67,16 @@ class AccountIn(Api):
     parent_id: str | None = None
     # Assets and liabilities: current (within a year) or long-term (migration 0023); none: from its name.
     term: Literal["current", "non_current"] | None = None
+    # Expenses, for the management reports (step 17): fixed or variable, and what it is to EBITDA and acquisition cost.
+    cost_behaviour: Literal["fixed", "variable"] | None = None
+    report_tag: Literal["depreciation", "amortisation", "interest", "income_tax", "sales_marketing"] | None = None
 
     @model_validator(mode="after")
     def _term_only_where_it_counts(self):
         if self.type not in ("asset", "liability"):
             self.term = None
+        if self.type != "expense":
+            self.cost_behaviour, self.report_tag = None, None
         return self
 
 
@@ -286,6 +291,12 @@ POSTING = {
     # The cost of goods sold, with each invoice, from Inventory's costs (2026-10-28).
     "cogs_account_id": ("expense", "Cost of goods sold (booked with each invoice)"),
     "inventory_account_id": ("asset", "Inventory (the stock goods sold come out of)"),
+    # Owner's equity and closing the year (step 16d); exchange differences on foreign bills (16c).
+    "capital_account_id": ("equity", "Owner's capital"),
+    "drawings_account_id": ("equity", "Owner's drawings"),
+    "retained_earnings_account_id": ("equity", "Retained earnings (the year's net income is closed to it)"),
+    "fx_gain_account_id": ("income", "Exchange gains (foreign bills paid for fewer pesos)"),
+    "fx_loss_account_id": ("expense", "Exchange losses (foreign bills paid for more pesos)"),
 }
 
 

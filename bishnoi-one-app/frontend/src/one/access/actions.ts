@@ -71,7 +71,7 @@ export async function addPerson(input: PersonInput): Promise<Result<{ person: { 
   });
 }
 
-export async function changePerson(id: string, change: { fullName?: string; title?: string | null; status?: "active" | "suspended" }): Promise<Result> {
+export async function changePerson(id: string, change: { fullName?: string; title?: string | null; email?: string; status?: "active" | "suspended" }): Promise<Result> {
   return attempt(async () => {
     await accountSend("PATCH", `/identity/access/people/${enc(id)}`, change);
     refresh();

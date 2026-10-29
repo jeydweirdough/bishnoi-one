@@ -46,8 +46,37 @@ def remember_company(settings, slug: str | None) -> None:
     return None
 
 
-# What this application does with each kind it takes: fn(db, data, slug). It takes none yet.
-HANDLERS: dict[str, Callable] = {}
+def _quote_ordered(db, data: dict, slug: str) -> None:
+    """Raise order in the CRM (step 11): the sales order, waiting for approval (app/sales.py)."""
+    from app.sales import from_quote
+
+    from_quote(db, data, slug)
+
+
+# What this application does with each kind it takes: fn(db, data, slug).
+def _invoice_issued(db, data: dict, slug: str) -> None:
+    from app import sales
+
+    sales.invoiced(db, data, slug)
+
+
+def _invoice_paid(db, data: dict, slug: str) -> None:
+    from app import sales
+
+    sales.paid(db, data, slug)
+
+
+def nightly(db) -> None:
+    """This application's own work at the Platform's nightly check: refill drafts, when switched on (step 15a)."""
+    from app.replenishment import nightly as refill
+
+    try:
+        refill(db)
+    except Exception:  # noqa: BLE001 (the night's other work goes on; tomorrow tries again)
+        db.rollback()
+
+
+HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])
@@ -176,4 +205,5 @@ def send_held(body: NoteIn, request: Request) -> Response:
         raise _nowhere()
     with sessions_for(request, claims["slug"])() as db:
         flush(db, request.app.state.settings)
+        nightly(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

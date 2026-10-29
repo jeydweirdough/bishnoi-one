@@ -1,3 +1,4 @@
+import { DropshipDelivered } from "@/src/modules/inventory/components/supply";
 import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
 import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Ban, ExternalLink, FileText, PackageCheck, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
@@ -252,6 +253,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
         actions={
           <>
             <PrintLink href={`/inventory/print/purchase-orders/${po.id}`} />
+            {po.dropship && (po.status === "ordered" || po.status === "partial") && may("receiving.receive") && <DropshipDelivered poId={po.id} />}
             {po.status === "draft" && may("purchasing.approve") && (
               <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve and place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "Once placed, it cannot be edited, only received or cancelled.", danger: false }} />
             )}
@@ -267,8 +269,20 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
           </>
         }
       >
-        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.warehouse.name}</span>
+        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.dropship && po.shipTo ? `${po.shipTo.name} (dropship)` : po.warehouse.name}</span>
       </PageHeader>
+      {(po.salesOrder || po.replenishment) && (
+        <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+          {po.replenishment && "Made by replenishment from use and lead time. "}
+          {po.salesOrder && (
+            <>
+              {po.dropship ? "Dropship for " : "Order-on-demand for "}
+              <Link href={`/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
+              {po.dropship && po.shipTo && <>: the vendor delivers to {po.shipTo.name}{po.shipTo.address && `, ${po.shipTo.address}`}. No stock comes through our warehouse.</>}
+            </>
+          )}
+        </p>
+      )}
 
       <Sheet className="px-5 py-4">
         <Trail steps={[
@@ -428,6 +442,13 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
         {r.deliveryRef && <> · delivery {r.deliveryRef}</>}
       </PageHeader>
       <DocumentHeaderStrip header={r.header} source={r.order && <Link href={`/inventory/purchase-orders/${r.order.id}`} className="hover:underline">{r.order.number}</Link>} />
+      {/* Receive → check → store (step 14a): waiting on hold until its quality check. */}
+      {r.qualityCheck && (
+        <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${r.qualityCheck.status === "waiting" ? "bg-promo-tint" : "bg-hema-tint"}`}>
+          {r.qualityCheck.status === "waiting" ? "On hold until its quality check: " : "Checked on arrival: "}
+          <Link href={`/inventory/quality-checks/${r.qualityCheck.id}`} className="font-semibold text-hema hover:underline">{r.qualityCheck.number}</Link>
+        </p>
+      )}
       <Sheet>
         <Table head={["Product", "Batch", "Expires", "Serial numbers", " Quantity", " Unit cost", " Amount"]} min="52rem">
           {r.lines.map((l) => (

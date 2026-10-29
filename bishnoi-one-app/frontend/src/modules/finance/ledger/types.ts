@@ -15,6 +15,9 @@ export type Account = {
   term: "current" | "non_current" | null;
   /** What the management figures count it as (term, or worked out from the name); null for other types. */
   termShown: "current" | "non_current" | null;
+  /** Expenses (step 17): fixed or variable, and what it is to EBITDA and acquisition cost. */
+  costBehaviour?: "fixed" | "variable" | null;
+  reportTag?: "depreciation" | "amortisation" | "interest" | "income_tax" | "sales_marketing" | null;
 };
 
 /** One row of a chart being imported, as the API would save it (app/routers/ledger.py). */

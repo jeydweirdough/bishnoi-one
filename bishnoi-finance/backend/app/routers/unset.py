@@ -21,12 +21,18 @@ from app.routers.tax import profile_complete
 router = APIRouter(prefix="/finance", tags=["unset"])
 
 
+# Needed only when their feature is used (cost of goods sold, step 3; equity, closing and exchange differences,
+# step 16): empty, they aren't owed; set to an account switched off, they are.
+OPTIONAL = {"cogs_account_id", "inventory_account_id", "capital_account_id", "drawings_account_id", "retained_earnings_account_id",
+            "fx_gain_account_id", "fx_loss_account_id"}
+
+
 def posting_gaps(db: Session) -> int:
-    """Default accounts left empty, or pointing at an account switched off."""
+    """Default accounts left empty (those every step needs), or pointing at an account switched off."""
     s = posting_settings(db)
-    chosen = [getattr(s, key) for key in POSTING]
-    active = set(db.scalars(select(Account.id).where(Account.id.in_([c for c in chosen if c]), Account.is_active)))
-    return sum(1 for c in chosen if c not in active)
+    chosen = {key: getattr(s, key) for key in POSTING}
+    active = set(db.scalars(select(Account.id).where(Account.id.in_([c for c in chosen.values() if c]), Account.is_active)))
+    return sum(1 for key, c in chosen.items() if (c not in active) and not (c is None and key in OPTIONAL))
 
 
 def categories_without_account(db: Session) -> int:

@@ -9,7 +9,8 @@ import type { Account, AccountType, Entry, ImportAccount, ImportCheck, Posting }
 // The ledger. The API checks every entry balances, and that only admins change
 // the chart and the posting accounts.
 
-export type AccountInput = { code: string; name: string; type: AccountType; description: string | null; isActive: boolean; parentId: string | null; term?: "current" | "non_current" | null };
+export type AccountInput = { code: string; name: string; type: AccountType; description: string | null; isActive: boolean; parentId: string | null; term?: "current" | "non_current" | null;
+  costBehaviour?: string | null; reportTag?: string | null };
 
 export async function saveAccount(id: string | null, input: AccountInput): Promise<Result<Account>> {
   return attempt(async () => {

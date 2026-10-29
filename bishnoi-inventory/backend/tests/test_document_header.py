@@ -6,8 +6,10 @@ from datetime import date, timedelta
 
 from tests.conftest import receive
 
-YESTERDAY = (date.today() - timedelta(days=1)).isoformat()
-TOMORROW = (date.today() + timedelta(days=1)).isoformat()
+from app.documents import today  # noqa: E402 (the company's day, not the computer's or UTC's)
+
+YESTERDAY = (today() - timedelta(days=1)).isoformat()
+TOMORROW = (today() + timedelta(days=1)).isoformat()
 
 
 def types(ana) -> dict:
@@ -76,3 +78,25 @@ def test_only_one_default_per_kind_and_the_default_stays_on(ana):
     assert ana.c.patch(f"/inventory/operation-types/{other['id']}", headers=ana.h, json={"isActive": False}).status_code == 409
     ana.patch(f"/inventory/operation-types/{default['id']}", {"isDefault": True})
     assert types(ana)["receipt"]["id"] == default["id"]
+
+
+def test_the_customer_signs_for_a_delivery(ana, world):
+    """Feature plan step 10: proof of delivery, once, on an issued order."""
+    import base64
+    import struct
+
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", 200, 60) + b"\x08\x06\x00\x00\x00" + b"\x00" * 40
+    signature = "data:image/png;base64," + base64.b64encode(png).decode()
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 20}])
+    sale = ana.post("/inventory/orders", {"recipient": "St. Luke's", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 5}]})
+    ana.post(f"/inventory/orders/{sale['id']}/confirm")
+    early = ana.c.post(f"/inventory/orders/{sale['id']}/received", headers=ana.h, json={"name": "Maria Santos", "signature": signature})
+    assert early.status_code == 409  # not issued yet
+    ana.post(f"/inventory/orders/{sale['id']}/issue", {})
+    bad = ana.c.post(f"/inventory/orders/{sale['id']}/received", headers=ana.h, json={"name": "Maria Santos", "signature": "data:image/png;base64,AAAA"})
+    assert bad.status_code == 422
+    ana.post(f"/inventory/orders/{sale['id']}/received", {"name": "Maria Santos", "signature": signature})
+    got = ana.get(f"/inventory/orders/{sale['id']}")["received"]
+    assert got["name"] == "Maria Santos" and got["signature"].startswith("data:image/png") and len(got["fingerprint"]) == 64
+    again = ana.c.post(f"/inventory/orders/{sale['id']}/received", headers=ana.h, json={"name": "Someone else", "signature": signature})
+    assert again.status_code == 409  # signed once, stays as signed

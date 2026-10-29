@@ -10,6 +10,7 @@ import { Figures, NoAccess, RowLink, Stamp, Table, Td } from "@/src/modules/inve
 import { BarList, Card, DetailPanel, InfoCard, InfoSection, StatCards } from "@/src/modules/inventory/components/detail";
 import { Icon } from "@/src/modules/inventory/platform/ui/icons";
 import { AddWarehouse, EditWarehouse, LocationsEditor } from "@/src/modules/inventory/components/warehouse-forms";
+import { QualityCheckSwitch } from "@/src/modules/inventory/components/quality";
 import { context, type Params, type Search } from "@/src/modules/inventory/lib/page";
 import type { Warehouse, WarehouseRow } from "@/src/modules/inventory/lib/types";
 
@@ -83,6 +84,7 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
           }
           actions={
             <>
+              {manage && <QualityCheckSwitch warehouseId={w.id} on={Boolean(w.qualityCheck)} />}
               {may("stock.view") && <LinkButton href={`/inventory/stock?warehouse=${w.id}`}>View stock</LinkButton>}
               {may("counts.create") && <LinkButton href={`/inventory/counts?warehouse=${w.id}`}>Start count</LinkButton>}
             </>
@@ -91,6 +93,7 @@ export async function WarehousePage({ params }: { params: Params<{ id: string }>
           <span className="font-mono text-meta">{w.code}</span>
           {w.address && <> · {w.address}</>}
           {!w.isActive && <> · <strong>Inactive</strong></>}
+          {w.qualityCheck && <> · checks goods on arrival</>}
         </PageHeader>
       </div>
       <DetailPanel>

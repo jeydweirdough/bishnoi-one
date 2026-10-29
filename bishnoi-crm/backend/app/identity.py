@@ -42,7 +42,8 @@ def me_out(user: User, settings: Settings) -> dict:
         "canManageSettings": administers,
         "canRecover": False,
         # Bishnoi One Order is connected: ready quotes show "Raise order".
-        "ordersLinked": settings.orders_linked,
+        # Raise order goes to the Sales app through the Platform (step 11): always available.
+        "ordersLinked": True,
         "pharmacyLinked": settings.pharmacy_linked,
         "viewedBy": None,
         "isOwner": user.role.is_system,

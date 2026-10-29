@@ -98,7 +98,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       ]),
     },
     { label: "Approvals", icon: "approvals", steps: keep([{ href: "/finance/prices", label: "Price approvals", icon: "pricing" }]) },
-    { label: "Banking", icon: "money", steps: keep([{ href: "/finance/bank", label: "Bank reconciliation", icon: "money" }]) },
+    { label: "Banking", icon: "money", steps: keep([{ href: "/finance/bank/accounts", label: "Bank accounts and rates", icon: "money" }, { href: "/finance/bank", label: "Bank reconciliation", icon: "money", exact: true }]) },
     {
       label: "Accountant",
       icon: "lists",
@@ -106,6 +106,9 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
         { href: "/finance/ledger", label: "Journal entries", icon: "lists", exact: true },
         { href: "/finance/ledger/accounts", label: "Chart of accounts", icon: "lists" },
         { href: "/finance/ledger/trial-balance", label: "Trial balance", icon: "reports" },
+        { href: "/finance/ledger/closing", label: "Closing and equity", icon: "lists" },
+        { href: "/finance/ledger/fixed-assets", label: "Fixed assets", icon: "lists" },
+        { href: "/finance/ledger/budgets", label: "Budgets", icon: "reports" },
       ]),
     },
     {

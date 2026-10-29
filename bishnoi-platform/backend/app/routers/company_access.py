@@ -29,7 +29,8 @@ from app.audit import audit
 from app import passwords
 from app.deps import DB, SettingsDep
 from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp
-from app.accounts import runs_company
+from app import email_rules
+from app.accounts import account_of, memberships, runs_company
 from app.routers.identity import Signed
 
 router = APIRouter(prefix="/identity/access", tags=["company access"])
@@ -345,7 +346,8 @@ class PersonRoleIn(Api):
 
 def get_person(db: Session, me: Identity, person_id: str) -> Identity:
     p = db.get(Identity, person_id)
-    if p is None or p.company_id != me.company_id:
+    # An operator's let-in membership isn't one of the company's people (2026-10-28).
+    if p is None or p.company_id != me.company_id or p.via_operator:
         raise not_found("person")
     return p
 
@@ -387,7 +389,14 @@ class PersonIn(Api):
 class PersonPatch(Api):
     full_name: str | None = Field(None, min_length=2, max_length=120)
     title: str | None = Field(None, max_length=120)
+    # Their sign-in email, at the company's domain (app/email_rules.py, decided 2026-10-29).
+    email: str | None = Field(None, max_length=254)
     status: Literal["active", "suspended"] | None = None
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str | None) -> str | None:
+        return check_email(value) if value else None
 
 
 class PasswordIn(Api):
@@ -403,6 +412,8 @@ def add_person(body: PersonIn, request: Request, db: DB, me: Admin, settings: Se
     """Someone new at the company: their account, their role and the modules they may open, in one go."""
     if db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == body.email.lower())):
         raise field_error("email", "Somebody here already has that email.")
+    email_rules.check_company_email(db.get(Company, me.company_id), body.email)
+    email_rules.check_available(db, body.email, me.company_id)
     role = get_role(db, me, body.role_id) if body.role_id else None
     apps = [company_module(db, me, key) for key in dict.fromkeys(body.apps)]
     p = Identity(company_id=me.company_id, full_name=body.full_name.strip(), email=body.email, title=(body.title or "").strip() or None, access_role_id=role.id if role else None)
@@ -425,6 +436,14 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
     """Their name or title, or switching them off (and on again): off, they can't sign in to any module."""
     p = get_person(db, me, person_id)
     fields = {k: v for k, v in changed(body).items() if v is not None and getattr(p, k) != v}
+    if "email" in fields:
+        new = fields.pop("email")
+        change_email(db, me, p, new)
+        audit(db, me.email, "access.email_changed", category="security", target=new, target_type="identity", target_id=p.id, company_id=me.company_id, fields=["email"])
+        if not fields:
+            db.commit()
+            told(request, settings, me.company_id)
+            return {"person": person_out(p)}
     if fields.get("status") == "suspended":
         if p.id == me.id:
             raise conflict("You can't switch yourself off. Ask another administrator.")
@@ -439,6 +458,20 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
         db.commit()
         told(request, settings, me.company_id)
     return {"person": person_out(p)}
+
+
+def change_email(db: Session, me: Identity, p: Identity, new: str) -> None:
+    """A person's sign-in email, changed by their company's administrator: at the company's domain, and
+    nobody else's anywhere. Their account keeps its password and history; they sign in with the new one."""
+    if db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == new, Identity.id != p.id)):
+        raise field_error("email", "Somebody here already has that email.")
+    email_rules.check_company_email(db.get(Company, me.company_id), new)
+    account = account_of(db, p)
+    email_rules.check_available(db, new, me.company_id, but_account=account.id if account else None)
+    if account is not None and (account.is_operator or any(
+            m.company_id != me.company_id and not m.via_operator and m.status == "active" for m in memberships(db, account))):
+        raise conflict(f"{p.email} is also used outside {db.get(Company, me.company_id).name}. Ask Bishnoi One's operators to separate it first.")
+    email_rules.change_email(db, p, new)
 
 
 @router.post("/people/{person_id}/password")

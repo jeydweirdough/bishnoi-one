@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import cpr
+from app.routers.packagings import packagings_of
 from app.access import allowed
 from app.api import Api, changed, conflict, field_error, found, iso, not_found
 from app.audit import audit
@@ -102,8 +103,10 @@ def reference_products(db: Session) -> list[dict]:
     """What a document's lines can be for: products that hold stock. One that only
     groups its sizes (BD Syringe, with 1, 3 and 5 mL) holds none itself, so its
     sizes are listed instead."""
-    products = db.scalars(select(Product).where(Product.product_type != "service", Product.variant_count == 0).order_by(func.lower(Product.name)))
-    return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id} for p in products]
+    products = db.scalars(select(Product).where(Product.product_type != "service", Product.variant_count == 0).order_by(func.lower(Product.name))).all()
+    packs = packagings_of(db)  # entered in packs on the forms (step 14e)
+    return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id,
+             "packagings": packs.get(p.id, [])} for p in products]
 
 
 REFERENCE = {
@@ -499,6 +502,13 @@ def sku_taken(db: DB, sku: str, but: str | None = None) -> bool:
     return db.scalar(q.where(Product.id != but) if but else q) is not None
 
 
+def consignment_value(db, p: Product, level: dict) -> dict:
+    from app.levels import consigned
+
+    theirs = consigned(db, [p.id]).get(p.id, 0)
+    return {"consigned": theirs, "value": max(0, level["onHand"] - theirs) * p.cost_price}
+
+
 def product_row(p: Product, level: dict, warn_days: int = 90) -> dict:
     return {
         **product_ref(p),
@@ -631,6 +641,10 @@ def read_product(_: View, db: DB, settings: SettingsDep, product_id: str) -> dic
     movements = db.scalars(select(Movement).where(Movement.product_id == p.id).order_by(Movement.id.desc()).limit(15)).all()
     return {
         **product_row(p, level, warn),
+        # Its packs (step 14e): Strip = 10, Box = 100…; stock stays in its base unit.
+        "packagings": packagings_of(db, [p.id]).get(p.id, []),
+        # Vendors' consignment stock (15d): on hand, not ours, so not in its value.
+        **consignment_value(db, p, level),
         "description": p.description,
         "unitName": p.unit.name,
         "taxRateBp": p.tax_rate_bp,

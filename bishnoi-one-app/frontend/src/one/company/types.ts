@@ -9,8 +9,20 @@ export type CompanyProfile = {
   currency: string;
   timezone: string;
   contactEmail: string | null;
+  /** Its people's email domain (getmeds.ph): they're added, and sign in, only at it (decided 2026-10-29). */
+  emailDomain: string | null;
   createdAt: string;
+  /** The letterhead every printed document carries (step 10). */
+  legalName: string | null;
+  address: string | null;
+  tin: string | null;
+  phone: string | null;
+  documentFooter: string | null;
+  logo: string | null;
 };
+
+/** Someone whose email isn't at the company's domain: they can't sign in until it's changed. */
+export type OffDomainPerson = { id: string; fullName: string; email: string };
 
 export type CompanyApp = { key: string; name: string; description: string | null; appUrl: string | null; people: number; administrators: number };
 

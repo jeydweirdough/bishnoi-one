@@ -3,26 +3,32 @@
     draft → confirmed (reserved) → picking (allocated) → issued → stock goes down
                     └──────────── cancelled (released) ┘
 
+A customer's delivery, once issued, is shipped: out for delivery, then delivered or failed
+(step 12, app/shipping.py and app/routers/shipping.py).
+
 Confirming checks the stock is there and holds it, so nobody else can take
 it. Issuing takes it out first expired, first out, unless a line names its
 batch.
 """
 
+import base64
+import hashlib
+import json
 from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 
-from app import business_events
+from app import business_events, documents, sales, shipping
 from app.access import CurrentAccess, allowed
 from app.api import Api, conflict, field_error, found, iso
-from app import documents
 from app.audit import audit
 from app.deps import DB, CurrentUser
-from app.models import ORDER_KINDS, Order, OrderLine, Product, Warehouse
+from app.models import ORDER_KINDS, Order, OrderLine, Product, SalesOrder, Warehouse
 from app.out import day, person, product_ref, warehouse_ref
 from app.paging import Limit, Offset, cut, total
+from app.signature_image import BadImage, checked_png
 from app.stock import Ref, available, clean_serials, next_number, pick_out, post, serials_out
 
 router = APIRouter(prefix="/inventory", tags=["orders"])
@@ -81,6 +87,10 @@ def order_brief(o: Order) -> dict:
         "createdAt": iso(o.created_at),
         "confirmedAt": iso(o.confirmed_at),
         "issuedAt": iso(o.issued_at),
+        # The wave it's picked in (step 14d).
+        "waveId": o.wave_id,
+        # How it goes and where it is (step 12): courier, tracking, fee; out for delivery, delivered or failed.
+        "shipping": shipping.shipping_out(o) if o.kind == "sale" else None,
     }
 
 
@@ -92,6 +102,10 @@ def order_out(db: DB, o: Order) -> dict:
         "createdBy": person(o.created_by),
         "confirmedBy": person(o.confirmed_by),
         "issuedBy": person(o.issued_by),
+        # Proof of delivery: who signed for it, and their signature (step 10).
+        "received": {"name": o.received_by_name, "signedAt": iso(o.received_signed_at),
+                     "signature": "data:image/png;base64," + base64.b64encode(o.received_signature).decode() if o.received_signature else None,
+                     "fingerprint": o.received_fingerprint} if o.received_signed_at else None,
         "lines": [
             {
                 "id": line.id,
@@ -151,11 +165,17 @@ def list_orders(
     q: str | None = Query(None, max_length=100),
     operation_type: str | None = Query(None, alias="operationType", max_length=36),
     timing: str | None = Query(None, max_length=10),
+    delivery: str | None = Query(None, max_length=40, description="out, delivered, failed (comma-separated)"),
+    courier: str | None = Query(None, max_length=36),
     limit: int | None = Limit(),
     offset: int = Offset(),
 ) -> list[dict] | dict:
     """Newest first. Without `limit`, the latest 500 (the board's columns)."""
     query = documents.narrow(select(Order).order_by(Order.created_at.desc()), Order, operation_type, timing)
+    if delivery:
+        query = query.where(Order.delivery_status.in_(delivery.split(",")))
+    if courier:
+        query = query.where(Order.courier_id == courier)
     if status_:
         query = query.where(Order.status.in_(status_.split(",")))
     if kind:
@@ -211,7 +231,8 @@ def reservations(_: View, db: DB, warehouse: str | None = Query(None, max_length
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
 def create_order(_: allowed("orders.create"), me: CurrentUser, db: DB, body: OrderIn) -> dict:
     check_order(db, body)
-    o = Order(number=next_number(db, "SO" if body.kind == "sale" else "IS"), kind=body.kind, recipient=body.recipient, warehouse_id=body.warehouse_id, needed_on=body.needed_on, notes=body.notes, created_by_id=me.id)
+    # A delivery (step 11: sales orders are the Sales app's own, SO-…): DR-…; an issue: IS-….
+    o = Order(number=next_number(db, "DR" if body.kind == "sale" else "IS"), kind=body.kind, recipient=body.recipient, warehouse_id=body.warehouse_id, needed_on=body.needed_on, notes=body.notes, created_by_id=me.id)
     set_lines(db, o, body)
     # Its header (step 8): scheduled for the day it's needed, unless another is given.
     o.scheduled_on = body.needed_on
@@ -312,15 +333,58 @@ def issue_order(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: s
         line.serials = serials
     o.status, o.issued_by_id, o.issued_at = "issued", me.id, datetime.now(UTC)
     documents.done(o, o.issued_at)
+    shipping.sent_out(o)
     audit(db, me, "order.issued", target=o.number, target_type="order", target_id=o.id)
+    # Its sales order is delivered (step 11).
+    sales.delivered(db, o, getattr(request.state, "company", None))
     # Told to the other apps (step 7): Finance makes the invoice from it in Stage 4.
     if o.kind == "sale":
         business_events.emit(db, getattr(request.state, "company", None), "delivery.done", {
-            "orderId": o.id, "number": o.number, "recipient": o.recipient, "warehouseId": o.warehouse_id, "issuedAt": o.issued_at.isoformat(),
+            "orderId": o.id, "number": o.number, "salesOrderId": o.sales_order_id, "recipient": o.recipient, "warehouseId": o.warehouse_id, "issuedAt": o.issued_at.isoformat(),
+            # Shipping (step 12): a fee charged to the customer is a line on the invoice (step 13).
+            "shipping": {"method": o.delivery_method, "courier": o.courier.name if o.courier else None, "trackingNumber": o.tracking_number,
+                         "fee": o.shipping_fee or 0, "feeCharged": bool(o.fee_charged)},
+            # The sale it delivers, as sold, for Finance to invoice it (step 13).
+            "salesOrder": sales.for_invoice(db.get(SalesOrder, o.sales_order_id)) if o.sales_order_id and db.get(SalesOrder, o.sales_order_id) else None,
             "lines": [{"sku": line.product.sku, "productId": line.product_id, "quantity": line.quantity, "unitPrice": line.unit_price, "picks": line.picks}
                       for line in o.lines]})
     db.commit()
     return {"id": o.id, "status": o.status}
+
+
+class ReceivedIn(Api):
+    name: str = Field(min_length=2, max_length=120)
+    # Drawn by the customer on the device, cleaned in the browser: a PNG as a data URL.
+    signature: str = Field(min_length=20, max_length=500_000)
+
+
+def delivered_content(o: Order) -> dict:
+    """What the customer's signature vouches for: the order, its lines, batches and serials as issued."""
+    return {"number": o.number, "recipient": o.recipient, "issuedAt": iso(o.issued_at),
+            "lines": [[line.product.sku, line.quantity, line.picks or [], line.serials or []] for line in o.lines]}
+
+
+@router.post("/orders/{order_id}/received")
+def sign_for_delivery(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, body: ReceivedIn, request: Request) -> dict:
+    """The customer signs for what they received (proof of delivery). Once signed, it stays as signed."""
+    o = found(db, Order, order_id, "order")
+    if o.status != "issued":
+        raise conflict("Issue the order first: the customer signs for what left the warehouse.")
+    if o.received_signed_at is not None:
+        raise conflict(f"{o.received_by_name} already signed for this delivery.")
+    try:
+        image = checked_png(body.signature)
+    except BadImage as e:
+        raise field_error("signature", str(e)) from None
+    content = json.dumps(delivered_content(o), sort_keys=True, separators=(",", ":"), default=str).encode()
+    o.received_by_name, o.received_signature = body.name.strip(), image
+    o.received_signed_at, o.received_fingerprint = datetime.now(UTC), hashlib.sha256(content).hexdigest()
+    # Signed for: delivered (step 12).
+    if o.kind == "sale" and o.delivery_status != "delivered":
+        shipping.delivered(db, o, getattr(request.state, "company", None), o.received_signed_at)
+    audit(db, me, "order.received", target=o.number, target_type="order", target_id=o.id, fields=["receivedByName", "signature"])
+    db.commit()
+    return {"id": o.id, "receivedBy": o.received_by_name, "signedAt": iso(o.received_signed_at)}
 
 
 @router.post("/orders/{order_id}/cancel")

@@ -12,7 +12,7 @@ export default async function OperatorsPage() {
   return (
     <>
       <PageHeader title="Operators">
-        The people at Bishnoi One who run it for every company: they see this Operations area and are administrator at every company. A switch on their account, with their one sign-in.
+        The people at Bishnoi One who run it for every company: they see this Operations area and work in any company. Each signs in with an email of their own, never one a company's person uses.
       </PageHeader>
       <div className="max-w-3xl">
         <OperatorsList operators={operators} meEmail={me.email.toLowerCase()} canChange={me.staff === "admin"} />

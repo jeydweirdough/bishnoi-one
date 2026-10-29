@@ -24,13 +24,14 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
+from app import fx
 from app.access import access_of, permitted
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.locks import lock_series, locked
-from app.models import OPEN_VOUCHERS, Account, Bill, JournalEntry, PaymentVoucher, StoredFile, Supplier, User, VoucherEvent, VoucherFile, VoucherLine
+from app.models import BankAccount, OPEN_VOUCHERS, Account, Bill, JournalEntry, PaymentVoucher, StoredFile, Supplier, User, VoucherEvent, VoucherFile, VoucherLine
 from app.notify import done, holders, tell
 from app.routers.funds import today
 from app.routers.payables import FileIn, files_out, found_file, file_response, set_aside, store_file
@@ -404,6 +405,9 @@ class ReleaseIn(Api):
     check_number: str | None = Field(None, max_length=40)
     check_date: date | None = None
     note: str | None = Field(None, max_length=300)
+    # The company bank account it went out of (step 16a); the rate on the day paid, for a foreign bill (16c).
+    bank_account_id: str | None = Field(None, max_length=36)
+    rate: float | None = Field(None, gt=0, le=100000)
 
 
 @router.post("/{voucher_id}/release")
@@ -421,13 +425,38 @@ def release(user: permitted("vouchers.release"), db: DB, settings: SettingsDep, 
     if v.method == "check" and not (body.check_number or "").strip():
         raise field_error("checkNumber", "Enter the check number.")
     paid_from = db.get(Account, v.paid_from_id) if v.paid_from_id else None
+    if body.bank_account_id:
+        bank = db.get(BankAccount, body.bank_account_id)
+        if bank is None or not bank.is_active:
+            raise field_error("bankAccountId", "Pick one of the company's active bank accounts.")
+        paid_from, v.bank_account_id, v.paid_from_id = bank.account, bank.id, bank.account_id
     if paid_from is None or not paid_from.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, "The account it's paid from isn't set or is switched off. Return it to be corrected.")
     for i, ln in enumerate(v.lines):
         if ln.amount_centavos > ln.bill.payable_centavos - ln.bill.paid_centavos or ln.bill.status != "recorded":
             raise line_error(i, "amountCentavos", f"Bill {ln.bill.no} no longer has {peso(ln.amount_centavos)} left to pay. Return the voucher to be corrected.")
     legs = [Leg(bill_payables(db, ln.bill), debit=ln.amount_centavos, description=f"Bill {ln.bill.no} ({ln.bill.bill_number})"[:200]) for ln in v.lines]
-    legs.append(Leg(paid_from, credit=v.total_centavos, description=f"{METHOD_LABELS[v.method]} to {v.supplier.name}"[:200]))
+    # A foreign bill is paid in its currency at the day's rate (step 16c): the pesos that go out differ from what it
+    # was booked at; the difference is an exchange gain (fewer pesos) or loss (more).
+    paid, rate_e4 = 0, None
+    for ln in v.lines:
+        b = ln.bill
+        if b.currency and b.currency != fx.BASE and b.foreign_payable:
+            rate_e4 = rate_e4 or fx.need_rate(db, b.currency, body.paid_on, body.rate, "rate")
+            foreign = round(b.foreign_payable * ln.amount_centavos / b.payable_centavos) if b.payable_centavos else 0
+            paid += fx.to_pesos(foreign, rate_e4)
+        else:
+            paid += ln.amount_centavos
+    exchange = v.total_centavos - paid
+    legs.append(Leg(paid_from, credit=paid, description=f"{METHOD_LABELS[v.method]} to {v.supplier.name}"[:200]))
+    if exchange:
+        s = posting_settings(db)
+        gain = db.get(Account, s.fx_gain_account_id) if s.fx_gain_account_id else None
+        loss = db.get(Account, s.fx_loss_account_id) if s.fx_loss_account_id else None
+        if (exchange > 0 and gain is None) or (exchange < 0 and loss is None):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Set the exchange gain and loss accounts under Accounting, Default accounts, then release it.")
+        legs.append(Leg(gain, credit=exchange, description="Exchange gain") if exchange > 0 else Leg(loss, debit=-exchange, description="Exchange loss"))
+    v.rate_e4, v.exchange_centavos = rate_e4, exchange or None
     reference = (body.check_number if v.method == "check" else body.bank_reference) or v.oojeema_ref
     e = post(db, body.paid_on, f"{v.number}: payment to {v.supplier.name}", legs, user.full_name, reference=(reference or v.number)[:80], source="voucher", by_id=user.id)
     for ln in v.lines:

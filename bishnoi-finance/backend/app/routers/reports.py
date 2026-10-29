@@ -462,6 +462,20 @@ def key_figures(c: Ctx):
          _reading(now.cash_cycle, 60, 90, low_is_good=True)),
         ("Cash", "Cash, bank, e-wallet and checks on the last day", m.peso(now.position.cash), m.peso(then.position.cash), _change(now.position.cash, then.position.cash),
          "Healthy" if now.position.cash > 0 else "None"),
+        # Step 17: from expenses tagged on the chart of accounts, owner's equity, and new customers.
+        ("EBITDA", "Net profit + depreciation, amortisation, interest and income tax", m.peso(now.ebitda), m.peso(then.ebitda), _change(now.ebitda, then.ebitda),
+         ("Tag those expenses on the chart of accounts" if not now.addbacks else "Positive" if now.ebitda > 0 else "Negative")),
+        ("Return on equity", "Net profit ÷ owner's equity (assets − liabilities)", _pct(now.return_on_equity), _pct(then.return_on_equity), "—",
+         "Not enough data" if now.return_on_equity is None else "Positive" if now.return_on_equity > 0 else "Negative"),
+        ("Debt to equity", "Liabilities ÷ owner's equity", _times(now.debt_to_equity), _times(then.debt_to_equity), "—",
+         _reading(now.debt_to_equity, 1.0, 2.0, low_is_good=True)),
+        ("Break-even revenue", "Fixed costs ÷ contribution margin (revenue less variable costs, as a share)",
+         m.peso(now.break_even) if now.break_even is not None else "—", m.peso(then.break_even) if then.break_even is not None else "—", "—",
+         "Tag expenses fixed or variable" if now.fixed_costs is None else "Not enough data" if now.break_even is None
+         else "Above it" if now.revenue >= now.break_even else "Below it"),
+        ("Customer acquisition cost", "Sales and marketing spend ÷ new customers", m.peso(now.acquisition_cost) if now.acquisition_cost is not None else "—",
+         m.peso(then.acquisition_cost) if then.acquisition_cost is not None else "—", "—",
+         "Tag sales and marketing expenses" if now.sales_marketing is None else "No new customers" if not now.new_customers else f"{now.new_customers} new customer{'' if now.new_customers == 1 else 's'}"),
     ]
     summary = [
         fig("Revenue", now.revenue, "money"),
@@ -579,6 +593,67 @@ def revenue_growth(c: Ctx):
     )
 
 
+def _fiscal(c: Ctx):
+    """For a day: (its fiscal year's last day, the month's place in that year, 0 to 11)."""
+    from calendar import monthrange
+
+    from app.models import TaxProfile
+
+    profile = c.db.get(TaxProfile, 1)
+    end_month = profile.fiscal_month_end if profile else 12
+
+    def where(d: date) -> tuple[date, int]:
+        year = d.year if d.month <= end_month else d.year + 1
+        index = (d.month - end_month - 1) % 12
+        return date(year, end_month, monthrange(year, end_month)[1]), index
+
+    return where
+
+
+def budget_vs_actual(c: Ctx):
+    """Each budgeted account for the period's months: what was budgeted, what happened, the difference, and how much of
+    the budget it used (step 17)."""
+    from app.models import Account, Budget
+
+    where = _fiscal(c)
+    months, at = [], c.first.replace(day=1)
+    while at <= c.last:
+        months.append(at)
+        at = date(at.year + 1, 1, 1) if at.month == 12 else date(at.year, at.month + 1, 1)
+    budgeted: dict[str, int] = {}
+    for d in months:
+        year_end, i = where(d)
+        for b in c.db.scalars(select(Budget).where(Budget.year_end == year_end)):
+            budgeted[b.account_id] = budgeted.get(b.account_id, 0) + (b.months[i] if i < len(b.months) else 0)
+    from app.bir_reports import balances
+
+    moves = balances(c.db, start=c.first, end=c.last)
+    rows = []
+    for a in c.db.scalars(select(Account).where(Account.id.in_(list(budgeted))).order_by(Account.code)):
+        d, cr = moves.get(a.id, (0, 0))
+        actual = cr - d if a.type == "income" else d - cr
+        budget = budgeted[a.id]
+        rows.append({"code": a.code, "account": a.name, "type": "Income" if a.type == "income" else "Expense", "budget": budget, "actual": actual,
+                     "variance": actual - budget, "used": actual / budget if budget else None})
+    columns = [col("code", "Code"), col("account", "Account"), col("type", "Type"), col("budget", "Budget", "money"), col("actual", "Actual", "money"),
+               col("variance", "Over (+) or under (−)", "money"), {**col("used", "Of budget", "percent"), "ratio": ["actual", "budget"]}]
+    return columns, rows, [], bar("account", "budget", "actual")
+
+
+def fixed_asset_register(c: Ctx):
+    """Every fixed asset: cost, depreciation to date, book value (step 17)."""
+    from app.models import Account, FixedAsset
+
+    names = {a.id: a.name for a in c.db.scalars(select(Account))}
+    rows = [{"asset": a.name, "account": names.get(a.asset_account_id, ""), "acquired": a.acquired_on.isoformat(), "months": a.useful_months,
+             "cost": a.cost_centavos, "accumulated": a.accumulated_centavos, "bookValue": a.cost_centavos - a.accumulated_centavos,
+             "status": "Active" if a.status == "active" else "Disposed"}
+            for a in c.db.scalars(select(FixedAsset).order_by(FixedAsset.acquired_on))]
+    return ([col("asset", "Asset"), col("account", "Account"), col("acquired", "Bought", "date"), col("months", "Useful life (months)", "number"),
+             col("cost", "Cost", "money"), col("accumulated", "Depreciated to date", "money"), col("bookValue", "Book value", "money"), col("status", "Status")],
+            rows, [fig("Book value", sum(r["bookValue"] for r in rows if r["status"] == "Active"), "money")], None)
+
+
 def cash_forecast(c: Ctx):
     """The next 12 weeks from the day: cash now, what customers owe by when it's due, what's owed
     to suppliers by when it's due, and the cash that leaves."""
@@ -644,6 +719,8 @@ REPORTS: tuple[Report, ...] = (
     Report("gross-margin-by-salesperson", "Gross margin by salesperson", "Management", "Revenue, cost of goods sold and gross profit for each salesperson in the period.", gross_margin_by("salesperson", "Salesperson"), "invoices.view", fixed=True),
     Report("revenue-by-division", "Revenue and margin by division", "Management", "Revenue, cost of goods sold and gross profit for each division in the period, by the salesperson's division when each invoice was made.", gross_margin_by("division", "Division"), "invoices.view", fixed=True),
     Report("revenue-by-team", "Revenue and margin by team", "Management", "Revenue, cost of goods sold and gross profit for each team in the period, by the salesperson's team when each invoice was made.", gross_margin_by("team", "Team"), "invoices.view", fixed=True),
+    Report("budget-vs-actual", "Budget against actual", "Management", "Each budgeted account for the period: budget, actual, over or under, and how much of the budget it used.", budget_vs_actual, "journal.view", fixed=True),
+    Report("fixed-assets", "Fixed asset register", "Accounting", "Every fixed asset: what it cost, its depreciation to date and its book value.", fixed_asset_register, "journal.view", dated=False, fixed=True),
     Report("cash-forecast", "Cash forecast", "Management", "Cash now, and what customers and suppliers are due to pay and be paid over the next 12 weeks.", cash_forecast, "journal.view", dated=False, fixed=True),
 )
 BY_KEY = {r.key: r for r in REPORTS}

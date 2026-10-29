@@ -64,7 +64,7 @@ def test_voiding_keeps_the_number_and_reverses_the_entry(client, ana, ben):  # n
     voided = client.post(f"/finance/invoices/{inv['id']}/void", json={"reason": "Wrong customer"}, headers=ana).json()
     assert (voided["status"], voided["number"], voided["voidReason"]) == ("void", "SI-000101", "Wrong customer")
     assert balances(client, ana) == {"1100": 0, "4000": 0, "2200": 0}
-    assert client.get("/finance/invoices?status=void", headers=ana).json()["counts"] == {"draft": 0, "issued": 0, "void": 1}
+    assert client.get("/finance/invoices?status=void", headers=ana).json()["counts"] == {"draft": 0, "issued": 0, "void": 1, "attention": 0}
 
 
 def test_what_stops_an_invoice(client, ana, ben):  # noqa: F811 (fixtures)

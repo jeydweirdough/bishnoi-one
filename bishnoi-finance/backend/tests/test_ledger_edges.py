@@ -117,8 +117,11 @@ def test_only_admins_set_the_default_accounts(client, ana, ben):
     assert unknown.status_code == 422
     posting = client.get("/finance/ledger/posting", headers=ben).json()
     assert posting["canEdit"] is False
-    # The cost of goods sold's two accounts (migration 0024) start unset: Finance picks them.
-    assert {i["key"] for i in posting["items"] if i["account"] is None} == {"cogs_account_id", "inventory_account_id"}
+    # The cost of goods sold's two accounts (migration 0024), and equity, closing and exchange differences (step 16,
+    # migration 0028), start unset: Finance picks them when it uses them.
+    assert {i["key"] for i in posting["items"] if i["account"] is None} == {
+        "cogs_account_id", "inventory_account_id", "capital_account_id", "drawings_account_id", "retained_earnings_account_id",
+        "fx_gain_account_id", "fx_loss_account_id"}
     assert {i["key"]: i["account"]["code"] for i in posting["items"] if i["account"]} == {
         "advances_account_id": "1200", "due_to_employees_account_id": "2100", "cash_account_id": "1000",
         "bank_account_id": "1010", "ewallet_account_id": "1020", "check_account_id": "1010",

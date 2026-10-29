@@ -1,32 +1,28 @@
-"""Raising an order in Bishnoi One Order from a ready quote, and the printed quotation's letterhead.
-(Bishnoi One Order is stood in for here.)"""
-
-import pytest
+"""Raising an order from a ready quote (step 11: through the Sales app, as the event quote.ordered), and the printed
+quotation's letterhead."""
 
 from app import orders
-from app.routers import quotes as quotes_router
 from tests.test_customers import company, crew  # noqa: F401 (crew is a fixture)
 from tests.test_quotes import catalogue, ids, line, save  # noqa: F401 (fixtures)
 
 
-@pytest.fixture
-def linked(app, monkeypatch):
-    app.state.settings.orders_api_url = "http://orders.test"
-    monkeypatch.setattr(type(app.state.settings), "orders_linked", property(lambda self: True))
-    sent = []
+def sent(app) -> list:
+    """The events the CRM saved to send (the outbox)."""
+    from sqlalchemy import select
 
-    def fake_send(settings, quote_id, body):
-        sent.append((quote_id, body))
-        return {"id": "ord-1", "number": "SO-000123", "url": "https://orders.test/orders/ord-1", "status": "new"}
+    from app.business_events import OutboxEvent
+    from tests.test_platform_roles import database
 
-    monkeypatch.setattr(quotes_router, "send_order", fake_send)
-    return sent
+    with database(app)() as db:
+        return [(e.kind, e.data) for e in db.scalars(select(OutboxEvent).where(OutboxEvent.kind == "quote.ordered"))]
 
 
-def test_a_ready_quote_is_ordered_once(client, crew, ids, linked):
+def test_a_ready_quote_is_ordered_once_through_the_sales_app(app, client, crew, ids):
+    """Feature plan step 11: Raise order sends the event quote.ordered; the Sales app makes the order."""
     acme = company(client, crew["ria"])
     q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 2)]).json()
     assert q["can"]["order"] and q["order"] is None
+    assert client.get("/auth/me", headers=crew["ria"]).json()["ordersLinked"] is True
 
     payload = client.get(f"/quotes/{q['id']}/order-payload", headers=crew["ria"]).json()
     assert payload["quote"]["number"] == q["number"]
@@ -37,42 +33,37 @@ def test_a_ready_quote_is_ordered_once(client, crew, ids, linked):
     r = client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
     assert r.status_code == 200, r.text
     got = r.json()
-    assert got["order"]["number"] == "SO-000123" and got["order"]["url"] == "https://orders.test/orders/ord-1"
-    assert not got["can"]["order"]
-    assert linked[0][0] == q["id"] and linked[0][1]["raisedBy"]["email"]
+    assert got["order"]["status"] == "sent" and got["order"]["number"] is None and not got["can"]["order"]
+    events = sent(app)
+    assert len(events) == 1 and events[0][1]["quote"]["id"] == q["id"] and events[0][1]["raisedBy"]["email"]
 
     again = client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
-    assert again.status_code == 409 and "SO-000123" in again.json()["detail"]
-    assert len(linked) == 1
+    assert again.status_code == 409
+    assert len(sent(app)) == 1
 
 
-def test_a_quote_waiting_for_approval_is_not_ordered(client, crew, ids, linked):
+def test_the_quote_hears_what_became_of_its_order(app, client, crew, ids):
+    from tests.test_platform_roles import note
+    from tests.test_platform_sign_in import PUBLIC
+
+    acme = company(client, crew["ria"])
+    q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1)]).json()
+    client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
+    app.state.settings.platform_public_key = PUBLIC
+    event = {"id": "ev-so-00001", "kind": "sales_order.updated", "source": "inventory", "occurredAt": "2026-10-29T00:00:00+00:00",
+             "data": {"quoteId": q["id"], "id": "so-1", "number": "SO-2026-00001", "status": "pending"}}
+    assert client.post("/platform/events", json={"pass": note("event", event=event)}).status_code == 204
+    order = client.get(f"/quotes/{q['id']}", headers=crew["ria"]).json()["order"]
+    assert order["number"] == "SO-2026-00001" and order["status"] == "pending" and order["url"] == "/sales/orders/so-1"
+
+
+def test_a_quote_waiting_for_approval_is_not_ordered(app, client, crew, ids):
     acme = company(client, crew["ria"])
     q = save(client, crew["ria"], acme, [line(ids["ORS-SACH"], 1, discount={"kind": "percent", "value": 1500})]).json()
     assert q["state"] == "waiting" and not q["can"]["order"]
     r = client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
     assert r.status_code == 409
-    assert linked == []
-
-
-def test_bishnoi_order_down_says_so_and_keeps_nothing(client, crew, ids, linked, monkeypatch):
-    def down(settings, quote_id, body):
-        raise orders.OrdersUnavailable("Bishnoi One Order can't be reached right now. Try again in a moment.")
-
-    monkeypatch.setattr(quotes_router, "send_order", down)
-    acme = company(client, crew["ria"])
-    q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1)]).json()
-    r = client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
-    assert r.status_code == 502 and "can't be reached" in r.json()["detail"]
-    assert client.get(f"/quotes/{q['id']}", headers=crew["ria"]).json()["order"] is None
-
-
-def test_not_connected(client, crew, ids):
-    acme = company(client, crew["ria"])
-    q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 1)]).json()
-    r = client.post(f"/quotes/{q['id']}/order", headers=crew["ria"])
-    assert r.status_code == 503 and "ORDERS_API_URL" in r.json()["detail"]
-    assert client.get("/auth/me", headers=crew["ria"]).json()["ordersLinked"] is False
+    assert sent(app) == []
 
 
 def test_letterhead_comes_from_company_settings(client, crew, ana):

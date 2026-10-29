@@ -63,7 +63,24 @@ def _organisation(db, data: dict, slug: str) -> None:
 
 # What this application does with each kind it takes: fn(db, data, slug). Invoices and payments are
 # kept as heard for now: the scorecards still read Finance's invoices (step 7 adds the events first).
-HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation}
+def _sales_order(db, data: dict, slug: str) -> None:
+    """The Sales app made, approved, rejected, delivered or cancelled a quote's order (step 11)."""
+    from app.models import Quote
+
+    quote = db.get(Quote, str(data.get("quoteId") or ""))
+    if quote is None:
+        return
+    order = dict(quote.sales_order or {})
+    order.update({"id": data.get("id"), "number": data.get("number"), "status": data.get("status"), "note": data.get("note"),
+                  "url": f"/sales/orders/{data.get('id')}", "deliveredAt": data.get("deliveredAt"),
+                  # Its delivery's shipping (step 12): out for delivery, delivered or failed, courier and tracking.
+                  "delivery": data.get("delivery"),
+                  # Invoiced from that delivery, and paid (step 13).
+                  "invoice": data.get("invoice")})
+    quote.sales_order = order
+
+
+HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation, "sales_order.updated": _sales_order}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])

@@ -25,6 +25,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import case, func, or_, select, text
 
+from app import fx
 from app.access import access_of, permissions_of, permitted
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -490,6 +491,8 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
     if b.status == "draft" and b.lines:
         try:
             w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
+            if b.currency and b.currency != fx.BASE and b.rate_e4:
+                w = pesos(w, b.rate_e4)
             worked = (w.lines, w.net, w.vat, w.withheld, w.total, w.payable)
         except HTTPException as refused:
             problem = refused.detail
@@ -500,6 +503,9 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
         "zohoSync": delivery_summary(db,'bill',b.id),
         "poNumber": b.po_number, "drNumber": b.dr_number, "checkedPo": b.checked_po, "checkedDr": b.checked_dr,
         "amountsIncludeVat": b.amounts_include_vat, "zohoRef": b.zoho_ref, "oojeemaRef": b.oojeema_ref, "notes": b.notes,
+        # A foreign-currency bill (step 16c): lines in its currency; peso amounts at the bill's rate.
+        "currency": b.currency or "PHP", "rate": b.rate_e4 / fx.SCALE if b.rate_e4 else None,
+        "foreignTotalCentavos": b.foreign_total, "foreignPayableCentavos": b.foreign_payable,
         "lines": [
             ln | {
                 "account": {"id": a.id, "code": a.code, "name": a.name} if (a := accounts.get(ln["accountId"])) else None,
@@ -620,6 +626,10 @@ class BillIn(Api):
     zoho_ref: str | None = Field(None, max_length=60)
     oojeema_ref: str | None = Field(None, max_length=60)
     notes: str | None = Field(None, max_length=500)
+    # A foreign-currency bill (step 16c): its lines are in this currency; booked at this rate (pesos per unit),
+    # else the one recorded for the bill's day.
+    currency: str = Field("PHP", min_length=3, max_length=3)
+    rate: float | None = Field(None, gt=0, le=100000)
     lines: list[BillLineIn] = Field(min_length=1, max_length=100)
 
 
@@ -656,6 +666,13 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
     b.amounts_include_vat, b.zoho_ref, b.oojeema_ref, b.notes, b.lines = body.amounts_include_vat, body.zoho_ref, body.oojeema_ref, body.notes, lines
     # Worked out now, so a draft's list shows its total; clearing works it out again.
     w = work_out(db, lines, body.bill_date, body.amounts_include_vat)
+    b.currency = body.currency.upper()
+    if b.currency != fx.BASE:
+        b.rate_e4 = fx.need_rate(db, b.currency, body.bill_date, body.rate, "rate")
+        b.foreign_total, b.foreign_payable = w.total, w.payable
+        w = pesos(w, b.rate_e4)
+    else:
+        b.rate_e4 = b.foreign_total = b.foreign_payable = None
     b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos = w.net, w.vat, w.withheld, w.total, w.payable
     if body.save_supplier_defaults:
         if not access_of(user).can("suppliers.edit"):
@@ -668,6 +685,19 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
         audit(db, user, "supplier.tax_defaults_confirmed", target=supplier.name, target_type="supplier", target_id=supplier.id, fields=["vat_registered", "withholding", "tax_defaults_confirmed"])
     if b.tax_reviewed:
         bill_event(b, "tax_reviewed", user)
+
+
+def pesos(w, rate_e4: int):
+    """A worked-out foreign bill in peso centavos: each line's amount, VAT and withholding at the rate; the totals
+    from the converted lines, so the entry still balances."""
+    from dataclasses import replace
+
+    lines = [ln | {"netCentavos": fx.to_pesos(ln["netCentavos"], rate_e4), "vatCentavos": fx.to_pesos(ln.get("vatCentavos", 0), rate_e4),
+                   "withheldCentavos": fx.to_pesos(ln.get("withheldCentavos", 0), rate_e4)} for ln in w.lines]
+    net = sum(ln["netCentavos"] for ln in lines)
+    vat = fx.to_pesos(w.vat, rate_e4)
+    withheld = fx.to_pesos(w.withheld, rate_e4)
+    return replace(w, lines=lines, net=net, vat=vat, withheld=withheld, total=net + vat, payable=net + vat - withheld)
 
 
 def found_bill(db: DB, bill_id: str) -> Bill:
@@ -813,6 +843,9 @@ def clear(db: DB, user, b: Bill, settings=None) -> None:
     if not b.supplier.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or return the bill.")
     w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
+    if b.currency and b.currency != fx.BASE:  # booked in pesos at the bill's rate (step 16c, from main)
+        b.foreign_total, b.foreign_payable = w.total, w.payable
+        w = pesos(w, b.rate_e4)
     legs, payables = bill_posting(db, b, w)
     e = post(db, b.bill_date, f"Bill from {b.supplier.name}, invoice {b.bill_number}", legs, user.full_name, reference=b.bill_number[:80], source="bill", by_id=user.id)
     b.lines = w.lines

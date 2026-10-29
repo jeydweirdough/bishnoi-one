@@ -2,8 +2,11 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
+import { PackagingsEditor, inPacks } from "@/src/modules/inventory/components/packagings";
+import { ProductDocuments } from "@/src/modules/inventory/components/supply";
+import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import { cache } from "react";
-import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
+import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { deleteProduct } from "@/src/modules/inventory/actions/inventory";
 import { ProductGallery, SupplierPrices } from "@/src/modules/inventory/components/product-extras";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
@@ -276,6 +279,21 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
             />
           )}
         </InfoCard>
+
+        {/* Its packs (step 14e): Strip = 10, Box = 100…; stock stays in its base unit. */}
+        <Card className="mt-5 px-5 pt-4 pb-4">
+          <SectionTitle icon="units">Packs</SectionTitle>
+          <PackagingsEditor productId={p.id} unit={p.unit} packs={p.packagings ?? []} canEdit={may("products.edit")} />
+          {(p.packagings ?? []).length > 0 && p.level.onHand > 0 && (
+            <p className="mt-2 text-meta text-ink-3">On hand: {p.level.onHand.toLocaleString()} {p.unit} = {inPacks(p.level.onHand, p.packagings ?? [], p.unit)}</p>
+          )}
+        </Card>
+
+        {/* Documents kept with it and sent with every sale (step 15e). */}
+        <Card className="mt-5 px-5 pt-4 pb-4">
+          <SectionTitle icon="documents">Documents</SectionTitle>
+          <ProductDocuments productId={p.id} documents={await load<ProductDocument[]>(`/inventory/products/${p.id}/documents`)} canEdit={may("products.edit")} />
+        </Card>
 
         {/* What each supplier charges: the full width, a row each, and a row to add one. */}
         <Card className="mt-5 px-5 pt-4 pb-4">

@@ -13,9 +13,10 @@ against done and work by person.
 """
 
 from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from pydantic import Field
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.api import Api, field_error
@@ -63,21 +64,39 @@ def apply(db: Session, doc, kinds: tuple[str, ...], body: HeaderIn | None, me: U
         doc.source_document = (body.source_document or "").strip() or None
 
 
-def done(doc, when: datetime | None = None) -> None:
-    doc.done_at = when or datetime.now(UTC)
+def zone() -> ZoneInfo:
+    """The company's time zone: a document done just after midnight in Manila is done that day there,
+    though it is still the day before in UTC (2026-10-29)."""
+    from app.config import get_settings
+
+    try:
+        return ZoneInfo(get_settings().org_timezone)
+    except Exception:  # noqa: BLE001 (an unknown name: the default)
+        return ZoneInfo("Asia/Manila")
 
 
 def _as_date(moment: datetime) -> date:
-    return (moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment).date()
+    return (moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment).astimezone(zone()).date()
 
 
-def timing(doc, today: date | None = None) -> str | None:
-    """late / on_time (done), overdue / due (not done), or None without a scheduled date."""
+def today() -> date:
+    return datetime.now(UTC).astimezone(zone()).date()
+
+
+def done(doc, when: datetime | None = None) -> None:
+    doc.done_at = when or datetime.now(UTC)
+    doc.done_on = _as_date(doc.done_at)
+
+
+def timing(doc, on: date | None = None) -> str | None:
+    """late / on_time (done), overdue / due (not done), or None without a scheduled date; days in the
+    company's time zone."""
     if doc.scheduled_on is None:
         return None
     if doc.done_at is not None:
-        return "late" if _as_date(doc.done_at) > doc.scheduled_on else "on_time"
-    return "overdue" if doc.scheduled_on < (today or date.today()) else "due"
+        done_day = doc.done_on or _as_date(doc.done_at)
+        return "late" if done_day > doc.scheduled_on else "on_time"
+    return "overdue" if doc.scheduled_on < (on or today()) else "due"
 
 
 def header_out(doc) -> dict:
@@ -97,13 +116,12 @@ def narrow(query, model, operation_type: str | None, when: str | None):
     if operation_type:
         query = query.where(model.operation_type_id == operation_type)
     if when in TIMINGS:
-        today = date.today()
-        done_day = func.date(model.done_at)
+        now = today()
         query = query.where({
-            "late": and_(model.done_at.is_not(None), model.scheduled_on.is_not(None), done_day > model.scheduled_on),
-            "on_time": and_(model.done_at.is_not(None), model.scheduled_on.is_not(None), done_day <= model.scheduled_on),
-            "overdue": and_(model.done_at.is_(None), model.scheduled_on < today),
-            "due": and_(model.done_at.is_(None), model.scheduled_on >= today),
+            "late": and_(model.done_on.is_not(None), model.scheduled_on.is_not(None), model.done_on > model.scheduled_on),
+            "on_time": and_(model.done_on.is_not(None), model.scheduled_on.is_not(None), model.done_on <= model.scheduled_on),
+            "overdue": and_(model.done_at.is_(None), model.scheduled_on < now),
+            "due": and_(model.done_at.is_(None), model.scheduled_on >= now),
         }[when])
     return query
 

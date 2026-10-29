@@ -48,9 +48,23 @@ def remember_company(settings, slug: str | None) -> None:
         platform_connect.write_value(settings, "company_slug", slug)
 
 
+def _delivery_done(db, data: dict, slug: str) -> None:
+    """A customer's delivery left the warehouse: its invoice (step 13, app/delivery_invoices.py)."""
+    from app.delivery_invoices import from_delivery
+
+    from_delivery(db, data, slug)
+
+
 # What this application does with each kind it takes: fn(db, data, slug). A kind with no handler is
-# kept as heard (its work comes with a later step: deliveries become invoices in Stage 4).
-HANDLERS: dict[str, Callable] = {}
+# kept as heard.
+def _consignment_billed(db, data: dict, slug: str) -> None:
+    """What sold from a vendor's consignment: a draft vendor bill (step 15d, app/consignment_bills.py)."""
+    from app.consignment_bills import from_settlement
+
+    from_settlement(db, data, slug)
+
+
+HANDLERS: dict[str, Callable] = {"delivery.done": _delivery_done, "consignment.billed": _consignment_billed}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])

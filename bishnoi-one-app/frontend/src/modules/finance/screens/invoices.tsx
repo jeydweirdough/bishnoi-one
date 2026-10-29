@@ -1,3 +1,4 @@
+import { loadLetterhead } from "@/src/platform/print/letterhead";
 import { ExternalLink, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { deleteInvoice } from "@/src/modules/finance/invoices/actions";
@@ -7,7 +8,7 @@ import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modul
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { InvoiceEditor } from "@/src/modules/finance/invoices/editor";
-import { AddSeries, SwitchSeries } from "@/src/modules/finance/invoices/series-editor";
+import { AddSeries, AutoInvoiceSetting, SwitchSeries } from "@/src/modules/finance/invoices/series-editor";
 import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, ReissueInvoice, RemovePayment, VoidInvoice } from "@/src/modules/finance/invoices/steps";
 import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "@/src/modules/finance/invoices/types";
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
@@ -41,9 +42,16 @@ function StatusMark({ status }: { status: InvoiceStatus }) {
   return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{STATUS_LABELS[status]}</span>;
 }
 
+/** The company's active bank accounts and e-wallets, for where a payment went (step 16a). */
+async function banksOf(): Promise<{ id: string; name: string; kind: string }[]> {
+  return load<{ items: { id: string; name: string; kind: string; isActive: boolean }[] }>("/finance/bank-accounts")
+    .then((r) => r.items.filter((b) => b.isActive))
+    .catch(() => []);
+}
+
 type Listing = {
   items: InvoiceSummary[];
-  counts: Record<InvoiceStatus, number>;
+  counts: Record<InvoiceStatus, number> & { attention: number };
   figures: { invoicedCentavos: number; invoicedLastMonthCentavos: number; collectedCentavos: number; collectedLastMonthCentavos: number };
   methods: { key: string; label: string }[];
 };
@@ -72,10 +80,13 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
   const sp = await searchParams;
   const status = one(sp.status);
   const q = one(sp.q);
+  // The drafts made from deliveries that couldn't be issued by themselves (step 13).
+  const attention = one(sp.attention) === "1";
   const query = new URLSearchParams();
   if (status) query.set("status", status);
+  if (attention) query.set("attention", "true");
   if (q) query.set("q", q);
-  const list = await load<Listing>(`/finance/invoices?${query}`);
+  const [list, banks] = await Promise.all([load<Listing>(`/finance/invoices?${query}`), banksOf()]);
   const today = fmt.todayKey();
   const f = list.figures;
   const collect = may(me, "invoices.collect");
@@ -110,7 +121,10 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
         />
         <UnderlineTabs
           tabs={[
-            ...TABS.map((t) => ({ href: href(t.key), label: t.label, count: t.key ? list.counts[t.key] : total, current: status === t.key })),
+            ...TABS.map((t) => ({ href: href(t.key), label: t.label, count: t.key ? list.counts[t.key] : total, current: !attention && status === t.key })),
+            ...(list.counts.attention > 0 || attention
+              ? [{ href: "/finance/invoices?attention=1", label: "From deliveries to check", count: list.counts.attention, current: attention }]
+              : []),
             { href: "/finance/invoices/receivables", label: "Receivables", current: false },
             { href: "/finance/invoices/zoho", label: "Zoho records", current: false },
           ]}
@@ -159,9 +173,9 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                     <span className="grid size-8 shrink-0 place-items-center rounded-full bg-mint-2 text-[0.6875rem] font-semibold text-sage-deep" aria-hidden>{initials(i.customer.name)}</span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium text-ink">{i.customer.name}</span>
-                      {(i.reference || i.replaces || i.replacedBy) && (
+                      {(i.reference || i.replaces || i.replacedBy || i.delivery) && (
                         <span className="block truncate text-meta text-ink-3">
-                          {[i.reference && `Ref. ${i.reference}`, i.replaces && `Replaces ${i.replaces.number}`, i.replacedBy && `Replaced by ${i.replacedBy.number ?? "a draft"}`].filter(Boolean).join(" · ")}
+                          {[i.delivery && `From ${i.delivery.number}`, i.reference && `Ref. ${i.reference}`, i.replaces && `Replaces ${i.replaces.number}`, i.replacedBy && `Replaced by ${i.replacedBy.number ?? "a draft"}`].filter(Boolean).join(" · ")}
                         </span>
                       )}
                     </span>
@@ -206,7 +220,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                           <strong className={`tabular-nums ${i.balanceCentavos > 0 ? "text-danger" : "text-sage-deep"}`}>{fmt.peso(i.balanceCentavos)}</strong>
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
-                          {collect && i.status === "issued" && i.balanceCentavos > 0 && <RecordPayment id={i.id} owed={i.balanceCentavos} methods={list.methods} org={me.org} today={today} />}
+                          {collect && i.status === "issued" && i.balanceCentavos > 0 && <RecordPayment id={i.id} owed={i.balanceCentavos} methods={list.methods} org={me.org} today={today} banks={banks} />}
                           <LinkButton href={`/finance/invoices/${i.id}`}>Open invoice</LinkButton>
                         </div>
                       </div>
@@ -239,7 +253,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
   const fmt = makeFormat(me.org);
   const { id } = await params;
   const editing = one((await searchParams).edit) === "1";
-  const inv = await load<Invoice>(`/finance/invoices/${enc(id)}`);
+  const [inv, letterhead] = await Promise.all([load<Invoice>(`/finance/invoices/${enc(id)}`), loadLetterhead()]);
   const crumbs = [{ href: "/finance/invoices", label: "Sales invoices" }];
 
   if (inv.status === "draft" && editing && may(me, "invoices.create")) {
@@ -284,6 +298,20 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             </span>
           )}
         </PageHeader>
+        {/* Made from a delivery (step 13): where it came from, and why it still waits when it does. */}
+        {inv.delivery && (
+          <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${inv.attention && inv.status === "draft" ? "bg-promo-tint" : "bg-hema-tint"}`}>
+            Made from delivery{" "}
+            <Link href={`/inventory/orders/${inv.delivery.id}`} className="font-mono font-semibold text-hema hover:underline">{inv.delivery.number}</Link>
+            {inv.salesOrder && (
+              <>
+                {" "}for sales order{" "}
+                <Link href={`/sales/orders/${inv.salesOrder.id}`} className="font-mono font-semibold text-hema hover:underline">{inv.salesOrder.number}</Link>
+              </>
+            )}
+            .{inv.attention && inv.status === "draft" && <> Waiting: {inv.attention}</>}
+          </p>
+        )}
         {/* Cancel and reissue: on screen only; the printed invoice stays standard (decided 2026-10-22). */}
         {(inv.replaces || inv.replacedBy) && (
           <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
@@ -333,11 +361,16 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
       {/* The invoice itself, as it prints. */}
       <Sheet className={`px-8 py-7 print:border-0 print:shadow-none ${inv.status === "void" ? "opacity-70" : ""}`}>
         <div className="flex flex-wrap justify-between gap-6 border-b-[3px] border-double border-ink pb-4">
-          <div>
+          <div className="flex items-start gap-3">
+            {/* The company's logo from its letterhead (step 10); the seller's BIR registration beside it. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {letterhead?.logo && <img src={letterhead.logo} alt="" className="h-14 max-w-40 object-contain" />}
+            <div>
             <p className="text-heading">{c?.seller.registeredName ?? me.org.name}</p>
             {c?.seller.tradeName && <p className="text-meta text-ink-2">{c.seller.tradeName}</p>}
             {c?.seller.address && <p className="text-meta text-ink-2">{c.seller.address}</p>}
             {c?.seller.tin && <p className="text-meta text-ink-2">{c.seller.regimeName} TIN {c.seller.tin}</p>}
+            </div>
           </div>
           <div className="text-right">
             <p className="text-stamp text-ink-3 uppercase">{c?.document ?? "Sales Invoice"}</p>
@@ -452,7 +485,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             </ul>
           )}
           {inv.balanceCentavos > 0 ? (
-            may(me, "invoices.collect") && <RecordPayment id={inv.id} owed={inv.balanceCentavos} methods={inv.methods} org={me.org} today={fmt.todayKey()} />
+            may(me, "invoices.collect") && <RecordPayment id={inv.id} owed={inv.balanceCentavos} methods={inv.methods} org={me.org} today={fmt.todayKey()} banks={await banksOf()} />
           ) : (
             <p className="text-sm text-ink-2">Paid in full.</p>
           )}
@@ -475,7 +508,11 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
 export async function SeriesPage() {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
-  const [series, { today }] = await Promise.all([load<SeriesList>("/finance/invoices/series"), taxChoices()]);
+  const [series, { today }, automatic] = await Promise.all([
+    load<SeriesList>("/finance/invoices/series"),
+    taxChoices(),
+    load<{ autoInvoice: "issue" | "draft" }>("/finance/invoices/automatic"),
+  ]);
   return (
     <>
       <PageHeader title="Transaction number series" crumbs={[{ href: "/finance/invoices", label: "Sales invoices" }]}>
@@ -487,6 +524,9 @@ export async function SeriesPage() {
           <AddSeries today={today} />
         </div>
       )}
+      <Sheet className="mb-4 px-5 py-4">
+        <AutoInvoiceSetting value={automatic.autoInvoice} canChange={series.canSetup} />
+      </Sheet>
       <Sheet>
         {series.items.length === 0 ? (
           <Empty title="No invoice numbers yet" icon="lists">

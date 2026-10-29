@@ -135,16 +135,24 @@ export function AddPerson({ data }: { data: AccessData }) {
 export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "" });
+  const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
+  const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
   const off = person.status !== "active";
 
   function save() {
     start(async () => {
-      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null });
-      if (!r.ok) return void toast.error(r.error);
+      const email = form.email.trim().toLowerCase();
+      const emailChanged = email !== person.email.toLowerCase();
+      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null, ...(emailChanged && { email }) });
+      if (!r.ok) {
+        setFields(r.fields ?? {});
+        if (!r.fields) toast.error(r.error);
+        return;
+      }
+      setFields({});
       setEditing(false);
-      toast.success("Saved");
+      toast.success("Saved", emailChanged ? { description: `${person.fullName} now signs in as ${email}, with the same password.` } : undefined);
       router.refresh();
     });
   }
@@ -154,7 +162,7 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
       <RowMenu
         label={`Actions for ${person.fullName}`}
         items={[
-          { label: "Change name or title", icon: <Pencil />, onSelect: () => setEditing(true) },
+          { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
           { label: "Set a new password", icon: <KeyRound />, onSelect: () => void newPassword(person) },
           ...(isMe
             ? []
@@ -175,8 +183,11 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
       />
       <Modal open={editing} title={`Change ${person.fullName}`} onCancel={() => !busy && setEditing(false)} onOk={save} okText="Save" confirmLoading={busy} width={480} destroyOnHidden>
         <FormGrid className="pt-2">
-          <Field label="Full name" size="full">
+          <Field label="Full name" size="full" error={fields.fullName}>
             {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={120} />}
+          </Field>
+          <Field label="Work email" size="full" error={fields.email} hint="They sign in with this. At your company's email domain; their password stays.">
+            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
           </Field>
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}

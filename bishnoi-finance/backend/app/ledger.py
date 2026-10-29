@@ -46,6 +46,10 @@ def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, referen
     account (a posting account nobody set) refuses the whole entry, so the
     step it belongs to doesn't happen either. `waits`: typed by hand, so it
     counts only once someone else approves it (app/routers/ledger.py)."""
+    # The books closed up to a day (step 16e): nothing is posted on or before it, not even a reversal.
+    lock = settings(db).locked_until
+    if lock is not None and on <= lock:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"The books are closed up to {lock:%d %b %Y}. Date it after that, or ask the Finance Head to open the period.")
     legs = [leg for leg in legs if leg.debit or leg.credit]
     missing = [leg for leg in legs if leg.account is None]
     if missing:
@@ -147,7 +151,7 @@ def account_out(a: Account) -> dict:
 
     shown = term_of(a)[0] if a.type in ("asset", "liability") else None
     return {"id": a.id, "code": a.code, "name": a.name, "type": a.type, "description": a.description, "isActive": a.is_active, "parentId": a.parent_id,
-            "term": a.term, "termShown": shown}
+            "term": a.term, "termShown": shown, "costBehaviour": a.cost_behaviour, "reportTag": a.report_tag}
 
 
 def entry_out(e: JournalEntry) -> dict:

@@ -18,6 +18,7 @@ export type ProfileInput = {
   registeredAddress: string | null;
   pricesIncludeTax: boolean;
   rdoCode: string | null;
+  rounding?: "line" | "invoice";
   fiscalMonthEnd: number;
 };
 

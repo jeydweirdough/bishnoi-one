@@ -51,16 +51,18 @@ def test_operators_are_a_switch_on_the_account(client, ana, getmeds):
     assert [f["email"] for f in found] == ["jade@getmeds.test"]
     # The last operator can't be switched off, nor can you switch yourself off.
     assert client.put(f"/platform/operators/{ops['operators'][0]['id']}", json={"isOperator": False}, headers=ana).status_code == 409
-    r = client.put(f"/platform/operators/{found[0]['id']}", json={"isOperator": True}, headers=ana)
-    assert r.status_code == 200 and r.json()["operator"]["isOperator"]
-    # Jade now sees the Operations area with her one sign-in.
-    jade = getmeds["jade"]["h"]
-    assert client.get("/identity/me", headers=jade).json()["staff"] == "admin"
-    assert client.get("/platform/companies", headers=jade).status_code == 200
-    # Switched off again: the Operations area closes.
-    client.put(f"/platform/operators/{found[0]['id']}", json={"isOperator": False}, headers=ana)
-    assert client.get("/identity/me", headers=jade).json()["staff"] is None
-    assert client.get("/platform/companies", headers=jade).status_code == 401
+    # GetMeds' Jade isn't made an operator: an operator has an email of their own (2026-10-29).
+    assert client.put(f"/platform/operators/{found[0]['id']}", json={"isOperator": True}, headers=ana).status_code == 409
+    r = client.post("/platform/operators", json={"email": "jade@bishnoione.test", "fullName": "Jade Madigal", "password": "long enough 1"}, headers=ana)
+    assert r.status_code == 201 and r.json()["operator"]["isOperator"]
+    token = client.post("/identity/login", json={"email": "jade@bishnoione.test", "password": "long enough 1"}).json()["accessToken"]
+    op = {"Authorization": f"Bearer {token}"}
+    assert client.get("/identity/me", headers=op).json()["staff"] == "admin"
+    assert client.get("/platform/companies", headers=op).status_code == 200
+    # Switched off: the Operations area closes; GetMeds' Jade never had it.
+    client.put(f"/platform/operators/{r.json()['operator']['id']}", json={"isOperator": False}, headers=ana)
+    assert client.get("/platform/companies", headers=op).status_code == 401
+    assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["staff"] is None
 
 
 def test_the_staff_sign_in_is_closed_on_a_server(app, client):
