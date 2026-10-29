@@ -41,6 +41,8 @@ type Props = {
   processes: Process[];
   /** Setup and administration, at the foot. */
   foot?: Process[];
+  /** A small label over the foot, when it holds a different kind of work (the Admin Console's operations, 2026-10-29). */
+  footLabel?: string;
   /** Each module draws its own icons by name. */
   icon: (name: string, className: string) => ReactNode;
   rail?: boolean;
@@ -310,7 +312,7 @@ function Switcher({ module, company, mine }: { module: ModuleKey; company?: stri
 }
 
 function Menu_({ props, current }: { props: Props; current: Step | undefined }) {
-  const { home, processes, foot = [], icon } = props;
+  const { home, processes, foot = [], footLabel, icon } = props;
   const areas = processes.filter((a) => a.steps.length > 0);
   const below = foot.filter((a) => a.steps.length > 0);
   // As Zoho lays it out: no headings, Home then each area in the order the work goes; setup and
@@ -322,7 +324,8 @@ function Menu_({ props, current }: { props: Props; current: Step | undefined }) 
         <Area key={a.label} area={a} current={current} icon={icon} />
       ))}
       {below.length > 0 && (
-        <div className="mt-3 space-y-px border-t border-rule pt-3">
+        <div className="mt-3 space-y-px border-t border-rule pt-3" role={footLabel ? "group" : undefined} aria-label={footLabel}>
+          {footLabel && <p className="px-3 pb-1 text-caps text-ink-3 uppercase group-data-[rail=true]/side:hidden">{footLabel}</p>}
           {below.map((a) => (
             <Area key={a.label} area={a} current={current} icon={icon} />
           ))}
