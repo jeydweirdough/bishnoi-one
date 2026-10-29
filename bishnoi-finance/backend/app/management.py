@@ -11,12 +11,14 @@ migration 0023); one that doesn't is worked out from its name, and the report sa
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import bir_reports as bir
 from app.models import Account, Bill, Invoice
+from app.receivables_asof import total_owed_on
 
 LONG_TERM = re.compile(
     r"property|plant|equipment|furniture|fixture|vehicle|building|land\b|leasehold|depreciation|amortization|investment|"
@@ -111,13 +113,10 @@ def purchases(db: Session, first: date, last: date) -> int:
     return int(total or 0)
 
 
-def receivables(db: Session, on: date) -> int:
-    """Still owed by customers on invoices dated up to the day (at what's paid today)."""
-    total = db.scalar(
-        select(func.coalesce(func.sum(Invoice.total_centavos - Invoice.paid_centavos), 0))
-        .where(Invoice.status == "issued", Invoice.invoice_date <= on, Invoice.paid_centavos < Invoice.total_centavos)
-    )
-    return int(total or 0)
+def receivables(db: Session, on: date, zone: ZoneInfo) -> int:
+    """Still owed by customers at the end of the day, rebuilt from dated payments,
+    take-offs and voids (app/receivables_asof.py), not from what's paid now."""
+    return total_owed_on(db, on, zone)
 
 
 def payables(db: Session, on: date) -> int:
@@ -196,7 +195,7 @@ class Figures:
         return None if any(p is None for p in parts) else parts[0] + parts[1] - parts[2]
 
 
-def figures(db: Session, first: date, last: date) -> Figures:
+def figures(db: Session, first: date, last: date, zone: ZoneInfo) -> Figures:
     st = bir.income_statement(db, first, last)["totals"]
     p = position(db, last)
     return Figures(
@@ -206,7 +205,7 @@ def figures(db: Session, first: date, last: date) -> Figures:
         income=st["incomeCentavos"],
         net_profit=st["netCentavos"],
         position=p,
-        receivables=receivables(db, last),
+        receivables=receivables(db, last, zone),
         payables=payables(db, last),
         purchases=purchases(db, first, last),
         days=(last - first).days + 1,

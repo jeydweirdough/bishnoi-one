@@ -11,6 +11,14 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    version: "0.4.33",
+    date: "2026-10-29",
+    changes: [
+      "New Import matching page under Settings: load the Zoho Bills and Vendor Payments exports and match each company label, bill-line account, tax label and paid-from account once. What the export already says is filled in for you (the company labels and VAT 12%); accounts with the same name are suggested. Whoever may confirm saves in one step; others propose and it waits for them. Unclear tax labels are BIR and Compliance's call. Imports use confirmed matches only.",
+      "Import from Zoho export on Bills and Payment vouchers (testing site only for now). Preview first: records that can't be imported yet are held with their reasons. Nothing is imported twice, and approvals done in Zoho are not repeated here; imported records are marked as imported.",
+    ],
+  },
   { version: "0.4.32", date: "2026-10-28", changes: ["Strengthened Q1 review: repeated payment applications and conflicting document references are held, withholding on every bill row is checked, and comparisons explain when totals cannot be calculated. Local rehearsals remain separate from BIR sign-off. Preserved final payment references in background delivery records and reconciled Finance database histories with an additive compatibility step."] },
   { version: "0.4.31", date: "2026-10-28", changes: ["Added Q1 import review for Zoho transactions and Oojeema opening/month-end AR and AP reports. Files are grouped and linked, account/company choices apply by group, and comparisons show unresolved differences. Supported records can be rehearsed in a separate local database; official books and provider records stay unchanged."] },
   { version: "0.4.30", date: "2026-10-28", changes: ["Separated official Finance in Neon from local test work, with visible environment labels. Approved bills and released payments can keep a durable background delivery job, with setup, waiting and attention states. Live Zoho sending requires separate authorisation and verified mappings; uncertain requests are held for checking instead of automatically sent again."] },

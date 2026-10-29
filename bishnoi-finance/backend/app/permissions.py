@@ -33,6 +33,10 @@ ACTION_LABELS = {
     "add": "Add",
     "edit": "Edit",
     "deactivate": "Switch off",
+    "propose": "Propose",
+    "confirm": "Confirm",
+    "confirm_tax": "Confirm tax",
+    "run": "Run",
 }
 
 
@@ -49,6 +53,7 @@ class Area:
 
 AREAS: tuple[Area, ...] = (
     Area("integrations", "Finance connections", "Administration", ("manage",)),
+    Area("imports", "Imports from Zoho exports", "Administration", ("propose", "confirm", "confirm_tax", "run")),
     Area("sales_orders", "Sales orders", "Sales", ("view", "create", "submit", "approve", "cancel")),
     Area("dashboard", "Overview", "Finance", ("view",)),
     Area("funds", "Marketing requests", "Marketing requests", ("view", "release", "check", "settle", "cancel")),
@@ -99,6 +104,10 @@ AREA_LABELS = {
     "vouchers.prepare": "Prepare (make, edit, submit, cancel)",
     "vouchers.release": "Release (pay)",
     "vouchers.void": "Void a released voucher",
+    "imports.propose": "Propose matches (load an export, suggest accounts)",
+    "imports.confirm": "Confirm company, account and money matches",
+    "imports.confirm_tax": "Confirm tax-label matches",
+    "imports.run": "Import bills and supplier payments (testing site only for now)",
 }
 
 

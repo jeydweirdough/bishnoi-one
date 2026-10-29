@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -1128,6 +1130,86 @@ class BankReconciliation(Base):
     finished_by: Mapped[str | None] = mapped_column(String(120), default=None)
 
     account: Mapped[Account] = relationship(lazy="joined")
+
+
+class ImportMatch(Base):
+    """One source label from an export (a Zoho account, a company label, a tax label), matched
+    once to Finance's choice for every import. Someone proposes; someone else confirms
+    (app/routers/imports.py). Only a confirmed match is used by an import."""
+
+    __tablename__ = "nbfi_import_matches"
+    __table_args__ = (
+        UniqueConstraint("source", "section", "role", "source_code", "source_label", name="import_match_once"),
+        CheckConstraint("status IN ('open', 'proposed', 'confirmed')", name="import_match_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source: Mapped[str] = mapped_column(String(20))
+    # company (a bill's company label), account (a bill line's account), tax (a bill line's tax label),
+    # money (the account a supplier payment was paid from).
+    section: Mapped[str] = mapped_column(String(20))
+    role: Mapped[str] = mapped_column(String(20))
+    source_code: Mapped[str] = mapped_column(String(80))
+    source_label: Mapped[str] = mapped_column(String(200))
+    # From the last export loaded: how many records use it, and their amount.
+    records: Mapped[int] = mapped_column(Integer, default=0)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    purchase_type: Mapped[str | None] = mapped_column(String(20), default=None)
+    vat_kind: Mapped[str | None] = mapped_column(String(10), default=None)
+    company: Mapped[str | None] = mapped_column(String(10), default=None)
+    status: Mapped[str] = mapped_column(String(12), default="open")
+    note: Mapped[str | None] = mapped_column(String(300), default=None)
+    proposed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    proposed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    proposed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    confirmed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    confirmed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    account: Mapped[Account | None] = relationship(lazy="joined")
+
+
+class ImportRun(Base):
+    """One import from export files: who ran it, when, and what came of each record."""
+
+    __tablename__ = "nbfi_import_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(20))
+    files: Mapped[list] = mapped_column(JSON, default=list)
+    # Of the files' contents, so the same files are recognised again.
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    counts: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(120))
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ImportRecord(Base):
+    """One source record in a run: created (with the bill or voucher it became), held (with
+    why) or skipped (another company's). A source record is created at most once."""
+
+    __tablename__ = "nbfi_import_records"
+    __table_args__ = (
+        CheckConstraint("outcome IN ('created', 'held', 'skipped')", name="import_record_outcome"),
+        Index("ix_nbfi_import_records_source_id", "source", "kind", "source_id"),
+        Index("import_created_once", "source", "kind", "source_id", unique=True,
+              sqlite_where=text("outcome = 'created'"), postgresql_where=text("outcome = 'created'")),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(ForeignKey("nbfi_import_runs.id"), index=True)
+    source: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(20))
+    source_id: Mapped[str] = mapped_column(String(120))
+    number: Mapped[str] = mapped_column(String(60))
+    outcome: Mapped[str] = mapped_column(String(12))
+    reasons: Mapped[list] = mapped_column(JSON, default=list)
+    bill_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bills.id"), default=None)
+    voucher_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_payment_vouchers.id"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 # Numbers on SQLite as records are saved (on Postgres the database gives them).

@@ -208,6 +208,7 @@ def document(kind,source,group,file_index):
         if d['unused'] or any(not a['reference'] for a in d['allocations']):problem(d,'unallocated')
         d['original']={'moneyAccount':r.get('Deposit To' if kind=='customer_payment' else 'Paid Through',''),
                        'moneyCode':r.get('Deposit To Account Code' if kind=='customer_payment' else 'Paid Through Account Code',''),
+                       'reference':r.get('Reference Number',''),
                        'method':{'cash':'cash','bank transfer':'bank','bank remittance':'bank','bank':'bank','check':'check','cheque':'check','ewallet':'ewallet','gcash':'ewallet'}.get(norm(r.get('Mode')))}
         if not d['original']['method']:problem(d,'payment_method')
         if any(a['withheld'] for a in d['allocations']):problem(d,'withholding_evidence')
@@ -246,7 +247,8 @@ def document(kind,source,group,file_index):
         if any(amounts):problem(d,'unsupported_components')
         if any(d[k] for k in ('shipping','shippingTax','adjustment','discount','roundOff','withheld')):problem(d,'unsupported_components')
         d['original']={'arAccount':r.get('Accounts Receivable',''),'apAccount':r.get('Accounts Payable',''),
-                       'moneyAccount':r.get('Paid Through',''),'moneyCode':r.get('Paid Through Account Code','')}
+                       'moneyAccount':r.get('Paid Through',''),'moneyCode':r.get('Paid Through Account Code',''),
+                       'inclusiveTax':r.get('Is Inclusive Tax','')}
         if kind=='expense' and r.get('Is Reimbursable')!='false':problem(d,'unsupported_components')
         if kind=='invoice' and (not d['tin'] or any(not ln['taxName'] for ln in d['lines'])):problem(d,'tax_details')
     return d

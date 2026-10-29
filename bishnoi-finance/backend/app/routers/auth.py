@@ -149,8 +149,6 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
 
     email = str(claims["email"]).strip().lower()
-    # Which company this database is, for the events it sends (app/business_events.py).
-    business_events.remember_company(settings, claims.get("companySlug"))
     # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
     if isinstance(claims.get("roleDef"), dict):
         platform_roles.keep(db, claims["roleDef"])
@@ -201,6 +199,10 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
     audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
     db.commit()
+    # Which company this database is, for the events it sends (app/business_events.py). Only now,
+    # after the commit: it's written through its own connection, and on SQLite that waited for the
+    # write lock this request still held, so every sign-in timed out (2026-10-29).
+    business_events.remember_company(settings, claims.get("companySlug"))
     response.headers["Cache-Control"] = "no-store"
     return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
 

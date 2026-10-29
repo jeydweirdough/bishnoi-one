@@ -21,6 +21,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.locks import lock_series
 from app.models import Account, FundRequest, JournalEntry, JournalLine, LedgerSettings
 
 
@@ -34,6 +35,7 @@ class Leg:
 
 def next_number(db: Session, on: date) -> str:
     prefix = f"JE-{on:%Y%m}-"
+    lock_series(db, prefix)  # two entries saved at once never read the same "highest so far"
     last = db.scalar(select(func.max(JournalEntry.number)).where(JournalEntry.number.like(f"{prefix}%")))
     return f"{prefix}{(int(last.rsplit('-', 1)[1]) + 1 if last else 1):04d}"
 

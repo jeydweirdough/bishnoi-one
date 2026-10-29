@@ -580,7 +580,10 @@ def list_bills(
     items = db.scalars(query.order_by(Bill.bill_date.desc(), Bill.no.desc())).all()
     held = set_aside(db, [b.id for b in items])
     items = filter_bills(items, user, today(settings), held, queue, supplier_id, bucket)
-    counts = dict(db.execute(select(STATE, func.count()).select_from(Bill).group_by(STATE)).all())
+    # Grouped by the subquery's column, not by STATE itself: PostgreSQL sees the CASE in SELECT and in
+    # GROUP BY as different expressions (its values are separate placeholders) and refuses (2026-10-29).
+    states = select(STATE.label("state")).select_from(Bill).subquery()
+    counts = dict(db.execute(select(states.c.state, func.count()).group_by(states.c.state)).all())
     without = db.scalar(select(func.count()).select_from(Bill).where(Bill.status != "void", ~select(BillFile.id).where(BillFile.bill_id == Bill.id).exists())) or 0
     can = access_of(user).can
     return {
@@ -785,13 +788,10 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     return bill_out(db, b, user)
 
 
-def clear(db: DB, user, b: Bill, settings=None) -> None:
-    """Approved (and checked, if tax is withheld): posted to the books. Dr each line's account
-    (before VAT) and Input VAT; Cr Accounts payable (what's paid the supplier) and the
-    withholding tax payable (Reconciler rule 3). Then ready to pay: Cristal is told."""
-    if not b.supplier.is_active:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or return the bill.")
-    w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
+def bill_posting(db: DB, b: Bill, w) -> tuple[list[Leg], Account | None]:
+    """A recorded bill's entry: Dr each line's account (before VAT) and Input VAT; Cr Accounts payable
+    (what's paid the supplier) and the withholding tax payable. Shared by clearing a bill and by
+    importing one (app/zoho_import.py), so both post the same way."""
     s = posting_settings(db)
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({ln["accountId"] for ln in w.lines})))}
     if any(not (a := accounts.get(ln["accountId"])) or not a.is_active for ln in w.lines):
@@ -803,6 +803,17 @@ def clear(db: DB, user, b: Bill, settings=None) -> None:
     payables = own if own is not None and own.is_active else (db.get(Account, s.payables_account_id) if s.payables_account_id else None)
     legs.append(Leg(payables, credit=w.payable, description=b.supplier.name[:200]))
     legs.append(Leg(db.get(Account, s.withholding_account_id) if s.withholding_account_id else None, credit=w.withheld, description="Tax withheld (EWT)"))
+    return legs, payables
+
+
+def clear(db: DB, user, b: Bill, settings=None) -> None:
+    """Approved (and checked, if tax is withheld): posted to the books. Dr each line's account
+    (before VAT) and Input VAT; Cr Accounts payable (what's paid the supplier) and the
+    withholding tax payable (Reconciler rule 3). Then ready to pay: Cristal is told."""
+    if not b.supplier.is_active:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or return the bill.")
+    w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
+    legs, payables = bill_posting(db, b, w)
     e = post(db, b.bill_date, f"Bill from {b.supplier.name}, invoice {b.bill_number}", legs, user.full_name, reference=b.bill_number[:80], source="bill", by_id=user.id)
     b.lines = w.lines
     b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos = w.net, w.vat, w.withheld, w.total, w.payable

@@ -2,10 +2,11 @@
 
 import os
 import re
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, exc
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -52,7 +53,7 @@ def make_engine(url: str, postgres_driver: str = "psycopg") -> Engine:
     # With every pooled connection busy, a request waits at most 10 seconds for one,
     # then answers 503 (app/guard.py), rather than piling up behind the others.
     engine = create_engine(url, connect_args=connect_args, pool_timeout=10)
-    _ping_when_idle(engine)
+    ping_when_idle(engine)
     return engine
 
 
@@ -62,27 +63,32 @@ def make_engine(url: str, postgres_driver: str = "psycopg") -> Engine:
 IDLE_BEFORE_PING = 60  # seconds
 
 
-def _ping_when_idle(engine: Engine) -> None:
-    import time
+def _returned(dbapi_connection, record) -> None:
+    record.info["back_at"] = time.monotonic()
 
-    from sqlalchemy import exc
 
-    @event.listens_for(engine, "checkin")
-    def _back(dbapi_connection, record) -> None:
-        record.info["back_at"] = time.monotonic()
+def _ping_if_idle(dbapi_connection, record, proxy) -> None:
+    back = record.info.get("back_at")
+    if back is None or time.monotonic() - back < IDLE_BEFORE_PING:
+        return
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        # The drivers open a transaction for that SELECT; end it, so the connection is
+        # handed out clean (a READ ONLY or isolation setting must be its first statement).
+        dbapi_connection.rollback()
+    except Exception as e:
+        # Whatever the driver raised (with pg8000 a dropped connection can surface as a
+        # plain TimeoutError or OSError, not a database error), the connection is dead:
+        # the pool drops it and hands out a fresh one.
+        raise exc.DisconnectionError() from e
 
-    @event.listens_for(engine, "checkout")
-    def _out(dbapi_connection, record, proxy) -> None:
-        back = record.info.get("back_at")
-        if back is None or time.monotonic() - back < IDLE_BEFORE_PING:
-            return
-        try:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("SELECT 1")
-            cursor.close()
-        except Exception as e:
-            # The pool drops this connection and hands out a fresh one.
-            raise exc.DisconnectionError() from e
+
+def ping_when_idle(engine: Engine) -> None:
+    """Both PostgreSQL drivers use this (psycopg here, pg8000 in app/postgres_driver.py)."""
+    event.listen(engine, "checkin", _returned)
+    event.listen(engine, "checkout", _ping_if_idle)
 
 
 def make_sessions(engine: Engine) -> sessionmaker[Session]:

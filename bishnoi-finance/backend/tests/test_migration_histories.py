@@ -15,8 +15,11 @@ def feature_history(tmp_path):
     source=API_DIR/'migrations'
     destination=tmp_path/'legacy_feature_migrations'
     shutil.copytree(source,destination)
-    for name in ('0023_account_term.py','0024_cost_of_goods_sold.py','0025_invoice_division.py','0026_business_events.py','0029_reconcile_finance_histories.py'):
+    for name in ('0023_account_term.py','0024_cost_of_goods_sold.py','0025_invoice_division.py','0026_business_events.py'):
         (destination/'versions'/name).unlink()
+    # The feature history ended at 0028: 0029 (the reconciliation) and everything after it came later.
+    for file in (destination/'versions').glob('[0-9][0-9][0-9][0-9]_*.py'):
+        if int(file.name[:4])>=29:file.unlink()
     for file in (source/'compat').glob('feature_*.py'):
         shutil.copy2(file,destination/'versions'/file.name.removeprefix('feature_'))
     return destination

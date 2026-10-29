@@ -6,15 +6,22 @@ create_all) is brought over by the first migration, which renames them to
 nbfi_users and nbfi_sessions, with everyone in them.
 
 Before any migration touches a SQLite file, a copy is kept beside it
-(`<name>.before-<revision>`); if the migration fails, the copy is put back,
-so the file is left exactly as it was. SQLite can't undo half a migration by
-itself (its schema changes aren't rolled back with a failed migration), so
-this is what makes a failure harmless. An existing copy is never overwritten:
-it is the last good one.
+(`<name>.before-<revision>-<time>`); if the migration fails, the copy is put
+back, so the file is left exactly as it was. SQLite can't undo half a
+migration by itself (its schema changes aren't rolled back with a failed
+migration), so this is what makes a failure harmless.
+
+The copy is made and put back through SQLite's own backup, never by copying
+the file: the database runs in WAL mode, so saved rows can still be in the
+`-wal` file beside it, and a file copy would leave them out. Every attempt
+makes its own copy and checks it before migrating; an older copy is never
+reused, since putting it back would undo whatever was saved after it.
 """
 
 import logging
-import shutil
+import sqlite3
+from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 
 from alembic import command
@@ -86,17 +93,38 @@ def _upgrade(engine: Engine) -> None:
     if file is None or not file.exists() or not tables:
         command.upgrade(config, "head")
         return
-    engine.dispose()  # let go of the file so the copy is whole
-    backup = file.with_name(f"{file.name}.before-{head}")
-    if not backup.exists():
-        shutil.copy2(file, backup)
-        log.warning("database backed up to %s before migrating %s -> %s", backup, current, head)
+    engine.dispose()  # this process's connections go before the copy and before any put-back
+    backup = file.with_name(f"{file.name}.before-{head}-{datetime.now():%Y%m%d-%H%M%S-%f}")
+    _copy(file, backup)
+    _check_backup(backup, tables, current)
+    log.warning("database backed up to %s before migrating %s -> %s", backup, current, head)
     try:
         command.upgrade(config, "head")
     except Exception:
         engine.dispose()
-        for extra in ("-wal", "-shm"):
-            file.with_name(file.name + extra).unlink(missing_ok=True)
-        shutil.copy2(backup, file)
+        _copy(backup, file)
         log.error("migrating %s -> %s failed; the database was put back from %s", current, head, backup)
         raise
+
+
+def _copy(source: Path, target: Path) -> None:
+    """One whole, consistent copy through SQLite, saved rows still in the WAL included."""
+    with closing(sqlite3.connect(source)) as src, closing(sqlite3.connect(target)) as dst:
+        src.backup(dst)
+
+
+class BackupNotUsable(RuntimeError):
+    """The copy made before migrating isn't a whole copy of the database; nothing was migrated."""
+
+
+def _check_backup(backup: Path, tables: set[str], revision: str | None) -> None:
+    with closing(sqlite3.connect(backup)) as db:
+        problems = [row[0] for row in db.execute("PRAGMA integrity_check")]
+        copied = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        version = db.execute(f"SELECT version_num FROM {VERSION_TABLE}").fetchone() if VERSION_TABLE in copied else None
+    if problems != ["ok"]:
+        raise BackupNotUsable(f"The copy {backup.name} failed SQLite's integrity check ({'; '.join(problems[:3])}); the database was not migrated.")
+    if missing := tables - copied:
+        raise BackupNotUsable(f"The copy {backup.name} is missing tables {sorted(missing)}; the database was not migrated.")
+    if (version[0] if version else None) != revision:
+        raise BackupNotUsable(f"The copy {backup.name} is at revision {version[0] if version else None}, not {revision}; the database was not migrated.")

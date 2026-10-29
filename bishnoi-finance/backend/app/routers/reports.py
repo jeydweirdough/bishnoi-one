@@ -29,6 +29,7 @@ from app.models import (
     PaymentVoucher,
     Supplier,
 )
+from app.receivables_asof import owed_on
 from app.routers.receivables import BUCKETS, bucket_of
 
 router = APIRouter(prefix="/finance/reports", tags=["reports"])
@@ -53,6 +54,7 @@ class Ctx:
     last: date
     start: datetime
     end: datetime
+    zone: ZoneInfo
 
 
 @dataclass
@@ -131,9 +133,8 @@ def receivables_ageing(c: Ctx):
     """As of the period's last day: what each customer still owes, by how late it is."""
     on = c.last
     by: dict[str, dict] = {}
-    q = select(Invoice).where(Invoice.status == "issued", Invoice.paid_centavos < Invoice.total_centavos, Invoice.invoice_date <= on)
-    for i in c.db.scalars(q):
-        owed = i.total_centavos - i.paid_centavos
+    for o in owed_on(c.db, on, c.zone):  # rebuilt for that day, not from what's paid now
+        i, owed = o.invoice, o.owed_centavos
         late = (on - (i.invoice_date + timedelta(days=i.terms_days))).days
         r = by.setdefault(i.customer_name, {"customer": i.customer_name, **{k: 0 for k, _, _ in BUCKETS}, "total": 0})
         r[bucket_of(max(0, late))] += owed
@@ -427,8 +428,8 @@ def key_figures(c: Ctx):
     """Each figure for the period, the same-length period before, and how it reads."""
     from app import management as m
 
-    now = m.figures(c.db, c.first, c.last)
-    then = m.figures(c.db, *m.previous(c.first, c.last))
+    now = m.figures(c.db, c.first, c.last, c.zone)
+    then = m.figures(c.db, *m.previous(c.first, c.last), c.zone)
     margin = now.net_margin
     roa = now.return_on_assets
     rows = [
@@ -667,7 +668,7 @@ def read_report(access: CurrentAccess, db: DB, settings: SettingsDep, key: str, 
     start = start or end.replace(day=1)
     if start > end:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The period starts after it ends.")
-    ctx = Ctx(db=db, first=start, last=end, start=datetime.combine(start, time.min, zone), end=datetime.combine(end + timedelta(days=1), time.min, zone))
+    ctx = Ctx(db=db, first=start, last=end, start=datetime.combine(start, time.min, zone), end=datetime.combine(end + timedelta(days=1), time.min, zone), zone=zone)
     columns, rows, summary, chart = r.build(ctx)
     return {"key": r.key, "title": r.title, "group": r.group, "about": r.about, "dated": r.dated, "fixed": r.fixed, "from": start.isoformat(), "to": end.isoformat(),
             "filters": [], "columns": columns, "rows": rows, "summary": summary, "chart": chart}

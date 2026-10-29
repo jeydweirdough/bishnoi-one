@@ -56,9 +56,15 @@ def python_engine(address):
     url, binding, options = connection_options(address)
     connection = channel_bound_connection(binding == "require")
     public_url = url.set(drivername="postgresql+pg8000", query={})
-    args = {"creator": lambda: connection(**options), "pool_pre_ping": True}
+    args = {"creator": lambda: connection(**options)}
     if os.environ.get("VERCEL"):
         args["poolclass"] = NullPool
     else:
         args["pool_timeout"] = 10
-    return create_engine(public_url, **args)
+    engine = create_engine(public_url, **args)
+    # Not pool_pre_ping: SQLAlchemy replaces a connection only when it recognises the
+    # error as a disconnect, and a dropped Neon connection can reach us as a plain socket
+    # TimeoutError, which then escaped and stopped the official reader (2026-10-28).
+    from app.db import ping_when_idle
+    ping_when_idle(engine)
+    return engine

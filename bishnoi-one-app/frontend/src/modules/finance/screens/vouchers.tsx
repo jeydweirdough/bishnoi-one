@@ -12,6 +12,7 @@ import type { SignedStep } from "@/src/modules/finance/signature/types";
 import { attachVoucherFile, removeVoucherFile } from "@/src/modules/finance/vouchers/actions";
 import { VoucherEditor } from "@/src/modules/finance/vouchers/editor";
 import { VoucherSteps } from "@/src/modules/finance/vouchers/steps";
+import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { VOUCHER_STATUS_LABELS, type Voucher, type VoucherChoices, type VoucherStatus, type VoucherSummary } from "@/src/modules/finance/vouchers/types";
 
 // Payment vouchers (app/routers/vouchers.py; Plans/Plan - Payment vouchers): prepared, then
@@ -47,15 +48,22 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   if (one(sp.queue)) query.set("queue", one(sp.queue));
   const list = await load<{ items: (VoucherSummary & { queueNote?: string | null })[]; counts: Record<VoucherStatus, number>; canPrepare: boolean; queueLabel: string | null }>(`/finance/vouchers?${query}`);
+  // Importing Zoho's supplier payments: its own tick, and the testing site only for now (app/routers/imports.py).
+  const canImport = (me.permissions?.includes("imports.run") ?? false) && me.dataEnvironment === "local_test";
   return (
     <>
       <PageHeader
         title="Payment vouchers"
         actions={
-          list.canPrepare && (
-            <LinkButton href="/finance/vouchers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              New payment voucher
-            </LinkButton>
+          (canImport || list.canPrepare) && (
+            <>
+              {canImport && <ZohoImport kind="supplier-payments" />}
+              {list.canPrepare && (
+                <LinkButton href="/finance/vouchers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                  New payment voucher
+                </LinkButton>
+              )}
+            </>
           )
         }
       >
@@ -164,6 +172,7 @@ const EVENT_LABELS: Record<string, string> = {
   returned: "Returned for correction",
   approved: "Approved",
   released: "Released and posted",
+  imported: "Imported from a Zoho export (released in Zoho)",
   cancelled: "Cancelled",
   voided: "Voided",
 };

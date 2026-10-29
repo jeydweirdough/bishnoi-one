@@ -30,6 +30,7 @@ from app.deps import DB, SettingsDep
 from app.funds import RELEASE_METHODS as METHODS
 from app.ledger import Leg, account, money_account, post
 from app.ledger import settings as posting_settings
+from app.locks import locked
 from app.models import Invoice, InvoicePayment, InvoiceSeries, JournalEntry
 from app.routers.funds import today
 from app.routers.tax import (
@@ -401,7 +402,7 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
     s = next((x for x in options if x.id == body.series_id), None) if body.series_id else (options[0] if options else None)
     if s is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "There are no invoice numbers left to issue from. Add the series from the BIR's Authority to Print under Invoices, Invoice numbers.")
-    s = db.scalar(select(InvoiceSeries).where(InvoiceSeries.id == s.id).with_for_update())
+    [s] = locked(db, InvoiceSeries, [s.id])  # also on SQLite, where FOR UPDATE alone locks nothing
     if not s.left:
         raise HTTPException(status.HTTP_409_CONFLICT, f"The series \"{s.name}\" has run out of numbers. Add the next Authority to Print's series.")
     inv.number = formatted(s, s.next_number)
@@ -442,6 +443,7 @@ class VoidIn(Api):
 @router.post("/{invoice_id}/void")
 def void(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoice_id: str, body: VoidIn) -> dict:
     inv = found(db, invoice_id)
+    locked(db, Invoice, [inv.id])  # a payment saved at the same moment is either seen or waits; never both
     cancel(db, settings, user, inv, body.reason)
     business_events.emit(db, None, "invoice.voided", {**{"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos}, "reason": body.reason})
     db.commit()
@@ -532,6 +534,8 @@ class PaymentIn(Api):
 def record_payment(user: permitted("invoices.collect"), db: DB, settings: SettingsDep, invoice_id: str, body: PaymentIn) -> dict:
     """Money received: cash in, what the customer owes down."""
     inv = found(db, invoice_id)
+    # Locked and read again before any check: two payments at once can't both fit in what was owed.
+    locked(db, Invoice, [inv.id])
     if inv.status != "issued":
         raise HTTPException(status.HTTP_409_CONFLICT, "Payments are recorded against an issued invoice.")
     if body.method not in METHODS:
@@ -575,7 +579,8 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
 def remove_payment(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoice_id: str, payment_id: str) -> dict:
     """A payment recorded by mistake: its entry reversed, the line kept and marked."""
     inv = found(db, invoice_id)
-    p = db.get(InvoicePayment, payment_id)
+    locked(db, Invoice, [inv.id])  # taken off twice at once: the second sees it already taken off
+    [p] = locked(db, InvoicePayment, [payment_id]) or [None]
     if p is None or p.invoice_id != inv.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such payment.")
     if p.removed_at:

@@ -29,9 +29,10 @@ function missingOf(unset: Unset, keys: string[]): Missing {
   return { count: found.reduce((n, key) => n + unset[key], 0), says: found.map((key) => UNSET_SAYS[key](unset[key])).join(". ") };
 }
 
-/** What each page needs, so the menu offers only what the role opens (the API checks the same). */
-const NEEDS: [string, string][] = [
+/** What each page needs, so the menu offers only what the role opens (the API checks the same). A list means any one of them. */
+const NEEDS: [string, string | string[]][] = [
   ["/finance/import-review", "integrations.manage"],
+  ["/finance/import-matching", ["imports.propose", "imports.confirm", "imports.confirm_tax", "imports.run"]],
   ["/finance/integrations/zoho", "integrations.manage"],
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
@@ -60,7 +61,8 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
   const may = (p: string) => me.permissions?.includes(p) ?? false;
   const opens = (href: string) => {
     const rule = NEEDS.find(([at]) => (at === "/finance" ? href === at : href === at || href.startsWith(`${at}/`)));
-    return rule ? may(rule[1]) : true;
+    if (!rule) return true;
+    return Array.isArray(rule[1]) ? rule[1].some(may) : may(rule[1]);
   };
   const keep = (steps: Step[]) => steps.filter((s) => opens(s.href.split("?")[0]));
   // As Zoho Books lays it out: Sales, Expenses, Approvals, Banking, Accountant, Taxes, Reports.
@@ -134,6 +136,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       steps: keep([
         { href: "/finance/integrations/zoho", label: "Zoho connection", icon: "settings" },
         { href: "/finance/import-review", label: "Import review", icon: "lists" },
+        { href: "/finance/import-matching", label: "Import matching", icon: "lists" },
         { href: "/finance/tax", label: "Taxes", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
         // Each person's e-signature and calendar: Finance's own (people themselves are on the Admin Console).
         { href: "/finance/admin/users", label: "People's details", icon: "people" },

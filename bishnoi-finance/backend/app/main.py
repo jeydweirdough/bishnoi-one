@@ -105,4 +105,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(zoho_deliveries.router)
     from app.routers import import_review
     app.include_router(import_review.router)
+    from app.routers import imports
+    app.include_router(imports.router)
     return app

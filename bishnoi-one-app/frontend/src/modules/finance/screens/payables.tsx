@@ -10,6 +10,7 @@ import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/paya
 import { AttachedFiles } from "@/src/modules/finance/payables/files";
 import { SupplierImport } from "@/src/modules/finance/payables/import";
 import { ImportedDetails } from "../payables/import-details";
+import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { SupplierForm, SwitchSupplier } from "@/src/modules/finance/payables/supplier-form";
 import { VOUCHER_STATUS_LABELS } from "@/src/modules/finance/vouchers/types";
 import { BILL_STATE_LABELS, type Bill, type BillChoices, type BillState, type BillSummary, type Supplier, type Withholding } from "@/src/modules/finance/payables/types";
@@ -64,6 +65,7 @@ const EVENT_LABELS: Record<string, string> = {
   checked: "Tax withheld checked",
   cleared: "Posted to the books: ready to pay",
   voided: "Voided",
+  imported: "Imported from a Zoho export (approved in Zoho, not re-approved here)",
 };
 
 export async function BillsPage({ searchParams }: { searchParams: Search }) {
@@ -78,15 +80,22 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   for (const key of ["queue", "supplierId", "bucket"]) if (one(sp[key])) query.set(key, one(sp[key]));
   const list = await load<{ items: (BillSummary & { queueNote?: string | null })[]; counts: Record<BillState | "missing", number>; canCreate: boolean; queueLabel: string | null }>(`/finance/bills?${query}`);
+  // Importing Zoho's bills: its own tick, and the testing site only for now (app/routers/imports.py).
+  const canImport = may(me, "imports.run") && me.dataEnvironment === "local_test";
   return (
     <>
       <PageHeader
         title="Bills"
         actions={
-          list.canCreate && (
-            <LinkButton href="/finance/bills/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              New bill
-            </LinkButton>
+          (canImport || list.canCreate) && (
+            <>
+              {canImport && <ZohoImport kind="bills" />}
+              {list.canCreate && (
+                <LinkButton href="/finance/bills/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                  New bill
+                </LinkButton>
+              )}
+            </>
           )
         }
       >

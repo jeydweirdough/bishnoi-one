@@ -29,6 +29,7 @@ from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
+from app.locks import lock_series, locked
 from app.models import OPEN_VOUCHERS, Account, Bill, JournalEntry, PaymentVoucher, StoredFile, Supplier, User, VoucherEvent, VoucherFile, VoucherLine
 from app.notify import done, holders, tell
 from app.routers.funds import today
@@ -192,6 +193,7 @@ def peso(centavos: int) -> str:
 
 def next_number(db: DB, on: date) -> str:
     prefix = f"PV-{on:%Y%m}-"
+    lock_series(db, prefix)  # two vouchers prepared at once never read the same "highest so far"
     last = db.scalar(select(func.max(PaymentVoucher.number)).where(PaymentVoucher.number.like(f"{prefix}%")))
     return f"{prefix}{(int(last.rsplit('-', 1)[1]) + 1 if last else 1):04d}"
 
@@ -286,7 +288,9 @@ def line_error(i: int, field: str, message: str) -> HTTPException:
 
 def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> None:
     """Each bill recorded, the supplier's, once, and no more than what's left of it after what
-    it's been paid and what other open vouchers set aside (so nothing is paid twice)."""
+    it's been paid and what other open vouchers set aside (so nothing is paid twice).
+    The bills are locked first, so two vouchers made at once for one bill can't both fit."""
+    locked(db, Bill, [b.id for b, _ in pairs])
     held = set_aside(db, [b.id for b, _ in pairs], exclude_voucher=v.id)
     seen = set()
     for i, (b, amount) in enumerate(pairs):
@@ -407,6 +411,10 @@ def release(user: permitted("vouchers.release"), db: DB, settings: SettingsDep, 
     """Paid: posts Dr each bill's payables account, Cr the account it's paid from (counts at once,
     like the other automatic entries), and each bill's paid amount goes up."""
     v = found(db, voucher_id)
+    # Locked and read again before any check: released twice at once, the second sees it released;
+    # two vouchers for one bill, the second sees what the first paid.
+    locked(db, PaymentVoucher, [v.id])
+    locked(db, Bill, [ln.bill_id for ln in v.lines])
     expect(v, "to_release")
     if body.paid_on > today(settings):
         raise field_error("paidOn", "The payment date can't be in the future.")
@@ -457,6 +465,8 @@ def cancel(user: CurrentUser, db: DB, voucher_id: str, body: ReasonIn) -> dict:
 def void(user: permitted("vouchers.void"), db: DB, settings: SettingsDep, voucher_id: str, body: ReasonIn) -> dict:
     """Released, then undone: its entry reversed today, the bills owed again (decision 7: Malou)."""
     v = found(db, voucher_id)
+    locked(db, PaymentVoucher, [v.id])  # voided twice at once: the second sees it void, nothing reversed twice
+    locked(db, Bill, [ln.bill_id for ln in v.lines])
     expect(v, "released")
     reason = body.reason.strip()
     entry = db.get(JournalEntry, v.entry_id) if v.entry_id else None

@@ -145,3 +145,19 @@ def test_someone_switched_off_here_stays_out(app, client, linked):
         db.commit()
     r = take(client, make_pass())
     assert r.status_code == 403 and "switched off" in r.json()["detail"]
+
+
+def test_the_first_pass_naming_the_company_signs_in_and_remembers_it(app, client, linked):
+    """The company named on a pass is kept for the events this app sends (app/business_events.py).
+    Written while the sign-in held SQLite's write lock, through a second connection, it waited
+    for that same request's lock and every sign-in failed with "database isn't answering"
+    (2026-10-29, Malou on the local site). It's kept once the sign-in is saved."""
+    from app import business_events
+
+    assert business_events.company_slug(app.state.settings) is None
+    r = take(client, make_pass(companySlug="2mg"))
+    assert r.status_code == 200, r.text
+    assert business_events.company_slug(app.state.settings) == "2mg"
+    assert me(client, r)["user"]["email"] == "jade@getmeds.test"
+    # Next time the same company: nothing to write, still signs in.
+    assert take(client, make_pass(companySlug="2mg")).status_code == 200

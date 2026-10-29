@@ -4,13 +4,13 @@ buckets by how far past its due date it is on the day asked.
 """
 
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 
 from app.access import permitted
 from app.deps import DB, SettingsDep
-from app.models import Invoice
+from app.receivables_asof import owed_on
 from app.routers.funds import today
 
 router = APIRouter(prefix="/finance/receivables", tags=["invoices"])
@@ -34,13 +34,13 @@ def ageing(_: permitted("invoices.view"), db: DB, settings: SettingsDep, on: dat
     """As of a day (today unless asked): each customer's open invoices, what's
     still owed on each, and how late it is."""
     on = on or today(settings)
-    rows = db.scalars(select(Invoice).where(Invoice.status == "issued", Invoice.paid_centavos < Invoice.total_centavos, Invoice.invoice_date <= on)).all()
     customers: dict[str, dict] = {}
     totals = {key: 0 for key, _, _ in BUCKETS}
-    for inv in rows:
+    # Rebuilt for that day from dated payments, take-offs and voids, not from what's paid now.
+    for o in owed_on(db, on, ZoneInfo(settings.org_timezone)):
+        inv, owed = o.invoice, o.owed_centavos
         due = inv.invoice_date + timedelta(days=inv.terms_days)
         late = max(0, (on - due).days)
-        owed = inv.total_centavos - inv.paid_centavos
         key = bucket_of(late)
         c = customers.setdefault(inv.customer_id or f"name:{inv.customer_name.lower()}", {
             "customerId": inv.customer_id, "name": inv.customer_name, "totalCentavos": 0,
