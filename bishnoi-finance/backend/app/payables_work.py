@@ -20,18 +20,24 @@ def balance(b, held):
     return {"owedCentavos": owed, "reservedCentavos": reserved, "availableCentavos": max(owed - reserved, 0)}
 
 
-def aging(db, on: date, supplier_id=None, bucket=None):
+def aging(db, on: date, supplier_id=None, bucket=None, current: bool = True):
+    """As of the end of `on`, rebuilt from dated bills, payments and voids (app/payables_asof.py).
+    Money set aside in unreleased vouchers is today's state, so it shows only for today (`current`)."""
+    from app.payables_asof import owed_on
     from app.routers.payables import set_aside
 
-    bills = [b for b in bill_rows(db) if b.status == "recorded" and b.paid_centavos < b.payable_centavos]
-    held = set_aside(db, [b.id for b in bills])
+    owed = sorted(owed_on(db, on), key=lambda o: (o.bill.due_date, o.bill.no or 0))
+    bills = [o.bill for o in owed]
+    held = set_aside(db, [b.id for b in bills]) if current else {}
     suppliers = {}
-    for b in bills:
+    for o in owed:
+        b = o.bill
         late = max((on - b.due_date).days, 0)
         key = bucket_of(late)
         if (supplier_id and b.supplier_id != supplier_id) or (bucket and key != bucket):
             continue
-        amounts = balance(b, held)
+        reserved = min(held.get(b.id, 0), o.owed_centavos)
+        amounts = {"owedCentavos": o.owed_centavos, "reservedCentavos": reserved, "availableCentavos": o.owed_centavos - reserved}
         row = suppliers.setdefault(b.supplier_id, {
             "id": b.supplier_id, "name": b.supplier.company_name or b.supplier.name,
             "owedCentavos": 0, "reservedCentavos": 0, "availableCentavos": 0,

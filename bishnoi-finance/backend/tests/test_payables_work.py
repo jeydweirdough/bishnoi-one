@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app.models import Bill, OPEN_VOUCHERS, PaymentVoucher, Supplier
+from app.models import Bill, JournalEntry, OPEN_VOUCHERS, PaymentVoucher, Supplier, VoucherLine
 from .test_dashboard import person
 from .test_payables import bill, supplier
 from .test_tax_api import app, ana, ben, client  # noqa: F401
@@ -94,16 +94,31 @@ def test_aging_boundaries_inactive_supplier_csv_and_large_lists(app, client, ana
     with app.state.sessions() as db:
         s = Supplier(name="Fictional supplies", created_by="Test", is_active=False)
         db.add(s)
+        # As in real use (2026-10-29: aging is rebuilt from dated events): a recorded bill has its
+        # posted entry, and what's paid on it was paid by a released voucher.
+        entry = JournalEntry(number="JE-TEST-0001", entry_date=on - timedelta(days=100), memo="Synthetic bills", source="bill", posted_by="Test")
+        db.add(entry)
         db.flush()
+        paid = []
         for i, days in enumerate([0, 1, 30, 31, 60, 61, 90, 91]):
-            db.add(Bill(supplier_id=s.id, bill_number=f"EDGE-{i}", bill_date=on-timedelta(days=100), due_date=on-timedelta(days=days),
-                        status="recorded", payable_centavos=10000, paid_centavos=1000, created_by="Test"))
+            b = Bill(supplier_id=s.id, bill_number=f"EDGE-{i}", bill_date=on-timedelta(days=100), due_date=on-timedelta(days=days),
+                     status="recorded", payable_centavos=10000, paid_centavos=1000, created_by="Test", entry_id=entry.id)
+            db.add(b)
+            paid.append((b, 1000))
         # More than the old 300-row limit; also prove drafts and paid/void bills are omitted.
         for i in range(302):
-            db.add(Bill(supplier_id=s.id, bill_number=f"BULK-{i}", bill_date=on, due_date=on, status="recorded", payable_centavos=100, created_by="Test"))
-        for status, paid in (("draft", 0), ("void", 0), ("recorded", 100)):
-            db.add(Bill(supplier_id=s.id, bill_number=f"EXCLUDED-{status}", bill_date=on, due_date=on, status=status,
-                        payable_centavos=100, paid_centavos=paid, created_by="Test"))
+            db.add(Bill(supplier_id=s.id, bill_number=f"BULK-{i}", bill_date=on, due_date=on, status="recorded", payable_centavos=100, created_by="Test", entry_id=entry.id))
+        for status, amount in (("draft", 0), ("void", 0), ("recorded", 100)):
+            b = Bill(supplier_id=s.id, bill_number=f"EXCLUDED-{status}", bill_date=on, due_date=on, status=status,
+                     payable_centavos=100, paid_centavos=amount, created_by="Test")
+            db.add(b)
+            if status == "recorded":
+                b.entry_id = entry.id
+                paid.append((b, 100))
+        db.flush()
+        db.add(PaymentVoucher(number="PV-TEST-0001", status="released", supplier_id=s.id, total_centavos=sum(a for _, a in paid),
+                              prepared_by="Test", paid_on=on - timedelta(days=50), entry_id=entry.id,
+                              lines=[VoucherLine(bill_id=b.id, position=i, amount_centavos=a) for i, (b, a) in enumerate(paid)]))
         db.commit()
         sid = s.id
     report = client.get("/finance/payables/aging", headers=ana).json()

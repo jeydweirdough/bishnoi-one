@@ -97,6 +97,34 @@ def confirmed(db) -> dict:
     return {k: m for k, m in saved(db).items() if m.status == "confirmed"}
 
 
+def pick(m: ImportMatch | None, d: dict, position: int, ln: dict, field: str) -> tuple:
+    """One choice for one bill line: the line's own choice, else its supplier's rule, else the label's
+    default (not for a label that depends on the record). Only confirmed rules count.
+    Returns (value, how, changed): changed when a line choice was saved for a different amount."""
+    if m is None:
+        return None, None, False
+    rules = [r for r in m.rules if r.status == "confirmed"]
+    line = next((r for r in rules if r.scope == "line" and r.bill_source_id == d["sourceId"] and r.line_position == position), None)
+    changed = line is not None and line.line_amount_centavos != ln["amount"]
+    supplier = next((r for r in rules if r.scope == "supplier" and r.supplier_key == norm(d["party"])), None)
+    for how, r in (("line choice", None if changed else line), ("supplier rule", supplier)):
+        if r is not None and getattr(r, field) is not None:
+            return getattr(r, field), how, changed
+    if m.status == "confirmed" and not m.per_record and getattr(m, field) is not None:
+        return getattr(m, field), "label", changed
+    return None, None, changed
+
+
+def missing(m: ImportMatch | None, i: int, what: str, label: str, changed: bool) -> str:
+    if changed:
+        return f"Line {i}: its saved line choice was for a different amount (the export changed). Choose again."
+    if m is None or (m.status != "confirmed" and not m.rules):
+        return f"Line {i}: {what} “{label}” isn't matched and confirmed yet."
+    if m.per_record:
+        return f"Line {i}: {what} “{label}” depends on the record, and no supplier rule or line choice covers this line yet."
+    return f"Line {i}: {what} “{label}” has no confirmed choice for this line yet."
+
+
 def companies_from(matches: dict, docs: list[dict]) -> None:
     """A bill's company comes only from its label's confirmed match; then payments take theirs
     from their bills (the import review's connect)."""
@@ -163,6 +191,44 @@ def fill_in(db, m: ImportMatch, now) -> None:
             m.account_id, m.note = same[0].id, "Suggested: the same name is in Finance's chart. Check it, choose the purchase type and save."
 
 
+RECORDS_SHOWN = 500
+
+
+def records_for(db, docs: list[dict], m: ImportMatch) -> dict:
+    """The records in the given exports that use one label, counted as the sheet counts them
+    (lines of bills confirmed as GPI's left out), so Finance can see what they are matching.
+    Read-only: nothing is saved."""
+    companies_from(confirmed(db), docs)
+    key, rows = match_key(m), []
+    usable = posting_accounts(db)
+    for d in docs:
+        if d["kind"] == "bill" and m.section == "company":
+            if company_key(d) == key:
+                rows.append({"kind": "bill", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
+                             "description": f"{len(d['lines'])} line(s)", "account": "", "tax": "", "company": d["companySource"]})
+        elif d["kind"] == "bill" and m.section in ("account", "tax") and d["company"] != "gpi":
+            for i, ln in enumerate(d["lines"], 1):
+                if (account_key(ln) if m.section == "account" else tax_key(ln)) == key:
+                    row = {"kind": "bill line", "number": d["number"], "date": d["date"], "party": d["party"], "amount": ln["amount"],
+                           "description": ln["description"], "account": ln["account"], "tax": ln["taxName"] or "blank",
+                           "company": d["companySource"], "billSourceId": d["sourceId"], "linePosition": i, "changed": False}
+                    # What this line takes now, and from where (line choice, supplier rule or the label).
+                    for field, name in (("account_id", "accountId"), ("purchase_type", "purchaseType"), ("vat_kind", "vatKind")):
+                        value, how, changed = pick(m, d, i, ln, field)
+                        row[name], row[name + "From"] = value, how
+                        row["changed"] = row["changed"] or changed
+                    acc = usable.get(row["accountId"]) if row["accountId"] else None
+                    row["accountName"] = f"{acc.code} · {acc.name}" if acc else None
+                    rows.append(row)
+        elif d["kind"] == "vendor_payment" and m.section == "money" and d["company"] != "gpi" and money_key(d) == key:
+            rows.append({"kind": "payment", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
+                         "description": "Pays " + ", ".join(sorted({a["number"] or a["reference"] for a in d["allocations"]})), "account": "",
+                         "tax": "", "company": ""})
+    rows.sort(key=lambda r: (r["date"], r["number"]))
+    return {"label": m.source_label, "section": m.section, "total": len(rows), "amountCentavos": sum(r["amount"] for r in rows),
+            "rows": rows[:RECORDS_SHOWN], "shown": min(len(rows), RECORDS_SHOWN), "perRecord": m.per_record}
+
+
 # --- planning: what each record would become ------------------------------------------------------
 
 def created_records(db, kind: str) -> dict:
@@ -179,10 +245,10 @@ def supplier_index(db) -> dict:
 
 
 def posting_accounts(db) -> dict:
-    """Accounts a bill line may use: active expense or asset accounts without accounts under them."""
-    accounts = list(db.scalars(select(Account)))
-    parents = {a.parent_id for a in accounts if a.parent_id}
-    return {a.id: a for a in accounts if a.is_active and a.type in ("expense", "asset") and a.id not in parents}
+    """Accounts a bill line may use: the same rule as a bill entered in Finance (routers/payables.py
+    apply_bill), any active expense or asset account. Parent accounts included: Oojeema's chart posts
+    to some of them (e.g. Merchandise Inventory, Furniture and Fixtures). Corrected 2026-10-29."""
+    return {a.id: a for a in db.scalars(select(Account)) if a.is_active and a.type in ("expense", "asset")}
 
 
 def peso(centavos: int) -> str:
@@ -192,8 +258,8 @@ def peso(centavos: int) -> str:
 def plan_bills(db, docs: list[dict], settings) -> list[dict]:
     from app.routers.funds import today
 
-    matches = confirmed(db)
-    companies_from(matches, docs)
+    every = saved(db)  # a label's rules count even before its default is chosen
+    companies_from(confirmed(db), docs)
     done = created_records(db, "bill")
     suppliers = supplier_index(db)
     usable = posting_accounts(db)
@@ -230,19 +296,22 @@ def plan_bills(db, docs: list[dict], settings) -> list[dict]:
             reasons.append(f"Supplier “{supplier.name}” is switched off in Finance.")
         lines = []
         for i, ln in enumerate(d["lines"], 1):
-            a, t = matches.get(account_key(ln)), matches.get(tax_key(ln))
-            label = ln["account"] or "no account"
-            if a is None:
-                reasons.append(f"Line {i}: account “{label}” isn't matched and confirmed yet.")
-            elif a.account_id not in usable:
-                reasons.append(f"Line {i}: “{label}” is matched to an account a bill line can't use (an active expense or asset account with nothing under it).")
-            elif a.purchase_type not in PURCHASE_TYPES:
-                reasons.append(f"Line {i}: “{label}” has no purchase type confirmed.")
-            if t is None or t.vat_kind not in VAT_KINDS:
-                reasons.append(f"Line {i}: tax label “{ln['taxName'] or 'blank'}” isn't matched and confirmed yet.")
-            if a is not None and t is not None and a.account_id in usable and a.purchase_type in PURCHASE_TYPES and t.vat_kind in VAT_KINDS:
-                lines.append({"accountId": a.account_id, "description": (ln["description"] or None) and ln["description"][:200],
-                              "amountCentavos": ln["amount"], "vat": t.vat_kind, "withholding": None, "purchaseType": a.purchase_type})
+            a, t = every.get(account_key(ln)), every.get(tax_key(ln))
+            label, tax_label = ln["account"] or "no account", ln["taxName"] or "blank"
+            account_id, _, changed_a = pick(a, d, i, ln, "account_id")
+            purchase, _, changed_p = pick(a, d, i, ln, "purchase_type")
+            vat, _, changed_t = pick(t, d, i, ln, "vat_kind")
+            if account_id is None:
+                reasons.append(missing(a, i, "account", label, changed_a))
+            elif account_id not in usable:
+                reasons.append(f"Line {i}: “{label}” is matched to an account a bill line can't use (bill lines take active expense or asset accounts, as in Finance's bill screen).")
+            if account_id is not None and purchase not in PURCHASE_TYPES:
+                reasons.append(missing(a, i, "account", label, True) if changed_p else f"Line {i}: “{label}” has no purchase type confirmed for this line.")
+            if vat not in VAT_KINDS:
+                reasons.append(missing(t, i, "tax label", tax_label, changed_t))
+            if account_id in usable and purchase in PURCHASE_TYPES and vat in VAT_KINDS:
+                lines.append({"accountId": account_id, "description": (ln["description"] or None) and ln["description"][:200],
+                              "amountCentavos": ln["amount"], "vat": vat, "withholding": None, "purchaseType": purchase})
         inclusive = d["original"].get("inclusiveTax")
         if inclusive not in ("true", "false"):
             reasons.append("The export doesn't say whether the amounts include tax.")
@@ -268,6 +337,7 @@ def plan_bills(db, docs: list[dict], settings) -> list[dict]:
             if not s.payables_account_id and not (supplier.payables_account_id):
                 reasons.append("No accounts payable account is set (Default accounts, or the supplier's own).")
             row["bill"] = {"supplier": supplier, "lines": lines, "include": inclusive == "true", "due": due, "worked": w}
+            row["choices"] = [[ln["accountId"], ln["purchaseType"], ln["vat"]] for ln in lines]
         if reasons:
             row["outcome"] = "held"
     return out
@@ -343,7 +413,9 @@ def summary(rows: list[dict]) -> dict:
     reasons = Counter(reason for r in rows if r["outcome"] == "held" for reason in r["reasons"])
     return {"counts": {k: counts.get(k, 0) for k in ("ready", "held", "skipped", "imported")},
             "reasons": [{"reason": k, "records": n} for k, n in reasons.most_common()],
-            "planKey": hashlib.sha256(json.dumps(sorted((r["sourceId"], r["outcome"]) for r in rows)).encode()).hexdigest()}
+            # What each ready bill's lines would post to is part of the plan: a choice changed after the
+            # preview changes the key, so the import refuses rather than posting something not previewed.
+            "planKey": hashlib.sha256(json.dumps(sorted([r["sourceId"], r["outcome"], r.get("choices") or []] for r in rows)).encode()).hexdigest()}
 
 
 def rows_out(rows: list[dict]) -> list[dict]:

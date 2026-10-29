@@ -211,3 +211,14 @@ def withholding_2307(_: Viewer, db: DB, settings: SettingsDep, year: int | None 
     if supplier_id:
         out["certificate"] = bir.form_2307(db, p, supplier_id)
     return out
+
+
+@router.get("/readiness")
+def readiness(_: Viewer, db: DB, settings: SettingsDep, start: date | None = None, end: date | None = None) -> dict:
+    """Each tax list against the books for the same period (app/bir_readiness.py). Read-only."""
+    from zoneinfo import ZoneInfo
+
+    from app.bir_readiness import readiness as compare
+
+    start, end = span(start, end, settings)
+    return {**compare(db, start, end, ZoneInfo(settings.org_timezone)), "period": period_out(start, end)}

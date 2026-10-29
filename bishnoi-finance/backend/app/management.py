@@ -120,12 +120,10 @@ def receivables(db: Session, on: date, zone: ZoneInfo) -> int:
 
 
 def payables(db: Session, on: date) -> int:
-    """Still owed to suppliers on bills dated up to the day (at what's paid today)."""
-    total = db.scalar(
-        select(func.coalesce(func.sum(Bill.payable_centavos - Bill.paid_centavos), 0))
-        .where(Bill.status == "recorded", Bill.bill_date <= on, Bill.paid_centavos < Bill.payable_centavos)
-    )
-    return int(total or 0)
+    """Owed to suppliers at the end of the day, rebuilt from dated bills, payments and voids
+    (app/payables_asof.py), not from what's paid now (corrected 2026-10-29)."""
+    from app.payables_asof import total_owed_on
+    return total_owed_on(db, on)
 
 
 @dataclass

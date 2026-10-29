@@ -9,7 +9,8 @@ import {Sheet,SectionTitle} from '../platform/ui/sheet';
 import {ListFrame,FigureStrip} from '@/src/platform/ui/list-layout';
 import {ExpandableTable} from '@/src/platform/ui/expandable-table';
 import {confirmMatch,proposeMatch} from './actions';
-import {day,money,readPair,send,type Match,type Matching,type Proposal,type Section} from './types';
+import {RecordsModal} from './records';
+import {day,money,readPair,send,type Match,type Matching,type Proposal,type Section,type SourceFile} from './types';
 
 // Settings → Import matching (app/routers/imports.py): each label in the Zoho Bills and Vendor
 // Payments exports is matched once. Whoever may confirm a section saves it in one step; others
@@ -25,9 +26,10 @@ const KINDS:Record<string,string>={bills:'Bills',supplier_payments:'Supplier pay
 const COUNT_WORDS:Record<string,string>={ready:'imported',held:'held',skipped:'skipped',imported:'already imported'};
 
 /** What the row shows chosen: the person's unsaved choice, else what is saved. */
-const chosenOf=(m:Match,draft?:Proposal):Proposal=>({accountId:m.accountId,purchaseType:m.purchaseType,vatKind:m.vatKind,company:m.company,note:'',...draft});
+const chosenOf=(m:Match,draft?:Proposal):Proposal=>({accountId:m.accountId,purchaseType:m.purchaseType,vatKind:m.vatKind,company:m.company,note:'',perRecord:m.perRecord,...draft});
 function complete(section:Section,p:Proposal){
  if(section==='company')return Boolean(p.company);
+ if(p.perRecord)return true;
  if(section==='account')return Boolean(p.accountId&&p.purchaseType);
  if(section==='tax')return Boolean(p.vatKind);
  return Boolean(p.accountId);
@@ -36,20 +38,21 @@ function status(m:Match){
  if(m.status==='open')return m.note?`Not chosen yet. ${m.note}`:'Not chosen yet';
  if(m.status==='proposed')return `Proposed by ${m.proposedBy||'someone'} on ${day(m.proposedAt)}${m.waitingOn?` · waiting for ${m.waitingOn}`:''}`;
  if(m.automatic)return `Filled in automatically on ${day(m.confirmedAt)}. ${m.note??''}`;
+ if(m.perRecord)return `Depends on the record (set by ${m.confirmedBy||'someone'} on ${day(m.confirmedAt)}): ${m.rules.confirmed} supplier or line ${m.rules.confirmed===1?'choice':'choices'}${m.rules.proposed?`, ${m.rules.proposed} waiting`:''}. Click the record count to choose.`;
  if(m.confirmedBy===m.proposedBy)return `Saved by ${m.confirmedBy||'someone'} on ${day(m.confirmedAt)}`;
  return `Confirmed by ${m.confirmedBy||'someone'} on ${day(m.confirmedAt)} (proposed by ${m.proposedBy||'someone'})`;
 }
 
-function MatchSection({section,data}:{section:(typeof SECTIONS)[number];data:Matching}){
- const [drafts,setDrafts]=useState<Record<string,Proposal>>({}),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState<string|null>(null);
+function MatchSection({section,data,files,onFiles}:{section:(typeof SECTIONS)[number];data:Matching;files:SourceFile[];onFiles:(files:SourceFile[])=>void}){
+ const [drafts,setDrafts]=useState<Record<string,Proposal>>({}),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState<string|null>(null),[viewing,setViewing]=useState<Match|null>(null);
  const rows=data.matches.filter(m=>m.section===section.key),counts=data.counts[section.key]??{open:0,proposed:0,confirmed:0};
  const {lineAccounts,moneyAccounts,purchaseTypes,vatKinds,companies}=data.choices;
  const edit=(m:Match,change:Proposal)=>setDrafts(d=>({...d,[m.id]:{...d[m.id],...change}}));
- const dirty=(m:Match)=>{const d=drafts[m.id];return Boolean(d&&((d.accountId!==undefined&&d.accountId!==m.accountId)||(d.purchaseType!==undefined&&d.purchaseType!==m.purchaseType)||(d.vatKind!==undefined&&d.vatKind!==m.vatKind)||(d.company!==undefined&&d.company!==m.company)||d.note));};
+ const dirty=(m:Match)=>{const d=drafts[m.id];return Boolean(d&&((d.accountId!==undefined&&d.accountId!==m.accountId)||(d.purchaseType!==undefined&&d.purchaseType!==m.purchaseType)||(d.vatKind!==undefined&&d.vatKind!==m.vatKind)||(d.company!==undefined&&d.company!==m.company)||(d.perRecord!==undefined&&d.perRecord!==m.perRecord)||d.note));};
  async function propose(m:Match){
   if(m.status==='confirmed'&&!m.savesConfirmed&&!window.confirm('Changing a confirmed match sends it back for confirmation. Imports stop using it until someone who may confirm it does. Continue?'))return;
   const p=chosenOf(m,drafts[m.id]);
-  const body:Proposal=section.key==='company'?{company:p.company}:section.key==='account'?{accountId:p.accountId,purchaseType:p.purchaseType}:section.key==='tax'?{vatKind:p.vatKind}:{accountId:p.accountId};
+  const body:Proposal=section.key==='company'?{company:p.company}:p.perRecord?{perRecord:true}:section.key==='account'?{accountId:p.accountId,purchaseType:p.purchaseType}:section.key==='tax'?{vatKind:p.vatKind}:{accountId:p.accountId};
   if(p.note?.trim())body.note=p.note.trim();
   setBusy(m.id);setError(null);
   const result=await proposeMatch(m.id,body);
@@ -65,12 +68,16 @@ function MatchSection({section,data}:{section:(typeof SECTIONS)[number];data:Mat
  }
  function choice(m:Match){
   const p=chosenOf(m,drafts[m.id]),off=!m.canPropose||busy===m.id,label=m.sourceLabel||'blank label';
+  // Sir Mel (2026-10-29): one Zoho label can stand for several of ours; then each line takes its
+  // supplier's rule or its own choice, made from the records window.
+  const depends=(section.key==='account'||section.key==='tax')&&<label className="flex items-center gap-2 text-meta text-ink-2"><input suppressHydrationWarning type="checkbox" disabled={off} checked={Boolean(p.perRecord)} onChange={e=>edit(m,{perRecord:e.target.checked})}/>Depends on the record (choose by supplier or line)</label>;
+  if(p.perRecord)return depends;
   if(section.key==='company')return <Select aria-label={`Company for ${label}`} disabled={off} placeholder="Choose company" value={p.company??''} onChange={e=>edit(m,{company:e.target.value||null})}>{companies.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</Select>;
-  if(section.key==='tax')return <Select aria-label={`VAT kind for ${label}`} disabled={off} placeholder="Choose VAT kind" value={p.vatKind??''} onChange={e=>edit(m,{vatKind:e.target.value||null})}>{vatKinds.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</Select>;
+  if(section.key==='tax')return <div className="space-y-2"><Select aria-label={`VAT kind for ${label}`} disabled={off} placeholder="Choose VAT kind" value={p.vatKind??''} onChange={e=>edit(m,{vatKind:e.target.value||null})}>{vatKinds.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</Select>{depends}</div>;
   const accounts=section.key==='account'?lineAccounts:moneyAccounts;
   const picker=<SearchSelect className="w-full" aria-label={`Finance account for ${label}`} showSearch={{optionFilterProp:'label'}} allowClear disabled={off} placeholder="Choose the Finance account…" value={p.accountId||undefined} options={accounts.map(a=>({value:a.id,label:`${a.code} · ${a.name}`}))} onChange={(value:string|undefined)=>edit(m,{accountId:value??null})}/>;
   if(section.key==='money')return picker;
-  return <div className="space-y-2">{picker}<Select aria-label={`Purchase type for ${label}`} disabled={off} placeholder="Choose purchase type" value={p.purchaseType??''} onChange={e=>edit(m,{purchaseType:e.target.value||null})}>{purchaseTypes.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</Select></div>;
+  return <div className="space-y-2">{picker}<Select aria-label={`Purchase type for ${label}`} disabled={off} placeholder="Choose purchase type" value={p.purchaseType??''} onChange={e=>edit(m,{purchaseType:e.target.value||null})}>{purchaseTypes.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</Select>{depends}</div>;
  }
  return <ListFrame><div className="space-y-1 px-5 pt-4 pb-3"><SectionTitle>{section.title}</SectionTitle><p className="text-sm text-ink-2">{section.says}</p></div>
  <FigureStrip figures={[{label:'Open',value:String(counts.open)},{label:'Waiting for confirmation',value:String(counts.proposed)},{label:'Confirmed',value:String(counts.confirmed)}]}/>
@@ -80,22 +87,23 @@ function MatchSection({section,data}:{section:(typeof SECTIONS)[number];data:Mat
   const p=chosenOf(m,drafts[m.id]),changed=dirty(m);
   return {id:m.id,cells:[
    <span key="label" className="font-medium">{m.sourceLabel||<span className="text-ink-3">Blank (no label in Zoho)</span>}{m.sourceCode&&<span className="block text-meta font-normal text-ink-3">{m.sourceCode}</span>}</span>,
-   <span key="records">{m.records}</span>,
+   m.records>0?<button key="records" type="button" suppressHydrationWarning className="font-medium text-sage-deep underline underline-offset-2 hover:text-ink" title="See these records" onClick={()=>setViewing(m)}>{m.records}</button>:<span key="records" className="text-ink-3">0</span>,
    <span key="amount">{money(m.amountCentavos)}</span>,
    <div key="choice">{choice(m)}</div>,
    <span key="status" className="text-meta text-ink-2">{status(m)}{m.note&&<span className="block text-ink-3">Note: {m.note}</span>}{changed&&<span className="block text-due-today">Changed here, not proposed yet</span>}</span>,
   ],actions:<>{m.canPropose&&<Button size="sm" variant={m.status==='open'||changed?'primary':'default'} loading={busy===m.id} disabled={!complete(section.key,p)||(m.status!=='open'&&!changed)} title={m.savesConfirmed?'Your save is final; who and when are kept':m.status==='confirmed'?'Changing sends it back for confirmation':'Someone who may confirm it checks it next'} onClick={()=>propose(m)}>{m.status==='confirmed'?'Change':m.savesConfirmed?'Save':'Propose'}</Button>}{m.canConfirm&&<Button size="sm" variant="primary" disabled={busy===m.id||changed} title={changed?'Propose or undo your change first':undefined} onClick={()=>confirm(m)}>Confirm</Button>}</>,
   detail:<div className="grid gap-3 sm:grid-cols-2"><p className="text-sm">{status(m)}{m.mine&&m.status==='proposed'?'. Your proposal: someone else confirms it.':''}</p>{m.canPropose?<Field label="Note with your proposal" optional>{props=><Input {...props} maxLength={300} value={p.note??''} placeholder="Why this choice (optional)" onChange={e=>edit(m,{note:e.target.value})}/>}</Field>:<p className="text-meta text-ink-3">Only people who can propose matches change these.</p>}</div>};
  })}/>}
+ {viewing&&<RecordsModal match={viewing} choices={data.choices} files={files} onFiles={onFiles} onClose={()=>setViewing(null)}/>}
  </ListFrame>;
 }
 
 export function ImportMatching({data}:{data:Matching}){
  const router=useRouter();
- const [picked,setPicked]=useState<File[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[loaded,setLoaded]=useState<{labels:number;new:number}|null>(null);
+ const [picked,setPicked]=useState<File[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[loaded,setLoaded]=useState<{labels:number;new:number}|null>(null),[files,setFiles]=useState<SourceFile[]>([]);
  async function load(){
   setBusy(true);setError(null);setLoaded(null);
-  try{const files=await readPair(picked);setLoaded(await send<{labels:number;new:number}>('/finance/import-matching/load',{files}));setPicked([]);router.refresh();}
+  try{const contents=await readPair(picked);setLoaded(await send<{labels:number;new:number}>('/finance/import-matching/load',{files:contents}));setFiles(contents);setPicked([]);router.refresh();}
   catch(e){setError(e instanceof Error?e.message:'The exports could not be loaded.');}finally{setBusy(false);}
  }
  return <div className="space-y-5"><Sheet className="space-y-3 p-5">
@@ -109,7 +117,7 @@ export function ImportMatching({data}:{data:Matching}){
   <div className="flex flex-wrap items-center gap-3"><Button variant="primary" loading={busy} disabled={picked.length!==2} onClick={load}>Load the Zoho exports</Button><span className="text-meta text-ink-3">{picked.length===2?'2 files selected':picked.length?`${picked.length} selected: choose exactly 2`:'No files selected'}</span></div>
   {loaded&&<p role="status" className="text-sm font-medium">{loaded.labels} labels, {loaded.new} new.</p>}
  </Sheet>}
- {SECTIONS.map(section=><MatchSection key={section.key} section={section} data={data}/>)}
+ {SECTIONS.map(section=><MatchSection key={section.key} section={section} data={data} files={files} onFiles={setFiles}/>)}
  <Sheet className="space-y-3 p-5"><SectionTitle>Recent imports</SectionTitle>
   {data.runs.length===0?<p className="text-sm text-ink-3">No imports yet. Bills and payments are imported from the Bills and Payment vouchers pages.</p>:
   <div className="overflow-x-auto"><table className="w-full min-w-[36rem] text-left text-sm"><thead><tr className="text-meta text-ink-3"><th className="py-2 font-semibold">What</th><th className="font-semibold">Result</th><th className="font-semibold">By</th><th className="font-semibold">When</th></tr></thead><tbody>{data.runs.map(r=><tr key={r.id} className="border-t border-rule"><td className="py-2">{KINDS[r.kind]||r.kind}<span className="block text-meta text-ink-3">{r.files.join(' · ')}</span></td><td>{Object.entries(r.counts).filter(([,n])=>n).map(([k,n])=>`${n} ${COUNT_WORDS[k]||k}`).join(' · ')||'Nothing imported'}</td><td>{r.by}</td><td>{day(r.at)}</td></tr>)}</tbody></table></div>}

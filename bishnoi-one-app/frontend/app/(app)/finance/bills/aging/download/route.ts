@@ -3,7 +3,7 @@ import { ApiError, fetchFile } from "@/src/modules/finance/platform/lib/api";
 export async function GET(request: Request) {
   const asked = new URL(request.url).searchParams;
   const query = new URLSearchParams({ format: "csv" });
-  for (const key of ["supplierId", "bucket"]) if (asked.has(key)) query.set(key, asked.get(key)!);
+  for (const key of ["supplierId", "bucket", "asOf"]) if (asked.get(key)) query.set(key, asked.get(key)!);
   try {
     const file = await fetchFile(`/finance/payables/aging?${query}`);
     return new Response(file.body, { headers: {

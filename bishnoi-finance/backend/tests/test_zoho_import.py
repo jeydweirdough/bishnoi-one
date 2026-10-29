@@ -221,3 +221,109 @@ def test_the_official_site_refuses_imports_and_changes_nothing(client, ana, app,
     assert r.status_code == 409 and "testing site" in r.json()["detail"]
     with app.state.sessions() as db:
         assert db.scalar(select(func.count()).select_from(Bill).where(Bill.zoho_ref.is_not(None))) == 0
+
+
+def test_a_labels_records_can_be_seen_and_nothing_is_saved(client, ana, app):
+    t = staff(client, ana)
+    files = pack()
+    client.post("/finance/imports/matching/load", json={"files": files}, headers=t["cristal"])
+    m = matches(client, t["malou"])  # Malou may only confirm, and may still look
+    r = client.post(f"/finance/imports/matching/{m[('account', 'Office Supplies')]['id']}/records", json={"files": files}, headers=t["malou"])
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # Getmeds' bill b2 is confirmed GPI, so only 2MG's line shows, as the sheet counts it.
+    assert body["total"] == 1 and body["rows"][0]["number"] == "SI-1" and body["rows"][0]["amount"] == 5000
+    pay = client.post(f"/finance/imports/matching/{m[('money', 'Synthetic Bank')]['id']}/records", json={"files": files}, headers=t["malou"]).json()
+    assert pay["total"] == 1 and pay["rows"][0]["kind"] == "payment"
+    with app.state.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(Bill)) == 0
+
+
+def test_parent_accounts_are_offered_as_on_the_bill_screen(client, ana, app):
+    """Corrected 2026-10-29: the bill screen accepts a parent expense/asset account; so does matching."""
+    from app.models import Account
+    t = staff(client, ana)
+    with app.state.sessions() as db:
+        parent = db.scalar(select(Account).where(Account.code == "6500"))
+        db.add(Account(code="6500-01", name="Synthetic child", type="expense", parent_id=parent.id))
+        db.commit()
+        parent_id = parent.id
+    choices = client.get("/finance/imports/matching", headers=t["malou"]).json()["choices"]["lineAccounts"]
+    assert parent_id in {a["id"] for a in choices}
+
+
+def rule(client, who, m, expect=200, **body):
+    r = client.post(f"/finance/imports/matching/{m['id']}/rules", json=body, headers=who)
+    assert r.status_code == expect, r.text
+    return r.json()
+
+
+def test_a_label_that_depends_on_the_record_takes_supplier_rules_and_line_choices(client, ana, app):
+    """Sir Mel, 2026-10-29: one Zoho account can stand for several of ours (Government Mandatories →
+    SSS, PhilHealth, Pag-IBIG), and purchase types vary within one account."""
+    from app.models import Account
+    gov = "Government Mandatories"
+    bills = [bill_row("b1", "SI-1", account_name=gov), bill_row("b2", "SI-2", account_name=gov)]
+    bills[1]["Vendor Name"] = "Other Agency"
+    files = pack(bills=bills, payments=[payment_row("v1", "b1", "VP-1")])
+    t, files = matched(client, ana, files)  # every label confirmed to 6500 · other goods
+    supplier(client, ana, name="Other Agency", tin="987654321")
+    with app.state.sessions() as db:
+        db.add(Account(code="6113-T", name="Synthetic ER contribution", type="expense"))
+        db.commit()
+    sss, other = account(client, ana, "6113-T"), account(client, ana, "6500")
+    m = matches(client, t["cristal"])[("account", gov)]
+    # Malou makes the label depend on the record: no default any more, so both lines are held.
+    flagged = propose(client, t["malou"], m, perRecord=True)
+    assert flagged["perRecord"] and flagged["status"] == "confirmed" and flagged["accountId"] is None
+    held = {r["sourceId"]: r for r in preview(client, t["cristal"], "bills", files)["rows"]}
+    assert held["b1"]["outcome"] == "held" and any("depends on the record" in x for x in held["b1"]["reasons"])
+    # A supplier rule covers every line from that supplier; Cristal's waits for Malou.
+    waiting = rule(client, t["cristal"], m, scope="supplier", supplier=NAME, accountId=sss, purchaseType="services")
+    assert waiting["status"] == "proposed"
+    assert client.post(f"/finance/imports/rules/{waiting['id']}/confirm", headers=t["cristal"]).status_code == 403
+    assert client.post(f"/finance/imports/rules/{waiting['id']}/confirm", headers=t["malou"]).json()["status"] == "confirmed"
+    # One line of the other supplier's bill, chosen line by line (Malou's save is final).
+    seen = client.post(f"/finance/imports/matching/{m['id']}/records", json={"files": files}, headers=t["malou"]).json()
+    line = next(r for r in seen["rows"] if r["number"] == "SI-2")
+    assert line["accountId"] is None and line["accountIdFrom"] is None
+    rule(client, t["malou"], m, scope="line", supplier="Other Agency", billSourceId=line["billSourceId"], billNumber="SI-2",
+         linePosition=line["linePosition"], lineAmountCentavos=line["amount"], accountId=other, purchaseType="capital_goods")
+    seen = {r["number"]: r for r in client.post(f"/finance/imports/matching/{m['id']}/records", json={"files": files}, headers=t["malou"]).json()["rows"]}
+    assert seen["SI-1"]["accountIdFrom"] == "supplier rule" and seen["SI-2"]["purchaseTypeFrom"] == "line choice"
+    p = preview(client, t["cristal"], "bills", files)
+    assert p["counts"]["ready"] == 2, p
+    run(client, t["cristal"], "bills", files, p["planKey"])
+    with app.state.sessions() as db:
+        got = {b.bill_number: b.lines[0] for b in db.scalars(select(Bill).where(Bill.zoho_ref.is_not(None)))}
+        assert got["SI-1"]["accountId"] == sss and got["SI-1"]["purchaseType"] == "services"
+        assert got["SI-2"]["accountId"] == other and got["SI-2"]["purchaseType"] == "capital_goods"
+
+
+def test_a_supplier_rule_can_change_only_the_purchase_type(client, ana, app):
+    t, files = matched(client, ana)
+    m = matches(client, t["cristal"])[("account", "Office Supplies")]
+    rule(client, t["malou"], m, scope="supplier", supplier=NAME, purchaseType="capital_goods")
+    p = preview(client, t["cristal"], "bills", files)
+    run(client, t["cristal"], "bills", files, p["planKey"])
+    with app.state.sessions() as db:
+        line = db.scalar(select(Bill).where(Bill.zoho_ref == "b1")).lines[0]
+        assert line["purchaseType"] == "capital_goods" and line["accountId"] == account(client, ana, "6500")
+
+
+def test_a_choice_changed_after_the_preview_stops_the_import(client, ana, app):
+    t, files = matched(client, ana)
+    p = preview(client, t["cristal"], "bills", files)
+    m = matches(client, t["cristal"])[("account", "Office Supplies")]
+    rule(client, t["malou"], m, scope="supplier", supplier=NAME, purchaseType="services")
+    run(client, t["cristal"], "bills", files, p["planKey"], expect=409)
+
+
+def test_a_line_choice_for_a_line_that_changed_is_held(client, ana, app):
+    t, files = matched(client, ana)
+    m = matches(client, t["cristal"])[("account", "Office Supplies")]
+    propose(client, t["malou"], m, perRecord=True)
+    rule(client, t["malou"], m, scope="line", supplier=NAME, billSourceId="b1", billNumber="SI-1", linePosition=1,
+         lineAmountCentavos=4000, accountId=account(client, ana, "6500"), purchaseType="services")  # the export says 50.00
+    rows = {r["sourceId"]: r for r in preview(client, t["cristal"], "bills", files)["rows"]}
+    assert rows["b1"]["outcome"] == "held" and any("different amount" in x for x in rows["b1"]["reasons"])

@@ -16,6 +16,10 @@ export const RELEASES: Release[] = [
     date: "2026-10-29",
     changes: [
       "New Import matching page under Settings: load the Zoho Bills and Vendor Payments exports and match each company label, bill-line account, tax label and paid-from account once. What the export already says is filled in for you (the company labels and VAT 12%); accounts with the same name are suggested. Whoever may confirm saves in one step; others propose and it waits for them. Unclear tax labels are BIR and Compliance's call. Imports use confirmed matches only.",
+      "On Import matching, click a label's record count to see the records that use it (bill lines or payments) in a window, with a search. They're read from the exports you loaded; nothing is saved.",
+      "A bill-line account or tax label can depend on the record: in its records window, choose for one line or for all lines from a supplier (for example Government Mandatories from SSS, PhilHealth or Pag-IBIG). A supplier rule can also change just the purchase type. A line's own choice comes first, then its supplier's rule, then the label. Parent accounts such as Furniture and Fixtures are now offered, as on the bill screen.",
+      "Accounts payable aging can now be shown as of an earlier day (for example a month-end, to compare with Oojeema's report). It's rebuilt from the dates bills, payments and voids were posted, so it agrees with the books on that day; the payables report and key figures use the same rule.",
+      "New BIR readiness page under Taxes: for a period, each tax list (output VAT, input VAT, tax withheld from suppliers and by customers) and the receivables and payables agings are set against the books, with the difference, possible reasons, and the entries the lists don't see (such as journal entries typed by hand). Nothing is changed.",
       "Import from Zoho export on Bills and Payment vouchers (testing site only for now). Preview first: records that can't be imported yet are held with their reasons. Nothing is imported twice, and approvals done in Zoho are not repeated here; imported records are marked as imported.",
     ],
   },

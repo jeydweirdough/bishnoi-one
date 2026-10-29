@@ -235,12 +235,13 @@ def bills_by_supplier(c: Ctx):
 
 def payables_ageing(c: Ctx):
     """As of the period's last day: what's still owed to each supplier, by how late it is."""
+    from app.payables_asof import owed_on
+
     names = supplier_names(c)
     on = c.last
     by: dict[str, dict] = {}
-    q = select(Bill).where(Bill.status == "recorded", Bill.paid_centavos < Bill.payable_centavos, Bill.bill_date <= on)
-    for b in c.db.scalars(q):
-        owed = b.payable_centavos - b.paid_centavos
+    for o in owed_on(c.db, on):
+        b, owed = o.bill, o.owed_centavos
         name = names.get(b.supplier_id, "Supplier")
         r = by.setdefault(name, {"supplier": name, **{k: 0 for k, _, _ in BUCKETS}, "total": 0})
         r[bucket_of(max(0, (on - b.due_date).days))] += owed

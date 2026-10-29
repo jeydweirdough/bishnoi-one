@@ -1,5 +1,7 @@
-"""Today's supplier balances, aged by due date. No historical balance claim."""
+"""Supplier balances, aged by due date: today's, or as of an earlier day (rebuilt from dated bills,
+payments and voids, app/payables_asof.py; 2026-10-29)."""
 
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Query
@@ -18,10 +20,14 @@ router = APIRouter(prefix="/payables", tags=["payables"])
 @router.get("/aging")
 def current_aging(_: permitted("bills.view"), db: DB, settings: SettingsDep,
                   supplier_id: str | None = Query(None, alias="supplierId", max_length=36),
-                  bucket: str | None = Query(None, max_length=12), format: Literal["json", "csv"] = "json"):
+                  bucket: str | None = Query(None, max_length=12), format: Literal["json", "csv"] = "json",
+                  on: date | None = Query(None, alias="asOf")):
     if bucket and bucket not in {k for k, _, _ in BUCKETS}:
         raise field_error("bucket", "Pick a listed aging bucket.")
-    found = aging(db, today(settings), supplier_id, bucket)
+    now = today(settings)
+    if on is not None and on > now:
+        raise field_error("asOf", "Pick today or an earlier day.")
+    found = aging(db, on or now, supplier_id, bucket, current=on is None or on == now)
     if format == "json":
         return found
     fields = [k for k, _, _ in BUCKETS]

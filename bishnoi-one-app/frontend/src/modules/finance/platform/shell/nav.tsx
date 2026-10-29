@@ -116,6 +116,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
         { href: "/finance/bir/withholding", label: "Withholding tax", icon: "letters" },
         { href: "/finance/bir/lists", label: "Summary lists", icon: "lists" },
         { href: "/finance/bir/sales-dat", label: "BIR files (DAT)", icon: "letters" },
+        { href: "/finance/bir/readiness", label: "BIR readiness", icon: "lists" },
       ]),
     },
     { label: "Calendar", icon: "calendar", steps: keep([{ href: "/finance/calendar", label: "Calendar", icon: "calendar" }]) },

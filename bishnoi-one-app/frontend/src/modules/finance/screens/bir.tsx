@@ -935,3 +935,66 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     </>
   );
 }
+
+// --- BIR readiness (2026-10-29): each tax list against the books for the same period ---------------
+
+type ReadinessCheck = {
+  key: string; title: string; says: string; status: "agrees" | "differs" | "not_set"; listName: string;
+  listCentavos: number; booksCentavos: number | null; differenceCentavos: number | null; message: string | null; causes: string[];
+  accounts: { id: string; code: string; name: string }[];
+  otherSources: { source: string; name: string; entries: number; centavos: number; listed: { id: string; number: string; date: string; memo: string; centavos: number }[] }[];
+};
+type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string } };
+const STATUS: Record<ReadinessCheck["status"], { label: string; tone: string }> = {
+  agrees: { label: "Agrees with the books", tone: "bg-mint-2 text-sage-deep" },
+  differs: { label: "Differs from the books", tone: "bg-due-today/10 text-due-today" },
+  not_set: { label: "Can't compare yet", tone: "bg-sheet text-ink-2" },
+};
+
+export async function BirReadinessPage({ searchParams }: { searchParams: Search }) {
+  const me = await getCompanyMe();
+  const fmt = makeFormat(me.org);
+  const sp = await searchParams;
+  const query = new URLSearchParams();
+  for (const key of ["start", "end"]) if (typeof sp[key] === "string" && sp[key]) query.set(key, sp[key] as string);
+  const data = await load<Readiness>(`/finance/bir/readiness?${query}`);
+  return (
+    <>
+      <PageHeader title="BIR readiness">
+        Each tax list set against the books for {data.period.label}. Where they differ, a return built from the list would disagree with the ledger; the entries behind the gap are listed. Nothing is changed here.
+      </PageHeader>
+      <Toolbar>
+        <DatesForm action="/finance/bir/readiness" start={data.period.start} end={data.period.end} />
+      </Toolbar>
+      <p className="mb-4 text-sm">{data.counts.agrees} agree · {data.counts.differs} differ · {data.counts.not_set} can&apos;t be compared yet</p>
+      <div className="space-y-4">
+        {data.checks.map((c) => (
+          <Sheet key={c.key} className="space-y-3 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div><h2 className="text-base font-semibold text-ink">{c.title}</h2><p className="text-meta text-ink-3">{c.says}</p></div>
+              <span className={`rounded-md px-2 py-1 text-meta font-semibold ${STATUS[c.status].tone}`}>{STATUS[c.status].label}</span>
+            </div>
+            {c.message ? <p className="text-sm text-ink-2">{c.message}</p> : (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <p className="text-sm">{c.listName}<span className="block text-lg font-semibold tabular-nums">{fmt.peso(c.listCentavos)}</span></p>
+                <p className="text-sm">Books ({c.accounts.map((a) => `${a.code} ${a.name}`).join(", ")})<span className="block text-lg font-semibold tabular-nums">{fmt.peso(c.booksCentavos ?? 0)}</span></p>
+                <p className="text-sm">Difference<span className={`block text-lg font-semibold tabular-nums ${c.differenceCentavos ? "text-due-today" : ""}`}>{fmt.peso(c.differenceCentavos ?? 0)}</span></p>
+              </div>
+            )}
+            {c.causes.length > 0 && <div><p className="text-sm font-semibold">Possible reasons</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-2">{c.causes.map((x) => <li key={x}>{x}</li>)}</ul></div>}
+            {c.otherSources.map((o) => (
+              <details key={o.source} className="rounded-lg border border-rule p-3">
+                <summary className="cursor-pointer text-sm"><strong>{o.name}</strong>: {o.entries} {o.entries === 1 ? "entry" : "entries"}, {fmt.peso(o.centavos)}, not in the tax list</summary>
+                <table className="mt-2 w-full text-sm"><tbody className="divide-y divide-rule">{o.listed.map((e) => (
+                  <tr key={e.id}><td className="py-1.5 pr-3"><Link href={`/finance/ledger?q=${encodeURIComponent(e.number)}`} className="text-hema hover:underline">{e.number}</Link></td><td className="pr-3">{fmt.dateLabel(e.date)}</td><td className="pr-3">{e.memo}</td><td className={num}>{fmt.peso(e.centavos)}</td></tr>
+                ))}</tbody></table>
+                {o.entries > o.listed.length && <p className="mt-1 text-meta text-ink-3">The first {o.listed.length} are listed.</p>}
+              </details>
+            ))}
+          </Sheet>
+        ))}
+      </div>
+      <p className="mt-4 text-meta text-ink-3">{data.note}</p>
+    </>
+  );
+}

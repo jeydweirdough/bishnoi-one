@@ -1167,7 +1167,53 @@ class ImportMatch(Base):
     confirmed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # "Depends on the record" (2026-10-29, Sir Mel: one Zoho account can stand for several of ours):
+    # no default; each line takes its supplier's rule or its own choice (ImportRule).
+    per_record: Mapped[bool] = mapped_column(default=False)
 
+    account: Mapped[Account | None] = relationship(lazy="joined")
+    rules: Mapped[list["ImportRule"]] = relationship(back_populates="match", cascade="all, delete-orphan", lazy="selectin")
+
+
+class ImportRule(Base):
+    """A choice for some of a label's lines, before its default: all lines from one supplier, or one
+    line of one bill. It may set the account, the purchase type and/or the VAT kind; what it leaves
+    empty comes from the label. Saved by someone who may confirm the section, it's final; otherwise
+    it waits. A line choice names the line by bill, position and amount (the export has no line ID),
+    so a line that changed in a later export no longer matches and is held."""
+
+    __tablename__ = "nbfi_import_rules"
+    __table_args__ = (
+        CheckConstraint("scope IN ('supplier', 'line')", name="import_rule_scope"),
+        CheckConstraint("status IN ('proposed', 'confirmed')", name="import_rule_status"),
+        Index("import_rule_supplier_once", "match_id", "supplier_key", unique=True,
+              sqlite_where=text("scope = 'supplier'"), postgresql_where=text("scope = 'supplier'")),
+        Index("import_rule_line_once", "match_id", "bill_source_id", "line_position", unique=True,
+              sqlite_where=text("scope = 'line'"), postgresql_where=text("scope = 'line'")),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    match_id: Mapped[str] = mapped_column(ForeignKey("nbfi_import_matches.id", ondelete="CASCADE"), index=True)
+    scope: Mapped[str] = mapped_column(String(10))
+    supplier: Mapped[str] = mapped_column(String(200))
+    supplier_key: Mapped[str] = mapped_column(String(200))
+    bill_source_id: Mapped[str | None] = mapped_column(String(120), default=None)
+    bill_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    line_position: Mapped[int | None] = mapped_column(Integer, default=None)
+    line_amount_centavos: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    purchase_type: Mapped[str | None] = mapped_column(String(20), default=None)
+    vat_kind: Mapped[str | None] = mapped_column(String(10), default=None)
+    status: Mapped[str] = mapped_column(String(12))
+    note: Mapped[str | None] = mapped_column(String(300), default=None)
+    proposed_by: Mapped[str] = mapped_column(String(120))
+    proposed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    proposed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    confirmed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    confirmed_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    match: Mapped[ImportMatch] = relationship(back_populates="rules")
     account: Mapped[Account | None] = relationship(lazy="joined")
 
 
