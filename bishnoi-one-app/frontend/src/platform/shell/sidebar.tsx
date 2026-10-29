@@ -1,7 +1,8 @@
 "use client";
 
 import { hiddenByFeature } from "@/src/platform/lib/features";
-import { useFeatures } from "@/src/platform/shell/features";
+import { useFeatures, useOperatorCompanies } from "@/src/platform/shell/features";
+import { switchCompany } from "@/src/one/actions";
 import { Check, ChevronDown, ChevronsUpDown, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -207,6 +208,8 @@ function Switcher({ module, company, mine }: { module: ModuleKey; company?: stri
   const button = useRef<HTMLButtonElement>(null);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const here = MODULES.find((m) => m.key === module)!;
+  // An operator works in any company: they switch here (decided 2026-10-29). Everyone else has one company.
+  const companies = useOperatorCompanies();
   // The Admin Console first, for those who have it: it's where they start.
   const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => Number(b.key === "platform") - Number(a.key === "platform"));
 
@@ -241,7 +244,7 @@ function Switcher({ module, company, mine }: { module: ModuleKey; company?: stri
         onClick={toggle}
         aria-expanded={at !== null}
         aria-haspopup="menu"
-        title="Switch module"
+        title={companies && companies.length > 1 ? "Switch module or company" : "Switch module"}
         className="flex w-full min-w-0 items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-sheet group-data-[rail=true]/side:justify-center"
       >
         <span className="grid size-9 shrink-0 place-items-center rounded-lg" style={{ background: here.tint, color: here.ink }}>
@@ -279,6 +282,26 @@ function Switcher({ module, company, mine }: { module: ModuleKey; company?: stri
             <Link href="/" role="menuitem" className="mt-1 flex items-center gap-2.5 border-t border-rule px-2.5 pt-2.5 pb-1.5 text-meta text-ink-2 hover:text-ink">
               <LayoutGrid className="size-4" aria-hidden /> All modules
             </Link>
+            {companies && companies.length > 1 && (
+              <div className="mt-1 border-t border-rule pt-1">
+                <p className="px-2.5 pt-1.5 pb-1 text-caps text-ink-3 uppercase">Company</p>
+                {companies.map((c) =>
+                  c.current ? (
+                    <div key={c.slug} className="flex items-center gap-2 rounded-lg bg-hema-tint px-2.5 py-2 text-sm text-ink" aria-current="true">
+                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      <Check className="size-4 shrink-0 text-sage-deep" aria-hidden />
+                    </div>
+                  ) : (
+                    <form key={c.slug} action={switchCompany}>
+                      <input suppressHydrationWarning type="hidden" name="company" value={c.slug} />
+                      <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-sm text-ink hover:bg-sheet">
+                        <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      </button>
+                    </form>
+                  ),
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

@@ -10,9 +10,14 @@ import { notFound } from "next/navigation";
 import { Icon } from "@/src/modules/inventory/platform/ui/icons";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
-import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
+import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { deleteOrder, orderStep } from "@/src/modules/inventory/actions/inventory";
 import { OrderForm } from "@/src/modules/inventory/components/document-forms";
+import { ReceivedProof, SignForDelivery } from "@/src/modules/inventory/components/sign-for-delivery";
+import { ShippingCard } from "@/src/modules/inventory/components/shipping";
+import { PickCheck } from "@/src/modules/inventory/components/scan";
+import { PackingCard } from "@/src/modules/inventory/components/packing";
+import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
 import { PickForm, type PickLine } from "@/src/modules/inventory/components/pick-form";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
@@ -28,7 +33,7 @@ import { loadSetup } from "@/src/modules/inventory/lib/setup";
 import { Pager } from "@/src/modules/inventory/platform/ui/pager";
 import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "@/src/modules/inventory/lib/page";
 import { batchChoices, given, referenceOf } from "@/src/modules/inventory/lib/reference";
-import type { BatchRow, Order, OrderBrief, Paged, Reference, Reservation } from "@/src/modules/inventory/lib/types";
+import type { BatchRow, Courier, Order, Packing, ProductDocument, OrderBrief, Paged, Reference, Reservation } from "@/src/modules/inventory/lib/types";
 
 type OrderFigures = { openCount: number; issuedThisMonth: number; issuedLastMonth: number };
 
@@ -231,6 +236,12 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
     ? o.lines.map((l) => ({ id: l.id, product: l.product, quantity: l.quantity, batches: l.product.trackBatches ? batchChoices(batches, l.product.id, day) : [] }))
     : [];
   const short = o.lines.filter((l) => l.available !== null && l.available < l.quantity);
+  // Shipping (step 12): a customer's delivery, unless cancelled.
+  const ships = o.kind === "sale" && o.shipping && o.status !== "cancelled";
+  const couriers = ships ? await load<Courier[]>("/inventory/couriers") : [];
+  const packing = ["confirmed", "picking", "issued"].includes(o.status) ? await load<Packing>(`/inventory/orders/${o.id}/packages`) : null;
+  // Its items' documents that go with every sale (step 15e).
+  const docs = await load<(ProductDocument & { product: { name: string } })[]>(`/inventory/orders/${o.id}/documents`);
 
   return (
     <>
@@ -266,8 +277,44 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
           { label: "Issued", who: o.issuedBy, when: o.issuedAt ? at(o.issuedAt) : null },
         ]} />
         {o.notes && <p className="mt-3 text-sm whitespace-pre-line text-ink-2">{o.notes}</p>}
+        {ships && o.shipping && (
+          <div className="mt-4 border-t border-rule pt-3">
+            <ShippingCard orderId={o.id} issued={o.status === "issued"} shipping={o.shipping} couriers={couriers}
+              may={{ edit: may("orders.edit"), issue: may("orders.issue") }} signedFor={Boolean(o.received)} />
+          </div>
+        )}
+        {docs.length > 0 && (
+          <div className="mt-4 border-t border-rule pt-3">
+            <SaleDocuments documents={docs} send={{ kind: "orders", id: o.id }} />
+          </div>
+        )}
+        {/* Proof of delivery (step 10): the customer signs on the device; it goes on the delivery note. */}
+        {o.status === "issued" && (
+          <div className="mt-4 border-t border-rule pt-3">
+            {o.received ? (
+              <ReceivedProof name={o.received.name} at={at(o.received.signedAt)} image={o.received.signature} />
+            ) : may("orders.issue") ? (
+              <SignForDelivery orderId={o.id} recipient={o.recipient} />
+            ) : (
+              <p className="text-meta text-ink-3">Not signed for yet.</p>
+            )}
+          </div>
+        )}
       </Sheet>
 
+      {/* Pick → pack → ship (step 14d): its boxes, once its stock is held. */}
+      {packing && (
+        <Sheet className="mt-5 px-5 py-4">
+          <PackingCard orderId={o.id} packing={packing} canPack={may("orders.issue") && o.shipping?.status !== "delivered"} />
+          {o.waveId && <p className="mt-2 text-meta text-ink-3">Picked in <Link href={`/inventory/waves/${o.waveId}`} className="text-hema hover:underline">a wave</Link> with other deliveries.</p>}
+        </Sheet>
+      )}
+      {/* Check picking by scanning (step 14c): while the stock is held, before it's issued. */}
+      {held && may("orders.issue") && (
+        <Sheet className="mt-5 px-5 py-4">
+          <PickCheck lines={o.lines.map((l) => ({ id: l.id, productId: l.product.id, name: l.product.name, sku: l.product.sku, quantity: l.quantity }))} />
+        </Sheet>
+      )}
       <Sheet className="mt-5">
         <Table head={["Product", " Quantity", ...(o.status === "draft" ? [" Available now"] : []), ...(o.status === "issued" ? ["Picked from"] : []), " Unit price", " Amount"]}>
           {o.lines.map((l) => (

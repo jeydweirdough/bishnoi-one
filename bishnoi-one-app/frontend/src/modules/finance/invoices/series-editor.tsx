@@ -5,7 +5,37 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { Field, FormError, FormGrid, Input } from "@/src/modules/finance/platform/ui/field";
-import { addSeries, switchSeries } from "@/src/modules/finance/invoices/actions";
+import { addSeries, setAutoInvoice, switchSeries } from "@/src/modules/finance/invoices/actions";
+import { Choice } from "@/src/platform/ui/field";
+
+/** Invoices from deliveries (step 13): issued at once from the series, or made as drafts for Finance to check and issue. */
+export function AutoInvoiceSetting({ value, canChange }: { value: "issue" | "draft"; canChange: boolean }) {
+  const [current, setCurrent] = useState(value);
+  const [pending, start] = useTransition();
+  function change(next: "issue" | "draft") {
+    if (!canChange || next === current) return;
+    start(async () => {
+      const r = await setAutoInvoice(next);
+      if (!r.ok) return void toast.error(r.error);
+      setCurrent(next);
+      toast.success(next === "issue" ? "Deliveries' invoices are issued at once" : "Deliveries' invoices wait for Finance to issue");
+    });
+  }
+  return (
+    <div aria-busy={pending}>
+      <Choice
+        name="autoInvoice"
+        legend="When a customer's delivery leaves the warehouse"
+        value={current}
+        onChange={change}
+        options={[{ value: "issue", label: "Issue its invoice at once" }, { value: "draft", label: "Make a draft for Finance" }]}
+      />
+      <p className="mt-1.5 text-meta text-ink-3">
+        Either way the invoice has the sale&apos;s lines, prices and VAT, and a shipping fee charged to the customer. One that can&apos;t be issued by itself waits under From deliveries to check.
+      </p>
+    </div>
+  );
+}
 
 /** A new run of numbers, as the BIR's Authority to Print states it. */
 export function AddSeries({ today }: { today: string }) {

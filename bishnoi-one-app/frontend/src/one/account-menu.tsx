@@ -1,11 +1,11 @@
 "use client";
 
-import { Check, ChevronDown, Eye, LogOut } from "lucide-react";
+import { ChevronDown, Eye, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
-import { signOut, switchCompany } from "./actions";
+import { signOut } from "./actions";
 import { VIEW_AS_EVENT } from "./view-as";
 
 type Company = { slug: string; name: string; current: boolean };
@@ -14,8 +14,8 @@ type Company = { slug: string; name: string; current: boolean };
 export type AccountLink = { href: string; label: string };
 
 /**
- * Who is signed in, the company they're working in (and the others they can
- * move to), their own pages in the module they're in, and sign out. `compact`:
+ * Who is signed in, the company they're working in, their own pages in the module they're in, and
+ * sign out. (An operator switches company in the sidebar, src/platform/shell/sidebar.tsx.) `compact`:
  * just the picture, at the top right of a module's pages (as before the one app).
  */
 export function AccountMenu({ id, name, email, companies, links = [], compact = false, viewAs = false }: { id: string; name: string; email: string; companies: Company[]; links?: AccountLink[]; compact?: boolean; /** Offer View as (src/one/view-as.tsx) under their own pages. */ viewAs?: boolean }) {
@@ -92,27 +92,7 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
               View as
             </button>
           )}
-          {companies.length > 1 && (
-            <>
-              <div className="my-1.5 border-t border-rule" />
-              <p className="px-2.5 pt-1 pb-1.5 text-meta font-semibold text-ink-3">Company</p>
-              {companies.map((c) =>
-                c.current ? (
-                  <div key={c.slug} className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm text-ink">
-                    {c.name}
-                    <Check className="ml-auto size-4 text-ink-3" aria-hidden />
-                  </div>
-                ) : (
-                  <form key={c.slug} action={switchCompany}>
-                    <input suppressHydrationWarning type="hidden" name="company" value={c.slug} />
-                    <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">
-                      {c.name}
-                    </button>
-                  </form>
-                ),
-              )}
-            </>
-          )}
+          {/* Switching company is in the sidebar, for operators only (decided 2026-10-29): everyone else has one company. */}
           <div className="my-1.5 border-t border-rule" />
           <form action={signOut}>
             <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-ink hover:bg-bench">

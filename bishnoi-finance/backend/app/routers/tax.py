@@ -8,7 +8,7 @@ quote, a pharmacy sale and an invoice are taxed by one set of rules.
 
 import re
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Literal, Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, status
@@ -108,6 +108,7 @@ def profile_out(p: TaxProfile, db: DB) -> dict:
         "branchCode": p.branch_code,
         "registeredAddress": p.registered_address,
         "pricesIncludeTax": p.prices_include_tax,
+        "rounding": p.rounding or "line",
         "rdoCode": p.rdo_code,
         "fiscalMonthEnd": p.fiscal_month_end,
         "complete": profile_complete(p),
@@ -129,6 +130,7 @@ PROFILE_PARTS = {
     "branch_code": "branch code",
     "registered_address": "registered address",
     "prices_include_tax": "catalogue prices",
+    "rounding": "VAT rounding",
     "rdo_code": "RDO code",
     "fiscal_month_end": "fiscal year end",
 }
@@ -216,6 +218,8 @@ class ProfileIn(Api):
     # The Revenue District Office ("050") and the month the fiscal year ends (12: calendar year).
     rdo_code: str | None = Field(None, max_length=3)
     fiscal_month_end: int | None = Field(None, ge=1, le=12)
+    # VAT rounded on each line, or once per invoice (step 16b); left off, it stays as it was.
+    rounding: Literal["line", "invoice"] | None = None
 
     @field_validator("rdo_code")
     @classmethod
@@ -261,6 +265,8 @@ def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep
         new["rdo_code"] = body.rdo_code or None
     if body.fiscal_month_end is not None:
         new["fiscal_month_end"] = body.fiscal_month_end
+    if body.rounding is not None:
+        new["rounding"] = body.rounding
     # Only what actually changed goes in the log and the history (it used to log every
     # part on the form: 2026-10-22). Saving it unchanged changes nothing.
     changed = [part for part, value in new.items() if getattr(profile, part) != value]
@@ -350,6 +356,7 @@ def work_out(db, settings: Settings, body: SaleBody) -> dict:
     sale = SaleIn(
         profile.regime, body.treatment, inclusive, on,
         [LineIn(l.quantity, l.unit_price_centavos, l.category, l.discount_centavos, l.relief_eligible, l.ref, l.description) for l in body.lines],
+        rounding=profile.rounding or "line",
     )
     try:
         result = compute(pack, rate_book.lookup(db, pack.country), sale)

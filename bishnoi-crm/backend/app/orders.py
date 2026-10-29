@@ -24,7 +24,7 @@ The payload (amounts in centavos, dates as YYYY-MM-DD):
       "raisedBy": {"id", "name", "email"},
       "payer": {"kind": "customer"} | {"kind": "guarantee_letter", "issuer", "letterNumber", "amountCentavos"},
       "lines": [{"productId", "inventoryId", "code", "name", "unit", "quantity", "freeQuantity",
-                 "unitPriceCentavos", "discountCentavos", "totalCentavos", "bundle"}],
+                 "unitPriceCentavos", "discountCentavos", "totalCentavos", "bundle", "vatCategory"}],
       "totals": {"grossCentavos", "promoDiscountCentavos", "discountCentavos", "totalCentavos"},
       "tax": {...Finance's tax summary...} | null,
       "currency": "PHP"
@@ -67,6 +67,13 @@ def person(user: User | None) -> dict | None:
     return {"id": user.id, "name": user.full_name, "email": user.email} if user else None
 
 
+def division_of(db: Session, team: Team | None) -> dict | None:
+    if team is None:
+        return None
+    top = db.get(Team, team.parent_id) if team.parent_id else team
+    return {"id": top.id, "name": top.name} if top else None
+
+
 def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
     """What Bishnoi One Order receives for a quote. See the module's docstring."""
     contact = db.get(Contact, quote.contact_id) if quote.contact_id else None
@@ -90,6 +97,8 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
             "discountCentavos": (line.get("promoDiscountCentavos") or 0) + (line.get("discountCentavos") or 0),
             "totalCentavos": line.get("totalCentavos", 0),
             "bundle": line.get("bundleName"),
+            # Its VAT category, for the invoice made from its delivery (step 13).
+            "vatCategory": product.vat_category if product else "standard",
         })
     return {
         "source": "bishnoi-crm",
@@ -112,6 +121,8 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
             "phone": text(customer, "phone", "mobile"),
         },
         "team": {"id": team.id, "name": team.name} if team else None,
+        # The division the team sits under (the org chart: step 4), for revenue by division.
+        "division": division_of(db, team),
         "salesperson": person(owner),
         "raisedBy": person(me),
         "payer": (

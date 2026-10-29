@@ -15,6 +15,7 @@ Permissions: invoices.view to read, .create for drafts, .issue, .void, and
 """
 
 import re
+from typing import Literal
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -119,6 +120,26 @@ def change_series(user: permitted("invoices.setup"), db: DB, series_id: str, bod
 
 
 # --- customers, from the CRM -----------------------------------------------------------------
+
+
+class AutomaticIn(Api):
+    auto_invoice: Literal["issue", "draft"]
+
+
+@router.get("/automatic")
+def automatic(_: permitted("invoices.view"), db: DB) -> dict:
+    """What happens when a customer's delivery leaves the warehouse (step 13): its invoice is issued at once, or made as a draft."""
+    return {"autoInvoice": posting_settings(db).auto_invoice}
+
+
+@router.put("/automatic")
+def set_automatic(user: permitted("invoices.setup"), db: DB, body: AutomaticIn) -> dict:
+    ledger = posting_settings(db)
+    if ledger.auto_invoice != body.auto_invoice:
+        ledger.auto_invoice = body.auto_invoice
+        audit(db, user, "invoice.automatic_set", target=body.auto_invoice, target_type="settings", fields=["autoInvoice"])
+        db.commit()
+    return {"autoInvoice": ledger.auto_invoice}
 
 
 @router.get("/customers")
@@ -248,6 +269,10 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linke
         "createdBy": inv.created_by, "createdAt": iso(inv.created_at),
         "issuedBy": inv.issued_by, "issuedAt": iso(inv.issued_at),
         "voidedBy": inv.voided_by, "voidedAt": iso(inv.voided_at), "voidReason": inv.void_reason,
+        # Made from a delivery (step 13): which, its sales order, and why it's still a draft when it couldn't be issued by itself.
+        "delivery": {"id": inv.delivery_id, "number": inv.delivery_number} if inv.delivery_id else None,
+        "salesOrder": {"id": inv.sales_order_id, "number": inv.sales_order_number} if inv.sales_order_id else None,
+        "attention": inv.attention,
         "series": {"id": inv.series.id, "name": inv.series.name, "atpNumber": inv.series.atp_number, "atpDate": inv.series.atp_date.isoformat(),
                    "range": f"{formatted(inv.series, inv.series.first_number)} to {formatted(inv.series, inv.series.last_number)}"} if inv.series else None,
     }
@@ -300,9 +325,12 @@ def list_invoices(
     status_: str | None = Query(None, alias="status", max_length=10),
     q: str | None = Query(None, max_length=100),
     customer: str | None = Query(None, max_length=36),
+    attention: bool = Query(False, description="only the drafts made from deliveries that couldn't be issued by themselves"),
     limit: int = Query(200, ge=1, le=500),
 ) -> dict:
     query = select(Invoice).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc()).limit(limit)
+    if attention:
+        query = query.where(Invoice.status == "draft", Invoice.attention.is_not(None))
     if status_ in ("draft", "issued", "void"):
         query = query.where(Invoice.status == status_)
     if customer:
@@ -315,7 +343,8 @@ def list_invoices(
     linked = links(db, rows)
     return {
         "items": [invoice_out(db, i, settings, full=False, linked=linked[i.id]) for i in rows],
-        "counts": {k: counts.get(k, 0) for k in ("draft", "issued", "void")},
+        "counts": {**{k: counts.get(k, 0) for k in ("draft", "issued", "void")},
+                   "attention": db.scalar(select(func.count()).select_from(Invoice).where(Invoice.status == "draft", Invoice.attention.is_not(None)))},
         "figures": month_figures(db, settings),
         # How a payment can be made, for Record payment on an opened row.
         "methods": [{"key": k, "label": v} for k, v in METHODS.items()],
@@ -387,6 +416,15 @@ class IssueIn(Api):
 def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invoice_id: str, body: IssueIn) -> dict:
     inv = found(db, invoice_id)
     must_be_draft(inv)
+    issue_now(db, settings, inv, user, user.full_name, body.series_id)
+    db.commit()
+    return invoice_out(db, inv, settings)
+
+
+def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, series_id: str | None = None) -> None:
+    """Numbers it from the series, works out its tax, posts it and tells the other apps; the caller commits.
+    Refused (409) when it can't be: no numbers left, the tax registration incomplete. Also used for the
+    invoices made from deliveries (app/delivery_invoices.py, step 13), with "Bishnoi One" as the actor."""
     # The customer's TIN, when the CRM has it and the draft doesn't.
     if inv.customer_id and not inv.customer_tin and settings.crm_linked:
         try:
@@ -398,7 +436,7 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
         raise HTTPException(status.HTTP_409_CONFLICT, " ".join(computed["warnings"]) + " Go to Tax, Registration, then issue it.")
     # The series, locked while its number is taken, so two invoices issued at once never share one.
     options = usable_series(db)
-    s = next((x for x in options if x.id == body.series_id), None) if body.series_id else (options[0] if options else None)
+    s = next((x for x in options if x.id == series_id), None) if series_id else (options[0] if options else None)
     if s is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "There are no invoice numbers left to issue from. Add the series from the BIR's Authority to Print under Invoices, Invoice numbers.")
     s = db.scalar(select(InvoiceSeries).where(InvoiceSeries.id == s.id).with_for_update())
@@ -409,7 +447,8 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
     inv.series, inv.status = s, "issued"
     inv.computed = computed
     inv.total_centavos, inv.tax_centavos = computed["totalDueCentavos"], tax_of(computed)
-    inv.issued_at, inv.issued_by = datetime.now(UTC), user.full_name
+    inv.issued_at, inv.issued_by = datetime.now(UTC), actor_name
+    inv.attention = None
     ledger = posting_settings(db)
     old = db.get(Invoice, inv.replaces_id) if inv.replaces_id else None
     replacing = f", replacing {old.number}" if old else ""
@@ -426,13 +465,12 @@ def issue(user: permitted("invoices.issue"), db: DB, settings: SettingsDep, invo
             Leg(account(db, ledger.cogs_account_id), debit=inv.cost_centavos, description="Cost of goods sold"),
             Leg(account(db, ledger.inventory_account_id), credit=inv.cost_centavos, description="Cost of goods sold"),
         ]
-    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}{replacing}", legs, user.full_name, reference=inv.number, source="invoice")
+    entry = post(db, inv.invoice_date, f"{inv.number}: sale to {inv.customer_name}{replacing}", legs, actor_name, reference=inv.number, source="invoice")
     inv.entry_id = entry.id
-    audit(db, user, "invoice.issued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
-    # Told to the other apps (step 7): the CRM scores sales from it.
-    business_events.emit(db, None, "invoice.issued", {"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos})
-    db.commit()
-    return invoice_out(db, inv, settings)
+    audit(db, actor, "invoice.issued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
+    # Told to the other apps (step 7): the CRM scores sales from it; the Sales app marks its order invoiced (step 13).
+    business_events.emit(db, None, "invoice.issued", {"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos,
+                                                        "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id})
 
 
 class VoidIn(Api):
@@ -567,6 +605,11 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
     business_events.emit(db, None, "payment.recorded", {
         "invoiceId": inv.id, "number": inv.number, "customerId": inv.customer_id, "paidOn": body.paid_on.isoformat(),
         "amountCentavos": settled, "paidCentavos": inv.paid_centavos, "totalCentavos": inv.total_centavos})
+    # Paid in full (step 13): the sales order's chain is closed, and the CRM hears it.
+    if inv.paid_centavos >= inv.total_centavos:
+        business_events.emit(db, None, "invoice.paid", {
+            "id": inv.id, "number": inv.number, "customerId": inv.customer_id, "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id,
+            "paidAt": datetime.now(UTC).isoformat(), "totalCentavos": inv.total_centavos})
     db.commit()
     return invoice_out(db, inv, settings)
 

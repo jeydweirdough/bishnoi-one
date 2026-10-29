@@ -72,6 +72,10 @@ export type InvoiceSummary = {
   replaces: { id: string; number: string | null; voidedAt: string | null; reason: string | null } | null;
   /** The invoice that replaces this cancelled one (a draft has no number yet). */
   replacedBy: { id: string; number: string | null; status: InvoiceStatus } | null;
+  /** Made from a customer's delivery (step 13): the delivery, its sales order, and why it still waits as a draft. */
+  delivery?: { id: string; number: string | null } | null;
+  salesOrder?: { id: string; number: string | null } | null;
+  attention?: string | null;
 };
 
 export type Payment = {

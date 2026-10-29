@@ -91,6 +91,9 @@ class SaleIn:
     prices_include_tax: bool
     on: date
     lines: list[LineIn]
+    # "line": VAT worked out and rounded on each line (as always); "invoice": once per rate on the invoice's
+    # total, the rounding difference put on its biggest line (step 16b).
+    rounding: str = "line"
 
 
 @dataclass
@@ -141,6 +144,34 @@ def _rate(rates: RateLookup, pack: Pack, code: str, on: date) -> int:
     return bp
 
 
+def _round_per_invoice(out: SaleOut, inclusive: bool) -> None:
+    """Each rate's VAT worked out once on its lines together; the difference from the lines' own rounding goes on
+    the biggest line, so the lines still add up to the invoice."""
+    by_rate: dict[int, list[LineOut]] = {}
+    for line in out.lines:
+        if line.bucket == "taxable" and line.rate_bp and not line.relief:
+            by_rate.setdefault(line.rate_bp, []).append(line)
+    for bp, lines in by_rate.items():
+        if inclusive:
+            prices = sum(x.price for x in lines)
+            target = prices - div_half_up(prices * FULL, FULL + bp)
+        else:
+            target = div_half_up(sum(x.taxable for x in lines) * bp, FULL)
+        diff = target - sum(x.tax for x in lines)
+        if not diff:
+            continue
+        big = max(lines, key=lambda x: x.taxable)
+        big.tax += diff
+        out.tax += diff
+        if inclusive:  # the price stays: the difference moves between its base and its tax
+            big.base -= diff
+            big.taxable -= diff
+            out.taxable_sales -= diff
+        else:
+            big.total += diff
+            out.total_due += diff
+
+
 def compute(pack: Pack, rates: RateLookup, sale: SaleIn) -> SaleOut:
     out = SaleOut(lines=[])
     for n, line in enumerate(sale.lines):
@@ -179,6 +210,9 @@ def compute(pack: Pack, rates: RateLookup, sale: SaleIn) -> SaleOut:
         else:
             out.non_taxable_sales += taxable
         out.total_due += taxable + tax
+
+    if sale.rounding == "invoice":
+        _round_per_invoice(out, sale.prices_include_tax)
 
     seller_code = pack.seller_tax(sale.regime)
     if seller_code:

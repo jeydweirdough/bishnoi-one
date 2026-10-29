@@ -17,27 +17,27 @@ from sqlalchemy.orm import Session
 from app.models import Order, OrderLine, Product, Stock, Transfer, TransferLine
 from app.stock import held, in_transit
 
-ZERO = {"onHand": 0, "damaged": 0, "reserved": 0, "allocated": 0, "available": 0, "inTransit": 0}
+ZERO = {"onHand": 0, "damaged": 0, "onHold": 0, "reserved": 0, "allocated": 0, "available": 0, "inTransit": 0}
 
 
 def by_warehouse(db: Session, product_ids: list[str] | None = None, warehouse_id: str | None = None) -> dict[tuple[str, str], dict[str, int]]:
     """Every quantity, per (product, warehouse) that has any."""
-    q = select(Stock.product_id, Stock.warehouse_id, func.sum(Stock.on_hand), func.sum(Stock.damaged)).group_by(Stock.product_id, Stock.warehouse_id)
+    q = select(Stock.product_id, Stock.warehouse_id, func.sum(Stock.on_hand), func.sum(Stock.damaged), func.sum(Stock.on_hold)).group_by(Stock.product_id, Stock.warehouse_id)
     if product_ids is not None:
         q = q.where(Stock.product_id.in_(product_ids))
     if warehouse_id:
         q = q.where(Stock.warehouse_id == warehouse_id)
     out: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: dict(ZERO))
-    for product_id, wh, on_hand, damaged in db.execute(q):
+    for product_id, wh, on_hand, damaged, on_hold in db.execute(q):
         row = out[(product_id, wh)]
-        row["onHand"], row["damaged"] = int(on_hand or 0), int(damaged or 0)
+        row["onHand"], row["damaged"], row["onHold"] = int(on_hand or 0), int(damaged or 0), int(on_hold or 0)
     for key, hold in held(db, product_ids=product_ids, warehouse_id=warehouse_id).items():
         out[key]["reserved"], out[key]["allocated"] = hold["reserved"], hold["allocated"]
     for key, qty in in_transit(db, product_ids=product_ids).items():
         if warehouse_id is None or key[1] == warehouse_id:
             out[key]["inTransit"] = qty
     for row in out.values():
-        row["available"] = row["onHand"] - row["damaged"] - row["reserved"] - row["allocated"]
+        row["available"] = row["onHand"] - row["damaged"] - row["onHold"] - row["reserved"] - row["allocated"]
     return out
 
 
@@ -92,6 +92,7 @@ def _parts(warehouse_id: str | None = None):
         Stock.warehouse_id.label("warehouse_id"),
         Stock.on_hand.label("on_hand"),
         Stock.damaged.label("damaged"),
+        Stock.on_hold.label("on_hold"),
         _zero().label("reserved"),
         _zero().label("allocated"),
         _zero().label("in_transit"),
@@ -100,6 +101,7 @@ def _parts(warehouse_id: str | None = None):
         select(
             OrderLine.product_id,
             Order.warehouse_id,
+            _zero(),
             _zero(),
             _zero(),
             case((Order.status == "confirmed", OrderLine.quantity), else_=0),
@@ -111,7 +113,7 @@ def _parts(warehouse_id: str | None = None):
         .where(Order.status.in_(("confirmed", "picking")))
     )
     coming = (
-        select(TransferLine.product_id, Transfer.to_warehouse_id, _zero(), _zero(), _zero(), _zero(), TransferLine.quantity)
+        select(TransferLine.product_id, Transfer.to_warehouse_id, _zero(), _zero(), _zero(), _zero(), _zero(), TransferLine.quantity)
         .select_from(TransferLine)
         .join(Transfer, TransferLine.transfer_id == Transfer.id)
         .where(Transfer.status == "in_transit")
@@ -124,16 +126,17 @@ def _parts(warehouse_id: str | None = None):
 
 
 def _summed(parts, *keys):
-    on_hand, damaged = func.sum(parts.c.on_hand), func.sum(parts.c.damaged)
+    on_hand, damaged, on_hold = func.sum(parts.c.on_hand), func.sum(parts.c.damaged), func.sum(parts.c.on_hold)
     reserved, allocated = func.sum(parts.c.reserved), func.sum(parts.c.allocated)
     return (
         select(
             *keys,
             on_hand.label("on_hand"),
             damaged.label("damaged"),
+            on_hold.label("on_hold"),
             reserved.label("reserved"),
             allocated.label("allocated"),
-            (on_hand - damaged - reserved - allocated).label("available"),
+            (on_hand - damaged - on_hold - reserved - allocated).label("available"),
             func.sum(parts.c.in_transit).label("in_transit"),
         )
         .group_by(*keys)
@@ -162,3 +165,18 @@ def state_sql(available, on_hand):
         (Product.max_stock.is_not(None) & (on_hand > Product.max_stock), "over"),
         else_="ok",
     )
+
+
+def consigned_sql():
+    """Vendors' consignment stock per (product, warehouse), as a subquery (step 15d): theirs, not ours, so left out of value."""
+    from app.models import Location
+
+    return (select(Stock.product_id.label("product_id"), Stock.warehouse_id.label("warehouse_id"), func.sum(Stock.on_hand).label("consigned"))
+            .join(Location, Stock.location_id == Location.id).where(Location.consignment_supplier_id.is_not(None))
+            .group_by(Stock.product_id, Stock.warehouse_id).subquery())
+
+
+def consigned(db: Session, product_ids: list[str]) -> dict[str, int]:
+    """Vendors' consignment stock per product, over every warehouse."""
+    sub = consigned_sql()
+    return {pid: int(n or 0) for pid, n in db.execute(select(sub.c.product_id, func.sum(sub.c.consigned)).where(sub.c.product_id.in_(product_ids)).group_by(sub.c.product_id))}

@@ -292,6 +292,7 @@ def count_brief(c: Count) -> dict:
         "createdBy": person(c.created_by),
         "approvedBy": person(c.approved_by),
         "approvedAt": iso(c.approved_at),
+        "scheduleId": c.schedule_id,
     }
 
 
@@ -342,19 +343,27 @@ def start_count(_: allowed("counts.create"), me: CurrentUser, db: DB, body: Coun
     warehouse = db.get(Warehouse, body.warehouse_id)
     if warehouse is None or not warehouse.is_active:
         raise field_error("warehouseId", "Pick a warehouse that's switched on.")
+    c = begin_count(db, me, warehouse, body.category_id, body.notes, body)
+    db.commit()
+    return {"id": c.id, "number": c.number}
+
+
+def begin_count(db: DB, me, warehouse: Warehouse, category_id: str | None, notes: str | None, header, schedule=None) -> Count:
+    """A count of every balance in the warehouse (or one category), written down as what's expected; the caller commits."""
+    body = header
     query = select(Stock).join(Product).join(Location, Stock.location_id == Location.id).where(Stock.warehouse_id == warehouse.id, Stock.on_hand > 0).order_by(Location.code, Product.name)
-    if body.category_id:
-        if db.get(Category, body.category_id) is None:
+    if category_id:
+        if db.get(Category, category_id) is None:
             raise field_error("categoryId", "Pick a category that exists.")
-        query = query.where(Product.category_id.in_(in_category(db, body.category_id)))
-    c = Count(number=next_number(db, "CNT"), warehouse_id=warehouse.id, category_id=body.category_id, notes=body.notes, created_by_id=me.id)
+        query = query.where(Product.category_id.in_(in_category(db, category_id)))
+    c = Count(number=next_number(db, "CNT"), warehouse_id=warehouse.id, category_id=category_id, notes=notes, created_by_id=me.id,
+              schedule_id=schedule.id if schedule else None, scheduled_on=schedule.next_on if schedule else None)
     c.lines = [CountLine(position=i, product_id=s.product_id, location_id=s.location_id, batch_id=s.batch_id, expected=s.on_hand) for i, s in enumerate(db.scalars(query))]
     documents.apply(db, c, ("count",), body, me, warehouse.id, new=True)
     db.add(c)
     db.flush()
-    audit(db, me, "count.started", target=c.number, target_type="count", target_id=c.id)
-    db.commit()
-    return {"id": c.id, "number": c.number}
+    audit(db, me, "count.started", target=c.number, target_type="count", target_id=c.id, fields=[f"from schedule {schedule.name}"] if schedule else [])
+    return c
 
 
 @router.get("/counts/{count_id}")
@@ -462,6 +471,11 @@ def approve_count(_: allowed("counts.approve"), me: CurrentUser, db: DB, count_i
         business_events.link(db, getattr(request.state, "company", None), business_events.ref("count", c.id, c.number), business_events.ref("adjustment", a.id, a.number))
     c.status, c.approved_by_id, c.approved_at = "approved", me.id, datetime.now(UTC)
     documents.done(c, c.approved_at)
+    # Its schedule comes round again (step 14b).
+    if c.schedule_id:
+        from app.count_schedules import counted
+
+        counted(db, c)
     audit(db, me, "count.approved", target=c.number, target_type="count", target_id=c.id)
     db.commit()
     return {"id": c.id, "status": c.status, "adjustmentId": adjustment_id}

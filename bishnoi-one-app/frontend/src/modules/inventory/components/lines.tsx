@@ -11,8 +11,9 @@ import type { Format } from "@/src/modules/inventory/platform/lib/format";
 import type { Org } from "@/src/modules/inventory/platform/lib/types";
 import { QuickAdd, type Added } from "@/src/modules/inventory/components/quick-add";
 
-export type PickableProduct = { id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string };
-export type Line = { productId: string; quantity: string; money: string };
+export type PickableProduct = { id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string; packagings?: { name: string; quantity: number }[] };
+/** `per`: how many base units one of what's typed is (a pack, step 14e); 1 or none: the base unit. Quantities go out in the base unit. */
+export type Line = { productId: string; quantity: string; money: string; per?: number };
 
 type Failure = { ok: false; error: string; fields?: Record<string, string> };
 type Outcome<T> = { ok: true; data: T } | Failure;
@@ -137,7 +138,7 @@ export function LinesEditor({
   }
 
   function set(i: number, change: Partial<Line>) {
-    const next = lines.map((line, j) => (j === i ? { ...line, ...change } : line));
+    const next = lines.map((line, j) => (j === i ? { ...line, ...change, ...(change.productId !== undefined && change.productId !== line.productId ? { per: 1 } : {}) } : line));
     // Picking a product fills in its usual amount, when none has been typed.
     if (change.productId && money) {
       const p = byId.get(change.productId);
@@ -151,12 +152,13 @@ export function LinesEditor({
   const key = limits.join(",");
   useEffect(() => {
     if (!limit) return;
-    const over = lines.some((l, i) => limits[i] !== undefined && Number(l.quantity) > limits[i]!);
-    if (over) onChange(lines.map((l, i) => (limits[i] !== undefined && Number(l.quantity) > limits[i]! ? { ...l, quantity: String(Math.max(0, limits[i]!)) } : l)));
+    const most = (l: Line, i: number) => (limits[i] === undefined ? undefined : Math.floor(limits[i]! / (l.per || 1)));
+    const over = lines.some((l, i) => most(l, i) !== undefined && Number(l.quantity) > most(l, i)!);
+    if (over) onChange(lines.map((l, i) => (most(l, i) !== undefined && Number(l.quantity) > most(l, i)! ? { ...l, quantity: String(Math.max(0, most(l, i)!)) } : l)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  const total = money ? lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (fmt.toCentavos(l.money) ?? 0), 0) : 0;
+  const total = money ? lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (l.per || 1) * (fmt.toCentavos(l.money) ?? 0), 0) : 0;
 
   return (
     <div>
@@ -204,6 +206,7 @@ export function LinesEditor({
                     </Select>
                     {(productError || qtyError) && <p className="mt-1 text-meta text-danger">{productError || qtyError}</p>}
                     {said && <p className="mt-1 text-meta text-ink-3">{said}</p>}
+                    {(line.per || 1) > 1 && line.quantity && <p className="mt-1 text-meta text-ink-3">= {((Number(line.quantity) || 0) * (line.per || 1)).toLocaleString()} {p?.unit}</p>}
                   </td>
                   <td className="px-3 py-2.5 align-top">
                     <div className="flex items-center justify-end gap-1.5">
@@ -212,10 +215,23 @@ export function LinesEditor({
                         invalid={Boolean(qtyError)}
                         value={line.quantity}
                         onChange={(quantity) => set(i, { quantity })}
-                        max={limits[i]}
+                        max={limits[i] === undefined ? undefined : Math.floor(limits[i]! / (line.per || 1))}
                         unit={p?.unit}
                       />
-                      <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>
+                      {p?.packagings?.length ? (
+                        <select
+                          suppressHydrationWarning
+                          aria-label={`Line ${i + 1} unit`}
+                          value={String(line.per || 1)}
+                          onChange={(e) => set(i, { per: Number(e.target.value) || 1 })}
+                          className="h-10 rounded-md border border-rule-strong bg-white px-1.5 text-meta text-ink"
+                        >
+                          <option value="1">{p.unit}</option>
+                          {p.packagings.map((k) => <option key={k.name} value={String(k.quantity)}>{k.name} ({k.quantity})</option>)}
+                        </select>
+                      ) : (
+                        <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>
+                      )}
                     </div>
                   </td>
                   {money && (
@@ -226,7 +242,7 @@ export function LinesEditor({
                   {money && (
                     <td className="px-3 py-2.5 text-right align-top tabular-nums">
                       <span className="inline-flex h-10 items-center text-ink">
-                        {line.productId && line.quantity ? fmt.peso((Number(line.quantity) || 0) * (fmt.toCentavos(line.money) ?? 0)) : <span className="text-ink-3">—</span>}
+                        {line.productId && line.quantity ? fmt.peso((Number(line.quantity) || 0) * (line.per || 1) * (fmt.toCentavos(line.money) ?? 0)) : <span className="text-ink-3">—</span>}
                       </span>
                     </td>
                   )}
@@ -271,7 +287,8 @@ export function linesOut(lines: Line[], fmt: Format, moneyKey?: "unitCost" | "un
     .filter((l) => l.productId || l.quantity)
     .map((l) => ({
       productId: l.productId,
-      quantity: Number(l.quantity) || 0,
+      // In packs on screen, in the base unit to the API (step 14e).
+      quantity: (Number(l.quantity) || 0) * (l.per || 1),
       ...(moneyKey ? { [moneyKey]: fmt.toCentavos(l.money) ?? 0 } : {}),
     }));
 }

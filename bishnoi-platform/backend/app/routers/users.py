@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.api import Api, camel, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
-from app import passwords
+from app import email_rules, passwords
+from app.accounts import account_of
 from app.deps import DB, AdminUser, CurrentUser
 from app.models import (
     TICKET_STATUSES,
@@ -179,6 +180,8 @@ def add_user(body: UserIn, db: DB, me: AdminUser) -> dict:
         raise field_error("companyId", "Pick the company they work for.")
     if _email_taken(db, body.email, company.id):
         raise field_error("email", f"Somebody at {company.name} already has that email.")
+    email_rules.check_company_email(company, body.email)
+    email_rules.check_available(db, body.email, company.id)
     allowed = _company_apps(db, company.id)
     for g in body.applications:
         if g.application_id not in allowed:
@@ -250,6 +253,17 @@ def update_user(user_id: str, body: UserPatch, db: DB, me: AdminUser) -> dict:
     fields = {k: v for k, v in fields.items() if getattr(p, k) != v}
     if ("email" in fields or "company_id" in fields) and _email_taken(db, fields.get("email", p.email), fields.get("company_id") or p.company_id, other_than=p.id):
         raise field_error("email", "Somebody at that company already has that email.")
+    if "email" in fields or "company_id" in fields:
+        target = db.get(Company, fields.get("company_id") or p.company_id)
+        if target is not None:
+            email_rules.check_company_email(target, fields.get("email", p.email))
+        account = account_of(db, p)
+        email_rules.check_available(db, fields.get("email", p.email), target.id if target else None, but_account=account.id if account else None)
+    if "email" in fields:
+        email_rules.change_email(db, p, fields.pop("email"))
+        fields_changed_email = True
+    else:
+        fields_changed_email = False
     withdrawn = 0
     if "company_id" in fields:
         if db.get(Company, fields["company_id"]) is None:
@@ -261,9 +275,10 @@ def update_user(user_id: str, body: UserPatch, db: DB, me: AdminUser) -> dict:
         ).rowcount
     for name, value in fields.items():
         setattr(p, name, value)
-    if fields:
+    if fields or fields_changed_email:
         action = {"suspended": "user.suspended", "active": "user.reactivated"}.get(fields.get("status"), "user.updated")
-        audit(db, me, action, target=p.email, target_type="user", target_id=p.id, company_id=p.company_id, fields=camel(fields))
+        audit(db, me, action, target=p.email, target_type="user", target_id=p.id, company_id=p.company_id,
+              fields=camel(fields) + (["email"] if fields_changed_email else []))
     db.commit()
     return {"user": user_out(p, db.get(Company, p.company_id)), "withdrawnApplications": withdrawn}
 

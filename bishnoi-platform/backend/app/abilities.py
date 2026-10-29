@@ -54,19 +54,20 @@ CATALOGUE: tuple[CatalogueApp, ...] = (
         Switch("field_sales.collections", "Collections"),
         Switch("field_sales.samples", "Samples", later=True),
     )),
-    CatalogueApp("sales", "Sales", "Confirmed orders, delivered and invoiced", "inventory", (
+    CatalogueApp("sales", "Sales", "Orders from approved quotes, approved, delivered and invoiced", "inventory", (
         Switch("sales.backorders", "Backorders", later=True),
         Switch("sales.returns", "Returns", later=True),
-        Switch("sales.order_on_demand", "Order-on-demand", later=True),
-        Switch("sales.dropship", "Dropshipping", later=True),
+        Switch("sales.order_on_demand", "Order-on-demand"),  # built in step 15b
+        Switch("sales.dropship", "Dropshipping"),  # built in step 15c
         Switch("sales.credit_check", "Credit check", later=True),
         Switch("sales.rx_check", "Rx check", later=True),
-    ), later=True),
+    )),
     CatalogueApp("purchasing", "Purchasing", "Buying from vendors", "inventory", (
         Switch("purchasing.approvals", "Purchase approvals"),
-        Switch("purchasing.auto_draft", "Automatic draft purchase orders", later=True),
-        Switch("purchasing.price_lists", "Vendor price lists", later=True),
-        Switch("purchasing.consignment", "Consignment", later=True),
+        Switch("purchasing.auto_draft", "Automatic draft purchase orders"),  # built in step 15a
+        Switch("purchasing.price_lists", "Vendor price lists"),  # vendor prices per item, used by replenishment (15a)
+        Switch("purchasing.consignment", "Consignment"),  # built in step 15d
+        Switch("purchasing.product_documents", "Documents sent with products"),  # built in step 15e
     )),
     CatalogueApp("inventory", "Inventory", "Stock and its traceability", "inventory", (
         Switch("inventory.batches", "Batches and expiry"),
@@ -79,19 +80,21 @@ CATALOGUE: tuple[CatalogueApp, ...] = (
     )),
     CatalogueApp("warehouse", "Warehouse", "Moving goods in and out", "inventory", (
         Switch("warehouse.routes", "Multi-step routes", later=True),
-        Switch("warehouse.packages", "Packages", later=True),
-        Switch("warehouse.waves", "Wave picking", later=True),
-        Switch("warehouse.barcodes", "Barcode scanning", later=True),
-        Switch("warehouse.quality", "Quality checks", later=True),
-    ), later=True),
+        Switch("warehouse.packages", "Packages"),  # built in step 14d
+        Switch("warehouse.waves", "Wave picking"),  # built in step 14d
+        Switch("warehouse.barcodes", "Barcode scanning"),  # built in step 14c
+        Switch("warehouse.quality", "Quality checks"),  # built in step 14a
+    )),
+    # Built in step 12 (2026-10-29); booking and tracking through the couriers' own systems come later.
     CatalogueApp("shipping", "Shipping", "Getting orders to customers", "inventory", (
-        Switch("shipping.couriers", "Couriers (LBC, J&T, Lalamove)", later=True),
-        Switch("shipping.tracking", "Tracking numbers", later=True),
-        Switch("shipping.proof", "Proof of delivery", later=True),
-    ), later=True),
+        Switch("shipping.couriers", "Couriers (LBC, J&T, Lalamove)"),
+        Switch("shipping.tracking", "Tracking numbers"),
+        Switch("shipping.proof", "Proof of delivery"),
+        Switch("shipping.courier_api", "Booking and tracking with the couriers' systems", later=True),
+    )),
     CatalogueApp("invoicing", "Invoicing", "Bill customers, collect payments", "finance", (
         Switch("invoicing.payments", "Record payments"),
-        Switch("invoicing.auto", "Automatic invoices", later=True),
+        Switch("invoicing.auto", "Automatic invoices"),  # built in step 13
         Switch("invoicing.channels", "Payment channels (GCash, Maya)", later=True),
         Switch("invoicing.statements", "Customer statements", later=True),
     )),
@@ -163,8 +166,9 @@ ABILITIES: tuple[Ability, ...] = (
     Ability("leads.inbox", "Work the lead inbox", "CRM and Sales", {"crm": ("customers.inbox",)}),
     Ability("quotes.make", "Make quotes and sales orders", "CRM and Sales", {
         "crm": (*_crud("quotes", "view", "create", "edit"), *_crud("orders", "view", "create", "edit")),
-        "inventory": ("orders.view", "orders.create", "stock.view", "products.view"),
+        "inventory": ("orders.view", "stock.view", "products.view", "sales.view", "sales.create", "sales.edit"),
     }),
+    Ability("sales.approve", "Approve sales orders", "CRM and Sales", {"inventory": ("sales.view", "sales.approve")}),
     Ability("discounts.give", "Give discounts, up to a limit", "CRM and Sales", {"crm": ("quotes.view",)}, limit="Largest discount, %"),
     Ability("discounts.approve", "Approve discounts, up to a limit", "CRM and Sales", {"crm": ("quotes.approve",)}, limit="Largest discount, %"),
     Ability("orders.credit", "Approve orders on credit", "CRM and Sales", {"crm": ("orders.approve", "orders.credit")}),
@@ -257,7 +261,7 @@ class JobRole:
 
 
 _REP = ("customers.work", "quotes.make", "discounts.give", "stock.see")
-_LEAD = (*_REP, "leads.inbox", "discounts.approve")
+_LEAD = (*_REP, "leads.inbox", "discounts.approve", "sales.approve")
 _DIVISION = (*_LEAD, "orders.credit", "prices.manage", "margins.see", "targets.set", "records.remove", "reports.management")
 _WAREHOUSE = ("stock.see", "stock.receive", "stock.deliver", "stock.move", "stock.count")
 _FINANCE = ("invoices.make", "payments.record", "bills.enter")
@@ -274,7 +278,7 @@ JOB_ROLES: tuple[JobRole, ...] = (
             (*_FINANCE, "bills.approve", "payments.release", "month.close", "bir.prepare", "margins.see", "reports.management", "reports.export", "activity.see"),
             limits={"bills.approve": 500_000}),
     JobRole("business_manager", "Business manager", "Whole company",
-            ("customers.work", "stock.see", "discounts.approve", "orders.credit", "purchasing.approve", "bills.approve", "margins.see",
+            ("customers.work", "stock.see", "discounts.approve", "sales.approve", "orders.credit", "purchasing.approve", "bills.approve", "margins.see",
              "reports.management", "reports.export", "activity.see"),
             {"crm": "all"}, {"discounts.approve": 100, "purchasing.approve": 100_000_000, "bills.approve": 100_000_000}),
     JobRole("company_admin", "Company administrator", "Whole company", (), admin=True),

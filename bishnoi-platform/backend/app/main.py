@@ -120,6 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(organisation.router)
     app.include_router(company_console.router)
     app.include_router(operators.router)
+    app.include_router(operators.people)
     app.include_router(events_router.router)
     app.include_router(saved_reports.router)
     app.include_router(dashboard.router)

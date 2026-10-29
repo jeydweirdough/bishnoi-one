@@ -47,10 +47,17 @@ class Kind:
 
 KINDS: dict[str, Kind] = {
     "organisation.changed": Kind(PLATFORM, ("crm",), "The company's org chart, or where someone sits, changed"),
-    "invoice.issued": Kind("finance", ("crm",), "An invoice was issued"),
+    "invoice.issued": Kind("finance", ("crm", "inventory"), "An invoice was issued"),
+    # Paid in full (step 13): the sales order's chain is closed.
+    "invoice.paid": Kind("finance", ("crm", "inventory"), "An invoice was paid in full"),
+    # What sold from a vendor's consignment, to pay them (step 15d): a draft vendor bill in Finance.
+    "consignment.billed": Kind("inventory", ("finance",), "A vendor's consignment sales were settled"),
     "invoice.voided": Kind("finance", ("crm",), "An invoice was voided"),
     "payment.recorded": Kind("finance", ("crm",), "A customer's payment was recorded"),
     "delivery.done": Kind("inventory", ("finance",), "Goods left the warehouse for a customer"),
+    # The Sales app (step 11): Raise order in the CRM makes the sales order; the CRM hears what became of it.
+    "quote.ordered": Kind("crm", ("inventory",), "A quote was ordered: its sales order is made"),
+    "sales_order.updated": Kind("inventory", ("crm",), "A sales order was approved, rejected, delivered or cancelled"),
     # Any app (ANY) links its documents into the chain; the platform keeps it (app/document_chain.py).
     "document.linked": Kind("*", (), "Two documents were linked: one came from the other"),
 }

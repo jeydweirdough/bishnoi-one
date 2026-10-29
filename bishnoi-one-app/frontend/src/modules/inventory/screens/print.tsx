@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
+import { LetterheadBlock, LetterheadFooter, loadLetterhead } from "@/src/platform/print/letterhead";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
-import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
+import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { PrintButton } from "@/src/modules/inventory/components/print-button";
 import { NoAccess } from "@/src/modules/inventory/components/ui";
 import { kindOf } from "@/src/modules/inventory/lib/order-kinds";
 import { context, type Params, type Search } from "@/src/modules/inventory/lib/page";
-import type { Order, PO, Receipt, SupplierRow, Transfer, WarehouseRow } from "@/src/modules/inventory/lib/types";
+import type { Order, Packing, PO, Receipt, SupplierRow, Transfer, Wave, WarehouseRow } from "@/src/modules/inventory/lib/types";
 
 // Each document on paper, to keep or send as proof: the purchase order to the
 // supplier, the goods receipt for a delivery, the issue slip for an order and
@@ -36,15 +37,13 @@ function Frame({ back, backLabel, auto, children }: { back: string; backLabel: s
   );
 }
 
-/** The company, the document's name and number, and its dates. */
-function Head({ ctx, title, number, facts, status }: { ctx: Ctx; title: string; number: string; facts: [string, string][]; status?: string }) {
+/** The company (its letterhead, from the Platform: step 10), the document's name and number, and its dates. */
+async function Head({ ctx, title, number, facts, status }: { ctx: Ctx; title: string; number: string; facts: [string, string][]; status?: string }) {
   const org = ctx.me.org;
+  const head = await loadLetterhead();
   return (
     <header className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
-      <div>
-        <p className="text-[16pt] font-bold">{org?.brandName || org?.name}</p>
-        {org?.brandName && org.brandName !== org.name && <p>{org.name}</p>}
-      </div>
+      <LetterheadBlock head={head} fallbackName={org?.brandName || org?.name || ""} />
       <div className="text-right">
         <p className="text-[18pt] font-bold tracking-wide uppercase">{title}</p>
         <p className="font-semibold">No. {number}</p>
@@ -87,24 +86,31 @@ function Notes({ notes }: { notes: string | null }) {
   );
 }
 
-/** Signature lines: the name printed when the step was taken in the app. */
-function Signatures({ items }: { items: [string, string | null | undefined][] }) {
+/** Signature lines: the name printed when the step was taken in the app, and the signature where one was
+ *  given in the app (a customer signing for a delivery: step 10). */
+function Signatures({ items }: { items: [string, string | null | undefined, ({ image: string; at: string } | null)?][] }) {
   return (
     <section className={`mt-12 grid break-inside-avoid gap-8 ${items.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
-      {items.map(([role, name]) => (
+      {items.map(([role, name, signed]) => (
         <div key={role}>
           <p className="text-[9pt] text-neutral-600">{role}</p>
-          <p className="mt-10 border-t border-black pt-1 text-center font-medium">{name || " "}</p>
-          <p className="text-center text-[8.5pt] text-neutral-600">Signature over printed name and date</p>
+          <div className="flex h-10 items-end justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {signed && <img src={signed.image} alt={`${name ?? role}'s signature`} className="max-h-10 max-w-full object-contain" />}
+          </div>
+          <p className="border-t border-black pt-1 text-center font-medium">{name || " "}</p>
+          <p className="text-center text-[8.5pt] text-neutral-600">{signed ? `Signed in the app, ${signed.at}` : "Signature over printed name and date"}</p>
         </div>
       ))}
     </section>
   );
 }
 
-function Foot({ ctx, children }: { ctx: Ctx; children?: ReactNode }) {
+async function Foot({ ctx, children }: { ctx: Ctx; children?: ReactNode }) {
+  const head = await loadLetterhead();
   return (
     <footer className="mt-8 border-t border-neutral-300 pt-2 text-center text-[8.5pt] text-neutral-600">
+      <LetterheadFooter head={head} />
       {children}
       {children ? " " : ""}Printed {ctx.at(new Date().toISOString())} by {ctx.me.user.fullName}.
     </footer>
@@ -289,6 +295,7 @@ export async function OrderPrint({ params, searchParams }: { params: Params<{ id
   if (!may("orders.view")) return <NoAccess what="orders" />;
   const { order: o } = await loadQuery<{ order: Order }>(`query Order($id: String!) { order(id: $id) }`, { id }, ["order"]);
   const { warehouses: [warehouse] } = await partiesOf(null, [o.warehouse.id]);
+  const enclosed = await load<{ name: string; product: { name: string } }[]>(`/inventory/orders/${o.id}/documents`).catch(() => []);
   const info = kindOf(o.kind);
   const priced = Boolean(info?.priced);
   const issued = o.status === "issued";
@@ -298,7 +305,13 @@ export async function OrderPrint({ params, searchParams }: { params: Params<{ id
         ctx={ctx}
         title={issued ? "Issue slip" : "Order"}
         number={o.number}
-        facts={[["Date", issued && o.issuedAt ? at(o.issuedAt) : day(o.createdAt.slice(0, 10))], ...(o.neededOn ? [["Required by", day(o.neededOn)] as [string, string]] : [])]}
+        facts={[
+          ["Date", issued && o.issuedAt ? at(o.issuedAt) : day(o.createdAt.slice(0, 10))],
+          ...(o.neededOn ? [["Required by", day(o.neededOn)] as [string, string]] : []),
+          // Shipping (step 12): how it goes, the courier and its tracking number.
+          ...(o.shipping?.method ? [["Ships by", o.shipping.courier?.name ?? o.shipping.methodLabel ?? ""] as [string, string]] : []),
+          ...(o.shipping?.trackingNumber ? [["Tracking no.", o.shipping.trackingNumber] as [string, string]] : []),
+        ]}
         status={STATUS[o.status]}
       />
       <Parties
@@ -356,7 +369,9 @@ export async function OrderPrint({ params, searchParams }: { params: Params<{ id
         )}
       </section>
       <Notes notes={o.notes} />
-      <Signatures items={[["Prepared by", o.createdBy?.name], ["Approved by", o.confirmedBy?.name], ["Issued by", o.issuedBy?.name], ["Received by", ""]]} />
+      {/* The documents sent with it (step 15e). */}
+      {enclosed.length > 0 && <p className="mt-4 text-[9pt]">Enclosed: {enclosed.map((d) => `${d.name} (${d.product.name})`).join("; ")}</p>}
+      <Signatures items={[["Prepared by", o.createdBy?.name, null], ["Approved by", o.confirmedBy?.name, null], ["Issued by", o.issuedBy?.name, null], ["Received by", o.received?.name ?? "", o.received?.signature ? { image: o.received.signature, at: ctx.at(o.received.signedAt) } : null]]} />
       <Foot ctx={ctx}>{priced ? "This is not an official receipt or sales invoice." : undefined}</Foot>
     </Frame>
   );
@@ -430,6 +445,79 @@ export async function TransferPrint({ params, searchParams }: { params: Params<{
       <Notes notes={t.notes} />
       <Signatures items={[["Requested by", (t.requestedBy ?? t.createdBy)?.name], ["Approved by", t.approvedBy?.name], ["Dispatched by", t.dispatchedBy?.name], ["Received by", t.receivedBy?.name]]} />
       <Foot ctx={ctx} />
+    </Frame>
+  );
+}
+
+// --- packages and waves (step 14d) ----------------------------------------------------------
+
+/** A delivery's box labels, one to a page: box number, which of how many, who it's for, the courier and what's inside. */
+export async function PackageLabels({ params, searchParams }: { params: Params<{ id: string }>; searchParams: Search }) {
+  const [{ id }, s] = await Promise.all([params, searchParams]);
+  const ctx = await context();
+  if (!ctx.may("orders.view")) return <NoAccess what="orders" />;
+  const { order: o } = await loadQuery<{ order: Order }>(`query Order($id: String!) { order(id: $id) }`, { id }, ["order"]);
+  const packing = await load<Packing>(`/inventory/orders/${encodeURIComponent(id)}/packages`);
+  return (
+    <Frame back={`/inventory/orders/${o.id}`} backLabel="Back to delivery" auto={s.auto === "1"}>
+      {packing.packages.length === 0 && <p className="text-sm">Nothing packed yet.</p>}
+      {packing.packages.map((p) => (
+        <section key={p.id} className="break-after-page border-2 border-black p-6 last:break-after-auto">
+          <p className="text-[10pt] uppercase">Deliver to</p>
+          <p className="text-[20pt] leading-tight font-bold">{o.recipient}</p>
+          <div className="mt-4 flex items-end justify-between gap-6 border-t border-black pt-3">
+            <div>
+              <p className="font-mono text-[26pt] font-bold">{p.number}</p>
+              <p className="text-[14pt]">Box {p.index} of {p.of}{p.weightGrams ? ` · ${(p.weightGrams / 1000).toLocaleString()} kg` : ""}</p>
+            </div>
+            <div className="text-right text-[10pt]">
+              <p>Delivery <span className="font-mono font-semibold">{o.number}</span></p>
+              {o.shipping?.courier && <p>{o.shipping.courier.name}</p>}
+              {o.shipping?.trackingNumber && <p className="font-mono font-semibold">{o.shipping.trackingNumber}</p>}
+              <p>From {o.warehouse.name}</p>
+            </div>
+          </div>
+          <ul className="mt-4 border-t border-black pt-2 text-[10pt]">
+            {p.lines.map((l) => <li key={l.lineId}>{l.quantity} × {l.product.name} <span className="text-neutral-600">({l.product.sku})</span></li>)}
+          </ul>
+        </section>
+      ))}
+    </Frame>
+  );
+}
+
+/** A wave's pick list: each product once, where to take it, and which delivery each part goes to. */
+export async function WavePickList({ params, searchParams }: { params: Params<{ id: string }>; searchParams: Search }) {
+  const [{ id }, s] = await Promise.all([params, searchParams]);
+  const ctx = await context();
+  if (!ctx.may("orders.view")) return <NoAccess what="waves" />;
+  const w = await load<Wave>(`/inventory/waves/${encodeURIComponent(id)}`);
+  return (
+    <Frame back={`/inventory/waves/${w.id}`} backLabel="Back to wave" auto={s.auto === "1"}>
+      <h1 className="text-[16pt] font-bold">Pick list {w.number}</h1>
+      <p className="text-[10pt]">{w.warehouse.name} · {w.orders.length} deliveries ({w.orders.map((o) => o.number).join(", ")}) · {w.units} units</p>
+      <table className="mt-4 w-full border-collapse">
+        <thead>
+          <tr className="border-y border-black text-left text-[9pt]">
+            <th scope="col" className={th}>✓</th>
+            <th scope="col" className={th}>Take from</th>
+            <th scope="col" className={th}>Product</th>
+            <th scope="col" className={`${th} text-right`}>Total</th>
+            <th scope="col" className={th}>For</th>
+          </tr>
+        </thead>
+        <tbody>
+          {w.pickList.map((r) => (
+            <tr key={r.product.id} className="break-inside-avoid border-b border-neutral-300 align-top text-[10pt]">
+              <td className={td}>☐</td>
+              <td className={td}>{r.short > 0 ? "Not enough on hand" : r.from.map((f, i) => <span key={i} className="block font-mono">{f.quantity} · {f.location.code}{f.batch ? ` · ${f.batch.batchNo}` : ""}</span>)}</td>
+              <td className={td}>{r.product.name}<span className="block text-[8.5pt] text-neutral-600">{r.product.sku}</span></td>
+              <td className={`${td} text-right font-semibold tabular-nums`}>{r.total}</td>
+              <td className={td}>{r.orders.map((o) => <span key={o.orderId} className="block">{o.quantity} → {o.number} {o.recipient}</span>)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Frame>
   );
 }

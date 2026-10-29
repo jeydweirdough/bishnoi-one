@@ -1,4 +1,4 @@
-import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, Users, type LucideIcon } from "lucide-react";
+import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, ShoppingCart, Users, type LucideIcon } from "lucide-react";
 
 // Every Bishnoi One module in the one app (decided 2026-10-23,
 // benchmarks/decisions.md): where its screens live on this site, which API it
@@ -11,7 +11,7 @@ import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, Shield
 //   soon    not built yet (a "Coming soon" page, for companies that have it).
 // A module brought in (Phase 2) changes from "moving" to "live" here, and that's all.
 
-export type ModuleKey = "platform" | "crm" | "inventory" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
+export type ModuleKey = "platform" | "crm" | "inventory" | "sales" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
 
 export type ModuleDef = {
   key: ModuleKey;
@@ -38,6 +38,9 @@ export type ModuleDef = {
 export const MODULES: ModuleDef[] = [
   { key: "crm", path: "/crm", label: "CRM", blurb: "Customers and sales", appKey: "crm", apiEnv: "CRM_API_URL", apiLocal: "http://127.0.0.1:8302", status: "live", public: ["/crm/order"], icon: Users, tint: "#e9f0fb", ink: "#4c78c8" },
   { key: "inventory", path: "/inventory", label: "Inventory", blurb: "Stock and orders", appKey: "inventory", apiEnv: "INVENTORY_API_URL", apiLocal: "http://127.0.0.1:8304", status: "live", icon: Package, tint: "#e7f1ea", ink: "#3f5e4a" },
+  // The Sales app (feature plan step 11): its own place, running in the Operations service (Inventory's API,
+  // its Platform key), shown to whoever has Inventory while the company's catalogue has Sales on (src/one/mine.ts).
+  { key: "sales", path: "/sales", label: "Sales", blurb: "Sales orders", appKey: "inventory", apiEnv: "INVENTORY_API_URL", apiLocal: "http://127.0.0.1:8304", status: "live", icon: ShoppingCart, tint: "#e6f3f3", ink: "#2f7d7d" },
   { key: "finance", path: "/finance", label: "Finance", blurb: "Invoices and tax", appKey: "finance", apiEnv: "FINANCE_API_URL", apiLocal: "http://127.0.0.1:8303", status: "live", icon: Landmark, tint: "#fcf3dd", ink: "#9a6a12" },
   { key: "pharmacy", path: "/pharmacy", label: "Pharmacy", blurb: "Prescriptions", appKey: "pharmacy", apiEnv: "PHARMACY_API_URL", apiLocal: "http://127.0.0.1:8307", status: "live", icon: HeartPulse, tint: "#fbe7e3", ink: "#c2493a" },
   { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Company settings", appKey: "exec", apiEnv: "ADMIN_API_URL", apiLocal: "http://127.0.0.1:8300", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },

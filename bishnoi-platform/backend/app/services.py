@@ -186,9 +186,9 @@ SERVICES: tuple[Service, ...] = (
     Service(
         key="smtp",
         name="Email sending (Brevo or any SMTP service)",
-        purpose="The CRM's own emails: quotes waiting for approval, price approvals and other notices.",
+        purpose="The CRM's own emails (quotes waiting for approval, price approvals, notices) and Inventory's (a sale's documents to the customer).",
         help_url="https://help.brevo.com/hc/en-us/articles/7924908994450",
-        apps=("crm",),
+        apps=("crm", "inventory"),  # Inventory sends a sale's documents to the customer (step 15e, 2026-10-29)
         details=(
             Detail("host", "SMTP server", "Brevo: smtp-relay.brevo.com. Another service: its SMTP server's address."),
             Detail("port", "Port", "587 for almost every service (Brevo too).", required=False),

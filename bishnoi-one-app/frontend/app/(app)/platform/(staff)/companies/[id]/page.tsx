@@ -1,9 +1,7 @@
 // One company: its particulars, the applications it has, its departments and
 // branches, its people, what's open with Support, and what was done to it.
-import { UserPlus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LinkButton } from "@/src/modules/console/platform/ui/button";
 import { Figure } from "@/src/modules/console/platform/ui/figure";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/console/platform/ui/sheet";
 import { enc, load } from "@/src/modules/console/platform/lib/api";
@@ -17,7 +15,6 @@ import { DeleteRecord } from "@/src/modules/console/components/delete-record";
 import { SuspendCompany } from "@/src/modules/console/components/organizations/company-tools";
 import { EditLink, SuspendedTag } from "@/src/modules/console/components/organizations/record-tools";
 import { Structure } from "@/src/modules/console/components/organizations/structure";
-import { UserRows } from "@/src/modules/console/components/users/user-rows";
 import type { AuditEntry, CompanyDetail, Options, PlatformUser, Ticket } from "@/src/modules/console/lib/types";
 import { ago, plural, when } from "@/src/modules/console/lib/words";
 
@@ -84,7 +81,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           { key: "applications", label: "Applications", href: href("applications"), count: company.applications.length },
           { key: "connections", label: "Connections", href: href("connections") },
           { key: "structure", label: "Structure", href: href("structure"), count: company.units.length },
-          { key: "users", label: "Users", href: href("users"), count: company.userCount },
+          { key: "users", label: "People", href: href("users"), count: company.userCount },
           { key: "issues", label: "Issues", href: href("issues"), count: company.openTickets + company.activeIncidents.length },
           { key: "activity", label: "Activity", href: href("activity") },
         ]}
@@ -94,7 +91,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
       {tab === "applications" && <Applications company={company} canChange={staff.canAdminister} />}
       {tab === "connections" && <Connections company={company} canChange={staff.canAdminister} />}
       {tab === "structure" && <Structure companyId={company.id} companyName={company.name} units={company.units} canChange={staff.canAdminister} />}
-      {tab === "users" && <People company={company} canAdd={staff.canAdminister} />}
+      {tab === "users" && <People company={company} />}
       {tab === "issues" && <Issues company={company} />}
       {tab === "activity" && <Activity company={company} />}
     </>
@@ -130,7 +127,7 @@ function Overview({ company }: { company: CompanyDetail }) {
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
       <div className="space-y-5">
         <Sheet className="grid grid-cols-2 divide-rule sm:grid-cols-4 sm:divide-x">
-          <Figure label="Users" value={company.userCount} href={`/platform/companies/${company.id}?tab=users`} />
+          <Figure label="People" value={company.userCount} href={`/platform/companies/${company.id}?tab=users`} />
           <Figure label="Active users" value={company.status === "suspended" ? 0 : company.activeUserCount} />
           <Figure label="Applications" value={company.appCount} href={`/platform/companies/${company.id}?tab=applications`} />
           <Figure label="Open tickets" value={company.openTickets} href={`/platform/companies/${company.id}?tab=issues`} />
@@ -144,6 +141,7 @@ function Overview({ company }: { company: CompanyDetail }) {
                 ["Status", company.status === "suspended" ? `Suspended since ${when(company.suspendedAt)}` : "Active"],
                 ["Currency", company.currency],
                 ["Time zone", company.timezone],
+                ["Email domain", company.emailDomain ? `@${company.emailDomain}` : "Not set"],
                 ["Contact email", company.contactEmail ? <a href={`mailto:${company.contactEmail}`} className="text-hema hover:underline">{company.contactEmail}</a> : null],
                 ["Departments", company.units.filter((u) => u.kind === "department").length],
                 ["Branches", company.units.filter((u) => u.kind === "branch").length],
@@ -170,7 +168,7 @@ function Overview({ company }: { company: CompanyDetail }) {
             <ul className="divide-y divide-rule border-t border-rule" role="list">
               {company.admins.map((a) => (
                 <li key={a.id} className="px-5 py-2.5">
-                  <Link href={`/platform/accounts/${a.id}`} className="block truncate font-semibold text-hema hover:underline">
+                  <Link href="/platform/people" className="block truncate font-semibold text-hema hover:underline">
                     {a.name}
                   </Link>
                   <span className="block truncate text-meta text-ink-3">{a.email}</span>
@@ -242,32 +240,46 @@ async function Applications({ company, canChange }: { company: CompanyDetail; ca
   );
 }
 
-async function People({ company, canAdd }: { company: CompanyDetail; canAdd: boolean }) {
+/**
+ * Its people, to look at (decided 2026-10-29: Companies → Users retired). Its administrators add and
+ * change them on People; an operator switches to the company (the sidebar's company switcher) to do it.
+ */
+async function People({ company }: { company: CompanyDetail }) {
   const { users } = await load<{ users: PlatformUser[] }>(`/platform/users?company_id=${enc(company.id)}`);
+  const domain = company.emailDomain;
   return (
     <Sheet>
       <div className="px-5 pt-4 pb-2">
-        <SectionTitle
-          icon="people"
-          action={
-            canAdd && (
-              <LinkButton href={`/platform/accounts/new?company=${company.id}`} size="sm" variant="quiet" icon={<UserPlus className="size-4" aria-hidden />}>
-                Add user
-              </LinkButton>
-            )
-          }
-        >
-          Users at {company.name}
+        <SectionTitle icon="people">
+          People at {company.name}
           <Count n={users.length} />
         </SectionTitle>
+        <p className="mt-1 text-meta text-ink-3">
+          {company.name}&apos;s administrators add and change its people on People. To do it yourself, switch to {company.name} from the sidebar&apos;s company switcher.
+        </p>
       </div>
       <div className="border-t border-rule">
         {users.length === 0 ? (
-          <Empty title="No users yet" icon="people">
-            {canAdd ? "Add users with “Add user”, then grant them access to its applications." : "A Platform Admin adds its users."}
-          </Empty>
+          <Empty title="No people yet" icon="people" source={`${company.name}'s administrators, on People.`} />
         ) : (
-          <UserRows users={users} showCompany={false} />
+          <ul className="divide-y divide-rule">
+            {users.map((u) => {
+              const off = Boolean(domain) && !u.email.toLowerCase().endsWith(`@${domain}`) && u.status === "active";
+              return (
+                <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm font-medium ${u.status === "active" ? "text-ink" : "text-ink-3 line-through"}`}>{u.fullName}</span>
+                    <span className="block truncate text-meta text-ink-3">{u.email}</span>
+                  </span>
+                  <span className="flex flex-wrap gap-1.5 text-meta">
+                    {u.isCompanyAdmin && <span className="rounded-full bg-hema-tint px-2 py-0.5 text-hema">Administrator</span>}
+                    {u.status !== "active" && <span className="rounded-full border border-rule px-2 py-0.5 text-ink-3">Suspended</span>}
+                    {off && <span className="rounded-full bg-danger-tint px-2 py-0.5 text-danger" title={`Not at @${domain}: can't sign in until it's changed`}>Email to change</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </Sheet>

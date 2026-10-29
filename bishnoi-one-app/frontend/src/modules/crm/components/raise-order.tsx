@@ -1,21 +1,25 @@
 "use client";
 
-import { ArrowUpRight, PackageCheck, Send } from "lucide-react";
+import { PackageCheck, Send } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { raiseOrder } from "@/src/modules/crm/actions/quote-order";
 import { buttonClass } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import type { Quote } from "@/src/platform/lib/types";
 
-/** Raise an order in Bishnoi One Order from this quote.
+const STATUS: Record<string, string> = {
+  sent: "Sent to Sales", pending: "Waiting for approval", confirmed: "Confirmed", delivered: "Delivered", rejected: "Rejected", cancelled: "Cancelled",
+};
+
+/** Raise this quote's sales order (feature plan step 11).
  *
- *  The CRM sends the quote to Bishnoi One Order's API (backend app/orders.py has the
- *  payload) and keeps the order number it answers with, so a quote is ordered
- *  once. After that this shows the order instead of the button.
+ *  The order details go to the Sales app (as the event quote.ordered, through Bishnoi One); the order is made
+ *  there, waits for approval, and its number and progress come back here. A quote is ordered once; after that
+ *  this shows the order, linking to it, with its status instead of the button.
  *
- *  Shown to people who raise orders. Until Bishnoi One Order is connected, and until
- *  the quote is approved and its letter checked, the button is there but off,
- *  and says why on hover. */
+ *  Shown to people who raise orders. Until the quote is approved and its letter checked (and an Rx quote
+ *  verified), the button is there but off, and says why on hover. */
 export function RaiseOrder({
   quote,
   linked,
@@ -27,33 +31,43 @@ export function RaiseOrder({
 }) {
   const order = quote.order;
   if (order) {
+    // Once it ships, where the delivery is says more than the order's status (step 12).
+    // Then invoiced and paid (step 13): the end of the chain.
+    const status = order.invoice?.paidAt ? "Paid" : order.invoice?.number ? `Invoiced ${order.invoice.number}` : (order.delivery?.statusLabel ?? STATUS[order.status ?? "sent"] ?? order.status);
+    const tracking = order.delivery?.trackingNumber ? (
+      order.delivery.trackingUrl ? (
+        <a href={order.delivery.trackingUrl} target="_blank" rel="noreferrer" className="text-meta text-hema hover:underline">
+          {order.delivery.courier ?? "Courier"} {order.delivery.trackingNumber}
+        </a>
+      ) : (
+        <span className="text-meta text-ink-3">
+          {order.delivery.courier ?? "Courier"} {order.delivery.trackingNumber}
+        </span>
+      )
+    ) : null;
     const label = (
       <>
         <PackageCheck className="size-4" aria-hidden />
-        Order {order.number}
+        {order.number ? `Order ${order.number}` : "Order sent"}
+        <span className="text-meta font-normal text-ink-3">· {status}</span>
       </>
     );
-    return order.url ? (
-      <a
-        href={order.url}
-        target="_blank"
-        rel="noopener"
-        className={buttonClass("default")}
-        title="Open the order in Bishnoi One Order"
-      >
-        {label}
-        <ArrowUpRight className="size-4" aria-hidden />
-        <span className="sr-only">(opens in a new tab)</span>
-      </a>
+    return order.url && order.id ? (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <Link href={order.url} className={buttonClass("default")} title={order.note ? `${status}: ${order.note}` : `Open the sales order (${status.toLowerCase()})`}>
+          {label}
+        </Link>
+        {tracking}
+      </span>
     ) : (
-      <span className="inline-flex h-9 items-center gap-2 px-2 text-sm font-medium text-ink-2">
+      <span className="inline-flex h-9 items-center gap-2 px-2 text-sm font-medium text-ink-2" title="The Sales app is making the order; its number shows here in a moment.">
         {label}
       </span>
     );
   }
   if (!mayOrder) return null;
   const why = !linked
-    ? "Bishnoi One Order isn't connected yet. Your administrator sets ORDERS_API_URL and ORDERS_API_KEY."
+    ? "Sales isn't available for your company yet. Ask your administrator to turn it on in Apps."
     : quote.state === "waiting"
       ? "Available once the quote is approved and its guarantee letter is checked."
       : quote.state === "rejected"
@@ -76,8 +90,8 @@ export function RaiseOrder({
         title={`Raise an order from ${quote.number}?`}
         body={
           <p>
-            The quote&apos;s products, prices and customer are sent to Bishnoi One
-            Order, which makes the sales order. This is done once per quote.
+            The quote&apos;s products, prices and customer go to Sales, which makes the sales order. It
+            waits for approval there; its number and progress show here. This is done once per quote.
           </p>
         }
         confirmLabel="Raise order"
@@ -87,8 +101,8 @@ export function RaiseOrder({
             toast.error("The order wasn't raised", { description: r.error });
             return false;
           }
-          toast.success(`Order ${r.data.order?.number} raised`, {
-            description: "Bishnoi One Order has it now.",
+          toast.success("Order sent to Sales", {
+            description: "It waits for approval there; its number shows here in a moment.",
           });
         }}
       />

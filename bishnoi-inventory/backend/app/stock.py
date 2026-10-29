@@ -228,8 +228,8 @@ def post(
         row = balance(db, product.id, location, batch.id if batch else None)
         where = f" in {location.warehouse.name}" + (f", batch {batch.batch_no}" if batch else "")
         if kind == "damage":
-            if row.on_hand - row.damaged < -quantity:
-                raise conflict(f"Only {row.on_hand - row.damaged} of {product.name} are in good condition{where}.")
+            if row.on_hand - row.damaged - row.on_hold < -quantity:
+                raise conflict(f"Only {row.on_hand - row.damaged - row.on_hold} of {product.name} are in good condition{where}.")
             row.damaged -= quantity
         elif kind == "write_off":
             if row.damaged < -quantity:
@@ -237,8 +237,8 @@ def post(
             row.damaged += quantity
             row.on_hand += change
         else:
-            if change < 0 and row.on_hand - row.damaged < -change:
-                raise conflict(f"Only {row.on_hand - row.damaged} of {product.name} are available{where}.")
+            if change < 0 and row.on_hand - row.damaged - row.on_hold < -change:
+                raise conflict(f"Only {row.on_hand - row.damaged - row.on_hold} of {product.name} are available{where}.")
             row.on_hand += change
         after = row.on_hand
         warehouse_id = location.warehouse_id
@@ -304,8 +304,8 @@ def in_transit(db: Session, *, product_ids: list[str] | None = None) -> dict[tup
 
 
 def good_stock(db: Session, product_id: str, warehouse_id: str) -> int:
-    """On hand and not damaged, in a warehouse."""
-    q = select(func.coalesce(func.sum(Stock.on_hand - Stock.damaged), 0)).where(Stock.product_id == product_id, Stock.warehouse_id == warehouse_id)
+    """On hand, not damaged and not waiting for its quality check, in a warehouse."""
+    q = select(func.coalesce(func.sum(Stock.on_hand - Stock.damaged - Stock.on_hold), 0)).where(Stock.product_id == product_id, Stock.warehouse_id == warehouse_id)
     return int(db.scalar(q) or 0)
 
 
@@ -322,7 +322,7 @@ def fefo(db: Session, product: Product, warehouse_id: str, quantity: int, *, bat
         select(Stock)
         .outerjoin(Batch, Stock.batch_id == Batch.id)
         .join(Location, Stock.location_id == Location.id)
-        .where(Stock.product_id == product.id, Stock.warehouse_id == warehouse_id, Stock.on_hand > Stock.damaged)
+        .where(Stock.product_id == product.id, Stock.warehouse_id == warehouse_id, Stock.on_hand > Stock.damaged + Stock.on_hold)
         .order_by(Batch.expires_on.is_(None), Batch.expires_on, Batch.received_at, Location.is_default.desc(), Location.code)
     )
     if batch_id:
@@ -330,7 +330,7 @@ def fefo(db: Session, product: Product, warehouse_id: str, quantity: int, *, bat
     picks: list[tuple[Stock, int]] = []
     left = quantity
     for row in db.scalars(q):
-        take = min(left, row.on_hand - row.damaged)
+        take = min(left, row.on_hand - row.damaged - row.on_hold)
         picks.append((row, take))
         left -= take
         if left == 0:

@@ -18,10 +18,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.access import allowed
 from app.api import Api, changed, check_email, conflict, field_error, found, iso
-from app import business_events, documents
+from app import business_events, documents, quality
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Product, PurchaseOrder, PurchaseOrderLine, Receipt, ReceiptLine, Supplier, SupplierProduct, Warehouse
+from app.models import Product, PurchaseOrder, QualityCheck, SalesOrder, PurchaseOrderLine, Receipt, ReceiptLine, Supplier, SupplierProduct, Warehouse
 from app.out import batch_ref, day, location_ref, person, product_ref, supplier_ref, today, warehouse_ref
 from app.paging import Limit, Offset, cut, total
 from app.stock import Ref, clean_serials, location_in, next_number, post, resolve_batch, serials_in
@@ -291,6 +291,10 @@ def po_out(db: DB, po: PurchaseOrder) -> dict:
     return {
         **po_brief(po),
         "notes": po.notes,
+        # Raised for a sales order (order-on-demand, 15b) or shipped straight to its customer (dropship, 15c); made by replenishment (15a).
+        "salesOrder": {"id": po.sales_order_id, "number": so.number} if po.sales_order_id and (so := db.get(SalesOrder, po.sales_order_id)) else None,
+        "dropship": po.dropship, "shipTo": {"name": po.ship_to_name, "address": po.ship_to_address} if po.dropship else None,
+        "replenishment": po.replenishment,
         "createdBy": person(po.created_by),
         "orderedBy": person(po.ordered_by),
         "lines": [
@@ -477,6 +481,22 @@ def delete_po(_: allowed("purchasing.edit"), me: CurrentUser, db: DB, po_id: str
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+class DropshipDoneIn(Api):
+    note: str | None = Field(None, max_length=300)
+
+
+@router.post("/purchase-orders/{po_id}/dropship-delivered")
+def dropship_delivered(_: allowed("receiving.receive"), me: CurrentUser, db: DB, po_id: str, body: DropshipDoneIn, request: Request) -> dict:
+    """The vendor delivered a dropship order to our customer (15c): no stock comes in; the sale is delivered and invoiced."""
+    from app import supply
+
+    po = found(db, PurchaseOrder, po_id, "purchase order")
+    order = supply.dropship_delivered(db, me, po, getattr(request.state, "company", None))
+    audit(db, me, "purchase_order.dropship_delivered", target=f"{po.number} · {order.number}", target_type="purchase_order", target_id=po.id)
+    db.commit()
+    return {"id": po.id, "status": po.status, "salesOrder": {"id": order.id, "number": order.number, "status": order.status}}
+
+
 @router.get("/backorders")
 def backorders(_: allowed("purchasing.view"), db: DB, limit: int | None = Limit(), offset: int = Offset()) -> list[dict] | dict:
     """Every unit still owed on a placed order."""
@@ -525,11 +545,14 @@ class ReceiptIn(documents.HeaderIn):
     location_id: str | None = Field(None, max_length=36)
     delivery_ref: str | None = Field(None, max_length=60)
     notes: str | None = Field(None, max_length=4000)
+    # On consignment (15d): the vendor's until it sells; kept in its own location.
+    consignment: bool = False
     lines: list[ReceiptLineIn] = Field(min_length=1, max_length=200)
 
 
 def receipt_brief(r: Receipt) -> dict:
     return {
+        "consignment": r.consignment,
         "id": r.id,
         "number": r.number,
         "order": {"id": r.order.id, "number": r.order.number} if r.order else None,
@@ -574,9 +597,12 @@ def list_receipts(
 @router.get("/receipts/{receipt_id}")
 def read_receipt(_: allowed("receiving.view"), db: DB, settings: SettingsDep, receipt_id: str) -> dict:
     r = found(db, Receipt, receipt_id, "receipt")
+    check = db.scalar(select(QualityCheck).where(QualityCheck.receipt_id == r.id))
     return {
         **receipt_brief(r),
         "notes": r.notes,
+        # Its quality check, when its warehouse checks what it receives (step 14a).
+        "qualityCheck": {"id": check.id, "number": check.number, "status": check.status} if check else None,
         "lines": [
             {
                 "id": line.id,
@@ -590,6 +616,19 @@ def read_receipt(_: allowed("receiving.view"), db: DB, settings: SettingsDep, re
             for line in r.lines
         ],
     }
+
+
+def consignment_location(db: DB, warehouse: Warehouse, supplier: Supplier):
+    """The vendor's consignment location in this warehouse, made the first time (15d)."""
+    from app.models import Location
+
+    found_ = db.scalar(select(Location).where(Location.warehouse_id == warehouse.id, Location.consignment_supplier_id == supplier.id))
+    if found_ is not None:
+        return found_
+    loc = Location(warehouse_id=warehouse.id, code=f"CON-{supplier.code}"[:20], name=f"Consignment: {supplier.name}"[:120], consignment_supplier_id=supplier.id)
+    db.add(loc)
+    db.flush()
+    return loc
 
 
 @router.post("/receipts", status_code=status.HTTP_201_CREATED)
@@ -611,7 +650,12 @@ def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: Rece
     warehouse = db.get(Warehouse, warehouse_id)
     if warehouse is None or not warehouse.is_active:
         raise field_error("warehouseId", "Pick a warehouse that's switched on.")
-    location = location_in(db, warehouse.id, body.location_id)
+    if body.consignment:
+        if not supplier_id:
+            raise field_error("supplierId", "Consignment stock is a vendor's: pick the vendor.")
+        location = consignment_location(db, warehouse, db.get(Supplier, supplier_id))
+    else:
+        location = location_in(db, warehouse.id, body.location_id)
 
     receipt = Receipt(
         number=next_number(db, "RC"),
@@ -622,6 +666,7 @@ def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: Rece
         delivery_ref=body.delivery_ref,
         notes=body.notes,
         received_by_id=me.id,
+        consignment=body.consignment,
         # Its header (step 8): the purchase order it came from, and the day it was expected.
         source_document=po.number if po else None,
         scheduled_on=po.expected_on if po else None,
@@ -634,6 +679,8 @@ def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: Rece
         business_events.link(db, getattr(request.state, "company", None), business_events.ref("purchase_order", po.id, po.number), business_events.ref("receipt", receipt.id, receipt.number))
     ref = Ref("receipt", receipt.id, receipt.number)
     order_lines = {line.id: line for line in po.lines} if po else {}
+    # A warehouse that checks what it receives holds it until its quality check (step 14a).
+    to_check: list = []
     for i, line in enumerate(body.lines):
         product = db.get(Product, line.product_id)
         if product is None or product.product_type == "service":
@@ -653,8 +700,12 @@ def receive(_: allowed("receiving.receive"), me: CurrentUser, db: DB, body: Rece
         serials_in(db, product, serials, location, batch)
         post(db, me, kind="receive", product=product, quantity=line.quantity, ref=ref, location=location, batch=batch, serials=serials, note=f"From {po.supplier.name}" if po else None)
         db.add(ReceiptLine(receipt_id=receipt.id, order_line_id=order_line.id if order_line else None, product_id=product.id, batch_id=batch.id if batch else None, quantity=line.quantity, unit_cost=unit_cost, serials=serials))
+        if warehouse.quality_check:
+            to_check.append((product, location, batch, line.quantity))
+    check = quality.hold(db, receipt, to_check) if to_check else None
     if po:
         po.status = "received" if all(o.received >= o.quantity for o in po.lines) else "partial"
     audit(db, me, "receipt.posted", target=receipt.number + (f" · {po.number}" if po else ""), target_type="receipt", target_id=receipt.id)
     db.commit()
-    return {"id": receipt.id, "number": receipt.number, "orderStatus": po.status if po else None}
+    return {"id": receipt.id, "number": receipt.number, "orderStatus": po.status if po else None,
+            "qualityCheck": {"id": check.id, "number": check.number} if check else None}

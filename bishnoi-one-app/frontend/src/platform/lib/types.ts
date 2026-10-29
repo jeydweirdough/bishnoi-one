@@ -548,7 +548,14 @@ export type Payment = {
   at: string;
 };
 
-export type QuoteOrder = { id: string; number: string; url: string | null; status: string | null; by: { id: string; name: string }; at: string };
+/** The quote's sales order in the Sales app (step 11): "sent" until the order is made, then its number and status. */
+export type QuoteOrder = {
+  id: string | null; number: string | null; url: string | null; status: string | null; note?: string | null; by: { id: string; name: string }; at: string;
+  /** Its delivery's shipping (step 12): out for delivery, delivered or failed, with the courier's tracking. */
+  delivery?: { number: string; status: string; statusLabel: string | null; courier: string | null; trackingNumber: string | null; trackingUrl: string | null; deliveredAt: string | null } | null;
+  /** Invoiced from its delivery, and paid (step 13). */
+  invoice?: { id: string; number: string | null; invoicedAt: string | null; paidAt: string | null } | null;
+};
 
 /** Credit status, as Finance's invoices have it (app/trade.py). Null status: Finance couldn't be asked. */
 export type CreditStatus = "good" | "approaching" | "overdue" | "suspended";

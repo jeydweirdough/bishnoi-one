@@ -33,6 +33,8 @@ class WarehouseIn(Api):
     address: str | None = Field(None, max_length=300)
     latitude: float | None = Field(None, ge=-90, le=90)
     longitude: float | None = Field(None, ge=-180, le=180)
+    # Receive → check → store (step 14a).
+    quality_check: bool = False
 
 
 class WarehousePatch(Api):
@@ -42,6 +44,7 @@ class WarehousePatch(Api):
     latitude: float | None = Field(None, ge=-90, le=90)
     longitude: float | None = Field(None, ge=-180, le=180)
     is_active: bool | None = None
+    quality_check: bool | None = None
 
 
 class LocationIn(Api):
@@ -77,6 +80,7 @@ def warehouse_out(w: Warehouse, total: dict | None, locations: int) -> dict:
         "latitude": w.latitude,
         "longitude": w.longitude,
         "isActive": w.is_active,
+        "qualityCheck": w.quality_check,
         "locationCount": locations,
         "units": (total or {}).get("units", 0),
         "value": (total or {}).get("value", 0),
@@ -100,7 +104,7 @@ def list_warehouses(_: View, db: DB) -> list[dict]:
 def create_warehouse(_: Manage, me: CurrentUser, db: DB, body: WarehouseIn) -> dict:
     if code_taken(db, body.code):
         raise field_error("code", "Another warehouse has that code.")
-    warehouse = Warehouse(code=body.code.upper(), name=body.name, address=body.address)
+    warehouse = Warehouse(code=body.code.upper(), name=body.name, address=body.address, quality_check=body.quality_check)
     db.add(warehouse)
     db.flush()
     db.add(Location(warehouse_id=warehouse.id, code="MAIN", name="Main area", is_default=True))

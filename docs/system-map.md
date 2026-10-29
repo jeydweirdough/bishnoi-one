@@ -1,6 +1,6 @@
 # System map
 
-What each app has, read from the code on 2026-10-28 by `scripts/system_map.py`.
+What each app has, read from the code on 2026-10-29 by `scripts/system_map.py`.
 Don't edit by hand: change the code, then run `python scripts/system_map.py` again.
 Settings are listed by name only. The feature plan (Desktop, `bishnoi-one-feature-plan.html`) says where each app is going.
 
@@ -8,9 +8,9 @@ Settings are listed by name only. The feature plan (Desktop, `bishnoi-one-featur
 
 | App | Address | Screens | Records (tables) | Reports | Permission areas | API endpoints | Latest migration |
 |---|---|---|---|---|---|---|---|
-| [Platform (Admin Console)](#platform-admin-console) | `/platform` | 16 | 38 | 0 | 0 | 153 | 0016_document_links |
+| [Platform (Admin Console)](#platform-admin-console) | `/platform` | 16 | 39 | 0 | 0 | 158 | 0018_signatures_and_letterhead |
 | [CRM](#crm) | `/crm` | 23 | 58 | 22 | 12 | 287 | 0079_business_events |
-| [Inventory](#inventory) | `/inventory` | 18 | 33 | 25 | 13 | 133 | 0010_document_header |
+| [Inventory](#inventory) | `/inventory` | 18 | 35 | 29 | 14 | 142 | 0013_sales_orders |
 | [Finance (Books)](#finance-books) | `/finance` | 25 | 36 | 25 | 14 | 153 | 0026_business_events |
 | [Pharmacy](#pharmacy) | `/pharmacy` | 11 | 23 | 14 | 12 | 84 | 0006_material_reviews |
 | [Executive Admin (Office)](#executive-admin-office) | `/admin` | 15 | 23 | 14 | 12 | 75 | 0010_vehicle_kind_and_material_details |
@@ -36,6 +36,7 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 | `nbpl_users` | User |
 | `nbpl_sessions` | One sign-in |
 | `nbpl_accounts` | A person, once across Bishnoi One: their email, name, the one password, and whether they are an operator (they run Bishnoi One itself: the O |
+| `nbpl_signatures` | A person's e-signature on their account (step 10, app/signatures.py) |
 | `nbpl_companies` | Company |
 | `nbpl_org_units` | A department or a branch of one company |
 | `nbpl_units` | One box on a company's org chart: a division, a department or a team, under another (or at the top), with the membership that heads it and t |
@@ -83,7 +84,7 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 ### Links to other apps
 
 - **Calls:** none
-- **Offers to other apps:** `GET /platform/integrations`, `POST /platform/applications/{app_id}/integrations`, `PATCH /platform/integrations/{integration_id}`, `DELETE /platform/integrations/{integration_id}`, `GET /connect/links`, `GET /platform/connections`, `POST /connect/hello`, `POST /platform/applications/{app_id}/connect-key`, `DELETE /platform/applications/{app_id}/connect-key`, `POST /connect/events`, `GET /connect/services`
+- **Offers to other apps:** `GET /platform/integrations`, `POST /platform/applications/{app_id}/integrations`, `PATCH /platform/integrations/{integration_id}`, `DELETE /platform/integrations/{integration_id}`, `GET /connect/links`, `GET /platform/connections`, `POST /connect/hello`, `POST /platform/applications/{app_id}/connect-key`, `DELETE /platform/applications/{app_id}/connect-key`, `POST /connect/events`, `GET /connect/signature`, `GET /connect/services`
 
 ### Settings (names only)
 
@@ -91,7 +92,7 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 
 ### API endpoints
 
-<details><summary>153 endpoints in 24 files</summary>
+<details><summary>158 endpoints in 24 files</summary>
 
 - **access:** `GET /platform/access/requests`, `POST /platform/access/requests`, `POST /platform/access/requests/{request_id}/decision`, `GET /platform/access/organizations`, `GET /platform/access/applications`, `GET /platform/access/roles`, `GET /platform/staff`, `POST /platform/staff`, `PATCH /platform/staff/{staff_id}`, `POST /platform/staff/{staff_id}/password`, `DELETE /platform/staff/{staff_id}`, `GET /platform/sessions`, `DELETE /platform/sessions/{session_id}`, `DELETE /platform/access/requests/{request_id}`
 - **activity:** `GET /platform/activity`
@@ -100,11 +101,11 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 - **communications:** `GET /platform/announcements`, `POST /platform/announcements`, `PATCH /platform/announcements/{notice_id}`, `DELETE /platform/announcements/{notice_id}`
 - **companies:** `GET /platform/companies`, `POST /platform/companies`, `GET /platform/companies/{company_id}`, `PATCH /platform/companies/{company_id}`, `PUT /platform/companies/{company_id}/applications`, `POST /platform/companies/{company_id}/units`, `PATCH /platform/companies/{company_id}/units/{unit_id}`, `DELETE /platform/companies/{company_id}/units/{unit_id}`, `DELETE /platform/companies/{company_id}`
 - **company_access:** `GET /identity/access`, `POST /identity/access/roles`, `PATCH /identity/access/roles/{role_id}`, `GET /identity/access/abilities`, `POST /identity/access/roles/from-job`, `PUT /identity/access/roles/{role_id}/abilities`, `DELETE /identity/access/roles/{role_id}`, `PUT /identity/access/people/{person_id}/role`, `POST /identity/access/people`, `PATCH /identity/access/people/{person_id}`, `POST /identity/access/people/{person_id}/password`, `PUT /identity/access/people/{person_id}/apps/{key}`, `DELETE /identity/access/people/{person_id}/apps/{key}`, `POST /identity/access/import`
-- **company_console:** `GET /identity/company`, `PATCH /identity/company`, `GET /identity/company/apps`, `GET /identity/company/catalogue`, `PUT /identity/company/catalogue/{key}`, `GET /identity/company/services`, `PUT /identity/company/services/{key}`, `POST /identity/company/services/{key}/check`, `GET /identity/company/activity`, `GET /identity/company/security`, `POST /identity/company/security/people/{person_id}/sign-out`
+- **company_console:** `GET /identity/company/letterhead`, `GET /identity/company`, `PATCH /identity/company`, `GET /identity/company/apps`, `GET /identity/company/catalogue`, `PUT /identity/company/catalogue/{key}`, `GET /identity/company/services`, `PUT /identity/company/services/{key}`, `POST /identity/company/services/{key}/check`, `GET /identity/company/activity`, `GET /identity/company/security`, `POST /identity/company/security/people/{person_id}/sign-out`
 - **connections:** `GET /connect/links`, `GET /platform/connections`, `POST /connect/hello`, `POST /platform/applications/{app_id}/connect-key`, `DELETE /platform/applications/{app_id}/connect-key`, `POST /platform/links`, `PATCH /platform/links/{link_id}`, `POST /platform/links/{link_id}/new-key`, `DELETE /platform/links/{link_id}`
 - **dashboard:** `GET /platform/dashboard`, `GET /platform/banner`, `GET /platform/options`, `GET /platform/frame`
 - **events:** `POST /connect/events`, `GET /platform/events`, `POST /platform/events/{event_id}/{target}/retry`, `POST /platform/events/{event_id}/{target}/skip`, `POST /platform/events/run`, `POST /platform/events/check`, `GET /cron/events-check`
-- **identity:** `POST /identity/login`, `POST /identity/logout`, `GET /identity/me`, `POST /identity/switch`, `POST /identity/pass`, `POST /identity/password`, `GET /identity/documents/trail`, `GET /pass/key`
+- **identity:** `POST /identity/login`, `POST /identity/logout`, `GET /identity/me`, `POST /identity/switch`, `POST /identity/pass`, `POST /identity/password`, `GET /identity/signature`, `PUT /identity/signature`, `POST /identity/signature/remove`, `GET /connect/signature`, `GET /identity/documents/trail`, `GET /pass/key`
 - **incidents:** `GET /platform/incidents`, `POST /platform/incidents`, `GET /platform/incidents/{incident_id}`, `PATCH /platform/incidents/{incident_id}`, `POST /platform/incidents/{incident_id}/updates`, `DELETE /platform/incidents/{incident_id}`
 - **monitoring:** `GET /platform/monitoring`, `GET /platform/monitoring/history`, `GET /platform/traffic`
 - **operators:** `GET /platform/operators`, `PUT /platform/operators/{account_id}`
@@ -292,7 +293,7 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 - **Home:** Home (`/inventory`)
 - **Items:** Items (`/inventory/products`), Item registrations (CPR) (`/inventory/products/cpr`)
 - **Inventory:** Stock on hand (`/inventory/stock`), Transfer orders (`/inventory/transfers`), Inventory adjustments (`/inventory/adjustments`), Inventory counts (`/inventory/counts`)
-- **Sales:** Sales orders (`/inventory/orders`), Reservations (`/inventory/reservations`)
+- **Sales:** Deliveries (`/inventory/orders`), Reservations (`/inventory/reservations`)
 - **Purchases:** Vendors (`/inventory/suppliers`), Purchase orders (`/inventory/purchase-orders`), Purchase receives (`/inventory/receipts`)
 - **Reports:** Reports (`/inventory/reports`)
 - **Settings:** Warehouses (`/inventory/warehouses`), Categories (`/inventory/catalog/categories`), Brands (`/inventory/catalog/brands`), Units (`/inventory/catalog/units`), Activity log (`/inventory/admin/audit`)
@@ -326,6 +327,8 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 | `nbin_purchase_order_lines` | PurchaseOrderLine |
 | `nbin_receipts` | One delivery taken in: against a purchase order, or on its own |
 | `nbin_receipt_lines` | ReceiptLine |
+| `nbin_sales_orders` | A customer's order (app/sales.py): made from an approved CRM quote, or typed in the Sales app at the price list's prices; waits for approval |
+| `nbin_sales_order_lines` | SalesOrderLine |
 | `nbin_orders` | Stock going out: a customer order, or an issue to a department or project |
 | `nbin_order_lines` | OrderLine |
 | `nbin_transfers` | Transfer |
@@ -343,6 +346,7 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 - **Orders:** Sales and issuance history
 - **Purchasing:** Purchase history, Purchases by item, Purchases by vendor, Supplier performance
 - **Sales:** Sales by customer, Sales by item, Sales by salesperson
+- **Sales orders:** Fill rate, Sales orders by division, Sales orders by salesperson, Sales orders by status
 - **Stock:** Batch details, Committed stock, Current inventory, Inventory summary, Inventory valuation *(fixed)*, Stock aging, Warehouse inventory
 
 ### Permissions
@@ -359,7 +363,8 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 | Suppliers & supplier prices (`suppliers`) | Purchasing | view, create, edit, delete |
 | Purchase orders (`purchasing`) | Purchasing | view, create, edit, approve |
 | Receiving (`receiving`) | Purchasing | view, receive |
-| Orders, reservations & issuance (`orders`) | Orders | view, create, edit, approve, issue |
+| Sales orders (`sales`) | Sales | view, create, edit, approve |
+| Deliveries, reservations & issuance (`orders`) | Orders | view, create, edit, approve, issue |
 | Reports (`reports`) | Insight | view, export |
 | Administration (`admin`) | Administration | users, roles, audit |
 
@@ -374,7 +379,7 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 
 ### API endpoints
 
-<details><summary>133 endpoints in 13 files</summary>
+<details><summary>142 endpoints in 14 files</summary>
 
 - **adjustments:** `GET /inventory/adjustments/reasons`, `GET /inventory/adjustments`, `POST /inventory/adjustments`, `GET /inventory/adjustments/{adjustment_id}`, `POST /inventory/adjustments/{adjustment_id}/approve`, `POST /inventory/adjustments/{adjustment_id}/reject`, `GET /inventory/counts`, `POST /inventory/counts`, `GET /inventory/counts/{count_id}`, `PUT /inventory/counts/{count_id}/lines`, `POST /inventory/counts/{count_id}/lines`, `POST /inventory/counts/{count_id}/submit`, `POST /inventory/counts/{count_id}/reopen`, `POST /inventory/counts/{count_id}/approve`, `POST /inventory/counts/{count_id}/cancel`, `DELETE /inventory/adjustments/{adjustment_id}`
 - **admin:** `GET /admin/users`, `POST /admin/users`, `PATCH /admin/users/{user_id}`, `POST /admin/users/{user_id}/password`, `GET /admin/roles`, `POST /admin/roles`, `PATCH /admin/roles/{role_id}`, `DELETE /admin/roles/{role_id}`, `GET /admin/audit`
@@ -382,9 +387,10 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 - **catalog:** `GET /inventory/reference`, `GET /inventory/categories`, `POST /inventory/categories`, `PATCH /inventory/categories/{category_id}`, `DELETE /inventory/categories/{category_id}`, `GET /inventory/brands`, `POST /inventory/brands`, `PATCH /inventory/brands/{brand_id}`, `DELETE /inventory/brands/{brand_id}`, `GET /inventory/units`, `POST /inventory/units`, `PATCH /inventory/units/{code}`, `DELETE /inventory/units/{code}`, `GET /inventory/products`, `POST /inventory/products`, `GET /inventory/products/{product_id}`, `PATCH /inventory/products/{product_id}`, `DELETE /inventory/products/{product_id}`, `POST /inventory/products/cpr`, `GET /inventory/products/cpr/summary`, `POST /inventory/products/{product_id}/images`, `GET /inventory/products/{product_id}/images/{image_id}`, `DELETE /inventory/products/{product_id}/images/{image_id}`, `PUT /inventory/products/{product_id}/suppliers/{supplier_id}`, `DELETE /inventory/products/{product_id}/suppliers/{supplier_id}`
 - **insight:** `GET /inventory/alerts`, `GET /inventory/dashboard`, `GET /inventory/reports`, `GET /inventory/reports/{key}`, `GET /inventory/reports/{key}/csv`
 - **integration:** `GET /integration/products`, `GET /integration/costs`, `GET /integration/stock`, `GET /integration/suppliers`, `GET /integration/suppliers/{supplier_id}`, `GET /integration/suppliers/{supplier_id}/receipts`
-- **orders:** `GET /inventory/orders`, `GET /inventory/order-figures`, `GET /inventory/reservations`, `POST /inventory/orders`, `GET /inventory/orders/{order_id}`, `PUT /inventory/orders/{order_id}`, `DELETE /inventory/orders/{order_id}`, `POST /inventory/orders/{order_id}/confirm`, `POST /inventory/orders/{order_id}/pick`, `POST /inventory/orders/{order_id}/issue`, `POST /inventory/orders/{order_id}/cancel`
+- **orders:** `GET /inventory/orders`, `GET /inventory/order-figures`, `GET /inventory/reservations`, `POST /inventory/orders`, `GET /inventory/orders/{order_id}`, `PUT /inventory/orders/{order_id}`, `DELETE /inventory/orders/{order_id}`, `POST /inventory/orders/{order_id}/confirm`, `POST /inventory/orders/{order_id}/pick`, `POST /inventory/orders/{order_id}/issue`, `POST /inventory/orders/{order_id}/received`, `POST /inventory/orders/{order_id}/cancel`
 - **profile:** `GET /auth/profile`, `PUT /auth/profile`, `POST /auth/password`, `GET /auth/activity`
 - **purchasing:** `GET /inventory/suppliers`, `POST /inventory/suppliers`, `GET /inventory/suppliers/{supplier_id}`, `PATCH /inventory/suppliers/{supplier_id}`, `DELETE /inventory/suppliers/{supplier_id}`, `GET /inventory/purchase-orders`, `GET /inventory/purchase-order-figures`, `POST /inventory/purchase-orders`, `GET /inventory/purchase-orders/{po_id}`, `PUT /inventory/purchase-orders/{po_id}`, `PATCH /inventory/purchase-orders/{po_id}`, `POST /inventory/purchase-orders/{po_id}/place`, `POST /inventory/purchase-orders/{po_id}/cancel`, `DELETE /inventory/purchase-orders/{po_id}`, `GET /inventory/backorders`, `GET /inventory/receipts`, `GET /inventory/receipts/{receipt_id}`, `POST /inventory/receipts`
+- **sales:** `GET /inventory/sales-orders`, `GET /inventory/sales-orders/{order_id}`, `POST /inventory/sales-orders`, `PUT /inventory/sales-orders/{order_id}`, `POST /inventory/sales-orders/{order_id}/submit`, `POST /inventory/sales-orders/{order_id}/approve`, `POST /inventory/sales-orders/{order_id}/reject`, `POST /inventory/sales-orders/{order_id}/cancel`
 - **stock:** `GET /inventory/stock`, `GET /inventory/movements`, `GET /inventory/batches`, `GET /inventory/serials`
 - **transfers:** `GET /inventory/transfers`, `GET /inventory/transfers/map`, `POST /inventory/transfers`, `GET /inventory/transfers/{transfer_id}`, `PUT /inventory/transfers/{transfer_id}`, `DELETE /inventory/transfers/{transfer_id}`, `POST /inventory/transfers/{transfer_id}/request`, `POST /inventory/transfers/{transfer_id}/approve`, `POST /inventory/transfers/{transfer_id}/dispatch`, `POST /inventory/transfers/{transfer_id}/receive`, `POST /inventory/transfers/{transfer_id}/cancel`
 - **unset:** `GET /inventory/unset`, `GET /inventory/setup`

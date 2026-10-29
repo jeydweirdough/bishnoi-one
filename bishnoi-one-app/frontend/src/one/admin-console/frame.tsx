@@ -46,6 +46,7 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
       label: "Operations",
       pages: [
         { href: "/platform/companies", label: "Companies", icon: "companies" },
+        { href: "/platform/people", label: "Find a person", icon: "person" },
         { href: "/platform/apis", label: "Services", icon: "apps" },
         { href: "/platform/events", label: "Events", icon: "activity" },
         { href: "/platform/operators", label: "Operators", icon: "people" },

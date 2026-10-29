@@ -20,7 +20,10 @@ from fastapi import APIRouter, Request
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 
+import base64
+
 from app import abilities as ab
+from app import email_rules, signatures
 from app import catalogue as catalogue_on
 from app import services as svc
 from app.access_roles import modules_of
@@ -33,6 +36,7 @@ from app.models import Application, AuditEntry, Company, CompanyApp, CompanySwit
 from app.routers import services as service_routes
 from app.routers.activity import entry_out
 from app.routers.company_access import Admin, get_person
+from app.routers.identity import Signed
 
 router = APIRouter(prefix="/identity/company", tags=["company console"])
 
@@ -41,12 +45,53 @@ PAGE = 50
 
 def company_out(c: Company) -> dict:
     return {"id": c.id, "no": c.no, "name": c.name, "slug": c.slug, "status": c.status, "currency": c.currency,
-            "timezone": c.timezone, "contactEmail": c.contact_email, "createdAt": iso(c.created_at)}
+            "timezone": c.timezone, "contactEmail": c.contact_email, "emailDomain": c.email_domain, "createdAt": iso(c.created_at),
+            # The letterhead (step 10).
+            "legalName": c.legal_name, "address": c.address, "tin": c.tin, "phone": c.phone, "documentFooter": c.document_footer,
+            "logo": signatures.data_url(c.logo, c.logo_type or "image/png") if c.logo else None}
+
+
+LOGO_TYPES = {b"\x89PNG\r\n\x1a\n": "image/png", b"\xff\xd8\xff": "image/jpeg"}
+MAX_LOGO = 400_000
+
+
+def logo_of(value: str) -> tuple[bytes, str]:
+    """A PNG or JPEG logo from a data URL, checked."""
+    raw = value.split(",", 1)[1] if value.startswith("data:") else value
+    try:
+        image = base64.b64decode(raw, validate=True)
+    except ValueError:
+        raise field_error("logo", "That isn't an image.") from None
+    if len(image) > MAX_LOGO:
+        raise field_error("logo", "The logo is too large: keep it under 400 KB.")
+    kind = next((k for head, k in LOGO_TYPES.items() if image.startswith(head)), None)
+    if kind is None:
+        raise field_error("logo", "The logo must be a PNG or JPEG image.")
+    return image, kind
+
+
+@router.get("/letterhead")
+def letterhead(signed: Signed, db: DB) -> dict:
+    """The company's letterhead, for printing any of its documents (any of its people may read it)."""
+    _, person = signed
+    c = db.get(Company, person.company_id)
+    return {"name": c.name, "legalName": c.legal_name or c.name, "address": c.address, "tin": c.tin, "phone": c.phone, "email": c.contact_email,
+            "footer": c.document_footer, "logo": signatures.data_url(c.logo, c.logo_type or "image/png") if c.logo else None}
+
+
+def off_domain(db, c: Company) -> list[dict]:
+    """Its people whose email isn't at its domain: they can't sign in until it's changed."""
+    if not c.email_domain:
+        return []
+    people = db.scalars(select(Identity).where(Identity.company_id == c.id, Identity.via_operator.is_(False), Identity.status == "active")
+                        .order_by(Identity.full_name)).all()
+    return [{"id": p.id, "fullName": p.full_name, "email": p.email} for p in people if email_rules.domain_of(p.email) != c.email_domain]
 
 
 @router.get("")
 def profile(db: DB, me: Admin) -> dict:
-    return {"company": company_out(db.get(Company, me.company_id))}
+    c = db.get(Company, me.company_id)
+    return {"company": company_out(c), "offDomain": off_domain(db, c)}
 
 
 class CompanyPatch(Api):
@@ -54,6 +99,15 @@ class CompanyPatch(Api):
     contact_email: str | None = Field(None, max_length=254)
     timezone: str | None = Field(None, max_length=64)
     currency: str | None = Field(None, min_length=3, max_length=3)
+    legal_name: str | None = Field(None, max_length=200)
+    address: str | None = Field(None, max_length=400)
+    tin: str | None = Field(None, max_length=30)
+    phone: str | None = Field(None, max_length=40)
+    document_footer: str | None = Field(None, max_length=400)
+    # Its people's email domain (getmeds.ph); "" clears it (app/email_rules.py).
+    email_domain: str | None = Field(None, max_length=254)
+    # A PNG or JPEG as a data URL; "" removes it.
+    logo: str | None = Field(None, max_length=600_000)
 
     @field_validator("contact_email")
     @classmethod
@@ -65,21 +119,38 @@ class CompanyPatch(Api):
 def change_profile(body: CompanyPatch, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
     c = db.get(Company, me.company_id)
     fields = changed(body)
+    logo_changed = "logo" in fields
+    if "logo" in fields:
+        logo = fields.pop("logo")
+        if logo:
+            c.logo, c.logo_type = logo_of(logo)
+        else:
+            c.logo, c.logo_type = None, None
+        audit(db, me.email, "company.updated", target=c.name, target_type="company", target_id=c.id, company_id=c.id, fields=["logo"])
+    LETTER = ("legal_name", "address", "tin", "phone", "document_footer")
     if "name" in fields and not fields["name"]:
         raise field_error("name", "Give the company a name.")
     if fields.get("timezone") and fields["timezone"] not in available_timezones():
         raise field_error("timezone", "Pick a time zone from the list, such as Asia/Manila.")
     if "currency" in fields:
         fields["currency"] = (fields["currency"] or c.currency).upper()
-    fields = {k: (v.strip() if isinstance(v, str) else v) for k, v in fields.items() if getattr(c, k) != v and not (k != "contact_email" and v is None)}
+    if "email_domain" in fields:
+        fields["email_domain"] = email_rules.check_domain(db, c, fields["email_domain"]) or ""
+    fields = {k: ((v.strip() or None) if k in LETTER and isinstance(v, str) else v.strip() if isinstance(v, str) else v)
+              for k, v in fields.items() if getattr(c, k) != v and not (k not in ("contact_email", *LETTER) and v is None)}
+    if fields.get("email_domain") == "":
+        fields["email_domain"] = None
+    if "email_domain" in fields and getattr(c, "email_domain") == fields["email_domain"]:
+        del fields["email_domain"]
     for k, v in fields.items():
         setattr(c, k, v)
-    if fields:
-        audit(db, me.email, "company.updated", target=c.name, target_type="company", target_id=c.id, company_id=c.id, fields=sorted(fields))
+    if fields or logo_changed:
+        if fields:
+            audit(db, me.email, "company.updated", target=c.name, target_type="company", target_id=c.id, company_id=c.id, fields=sorted(fields))
         db.commit()
         # Each app keeps its company's name and settings from the company pass.
         push_company(request.app.state.sessions, settings, c.id, apps_of(db, c.id))
-    return {"company": company_out(c)}
+    return {"company": company_out(c), "offDomain": off_domain(db, c)}
 
 
 @router.get("/apps")

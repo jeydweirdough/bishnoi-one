@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.api import SLUG, Api, camel, changed, check_email, conflict, field_error, iso, not_found, now
 from app.audit import audit
 from app.deps import DB, AdminUser, CurrentUser, SettingsDep
-from app import company_push
+from app import company_push, email_rules
 from app.models import (
     TICKET_STATUSES,
     Application,
@@ -92,6 +92,7 @@ class CompanyIn(CompanyFields):
     timezone: str = "Asia/Manila"
     contact_email: str | None = Field(None, max_length=254)
     notes: str | None = Field(None, max_length=4000)
+    email_domain: str | None = Field(None, max_length=254)
     application_ids: list[str] = []
     # Who runs it: they join as its first company admin.
     admin_name: str | None = Field(None, min_length=2, max_length=120)
@@ -105,6 +106,7 @@ class CompanyPatch(CompanyFields):
     timezone: str | None = None
     contact_email: str | None = Field(None, max_length=254)
     notes: str | None = Field(None, max_length=4000)
+    email_domain: str | None = Field(None, max_length=254)
     status: Literal["active", "suspended"] | None = None
 
 
@@ -133,6 +135,7 @@ def company_out(c: Company, **extra) -> dict:
         "currency": c.currency,
         "timezone": c.timezone,
         "contactEmail": c.contact_email,
+        "emailDomain": c.email_domain,
         "notes": c.notes,
         "createdAt": iso(c.created_at),
         "suspendedAt": iso(c.suspended_at),
@@ -196,6 +199,11 @@ def add_company(body: CompanyIn, db: DB, me: AdminUser) -> dict:
         raise field_error("adminEmail" if body.admin_email is None else "adminName", "Give both their name and their email, or neither.")
     apps = _apps(db, body.application_ids)
     c = Company(name=body.name, slug=slug, currency=body.currency, timezone=body.timezone, contact_email=body.contact_email, notes=body.notes)
+    c.email_domain = email_rules.check_domain(db, c, body.email_domain)
+    if body.admin_email:
+        if c.email_domain:
+            email_rules.check_company_email(c, body.admin_email)
+        email_rules.check_available(db, body.admin_email, None)
     db.add(c)
     db.flush()
     for a in apps:
@@ -267,6 +275,8 @@ def update_company(company_id: str, body: CompanyPatch, db: DB, me: AdminUser, r
             raise field_error(required, "This can't be empty.")
     if "slug" in fields and fields["slug"] != c.slug and db.scalar(select(Company).where(Company.slug == fields["slug"])):
         raise field_error("slug", f"The address {fields['slug']} is taken.")
+    if "email_domain" in fields:
+        fields["email_domain"] = email_rules.check_domain(db, c, fields["email_domain"])
     fields = {k: v for k, v in fields.items() if getattr(c, k) != v}
     if not fields:
         return {"company": company_out(c)}

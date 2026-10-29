@@ -8,7 +8,6 @@ from datetime import date
 import pytest
 
 from app import pharmacy
-from app.routers import quotes as quotes_router
 from tests.test_customers import company, crew  # noqa: F401 (crew is a fixture)
 from tests.test_quotes import catalogue, ids, line, save  # noqa: F401 (fixtures)
 
@@ -50,9 +49,9 @@ def fake(app, monkeypatch):
 
 
 @pytest.fixture
-def ordering(app, monkeypatch):
-    monkeypatch.setattr(type(app.state.settings), "orders_linked", property(lambda self: True))
-    monkeypatch.setattr(quotes_router, "send_order", lambda settings, quote_id, body: {"id": "ord-1", "number": "SO-1"})
+def ordering(app):
+    """Raise order goes to the Sales app as an event (step 11): nothing to stand in for."""
+    return app
 
 
 def rx_quote(client, crew, ids):

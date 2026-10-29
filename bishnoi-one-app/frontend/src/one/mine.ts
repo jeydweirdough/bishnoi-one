@@ -13,7 +13,10 @@ export function myModules(me: Account): MyModule[] {
   const byGrant = [...me.apps].sort((a, b) => (a.grantedAt ?? "").localeCompare(b.grantedAt ?? ""));
   const given: MyModule[] = byGrant.flatMap((a) => {
     const m = moduleByAppKey(a.key);
-    return m && !m.accountOnly ? [{ key: m.key, oldUrl: a.appUrl }] : [];
+    if (!m || m.accountOnly) return [];
+    // Sales runs in the Operations service (Inventory's): it comes with Inventory, while the catalogue has it on (step 11).
+    const withSales = m.key === "inventory" && me.features?.["app:sales"] !== false ? [{ key: "sales" as const, oldUrl: null }] : [];
+    return [{ key: m.key, oldUrl: a.appUrl }, ...withSales];
   });
   if (!(me.isCompanyAdmin || me.staff)) return given;
   // A company's administrators, and Bishnoi One's staff, see every module (decided 2026-10-25): what

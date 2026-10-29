@@ -4,9 +4,11 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
-import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
+import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
 import { adjustmentStep, countStep, withdrawAdjustment } from "@/src/modules/inventory/actions/inventory";
 import { AdjustmentForm, CountSheet, StartCount } from "@/src/modules/inventory/components/adjust-forms";
+import { CountSchedules } from "@/src/modules/inventory/components/count-schedules";
+import { CountByScan } from "@/src/modules/inventory/components/scan";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { AdjustmentStamp, CountStamp } from "@/src/modules/inventory/components/stamps";
 import { StepButton } from "@/src/modules/inventory/components/step-button";
@@ -17,7 +19,7 @@ import { loadSetup } from "@/src/modules/inventory/lib/setup";
 import { Pager } from "@/src/modules/inventory/platform/ui/pager";
 import { canAddFrom, context, keepInRange, paging, type Params, type Search } from "@/src/modules/inventory/lib/page";
 import { given, referenceOf } from "@/src/modules/inventory/lib/reference";
-import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, Paged, ReasonOption, Reference } from "@/src/modules/inventory/lib/types";
+import type { Adjustment, AdjustmentBrief, BatchRow, Count, CountBrief, CountSchedule, Paged, ReasonOption, Reference } from "@/src/modules/inventory/lib/types";
 
 export async function AdjustmentsPage({ searchParams }: { searchParams: Search }) {
   const { me, fmt, may, at } = await context();
@@ -146,7 +148,7 @@ export async function NewAdjustmentPage({ searchParams }: { searchParams: Search
 }
 
 export async function CountsPage({ searchParams }: { searchParams: Search }) {
-  const { me, fmt, may, at } = await context();
+  const { me, fmt, may, at, day } = await context();
   if (!may("counts.view")) return <NoAccess what="inventory counts" />;
   const s = await searchParams;
   const status = param(s, "status");
@@ -160,6 +162,8 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
   );
   keepInRange(list.items.length, list.total, page, base);
   const rows = list.items;
+  // Cycle count schedules (step 14b): due ones first.
+  const schedules = await load<{ items: CountSchedule[]; due: number }>("/inventory/count-schedules");
   return (
     <>
       <PageHeader title="Inventory counts">
@@ -168,6 +172,13 @@ export async function CountsPage({ searchParams }: { searchParams: Search }) {
       <Filters keep={{ status }}>
         <HeaderFilters types={operationTypes} kinds={["count"]} operationType={h.operationType} timing={h.timing} />
       </Filters>
+      <Sheet className="mb-5 px-5 py-4">
+        <CountSchedules
+          schedules={schedules.items.map((x) => ({ ...x, nextLabel: day(x.nextOn), lastLabel: x.lastCountedOn ? day(x.lastCountedOn) : null }))}
+          reference={ref}
+          may={{ create: may("counts.create"), manage: may("counts.approve") }}
+        />
+      </Sheet>
       {may("counts.create") && (
         <Sheet className="mb-5 px-5 py-4">
           <StartCount canAdd={canAddFrom(may)} reference={ref} warehouseId={param(s, "warehouse")} />
@@ -247,6 +258,12 @@ export async function CountPage({ params }: { params: Params<{ id: string }> }) 
           { label: "Started", value: <span className="text-sm">{at(c.createdAt)}</span> },
         ]}
       />
+      {/* Count by scanning (step 14c): each scan adds one to the item's line. */}
+      {c.status === "open" && may("counts.create") && (
+        <Sheet className="mt-5 px-5 py-4">
+          <CountByScan countId={c.id} />
+        </Sheet>
+      )}
       <Sheet className="mt-5">
         <div className="px-5 pt-4"><SectionTitle icon="lists">Count sheet</SectionTitle></div>
         {c.lines.length === 0 ? (

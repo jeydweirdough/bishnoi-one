@@ -15,7 +15,7 @@ should reach what, and what is happening across all of it.
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, BigInteger, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -118,6 +118,21 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AccountSignature(Base):
+    """A person's e-signature on their account (step 10, app/signatures.py). Replaced or removed ones
+    are kept (replaced_at), for what they signed."""
+
+    __tablename__ = "nbpl_signatures"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("nbpl_accounts.id", ondelete="CASCADE"), index=True)
+    image: Mapped[bytes] = mapped_column(LargeBinary)
+    method: Mapped[str] = mapped_column(String(10))  # drawn or uploaded
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
 # ---- Organizations -------------------------------------------------------------
 
 COMPANY_STATUSES = ("active", "suspended")
@@ -127,7 +142,8 @@ UNIT_KINDS = ("department", "branch")
 class Company(Base):
     __tablename__ = "nbpl_companies"
     __mapper_args__ = {"eager_defaults": True}
-    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True),)
+    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True),
+                      Index("nbpl_companies_email_domain", "email_domain", unique=True))
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
@@ -139,6 +155,16 @@ class Company(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Manila")
     contact_email: Mapped[str | None] = mapped_column(String(254), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
+    # The letterhead every printed document carries (step 10, migration 0018).
+    legal_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    address: Mapped[str | None] = mapped_column(String(400), default=None)
+    tin: Mapped[str | None] = mapped_column(String(30), default=None)
+    phone: Mapped[str | None] = mapped_column(String(40), default=None)
+    logo: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
+    logo_type: Mapped[str | None] = mapped_column(String(20), default=None)
+    document_footer: Mapped[str | None] = mapped_column(String(400), default=None)
+    # Its people's email domain (getmeds.ph): one per company, never a public one (migration 0019, app/email_rules.py).
+    email_domain: Mapped[str | None] = mapped_column(String(253), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 

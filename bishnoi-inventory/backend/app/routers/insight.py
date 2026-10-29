@@ -26,11 +26,13 @@ from app.models import (
     AdjustmentLine,
     Batch,
     Count,
+    Location,
     Movement,
     Order,
     Product,
     PurchaseOrder,
     Receipt,
+    SalesOrder,
     Stock,
     Supplier,
     Transfer,
@@ -264,14 +266,26 @@ def current_inventory(p: Params) -> tuple[list[dict], list[dict]]:
     return [col("sku", "SKU"), col("product", "Product"), col("warehouse", "Warehouse"), col("onHand", "On hand", "number"), col("damaged", "Damaged", "number"), col("reserved", "Reserved", "number"), col("allocated", "Allocated", "number"), col("available", "Available", "number"), col("inTransit", "In transit", "number"), col("unit", "Unit"), col("state", "Stock")], rows
 
 
+def consigned(p: Params) -> dict[str, int]:
+    """What sits in vendors' consignment locations, per product (15d): theirs, not ours."""
+    q = (select(Stock.product_id, func.sum(Stock.on_hand)).join(Location, Stock.location_id == Location.id)
+         .where(Location.consignment_supplier_id.is_not(None)).group_by(Stock.product_id))
+    if p.warehouse:
+        q = q.where(Stock.warehouse_id == p.warehouse)
+    return {pid: int(n or 0) for pid, n in p.db.execute(q)}
+
+
 def valuation(p: Params):
+    """Ours only: consignment stock is the vendor's until it sells (15d)."""
     products = {x.id: x for x in stocked(p.db)}
+    theirs = consigned(p)
     rows = []
     for pid, lv in by_product(p.db, list(products), p.warehouse).items():
         x = products.get(pid)
-        if x is None or not lv["onHand"]:
+        own = lv["onHand"] - theirs.get(pid, 0)
+        if x is None or own <= 0:
             continue
-        rows.append({"sku": x.sku, "product": x.name, "category": category_path(x.category) or "—", "onHand": lv["onHand"], "unitCost": x.cost_price, "value": lv["onHand"] * x.cost_price, "retail": lv["onHand"] * x.selling_price})
+        rows.append({"sku": x.sku, "product": x.name, "category": category_path(x.category) or "—", "onHand": own, "unitCost": x.cost_price, "value": own * x.cost_price, "retail": own * x.selling_price})
     rows.sort(key=lambda r: -r["value"])
     return [col("sku", "SKU"), col("product", "Product"), col("category", "Category"), col("onHand", "On hand", "number"), col("unitCost", "Unit cost", "money"), col("value", "Value at cost", "money"), col("retail", "Value at selling price", "money")], rows
 
@@ -430,6 +444,33 @@ def variance(p: Params):
     return [col("count", "Count"), col("at", "Approved", "datetime"), col("warehouse", "Warehouse"), col("sku", "SKU"), col("product", "Product"), col("location", "Location"), col("batch", "Batch"), col("expected", "Expected", "number"), col("counted", "Counted", "number"), col("difference", "Difference", "number"), col("value", "Value", "money")], rows
 
 
+def count_accuracy(p: Params):
+    """Each warehouse's counts approved in the period (step 14b): lines counted, how many matched what the system
+    expected, the accuracy, and the units and value found different."""
+    q = select(Count).where(Count.status == "approved", Count.approved_at >= p.after, Count.approved_at < p.before)
+    if p.warehouse:
+        q = q.where(Count.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    for c in p.db.scalars(q):
+        r = by.setdefault(c.warehouse_id, {"warehouse": c.warehouse.name, "counts": 0, "scheduled": 0, "lines": 0, "matched": 0, "unitsOff": 0, "valueOff": 0})
+        r["counts"] += 1
+        r["scheduled"] += 1 if c.schedule_id else 0
+        for line in c.lines:
+            if line.counted is None:
+                continue
+            r["lines"] += 1
+            off = line.counted - line.expected
+            r["matched"] += off == 0
+            r["unitsOff"] += abs(off)
+            r["valueOff"] += abs(off) * line.product.cost_price
+    rows = sorted(by.values(), key=lambda r: r["warehouse"].lower())
+    for r in rows:
+        r["accuracy"] = r["matched"] / r["lines"] if r["lines"] else None
+    return [col("warehouse", "Warehouse"), col("counts", "Counts", "number"), col("scheduled", "From schedules", "number"), col("lines", "Lines counted", "number"),
+            col("matched", "Lines matching", "number"), {**col("accuracy", "Accuracy", "percent"), "ratio": ["matched", "lines"]},
+            col("unitsOff", "Units different", "number"), col("valueOff", "Value different", "money")], rows
+
+
 def product_movement(p: Params):
     q = select(Movement.product_id, Movement.kind, func.sum(Movement.quantity)).where(Movement.at >= p.after, Movement.at < p.before, Movement.kind.not_in(("reserve", "release", "damage"))).group_by(Movement.product_id, Movement.kind)
     if p.warehouse:
@@ -569,6 +610,214 @@ def sales_by_salesperson(p: Params):
             r["value"] += line.quantity * line.unit_price
     rows = sorted(by.values(), key=lambda r: -r["value"])
     return [col("salesperson", "Name"), col("orderCount", "Order count", "number"), col("items", "Line items", "number"), col("quantity", "Total quantity", "number"), col("value", "Total value", "money")], rows
+
+
+SALES_STATUS = {"draft": "Draft", "pending": "Waiting for approval", "confirmed": "Confirmed", "delivered": "Delivered", "rejected": "Rejected", "cancelled": "Cancelled"}
+
+
+def _sales_orders(p: Params):
+    q = select(SalesOrder).where(SalesOrder.created_at >= p.after, SalesOrder.created_at < p.before)
+    if p.warehouse:
+        q = q.where(SalesOrder.warehouse_id == p.warehouse)
+    return p.db.scalars(q).all()
+
+
+def sales_orders_by(key: str, label: str):
+    """The Sales app's orders in the period (step 11), by status, salesperson or division: how many, what they
+    come to, and how many were approved and delivered."""
+
+    def build(p: Params):
+        by: dict[str, dict] = {}
+        for o in _sales_orders(p):
+            name = {"status": SALES_STATUS[o.status], "salesperson": o.salesperson_name or o.created_by_name or "No salesperson",
+                    "division": o.division_name or "Not in a division"}[key]
+            r = by.setdefault(name, {"name": name, "orders": 0, "value": 0, "approved": 0, "delivered": 0})
+            r["orders"] += 1
+            r["value"] += o.total_centavos
+            r["approved"] += o.status in ("confirmed", "delivered")
+            r["delivered"] += o.status == "delivered"
+        rows = sorted(by.values(), key=lambda r: -r["value"])
+        cols = [col("name", label), col("orders", "Orders", "number"), col("value", "Value", "money")]
+        if key != "status":
+            cols += [col("approved", "Approved", "number"), col("delivered", "Delivered", "number")]
+        return cols, rows
+
+    return build
+
+
+def fill_rate(p: Params):
+    """Ordered against delivered, per product, for the approved orders of the period (step 11): what share of what
+    customers ordered has gone out."""
+    by: dict[str, dict] = {}
+    for o in _sales_orders(p):
+        if o.status not in ("confirmed", "delivered"):
+            continue
+        for line in o.lines:
+            r = by.setdefault(line.product_id, {"product": line.product.name, "sku": line.product.sku, "ordered": 0, "delivered": 0})
+            r["ordered"] += line.quantity
+            r["delivered"] += line.delivered
+    rows = []
+    for r in by.values():
+        r["short"] = r["ordered"] - r["delivered"]
+        r["fillRate"] = r["delivered"] / r["ordered"] if r["ordered"] else None
+        rows.append(r)
+    rows.sort(key=lambda r: (r["fillRate"] if r["fillRate"] is not None else 1, r["product"].lower()))
+    return [col("product", "Product"), col("sku", "SKU"), col("ordered", "Ordered", "number"), col("delivered", "Delivered", "number"),
+            col("short", "Still to deliver", "number"), {**col("fillRate", "Fill rate", "percent"), "ratio": ["delivered", "ordered"]}], rows
+
+
+def order_to_cash(p: Params):
+    """Each sales order of the period through the chain (step 13): ordered → approved → delivered → invoiced →
+    paid, with the days between, and what is still waiting. Approved orders only."""
+
+    def days(start, end):
+        return round((end - start).total_seconds() / 86400, 1) if start and end else None
+
+    rows = []
+    for o in _sales_orders(p):
+        if o.status in ("draft", "pending", "rejected", "cancelled"):
+            continue
+        stage = "Paid" if o.paid_at else "Invoiced" if o.invoice_id else "Delivered" if o.delivered_at else "Approved"
+        rows.append({"order": o.number, "customer": o.customer_name, "quote": o.quote_number or "", "stage": stage,
+                     "value": o.total_centavos, "invoice": o.invoice_number or "",
+                     "toApprove": days(o.created_at, o.decided_at), "toDeliver": days(o.decided_at, o.delivered_at),
+                     "toInvoice": days(o.delivered_at, o.invoiced_at), "toBePaid": days(o.invoiced_at, o.paid_at),
+                     "orderToCash": days(o.created_at, o.paid_at)})
+    rows.sort(key=lambda r: r["order"])
+    return [col("order", "Sales order"), col("customer", "Customer"), col("quote", "Quote"), col("stage", "Where it is"), col("value", "Value", "money"),
+            col("invoice", "Invoice"), col("toApprove", "Days to approve", "number"), col("toDeliver", "Days to deliver", "number"),
+            col("toInvoice", "Days to invoice", "number"), col("toBePaid", "Days to be paid", "number"), col("orderToCash", "Order to cash (days)", "number")], rows
+
+
+def _deliveries(p: Params) -> list[Order]:
+    """The customers' deliveries issued in the period (step 12)."""
+    q = select(Order).where(Order.kind == "sale", Order.status == "issued", Order.issued_at >= p.after, Order.issued_at < p.before)
+    if p.warehouse:
+        q = q.where(Order.warehouse_id == p.warehouse)
+    return list(p.db.scalars(q))
+
+
+def _delivery_row(name: str) -> dict:
+    return {"name": name, "deliveries": 0, "delivered": 0, "out": 0, "failed": 0, "promised": 0, "onTime": 0, "late": 0, "days": [], "fees": 0, "charged": 0}
+
+
+def _count_delivery(r: dict, o: Order) -> None:
+    from app.shipping import on_time
+
+    r["deliveries"] += 1
+    r[o.delivery_status if o.delivery_status in ("delivered", "out", "failed") else "out"] += 1
+    r["fees"] += o.shipping_fee or 0
+    r["charged"] += (o.shipping_fee or 0) if o.fee_charged else 0
+    kept = on_time(o)
+    if kept is not None:
+        r["promised"] += 1
+        r["onTime" if kept else "late"] += 1
+    if o.delivered_at and o.issued_at:
+        r["days"].append((o.delivered_at - o.issued_at).total_seconds() / 86400)
+
+
+def _delivery_rows(rows: list[dict]) -> list[dict]:
+    for r in rows:
+        days = r.pop("days")
+        r["onTimeRate"] = r["onTime"] / r["promised"] if r["promised"] else None
+        r["failRate"] = r["failed"] / r["deliveries"] if r["deliveries"] else None
+        r["averageDays"] = round(sum(days) / len(days), 1) if days else None
+    return rows
+
+
+def _delivery_columns(first: str) -> list[dict]:
+    return [col("name", first), col("deliveries", "Deliveries", "number"), col("delivered", "Delivered", "number"), col("out", "Out for delivery", "number"),
+            col("failed", "Failed", "number"), {**col("failRate", "Failed rate", "percent"), "ratio": ["failed", "deliveries"]},
+            col("onTime", "On time", "number"), col("late", "Late", "number"), {**col("onTimeRate", "On-time rate", "percent"), "ratio": ["onTime", "promised"]},
+            col("averageDays", "Average days to deliver", "number"), col("fees", "Shipping fees", "money"), col("charged", "Charged to customers", "money")]
+
+
+def deliveries_by_courier(p: Params):
+    """Each courier's deliveries in the period: delivered, failed, on time, how long, and what they cost (step 12)."""
+    from app.shipping import METHOD_LABELS
+
+    by: dict[str, dict] = {}
+    for o in _deliveries(p):
+        method = o.delivery_method or "courier"
+        name = o.courier.name if o.courier else "No courier set" if method == "courier" else METHOD_LABELS[method]
+        _count_delivery(by.setdefault(name, _delivery_row(name)), o)
+    rows = sorted(_delivery_rows(list(by.values())), key=lambda r: -r["deliveries"])
+    return _delivery_columns("Courier"), rows
+
+
+def on_time_delivery(p: Params):
+    """Each month's deliveries: how many reached the customer by the day promised (step 12)."""
+    from app import documents
+
+    by: dict[str, dict] = {}
+    for o in _deliveries(p):
+        month = o.issued_at.astimezone(documents.zone()).strftime("%Y-%m")
+        _count_delivery(by.setdefault(month, _delivery_row(month)), o)
+    rows = _delivery_rows([by[k] for k in sorted(by)])
+    return _delivery_columns("Month"), rows
+
+
+def quality_by_vendor(p: Params):
+    """Each vendor's goods checked in the period (step 14a): units checked, passed and failed, the failed rate and the
+    commonest reason."""
+    from collections import Counter
+
+    from app.models import QualityCheck
+    from app.quality import REASON_LABELS
+
+    q = select(QualityCheck).where(QualityCheck.status == "done", QualityCheck.checked_at >= p.after, QualityCheck.checked_at < p.before)
+    if p.warehouse:
+        q = q.where(QualityCheck.warehouse_id == p.warehouse)
+    by: dict[str, dict] = {}
+    reasons: dict[str, Counter] = {}
+    for c in p.db.scalars(q):
+        name = c.receipt.supplier.name if c.receipt.supplier else "No vendor"
+        r = by.setdefault(name, {"vendor": name, "checks": 0, "units": 0, "passed": 0, "failed": 0})
+        r["checks"] += 1
+        for line in c.lines:
+            r["units"] += line.quantity
+            r["passed"] += line.passed or 0
+            r["failed"] += line.failed or 0
+            if line.failed:
+                reasons.setdefault(name, Counter())[line.reason or "other"] += line.failed
+    rows = sorted(by.values(), key=lambda r: -(r["failed"] / r["units"] if r["units"] else 0))
+    for r in rows:
+        r["failRate"] = r["failed"] / r["units"] if r["units"] else None
+        top = reasons.get(r["vendor"])
+        r["reason"] = REASON_LABELS.get(top.most_common(1)[0][0], "") if top else ""
+    return [col("vendor", "Vendor"), col("checks", "Checks", "number"), col("units", "Units checked", "number"), col("passed", "Passed", "number"),
+            col("failed", "Failed", "number"), {**col("failRate", "Failed rate", "percent"), "ratio": ["failed", "units"]}, col("reason", "Commonest reason")], rows
+
+
+def consignment(p: Params):
+    """Each vendor's consignment (15d): what sold from it in the period (to pay them, at their price) and what is left."""
+    from app.models import Supplier, SupplierProduct
+
+    vendors = {s.id: s for s in p.db.scalars(select(Supplier))}
+    locations = {loc.id: loc for loc in p.db.scalars(select(Location).where(Location.consignment_supplier_id.is_not(None)))}
+    if not locations:
+        return [col("vendor", "Vendor"), col("product", "Product"), col("sold", "Sold", "number"), col("toPay", "To pay", "money"), col("left", "Still on consignment", "number")], []
+    sold = p.db.execute(select(Movement.location_id, Movement.product_id, func.sum(-Movement.quantity))
+                        .where(Movement.kind == "issue", Movement.location_id.in_(list(locations)), Movement.at >= p.after, Movement.at < p.before)
+                        .group_by(Movement.location_id, Movement.product_id)).all()
+    left = p.db.execute(select(Stock.location_id, Stock.product_id, func.sum(Stock.on_hand)).where(Stock.location_id.in_(list(locations)))
+                        .group_by(Stock.location_id, Stock.product_id)).all()
+    by: dict[tuple[str, str], dict] = {}
+    for loc_id, pid, n in sold:
+        by.setdefault((locations[loc_id].consignment_supplier_id, pid), {"sold": 0, "left": 0})["sold"] += int(n or 0)
+    for loc_id, pid, n in left:
+        by.setdefault((locations[loc_id].consignment_supplier_id, pid), {"sold": 0, "left": 0})["left"] += int(n or 0)
+    products = {x.id: x for x in p.db.scalars(select(Product).where(Product.id.in_({pid for _, pid in by})))}
+    rows = []
+    for (sid, pid), r in by.items():
+        x = products[pid]
+        terms = p.db.get(SupplierProduct, (sid, pid))
+        price = terms.price if terms and terms.price else x.cost_price
+        rows.append({"vendor": vendors[sid].name if sid in vendors else "—", "sku": x.sku, "product": x.name, "sold": r["sold"], "unitCost": price,
+                     "toPay": r["sold"] * price, "left": r["left"]})
+    rows.sort(key=lambda r: (r["vendor"].lower(), r["product"].lower()))
+    return [col("vendor", "Vendor"), col("sku", "SKU"), col("product", "Product"), col("sold", "Sold", "number"), col("unitCost", "Vendor price", "money"),
+            col("toPay", "To pay", "money"), col("left", "Still on consignment", "number")], rows
 
 
 def purchases_by_vendor(p: Params):
@@ -723,12 +972,24 @@ REPORTS: tuple[Report, ...] = (
     Report("sales-by-customer", "Sales by customer", "Sales", "Each customer's order count, quantity and value — like Zoho's 'Sales by Customer'.", sales_by_customer, dated=True, chart=bar("customer", "value")),
     Report("sales-by-item", "Sales by item", "Sales", "Each product issued: quantity, average price, value and share of total.", sales_by_item, dated=True, chart=bar("product", "value")),
     Report("sales-by-salesperson", "Sales by salesperson", "Sales", "Each person who issued orders: count, quantity and value.", sales_by_salesperson, dated=True, by_warehouse=False, chart=bar("salesperson", "value")),
+    # The Sales app's sales orders (step 11).
+    Report("sales-orders-by-status", "Sales orders by status", "Sales orders", "How many orders are waiting, confirmed, delivered or rejected, and what they come to.", sales_orders_by("status", "Status"), dated=True, chart=bar("name", "value")),
+    Report("sales-orders-by-salesperson", "Sales orders by salesperson", "Sales orders", "Each salesperson's orders in the period: how many, their value, approved and delivered.", sales_orders_by("salesperson", "Salesperson"), dated=True, by_warehouse=False, chart=bar("name", "value")),
+    Report("sales-orders-by-division", "Sales orders by division", "Sales orders", "Each division's orders in the period, by the salesperson's division when ordered.", sales_orders_by("division", "Division"), dated=True, by_warehouse=False, chart=bar("name", "value")),
+    Report("order-to-cash", "Order to cash", "Sales orders", "Each approved order through approval, delivery, invoice and payment, with the days between and where it is now.", order_to_cash, dated=True, by_warehouse=False),
+    Report("fill-rate", "Fill rate", "Sales orders", "What share of what customers ordered has gone out, per product, for the period's approved orders.", fill_rate, dated=True, chart=bar("product", "ordered", "delivered")),
+    # Shipping with couriers (step 12).
+    Report("deliveries-by-courier", "Deliveries by courier", "Shipping", "Each courier's deliveries in the period: delivered, failed, on time, days to deliver and shipping fees.", deliveries_by_courier, dated=True, chart=bar("name", "delivered", "failed")),
+    Report("on-time-delivery", "On-time delivery", "Shipping", "Each month's deliveries reaching the customer by the promised day, with failed ones and shipping fees.", on_time_delivery, dated=True, chart=bar("name", "onTime", "late")),
+    Report("consignment", "Consignment", "Purchasing", "Each vendor's consignment: what sold from it in the period, what to pay them at their price, and what is still theirs on hand.", consignment, dated=True, chart=bar("product", "sold", "left")),
     Report("purchases", "Purchase history", "Purchasing", "Everything received in the period.", purchase_history, dated=True),
     Report("purchases-by-vendor", "Purchases by vendor", "Purchasing", "Each supplier's receipt count, quantity and spend — like Zoho's 'Purchases by Vendor'.", purchases_by_vendor, dated=True, chart=bar("vendor", "spend")),
     Report("purchases-by-item", "Purchases by item", "Purchasing", "Each product received: quantity, average cost and total spend.", purchases_by_item, dated=True, chart=bar("product", "spend")),
+    Report("quality-by-vendor", "Quality checks by vendor", "Purchasing", "Each vendor's goods checked on arrival in the period: passed, failed, the failed rate and the commonest reason.", quality_by_vendor, dated=True, chart=bar("vendor", "passed", "failed")),
     Report("suppliers", "Supplier performance", "Purchasing", "Fill rate, on-time deliveries and lead time, per supplier.", supplier_performance, by_warehouse=False, chart=bar("supplier", "fillRate", "onTimeRate")),
     Report("issuance", "Sales and issuance history", "Orders", "Everything issued in the period.", issuance_history, dated=True),
     Report("adjustments", "Inventory adjustments", "Control", "Every posted adjustment in the period, with its reason.", adjustments_report, dated=True, fixed=True),
+    Report("count-accuracy", "Count accuracy", "Control", "Each warehouse's approved counts: lines matching what was expected, accuracy, and the units and value found different.", count_accuracy, dated=True, chart=bar("warehouse", "matched", "lines")),
     Report("variance", "Inventory variance", "Control", "Differences found by counts approved in the period.", variance, dated=True),
 )
 BY_KEY = {r.key: r for r in REPORTS}

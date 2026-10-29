@@ -182,10 +182,12 @@ def test_giving_and_taking_a_module(client, getmeds):
 
 def test_staff_open_the_console_with_their_bishnoi_one_account(client, ana, getmeds):
     """One sign-in (decided 2026-10-24): a Bishnoi One account whose email is staff's acts as that staff member."""
-    c = getmeds["company"]
-    ana_account = person(client, ana, c, "Ana Reyes", "ana@example.com", admin=True)  # Ana is a Platform Admin
-    assert client.get("/identity/me", headers=ana_account["h"]).json()["staff"] == "admin"
-    assert client.get("/platform/companies", headers=ana_account["h"]).status_code == 200
+    from tests.conftest import PASSWORD
+
+    token = client.post("/identity/login", json={"email": "ana@example.com", "password": PASSWORD}).json()["accessToken"]  # Ana is an operator
+    ana_account = {"Authorization": f"Bearer {token}"}
+    assert client.get("/identity/me", headers=ana_account).json()["staff"] == "admin"
+    assert client.get("/platform/companies", headers=ana_account).status_code == 200
     # someone who isn't staff gets nothing of the console's
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["staff"] is None
     assert client.get("/platform/companies", headers=getmeds["jade"]["h"]).status_code == 401

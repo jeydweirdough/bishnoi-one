@@ -30,6 +30,8 @@ export type BatchRef = {
 export type Level = {
   onHand: number;
   damaged: number;
+  /** Received and waiting for its quality check (step 14a): on hand, not usable yet. */
+  onHold?: number;
   reserved: number;
   allocated: number;
   available: number;
@@ -44,7 +46,7 @@ export type Reference = {
   units: { code: string; name: string; isActive: boolean }[];
   suppliers: (Ref & { isActive: boolean })[];
   warehouses: (Ref & { isActive: boolean; locations: { id: string; code: string; name: string; isDefault: boolean; isActive: boolean }[] })[];
-  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null })[];
+  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null; packagings?: { name: string; quantity: number }[] })[];
 };
 
 export type ProductType = "stock" | "consumable" | "asset" | "service";
@@ -89,6 +91,10 @@ export type MovementBrief = {
 };
 
 export type Product = ProductRow & {
+  /** Vendors' consignment stock in it (15d): on hand, not ours, not in its value. */
+  consigned?: number;
+  /** Its packs (step 14e); stock stays in its base unit. */
+  packagings?: PackagingRow[];
   description: string | null;
   unitName: string;
   taxRateBp: number;
@@ -184,7 +190,57 @@ export type SerialRow = {
   history: Movement[];
 };
 
-export type WarehouseRow = Ref & { address: string | null; isActive: boolean; locationCount: number; units: number; value: number; products: number };
+export type WarehouseRow = Ref & { address: string | null; isActive: boolean; locationCount: number; units: number; value: number; products: number; qualityCheck?: boolean };
+
+/** A file kept with an item, and whether it goes with every sale (step 15e). */
+export type ProductDocument = { id: string; productId: string; name: string; fileName: string; contentType: string; size: number; sendWithSales: boolean; createdAt: string; href: string };
+
+/** Replenishment (step 15a). */
+export type ReplenishmentSettings = { safetyDays: number; defaultLeadDays: number; historyDays: number; automatic: boolean; lastRunAt: string | null };
+export type ReplenishmentRow = {
+  product: ProductRef; supplier: { id: string; code?: string; name: string } | null; available: number; inTransit: number; onOrder: number; dailyUse: number;
+  leadDays: number; safetyDays: number; orderPoint: number; position: number; suggested: number; daysLeft: number | null; unitCost: number;
+};
+
+/** A pack of an item and how many of its base unit it holds (step 14e). */
+export type PackagingRow = { id: string; name: string; quantity: number; barcode: string | null };
+
+/** A delivery's packages (step 14d). */
+export type Packing = {
+  packages: { id: string; number: string; index: number; of: number; weightGrams: number | null; notes: string | null; packedBy: Person | null; createdAt: string;
+              lines: { lineId: string; product: ProductRef; quantity: number }[] }[];
+  lines: { lineId: string; product: ProductRef; quantity: number; packed: number }[];
+  allPacked: boolean;
+};
+
+/** Several held deliveries picked together (step 14d). */
+export type WaveBrief = {
+  id: string; number: string; status: "open" | "done"; warehouse: Ref; notes: string | null; createdBy: Person | null; createdAt: string; doneAt: string | null;
+  orders: { id: string; number: string; recipient: string; status: string; units: number }[]; units: number;
+};
+export type Wave = WaveBrief & {
+  pickList: { product: ProductRef; total: number; short: number; from: { location: { id: string; code: string }; batch: { id: string; batchNo: string; expiresOn: string | null } | null; quantity: number }[];
+              orders: { orderId: string; number: string; recipient: string; quantity: number }[] }[];
+};
+
+/** A cycle count that comes round every so many days (step 14b). */
+export type CountSchedule = {
+  id: string; name: string; warehouse: Ref; category: { id: string; name: string } | null; everyDays: number; nextOn: string; lastCountedOn: string | null;
+  isActive: boolean; due: boolean; overdueDays: number; openCount: { id: string; number: string; status: string } | null; createdAt: string;
+};
+
+/** A receipt's quality check (step 14a). */
+export type QualityCheckBrief = {
+  id: string; number: string; status: "waiting" | "done";
+  receipt: { id: string; number: string }; supplier: { id: string; name: string } | null; warehouse: { id: string; code: string; name: string };
+  receivedAt: string | null; checkedBy: { id: string; name: string } | null; checkedAt: string | null; units: number; passed: number; failed: number; createdAt: string | null;
+};
+export type QualityCheck = QualityCheckBrief & {
+  notes: string | null;
+  lines: { id: string; product: ProductRef; location: { id: string; code: string; name: string }; batch: { id: string; batchNo: string; expiresOn: string | null } | null;
+           quantity: number; passed: number | null; failed: number | null; reason: string | null; reasonLabel: string | null; note: string | null }[];
+  reasons: { value: string; label: string }[];
+};
 export type Warehouse = WarehouseRow & {
   createdAt: string;
   summary: Level;
@@ -249,7 +305,7 @@ export type POBrief = {
   /** Its lines, short, for a list row that opens in place. */
   items: { sku: string; product: string; quantity: number; received: number; unitCost: number }[];
 };
-export type PO = POBrief & {
+export type PO = POBrief & POExtras & {
   notes: string | null;
   createdBy: Person;
   orderedBy: Person;
@@ -282,14 +338,42 @@ export type ReceiptBrief = {
   units: number;
   total: number;
 };
+export type POExtras = {
+  /** Raised for a sales order (order-on-demand 15b, dropship 15c), or made by replenishment (15a). */
+  salesOrder?: { id: string; number: string } | null; dropship?: boolean; shipTo?: { name: string | null; address: string | null } | null; replenishment?: boolean;
+};
+
 export type Receipt = ReceiptBrief & {
   notes: string | null;
+  /** Its quality check, when its warehouse checks what it receives (step 14a). */
+  qualityCheck?: { id: string; number: string; status: "waiting" | "done" } | null;
   lines: { id: string; product: ProductRef; quantity: number; unitCost: number; total: number; batch: BatchRef | null; serials: string[] }[];
 };
 
 export type OrderKind = "sale" | "internal" | "department" | "project" | "distribution";
 export type OrderStatus = "draft" | "confirmed" | "picking" | "issued" | "cancelled";
 export type Pick = { locationId: string; locationCode: string; batchId: string | null; batchNo: string | null; expiresOn: string | null; quantity: number };
+
+/** A delivery company (step 12). */
+export type Courier = { id: string; code: string; name: string; trackingUrl: string | null; sortOrder: number; isActive: boolean };
+export type DeliveryMethod = "courier" | "own" | "pickup";
+/** How a customer's delivery goes and where it is (step 12). */
+export type Shipping = {
+  method: DeliveryMethod | null;
+  methodLabel: string | null;
+  courier: { id: string; name: string } | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  fee: number;
+  feeCharged: boolean;
+  status: "out" | "delivered" | "failed" | null;
+  statusLabel: string | null;
+  deliveredAt: string | null;
+  onTime: boolean | null;
+  failedReason: string | null;
+  attempts: number;
+  hasPhoto: boolean;
+};
 
 export type OrderBrief = {
   id: string;
@@ -309,8 +393,14 @@ export type OrderBrief = {
   issuedAt: string | null;
   /** Its lines, short, for a list row that opens in place. */
   items: { sku: string; product: string; quantity: number; unitPrice: number }[];
+  /** A customer's delivery's shipping (step 12); null for an issue to a department or project. */
+  shipping?: Shipping | null;
+  /** The wave it is picked in (step 14d). */
+  waveId?: string | null;
 };
 export type Order = OrderBrief & {
+  /** Proof of delivery: who signed for it, and their signature (step 10). */
+  received?: { name: string; signedAt: string; signature: string | null; fingerprint: string } | null;
   notes: string | null;
   createdBy: Person;
   confirmedBy: Person;
