@@ -17,6 +17,7 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     groups.push({ label: "Home", pages: [{ href: "/platform/home", label: "Home", icon: "home" }] });
     groups.push({
       label: "Company",
+      icon: "company",
       pages: [
         { href: "/platform/company", label: "Company profile", icon: "company" },
         { href: "/platform/company/apps", label: "Apps", icon: "apps" },
@@ -27,6 +28,7 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     });
     groups.push({
       label: "People",
+      icon: "people",
       pages: [
         { href: "/platform/roles/people", label: "People", icon: "people" },
         { href: "/platform/roles", label: "Roles", icon: "roles" },
@@ -35,23 +37,35 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     });
     groups.push({
       label: "Reports",
+      icon: "reports",
       pages: [
         { href: "/platform/reports", label: "Reports Center", icon: "reports" },
         { href: "/platform/reports/kpis", label: "Company KPIs", icon: "goals" },
       ],
     });
   }
-  if (me.staff)
+  // Bishnoi One's own work, for operators only: kept apart, under a line at the foot (2026-10-29).
+  if (me.staff) {
     groups.push({
-      label: "Operations",
+      label: "Companies and people",
+      icon: "companies",
+      operators: true,
       pages: [
         { href: "/platform/companies", label: "Companies", icon: "companies" },
         { href: "/platform/people", label: "Find a person", icon: "person" },
-        { href: "/platform/apis", label: "Services", icon: "apps" },
-        { href: "/platform/events", label: "Events", icon: "activity" },
         { href: "/platform/operators", label: "Operators", icon: "people" },
       ],
     });
+    groups.push({
+      label: "Services",
+      icon: "apps",
+      operators: true,
+      pages: [
+        { href: "/platform/apis", label: "Services", icon: "apps" },
+        { href: "/platform/events", label: "Events", icon: "activity" },
+      ],
+    });
+  }
   return groups;
 }
 
