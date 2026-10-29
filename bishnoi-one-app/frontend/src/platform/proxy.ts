@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isPublicPath, moduleOfPath, moduleByKey } from "./lib/modules";
 import { ACCOUNT_COOKIE, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie } from "./lib/session-cookie";
+import { siteUrl } from "./lib/site";
 
 // The first gate for every page of the one app (decided 2026-10-23):
 //  - no Bishnoi One account here: sign in first (the API checks every request
@@ -15,7 +16,7 @@ export async function proxy(request: NextRequest) {
   const here = reportModule ? moduleByKey(reportModule) : moduleOfPath(pathname);
   // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer
   // isn't signed in, so they go straight to the order page, never to the sign-in page.
-  if (pathname.startsWith("/order/")) return NextResponse.redirect(new URL(`/crm${pathname}${search}`, request.url), 308);
+  if (pathname.startsWith("/order/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   // A module's public page (a customer's order link): anyone, signed in or not, still talking to that module's API.
@@ -24,7 +25,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
   if (!request.cookies.get(ACCOUNT_COOKIE)?.value) {
-    const login = new URL("/login", request.url);
+    const login = siteUrl("/login", request);
     if (next !== "/") login.searchParams.set("next", next);
     return NextResponse.redirect(login);
   }
@@ -37,7 +38,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!request.cookies.get(moduleCookie(here.key))?.value) {
-    const enter = new URL(`/auth/enter/${here.key}`, request.url);
+    const enter = siteUrl(`/auth/enter/${here.key}`, request);
     enter.searchParams.set("next", next);
     return NextResponse.redirect(enter);
   }

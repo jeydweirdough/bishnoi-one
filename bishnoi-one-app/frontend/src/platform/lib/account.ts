@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { ACCOUNT_COOKIE } from "./session-cookie";
+import { siteOrigin } from "./site";
 
 // The Bishnoi One account, on Bishnoi One Platform's API (/identity/...): the
 // one sign-in for every module. Only the Next server talks to it, with the
@@ -13,14 +14,7 @@ export const PLATFORM_API = (process.env.PLATFORM_API_URL ?? "http://127.0.0.1:8
 // Where this site is: a module's pass names it as the return. ONE_APP_URL when
 // set; else the address it was reached at (decided 2026-10-27: nothing to set),
 // which the Platform accepts when it's an application's address in Applications.
-export function oneAppUrl(headers: Headers, fallback: string): string {
-  const set = process.env.ONE_APP_URL;
-  if (set) return set.replace(/\/$/, "");
-  const first = (name: string) => headers.get(name)?.split(",")[0].trim() || null;
-  const host = first("x-forwarded-host") || first("host");
-  const proto = first("x-forwarded-proto") || new URL(fallback).protocol.replace(":", "");
-  return host ? `${proto}://${host}` : new URL(fallback).origin;
-}
+export const oneAppUrl = siteOrigin;
 
 export class AccountError extends Error {
   constructor(
