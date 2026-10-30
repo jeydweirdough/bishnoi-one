@@ -108,3 +108,21 @@ def test_the_home_counts_people_sign_ins_security_and_access(client, getmeds):
     assert apps["crm"] == 2 and apps["pharmacy"] == 1  # Jade's grant + Olive, the administrator, opens every app
     assert any(e["action"] == "access.person_deleted" for e in body["recent"])
     assert client.get("/identity/company/overview", headers=getmeds["jade"]["h"]).status_code == 403
+
+
+def test_people_reports_hold_people_never_money(client, getmeds):
+    h = getmeds["owner"]["h"]
+    keys = [r["key"] for r in client.get("/identity/company/reports", headers=h).json()["reports"]]
+    assert keys == ["people", "sign-ins", "access-by-app", "roles", "security-events"]
+    for key in keys:
+        r = client.get(f"/identity/company/reports/{key}", headers=h)
+        assert r.status_code == 200, (key, r.text)
+        assert all(c["kind"] != "money" for c in r.json()["columns"])
+    people = client.get("/identity/company/reports/people", headers=h).json()
+    assert {row[1]["text"] for row in people["rows"]} == {"olive@getmeds.test", "jade@getmeds.test", "rio@getmeds.test"}
+    signed = client.get("/identity/company/reports/sign-ins", headers=h).json()
+    jade = next(row for row in signed["rows"] if row[1]["text"] == "jade@getmeds.test")
+    assert jade[2]["raw"] == 1  # signed in once, by the fixture
+    access = client.get("/identity/company/reports/access-by-app", headers=h).json()
+    assert [c["label"] for c in access["columns"]][:2] == ["Name", "Role"]
+    assert client.get("/identity/company/reports/revenue", headers=h).status_code == 404

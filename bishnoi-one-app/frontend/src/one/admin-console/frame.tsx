@@ -40,8 +40,8 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
       label: "Reports",
       icon: "reports",
       pages: [
+        // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
         { href: "/platform/reports", label: "Reports Center", icon: "reports" },
-        { href: "/platform/reports/kpis", label: "Company KPIs", icon: "goals" },
       ],
     });
   }

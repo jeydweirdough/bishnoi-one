@@ -11,7 +11,7 @@ export const metadata = { title: "Home" };
 
 // The Admin Console's Home (2026-10-30): user control at a glance, for the company's administrators:
 // who's here, who signs in, how safe the sign-ins are, and who can open which app. Counted by the
-// Platform alone (/identity/company/overview), so it's quick; finance figures live in Reports Center.
+// Platform alone (/identity/company/overview), so it's quick. No money here: the Admin Console is people.
 // The page is drawn at once; the figures stream in.
 
 type Overview = {
@@ -31,6 +31,14 @@ type Overview = {
 };
 
 const PEOPLE = "/platform/roles/people";
+const EMPTY: Overview = {
+  people: { active: 0, off: 0, inBin: 0, administrators: 0, noRole: 0, noApps: 0 },
+  signIns: { today: 0, week: 0, month: 0, never: 0, invitesPending: 0, passwordsToChange: 0 },
+  security: { twoStepAdministrators: { on: 0, of: 0 }, twoStepEveryone: { on: 0, of: 0 }, required: false, failedThisWeek: 0, lockedNow: 0, offDomain: 0 },
+  apps: [],
+  roles: [],
+  recent: [],
+};
 const n = (v: number, one: string, many = `${one}s`) => `${v} ${v === 1 ? one : many}`;
 
 // What a security entry says, in plain words.
@@ -110,18 +118,30 @@ function Bars({ rows, href, total }: { rows: { key: string; name: string; people
 export default async function AdminHome() {
   const account = await getAccount();
   if (!account.isCompanyAdmin) redirect("/platform/reports");
-  const data = accountSend<Overview>("GET", "/identity/company/overview");
+  // Never a blank page: a Platform that can't answer (unreachable, or older than this screen) is said plainly.
+  const answer = accountSend<Overview>("GET", "/identity/company/overview").then(
+    (o) => ({ o, why: null as string | null }),
+    (e: unknown) => ({ o: null, why: e instanceof Error ? e.message : "Bishnoi One can't be reached right now." }),
+  );
+  const data = answer.then((a) => a.o ?? EMPTY);
   const leads = ["Active people", "Signed in this week", "Administrators with two-step sign-in", "Administrators"];
 
   return (
     <>
-      <PageHeader title="Home">
-        Your company&apos;s people and access at a glance. Finance figures are in{" "}
-        <Link href="/platform/reports" className="text-hema underline">
-          Reports Center
-        </Link>
-        .
-      </PageHeader>
+      <PageHeader title="Home">Your company&apos;s people at a glance: who&apos;s here, who signs in, and who can open what.</PageHeader>
+      <Later data={answer} fallback={null}>
+        {(a) =>
+          a.why ? (
+            <p role="status" className="mb-4 rounded-lg border border-promo bg-promo-tint px-4 py-2.5 text-sm text-promo-ink">
+              These figures couldn&apos;t be loaded: {a.why}{" "}
+              {/404|not found/i.test(a.why) ? "Bishnoi One Platform is older than this screen: redeploy the Platform." : ""}{" "}
+              <a href="/platform/home" className="underline">
+                Try again
+              </a>
+            </p>
+          ) : null
+        }
+      </Later>
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Later data={data} fallback={leads.map((l, i) => <FigureCardLoading key={l} label={l} first={i === 0} />)}>

@@ -9,6 +9,9 @@ roles and the org chart are in company_access.py and organisation.py; this is th
 - GET  /identity/company/activity: the company's activity log, newest first.
 - GET  /identity/company/security, POST …/security/people/{id}/sign-out: who has a password,
   when each last signed in, open sign-ins, and ending a person's sign-ins.
+- GET  /identity/company/reports, …/reports/{key}?from&to: people reports for the Admin Console's Reports
+  Center (2026-10-30): people, sign-in activity, access by app, roles, security events. No money: the
+  apps' own reports (Finance, CRM…) are opened in each app.
 - GET  /identity/company/overview: the Admin Console's Home (2026-10-30): people, sign-ins, security
   and access by app, counted for the company (user control; finance figures are in Reports).
 - GET  /identity/company/administrators, PUT …/administrators/{id} {on}: who runs the company in
@@ -21,7 +24,7 @@ Every change is in the audit log (names of what changed, never values).
 from datetime import UTC, datetime
 from zoneinfo import available_timezones
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select
 
@@ -31,6 +34,7 @@ from app import abilities as ab
 from app import email_rules, signatures
 from app import catalogue as catalogue_on
 from app import services as svc
+from app import access_roles
 from app.access_roles import modules_of
 from app.accounts import account_of
 from app.api import Api, changed, check_email, conflict, field_error, iso, not_found
@@ -429,3 +433,105 @@ def overview(db: DB, me: Admin, settings: SettingsDep) -> dict:
         "roles": roles,
         "recent": [entry_out(e) for e in recent],
     }
+
+
+# ---- People reports (2026-10-30): the Admin Console's Reports Center is people, never money -----------
+
+PEOPLE_REPORTS = [
+    {"key": "people", "name": "People", "about": "Everyone at the company: role, apps, status, two-step sign-in and last sign-in.", "dated": False},
+    {"key": "sign-ins", "name": "Sign-in activity", "about": "Each person's sign-ins and wrong passwords in the period, and when they last signed in.", "dated": True},
+    {"key": "access-by-app", "name": "Access by app", "about": "Who can open which app. Administrators open every app the company has.", "dated": False},
+    {"key": "roles", "name": "Roles", "about": "Each role, how many people hold it, and how many apps it covers.", "dated": False},
+    {"key": "security-events", "name": "Security events", "about": "Sign-ins, password and two-step changes, invitations and access changes in the period.", "dated": True},
+]
+
+
+@router.get("/reports")
+def people_reports(me: Admin) -> dict:
+    return {"reports": PEOPLE_REPORTS}
+
+
+def _col(key: str, label: str, kind: str = "text") -> dict:
+    return {"key": key, "label": label, "kind": kind}
+
+
+def _cell(value, text: str | None = None) -> dict:
+    return {"raw": value, "text": text if text is not None else ("" if value is None else str(value))}
+
+
+@router.get("/reports/{key}")
+def people_report(key: str, db: DB, me: Admin, date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to")) -> dict:
+    from datetime import date as Date, timedelta
+
+    from app import sign_in
+    from app.models import AccessRole
+
+    found = next((r for r in PEOPLE_REPORTS if r["key"] == key), None)
+    if found is None:
+        raise not_found("report")
+    try:
+        start = Date.fromisoformat(date_from) if date_from else datetime.now(UTC).date().replace(day=1)
+        end = Date.fromisoformat(date_to) if date_to else datetime.now(UTC).date()
+    except ValueError:
+        raise field_error("from", "Use dates like 2026-10-01.") from None
+    since = datetime(start.year, start.month, start.day, tzinfo=UTC)
+    until = datetime(end.year, end.month, end.day, tzinfo=UTC) + timedelta(days=1)
+    people = db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False), Identity.deleted_at.is_(None))
+                        .order_by(func.lower(Identity.full_name))).all()
+    roles = {r.id: r for r in db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id))}
+    apps = modules_of(db, me.company_id)
+    grants: dict[str, set[str]] = {}
+    for identity_id, app_id in db.execute(select(IdentityApp.identity_id, IdentityApp.application_id).join(Identity, Identity.id == IdentityApp.identity_id)
+                                          .where(Identity.company_id == me.company_id)).all():
+        grants.setdefault(identity_id, set()).add(app_id)
+    status_word = lambda p: "Active" if p.status == "active" else "Switched off"  # noqa: E731
+    columns: list[dict] = []
+    rows: list[list[dict]] = []
+
+    if key == "people":
+        columns = [_col("name", "Name"), _col("email", "Email"), _col("title", "Title"), _col("role", "Role"), _col("apps", "Apps"), _col("status", "Status"),
+                   _col("admin", "Administrator"), _col("twoStep", "Two-step sign-in"), _col("last", "Last sign-in", "datetime")]
+        for p in people:
+            a = account_of(db, p)
+            names = ["All (administrator)"] if p.is_company_admin else [x.name for x in apps if x.id in grants.get(p.id, set())]
+            last = as_utc(a.last_sign_in_at) if a and a.last_sign_in_at else None
+            rows.append([_cell(p.full_name), _cell(p.email), _cell(p.title), _cell(roles[p.access_role_id].name if p.access_role_id in roles else None),
+                         _cell(", ".join(names)), _cell(status_word(p)), _cell("Yes" if p.is_company_admin else ""),
+                         _cell("On" if a and sign_in.two_step_on(a) else "Off"), _cell(iso(last) if last else None, last.isoformat() if last else "Never")])
+    elif key == "sign-ins":
+        emails = [p.email.lower() for p in people]
+        counted = lambda action: dict(db.execute(select(AuditEntry.target, func.count()).where(  # noqa: E731
+            AuditEntry.action == action, AuditEntry.target.in_(emails), AuditEntry.created_at >= since, AuditEntry.created_at < until).group_by(AuditEntry.target)).all()) if emails else {}
+        signed, wrong = counted("identity.signed_in"), counted("identity.sign_in_failed")
+        columns = [_col("name", "Name"), _col("email", "Email"), _col("signIns", "Sign-ins", "number"), _col("wrong", "Wrong passwords", "number"),
+                   _col("last", "Last sign-in", "datetime"), _col("status", "Status")]
+        for p in people:
+            a = account_of(db, p)
+            last = as_utc(a.last_sign_in_at) if a and a.last_sign_in_at else None
+            rows.append([_cell(p.full_name), _cell(p.email), _cell(signed.get(p.email.lower(), 0)), _cell(wrong.get(p.email.lower(), 0)),
+                         _cell(iso(last) if last else None, last.isoformat() if last else "Never"), _cell(status_word(p))])
+    elif key == "access-by-app":
+        columns = [_col("name", "Name"), _col("role", "Role")] + [_col(a.key, a.name) for a in apps]
+        for p in people:
+            if p.status != "active":
+                continue
+            rows.append([_cell(p.full_name), _cell(roles[p.access_role_id].name if p.access_role_id in roles else None)]
+                        + [_cell("Yes" if p.is_company_admin or a.id in grants.get(p.id, set()) else "") for a in apps])
+    elif key == "roles":
+        holders: dict[str, int] = {}
+        for p in people:
+            if p.status == "active" and p.access_role_id:
+                holders[p.access_role_id] = holders.get(p.access_role_id, 0) + 1
+        columns = [_col("role", "Role"), _col("people", "People", "number"), _col("everything", "Full access"), _col("apps", "Apps it covers", "number"), _col("about", "Description")]
+        for r in sorted(roles.values(), key=lambda r: (not r.is_admin, r.name.lower())):
+            covered = len(access_roles.grants_of(db, r))
+            rows.append([_cell(r.name), _cell(holders.get(r.id, 0)), _cell("Yes" if r.is_admin else ""), _cell(covered), _cell(r.description)])
+    elif key == "security-events":
+        columns = [_col("at", "When", "datetime"), _col("who", "Who"), _col("what", "What"), _col("target", "About"), _col("address", "From address")]
+        for e in db.scalars(select(AuditEntry).where(AuditEntry.company_id == me.company_id, AuditEntry.category == "security",
+                                                     AuditEntry.created_at >= since, AuditEntry.created_at < until).order_by(AuditEntry.created_at.desc()).limit(2000)):
+            at = as_utc(e.created_at)
+            rows.append([_cell(iso(at), at.isoformat()), _cell(e.actor), _cell(e.action.replace("identity.", "").replace("access.", "").replace("company.", "").replace("_", " ")),
+                         _cell(e.target), _cell(e.address)])
+    return {"key": key, "name": found["name"], "about": found["about"], "dated": found["dated"], "from": start.isoformat(), "to": end.isoformat(),
+            "columns": columns, "rows": rows}

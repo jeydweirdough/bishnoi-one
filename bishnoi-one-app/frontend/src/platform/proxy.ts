@@ -13,11 +13,15 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   // OAuth codes must never enter login return URLs or the last-page cookie.
   const next = pathname === "/finance/integrations/zoho/callback" ? pathname : pathname + search;
-  const reportModule = pathname.match(/^\/platform\/reports\/(crm|inventory|finance|admin|pharmacy)(?:\/|$)/)?.[1];
+  // The Admin Console's Reports Center is people reports only (2026-10-30): an app's report, and Company KPIs,
+  // are opened in that app; old links to them here go there.
+  const appReport = pathname.match(/^\/platform\/reports\/(crm|inventory|finance|admin|pharmacy)(\/.*)?$/);
+  if (appReport) return NextResponse.redirect(siteUrl(`${moduleByKey(appReport[1])?.path ?? ""}/reports${appReport[2] ?? ""}${search}`, request), 308);
+  if (pathname === "/platform/reports/kpis") return NextResponse.redirect(siteUrl(`/crm/kpis${search}`, request), 308);
   // A page in another module's frame (sales orders in the CRM): it talks to its own module, the frame to the frame's.
   const borrowed = borrowedOf(pathname);
   const frame = borrowed ? moduleByKey(borrowed.frame) : null;
-  const here = borrowed ? moduleByKey(borrowed.module) : reportModule ? moduleByKey(reportModule) : moduleOfPath(pathname);
+  const here = borrowed ? moduleByKey(borrowed.module) : moduleOfPath(pathname);
   // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer
   // isn't signed in, so they go straight to the order page, never to the sign-in page.
   if (pathname.startsWith("/order/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
