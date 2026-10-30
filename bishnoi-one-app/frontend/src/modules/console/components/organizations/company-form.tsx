@@ -56,13 +56,13 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
         };
         for (const k of TEXT) if ((next[k] ?? null) !== (company[k] ?? null)) (change as Record<string, unknown>)[k] = next[k];
         if (Object.keys(change).length === 0) {
-          router.push(`/platform/companies/${company.id}`);
+          router.push(`/operations/companies/${company.id}`);
           return;
         }
         const result = await updateCompany(company.id, change);
         if (result.ok) {
           toast.success("Changes saved", { description: next.name });
-          router.push(`/platform/companies/${company.id}`);
+          router.push(`/operations/companies/${company.id}`);
           return;
         }
         setError(result.error);
@@ -81,7 +81,7 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
       });
       if (result.ok) {
         toast.success("Company added", { description: result.data.name });
-        router.push(`/platform/companies/${result.data.id}`);
+        router.push(`/operations/companies/${result.data.id}`);
         return;
       }
       setError(result.error);
@@ -180,7 +180,7 @@ export function CompanyForm({ company, applications }: { company?: Company; appl
         <Button type="submit" variant="primary" loading={pending}>
           {company ? "Save changes" : "Add company"}
         </Button>
-        <LinkButton href={company ? `/platform/companies/${company.id}` : "/platform/companies"} variant="quiet">
+        <LinkButton href={company ? `/operations/companies/${company.id}` : "/operations/companies"} variant="quiet">
           Cancel
         </LinkButton>
       </div>

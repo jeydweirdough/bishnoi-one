@@ -36,7 +36,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       <PageHeader title="Services" actions={staff.canAdminister && <RegisterApplication />}>
         Each app&apos;s service: where its screens and API are, which companies use it, and what was deployed. Health tracking, incidents and support tickets were retired (step 5).
       </PageHeader>
-      <Tabs current={tab} tabs={TABS.map((t) => ({ ...t, href: t.key === "registry" ? "/platform/apis" : `/platform/apis?tab=${t.key}` }))} />
+      <Tabs current={tab} tabs={TABS.map((t) => ({ ...t, href: t.key === "registry" ? "/operations/apis" : `/operations/apis?tab=${t.key}` }))} />
       {tab === "registry" && <Registry retired={retired} canAdminister={staff.canAdminister} />}
       {tab === "deployments" && <Deployments canDelete={staff.canAdminister} />}
       {tab === "integrations" && <Integrations />}
@@ -49,7 +49,7 @@ function AppRow({ a }: { a: Application }) {
   return (
     <li>
       <Link
-        href={`/platform/apis/${a.id}`}
+        href={`/operations/apis/${a.id}`}
         className="group grid gap-x-6 gap-y-2 border-l-4 border-transparent px-5 py-4 transition-colors hover:bg-mint focus-visible:bg-mint focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto]"
       >
         <span className="min-w-0">
@@ -78,8 +78,8 @@ async function Registry({ retired, canAdminister }: { retired: boolean; canAdmin
         <ToggleLinks
           current={retired ? "all" : "active"}
           options={[
-            { value: "active", label: "Active", href: "/platform/apis" },
-            { value: "all", label: "Include retired", href: "/platform/apis?retired=1" },
+            { value: "active", label: "Active", href: "/operations/apis" },
+            { value: "all", label: "Include retired", href: "/operations/apis?retired=1" },
           ]}
         />
       </div>
@@ -112,7 +112,7 @@ async function Deployments({ canDelete }: { canDelete: boolean }) {
             <li key={d.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-5 py-3">
               <div className="min-w-0">
                 <p>
-                  <Link href={`/platform/apis/${d.applicationId}?tab=deployments`} className="font-semibold text-hema hover:underline">
+                  <Link href={`/operations/apis/${d.applicationId}?tab=deployments`} className="font-semibold text-hema hover:underline">
                     {d.applicationName}
                   </Link>{" "}
                   <span className="font-semibold tabular-nums">{d.version}</span>
@@ -163,7 +163,7 @@ async function Integrations() {
                   <span className="text-ink-2">
                     {" "}
                     ·{" "}
-                    <Link href={`/platform/apis/${i.applicationId}?tab=integrations`} className="text-hema hover:underline">
+                    <Link href={`/operations/apis/${i.applicationId}?tab=integrations`} className="text-hema hover:underline">
                       {i.applicationName}
                     </Link>
                   </span>

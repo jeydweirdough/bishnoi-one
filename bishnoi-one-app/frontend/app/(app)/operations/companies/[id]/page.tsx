@@ -35,25 +35,25 @@ export default async function CompanyPage({ params, searchParams }: Props) {
   const tab: Tab = TABS.includes(search.tab as Tab) ? (search.tab as Tab) : "overview";
   const [company, staff] = await Promise.all([getCompany(id), getStaff()]);
   const suspended = company.status === "suspended";
-  const href = (t: Tab) => `/platform/companies/${company.id}${t === "overview" ? "" : `?tab=${t}`}`;
+  const href = (t: Tab) => `/operations/companies/${company.id}${t === "overview" ? "" : `?tab=${t}`}`;
 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/platform/companies", label: "Companies" }]}
+        crumbs={[{ href: "/operations/companies", label: "Companies" }]}
         title={company.name}
         tools={
           <>
             {suspended && <SuspendedTag />}
             {staff.canAdminister && (
               <>
-                <EditLink href={`/platform/companies/${company.id}/edit`} what={company.name} />
+                <EditLink href={`/operations/companies/${company.id}/edit`} what={company.name} />
                 <SuspendCompany id={company.id} name={company.name} status={company.status} people={company.userCount} />
                 <DeleteRecord
                   kind="company"
                   id={company.id}
                   name={company.name}
-                  after="/platform/companies"
+                  after="/operations/companies"
                   done="Company deleted"
                   body={`${company.name} is removed from the platform with its ${company.userCount === 1 ? "1 person" : `${company.userCount} people`}, their access, its structure and connections. Tickets it raised stay. Its data inside each application (the CRM's customers, Inventory's stock) isn't touched. It can't be undone; to keep it, suspend it instead.`}
                 />
@@ -127,10 +127,10 @@ function Overview({ company }: { company: CompanyDetail }) {
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
       <div className="space-y-5">
         <Sheet className="grid grid-cols-2 divide-rule sm:grid-cols-4 sm:divide-x">
-          <Figure label="People" value={company.userCount} href={`/platform/companies/${company.id}?tab=users`} />
+          <Figure label="People" value={company.userCount} href={`/operations/companies/${company.id}?tab=users`} />
           <Figure label="Active users" value={company.status === "suspended" ? 0 : company.activeUserCount} />
-          <Figure label="Applications" value={company.appCount} href={`/platform/companies/${company.id}?tab=applications`} />
-          <Figure label="Open tickets" value={company.openTickets} href={`/platform/companies/${company.id}?tab=issues`} />
+          <Figure label="Applications" value={company.appCount} href={`/operations/companies/${company.id}?tab=applications`} />
+          <Figure label="Open tickets" value={company.openTickets} href={`/operations/companies/${company.id}?tab=issues`} />
         </Sheet>
         <Sheet className="px-5 py-4">
           <SectionTitle icon="particulars">Details</SectionTitle>
@@ -168,7 +168,7 @@ function Overview({ company }: { company: CompanyDetail }) {
             <ul className="divide-y divide-rule border-t border-rule" role="list">
               {company.admins.map((a) => (
                 <li key={a.id} className="px-5 py-2.5">
-                  <Link href="/platform/people" className="block truncate font-semibold text-hema hover:underline">
+                  <Link href="/operations/people" className="block truncate font-semibold text-hema hover:underline">
                     {a.name}
                   </Link>
                   <span className="block truncate text-meta text-ink-3">{a.email}</span>

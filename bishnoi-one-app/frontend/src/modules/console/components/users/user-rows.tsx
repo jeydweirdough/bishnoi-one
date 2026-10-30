@@ -27,7 +27,7 @@ export function UserRows({ users, showCompany = true }: { users: PlatformUser[];
           >
             <span className="min-w-0">
               <span className="flex flex-wrap items-center gap-2">
-                <Link href={`/platform/accounts/${u.id}`} className={`truncate font-semibold hover:underline ${blocked ? "text-ink-2" : "text-hema"}`}>
+                <Link href={`/operations/accounts/${u.id}`} className={`truncate font-semibold hover:underline ${blocked ? "text-ink-2" : "text-hema"}`}>
                   {u.fullName}
                 </Link>
                 {u.isCompanyAdmin && <AdminStamp />}
@@ -41,7 +41,7 @@ export function UserRows({ users, showCompany = true }: { users: PlatformUser[];
             {showCompany && (
               <span className="min-w-0 truncate text-meta text-ink-2">
                 {u.companyName ? (
-                  <Link href={`/platform/companies/${u.companyId}`} className="hover:text-hema hover:underline">
+                  <Link href={`/operations/companies/${u.companyId}`} className="hover:text-hema hover:underline">
                     {u.companyName}
                   </Link>
                 ) : (

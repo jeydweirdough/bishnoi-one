@@ -67,14 +67,14 @@ export function UserForm({
         if (isCompanyAdmin !== user.isCompanyAdmin) change.isCompanyAdmin = isCompanyAdmin;
         if (moving) change.companyId = companyId;
         if (Object.keys(change).length === 0) {
-          router.push(`/platform/accounts/${user.id}`);
+          router.push(`/operations/accounts/${user.id}`);
           return;
         }
         const result = await updateUser(user.id, change);
         if (result.ok) {
           const n = result.data.withdrawnApplications;
           toast.success("Changes saved", { description: n ? `${plural(n, "application")} removed with the company change.` : values.fullName.trim() });
-          router.push(`/platform/accounts/${user.id}`);
+          router.push(`/operations/accounts/${user.id}`);
           return;
         }
         setError(result.error);
@@ -93,7 +93,7 @@ export function UserForm({
       });
       if (result.ok) {
         toast.success("User added", { description: result.data.fullName });
-        router.push(`/platform/accounts/${result.data.id}`);
+        router.push(`/operations/accounts/${result.data.id}`);
         return;
       }
       setError(result.error);
@@ -203,7 +203,7 @@ export function UserForm({
         <Button type="submit" variant="primary" loading={pending} disabled={moving && loadingApps}>
           {user ? (moving && losing.length > 0 ? "Change company and save" : "Save changes") : "Add user"}
         </Button>
-        <LinkButton href={user ? `/platform/accounts/${user.id}` : initialCompany ? `/platform/companies/${initialCompany}?tab=users` : "/platform/accounts"} variant="quiet">
+        <LinkButton href={user ? `/operations/accounts/${user.id}` : initialCompany ? `/operations/companies/${initialCompany}?tab=users` : "/operations/accounts"} variant="quiet">
           Cancel
         </LinkButton>
       </div>

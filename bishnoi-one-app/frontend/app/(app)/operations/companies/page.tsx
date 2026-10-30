@@ -26,7 +26,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const filtered = Boolean(q || status);
   const link = (s: string) => {
     const next = new URLSearchParams({ ...(q && { q }), ...(s && { status: s }) });
-    return `/platform/companies${next.size ? `?${next}` : ""}`;
+    return `/operations/companies${next.size ? `?${next}` : ""}`;
   };
 
   return (
@@ -35,7 +35,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         title="Companies"
         actions={
           staff.canAdminister && (
-            <LinkButton href="/platform/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+            <LinkButton href="/operations/companies/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
               Add company
             </LinkButton>
           )
@@ -82,7 +82,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
               {companies.map((c) => (
                 <li key={c.id}>
                   <Link
-                    href={`/platform/companies/${c.id}`}
+                    href={`/operations/companies/${c.id}`}
                     className="grid gap-1 px-5 py-3 hover:bg-bench/40 md:grid-cols-[minmax(0,1fr)_6rem_6rem_7rem] md:items-center md:gap-4"
                   >
                     <span className="min-w-0">

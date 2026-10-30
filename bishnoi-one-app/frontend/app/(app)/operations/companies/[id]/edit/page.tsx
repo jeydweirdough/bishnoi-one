@@ -25,8 +25,8 @@ export default async function EditCompanyPage({ params }: Props) {
       <PageHeader
         title={`Edit ${company.name}`}
         crumbs={[
-          { href: "/platform/companies", label: "Companies" },
-          { href: `/platform/companies/${company.id}`, label: company.name },
+          { href: "/operations/companies", label: "Companies" },
+          { href: `/operations/companies/${company.id}`, label: company.name },
         ]}
       />
       <Sheet className="max-w-3xl px-5 py-5 sm:px-6">

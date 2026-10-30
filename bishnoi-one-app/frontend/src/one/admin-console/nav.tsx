@@ -11,10 +11,10 @@ export type ConsoleGroup = { label: string; icon?: IconName; flow?: boolean; ope
 /**
  * The Admin Console's sidebar: the same one every module wears (src/platform/shell/sidebar.tsx). Grouped as the
  * modules are (2026-10-29, the flat list of every page was too long): Home, then one row per area of the company's
- * administration (Company, People, Reports), each opening in place to its pages; under a line at the foot, labelled,
- * Bishnoi One's operations, for operators only.
+ * administration (Company, People, Reports), each opening in place to its pages. Operations (2026-10-30) wears the
+ * same sidebar with its own areas; operators' pages are no longer at the Admin Console's foot.
  */
-export function ConsoleNav({ groups, mine, company, rail = false, actions }: { groups: ConsoleGroup[]; mine: MyModule[]; company?: string | null; rail?: boolean; actions?: ReactNode }) {
+export function ConsoleNav({ module = "platform", groups, mine, company, rail = false, actions }: { module?: "platform" | "operations"; groups: ConsoleGroup[]; mine: MyModule[]; company?: string | null; rail?: boolean; actions?: ReactNode }) {
   const area = (g: ConsoleGroup): Process => ({
     label: g.label, icon: g.icon ?? g.pages[0]?.icon,
     steps: g.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, exact: p.href === "/platform/roles" })),
@@ -25,13 +25,13 @@ export function ConsoleNav({ groups, mine, company, rail = false, actions }: { g
   const foot = groups.filter((g) => g.operators).map(area);
   return (
     <Sidebar
-      module="platform"
+      module={module}
       company={company}
       mine={mine}
       home={home}
       processes={processes}
       foot={foot}
-      footLabel={foot.length > 0 ? "Bishnoi One operations" : undefined}
+      footLabel={foot.length > 0 ? "Bishnoi One" : undefined}
       icon={(name, className) => <Icon name={name as IconName} className={className} />}
       rail={rail}
       actions={actions}

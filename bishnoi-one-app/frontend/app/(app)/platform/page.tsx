@@ -4,6 +4,8 @@ import { consoleGroups } from "@/src/one/admin-console/frame";
 
 // The Admin Console opens on the first page this person may use.
 export default async function AdminConsoleHome() {
-  const first = consoleGroups(await getAccount())[0]?.pages[0]?.href;
-  redirect(first ?? "/?notice=" + encodeURIComponent("The Admin Console is for your company's administrators and Bishnoi One's staff."));
+  const me = await getAccount();
+  const first = consoleGroups(me)[0]?.pages[0]?.href;
+  // An operator with no company to run here works in Operations.
+  redirect(first ?? (me.staff ? "/operations" : "/?notice=" + encodeURIComponent("The Admin Console is for your company's administrators.")));
 }
