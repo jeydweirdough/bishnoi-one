@@ -45,6 +45,9 @@ def me_out(user: User, settings: Settings) -> dict:
         # Raise order goes to the Sales app through the Platform (step 11): always available.
         "ordersLinked": True,
         "pharmacyLinked": settings.pharmacy_linked,
+        # Connected to Bishnoi One (as platform_roles.managed): people, roles, divisions and teams are kept
+        # there, so the screens send people to the Admin Console instead of offering forms this API refuses.
+        "onPlatform": bool(settings.platform_api_url),
         "viewedBy": None,
         "isOwner": user.role.is_system,
         "isDeveloperAdmin": False,

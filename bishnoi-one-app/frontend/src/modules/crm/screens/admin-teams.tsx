@@ -16,7 +16,7 @@ export default async function TeamsPage() {
       <PageHeader title="People and access">
         People work in teams. A team lead reaches their own team&apos;s records; a manager, above the team leads, reaches every team they&apos;re the manager of.
       </PageHeader>
-      <TeamsEditor teams={teams} managers={managers} />
+      <TeamsEditor teams={teams} managers={managers} onPlatform={me.onPlatform} />
     </>
   );
 }

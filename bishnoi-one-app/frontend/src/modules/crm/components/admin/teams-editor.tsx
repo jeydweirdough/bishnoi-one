@@ -1,7 +1,8 @@
 "use client";
 
 import { CustomerSharingButton } from "@/src/modules/crm/components/crm/customer-sharing";
-import { Plus } from "lucide-react";
+import { Network, Plus } from "lucide-react";
+import { LinkButton } from "@/src/platform/ui/ant-button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -18,8 +19,10 @@ import { OffTag } from "@/src/modules/crm/components/admin/words";
 /** Who can be a team's manager: people whose role manages teams. */
 export type ManagerOption = { id: string; name: string };
 
-/** Teams: add one, change its name, description, manager or headquarters, switch it off, or delete it while nobody's in it. */
-export function TeamsEditor({ teams, managers = [] }: { teams: TeamRow[]; managers?: ManagerOption[] }) {
+/** Teams: add one, change its name, description, manager or headquarters, switch it off, or delete it while nobody's in it.
+ *  `onPlatform`: connected to Bishnoi One, where divisions and teams are kept; shown here, changed there. */
+export function TeamsEditor({ teams, managers = [], onPlatform = false }: { teams: TeamRow[]; managers?: ManagerOption[]; onPlatform?: boolean }) {
+  if (onPlatform) return <TeamsFromOrganisation teams={teams} />;
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -35,6 +38,50 @@ export function TeamsEditor({ teams, managers = [] }: { teams: TeamRow[]; manage
           <ul className="divide-y divide-rule">
             {teams.map((t) => (
               <TeamLine key={t.id} team={t} managers={managers} teams={teams} />
+            ))}
+          </ul>
+        )}
+      </Sheet>
+    </div>
+  );
+}
+
+/** Connected: the teams as the Admin Console's Organisation has them, and the way there. Nothing to fill in here. */
+function TeamsFromOrganisation({ teams }: { teams: TeamRow[] }) {
+  const division = (t: TeamRow) => teams.find((d) => d.id === t.parentId)?.name;
+  const toOrganisation = (
+    <LinkButton href="/platform/organisation" variant="primary" icon={<Network className="size-4" aria-hidden />}>
+      Open Organisation
+    </LinkButton>
+  );
+  return (
+    <div className="space-y-5">
+      <Sheet className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+        <p className="max-w-2xl text-sm text-ink-2">
+          Divisions and teams, their heads and who is in them, are set in the Admin Console&apos;s Organisation. Changes there show here at once.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <CustomerSharingButton />
+          {toOrganisation}
+        </div>
+      </Sheet>
+      <Sheet>
+        {teams.length === 0 ? (
+          <Empty icon="teams" title="No teams yet" actions={toOrganisation}>
+            Add divisions and teams in the Organisation, and place people in them. They come here by themselves.
+          </Empty>
+        ) : (
+          <ul className="divide-y divide-rule">
+            {teams.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">
+                <span className="text-sm font-semibold text-ink">{t.name}</span>
+                {!t.isActive && <OffTag />}
+                <span className="text-meta text-ink-3">
+                  {division(t) ? `In ${division(t)}` : "Division"}
+                  {t.manager ? ` · Headed by ${t.manager.name}` : ""}
+                  {` · ${t.memberCount} ${t.memberCount === 1 ? "person" : "people"}`}
+                </span>
+              </li>
             ))}
           </ul>
         )}

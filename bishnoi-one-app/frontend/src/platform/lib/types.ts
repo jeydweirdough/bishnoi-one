@@ -125,6 +125,8 @@ export type Me = {
   ordersLinked?: boolean;
   /** Bishnoi One Pharmacy is connected, so Rx quotes can be sent for the pharmacist's check. */
   pharmacyLinked?: boolean;
+  /** Connected to Bishnoi One: people, roles, divisions and teams are kept in the Admin Console, not changed here. */
+  onPlatform?: boolean;
   // Set when a Developer Admin is looking through this person's eyes. The
   // screens resolve as the person; this says who is really at the keyboard,
   // and every change is refused while it is set.
