@@ -1,4 +1,4 @@
-import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, ShoppingCart, Users, type LucideIcon } from "lucide-react";
+import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, ShoppingCart, Users, Wrench, type LucideIcon } from "lucide-react";
 
 // Every Bishnoi One module in the one app (decided 2026-10-23,
 // benchmarks/decisions.md): where its screens live on this site, which API it
@@ -11,7 +11,7 @@ import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, Shield
 //   soon    not built yet (a "Coming soon" page, for companies that have it).
 // A module brought in (Phase 2) changes from "moving" to "live" here, and that's all.
 
-export type ModuleKey = "platform" | "crm" | "inventory" | "sales" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
+export type ModuleKey = "platform" | "operations" | "crm" | "inventory" | "sales" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
 
 export type ModuleDef = {
   key: ModuleKey;
@@ -48,7 +48,10 @@ export const MODULES: ModuleDef[] = [
   { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiEnv: "REGULATORY_API_URL", apiLocal: "http://127.0.0.1:8308", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
   // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform
   // staff (same email) see APIs, companies and accounts; a company's administrators its roles.
-  { key: "platform", path: "/platform", label: "Admin Console", blurb: "APIs, companies, accounts and roles", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
+  { key: "platform", path: "/platform", label: "Admin Console", blurb: "Your company: profile, people, roles, apps and reports", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
+  // Bishnoi One Operations (2026-10-30): Bishnoi One's own operators only, apart from any company's Admin Console:
+  // every company, accounts and operators, the services and their connections, and troubleshooting (events).
+  { key: "operations", path: "/operations", label: "Operations", blurb: "Bishnoi One: companies, services and troubleshooting", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Wrench, tint: "#eef1f6", ink: "#4a5b78" },
 ];
 
 export const moduleByKey = (key: string | null | undefined): ModuleDef | null => MODULES.find((m) => m.key === key) ?? null;

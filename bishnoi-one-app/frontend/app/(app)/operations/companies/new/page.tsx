@@ -13,7 +13,7 @@ export default async function NewCompanyPage() {
   const options = await load<Options>("/platform/options");
   return (
     <>
-      <PageHeader title="Add company" crumbs={[{ href: "/platform/companies", label: "Companies" }]}>
+      <PageHeader title="Add company" crumbs={[{ href: "/operations/companies", label: "Companies" }]}>
         A company on the platform, with the applications its users can access.
       </PageHeader>
       <Sheet className="max-w-3xl px-5 py-5 sm:px-6">

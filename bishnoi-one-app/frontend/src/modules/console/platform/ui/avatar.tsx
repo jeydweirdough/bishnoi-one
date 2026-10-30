@@ -23,7 +23,7 @@ export function initials(name: string): string {
 
 /** The picture's address. `at` (when it last changed) makes a new one load after a change. */
 export function photoSrc(id: string, at: string | null | undefined): string | null {
-  return at ? `/platform/people/${encodeURIComponent(id)}/photo?v=${encodeURIComponent(at)}` : null;
+  return at ? `/operations/people/${encodeURIComponent(id)}/photo?v=${encodeURIComponent(at)}` : null;
 }
 
 export function Avatar({

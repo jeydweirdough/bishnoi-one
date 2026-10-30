@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { accountSend, getAccount } from "@/src/platform/lib/account";
 import { apiFor } from "@/src/platform/lib/api";
-import type { ModuleKey } from "@/src/platform/lib/modules";
+import { moduleByKey, type ModuleKey } from "@/src/platform/lib/modules";
 import { moduleCookie } from "@/src/platform/lib/session-cookie";
 import { myModules } from "@/src/one/mine";
+import { enterSoftly, unavailableIn } from "@/src/platform/lib/enter";
 import type { ReportData } from "@/src/platform/reports/types";
 import { FigureCard, FigureCardLoading, Tile, type Figure } from "@/src/platform/ui/figures";
 import { Later } from "@/src/platform/ui/later";
@@ -15,7 +16,8 @@ export const metadata = { title: "Home" };
 
 // The executive Home (decided 2026-10-28, feature plan Track R): the company in a few figures, read
 // from each app's own Management reports with this person's access, each linking to its report.
-// The page is drawn at once; the figures arrive as each app answers.
+// The page is drawn at once; the figures arrive as each app answers. An app that can't be opened or
+// doesn't answer is left out with a notice: it never keeps the rest of Home from showing.
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const BASE = "/platform/home";
@@ -74,18 +76,23 @@ export default async function ExecutiveHome({ searchParams }: { searchParams: Se
   const { from, to } = span(period);
   const here = `${BASE}?period=${period}`;
 
-  // Each app's figures are read with its own session, opened on the way if it isn't yet.
-  const has = new Set(myModules(account).map((m) => m.key));
+  // Each app's figures are read with its own session, opened on the way if it isn't yet. One that
+  // couldn't be opened comes back in `unavailable` and is left out (src/platform/lib/enter.ts).
+  const mine = new Set(myModules(account).map((m) => m.key));
+  const unavailable = unavailableIn(s);
   const jar = await cookies();
   for (const m of ["finance", "crm"] as const) {
-    if (has.has(m) && !jar.get(moduleCookie(m))?.value) redirect(`/auth/enter/${m}?next=${encodeURIComponent(here)}`);
+    if (mine.has(m) && !unavailable.has(m) && !jar.get(moduleCookie(m))?.value) redirect(enterSoftly(m, here));
   }
+  const has = new Set([...mine].filter((m) => !unavailable.has(m)));
 
   const link = (module: string, key: string, dated = true) => `/platform/reports/${module}/${key}${dated ? `?from=${from}&to=${to}` : ""}`;
   const none = Promise.resolve(null);
   const finance = has.has("finance")
     ? Promise.all([report("finance", "key-figures", from, to), report("finance", "revenue-growth", from, to), report("finance", "cash-forecast", from, to), report("finance", "receivables-ageing", from, to)])
     : Promise.all([none, none, none, none]);
+  // Opened but not answering (down, or its books not set up yet): said once, above the figures.
+  const silent = finance.then((reports) => (has.has("finance") && reports.every((r) => r === null) ? ["Finance"] : []));
   const crm = has.has("crm")
     ? Promise.all([report("crm", "pipeline-coverage", from, to), report("crm", "sales-attainment", from, to), report("crm", "customer-lifetime-value", from, to)])
     : Promise.all([none, none, none]);
@@ -135,7 +142,22 @@ export default async function ExecutiveHome({ searchParams }: { searchParams: Se
       <PageHeader title="Home" tools={<ToggleLinks current={period} options={PERIODS.map((p) => ({ ...p, href: `${BASE}?period=${p.value}` }))} />}>
         The company in a few figures, {from} to {to}. Each opens its report.
       </PageHeader>
-      {!has.has("finance") ? (
+      {unavailable.size > 0 && (
+        <p role="status" className="mb-4 text-sm text-ink-2">
+          Not available just now: {[...unavailable].map((m) => moduleByKey(m)?.label ?? m).join(", ")}. Its figures show as —.{" "}
+          <a href={here} className="underline">Try again</a>
+        </p>
+      )}
+      <Later data={silent} fallback={null}>
+        {(names) =>
+          names.length > 0 ? (
+            <p role="status" className="mb-4 text-sm text-ink-2">
+              {names.join(", ")} didn&apos;t answer, so its figures show as —. If its books aren&apos;t set up yet, they fill in once they are.
+            </p>
+          ) : null
+        }
+      </Later>
+      {!mine.has("finance") ? (
         <p className="text-sm text-ink-3">These figures come from Finance. Add Finance to your company&apos;s apps to see them.</p>
       ) : (
         <div className="space-y-4">

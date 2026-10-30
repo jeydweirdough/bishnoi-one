@@ -22,7 +22,12 @@ export function myModules(me: Account): MyModule[] {
   // A company's administrators, and Bishnoi One's staff, see every module (decided 2026-10-25): what
   // the company has (Platform gives administrators all of it), the ones coming soon, and the Admin Console.
   const soon: MyModule[] = MODULES.filter((m) => m.status === "soon" && !given.some((x) => x.key === m.key)).map((m) => ({ key: m.key, oldUrl: null }));
-  return [...given, ...soon, { key: "platform", oldUrl: null }];
+  // The Admin Console is the company's; Operations is Bishnoi One's own, for operators only (2026-10-30).
+  const consoles: MyModule[] = [
+    ...(me.isCompanyAdmin ? [{ key: "platform" as const, oldUrl: null }] : []),
+    ...(me.staff ? [{ key: "operations" as const, oldUrl: null }] : []),
+  ];
+  return [...given, ...soon, ...consoles];
 }
 
 /**
@@ -32,7 +37,8 @@ export function myModules(me: Account): MyModule[] {
  * page of tiles; null with nothing at all. The module switcher takes either to the rest.
  */
 export function primaryModule(me: Account): ModuleDef | null {
-  if (me.isCompanyAdmin || me.staff) return moduleByKey("platform");
+  if (me.isCompanyAdmin) return moduleByKey("platform");
+  if (me.staff) return moduleByKey("operations");
   const mine = myModules(me)
     .map((x) => moduleByKey(x.key))
     .filter((m): m is ModuleDef => m !== null);

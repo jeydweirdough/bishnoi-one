@@ -149,7 +149,7 @@ export function FindPerson() {
                     {a.memberships.map((m) => (
                       <Link
                         key={m.id}
-                        href={`/platform/companies/${m.companyId}`}
+                        href={`/operations/companies/${m.companyId}`}
                         title={m.offDomain ? "Not at the company's email domain: can't sign in until it's changed" : m.status === "active" ? undefined : "Suspended there"}
                         className={`rounded-full border px-2 py-0.5 hover:border-hema ${m.status === "active" ? "border-rule-strong text-ink" : "border-rule text-ink-3 line-through"}`}
                       >

@@ -66,7 +66,7 @@ function ApplicationForm({ app, onDone }: { app?: Application; onDone: () => voi
       }
       toast.success("Application registered", { description: result.data.name });
       onDone();
-      router.push(`/platform/apis/${result.data.id}`);
+      router.push(`/operations/apis/${result.data.id}`);
     });
   }
 

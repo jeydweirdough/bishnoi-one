@@ -42,12 +42,12 @@ export default async function ApplicationPage({ params, searchParams }: { params
   const [app, staff] = await Promise.all([getApp(id), getStaff()]);
   const admin = staff.canAdminister;
   const activeIncidents = app.incidents.filter((i) => i.status !== "resolved").length;
-  const base = `/platform/apis/${app.id}`;
+  const base = `/operations/apis/${app.id}`;
 
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/platform/apis", label: "Applications" }]}
+        crumbs={[{ href: "/operations/apis", label: "Applications" }]}
         title={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             {app.name}
@@ -64,7 +64,7 @@ export default async function ApplicationPage({ params, searchParams }: { params
                 kind="application"
                 id={app.id}
                 name={app.name}
-                after="/platform/apis"
+                after="/operations/apis"
                 done="Application deleted"
                 body={`${app.name} goes from the registry, with its deployments, integrations and links. Only once no company has it: the applications sign in through it. To keep its history, retire it instead.`}
               />
@@ -182,7 +182,7 @@ function Companies({ app }: { app: ApplicationDetail }) {
           {app.companies.map((c) => (
             <li key={c.id} className="flex items-baseline justify-between gap-4 px-5 py-3">
               <span className="min-w-0">
-                <Link href={`/platform/companies/${c.id}`} className="font-semibold text-hema hover:underline">
+                <Link href={`/operations/companies/${c.id}`} className="font-semibold text-hema hover:underline">
                   {c.name}
                 </Link>
                 {c.status === "suspended" && <span className="ml-2 text-stamp text-ink-3 uppercase">Suspended</span>}

@@ -32,8 +32,9 @@ export function ModuleSwitcher({ mine, compact = false }: { mine: MyModule[]; co
     };
   }, [open]);
 
-  // The Admin Console first, for those who have it: it's where they start.
-  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => Number(b.key === "platform") - Number(a.key === "platform"));
+  // The consoles first (the Admin Console, then Operations), for those who have them: where they start.
+  const rank = (k: string) => (k === "platform" ? 0 : k === "operations" ? 1 : 2);
+  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => rank(a.key) - rank(b.key));
   return (
     <div ref={box} className="relative">
       {compact ? (

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getAccount } from "@/src/platform/lib/account";
 import { apiFor, ApiError } from "@/src/platform/lib/api";
 import { myModules } from "@/src/one/mine";
+import { enterSoftly, unavailableIn } from "@/src/platform/lib/enter";
 import { moduleCookie } from "@/src/platform/lib/session-cookie";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { KpiScorecard, KpiResult, KpiDef, Me, Org, TeamRow } from "@/src/platform/lib/types";
@@ -23,8 +24,9 @@ export default async function CompanyKpis({ searchParams }: { searchParams: Sear
   if (!account.isCompanyAdmin) redirect("/platform");
   const header = <PageHeader title="Company KPIs" crumbs={[{ href: "/platform/reports", label: "Reports Center" }]}>Results against targets, from company and role summaries through divisions, teams and individual users.</PageHeader>;
   if (!myModules(account).some(m => m.key === "crm")) return <>{header}<p>Per-user KPIs are available when CRM is enabled for your company.</p></>;
-  if (!(await cookies()).get(moduleCookie("crm"))?.value) redirect(`/auth/enter/crm?next=${encodeURIComponent(base)}`);
   const params = await searchParams;
+  if (unavailableIn(params).has("crm")) return <>{header}<p role="status">CRM can&apos;t be opened just now, so KPI results can&apos;t be shown. <Link href={base} className="underline">Try again</Link>.</p></>;
+  if (!(await cookies()).get(moduleCookie("crm"))?.value) redirect(enterSoftly("crm", base));
   const api = apiFor("crm");
   let first: KpiScorecard;
   let me: Me & { org: Org };
@@ -35,7 +37,7 @@ export default async function CompanyKpis({ searchParams }: { searchParams: Sear
       api.get<Me & { org: Org }>("/auth/me"),
     ]);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) redirect(`/auth/enter/crm?next=${encodeURIComponent(base)}`);
+    if (error instanceof ApiError && error.status === 401) redirect(enterSoftly("crm", base));
     return <>{header}<p role="status">KPI results cannot be loaded with your current access or connection. <Link href={base} className="underline">Try again</Link>.</p></>;
   }
   const fmt = makeFormat(me.org);

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { ServiceInfo } from "@/src/modules/console/actions/services";
 import { accountSend } from "@/src/platform/lib/account";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { CatalogueEntry, CompanyProfile } from "./types";
+import type { Administrators, CatalogueEntry, CompanyProfile } from "./types";
 
 // A company administrator's changes to their own company, on Bishnoi One Platform
 // (/identity/company, feature plan step 5).
@@ -50,6 +50,15 @@ export async function signPersonOut(id: string): Promise<Result<{ ended: number 
 export async function switchCatalogue(key: string, on: boolean): Promise<Result<{ apps: CatalogueEntry[] }>> {
   return attempt(async () => {
     const r = await accountSend<{ apps: CatalogueEntry[] }>("PUT", `/identity/company/catalogue/${enc(key)}`, { on });
+    refresh();
+    return r;
+  });
+}
+
+/** Makes someone a company administrator, or stops them being one (2026-10-30). */
+export async function setAdministrator(id: string, on: boolean): Promise<Result<Administrators>> {
+  return attempt(async () => {
+    const r = await accountSend<Administrators>("PUT", `/identity/company/administrators/${enc(id)}`, { on });
     refresh();
     return r;
   });

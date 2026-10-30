@@ -212,8 +212,9 @@ function Switcher({ module, company, mine }: { module: ModuleKey; company?: stri
   const here = MODULES.find((m) => m.key === module)!;
   // An operator works in any company: they switch here (decided 2026-10-29). Everyone else has one company.
   const companies = useOperatorCompanies();
-  // The Admin Console first, for those who have it: it's where they start.
-  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => Number(b.key === "platform") - Number(a.key === "platform"));
+  // The consoles first (the Admin Console, then Operations), for those who have them: where they start.
+  const rank = (k: string) => (k === "platform" ? 0 : k === "operations" ? 1 : 2);
+  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => rank(a.key) - rank(b.key));
 
   useEffect(() => setAt(null), [pathname]);
   useEffect(() => {

@@ -18,6 +18,9 @@ export async function proxy(request: NextRequest) {
   // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer
   // isn't signed in, so they go straight to the order page, never to the sign-in page.
   if (pathname.startsWith("/order/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
+  // Operators' pages moved out of the Admin Console into Operations (2026-10-30): old links still land.
+  const moved = pathname.match(/^\/platform\/(companies|apis|events|operators|people|accounts|jobs)(\/.*)?$/);
+  if (moved) return NextResponse.redirect(siteUrl(`/operations/${moved[1]}${moved[2] ?? ""}${search}`, request), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   // A module's public page (a customer's order link): anyone, signed in or not, still talking to that module's API.

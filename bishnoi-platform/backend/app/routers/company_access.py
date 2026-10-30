@@ -450,6 +450,10 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
         role = db.get(AccessRole, p.access_role_id) if p.access_role_id else None
         if role and role.is_admin and not other_admins_people(db, me.company_id, but=p.id):
             raise conflict("Someone must always have everything, or nobody could fix a mistake in access. Give it to someone else first.")
+        if p.is_company_admin and not db.scalar(
+                select(func.count()).select_from(Identity).where(Identity.company_id == me.company_id, Identity.is_company_admin, Identity.id != p.id,
+                                                                 Identity.status == "active", Identity.via_operator.is_(False))):
+            raise conflict(f"{p.full_name} is the company's only administrator. Make someone else one first (Company profile).")
     for name, value in fields.items():
         setattr(p, name, value.strip() if isinstance(value, str) and name != "status" else value)
     if fields:

@@ -33,7 +33,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         {STATES.map((x) => (
           <Link
             key={x.key}
-            href={`/platform/events?state=${x.key}`}
+            href={`/operations/events?state=${x.key}`}
             aria-current={state === x.key ? "page" : undefined}
             className={`rounded-lg border px-3 py-1.5 text-sm ${state === x.key ? "border-hema bg-hema-tint font-semibold text-ink" : "border-rule-strong bg-sheet text-ink-2 hover:border-hema"}`}
           >

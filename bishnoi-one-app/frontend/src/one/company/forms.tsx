@@ -1,14 +1,15 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, UserMinus, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Combobox, Select } from "@/src/platform/ui/pickers";
-import { changeCompany, signPersonOut } from "./actions";
-import type { CompanyProfile } from "./types";
+import { ConfirmButton } from "@/src/platform/ui/confirm";
+import { changeCompany, setAdministrator, signPersonOut } from "./actions";
+import type { Administrators, CompanyProfile } from "./types";
 
 const ZONES = ["Asia/Manila", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Tokyo", "Asia/Dubai", "Europe/London", "America/New_York", "America/Los_Angeles", "UTC"];
 const CURRENCIES = [
@@ -178,5 +179,80 @@ export function LetterheadForm({ company }: { company: CompanyProfile }) {
         </Button>
       </div>
     </FormGrid>
+  );
+}
+
+/** Who runs the company in Bishnoi One (2026-10-30): add one from the company's people, remove one
+ * beside their name. Never yourself, never the last one (the Platform refuses both). */
+export function AdministratorsCard({ data }: { data: Administrators }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  const [pick, setPick] = useState<string | undefined>(undefined);
+  const only = data.administrators.length === 1;
+
+  function add() {
+    if (!pick) return;
+    start(async () => {
+      const r = await setAdministrator(pick, true);
+      if (!r.ok) return void toast.error(r.error);
+      const p = data.others.find((o) => o.id === pick);
+      toast.success(`${p?.fullName ?? "They"} can now run the company`, { description: "They see the Admin Console from their next page." });
+      setPick(undefined);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <ul className="divide-y divide-rule">
+        {data.administrators.map((a) => (
+          <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
+            <span className="font-medium text-ink">{a.fullName}</span>
+            <span className="text-ink-3">{a.email}</span>
+            {a.isMe && <span className="text-meta text-ink-3">(you)</span>}
+            <span className="ml-auto">
+              {!a.isMe && !only && (
+                <ConfirmButton
+                  label="Remove"
+                  triggerSize="sm"
+                  icon={<UserMinus className="size-4" aria-hidden />}
+                  title={`Remove ${a.fullName} as administrator?`}
+                  body="They keep their apps and role, but can no longer open the Admin Console or change the company. Their sign-ins end; they sign in again."
+                  confirmLabel="Remove"
+                  onConfirm={async () => {
+                    const r = await setAdministrator(a.id, false);
+                    if (!r.ok) {
+                      toast.error(r.error);
+                      return false;
+                    }
+                    toast.success(`${a.fullName} is no longer an administrator`);
+                    router.refresh();
+                  }}
+                />
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {only && <p className="text-meta text-ink-3">To replace the only administrator, add the new one first, then remove the old one.</p>}
+      {data.others.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-56 flex-1">
+            <Combobox
+              aria-label="Person to make an administrator"
+              placeholder="Choose a person"
+              value={pick}
+              onChange={(v) => setPick(v as string)}
+              options={data.others.map((o) => ({ value: o.id, label: `${o.fullName} · ${o.email}` }))}
+            />
+          </div>
+          <Button icon={<UserPlus className="size-4" aria-hidden />} onClick={add} loading={busy} disabled={!pick}>
+            Make administrator
+          </Button>
+        </div>
+      ) : (
+        <p className="text-meta text-ink-3">Everyone here is already an administrator. Add people on People first.</p>
+      )}
+    </div>
   );
 }
