@@ -129,7 +129,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
   }
 
   return (
-    <li className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_15rem_minmax(0,1.6fr)_auto] lg:items-center">
+    <li className="group grid gap-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_15rem_minmax(0,1.6fr)_auto] lg:items-center">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink">
           {person.fullName}

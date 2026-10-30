@@ -127,7 +127,7 @@ function UnitTree({ data }: { data: OrgData }) {
 
 function UnitRow({ unit, depth, manager, onEdit, onAdd }: { unit: OrgUnit; depth: number; manager?: string; onEdit: () => void; onAdd: () => void }) {
   return (
-    <div className="flex items-center gap-3 py-2.5" style={{ paddingLeft: `${depth * 1.25}rem` }}>
+    <div className="group flex items-center gap-3 py-2.5" style={{ paddingLeft: `${depth * 1.25}rem` }}>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-2 text-sm">
           <span className={depth === 0 ? "font-semibold text-ink" : "font-medium text-ink"}>{unit.name}</span>
@@ -285,7 +285,7 @@ function Branches({ data }: { data: OrgData }) {
       ) : (
         <ul className="mt-2 divide-y divide-rule">
           {shown.map((b) => (
-            <li key={b.id} className={`flex items-center gap-3 py-2.5 ${b.isActive ? "" : "text-ink-3"}`}>
+            <li key={b.id} className={`group flex items-center gap-3 py-2.5 ${b.isActive ? "" : "text-ink-3"}`}>
               <Building2 className="size-4 shrink-0 text-ink-3" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm ${b.isActive ? "font-medium text-ink" : ""}`}>

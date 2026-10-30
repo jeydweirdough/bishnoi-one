@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "antd";
-import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword } from "./actions";
+import { setAdministrator } from "@/src/one/company/actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
 
@@ -76,10 +77,47 @@ async function sendInvitation(person: { id: string; fullName: string }) {
   });
 }
 
-async function newPassword(person: { id: string; fullName: string }) {
-  const r = await setPersonPassword(person.id);
-  if (!r.ok) return toast.error(r.error);
-  if (r.data.password) showPassword(person.fullName, r.data.password);
+/** A new password for someone: typed by the administrator, or made up. Either way they choose their own at their next sign-in. */
+function PasswordDialog({ person, open, onClose }: { person: { id: string; fullName: string }; open: boolean; onClose: () => void }) {
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState<string>();
+  const [busy, start] = useTransition();
+  function save(made: boolean) {
+    start(async () => {
+      const r = await setPersonPassword(person.id, made ? undefined : typed);
+      if (!r.ok) return setError(r.error);
+      setTyped("");
+      setError(undefined);
+      onClose();
+      if (r.data.password) showPassword(person.fullName, r.data.password);
+      else toast.success(`${person.fullName}'s password is set`, { description: "Their other sign-ins ended; they choose their own at the next sign-in." });
+    });
+  }
+  return (
+    <Modal
+      open={open}
+      title={`New password for ${person.fullName}`}
+      onCancel={() => !busy && onClose()}
+      destroyOnHidden
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={() => save(true)} disabled={busy}>
+            Make one up
+          </Button>
+          <Button variant="primary" onClick={() => save(false)} loading={busy} disabled={typed.length === 0}>
+            Set this password
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 pt-2">
+        <p className="text-sm text-ink-2">Type one to give them, or let Bishnoi One make one up. They choose their own at their next sign-in, and their other sign-ins end now.</p>
+        <Field label="New password" error={error} hint="At least 8 characters.">
+          {(p) => <Input {...p} type="text" autoComplete="off" value={typed} onChange={(e) => (setTyped(e.target.value), setError(undefined))} maxLength={200} />}
+        </Field>
+      </div>
+    </Modal>
+  );
 }
 
 /** Add person: who they are, their role, and the modules they may open. */
@@ -168,6 +206,7 @@ export function AddPerson({ data }: { data: AccessData }) {
 export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
@@ -192,15 +231,34 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
 
   return (
     <>
+      <PasswordDialog person={person} open={settingPassword} onClose={() => setSettingPassword(false)} />
       <RowMenu
+        always
         label={`Actions for ${person.fullName}`}
         items={[
           { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
           ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
-          { label: "Set a new password", icon: <KeyRound />, onSelect: () => void newPassword(person) },
+          { label: "Set a new password", icon: <KeyRound />, onSelect: () => setSettingPassword(true) },
           ...(isMe
             ? []
             : [
+                person.isCompanyAdmin
+                  ? {
+                      label: "Remove as administrator",
+                      icon: <ShieldOff />,
+                      run: () => setAdministrator(person.id, false),
+                      confirm: `Remove ${person.fullName} as administrator? They keep their role and apps, but can't open the Admin Console. Their sign-ins end.`,
+                      done: `${person.fullName} is no longer an administrator`,
+                    }
+                  : off
+                    ? "divider" as const
+                    : {
+                        label: "Make administrator",
+                        icon: <ShieldCheck />,
+                        run: () => setAdministrator(person.id, true),
+                        confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
+                        done: `${person.fullName} is now an administrator`,
+                      },
                 {
                   label: "Reset two-step sign-in",
                   icon: <ShieldOff />,
