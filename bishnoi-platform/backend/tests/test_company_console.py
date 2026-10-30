@@ -93,3 +93,18 @@ def test_administrators_are_made_and_unmade_by_another_administrator(client, get
     assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "suspended"}, headers=jade["h"]).status_code == 409
     log = client.get("/identity/company/activity", headers=jade["h"]).json()["entries"]
     assert [e["action"] for e in log[:2]] == ["company.administrator_removed", "company.administrator_added"]
+
+
+def test_the_home_counts_people_sign_ins_security_and_access(client, getmeds):
+    h = getmeds["owner"]["h"]
+    client.delete(f"/identity/access/people/{getmeds['rio']['id']}", headers=h)
+    o = client.get("/identity/company/overview", headers=h)
+    assert o.status_code == 200, o.text
+    body = o.json()
+    assert body["people"] == {"active": 2, "off": 0, "inBin": 1, "administrators": 1, "noRole": 1, "noApps": 0}
+    assert body["signIns"]["week"] == 2 and body["signIns"]["never"] == 0  # Olive and Jade signed in (the fixture)
+    assert body["security"]["twoStepAdministrators"] == {"on": 0, "of": 1}
+    apps = {a["key"]: a["people"] for a in body["apps"]}
+    assert apps["crm"] == 2 and apps["pharmacy"] == 1  # Jade's grant + Olive, the administrator, opens every app
+    assert any(e["action"] == "access.person_deleted" for e in body["recent"])
+    assert client.get("/identity/company/overview", headers=getmeds["jade"]["h"]).status_code == 403

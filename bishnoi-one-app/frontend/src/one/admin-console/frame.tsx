@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getAccount, type Account } from "@/src/platform/lib/account";
 import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
@@ -94,6 +95,10 @@ export async function AdminConsoleFrame({ children, console: which = "platform" 
   return (
     <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
       <ConsoleNav module={which} groups={groups} mine={myModules(me)} company={which === "operations" ? "Bishnoi One" : me.company?.name} rail={rail} actions={actions} />
+      {/* Says at once that a link was clicked: a bar within the console, the 4-dot loader when opening another app. */}
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
         <header className="mb-4 hidden items-center justify-end gap-1 lg:flex">{actions}</header>
         <div className="mx-auto max-w-[80rem]">{children}</div>

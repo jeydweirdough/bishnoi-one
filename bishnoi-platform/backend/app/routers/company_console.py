@@ -9,6 +9,8 @@ roles and the org chart are in company_access.py and organisation.py; this is th
 - GET  /identity/company/activity: the company's activity log, newest first.
 - GET  /identity/company/security, POST …/security/people/{id}/sign-out: who has a password,
   when each last signed in, open sign-ins, and ending a person's sign-ins.
+- GET  /identity/company/overview: the Admin Console's Home (2026-10-30): people, sign-ins, security
+  and access by app, counted for the company (user control; finance figures are in Reports).
 - GET  /identity/company/administrators, PUT …/administrators/{id} {on}: who runs the company in
   Bishnoi One, made or unmade by another administrator (2026-10-30). Never yourself off, never the
   last one; someone unmade signs in again (their sign-ins end) and opens the console no more.
@@ -350,3 +352,80 @@ def set_administrator(person_id: str, body: AdministratorIn, db: DB, me: Admin) 
           target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
     db.commit()
     return administrators(db, me)
+
+
+# ---- The Admin Console's Home (2026-10-30): user control at a glance --------------------------------
+
+
+@router.get("/overview")
+def overview(db: DB, me: Admin, settings: SettingsDep) -> dict:
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from app import sign_in
+    from app.models import AccessRole, SignInFailure, SignInLink
+
+    company = db.get(Company, me.company_id)
+    everyone = db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False))).all()
+    active = [p for p in everyone if p.status == "active" and p.deleted_at is None]
+    accounts = {p.id: account_of(db, p) for p in active}
+    granted = {i for (i,) in db.execute(select(IdentityApp.identity_id).join(Identity, Identity.id == IdentityApp.identity_id)
+                                        .where(Identity.company_id == me.company_id)).all()}
+    now = datetime.now(UTC)
+    zone = ZoneInfo(company.timezone or "Asia/Manila")
+    midnight = datetime.now(zone).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
+    seen = {pid: as_utc(a.last_sign_in_at) for pid, a in accounts.items() if a is not None and a.last_sign_in_at}
+    admins = [p for p in active if p.is_company_admin]
+    on = lambda people: sum(1 for p in people if accounts.get(p.id) is not None and sign_in.two_step_on(accounts[p.id]))  # noqa: E731
+    emails = [p.email.lower() for p in everyone]
+    account_ids = [a.id for a in accounts.values() if a is not None]
+    window = now - timedelta(minutes=settings.login_lockout_minutes)
+    locked = db.execute(select(SignInFailure.email).where(SignInFailure.email.in_(emails), SignInFailure.at > window)
+                        .group_by(SignInFailure.email).having(func.count() >= settings.login_attempts)).all() if emails else []
+    failed = db.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action == "identity.sign_in_failed", AuditEntry.target.in_(emails),
+                                                                         AuditEntry.created_at > now - timedelta(days=7))) if emails else 0
+    invites = db.scalar(select(func.count()).select_from(SignInLink).where(SignInLink.account_id.in_(account_ids), SignInLink.kind == "invite",
+                                                                          SignInLink.used_at.is_(None), SignInLink.expires_at > now)) if account_ids else 0
+    apps = []
+    for a in modules_of(db, me.company_id):
+        given = db.scalar(select(func.count()).select_from(IdentityApp).join(Identity, Identity.id == IdentityApp.identity_id)
+                          .where(IdentityApp.application_id == a.id, Identity.company_id == me.company_id, Identity.status == "active",
+                                 Identity.deleted_at.is_(None), Identity.via_operator.is_(False), Identity.is_company_admin.is_(False))) or 0
+        apps.append({"key": a.key, "name": a.name, "people": given + len(admins)})
+    holders: dict[str, int] = {}
+    for p in active:
+        if p.access_role_id:
+            holders[p.access_role_id] = holders.get(p.access_role_id, 0) + 1
+    roles = [{"id": r.id, "name": r.name, "people": holders.get(r.id, 0)}
+             for r in db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name)))]
+    recent = db.scalars(select(AuditEntry).where(AuditEntry.company_id == me.company_id, AuditEntry.category == "security")
+                        .order_by(AuditEntry.created_at.desc()).limit(8)).all()
+    return {
+        "people": {
+            "active": len(active),
+            "off": sum(1 for p in everyone if p.status != "active" and p.deleted_at is None),
+            "inBin": sum(1 for p in everyone if p.deleted_at is not None),
+            "administrators": len(admins),
+            "noRole": sum(1 for p in active if not p.access_role_id and not p.is_company_admin),
+            "noApps": sum(1 for p in active if p.id not in granted and not p.is_company_admin),
+        },
+        "signIns": {
+            "today": sum(1 for t in seen.values() if t >= midnight),
+            "week": sum(1 for t in seen.values() if t >= now - timedelta(days=7)),
+            "month": sum(1 for t in seen.values() if t >= now - timedelta(days=30)),
+            "never": sum(1 for p in active if p.id not in seen),
+            "invitesPending": invites or 0,
+            "passwordsToChange": sum(1 for a in accounts.values() if a is not None and a.must_change_password),
+        },
+        "security": {
+            "twoStepAdministrators": {"on": on(admins), "of": len(admins)},
+            "twoStepEveryone": {"on": on(active), "of": len(active)},
+            "required": settings.two_step_required,
+            "failedThisWeek": failed or 0,
+            "lockedNow": len(locked),
+            "offDomain": sum(1 for p in active if email_rules.off_domain(db, p)),
+        },
+        "apps": apps,
+        "roles": roles,
+        "recent": [entry_out(e) for e in recent],
+    }

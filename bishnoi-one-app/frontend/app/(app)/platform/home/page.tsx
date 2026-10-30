@@ -1,178 +1,186 @@
-import { cookies } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { accountSend, getAccount } from "@/src/platform/lib/account";
-import { apiFor } from "@/src/platform/lib/api";
-import { moduleByKey, type ModuleKey } from "@/src/platform/lib/modules";
-import { moduleCookie } from "@/src/platform/lib/session-cookie";
-import { myModules } from "@/src/one/mine";
-import { enterSoftly, unavailableIn } from "@/src/platform/lib/enter";
-import type { ReportData } from "@/src/platform/reports/types";
+import { ago } from "@/src/modules/console/lib/words";
 import { FigureCard, FigureCardLoading, Tile, type Figure } from "@/src/platform/ui/figures";
 import { Later } from "@/src/platform/ui/later";
-import { PageHeader } from "@/src/platform/ui/sheet";
-import { ToggleLinks } from "@/src/platform/ui/toggle-links";
+import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { ListRows } from "@/src/platform/ui/skeleton";
 
 export const metadata = { title: "Home" };
 
-// The executive Home (decided 2026-10-28, feature plan Track R): the company in a few figures, read
-// from each app's own Management reports with this person's access, each linking to its report.
-// The page is drawn at once; the figures arrive as each app answers. An app that can't be opened or
-// doesn't answer is left out with a notice: it never keeps the rest of Home from showing.
+// The Admin Console's Home (2026-10-30): user control at a glance, for the company's administrators:
+// who's here, who signs in, how safe the sign-ins are, and who can open which app. Counted by the
+// Platform alone (/identity/company/overview), so it's quick; finance figures live in Reports Center.
+// The page is drawn at once; the figures stream in.
 
-type Search = Promise<Record<string, string | string[] | undefined>>;
-const BASE = "/platform/home";
-const PERIODS = [
-  { value: "month", label: "This month" },
-  { value: "last-month", label: "Last month" },
-  { value: "quarter", label: "This quarter" },
-  { value: "year", label: "This year" },
-] as const;
-type Period = (typeof PERIODS)[number]["value"];
-
-/** Today in Manila, and the period's first and last day (YYYY-MM-DD). */
-function span(period: Period): { from: string; to: string } {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-  const [y, m] = today.split("-").map(Number);
-  const iso = (yy: number, mm: number, dd: number) => `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
-  const lastDay = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
-  if (period === "last-month") {
-    const [py, pm] = m === 1 ? [y - 1, 12] : [y, m - 1];
-    return { from: iso(py, pm, 1), to: iso(py, pm, lastDay(py, pm)) };
-  }
-  if (period === "quarter") return { from: iso(y, Math.floor((m - 1) / 3) * 3 + 1, 1), to: today };
-  if (period === "year") return { from: iso(y, 1, 1), to: today };
-  return { from: iso(y, m, 1), to: today };
-}
-
-const PATHS: Partial<Record<ModuleKey, string>> = { finance: "/finance/reports", crm: "/reports" };
-
-/** One Management report, or null when it can't be read (no access, not connected). */
-async function report(module: ModuleKey, key: string, from: string, to: string): Promise<ReportData | null> {
-  try {
-    return await apiFor(module).get<ReportData>(`${PATHS[module]}/${key}?from=${from}&to=${to}`);
-  } catch {
-    return null;
-  }
-}
-
-const value = (r: ReportData | null, label: string) => r?.summary?.find((f) => f.label === label || f.label.startsWith(`${label},`))?.value ?? null;
-const row = (r: ReportData | null, figure: string) => r?.rows.find((x) => x.figure === figure) ?? null;
-const peso = (centavos: number | null) =>
-  centavos === null ? "—" : `${centavos < 0 ? "−" : ""}₱${(Math.abs(centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 1000) / 10}%`);
-const reading = (text: unknown): Figure["pill"] => {
-  const t = String(text ?? "");
-  if (!t || t === "—" || t === "Not enough data") return undefined;
-  const good = ["Healthy", "Profit", "Growing", "Positive", "Covered", "Target met", "Above it"].includes(t);
-  const bad = ["Loss", "Short", "Low", "Slow", "Negative", "Down", "None", "Below it"].includes(t);
-  return { text: t, tone: good ? "good" : bad ? "bad" : "warn" };
+type Overview = {
+  people: { active: number; off: number; inBin: number; administrators: number; noRole: number; noApps: number };
+  signIns: { today: number; week: number; month: number; never: number; invitesPending: number; passwordsToChange: number };
+  security: {
+    twoStepAdministrators: { on: number; of: number };
+    twoStepEveryone: { on: number; of: number };
+    required: boolean;
+    failedThisWeek: number;
+    lockedNow: number;
+    offDomain: number;
+  };
+  apps: { key: string; name: string; people: number }[];
+  roles: { id: string; name: string; people: number }[];
+  recent: { id: string; at: string; actor: string; action: string; target: string }[];
 };
 
-export default async function ExecutiveHome({ searchParams }: { searchParams: Search }) {
+const PEOPLE = "/platform/roles/people";
+const n = (v: number, one: string, many = `${one}s`) => `${v} ${v === 1 ? one : many}`;
+
+// What a security entry says, in plain words.
+const SAID: Record<string, string> = {
+  "identity.signed_in": "signed in",
+  "identity.sign_in_failed": "wrong password",
+  "identity.two_step_failed": "wrong two-step code",
+  "identity.two_step_on": "turned on two-step sign-in",
+  "identity.two_step_off": "turned off two-step sign-in",
+  "identity.recovery_code_used": "used a recovery code",
+  "identity.password_changed": "changed their password",
+  "identity.password_set_by_link": "reset their password",
+  "identity.invitation_accepted": "accepted their invitation",
+  "identity.reset_requested": "asked for a password reset",
+  "access.password_set": "set a password for",
+  "access.person_invited": "invited",
+  "access.invite_link_made": "made an invitation link for",
+  "access.person_deleted": "deleted",
+  "access.person_restored": "restored",
+  "access.two_step_reset": "reset two-step sign-in for",
+  "access.email_changed": "changed the email of",
+  "company.administrator_added": "made an administrator:",
+  "company.administrator_removed": "removed as administrator:",
+};
+
+function lead(o: Overview): Figure[] {
+  const admins = o.security.twoStepAdministrators;
+  const missing = admins.of - admins.on;
+  return [
+    { value: String(o.people.active), label: "Active people", note: `${o.people.off} switched off · ${o.people.inBin} in the recycle bin`, href: PEOPLE },
+    { value: String(o.signIns.week), label: "Signed in this week", note: `${o.signIns.today} today · ${n(o.signIns.never, "person has", "people have")} never signed in`, href: "/platform/company/security" },
+    {
+      value: `${admins.on} of ${admins.of}`,
+      label: "Administrators with two-step sign-in",
+      note: `Everyone: ${o.security.twoStepEveryone.on} of ${o.security.twoStepEveryone.of}`,
+      href: "/platform/company/security",
+      pill: admins.of === 0 ? undefined : missing === 0 ? { text: "All protected", tone: "good" } : { text: `${missing} without`, tone: o.security.required ? "bad" : "warn" },
+    },
+    { value: String(o.people.administrators), label: "Administrators", note: "Who runs the company here", href: "/platform/company" },
+  ];
+}
+
+function tiles(o: Overview): Figure[] {
+  return [
+    { value: String(o.people.noRole), label: "No role yet", note: "Each module goes by its own until given one", href: PEOPLE, alert: o.people.noRole > 0 },
+    { value: String(o.people.noApps), label: "No apps yet", note: "They can sign in but open nothing", href: PEOPLE, alert: o.people.noApps > 0 },
+    { value: String(o.signIns.invitesPending), label: "Invitations waiting", note: "Sent, not yet accepted", href: PEOPLE },
+    { value: String(o.signIns.passwordsToChange), label: "Passwords to change", note: "Handed over; changed at their first sign-in", href: PEOPLE },
+    { value: String(o.security.failedThisWeek), label: "Wrong passwords this week", note: "Tries with your people's emails", href: "/platform/company/activity", alert: o.security.failedThisWeek > 0 },
+    { value: String(o.security.lockedNow), label: "Locked out now", note: "Too many wrong passwords; they wait a few minutes", href: "/platform/company/security", alert: o.security.lockedNow > 0 },
+    { value: String(o.security.offDomain), label: "Emails to change", note: "Outside your email domain: they can't sign in", href: "/platform/company", alert: o.security.offDomain > 0 },
+    { value: String(o.signIns.month), label: "Signed in this month", note: `Of ${o.people.active} active`, href: "/platform/company/security" },
+  ];
+}
+
+function Bars({ rows, href, total }: { rows: { key: string; name: string; people: number }[]; href: string; total: number }) {
+  if (rows.length === 0) return <p className="mt-3 text-sm text-ink-3">None yet.</p>;
+  return (
+    <ul className="mt-3 space-y-2.5">
+      {rows.map((r) => (
+        <li key={r.key}>
+          <Link href={href} className="block rounded-md hover:bg-bench">
+            <span className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="truncate text-ink">{r.name}</span>
+              <span className="shrink-0 text-ink-3">{n(r.people, "person", "people")}</span>
+            </span>
+            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-rule" aria-hidden>
+              <span className="block h-full rounded-full bg-sage-deep" style={{ width: `${total ? Math.min(100, Math.round((r.people / total) * 100)) : 0}%` }} />
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default async function AdminHome() {
   const account = await getAccount();
   if (!account.isCompanyAdmin) redirect("/platform/reports");
-  const s = await searchParams;
-  const period: Period = PERIODS.some((p) => p.value === s.period) ? (s.period as Period) : "month";
-  const { from, to } = span(period);
-  const here = `${BASE}?period=${period}`;
+  const data = accountSend<Overview>("GET", "/identity/company/overview");
+  const leads = ["Active people", "Signed in this week", "Administrators with two-step sign-in", "Administrators"];
 
-  // Each app's figures are read with its own session, opened on the way if it isn't yet. One that
-  // couldn't be opened comes back in `unavailable` and is left out (src/platform/lib/enter.ts).
-  const mine = new Set(myModules(account).map((m) => m.key));
-  const unavailable = unavailableIn(s);
-  const jar = await cookies();
-  for (const m of ["finance", "crm"] as const) {
-    if (mine.has(m) && !unavailable.has(m) && !jar.get(moduleCookie(m))?.value) redirect(enterSoftly(m, here));
-  }
-  const has = new Set([...mine].filter((m) => !unavailable.has(m)));
-
-  const link = (module: string, key: string, dated = true) => `/platform/reports/${module}/${key}${dated ? `?from=${from}&to=${to}` : ""}`;
-  const none = Promise.resolve(null);
-  const finance = has.has("finance")
-    ? Promise.all([report("finance", "key-figures", from, to), report("finance", "revenue-growth", from, to), report("finance", "cash-forecast", from, to), report("finance", "receivables-ageing", from, to)])
-    : Promise.all([none, none, none, none]);
-  // Opened but not answering (down, or its books not set up yet): said once, above the figures.
-  const silent = finance.then((reports) => (has.has("finance") && reports.every((r) => r === null) ? ["Finance"] : []));
-  const crm = has.has("crm")
-    ? Promise.all([report("crm", "pipeline-coverage", from, to), report("crm", "sales-attainment", from, to), report("crm", "customer-lifetime-value", from, to)])
-    : Promise.all([none, none, none]);
-  const people = accountSend<{ people: { status: string }[] }>("GET", "/identity/access")
-    .then((a) => a.people.filter((p) => p.status === "active").length)
-    .catch(() => null);
-
-  const lead = finance.then(([key, growth, cash]): Figure[] => {
-    const g = value(growth, "Growth");
-    const lowest = value(cash, "Lowest cash ahead");
-    return [
-      { value: peso(value(key, "Revenue")), label: "Revenue", note: g === null ? "No revenue the period before" : `${g >= 0 ? "+" : ""}${pct(g)} on the period before`, href: link("finance", "revenue-growth"), pill: reading(row(key, "Revenue")?.reading) },
-      { value: peso(value(key, "Net profit")), label: "Net profit", note: `Net margin ${row(key, "Net margin")?.now ?? "—"}`, href: link("finance", "key-figures"), pill: reading(row(key, "Net profit")?.reading) },
-      { value: peso(value(cash, "Cash now")), label: "Cash", note: lowest === null ? "Forecast not available" : `Lowest in the next 12 weeks: ${peso(lowest)}`, alert: lowest !== null && lowest < 0, href: link("finance", "cash-forecast", false) },
-      { value: peso(value(key, "Working capital")), label: "Working capital", note: `Current ratio ${row(key, "Current ratio")?.now ?? "—"}`, href: link("finance", "key-figures"), pill: reading(row(key, "Current ratio")?.reading) },
-    ];
-  });
-  const tiles = Promise.all([finance, crm, people]).then(([[key, , , ageing], [coverage, attainment, clv], heads]): Figure[] => {
-    const late = value(ageing, "Late");
-    const revenue = value(key, "Revenue");
-    const out: Figure[] = [
-      { value: String(row(key, "Days to collect (DSO)")?.now ?? "—"), label: "Days to collect", note: "Receivables ÷ revenue × days", href: link("finance", "key-figures"), pill: reading(row(key, "Days to collect (DSO)")?.reading) },
-      { value: peso(late), label: "Overdue receivables", note: "Owed by customers, past due", alert: (late ?? 0) > 0, href: link("finance", "receivables-ageing") },
-      { value: String(row(key, "Return on assets")?.now ?? "—"), label: "Return on assets", note: "Net profit ÷ total assets", href: link("finance", "key-figures"), pill: reading(row(key, "Return on assets")?.reading) },
-      { value: String(row(key, "Quick ratio")?.now ?? "—"), label: "Quick ratio", note: "Current assets without inventory ÷ current liabilities", href: link("finance", "key-figures"), pill: reading(row(key, "Quick ratio")?.reading) },
-      // Step 17: from expenses tagged on the chart of accounts, owner's equity and new customers.
-      { value: String(row(key, "EBITDA")?.now ?? "—"), label: "EBITDA", note: "Net profit + depreciation, interest and income tax", href: link("finance", "key-figures"), pill: reading(row(key, "EBITDA")?.reading) },
-      { value: String(row(key, "Return on equity")?.now ?? "—"), label: "Return on equity", note: `Debt to equity ${row(key, "Debt to equity")?.now ?? "—"}`, href: link("finance", "key-figures"), pill: reading(row(key, "Return on equity")?.reading) },
-      { value: String(row(key, "Break-even revenue")?.now ?? "—"), label: "Break-even revenue", note: "Fixed costs ÷ contribution margin", href: link("finance", "key-figures"), pill: reading(row(key, "Break-even revenue")?.reading) },
-      { value: String(row(key, "Customer acquisition cost")?.now ?? "—"), label: "Customer acquisition cost", note: "Sales and marketing spend ÷ new customers", href: link("finance", "key-figures") },
-    ];
-    if (has.has("crm")) {
-      const cover = value(coverage, "Coverage");
-      out.push(
-        { value: pct(cover), label: "Pipeline coverage", note: "Open deals closing this month ÷ what's left of the target", href: link("crm", "pipeline-coverage"), pill: cover === null ? undefined : { text: cover >= 1 ? "Covered" : "Short", tone: cover >= 1 ? "good" : "warn" } },
-        { value: pct(value(attainment, "Attainment")), label: "Sales against target", note: "Won ÷ target, this month", href: link("crm", "sales-attainment") },
-        { value: peso(value(clv, "Average lifetime value")), label: "Customer lifetime value", note: "Average per customer", href: link("crm", "customer-lifetime-value") },
-      );
-    }
-    out.push({ value: revenue !== null && heads ? peso(Math.round(revenue / heads)) : "—", label: "Revenue per person", note: heads ? `Revenue ÷ ${heads} active people` : "People not available" });
-    return out;
-  });
-
-  const lead4 = ["Revenue", "Net profit", "Cash", "Working capital"];
   return (
     <>
-      <PageHeader title="Home" tools={<ToggleLinks current={period} options={PERIODS.map((p) => ({ ...p, href: `${BASE}?period=${p.value}` }))} />}>
-        The company in a few figures, {from} to {to}. Each opens its report.
+      <PageHeader title="Home">
+        Your company&apos;s people and access at a glance. Finance figures are in{" "}
+        <Link href="/platform/reports" className="text-hema underline">
+          Reports Center
+        </Link>
+        .
       </PageHeader>
-      {unavailable.size > 0 && (
-        <p role="status" className="mb-4 text-sm text-ink-2">
-          Not available just now: {[...unavailable].map((m) => moduleByKey(m)?.label ?? m).join(", ")}. Its figures show as —.{" "}
-          <a href={here} className="underline">Try again</a>
-        </p>
-      )}
-      <Later data={silent} fallback={null}>
-        {(names) =>
-          names.length > 0 ? (
-            <p role="status" className="mb-4 text-sm text-ink-2">
-              {names.join(", ")} didn&apos;t answer, so its figures show as —. If its books aren&apos;t set up yet, they fill in once they are.
-            </p>
-          ) : null
-        }
-      </Later>
-      {!mine.has("finance") ? (
-        <p className="text-sm text-ink-3">These figures come from Finance. Add Finance to your company&apos;s apps to see them.</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Later data={lead} fallback={lead4.map((l, i) => <FigureCardLoading key={l} label={l} first={i === 0} />)}>
-              {(figures) => figures.map((f, i) => <FigureCard key={f.label} figure={f} first={i === 0} />)}
-            </Later>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Later data={tiles} fallback={null}>
-              {(figures) => figures.map((f) => <Tile key={f.label} figure={f} />)}
-            </Later>
-          </div>
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Later data={data} fallback={leads.map((l, i) => <FigureCardLoading key={l} label={l} first={i === 0} />)}>
+            {(o) => lead(o).map((f, i) => <FigureCard key={f.label} figure={f} first={i === 0} />)}
+          </Later>
         </div>
-      )}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Later data={data} fallback={null}>
+            {(o) => tiles(o).map((f) => <Tile key={f.label} figure={f} />)}
+          </Later>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="apps">Access by app</SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={4} columns={2} /></div>}>
+              {(o) => <Bars rows={o.apps} href={PEOPLE} total={o.people.active} />}
+            </Later>
+          </Sheet>
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="roles">People by role</SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={4} columns={2} /></div>}>
+              {(o) => <Bars rows={o.roles.map((r) => ({ key: r.id, name: r.name, people: r.people }))} href="/platform/roles" total={o.people.active} />}
+            </Later>
+          </Sheet>
+          <Sheet className="px-5 py-4">
+            <SectionTitle
+              icon="password"
+              action={
+                <Link href="/platform/company/activity" className="text-meta text-ink-2 hover:text-hema hover:underline">
+                  Activity log
+                </Link>
+              }
+            >
+              Recent security
+            </SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={5} columns={2} /></div>}>
+              {(o) =>
+                o.recent.length === 0 ? (
+                  <Empty icon="password" title="Nothing yet">
+                    Sign-ins, password changes and access changes show here.
+                  </Empty>
+                ) : (
+                  <ul className="mt-3 divide-y divide-rule">
+                    {o.recent.map((e) => (
+                      <li key={e.id} className="py-2 text-sm">
+                        <span className="text-ink">
+                          {e.actor} {SAID[e.action] ?? e.action.replace(/[._]/g, " ")}
+                          {e.target && e.target !== e.actor ? ` ${e.target}` : ""}
+                        </span>
+                        <span className="block text-meta text-ink-3">{ago(e.at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </Later>
+          </Sheet>
+        </div>
+      </div>
     </>
   );
 }
