@@ -12,6 +12,15 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.34",
+    date: "2026-10-30",
+    changes: [
+      "New Petty cash page in the sidebar: one voucher for each paper petty cash voucher, with a line for each official receipt (its date, store, receipt number, account, VAT and any tax withheld) and a photo or PDF of every receipt. It can't be submitted until every receipt is attached. Someone else, never whoever made or submitted it, opens each receipt beside its line, then checks and posts it or returns it with the reason. A posted voucher is voided with a reason. Each fund's balance in the books is shown at the top, the voucher prints with every receipt after it, and posted lines are in the BIR purchase lists.",
+      "Marketing requests are back under their own name in the sidebar, on one page with a tab for each stage (to release, to review, to settle, outstanding advances, settled and cancelled) and how many are in each. It opens on the first stage your role can act on. Old links still work.",
+      "The Zoho connection page shows today's Zoho requests against Finance's daily cap, what's kept for changed records, and the daily list check; changed records are read first.",
+    ],
+  },
+  {
     version: "0.4.33",
     date: "2026-10-29",
     changes: [

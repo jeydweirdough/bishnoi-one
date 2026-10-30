@@ -18,11 +18,11 @@ export function FinancePrintFrame({ org, company, children }: { org: Org | null;
   const timestamp = useRef<HTMLSpanElement>(null);
   const context = useRef<HTMLParagraphElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const documentPage = /\/vouchers\/[^/]+\/print$|\/ledger\/voucher\//.test(path) || /\/funds\/[^/]+\/report$/.test(path);
+  const documentPage = /\/(vouchers|petty-cash)\/[^/]+\/print$|\/ledger\/voucher\//.test(path) || /\/funds\/[^/]+\/report$/.test(path);
   const existingPrintAction = documentPage || /^\/finance\/invoices\/[^/]+$/.test(path);
   const wide = /\/bir(?:\/|$)|\/bills\/aging|\/ledger\/(accounts|trial-balance)|\/invoices\/receivables/.test(path)
-    || /^\/finance\/(bills|suppliers|vouchers|ledger|invoices|bank|funds)$/.test(path);
-  const printable = /^\/finance\/(bills|suppliers|vouchers|ledger|invoices|bank|funds|bir)(\/|$)/.test(path)
+    || /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds)$/.test(path);
+  const printable = /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds|bir)(\/|$)/.test(path)
     && !/\/new(?:\/|$)|\/files(?:\/|$)|\/sales-dat(?:\/|$)|\/ledger\/(posting|categories)(?:\/|$)|\/invoices\/series(?:\/|$)/.test(path);
 
   useEffect(() => {

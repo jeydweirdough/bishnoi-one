@@ -1,18 +1,20 @@
 import { ExternalLink, FileText } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { buttonClass } from "@/src/modules/finance/platform/ui/button";
+import { ListFrame, ListToolbar, UnderlineTabs } from "@/src/platform/ui/list-layout";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat, type Format } from "@/src/modules/finance/platform/lib/format";
 import { DownloadLink } from "@/src/modules/finance/exports/download-link";
 import { CategoriesEditor } from "@/src/modules/finance/funds/categories-editor";
 import type { Chart } from "@/src/modules/finance/ledger/types";
-import type { ExpenseCategory, FundRequest } from "@/src/modules/finance/funds/types";
+import type { ExpenseCategory, FundCounts, FundRequest } from "@/src/modules/finance/funds/types";
 
-// Marketing requests, by what Finance does next: release, review, settle. Refunds
-// and reimbursements are one settlement queue; settled and cancelled requests
-// are one history. Each is a sub-page of Marketing requests in the sidebar.
+// Marketing requests: one page, with a tab for each stage (release, review, settle; the
+// advances still out; settled and cancelled). Refunds and reimbursements are one settlement
+// stage. The stage is in the address (?stage=…), so a tab can be linked to and bookmarked;
+// the old sub-page addresses redirect here (stageRedirect).
 
 export type FundTask = "to_release" | "to_check" | "to_settle" | "to_liquidate" | "history";
 
@@ -21,38 +23,66 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 // A list shows this many requests; the download has all of them.
 const LIST_LIMIT = 100;
 
-const TASKS: Record<FundTask, { path: string; title: string; intro: string; empty: string }> = {
-  to_release: {
-    path: "/finance/funds",
-    title: "For release",
-    intro: "Requests approved by the requester's Team Lead in the CRM, oldest first. Release the cash advance, or decline the release with a reason.",
+const PAGE = "/finance/funds";
+
+/** Each stage: its tab, the line saying what it is and who acts next, and the permission that acts on it (app/routers/funds.py). */
+const STAGES: { key: FundTask; tab: string; says: string; acts: string | null; empty: string }[] = [
+  {
+    key: "to_release",
+    tab: "To release",
+    says: "Requests approved by the requester's Team Lead in the CRM, oldest first. Next: someone whose role may release cash advances releases it, or declines the release with a reason. A requester who still has an earlier advance to liquidate gets the next one only after that's liquidated.",
+    acts: "funds.release",
     empty: "No requests for release.",
   },
-  to_check: {
-    path: "/finance/funds/review",
-    title: "For review",
-    intro: "Submitted liquidations, oldest first. Accept or reject each expense, then complete the review.",
+  {
+    key: "to_check",
+    tab: "To review",
+    says: "Liquidations the requester has submitted, oldest first. Next: someone whose role may review liquidations accepts or rejects each expense and completes the review, or returns it for correction. Whoever released the cash advance doesn't review its liquidation.",
+    acts: "funds.check",
     empty: "No liquidations for review.",
   },
-  to_settle: {
-    path: "/finance/funds/settlement",
-    title: "For settlement",
-    intro: "Reviewed liquidations with a balance: a refund due from the employee, or a reimbursement due to them.",
+  {
+    key: "to_settle",
+    tab: "To settle",
+    says: "Reviewed liquidations with a balance: a refund due from the employee, or a reimbursement due to them. Next: someone whose role may settle records the money returned or paid.",
+    acts: "funds.settle",
     empty: "No liquidations for settlement.",
   },
-  to_liquidate: {
-    path: "/finance/funds/outstanding",
-    title: "Outstanding",
-    intro: "Cash advances released and not yet liquidated. Overdue items first.",
+  {
+    key: "to_liquidate",
+    tab: "Outstanding advances",
+    says: "Cash advances released whose liquidation isn't in yet, overdue first. Next: the requester submits the liquidation; it then moves to To review.",
+    acts: null,
     empty: "No outstanding cash advances.",
   },
-  history: {
-    path: "/finance/funds/history",
-    title: "History",
-    intro: "Settled and cancelled requests, newest first.",
+  {
+    key: "history",
+    tab: "Settled and cancelled",
+    says: "Settled and cancelled requests, newest first. Nothing more to do on these.",
+    acts: null,
     empty: "No settled or cancelled requests yet.",
   },
-};
+];
+
+const isStage = (v: unknown): v is FundTask => STAGES.some((s) => s.key === v);
+
+/** How many are in each stage, from /finance/funds/counts. */
+function countOf(counts: FundCounts & { to_settle: number }, stage: FundTask): number {
+  if (stage === "history") return (counts.closed ?? 0) + (counts.cancelled ?? 0);
+  return counts[stage] ?? 0;
+}
+
+/** The old address of one stage (/finance/funds/review and the like): to its tab, keeping the rest of the address's query. */
+export async function stageRedirect(stage: FundTask, searchParams: Search): Promise<never> {
+  const sp = await searchParams;
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(sp)) {
+    if (key === "stage" || value === undefined) continue;
+    for (const v of Array.isArray(value) ? value : [value]) next.append(key, v);
+  }
+  next.set("stage", stage);
+  redirect(`${PAGE}?${next}`);
+}
 
 /** The amount that matters at this step, and what it is. */
 function Amount({ r, fmt }: { r: FundRequest; fmt: Format }) {
@@ -74,45 +104,49 @@ function Amount({ r, fmt }: { r: FundRequest; fmt: Format }) {
   );
 }
 
-export default async function FundsPage({ task, searchParams }: { task: FundTask; searchParams: Search }) {
+export default async function FundsPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
-  const t = TASKS[task];
+  const may = (p: string) => me.permissions?.includes(p) ?? false;
   const sp = await searchParams;
   const q = (typeof sp.q === "string" ? sp.q : "").trim().slice(0, 100);
+  const asked = isStage(sp.stage) ? sp.stage : null;
+  // The counts are the company's (the same as the sidebar's); "for you" is the stage your role acts on.
+  const counts = await load<FundCounts & { to_settle: number }>("/finance/funds/counts");
+  // No stage asked: the first one with something your role can act on; otherwise the settled and cancelled.
+  const task: FundTask = asked ?? STAGES.find((s) => s.acts && may(s.acts) && countOf(counts, s.key) > 0)?.key ?? "history";
+  const t = STAGES.find((s) => s.key === task)!;
   const shown = new URLSearchParams({ task });
   if (q) shown.set("q", q);
   const list = await load<{ items: FundRequest[] }>(`/finance/funds?${shown}&limit=${LIST_LIMIT}`);
   const items = task === "to_liquidate" ? [...list.items].sort((a, b) => Number(b.overdue) - Number(a.overdue)) : list.items;
-  // Where more than one status shares a page, each row says which.
+  // Where more than one status shares a stage, each row says which.
   const mixed = task === "to_settle" || task === "history";
+  const here = `${PAGE}?stage=${task}`;
   return (
     <>
-      <PageHeader title={t.title} actions={<DownloadLink href={`/finance/funds/export?${shown}`} />}>
-        {t.intro}
+      <PageHeader title="Marketing requests">
+        Cash advances for marketing, approved by the requester&apos;s Team Lead in the CRM. Finance releases the cash advance, the requester liquidates it,
+        Finance reviews the liquidation and settles any balance. Each tab is one stage, with how many are in it.
       </PageHeader>
-      <form className="mb-4 flex flex-wrap items-end gap-3" action={t.path} role="search">
-        <label className="text-meta text-ink-2">
-          Search
-          <input suppressHydrationWarning
-            type="search"
-            name="q"
-            defaultValue={q}
-            maxLength={100}
-            placeholder="Number, requester, purpose or customer"
-            className="ml-2 h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
-          />
-        </label>
-        <button suppressHydrationWarning type="submit" className={buttonClass("default", "sm")}>
-          Search
-        </button>
-        {q && (
-          <Link href={t.path} className="text-meta text-hema hover:underline">
-            Clear
-          </Link>
-        )}
-      </form>
-      <Sheet>
+      <ListFrame>
+        <UnderlineTabs
+          label="Stage"
+          tabs={STAGES.map((s) => ({ href: `${PAGE}?stage=${s.key}`, label: s.tab, count: countOf(counts, s.key), current: s.key === task }))}
+        />
+        <p className="border-b border-rule px-5 py-3 text-sm text-ink-2">
+          {t.says}
+          {t.acts && may(t.acts) && " Your role can do this."}
+          {task === "to_liquidate" && counts.overdue > 0 && <span className="font-medium text-danger"> {counts.overdue} overdue.</span>}
+        </p>
+        <ListToolbar q={q} placeholder="Number, requester, purpose or customer" keep={{ stage: task }}>
+          {q && (
+            <Link href={here} className="text-meta text-hema hover:underline">
+              Clear search
+            </Link>
+          )}
+          <DownloadLink href={`/finance/funds/export?${shown}`} />
+        </ListToolbar>
         {items.length === 0 ? (
           q ? (
             <Empty title="No requests match" icon="payments">
@@ -124,7 +158,7 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
             </Empty>
           )
         ) : (
-          <ul className="divide-y divide-rule">
+          <ul className="divide-y divide-rule border-t border-rule">
             {items.map((r) => (
               <li key={r.id} className="flex items-center gap-2 pr-3 hover:bg-bench/60">
                 <Link href={`/finance/funds/${r.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 py-3 pl-5">
@@ -160,7 +194,7 @@ export default async function FundsPage({ task, searchParams }: { task: FundTask
             ))}
           </ul>
         )}
-      </Sheet>
+      </ListFrame>
       {items.length === LIST_LIMIT && (
         <p className="mt-2 px-1 text-meta text-ink-3">
           Showing the first {LIST_LIMIT} requests. Search to narrow the list, or download the CSV for all of them.

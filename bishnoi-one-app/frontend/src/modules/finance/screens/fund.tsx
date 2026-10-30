@@ -8,15 +8,15 @@ import type { ExpenseCategory, FundRequest } from "@/src/modules/finance/funds/t
 
 export const metadata = { title: "Marketing request" };
 
-/** The queue each status sits in, for the breadcrumb. */
+/** The stage tab of Marketing requests each status sits in, for the breadcrumb. */
 const QUEUE: Record<string, { href: string; label: string }> = {
-  to_release: { href: "/finance/funds", label: "For release" },
-  to_liquidate: { href: "/finance/funds/outstanding", label: "Outstanding" },
-  to_check: { href: "/finance/funds/review", label: "For review" },
-  to_return: { href: "/finance/funds/settlement", label: "For settlement" },
-  to_reimburse: { href: "/finance/funds/settlement", label: "For settlement" },
-  closed: { href: "/finance/funds/history", label: "History" },
-  cancelled: { href: "/finance/funds/history", label: "History" },
+  to_release: { href: "/finance/funds?stage=to_release", label: "To release" },
+  to_liquidate: { href: "/finance/funds?stage=to_liquidate", label: "Outstanding advances" },
+  to_check: { href: "/finance/funds?stage=to_check", label: "To review" },
+  to_return: { href: "/finance/funds?stage=to_settle", label: "To settle" },
+  to_reimburse: { href: "/finance/funds?stage=to_settle", label: "To settle" },
+  closed: { href: "/finance/funds?stage=history", label: "Settled and cancelled" },
+  cancelled: { href: "/finance/funds?stage=history", label: "Settled and cancelled" },
 };
 
 /** One request: the action Finance takes at this step, the request and its

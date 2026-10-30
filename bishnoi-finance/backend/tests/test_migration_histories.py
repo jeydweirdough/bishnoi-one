@@ -83,5 +83,5 @@ def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revisi
                             'nbfi_import_matches':{'per_record'}}.items():
             assert names<={x['name'] for x in inspect(c).get_columns(table)},table
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
-        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0032'
+        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0033'
     engine.dispose()

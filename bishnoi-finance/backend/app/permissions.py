@@ -66,6 +66,9 @@ AREAS: tuple[Area, ...] = (
     Area("suppliers", "Suppliers", "Payables", ("view", "add", "edit", "deactivate")),
     Area("bills", "Supplier bills", "Payables", ("view", "create", "approve", "first", "check", "void")),
     Area("vouchers", "Payment vouchers", "Payables", ("view", "prepare", "release", "void")),
+    # Petty cash (2026-10-30, migration 0033): its own module; view and make (add, edit, attach receipts,
+    # submit) are separate ticks, as the user asked; checking and posting, and voiding, are their own.
+    Area("petty_cash", "Petty cash", "Petty cash", ("view", "create", "check", "void")),
     # approve: entries typed by hand wait for someone who holds it, never whoever posted them (2026-10-22).
     # first: the main approver (the Finance Head), told of every entry at once; other approvers are
     # backup, told only of the main approver's own entries and of ones waiting over a working day.
@@ -104,6 +107,9 @@ AREA_LABELS = {
     "vouchers.prepare": "Prepare (make, edit, submit, cancel)",
     "vouchers.release": "Release (pay)",
     "vouchers.void": "Void a released voucher",
+    "petty_cash.create": "Add and edit (attach receipts, submit)",
+    "petty_cash.check": "Check and post, or return",
+    "petty_cash.void": "Void a posted voucher",
     "imports.propose": "Propose matches (load an export, suggest accounts)",
     "imports.confirm": "Confirm company, account and money matches",
     "imports.confirm_tax": "Confirm tax-label matches",

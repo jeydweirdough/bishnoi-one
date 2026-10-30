@@ -54,10 +54,10 @@ async function KeptOverview({ org }: { org: Org }) {
           <SectionTitle icon="payments">Marketing requests</SectionTitle>
         </div>
         <div className="grid grid-cols-2 divide-x divide-rule sm:grid-cols-4">
-          <Figure label="For release" value={counts.to_release} href="/finance/funds" />
-          <Figure label="For review" value={counts.to_check} href="/finance/funds/review" />
-          <Figure label="For settlement" value={counts.to_settle} href="/finance/funds/settlement" />
-          <Figure label="Overdue liquidations" value={counts.overdue} href="/finance/funds/outstanding" flag />
+          <Figure label="For release" value={counts.to_release} href="/finance/funds?stage=to_release" />
+          <Figure label="For review" value={counts.to_check} href="/finance/funds?stage=to_check" />
+          <Figure label="For settlement" value={counts.to_settle} href="/finance/funds?stage=to_settle" />
+          <Figure label="Overdue liquidations" value={counts.overdue} href="/finance/funds?stage=to_liquidate" flag />
         </div>
       </Sheet>
       <CashBalances org={org} />

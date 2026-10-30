@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Bill, Invoice, InvoicePayment, JournalEntry, JournalLine, Supplier, TaxProfile
+from app.models import Account, Bill, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile
 from app import payables
 from app.tax.packs.ph import PERCENTAGE
 from app.tax.rates import lookup
@@ -305,11 +305,11 @@ def vat_return(db: Session, p: Period) -> dict:
     output = t["tax"]
     bills = bills_between(db, p.start, p.end)
     purchases = {k: sum(b.by_kind[k] for b in bills) for k in ("vatable", "zero_rated", "exempt", "non_vat")}
-    input_tax = sum(b.bill.vat_centavos for b in bills)
+    input_tax = sum(b.vat for b in bills)
     for m in months:
         mb = bills_between(db, date.fromisoformat(m["start"]), date.fromisoformat(m["end"]))
-        m["purchasesCentavos"] = sum(b.bill.net_centavos for b in mb)
-        m["inputTaxCentavos"] = sum(b.bill.vat_centavos for b in mb)
+        m["purchasesCentavos"] = sum(b.net for b in mb)
+        m["inputTaxCentavos"] = sum(b.vat for b in mb)
     return {
         "form": "2550Q", "title": "Quarterly value-added tax return", "months": months,
         "lines": [
@@ -329,7 +329,7 @@ def vat_return(db: Session, p: Period) -> dict:
             ],
             {"key": "payable", "label": "VAT payable" if output >= input_tax else "Excess input VAT, carried over", "amountCentavos": abs(output - input_tax)},
         ],
-        "notes": ["Input VAT is from recorded supplier bills dated in the quarter. Taxes customers withheld (the SAWT) are credited on the income tax return, not here."],
+        "notes": ["Input VAT is from recorded supplier bills and posted petty cash receipts dated in the quarter. Taxes customers withheld (the SAWT) are credited on the income tax return, not here."],
     }
 
 
@@ -391,41 +391,44 @@ def camel(key: str) -> str:
 
 @dataclass
 class Purchase:
-    """A recorded (or voided) supplier bill as the BIR reports read it: its amounts by VAT kind and
-    what was withheld from it, by ATC and rate, worked out line by line as the bill was."""
+    """A purchase as the BIR reports read it: a recorded (or voided) supplier bill, or one receipt on a posted
+    (or voided) petty cash voucher (added 2026-10-30). Its amounts by VAT kind and purchase type, and what
+    was withheld from it, by ATC and rate, worked out line by line exactly as it was posted."""
 
-    bill: Bill
+    source: str  # bill or petty_cash
+    on: date
+    no: str | int | None  # the bill's number, or the petty cash voucher's
+    reference: str  # the supplier's invoice number, or the store's receipt number
+    payee_id: str  # a supplier's id, or "store:" and the store's TIN (else its name) for petty cash
+    name: str
+    tin: str | None
+    address: str | None
+    void: bool
+    net: int
+    vat: int
+    withheld: int
     by_kind: dict[str, int]
     by_type: dict[str, dict[str, int]]
     held: list[tuple[str, int, int, int]]  # (ATC, rate in basis points, base, tax withheld)
 
     @property
-    def void(self) -> bool:
-        return self.bill.status == "void"
+    def total(self) -> int:
+        return self.net + self.vat
+
+    @property
+    def payable(self) -> int:
+        return self.net + self.vat - self.withheld
 
     @property
     def supplier_id(self) -> str:
-        return self.bill.supplier_id
-
-    @property
-    def name(self) -> str:
-        return (self.bill.supplier.company_name or self.bill.supplier.name).strip()
-
-    @property
-    def tin(self) -> str | None:
-        return self.bill.supplier.tin
-
-    @property
-    def address(self) -> str | None:
-        return self.bill.supplier.address
+        return self.payee_id
 
 
-def purchase(db: Session, bill: Bill) -> Purchase:
-    worked = payables.work_out(db, bill.lines or [], bill.bill_date, bill.amounts_include_vat)
+def classify(lines: list[dict]) -> tuple[dict, dict, list]:
     kinds = {"vatable": 0, "zero_rated": 0, "exempt": 0, "non_vat": 0}
     types = {k: {"netCentavos": 0, "vatCentavos": 0} for k in payables.PURCHASE_TYPES}
     held: dict[tuple[str, int], list[int]] = {}
-    for line in worked.lines:
+    for line in lines:
         group = types[line.get("purchaseType", "other_goods")]
         group["netCentavos"] += line["netCentavos"]
         group["vatCentavos"] += line["vatCentavos"]
@@ -435,15 +438,49 @@ def purchase(db: Session, bill: Bill) -> Purchase:
             row = held.setdefault((code, payables.WITHHOLDING[code][1]), [0, 0])
             row[0] += line["netCentavos"]
             row[1] += line["withheldCentavos"]
-    return Purchase(bill, kinds, types, [(code, bp, base, tax) for (code, bp), (base, tax) in held.items()])
+    return kinds, types, [(code, bp, base, tax) for (code, bp), (base, tax) in held.items()]
+
+
+def purchase(db: Session, bill: Bill) -> Purchase:
+    worked = payables.work_out(db, bill.lines or [], bill.bill_date, bill.amounts_include_vat)
+    kinds, types, held = classify(worked.lines)
+    return Purchase("bill", bill.bill_date, bill.no, bill.bill_number, bill.supplier_id,
+                    (bill.supplier.company_name or bill.supplier.name).strip(), bill.supplier.tin, bill.supplier.address,
+                    bill.status == "void", bill.net_centavos, bill.vat_centavos, bill.withheld_centavos, kinds, types, held)
+
+
+def store_key(line: PettyCashLine) -> str:
+    return "store:" + (line.store_tin or " ".join(line.store.split()).upper())
+
+
+def receipts(db: Session, v: PettyCashVoucher) -> list[Purchase]:
+    """Each receipt on a petty cash voucher, as its own purchase from its store, worked out as it was posted."""
+    worked = payables.work_out(db, [{"accountId": ln.account_id, "amountCentavos": ln.amount_centavos, "vat": ln.vat,
+                                     "withholding": ln.withholding, "purchaseType": ln.purchase_type} for ln in v.lines],
+                               v.voucher_date, v.amounts_include_vat)
+    out = []
+    for ln, w in zip(v.lines, worked.lines):
+        kinds, types, held = classify([w])
+        out.append(Purchase("petty_cash", v.voucher_date, v.number, ln.receipt_number, store_key(ln), ln.store.strip(), ln.store_tin, None,
+                            v.status == "void", w["netCentavos"], w["vatCentavos"], w["withheldCentavos"], kinds, types, held))
+    return out
 
 
 def bills_between(db: Session, start: date, end: date, *, with_void: bool = False, supplier_id: str | None = None) -> list[Purchase]:
+    """Every purchase dated in the period: supplier bills and petty cash receipts, in date order."""
     statuses = ("recorded", "void") if with_void else ("recorded",)
-    q = select(Bill).where(Bill.status.in_(statuses), Bill.bill_date >= start, Bill.bill_date <= end)
-    if supplier_id:
-        q = q.where(Bill.supplier_id == supplier_id)
-    return [purchase(db, b) for b in db.scalars(q.order_by(Bill.bill_date, Bill.no))]
+    out: list[Purchase] = []
+    if not supplier_id or not supplier_id.startswith("store:"):
+        q = select(Bill).where(Bill.status.in_(statuses), Bill.bill_date >= start, Bill.bill_date <= end)
+        if supplier_id:
+            q = q.where(Bill.supplier_id == supplier_id)
+        out += [purchase(db, b) for b in db.scalars(q.order_by(Bill.bill_date, Bill.no))]
+    if not supplier_id or supplier_id.startswith("store:"):
+        q = select(PettyCashVoucher).where(PettyCashVoucher.status.in_(("posted", "void") if with_void else ("posted",)),
+                                          PettyCashVoucher.voucher_date >= start, PettyCashVoucher.voucher_date <= end)
+        for v in db.scalars(q.order_by(PettyCashVoucher.voucher_date, PettyCashVoucher.number)):
+            out += [pu for pu in receipts(db, v) if not supplier_id or pu.payee_id == supplier_id]
+    return sorted(out, key=lambda pu: pu.on)
 
 
 PURCHASE_KEYS = ("totalCentavos", "vatableCentavos", "inputTaxCentavos", "zeroRatedCentavos", "exemptCentavos", "ewtCentavos", "payableCentavos")
@@ -453,17 +490,17 @@ def purchase_journal(db: Session, start: date, end: date) -> dict:
     rows = []
     totals = {k: 0 for k in PURCHASE_KEYS}
     for pu in bills_between(db, start, end, with_void=True):
-        b, k, void = pu.bill, pu.by_kind, pu.void
+        k, void = pu.by_kind, pu.void
         row = {
-            "date": b.bill_date.isoformat(), "no": b.no, "supplierInvoiceNo": b.bill_number, "supplier": pu.name, "tin": pu.tin, "void": void,
+            "date": pu.on.isoformat(), "no": pu.no, "source": pu.source, "supplierInvoiceNo": pu.reference, "supplier": pu.name, "tin": pu.tin, "void": void,
             "atc": ", ".join(sorted({h[0] for h in pu.held})) or None,
-            "totalCentavos": 0 if void else b.total_centavos,
+            "totalCentavos": 0 if void else pu.total,
             "vatableCentavos": 0 if void else k["vatable"],
-            "inputTaxCentavos": 0 if void else b.vat_centavos,
+            "inputTaxCentavos": 0 if void else pu.vat,
             "zeroRatedCentavos": 0 if void else k["zero_rated"],
             "exemptCentavos": 0 if void else k["exempt"] + k["non_vat"],
-            "ewtCentavos": 0 if void else b.withheld_centavos,
-            "payableCentavos": 0 if void else b.payable_centavos,
+            "ewtCentavos": 0 if void else pu.withheld,
+            "payableCentavos": 0 if void else pu.payable,
         }
         rows.append(row)
         for key in PURCHASE_KEYS:
@@ -482,8 +519,8 @@ def slp(db: Session, p: Period) -> dict:
         row["exemptCentavos"] += k["exempt"] + k["non_vat"]
         row["zeroRatedCentavos"] += k["zero_rated"]
         row["taxableCentavos"] += k["vatable"]
-        row["inputTaxCentavos"] += pu.bill.vat_centavos
-        row["grossTaxableCentavos"] += k["vatable"] + pu.bill.vat_centavos
+        row["inputTaxCentavos"] += pu.vat
+        row["grossTaxableCentavos"] += k["vatable"] + pu.vat
         for kind, amounts in pu.by_type.items():
             row[f"{camel(kind)}Centavos"] = row.get(f"{camel(kind)}Centavos", 0) + amounts["netCentavos"]
             row[f"{camel(kind)}InputTaxCentavos"] = row.get(f"{camel(kind)}InputTaxCentavos", 0) + amounts["vatCentavos"]
@@ -578,17 +615,21 @@ def form_2307(db: Session, p: Period, supplier_id: str) -> dict:
     months = months_of(p)
     rows: dict[tuple, dict] = {}
     for pu in bills:
-        i = next(n for n, m in enumerate(months) if m.start <= pu.bill.bill_date <= m.end)
+        i = next(n for n, m in enumerate(months) if m.start <= pu.on <= m.end)
         for atc, bp, base, tax in pu.held:
             row = rows.setdefault((atc, bp), {"atc": atc, "nature": nature(atc), "rateBp": bp, "months": [0, 0, 0], "baseCentavos": 0, "taxCentavos": 0})
             row["months"][i] += base
             row["baseCentavos"] += base
             row["taxCentavos"] += tax
-    supplier = db.get(Supplier, supplier_id)
+    if supplier_id.startswith("store:"):  # a store paid from petty cash: as its receipts name it
+        payee = {"id": supplier_id, "name": bills[0].name if bills else None, "tin": bills[0].tin if bills else None, "address": None}
+    else:
+        supplier = db.get(Supplier, supplier_id)
+        payee = {"id": supplier_id, "name": (supplier.company_name or supplier.name) if supplier else None,
+                 "tin": supplier.tin if supplier else None, "address": supplier.address if supplier else None}
     return {
         "form": "2307", "title": "Certificate of creditable tax withheld at source",
-        "payee": {"id": supplier_id, "name": (supplier.company_name or supplier.name) if supplier else None,
-                  "tin": supplier.tin if supplier else None, "address": supplier.address if supplier else None},
+        "payee": payee,
         "monthLabels": [m.label for m in months],
         "rows": sorted(rows.values(), key=lambda r: r["atc"] or ""),
         "totals": {"baseCentavos": sum(r["baseCentavos"] for r in rows.values()), "taxCentavos": sum(r["taxCentavos"] for r in rows.values())},

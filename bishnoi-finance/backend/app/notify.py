@@ -31,6 +31,7 @@ ACTIONABLE = (
     "bill.to_approve", "bill.to_check", "bill.returned", "bill.ready",
     "voucher.to_release", "voucher.returned",
     "sales_order.to_approve", "sales_order.returned",
+    "petty_cash.to_check", "petty_cash.returned",
 )
 
 # Several unread of one of these kinds show as one line, linking to the list.
@@ -46,6 +47,8 @@ GROUPS = {
     "bill.ready": ("{n} supplier bills are approved and ready to pay.", "/bills?show=ready"),
     "voucher.to_release": ("{n} payment vouchers are ready to release.", "/vouchers?show=to_release"),
     "voucher.returned": ("{n} payment vouchers were returned to you for correction.", "/vouchers?show=returned"),
+    "petty_cash.to_check": ("{n} petty cash vouchers are waiting for you to check them.", "/petty-cash?show=to_check"),
+    "petty_cash.returned": ("{n} petty cash vouchers were returned to you for correction.", "/petty-cash?show=returned"),
 }
 
 

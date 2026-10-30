@@ -23,7 +23,7 @@ from sqlalchemy import func, select, update
 from app.access import CurrentAccess, permitted
 from app.crm import CrmUnavailable, waiting_prices
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Bill, FundRequest, Invoice, JournalEntry, JournalLine, Notification, PaymentVoucher, utcnow
+from app.models import Bill, FundRequest, Invoice, JournalEntry, JournalLine, Notification, PaymentVoucher, PettyCashVoucher, utcnow
 from app.notify import ACTIONABLE, GROUPS, unread_count
 from app.permissions import ROLE_ADMIN_ID, ROLE_AUDITOR_ID, ROLE_STAFF_ID
 from app.routers.tax import Api
@@ -351,6 +351,7 @@ def read_notifications(user: CurrentUser, db: DB, settings: SettingsDep, body: R
 SIGNED_RECORDS = {
     "journal_entry": ("journal.view", JournalEntry), "fund_request": ("funds.view", FundRequest),
     "payment_voucher": ("vouchers.view", PaymentVoucher), "bill": ("bills.view", Bill),  # 2026-10-23
+    "petty_cash": ("petty_cash.view", PettyCashVoucher),  # 2026-10-30
 }
 
 
@@ -393,3 +394,8 @@ router.include_router(payables_reports_router)
 
 from app.routers.sales_orders import router as sales_orders_router  # noqa: E402
 router.include_router(sales_orders_router)
+
+# --- petty cash (app/routers/petty_cash.py): /finance/petty-cash, the same way (2026-10-30) ----------
+from app.routers.petty_cash import router as petty_cash_router  # noqa: E402
+
+router.include_router(petty_cash_router)

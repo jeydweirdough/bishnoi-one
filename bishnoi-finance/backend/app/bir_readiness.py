@@ -20,7 +20,7 @@ from app.models import Account, Bill, JournalEntry, JournalLine
 
 SOURCE_NAMES = {"invoice": "Sales invoices and collections", "bill": "Supplier bills", "voucher": "Payment vouchers",
                 "fund": "Marketing requests and liquidations", "manual": "Journal entries typed by hand", "admin": "Setup",
-                "pack": "Imported pack"}
+                "pack": "Imported pack", "petty_cash": "Petty cash vouchers"}
 ENTRIES_LISTED = 50
 
 
@@ -81,10 +81,10 @@ def readiness(db: Session, start: date, end: date, zone: ZoneInfo) -> dict:
               sales.get("taxCentavos", 0), one(s.output_tax_account_id), start, end, True, {"invoice"}, "Sales journal",
               [other, VOID_CAUSE]),
         check(db, "input_vat", "Input VAT", "Purchase journal input VAT (what SLP and 2550Q read) against the Input VAT account.",
-              purchases["inputTaxCentavos"], one(s.input_tax_account_id), start, end, False, {"bill"}, "Purchase journal",
-              [other, VOID_CAUSE, "Import VAT or VAT on receipts recorded outside supplier bills never reaches the purchase lists."]),
+              purchases["inputTaxCentavos"], one(s.input_tax_account_id), start, end, False, {"bill", "petty_cash"}, "Purchase journal",
+              [other, VOID_CAUSE, "Import VAT, or VAT on receipts recorded outside supplier bills and petty cash vouchers, never reaches the purchase lists."]),
         check(db, "ewt", "Tax withheld from suppliers (EWT)", "Purchase journal tax withheld (what QAP, 0619-E and 1601-EQ read) against the withholding tax payable account.",
-              purchases["ewtCentavos"], one(s.withholding_account_id), start, end, True, {"bill"}, "Purchase journal / QAP",
+              purchases["ewtCentavos"], one(s.withholding_account_id), start, end, True, {"bill", "petty_cash"}, "Purchase journal / QAP",
               [other, VOID_CAUSE]),
         check(db, "cwt", "Tax withheld by customers (CWT)", "Cash receipts tax withheld (what SAWT reads) against the creditable withholding tax account.",
               receipts["cwtCentavos"], one(s.cwt_account_id), start, end, False, {"invoice"}, "Cash receipts / SAWT",

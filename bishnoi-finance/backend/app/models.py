@@ -1390,6 +1390,112 @@ class ImportRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+# --- petty cash: spending from a petty cash fund, receipt by receipt (app/routers/petty_cash.py, 0033) ---
+#
+# One petty cash voucher (PCV) with its receipts, as the paper voucher is today ("2MG PCV 01682").
+# Made and submitted by whoever may make them (petty_cash.create: Aubrey), checked and posted or
+# returned by someone else (petty_cash.check: Cristal or Malou), voided with a reason
+# (petty_cash.void). Every receipt line has its photo or PDF. Posting: Dr each line's account
+# (before VAT) and Input VAT; Cr the fund (what was paid out) and the withholding tax payable.
+# Decided 2026-10-30 (Plans/Plan - Petty cash and receipts).
+
+PETTY_CASH_STATUSES = ("draft", "to_check", "returned", "posted", "void")
+
+
+class PettyCashVoucher(Base):
+    __tablename__ = "nbfi_petty_cash_vouchers"
+    __table_args__ = (
+        CheckConstraint(f"status IN {PETTY_CASH_STATUSES}", name="petty_cash_status"),
+        # The paper voucher number is used once, unless that voucher was voided.
+        Index("petty_cash_number_once", "number_key", unique=True,
+              sqlite_where=text("status <> 'void'"), postgresql_where=text("status <> 'void'")),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # The number written on the paper voucher, as written; number_key is it lower-cased with single spaces.
+    number: Mapped[str] = mapped_column(String(60))
+    number_key: Mapped[str] = mapped_column(String(60))
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    fund_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"), index=True)
+    voucher_date: Mapped[date] = mapped_column(Date)
+    person_in_charge: Mapped[str | None] = mapped_column(String(120), default=None)
+    department: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    amounts_include_vat: Mapped[bool] = mapped_column(default=True)
+    # Worked out (app/payables.py work_out, as bills are) and kept as posted.
+    net_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    vat_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    withheld_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    paid_out_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_by: Mapped[str] = mapped_column(String(120))
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    submitted_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    checked_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    checked_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    fund: Mapped[Account] = relationship(lazy="joined")
+    lines: Mapped[list["PettyCashLine"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="PettyCashLine.position")
+    events: Mapped[list["PettyCashEvent"]] = relationship(cascade="all, delete-orphan", lazy="selectin", order_by="PettyCashEvent.id")
+
+
+class PettyCashLine(Base):
+    """One receipt: where and when it was spent, what for, its tax, and its photo or PDF (required to submit)."""
+
+    __tablename__ = "nbfi_petty_cash_lines"
+    __table_args__ = (
+        CheckConstraint("purchase_type IN ('services', 'capital_goods', 'other_goods', 'importation')", name="petty_cash_purchase_type"),
+        CheckConstraint("vat IN ('vat', 'zero', 'exempt', 'none')", name="petty_cash_vat"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_petty_cash_vouchers.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    spent_on: Mapped[date] = mapped_column(Date)
+    store: Mapped[str] = mapped_column(String(200))
+    store_tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    receipt_number: Mapped[str] = mapped_column(String(60))
+    account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    description: Mapped[str | None] = mapped_column(String(200), default=None)
+    purchase_type: Mapped[str] = mapped_column(String(20), default="other_goods")
+    vat: Mapped[str] = mapped_column(String(10), default="vat")
+    withholding: Mapped[str | None] = mapped_column(String(10), default=None)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
+    net_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    vat_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    withheld_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    # The receipt (kept in nbfi_stored_files, like bill files).
+    file_ref: Mapped[str | None] = mapped_column(String(32), default=None)
+    file_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    file_type: Mapped[str | None] = mapped_column(String(100), default=None)
+    file_size: Mapped[int | None] = mapped_column(Integer, default=None)
+    file_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    file_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    account: Mapped[Account] = relationship(lazy="joined")
+
+
+class PettyCashEvent(Base):
+    """What happened to a voucher, in order: submitted, returned (with why), posted, voided."""
+
+    __tablename__ = "nbfi_petty_cash_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_petty_cash_vouchers.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    kind: Mapped[str] = mapped_column(String(20))
+    who: Mapped[str] = mapped_column(String(120))
+    who_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
+    text: Mapped[str | None] = mapped_column(String(300), default=None)
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 

@@ -40,6 +40,7 @@ const NEEDS: [string, string | string[]][] = [
   ["/finance/bills", "bills.view"],
   ["/finance/suppliers", "suppliers.view"],
   ["/finance/vouchers", "vouchers.view"],
+  ["/finance/petty-cash", "petty_cash.view"],
   ["/finance/bank", "bank.view"],
   ["/finance/ledger/accounts", "accounts.view"],
   ["/finance/ledger/posting", "accounts.view"],
@@ -73,6 +74,8 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       { href: "/finance/vouchers", label: "Payment vouchers", icon: "payments" },
       { href: "/finance/suppliers", label: "Suppliers", icon: "people" },
     ]) },
+    // Petty cash (2026-10-30): vouchers paid out of a petty cash fund, each with its receipts (screens/petty-cash.tsx).
+    { label: "Petty cash", icon: "money", steps: keep([{ href: "/finance/petty-cash", label: "Petty cash", icon: "money" }]) },
     {
       label: "Sales",
       icon: "letters",
@@ -84,17 +87,18 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
         { href: "/finance/invoices/receivables", label: "Receivables", icon: "money" },
       ]),
     },
-    // Marketing requests: a cash advance is released, its liquidation reviewed, then settled.
+    // Marketing requests: a cash advance is released, its liquidation reviewed, then settled. One page,
+    // a tab for each stage (screens/funds.tsx); current on every /finance/funds/... page, a request's included.
     {
-      label: "Expenses",
+      label: "Marketing requests",
       icon: "payments",
-      flow: true,
       steps: keep([
-        { href: "/finance/funds", label: "Pending release", icon: "payments", count: waiting.to_release, exact: true },
-        { href: "/finance/funds/review", label: "Pending liquidation review", icon: "approvals", count: waiting.to_check },
-        { href: "/finance/funds/settlement", label: "Pending settlement", icon: "money", count: waiting.to_settle },
-        { href: "/finance/funds/outstanding", label: "Outstanding advances", icon: "history", count: waiting.overdue },
-        { href: "/finance/funds/history", label: "Expense history", icon: "lists" },
+        {
+          href: "/finance/funds",
+          label: "Marketing requests",
+          icon: "payments",
+          count: (["to_release", "to_check", "to_settle", "overdue"] as const).reduce((n, key) => n + (waiting[key] ?? 0), 0),
+        },
       ]),
     },
     { label: "Approvals", icon: "approvals", steps: keep([{ href: "/finance/prices", label: "Price approvals", icon: "pricing" }]) },
