@@ -166,6 +166,18 @@ def test_vouchers_pay_from_the_accounts_under_cash(client, ana, team):
     assert bdo["parentId"] == cash["id"]
 
 
+def test_a_bank_account_nested_under_cash_can_be_paid_from(client, ana, team):
+    """Fixed 2026-10-30: paid-from accounts follow the cash book's rule (any depth under CASH)."""
+    cash = client.post("/finance/ledger/accounts", json={"code": "0001-000", "name": "CASH", "type": "asset"}, headers=ana).json()
+    group = client.post("/finance/ledger/accounts", json={"code": "1200-000", "name": "Cash in Bank", "type": "asset", "parentId": cash["id"]}, headers=ana).json()
+    dollars = client.post("/finance/ledger/accounts", json={"code": "1203-000", "name": "Synthetic dollar account", "type": "asset", "parentId": group["id"]}, headers=ana).json()
+    offered = {a["code"] for a in client.get("/finance/vouchers/choices", headers=team["aubrey"]).json()["accounts"]}
+    assert {"1200-000", "1203-000"} <= offered and "1300" not in offered
+    s, b = ready_bill(client, team)
+    r = client.post("/finance/vouchers", json={"supplierId": s["id"], "paidFromId": dollars["id"], "lines": [{"billId": b["id"], "amountCentavos": 100}]}, headers=team["aubrey"])
+    assert r.status_code == 201, r.text
+
+
 def test_amounts_in_words():
     assert in_words(1_110_050) == "Eleven thousand one hundred pesos and 50/100"
     assert in_words(100) == "One peso and 00/100"
