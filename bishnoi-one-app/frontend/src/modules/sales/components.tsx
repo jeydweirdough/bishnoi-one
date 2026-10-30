@@ -91,7 +91,7 @@ export function SalesOrderForm({ org, reference }: { org: Org; reference: Pick<R
       warehouseId: form.warehouseId || null, scheduledOn: form.scheduledOn || null, notes: form.notes.trim() || null,
       lines: linesOut(lines, fmt).map(({ productId, quantity }) => ({ productId, quantity })),
     };
-    save(() => saveSalesOrder(null, input), (out) => ({ message: "Sales order saved as a draft", go: `/sales/orders/${out.id}` }));
+    save(() => saveSalesOrder(null, input), (out) => ({ message: "Sales order saved as a draft", go: `/crm/sales/orders/${out.id}` }));
   }
 
   return (

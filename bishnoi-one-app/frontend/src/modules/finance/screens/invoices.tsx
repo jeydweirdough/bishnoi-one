@@ -306,7 +306,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             {inv.salesOrder && (
               <>
                 {" "}for sales order{" "}
-                <Link href={`/sales/orders/${inv.salesOrder.id}`} className="font-mono font-semibold text-hema hover:underline">{inv.salesOrder.number}</Link>
+                <Link href={`/crm/sales/orders/${inv.salesOrder.id}`} className="font-mono font-semibold text-hema hover:underline">{inv.salesOrder.number}</Link>
               </>
             )}
             .{inv.attention && inv.status === "draft" && <> Waiting: {inv.attention}</>}

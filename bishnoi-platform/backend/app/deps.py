@@ -92,6 +92,7 @@ def staff_by_account(db: Session, token: str) -> SignInSession | None:
 def current_user(
     record: Annotated[SignInSession, Depends(current_session)],
     db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> User:
     """Checked on every request, so switching someone off or changing their
     password ends their sessions at once."""
@@ -100,6 +101,12 @@ def current_user(
     by_account = getattr(record, "by_account", False)
     if user is None or not user.is_active or (not by_account and as_utc(record.created_at) < as_utc(user.password_changed_at)):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SIGN_IN_AGAIN)
+    # Operators work in every company: two-step sign-in first, where it's required (2026-10-30).
+    if by_account and settings.two_step_required:
+        from app import sign_in
+        account = db.scalar(select(Account).where(func.lower(Account.email) == user.email.lower()))
+        if account is not None and not sign_in.two_step_on(account):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Set up two-step sign-in first: Your profile, Two-step sign-in. Operators need it.")
     return user
 
 

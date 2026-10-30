@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "antd";
-import { Copy, KeyRound, Pencil, Plus, Power, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldOff, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { Button } from "@/src/platform/ui/button";
 import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { addPerson, changePerson, setPersonPassword } from "./actions";
+import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword } from "./actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
 
@@ -25,7 +25,7 @@ function showPassword(name: string, password: string) {
     okText: "Done",
     content: (
       <div className="mt-2 space-y-2">
-        <p className="text-sm text-ink-2">Give it to them yourself. It isn&apos;t shown again; they can change it after signing in.</p>
+        <p className="text-sm text-ink-2">Give it to them yourself. It isn&apos;t shown again, and they choose their own at their first sign-in. An invitation is safer: they set it themselves.</p>
         <p className="flex items-center gap-2 rounded-lg bg-bench px-3 py-2 font-mono text-sm">
           <span className="min-w-0 flex-1 truncate">{password}</span>
           <button
@@ -34,6 +34,39 @@ function showPassword(name: string, password: string) {
             aria-label="Copy password"
             className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
             onClick={() => navigator.clipboard.writeText(password).then(() => toast.success("Password copied"), () => toast.error("Couldn't copy: select it instead."))}
+          >
+            <Copy className="size-4" aria-hidden />
+          </button>
+        </p>
+      </div>
+    ),
+  });
+}
+
+/** An invitation: emailed when the company sends email; the link shown to pass on either way. */
+async function sendInvitation(person: { id: string; fullName: string }) {
+  const r = await invitePerson(person.id);
+  if (!r.ok) return toast.error(r.error);
+  const { link, emailed } = r.data;
+  Modal.info({
+    title: emailed ? `Invitation sent to ${person.fullName}` : `${person.fullName}'s invitation link`,
+    icon: <Mail className="mr-3 size-5 text-sage-deep" aria-hidden />,
+    okText: "Done",
+    content: (
+      <div className="mt-2 space-y-2">
+        <p className="text-sm text-ink-2">
+          {emailed
+            ? "They choose their own password with the link in the email (it works for a week, once). You can also pass this link on yourself:"
+            : "Your company hasn't set up email sending (Company, Integrations), so nothing was emailed. Pass this link on yourself; it works for a week, once:"}
+        </p>
+        <p className="flex items-center gap-2 rounded-lg bg-bench px-3 py-2 font-mono text-meta">
+          <span className="min-w-0 flex-1 truncate">{link}</span>
+          <button
+            suppressHydrationWarning
+            type="button"
+            aria-label="Copy link"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            onClick={() => navigator.clipboard.writeText(link).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy: select it instead."))}
           >
             <Copy className="size-4" aria-hidden />
           </button>
@@ -69,8 +102,8 @@ export function AddPerson({ data }: { data: AccessData }) {
       router.refresh();
       const { person, hasPassword } = r.data;
       toast.success(`${person.fullName} added`, {
-        description: hasPassword ? "They sign in with the password they already have at another company." : "Set their first password to hand over.",
-        action: hasPassword ? undefined : { label: "Set a password", onClick: () => void newPassword(person) },
+        description: hasPassword ? "They sign in with the password they already have at another company." : "Send them an invitation: they choose their own password.",
+        action: hasPassword ? undefined : { label: "Send invitation", onClick: () => void sendInvitation(person) },
         duration: 10_000,
       });
     });
@@ -131,7 +164,7 @@ export function AddPerson({ data }: { data: AccessData }) {
   );
 }
 
-/** A person's ⋯: change their details, set a new password, switch them off or on. */
+/** A person's ⋯: change their details, set a new password, switch them off or on, delete them to the recycle bin. */
 export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -163,10 +196,18 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
         label={`Actions for ${person.fullName}`}
         items={[
           { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
+          ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
           { label: "Set a new password", icon: <KeyRound />, onSelect: () => void newPassword(person) },
           ...(isMe
             ? []
             : [
+                {
+                  label: "Reset two-step sign-in",
+                  icon: <ShieldOff />,
+                  run: () => resetTwoStep(person.id),
+                  confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
+                  done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
+                },
                 "divider" as const,
                 off
                   ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
@@ -178,6 +219,14 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
                       confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
                       done: `${person.fullName} is switched off`,
                     },
+                {
+                  label: "Delete",
+                  icon: <Trash2 />,
+                  run: () => deletePerson(person.id),
+                  danger: true,
+                  confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
+                  done: `${person.fullName} is in the recycle bin`,
+                },
               ]),
         ]}
       />

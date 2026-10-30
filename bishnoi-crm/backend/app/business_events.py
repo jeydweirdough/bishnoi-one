@@ -72,7 +72,7 @@ def _sales_order(db, data: dict, slug: str) -> None:
         return
     order = dict(quote.sales_order or {})
     order.update({"id": data.get("id"), "number": data.get("number"), "status": data.get("status"), "note": data.get("note"),
-                  "url": f"/sales/orders/{data.get('id')}", "deliveredAt": data.get("deliveredAt"),
+                  "url": f"/crm/sales/orders/{data.get('id')}", "deliveredAt": data.get("deliveredAt"),
                   # Its delivery's shipping (step 12): out for delivery, delivered or failed, courier and tracking.
                   "delivery": data.get("delivery"),
                   # Invoiced from that delivery, and paid (step 13).

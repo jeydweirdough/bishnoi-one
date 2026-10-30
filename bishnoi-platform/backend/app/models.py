@@ -116,6 +116,47 @@ class Account(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Sign-in security (2026-10-30, app/sign_in.py): a handed-over password is changed at the first sign-in;
+    # two-step sign-in with an authenticator app (the secret sealed, recovery codes hashed, each used once).
+    must_change_password: Mapped[bool] = mapped_column(default=False, server_default="0")
+    two_step_secret: Mapped[str | None] = mapped_column(Text, default=None)
+    two_step_on_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    recovery_codes: Mapped[list | None] = mapped_column(JSON, default=None)
+
+
+SIGN_IN_LINK_KINDS = ("reset", "invite", "two_step")
+
+
+class SignInLink(Base):
+    """A one-time link (app/sign_in.py): forgot password ("reset"), a new person setting their own
+    password ("invite"), or a sign-in waiting for its two-step code ("two_step"). Only the hash is kept."""
+
+    __tablename__ = "nbpl_sign_in_links"
+    __table_args__ = (_one_of("kind", SIGN_IN_LINK_KINDS, "nbpl_sign_in_link_kind"), Index("nbpl_sign_in_links_token", "token_hash", unique=True),
+                      Index("nbpl_sign_in_links_account", "account_id"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("nbpl_accounts.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(12))
+    token_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    made_by: Mapped[str | None] = mapped_column(String(254), default=None)
+    # The membership a two-step sign-in opens at (the company they were signing in to).
+    identity_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
+
+class SignInFailure(Base):
+    """A wrong password, by email: counted for the lockout, in the database so a restart doesn't forget."""
+
+    __tablename__ = "nbpl_sign_in_failures"
+    __table_args__ = (Index("nbpl_sign_in_failures_email", "email", "at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    email: Mapped[str] = mapped_column(String(254))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    address: Mapped[str | None] = mapped_column(String(64), default=None)
 
 
 class AccountSignature(Base):
@@ -430,6 +471,9 @@ class Identity(Base):
     branch_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_branches.id", ondelete="SET NULL"), default=None)
     # Made for an operator (app/platform_admins.py), not added by the company.
     via_operator: Mapped[bool] = mapped_column(default=False)
+    # In the recycle bin (2026-10-30): deleted by a company administrator, switched off, out of People; restorable.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    deleted_by: Mapped[str | None] = mapped_column(String(254), default=None)
 
 
 # ---- Access: one role per person per company, for every module -------------------

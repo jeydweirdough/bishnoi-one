@@ -44,6 +44,8 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       ...when(selling && may("customers.view"), { href: "/crm/contacts", label: "Contacts", icon: "person" }),
       ...when(selling && may("deals.view"), { href: "/crm/deals", label: "Deals", icon: "deals" }),
       ...when(selling && may("quotes.view"), { href: "/crm/quotes", label: "Quotes", icon: "quotes" }),
+      // Kept by Inventory (the Operations service), worked here: a quote's order, then its approval (2026-10-30).
+      ...when(selling && may("quotes.view"), { href: "/crm/sales", label: "Sales orders", icon: "issuance" }),
       ...when(selling && may("quotes.view"), { href: "/crm/order-links", label: "Order links", icon: "orders" }),
       ...when(selling && may("customers.view"), { href: "/crm/retention", label: "Retention", icon: "retention" }),
     ],

@@ -43,7 +43,10 @@ export async function accountCall<T>(path: string, body?: unknown, token?: strin
   }
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new AccountError(response.status, typeof data?.detail === "string" ? data.detail : "Something went wrong. Try again.");
+  if (!response.ok) {
+    const detail = typeof data?.detail === "string" ? data.detail : Array.isArray(data?.detail) && typeof data.detail[0]?.msg === "string" ? data.detail[0].msg : null;
+    throw new AccountError(response.status, detail ?? "Something went wrong. Try again.");
+  }
   return data as T;
 }
 
@@ -92,6 +95,9 @@ export type Account = {
   apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null }[];
   /** The company's app catalogue (step 6): "app:purchasing", "inventory.batches"… on or off. */
   features?: Record<string, boolean>;
+  /** Sign-in security (2026-10-30): a handed-over password still to change; two-step sign-in, and whether it's owed. */
+  mustChangePassword?: boolean;
+  twoStep?: { on: boolean; needed: boolean };
 };
 
 /**

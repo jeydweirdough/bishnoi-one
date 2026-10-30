@@ -49,10 +49,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
                 <p className="mx-auto mt-3 max-w-[21rem] text-sm leading-relaxed text-ink-2">Sign in with your Bishnoi One account. One account opens every module your company gives you.</p>
               </div>
               {expired && <p className="mt-6 rounded-lg bg-[#f1f7ee] px-4 py-2.5 text-center text-sm text-ink-2">Your session ended. Sign in again to pick up where you left off.</p>}
-              <LoginForm next={next} />
+              <LoginForm next={next} email={typeof q.email === "string" ? q.email : ""} />
             </div>
           </div>
-          <p className="text-center text-meta text-ink-3">Forgot your password? Ask your company&apos;s administrator to reset it.</p>
+          <p className="text-center text-meta text-ink-3">New here? Use the link in your invitation email, or ask your company&apos;s administrator.</p>
         </section>
         <Showcase slides={SLIDES} brand={APP_NAME} label="What one Bishnoi One account gives you" />
       </div>

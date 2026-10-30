@@ -22,7 +22,7 @@ router = APIRouter(prefix="/inventory", tags=["scanning"])
 # Each document kind: its model, the page it opens in the one app, and what it's called.
 DOCUMENTS = (
     (Order, "/inventory/orders/", "Delivery"),
-    (SalesOrder, "/sales/orders/", "Sales order"),
+    (SalesOrder, "/crm/sales/orders/", "Sales order"),
     (PurchaseOrder, "/inventory/purchase-orders/", "Purchase order"),
     (Receipt, "/inventory/receipts/", "Purchase receive"),
     (Count, "/inventory/counts/", "Inventory count"),

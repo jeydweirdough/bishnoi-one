@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { moduleByKey, type ModuleDef, type ModuleKey } from "./modules";
-import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, MODULE_HEADER, VIEW_AS_HEADER, moduleCookie, viewAsCookie } from "./session-cookie";
+import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, FRAME_HEADER, MODULE_HEADER, VIEW_AS_HEADER, moduleCookie, viewAsCookie } from "./session-cookie";
 import type { Me, Org } from "./types";
 
 // The browser never talks to the API. Pages and server actions call it from
@@ -49,6 +49,12 @@ export async function moduleApi(m: ModuleDef): Promise<string> {
 /** The module this request is for (from its path, via the proxy), or null outside any module. */
 export async function currentModule(): Promise<ModuleDef | null> {
   return moduleByKey((await headers()).get(MODULE_HEADER));
+}
+
+/** The module whose frame (sidebar, who-you-are) this page is drawn in: its own, or the one it borrows (modules.ts borrowedOf). */
+async function frameModule(): Promise<ModuleDef | null> {
+  const h = await headers();
+  return moduleByKey(h.get(FRAME_HEADER) ?? h.get(MODULE_HEADER));
 }
 
 export class ApiError extends Error {
@@ -193,10 +199,10 @@ export async function load<T>(path: string): Promise<T> {
 export type GraphQLError = { message: string; path?: (string | number)[]; extensions?: { code?: string; status?: number } };
 
 /** One query: its data, and the errors of any field that couldn't be read (the rest still comes). */
-export async function query<T>(document: string, variables?: Record<string, unknown>): Promise<{ data: T; errors: GraphQLError[] }> {
+export async function query<T>(document: string, variables?: Record<string, unknown>, named?: ModuleDef): Promise<{ data: T; errors: GraphQLError[] }> {
   let res: { data: T | null; errors?: GraphQLError[] };
   try {
-    res = await api.post<{ data: T | null; errors?: GraphQLError[] }>("/graphql", { query: document, variables: variables ?? {} });
+    res = await client(named).post<{ data: T | null; errors?: GraphQLError[] }>("/graphql", { query: document, variables: variables ?? {} });
   } catch (error) {
     if (error instanceof ApiError) sendToErrorPage(error.status);
     throw error;
@@ -230,9 +236,19 @@ export async function loadQuery<T extends Record<string, unknown>>(document: str
  * layout and the page share it.
  */
 export const getFrame = cache(async (): Promise<{ me: Me; unset: Record<string, number> | null }> => {
-  const { data } = await query<{ me: Me | null; unset: Record<string, number> | null }>("query Frame { me unset }");
+  // The frame's module: on a borrowed page (sales orders in the CRM) the CRM's, not the page's.
+  const frame = (await frameModule()) ?? undefined;
+  const { data } = await query<{ me: Me | null; unset: Record<string, number> | null }>("query Frame { me unset }", undefined, frame);
   // A count that can't be had is left out rather than stopping the page; who you are can't be.
-  if (!data.me) return { me: await load<Me>("/auth/me"), unset: data.unset };
+  if (!data.me) {
+    const me = await client(frame)
+      .get<Me>("/auth/me")
+      .catch((error) => {
+        if (error instanceof ApiError) sendToErrorPage(error.status);
+        throw error;
+      });
+    return { me, unset: data.unset };
+  }
   return { me: data.me, unset: data.unset };
 });
 

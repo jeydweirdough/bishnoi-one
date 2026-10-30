@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { givePersonRole, importRoles, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
 import { AddPerson, PersonMenu } from "./person-dialogs";
+import { ImportPeople } from "./import-people";
 import type { AccessData, AccessPerson } from "./types";
 
 const NONE = "";
@@ -80,6 +82,13 @@ export function PeopleList({ data }: { data: AccessData }) {
           <span className="ml-auto text-meta text-ink-3">
             {shown.length} of {data.people.length}
           </span>
+          <Link href="/platform/roles/people/bin" className="text-meta text-ink-2 hover:text-hema hover:underline">
+            Recycle bin{data.inBin > 0 ? ` (${data.inBin})` : ""}
+          </Link>
+          <a href="/platform/roles/people/export" className="text-meta text-ink-2 hover:text-hema hover:underline" download>
+            Export
+          </a>
+          <ImportPeople />
           <AddPerson data={data} />
         </div>
 
@@ -165,7 +174,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
           );
         })}
       </div>
-      <PersonMenu person={person} isMe={false} />
+      <PersonMenu person={person} isMe={person.id === data.meId} />
     </li>
   );
 }

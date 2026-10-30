@@ -8,6 +8,9 @@ application they have been given.
   that application's own address (or to Bishnoi One.exe on the same PC) only;
   for the company they're in, or another of theirs when it names one.
 - /identity/password: changing their password (at every company of theirs).
+- Sign-in security (2026-10-30, app/sign_in.py): /identity/login/code (the two-step code), forgot
+  password (/identity/password/forgot → an emailed link), /identity/password/link and /set (a reset or
+  an invitation's link sets the password), /identity/two-step (an authenticator app: start, confirm, off).
 
 A person has one account (models.Account: email, the one password; step 4,
 2026-10-28) and a membership at each company they work for (models.Identity);
@@ -34,19 +37,17 @@ from app.api import Api
 from app.access_roles import role_for_pass
 from app.org_push import placement
 from app.audit import audit
-from app import catalogue, document_chain, email_rules, platform_admins, signatures
+from app import catalogue, document_chain, email_rules, platform_admins, sign_in, signatures
 from app.accounts import account_by_email, account_of, memberships, runs_company
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
 from app.models import AccessRole, Account, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
 from app.passes import ISSUER, PassUnavailable, issue, key_id, public_key
-from app.routers.auth import Attempts
 from app import passwords
 from app.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
 
 router = APIRouter(tags=["bishnoi accounts"])
 
 WRONG = "That email and password don't match a Bishnoi One account."
-attempts = Attempts()
 _bearer = HTTPBearer(auto_error=False)
 
 # Bishnoi One.exe runs the applications on the PC itself, on these ports.
@@ -118,8 +119,7 @@ def open_session(db: Session, settings, person: Identity, address, action: str) 
 @router.post("/identity/login")
 def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
     email = body.email.strip().lower()
-    window = settings.login_lockout_minutes * 60
-    wait = attempts.wait_seconds(email, settings.login_attempts, window)
+    wait = sign_in.wait_seconds(db, settings, email)
     if wait:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
@@ -129,7 +129,7 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
     account = account_by_email(db, email)
     ok = verify_password(body.password, account.password_hash if account and account.password_hash else DUMMY_HASH)
     if account is None or not account.password_hash or not ok:
-        attempts.failed(email, window)
+        sign_in.failed(db, settings, email, address)
         audit(db, email, "identity.sign_in_failed", category="security", target=email, target_type="identity", target_id=None, address=address)
         db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
@@ -153,10 +153,57 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
     if not at_domain:
         raise HTTPException(status.HTTP_403_FORBIDDEN, not_at_domain(db, open_rows[0][0]))
     open_rows = at_domain
-    attempts.clear(email)
-    account.last_sign_in_at = datetime.now(UTC)
+    sign_in.cleared(db, email)
     response.headers["Cache-Control"] = "no-store"
-    return open_session(db, settings, open_rows[0][0], address, "identity.signed_in")
+    # Two-step sign-in: the password was right; the session opens once the code is (POST /identity/login/code).
+    if sign_in.two_step_on(account):
+        ticket = sign_in.make_link(db, account, "two_step", 5 / 60, identity_id=open_rows[0][0].id)
+        db.commit()
+        return {"twoStep": True, "ticket": ticket}
+    account.last_sign_in_at = datetime.now(UTC)
+    return {**open_session(db, settings, open_rows[0][0], address, "identity.signed_in"), **after_sign_in(db, settings, account, open_rows[0][0])}
+
+
+def after_sign_in(db: Session, settings, account: Account, person: Identity) -> dict:
+    """What the one app does next: change a handed-over password, or set up two-step sign-in where it's required."""
+    return {"mustChangePassword": account.must_change_password, "needsTwoStep": sign_in.needs_two_step(settings, account, runs_company(db, person))}
+
+
+class CodeIn(Api):
+    ticket: str = Field(min_length=10, max_length=200)
+    code: str = Field(min_length=6, max_length=20)
+
+
+@router.post("/identity/login/code")
+def login_code(body: CodeIn, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
+    """The second step: the code from their authenticator app, or one of their recovery codes."""
+    link = sign_in.find_link(db, body.ticket, ("two_step",))
+    account = db.get(Account, link.account_id) if link else None
+    if link is None or account is None or account.status != "active":
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in took too long. Enter your email and password again.")
+    wait = sign_in.wait_seconds(db, settings, account.email)
+    if wait:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"Too many wrong codes. Try again in {max(1, wait // 60)} minute(s).", headers={"Retry-After": str(wait)})
+    secret = sign_in.unsealed(settings, account.two_step_secret)
+    recovered = False
+    if not (secret and sign_in.code_ok(secret, body.code)):
+        recovered = sign_in.use_recovery_code(account, body.code)
+        if not recovered:
+            sign_in.failed(db, settings, account.email, address)
+            audit(db, account.email, "identity.two_step_failed", category="security", target=account.email, target_type="account", target_id=account.id, address=address)
+            db.commit()
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That code isn't right. Use the newest one in your authenticator app.")
+    link.used_at = datetime.now(UTC)
+    person = db.get(Identity, link.identity_id) if link.identity_id else None
+    if person is None or person.status != "active":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your Bishnoi One access is suspended. Ask your company's administrator.")
+    sign_in.cleared(db, account.email)
+    account.last_sign_in_at = datetime.now(UTC)
+    if recovered:
+        audit(db, account.email, "identity.recovery_code_used", category="security", target=account.email, target_type="account", target_id=account.id, address=address)
+    response.headers["Cache-Control"] = "no-store"
+    out = {**open_session(db, settings, person, address, "identity.signed_in"), **after_sign_in(db, settings, account, person)}
+    return {**out, "recoveryCodesLeft": len(account.recovery_codes or []) if recovered else None}
 
 
 @router.post("/identity/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -201,7 +248,7 @@ def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityAp
 
 
 @router.get("/identity/me")
-def me(signed: Signed, db: DB) -> dict:
+def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
     _, person = signed
     company = db.get(Company, person.company_id)
     role = db.get(AccessRole, person.access_role_id) if person.access_role_id else None
@@ -226,6 +273,9 @@ def me(signed: Signed, db: DB) -> dict:
         "staff": "admin" if (account := account_of(db, person)) and account.is_operator else None,
         # Where they sit on the company's org chart (step 4).
         "org": placement(db, person),
+        # Sign-in security (2026-10-30): a handed-over password to change; two-step sign-in, and whether it's owed.
+        "mustChangePassword": bool(account and account.must_change_password),
+        "twoStep": {"on": bool(account and sign_in.two_step_on(account)), "needed": sign_in.needs_two_step(settings, account, runs_company(db, person))},
         # The company's app catalogue: each catalogue app ("app:purchasing") and feature, on or off (step 6).
         "features": catalogue.switches(db, person.company_id),
         "apps": [
@@ -309,6 +359,11 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
     grant = grant_of(db, person, app)
     if grant is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")
+    holder = account_of(db, person)
+    if holder is not None and holder.must_change_password:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Change the password you were given first: open Bishnoi One and choose your own.")
+    if sign_in.needs_two_step(settings, holder, runs_company(db, person)):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Set up two-step sign-in first: open Bishnoi One, Your profile.")
     try:
         token = issue(settings, person, company, app, grant, role_for_pass(db, person, app), placement(db, person), company_admin=runs_company(db, person))
     except PassUnavailable as e:
@@ -331,13 +386,16 @@ def change_password(body: PasswordIn, signed: Signed, db: DB) -> Response:
     account = account_of(db, person)
     if not verify_password(body.current_password, (account.password_hash if account else None) or DUMMY_HASH):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Your current password isn't right.")
-    problem = check_password_rules(body.new_password)
+    problem = sign_in.password_problem(body.new_password, person.email, person.full_name)
     if problem:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
+    if verify_password(body.new_password, account.password_hash or DUMMY_HASH):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose a password different from the one you have.")
     now = datetime.now(UTC)
     password = hash_password(body.new_password)
     # One password at every company of theirs, and in the Admin Console (app/passwords.py).
     passwords.set_for(db, person.email, password, now)
+    account.must_change_password = False
     # this sign-in carries on; every other one ends
     record.created_at = now
     audit(db, person.email, "identity.password_changed", category="security", target=person.email, target_type="identity", target_id=person.id)
@@ -437,3 +495,134 @@ def pass_key(settings: SettingsDep) -> dict:
         return {"issuer": ISSUER, "alg": "EdDSA", "kid": key_id(settings), "publicKey": public_key(settings)}
     except PassUnavailable as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e
+
+
+# ---- Forgot password, invitations and two-step sign-in (2026-10-30, app/sign_in.py) -----------------
+
+
+class ForgotIn(Api):
+    email: str = Field(min_length=3, max_length=254)
+
+
+@router.post("/identity/password/forgot", status_code=status.HTTP_204_NO_CONTENT)
+def forgot_password(body: ForgotIn, db: DB, settings: SettingsDep, address: Address) -> Response:
+    """Emails a link to choose a new password, when the email is an active account's and its company
+    sends email. Always answers the same, so nobody learns which emails have accounts."""
+    email = body.email.strip().lower()
+    account = account_by_email(db, email)
+    rows = usable(db, memberships(db, account)) if account and account.status == "active" else []
+    rows = [(r, c) for r, c in rows if not r.via_operator] or rows
+    if account is not None and rows and sign_in.count_unused(db, account.id, "reset") < 3:
+        token = sign_in.make_link(db, account, "reset", settings.reset_link_hours)
+        url = sign_in.site(db, settings) + sign_in.link_path("reset", token)
+        sent = sign_in.send(db, settings, rows[0][1].id, account.email, "Choose a new Bishnoi One password",
+                            f"Hello {account.full_name},\n\nSomeone asked to reset the password of your Bishnoi One account ({account.email}). "
+                            f"To choose a new one, open this link within {settings.reset_link_hours} hour(s):\n\n{url}\n\n"
+                            "If it wasn't you, ignore this email: your password stays as it is.\n\nBishnoi One")
+        audit(db, email, "identity.reset_requested" if sent else "identity.reset_not_sent", category="security", target=email, target_type="account",
+              target_id=account.id, company_id=rows[0][1].id, address=address)
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/identity/password/link")
+def password_link(token: Annotated[str, Query(min_length=10, max_length=200)], db: DB) -> dict:
+    """What a reset or invitation link is for, so its page can greet the person."""
+    link = sign_in.find_link(db, token, ("reset", "invite"))
+    account = db.get(Account, link.account_id) if link else None
+    if link is None or account is None or account.status != "active":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This link has expired or was already used. Ask for a new one.")
+    rows = usable(db, memberships(db, account))
+    return {"kind": link.kind, "email": account.email, "fullName": account.full_name, "company": rows[0][1].name if rows else None}
+
+
+class SetPasswordIn(Api):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD)
+
+
+@router.post("/identity/password/set", status_code=status.HTTP_204_NO_CONTENT)
+def set_password_by_link(body: SetPasswordIn, db: DB, address: Address) -> Response:
+    """A reset or invitation link's password: theirs at every company; every other sign-in ends."""
+    link = sign_in.find_link(db, body.token, ("reset", "invite"))
+    account = db.get(Account, link.account_id) if link else None
+    if link is None or account is None or account.status != "active":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This link has expired or was already used. Ask for a new one.")
+    problem = sign_in.password_problem(body.password, account.email, account.full_name)
+    if problem:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "password"], "msg": problem}])
+    now = datetime.now(UTC)
+    passwords.set_for(db, account.email, hash_password(body.password), now)
+    account.must_change_password = False
+    link.used_at = now
+    sign_in.cleared(db, account.email)
+    audit(db, account.email, "identity.password_set_by_link" if link.kind == "reset" else "identity.invitation_accepted", category="security",
+          target=account.email, target_type="account", target_id=account.id, address=address)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _two_step_out(settings, db: Session, account: Account, person: Identity) -> dict:
+    return {"on": sign_in.two_step_on(account), "required": bool(settings.two_step_required and (runs_company(db, person) or account.is_operator)),
+            "recoveryCodesLeft": len(account.recovery_codes or []) if sign_in.two_step_on(account) else 0}
+
+
+@router.get("/identity/two-step")
+def two_step(signed: Signed, db: DB, settings: SettingsDep) -> dict:
+    _, person = signed
+    return _two_step_out(settings, db, account_of(db, person), person)
+
+
+@router.post("/identity/two-step/start")
+def two_step_start(body: PasswordOnly, signed: Signed, db: DB, settings: SettingsDep) -> dict:
+    """A new secret for their authenticator app (shown as a QR code and as text); on once a code from it is confirmed."""
+    _, person = signed
+    account = _check_password(db, person, body.password)
+    if sign_in.two_step_on(account):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Two-step sign-in is already on. Turn it off first to move it to another phone.")
+    secret = sign_in.new_secret()
+    account.two_step_secret = sign_in.sealed(settings, secret)
+    db.commit()
+    uri = sign_in.setup_uri(account, secret, settings.org_name)
+    return {"secret": secret, "uri": uri, "qr": sign_in.qr_svg(uri)}
+
+
+class TwoStepCodeIn(Api):
+    code: str = Field(min_length=6, max_length=20)
+
+
+@router.post("/identity/two-step/confirm")
+def two_step_confirm(body: TwoStepCodeIn, signed: Signed, db: DB, settings: SettingsDep, address: Address) -> dict:
+    """The first code from the app: two-step sign-in is on, and ten recovery codes are shown once."""
+    _, person = signed
+    account = account_of(db, person)
+    secret = sign_in.unsealed(settings, account.two_step_secret) if account else None
+    if account is None or not secret or sign_in.two_step_on(account):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Start again: scan the code, then enter the number it shows.")
+    if not sign_in.code_ok(secret, body.code):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "code"], "msg": "That code isn't right. Enter the newest one the app shows."}])
+    codes, hashes = sign_in.new_recovery_codes()
+    account.two_step_on_at, account.recovery_codes = datetime.now(UTC), hashes
+    audit(db, account.email, "identity.two_step_on", category="security", target=account.email, target_type="account", target_id=account.id, address=address)
+    db.commit()
+    return {**_two_step_out(settings, db, account, person), "recoveryCodes": codes}
+
+
+class TwoStepOffIn(Api):
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD)
+    code: str = Field(min_length=6, max_length=20)
+
+
+@router.post("/identity/two-step/off")
+def two_step_off(body: TwoStepOffIn, signed: Signed, db: DB, settings: SettingsDep, address: Address) -> dict:
+    _, person = signed
+    account = _check_password(db, person, body.password)
+    if settings.two_step_required and (runs_company(db, person) or account.is_operator):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Administrators must keep two-step sign-in on. To move it to a new phone, ask another administrator to reset it.")
+    secret = sign_in.unsealed(settings, account.two_step_secret)
+    if not (secret and sign_in.code_ok(secret, body.code)) and not sign_in.use_recovery_code(account, body.code):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "code"], "msg": "That code isn't right."}])
+    account.two_step_secret, account.two_step_on_at, account.recovery_codes = None, None, None
+    audit(db, account.email, "identity.two_step_off", category="security", target=account.email, target_type="account", target_id=account.id, address=address)
+    db.commit()
+    return _two_step_out(settings, db, account, person)

@@ -7,13 +7,18 @@ import { loadAccess } from "./load";
  * console 2026-10-24): what each role may do in each module, and who holds
  * which, for the whole company. Only its administrators see it.
  */
-export async function AccessFrame({ current, children }: { current: "people" | "roles"; children: ReactNode }) {
+export async function AccessFrame({ current, children }: { current: "people" | "roles" | "bin"; children: ReactNode }) {
   const data = await loadAccess();
   return (
     <>
-      <PageHeader title={current === "people" ? "People" : "Roles"}>
+      <PageHeader
+        title={current === "people" ? "People" : current === "bin" ? "Recycle bin" : "Roles"}
+        crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "People" }] : undefined}
+      >
         {data ? (
-          current === "people" ? (
+          current === "bin" ? (
+            <>People deleted from {data.company.name}. They can&apos;t sign in, and what they did stays. Restore puts them back on People, switched off until you switch them on.</>
+          ) : current === "people" ? (
             <>Everyone at {data.company.name}, once for every module: add people, give each one role and the modules they may open, set passwords, switch people off. The modules are told at once.</>
           ) : (
             <>What each role can do, in plain words, and whose records it sees. Start from one of Bishnoi One&apos;s job roles and adjust it. Every app is told at once.</>

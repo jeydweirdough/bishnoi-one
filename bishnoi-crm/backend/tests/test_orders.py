@@ -54,7 +54,7 @@ def test_the_quote_hears_what_became_of_its_order(app, client, crew, ids):
              "data": {"quoteId": q["id"], "id": "so-1", "number": "SO-2026-00001", "status": "pending"}}
     assert client.post("/platform/events", json={"pass": note("event", event=event)}).status_code == 204
     order = client.get(f"/quotes/{q['id']}", headers=crew["ria"]).json()["order"]
-    assert order["number"] == "SO-2026-00001" and order["status"] == "pending" and order["url"] == "/sales/orders/so-1"
+    assert order["number"] == "SO-2026-00001" and order["status"] == "pending" and order["url"] == "/crm/sales/orders/so-1"
 
 
 def test_a_quote_waiting_for_approval_is_not_ordered(app, client, crew, ids):

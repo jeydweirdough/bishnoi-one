@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getAccount } from "@/src/platform/lib/account";
 import { FeaturesProvider } from "@/src/platform/shell/features";
@@ -10,6 +11,8 @@ import { FeaturesProvider } from "@/src/platform/shell/features";
 // operator the companies they can switch to (the sidebar's company switcher, decided 2026-10-29).
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const account = await getAccount();
+  // Before anything else (2026-10-30): their own password for a handed-over one, and two-step sign-in where it's owed.
+  if (account.mustChangePassword || account.twoStep?.needed) redirect("/login/first");
   return (
     <div className="min-h-dvh bg-bench">
       <FeaturesProvider features={account.features ?? null} companies={account.staff ? account.companies : null}>{children}</FeaturesProvider>

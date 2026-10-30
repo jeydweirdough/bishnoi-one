@@ -244,3 +244,26 @@ def test_saved_reports_are_kept_once_and_shared_safely(client, getmeds):
     assert client.patch(f"/identity/reports/{rid}", json={"name": "Theirs"}, headers=owner).status_code == 404  # not the owner
     assert client.get("/identity/reports?app=finance", headers=jade).json() == []  # one module's reports only
     assert client.delete(f"/identity/reports/{rid}", headers=owner).status_code == 204  # a company administrator may
+
+
+def test_deleting_a_person_puts_them_in_the_recycle_bin_and_restore_brings_them_back(client, getmeds):
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    assert client.delete(f"/identity/access/people/{getmeds['owner']['id']}", headers=h).status_code == 409  # never yourself
+    r = client.delete(f"/identity/access/people/{jade['id']}", headers=h)
+    assert r.status_code == 200, r.text
+    assert client.get("/identity/me", headers=jade["h"]).status_code == 401  # her sign-ins ended
+    body = client.get("/identity/access", headers=h).json()
+    assert jade["id"] not in [p["id"] for p in body["people"]] and body["inBin"] == 1
+    bin_ = client.get("/identity/access/bin", headers=h).json()["people"]
+    assert [p["email"] for p in bin_] == ["jade@getmeds.test"] and bin_[0]["status"] == "suspended"
+    # nothing is done to someone in the bin but restoring them; her email isn't taken by someone new either
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "active"}, headers=h).status_code == 409
+    again = client.post("/identity/access/people", json={"fullName": "Jade Again", "email": "jade@getmeds.test"}, headers=h)
+    assert again.status_code == 422 and "recycle bin" in again.text
+    assert client.post(f"/identity/access/people/{jade['id']}/restore", headers=h).status_code == 200
+    body = client.get("/identity/access", headers=h).json()
+    back = next(p for p in body["people"] if p["id"] == jade["id"])
+    assert back["status"] == "suspended" and body["inBin"] == 0  # back on People, switched off until switched on
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "active"}, headers=h).status_code == 200
+    log = [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]
+    assert "access.person_deleted" in log and "access.person_restored" in log
