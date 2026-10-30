@@ -51,7 +51,8 @@ class Settings(BaseSettings):
     login_attempts: int = 5
     login_lockout_minutes: int = 15
     # Two-step sign-in (an authenticator app) required of company administrators and operators before
-    # they change anything. Unset: required in production, optional elsewhere (this computer, tests).
+    # they change anything. Off unless set (decided 2026-10-30: not everyone wants it; those who run a
+    # company without it are reminded on every page instead).
     require_two_step: bool | None = None
     # How long a forgot-password link and an invitation last, in hours.
     reset_link_hours: int = 1
@@ -102,7 +103,7 @@ class Settings(BaseSettings):
 
     @property
     def two_step_required(self) -> bool:
-        return self.require_two_step if self.require_two_step is not None else self.environment == "production"
+        return bool(self.require_two_step)
 
     @model_validator(mode="after")
     def _this_computer_always(self):

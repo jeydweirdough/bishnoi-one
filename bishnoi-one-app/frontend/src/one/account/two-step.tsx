@@ -20,7 +20,7 @@ export function TwoStepCard({ state }: { state: TwoStepState }) {
   const [busy, start] = useTransition();
 
   return (
-    <Sheet className="mt-5 px-5 py-4">
+    <Sheet id="two-step" className="mt-5 scroll-mt-6 px-5 py-4">
       <SectionTitle icon="password">Two-step sign-in</SectionTitle>
       {state.on ? (
         <div className="mt-2 space-y-3 text-sm text-ink-2">

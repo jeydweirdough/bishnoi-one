@@ -143,6 +143,13 @@ def test_once_connected_people_are_kept_on_the_platform(app, client):
         assert client.patch("/admin/users/x", json={"isActive": False}).status_code == 409
         assert client.post("/admin/roles", json={}).status_code == 409
         # not the Platform's: answered by the endpoint itself (here, no one is signed in)
-        assert client.patch("/admin/users/x", json={"licenseNo": "PRC-1"}).status_code != 409
+        assert client.patch("/admin/users/x", json={"licenseNo": "PRC-1"}).status_code == 409  # kept on the Platform too since 2026-10-30
     finally:
         app.state.settings.platform_api_url = None
+
+
+def test_a_persons_crm_details_come_from_the_platform(app, client, linked):
+    r = client.post("/platform/roles", json={"pass": note(roles=[REP], people=[{"email": WHO, "role": "Medical rep", "admin": False, "details": {"employeeId": "GM-0042"}}])})
+    assert r.status_code == 204, r.text
+    with database(app)() as db:
+        assert db.scalar(select(User).where(func.lower(User.email) == WHO)).employee_id == "GM-0042"

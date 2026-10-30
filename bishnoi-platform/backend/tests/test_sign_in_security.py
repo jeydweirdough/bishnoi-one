@@ -108,7 +108,7 @@ def test_two_step_is_required_of_administrators_where_it_is_required(app, client
     app.state.settings.require_two_step = True
     h = getmeds["owner"]["h"]
     me = client.get("/identity/me", headers=h).json()
-    assert me["twoStep"] == {"on": False, "needed": True}
+    assert me["twoStep"] == {"on": False, "needed": True, "suggested": True}
     refused = client.get("/identity/access", headers=h)
     assert refused.status_code == 403 and "two-step" in refused.text
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["twoStep"]["needed"] is False  # not an administrator
@@ -133,3 +133,11 @@ def test_people_are_imported_from_a_file_checked_first_then_all_at_once(client, 
     assert done["added"] == 1 and done["invited"] == 1 and done["emailed"] == 0
     people = {p["email"]: p for p in client.get("/identity/access", headers=h).json()["people"]}
     assert people["kay@getmeds.test"]["roleId"] == role["id"] and [a["key"] for a in people["kay@getmeds.test"]["apps"]] == ["crm"]
+
+
+def test_two_step_is_optional_by_default_and_suggested_to_administrators(app, client, getmeds):
+    assert app.state.settings.two_step_required is False
+    me = client.get("/identity/me", headers=getmeds["owner"]["h"]).json()
+    assert me["twoStep"] == {"on": False, "needed": False, "suggested": True}  # reminded, not stopped
+    assert client.get("/identity/access", headers=getmeds["owner"]["h"]).status_code == 200
+    assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["twoStep"]["suggested"] is False  # not an administrator

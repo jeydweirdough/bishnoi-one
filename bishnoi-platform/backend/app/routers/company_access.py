@@ -109,6 +109,7 @@ def overview(db: DB, me: Admin) -> dict:
             "isCompanyAdmin": p.is_company_admin,
             "roleId": p.access_role_id,
             "apps": given,
+            "appDetails": p.app_details or {},
         })
         if p.access_role_id is None and any(g["role"] for g in given):
             to_choose.append(p.id)
@@ -394,9 +395,36 @@ class PersonIn(Api):
         return check_email(value)
 
 
+# What each app keeps of its own about a person, edited here (2026-10-30): the app, then its fields.
+APP_DETAILS = {"crm": {"employeeId": str}, "pharmacy": {"licenseNo": str}, "finance": {"calendarOn": bool}}
+
+
+def clean_details(given: dict | None, before: dict | None) -> dict:
+    out = {k: dict(v) for k, v in (before or {}).items()}
+    for app, fields in (given or {}).items():
+        allowed = APP_DETAILS.get(app)
+        if allowed is None or not isinstance(fields, dict):
+            raise field_error("appDetails", f"Nothing of {app}'s is kept here.")
+        for name, value in fields.items():
+            kind = allowed.get(name)
+            if kind is None:
+                raise field_error("appDetails", f"{app} keeps no {name}.")
+            if value in (None, ""):
+                out.setdefault(app, {}).pop(name, None)
+            elif kind is bool:
+                out.setdefault(app, {})[name] = bool(value)
+            else:
+                text = str(value).strip()
+                if len(text) > 40:
+                    raise field_error("appDetails", "Use at most 40 characters.")
+                out.setdefault(app, {})[name] = text
+    return {k: v for k, v in out.items() if v}
+
+
 class PersonPatch(Api):
     full_name: str | None = Field(None, min_length=2, max_length=120)
     title: str | None = Field(None, max_length=120)
+    app_details: dict[str, dict] | None = None
     # Their sign-in email, at the company's domain (app/email_rules.py, decided 2026-10-29).
     email: str | None = Field(None, max_length=254)
     status: Literal["active", "suspended"] | None = None
@@ -412,7 +440,8 @@ class PasswordIn(Api):
 
 
 def person_out(p: Identity) -> dict:
-    return {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status, "isCompanyAdmin": p.is_company_admin, "roleId": p.access_role_id}
+    return {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status, "isCompanyAdmin": p.is_company_admin, "roleId": p.access_role_id,
+            "appDetails": p.app_details or {}}
 
 
 @router.post("/people", status_code=status.HTTP_201_CREATED)
@@ -446,7 +475,12 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
     p = get_person(db, me, person_id)
     if p.deleted_at is not None:
         raise conflict(f"{p.full_name} is in the recycle bin. Restore them first.")
-    fields = {k: v for k, v in changed(body).items() if v is not None and getattr(p, k) != v}
+    fields = {k: v for k, v in changed(body).items() if v is not None and k != "app_details" and getattr(p, k) != v}
+    if body.app_details is not None:
+        details = clean_details(body.app_details, p.app_details)
+        if details != (p.app_details or {}):
+            p.app_details = details or None
+            fields["app_details"] = details
     if "email" in fields:
         new = fields.pop("email")
         change_email(db, me, p, new)
@@ -466,6 +500,8 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
                                                                  Identity.status == "active", Identity.via_operator.is_(False))):
             raise conflict(f"{p.full_name} is the company's only administrator. Make someone else one first (Company profile).")
     for name, value in fields.items():
+        if name == "app_details":
+            continue
         setattr(p, name, value.strip() if isinstance(value, str) and name != "status" else value)
     if fields:
         action = {"suspended": "access.person_suspended", "active": "access.person_reactivated"}.get(fields.get("status"), "access.person_changed")

@@ -173,7 +173,7 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
     # Everyone who may open this module: their role (when they have one here) and, since R2, whether
     # they're switched on, so switching someone off on the Platform switches them off in the module.
     people = db.execute(
-        select(Identity.email, Identity.access_role_id, Identity.status)
+        select(Identity.email, Identity.access_role_id, Identity.status, Identity.app_details)
         .join(IdentityApp, (IdentityApp.identity_id == Identity.id) & (IdentityApp.application_id == app.id))
         .where(Identity.company_id == company.id)
         .order_by(Identity.email)
@@ -187,8 +187,10 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
         "slug": company.slug,
         "roles": [spec(db, r, app.key) for r in roles],
         "people": [
-            {"email": e.lower(), "role": by_id[rid].name if rid in by_id else None, "admin": bool(rid in by_id and by_id[rid].is_admin), "active": st == "active"}
-            for e, rid, st in people
+            {"email": e.lower(), "role": by_id[rid].name if rid in by_id else None, "admin": bool(rid in by_id and by_id[rid].is_admin), "active": st == "active",
+             # What this app keeps of its own about them (an employee ID, a licence number), kept on the Platform.
+             "details": (details or {}).get(app.key) or {}}
+            for e, rid, st, details in people
         ],
         "iat": now,
         "exp": now + PUSH_LIFETIME,

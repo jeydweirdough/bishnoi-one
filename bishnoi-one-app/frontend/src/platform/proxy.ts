@@ -25,6 +25,12 @@ export async function proxy(request: NextRequest) {
   // Order links sent before the CRM moved under /crm (/order/<company>/<token>): the customer
   // isn't signed in, so they go straight to the order page, never to the sign-in page.
   if (pathname.startsWith("/order/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
+  // People, roles and teams are kept only in the Admin Console (2026-10-30): each app's own pages for them go there.
+  const peoplePage = pathname.match(/^\/(crm|inventory|finance|admin|pharmacy)\/admin\/(users|roles|teams)(?:\/|$)/);
+  if (peoplePage) {
+    const to = peoplePage[2] === "users" ? "/platform/roles/people" : peoplePage[2] === "roles" ? "/platform/roles" : "/platform/organisation";
+    return NextResponse.redirect(siteUrl(to, request), 307);
+  }
   // Operators' pages moved out of the Admin Console into Operations (2026-10-30): old links still land.
   const moved = pathname.match(/^\/platform\/(companies|apis|events|operators|people|accounts|jobs)(\/.*)?$/);
   if (moved) return NextResponse.redirect(siteUrl(`/operations/${moved[1]}${moved[2] ?? ""}${search}`, request), 308);

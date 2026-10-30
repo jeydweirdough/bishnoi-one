@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { accountSend } from "@/src/platform/lib/account";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { AccessRole, ImportReport, RoleInput } from "./types";
+import type { AccessRole, AppDetails, ImportReport, RoleInput } from "./types";
 
 // A company administrator's changes to access, on Bishnoi One Platform
 // (/identity/access). The Platform sends each module the change.
@@ -71,7 +71,7 @@ export async function addPerson(input: PersonInput): Promise<Result<{ person: { 
   });
 }
 
-export async function changePerson(id: string, change: { fullName?: string; title?: string | null; email?: string; status?: "active" | "suspended" }): Promise<Result> {
+export async function changePerson(id: string, change: { fullName?: string; title?: string | null; email?: string; status?: "active" | "suspended"; appDetails?: AppDetails }): Promise<Result> {
   return attempt(async () => {
     await accountSend("PATCH", `/identity/access/people/${enc(id)}`, change);
     refresh();

@@ -474,6 +474,9 @@ class Identity(Base):
     # In the recycle bin (2026-10-30): deleted by a company administrator, switched off, out of People; restorable.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     deleted_by: Mapped[str | None] = mapped_column(String(254), default=None)
+    # What each app keeps of its own about them, kept here (2026-10-30): {"crm": {"employeeId"}, "pharmacy": {"licenseNo"},
+    # "finance": {"calendarOn"}}. Sent to each app with the people it's told about (access_roles.roles_note).
+    app_details: Mapped[dict | None] = mapped_column(JSON, default=None)
 
 
 # ---- Access: one role per person per company, for every module -------------------

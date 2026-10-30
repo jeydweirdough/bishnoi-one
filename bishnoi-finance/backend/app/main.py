@@ -109,4 +109,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(import_review.router)
     from app.routers import imports
     app.include_router(imports.router)
+    # Data clean-up and the recycle bin, for administrators (2026-10-30).
+    from app.recycle_bin import make_router as recycle_router
+    from app.recycle_kinds import KINDS as recycle_kinds
+
+    app.include_router(recycle_router(recycle_kinds))
     return app

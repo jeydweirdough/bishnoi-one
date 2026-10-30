@@ -174,7 +174,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
           );
         })}
       </div>
-      <PersonMenu person={person} isMe={person.id === data.meId} />
+      <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} />
     </li>
   );
 }

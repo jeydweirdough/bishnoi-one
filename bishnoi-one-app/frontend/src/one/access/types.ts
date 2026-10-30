@@ -46,7 +46,11 @@ export type AccessPerson = {
   roleId: string | null;
   /** The modules they may open, and the role each gives them today. */
   apps: { key: string; role: string | null }[];
+  /** What each app keeps of its own about them, kept here (2026-10-30): CRM employee ID, licence number, Finance calendar. */
+  appDetails?: AppDetails;
 };
+
+export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };
 
 export type AccessData = {
   company: { id: string; name: string };

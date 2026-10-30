@@ -248,6 +248,11 @@ def needs_two_step(settings: Settings, account: Account | None, runs: bool) -> b
     return bool(settings.two_step_required and account is not None and (runs or account.is_operator) and not two_step_on(account))
 
 
+def suggests_two_step(account: Account | None, runs: bool) -> bool:
+    """Someone who runs a company (or is an operator) without two-step sign-in: reminded on every page, not stopped."""
+    return bool(account is not None and (runs or account.is_operator) and not two_step_on(account))
+
+
 def count_unused(db: Session, account_id: str, kind: str) -> int:
     return db.scalar(select(func.count()).select_from(SignInLink).where(SignInLink.account_id == account_id, SignInLink.kind == kind,
                                                                          SignInLink.used_at.is_(None), SignInLink.expires_at > datetime.now(UTC))) or 0

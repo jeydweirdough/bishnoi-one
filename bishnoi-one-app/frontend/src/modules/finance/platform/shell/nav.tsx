@@ -142,11 +142,10 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
         { href: "/finance/import-review", label: "Import review", icon: "lists" },
         { href: "/finance/import-matching", label: "Import matching", icon: "lists" },
         { href: "/finance/tax", label: "Taxes", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
-        // Each person's e-signature and calendar: Finance's own (people themselves are on the Admin Console).
-        { href: "/finance/admin/users", label: "People's details", icon: "people" },
         { href: "/finance/invoices/series", label: "Transaction number series", icon: "letters", missing: missingOf(unset, ["invoiceSeries"]) },
         { href: "/finance/ledger/posting", label: "Default accounts", icon: "settings", missing: missingOf(unset, ["postingAccounts"]) },
         { href: "/finance/ledger/categories", label: "Expense categories", icon: "lists", missing: missingOf(unset, ["categoryAccounts"]) },
+        ...(me.isOwner ? [{ href: "/finance/admin/data-cleanup", label: "Data clean-up", icon: "settings" }] : []),
         { href: "/finance/admin/audit", label: "Activity log", icon: "auditLog" },
       ]),
     },

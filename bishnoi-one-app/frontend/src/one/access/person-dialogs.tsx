@@ -203,11 +203,18 @@ export function AddPerson({ data }: { data: AccessData }) {
 }
 
 /** A person's ⋯: change their details, set a new password, switch them off or on, delete them to the recycle bin. */
-export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
+export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
+  // What each app keeps of its own about them (2026-10-30), for the apps the company has.
+  const [details, setDetails] = useState({
+    employeeId: person.appDetails?.crm?.employeeId ?? "",
+    licenseNo: person.appDetails?.pharmacy?.licenseNo ?? "",
+    calendarOn: Boolean(person.appDetails?.finance?.calendarOn),
+  });
+  const has = (key: string) => modules.includes(key);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
   const off = person.status !== "active";
@@ -216,7 +223,12 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
     start(async () => {
       const email = form.email.trim().toLowerCase();
       const emailChanged = email !== person.email.toLowerCase();
-      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null, ...(emailChanged && { email }) });
+      const appDetails = {
+        ...(has("crm") && { crm: { employeeId: details.employeeId.trim() } }),
+        ...(has("pharmacy") && { pharmacy: { licenseNo: details.licenseNo.trim() } }),
+        ...(has("finance") && { finance: { calendarOn: details.calendarOn } }),
+      };
+      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null, ...(emailChanged && { email }), appDetails });
       if (!r.ok) {
         setFields(r.fields ?? {});
         if (!r.fields) toast.error(r.error);
@@ -299,6 +311,22 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
           </Field>
+          {has("crm") && (
+            <Field label="Employee ID" size="full" optional hint="Shown in the CRM.">
+              {(p) => <Input {...p} value={details.employeeId} onChange={(e) => setDetails({ ...details, employeeId: e.target.value })} maxLength={40} />}
+            </Field>
+          )}
+          {has("pharmacy") && (
+            <Field label="PRC licence number" size="full" optional hint="For pharmacists: printed on what they dispense in Pharmacy.">
+              {(p) => <Input {...p} value={details.licenseNo} onChange={(e) => setDetails({ ...details, licenseNo: e.target.value })} maxLength={40} />}
+            </Field>
+          )}
+          {has("finance") && (
+            <label className="col-span-full inline-flex items-center gap-2 text-sm text-ink-2">
+              <input type="checkbox" checked={details.calendarOn} onChange={(e) => setDetails({ ...details, calendarOn: e.target.checked })} />
+              Finance calendar on for them
+            </label>
+          )}
         </FormGrid>
       </Modal>
     </>

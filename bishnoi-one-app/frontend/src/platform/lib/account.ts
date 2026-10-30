@@ -97,7 +97,8 @@ export type Account = {
   features?: Record<string, boolean>;
   /** Sign-in security (2026-10-30): a handed-over password still to change; two-step sign-in, and whether it's owed. */
   mustChangePassword?: boolean;
-  twoStep?: { on: boolean; needed: boolean };
+  /** `needed`: required and missing (only when the Platform requires it); `suggested`: runs a company without it, reminded on every page. */
+  twoStep?: { on: boolean; needed: boolean; suggested?: boolean };
 };
 
 /**

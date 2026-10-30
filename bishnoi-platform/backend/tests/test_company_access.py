@@ -267,3 +267,28 @@ def test_deleting_a_person_puts_them_in_the_recycle_bin_and_restore_brings_them_
     assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "active"}, headers=h).status_code == 200
     log = [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]
     assert "access.person_deleted" in log and "access.person_restored" in log
+
+
+def test_each_apps_details_about_a_person_are_kept_here_and_sent(client, getmeds):
+    from app import access_roles
+    from app.models import Application, Company
+
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    r = client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"crm": {"employeeId": "GM-0042"}, "pharmacy": {"licenseNo": "PRC-77"}}}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["person"]["appDetails"] == {"crm": {"employeeId": "GM-0042"}, "pharmacy": {"licenseNo": "PRC-77"}}
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"crm": {"shoeSize": "9"}}}, headers=h).status_code == 422
+    # cleared by sending it empty
+    r = client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"pharmacy": {"licenseNo": ""}}}, headers=h)
+    assert r.json()["person"]["appDetails"] == {"crm": {"employeeId": "GM-0042"}}
+    # what the CRM is told about her
+    app_ = client.app
+    with app_.state.sessions() as db:
+        company = db.get(Company, getmeds["company"]["id"])
+        crm = db.query(Application).filter(Application.key == "crm").one()
+        from app.passes import public_key  # noqa: F401  (signing works in tests)
+        token = access_roles.roles_note(db, app_.state.settings, company, crm)
+    import base64, json
+    claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
+    who = next(p for p in claims["people"] if p["email"] == "jade@getmeds.test")
+    assert who["details"] == {"employeeId": "GM-0042"}

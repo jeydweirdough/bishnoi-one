@@ -275,7 +275,8 @@ def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
         "org": placement(db, person),
         # Sign-in security (2026-10-30): a handed-over password to change; two-step sign-in, and whether it's owed.
         "mustChangePassword": bool(account and account.must_change_password),
-        "twoStep": {"on": bool(account and sign_in.two_step_on(account)), "needed": sign_in.needs_two_step(settings, account, runs_company(db, person))},
+        "twoStep": {"on": bool(account and sign_in.two_step_on(account)), "needed": sign_in.needs_two_step(settings, account, runs_company(db, person)),
+                    "suggested": sign_in.suggests_two_step(account, runs_company(db, person))},
         # The company's app catalogue: each catalogue app ("app:purchasing") and feature, on or off (step 6).
         "features": catalogue.switches(db, person.company_id),
         "apps": [
