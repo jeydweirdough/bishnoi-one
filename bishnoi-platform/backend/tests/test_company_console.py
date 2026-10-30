@@ -72,3 +72,24 @@ def test_the_staff_sign_in_is_closed_on_a_server(app, client):
         assert r.status_code == 403 and "Bishnoi One account" in r.json()["detail"]
     finally:
         app.state.settings.environment = "development"
+
+
+def test_administrators_are_made_and_unmade_by_another_administrator(client, getmeds):
+    owner, jade = getmeds["owner"], getmeds["jade"]
+    h = owner["h"]
+    body = client.get("/identity/company/administrators", headers=h).json()
+    assert [a["email"] for a in body["administrators"]] == ["olive@getmeds.test"] and body["administrators"][0]["isMe"]
+    # never yourself off, never the only one (also not by switching them off on People)
+    assert client.put(f"/identity/company/administrators/{owner['id']}", json={"on": False}, headers=h).status_code == 409
+    made = client.put(f"/identity/company/administrators/{jade['id']}", json={"on": True}, headers=h)
+    assert made.status_code == 200, made.text
+    assert {a["email"] for a in made.json()["administrators"]} == {"olive@getmeds.test", "jade@getmeds.test"}
+    assert client.get("/identity/company", headers=jade["h"]).status_code == 200  # Jade opens the console now
+    # Jade removes Olive; Olive's sign-ins end and she is no administrator any more
+    gone = client.put(f"/identity/company/administrators/{owner['id']}", json={"on": False}, headers=jade["h"])
+    assert gone.status_code == 200, gone.text
+    assert client.get("/identity/me", headers=h).status_code == 401
+    # Jade is now the only one: she can't be switched off on People either
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "suspended"}, headers=jade["h"]).status_code == 409
+    log = client.get("/identity/company/activity", headers=jade["h"]).json()["entries"]
+    assert [e["action"] for e in log[:2]] == ["company.administrator_removed", "company.administrator_added"]

@@ -6,9 +6,9 @@ import { ago, when } from "@/src/modules/console/lib/words";
 import { accountSend } from "@/src/platform/lib/account";
 import { ApiError } from "@/src/platform/lib/api";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { LetterheadForm, ProfileForm, SignOutButton } from "./forms";
+import { AdministratorsCard, LetterheadForm, ProfileForm, SignOutButton } from "./forms";
 import { CatalogueBoard } from "./catalogue";
-import type { ActivityEntry, CatalogueEntry, CompanyProfile, OffDomainPerson, SecurityData } from "./types";
+import type { ActivityEntry, Administrators, CatalogueEntry, CompanyProfile, OffDomainPerson, SecurityData } from "./types";
 
 // The company console (feature plan step 5, 2026-10-28): what a company's own administrators keep
 // about their company in the Admin Console. People, roles and the org chart have their own pages.
@@ -43,7 +43,10 @@ function Page({ title, intro, children }: { title: string; intro: ReactNode; chi
 }
 
 export async function CompanyProfilePage() {
-  const data = await read<{ company: CompanyProfile; offDomain: OffDomainPerson[] }>("/identity/company");
+  const [data, admins] = await Promise.all([
+    read<{ company: CompanyProfile; offDomain: OffDomainPerson[] }>("/identity/company"),
+    read<Administrators>("/identity/company/administrators"),
+  ]);
   if (!data) return <Page title="Company profile" intro={null}><NotYours /></Page>;
   const c = data.company;
   return (
@@ -55,6 +58,13 @@ export async function CompanyProfilePage() {
             <ProfileForm company={c} />
           </div>
         </Sheet>
+        {admins && (
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="roles">Administrators</SectionTitle>
+            <p className="mt-1 mb-3 text-meta text-ink-3">They run the company in Bishnoi One: this console, people, roles and apps.</p>
+            <AdministratorsCard data={admins} />
+          </Sheet>
+        )}
         {data.offDomain.length > 0 && (
           <Sheet className="px-5 py-4 lg:col-span-2">
             <SectionTitle icon="email">Emails to change</SectionTitle>

@@ -63,3 +63,7 @@ export type CatalogueEntry = {
   available: boolean;
   switches: { key: string; label: string; hint: string; later: boolean; on: boolean }[];
 };
+
+/** A person at the company, as the Administrators card lists them (2026-10-30). */
+export type AdminPerson = { id: string; fullName: string; email: string; title: string | null; isMe: boolean };
+export type Administrators = { administrators: AdminPerson[]; others: AdminPerson[] };

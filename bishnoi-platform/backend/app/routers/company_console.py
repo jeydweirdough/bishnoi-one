@@ -9,6 +9,9 @@ roles and the org chart are in company_access.py and organisation.py; this is th
 - GET  /identity/company/activity: the company's activity log, newest first.
 - GET  /identity/company/security, POST …/security/people/{id}/sign-out: who has a password,
   when each last signed in, open sign-ins, and ending a person's sign-ins.
+- GET  /identity/company/administrators, PUT …/administrators/{id} {on}: who runs the company in
+  Bishnoi One, made or unmade by another administrator (2026-10-30). Never yourself off, never the
+  last one; someone unmade signs in again (their sign-ins end) and opens the console no more.
 
 Every change is in the audit log (names of what changed, never values).
 """
@@ -303,3 +306,47 @@ def sign_out(person_id: str, db: DB, me: Admin) -> dict:
     db.commit()
     return {"ended": ended}
 
+
+
+# ---- Company administrators (2026-10-30) --------------------------------------------------------
+
+
+def _admins(db, company_id: str) -> list[Identity]:
+    return db.scalars(select(Identity).where(Identity.company_id == company_id, Identity.is_company_admin, Identity.status == "active",
+                                             Identity.via_operator.is_(False)).order_by(Identity.full_name)).all()
+
+
+@router.get("/administrators")
+def administrators(db: DB, me: Admin) -> dict:
+    people = db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.status == "active",
+                                               Identity.via_operator.is_(False)).order_by(Identity.full_name)).all()
+    out = lambda p: {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "isMe": p.id == me.id}  # noqa: E731
+    return {"administrators": [out(p) for p in people if p.is_company_admin], "others": [out(p) for p in people if not p.is_company_admin]}
+
+
+class AdministratorIn(Api):
+    on: bool
+
+
+@router.put("/administrators/{person_id}")
+def set_administrator(person_id: str, body: AdministratorIn, db: DB, me: Admin) -> dict:
+    p = get_person(db, me, person_id)
+    if p.is_company_admin == body.on:
+        return administrators(db, me)
+    if body.on and p.status != "active":
+        raise conflict(f"{p.full_name} is switched off. Switch them on first on People.")
+    if not body.on:
+        if p.id == me.id:
+            raise conflict("You can't remove yourself. Another administrator can.")
+        if not [a for a in _admins(db, me.company_id) if a.id != p.id]:
+            raise conflict(f"{p.full_name} is the company's only administrator. Make someone else one first.")
+    p.is_company_admin = body.on
+    if not body.on:
+        # Their console is closed at once: they sign in again, without it.
+        now = datetime.now(UTC)
+        for s in db.scalars(select(IdentitySession).where(IdentitySession.identity_id == p.id, IdentitySession.revoked_at.is_(None))):
+            s.revoked_at = now
+    audit(db, me.email, "company.administrator_added" if body.on else "company.administrator_removed", category="security",
+          target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
+    db.commit()
+    return administrators(db, me)
