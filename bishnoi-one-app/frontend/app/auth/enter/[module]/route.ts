@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AccountError, accountCall, oneAppUrl } from "@/src/platform/lib/account";
 import { moduleApi } from "@/src/platform/lib/api";
 import { moduleByKey } from "@/src/platform/lib/modules";
+import { markUnavailable } from "@/src/platform/lib/enter";
 import { siteUrl } from "@/src/platform/lib/site";
 import { ACCOUNT_COOKIE, COMPANY_COOKIE, companyOfToken, cookieOptions, moduleCookie } from "@/src/platform/lib/session-cookie";
 
@@ -10,13 +11,16 @@ import { ACCOUNT_COOKIE, COMPANY_COOKIE, companyOfToken, cookieOptions, moduleCo
 // the Platform hands a pass for the module (it decides who may open it), the
 // module's API turns the pass into a session (its /auth/platform), and the
 // session is kept in that module's cookie. Then back to the page they asked for.
-// Anything refused goes home with the reason, said plainly.
+// Anything refused goes home with the reason, said plainly; with `soft` (a page that reads several
+// modules, src/platform/lib/enter.ts) it goes back to that page, which leaves this module out.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ module: string }> }) {
   const { module: key } = await params;
   const asked = request.nextUrl.searchParams.get("next") ?? "";
   // Only a page of this site: never somewhere else.
   const next = asked.startsWith("/") && !asked.startsWith("//") ? asked : "/";
-  const home = (notice: string) => NextResponse.redirect(siteUrl(`/?notice=${encodeURIComponent(notice.slice(0, 300))}`, request));
+  const soft = request.nextUrl.searchParams.get("soft") === "1";
+  const home = (notice: string) =>
+    NextResponse.redirect(siteUrl(soft ? markUnavailable(next, key) : `/?notice=${encodeURIComponent(notice.slice(0, 300))}`, request));
 
   const m = moduleByKey(key);
   if (!m || m.status !== "live") return NextResponse.redirect(siteUrl("/", request));
