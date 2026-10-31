@@ -7,7 +7,7 @@ export type ChartPoint = { x: string; values: (number | null)[] };
 
 const COLOURS = ["#5f8a6f", "#1f2a24", "#c9a24b", "#8aa8c8"];
 
-export function ReportChartView({ kind, labels, points, format }: { kind: "bar" | "line"; labels: string[]; points: ChartPoint[]; format: (v: number) => string }) {
+export function ReportChartView({ kind, labels, points, format, colours = COLOURS }: { kind: "bar" | "line"; labels: string[]; points: ChartPoint[]; format: (v: number) => string; colours?: string[] }) {
   const W = 760;
   const H = 240;
   const pad = { l: 56, r: 12, t: 12, b: 42 };
@@ -37,7 +37,7 @@ export function ReportChartView({ kind, labels, points, format }: { kind: "bar" 
                 const x = pad.l + i * step + step * 0.15 + s * bw;
                 const h = ((v ?? 0) / nice) * ih;
                 return (
-                  <rect key={`${i}-${s}`} x={x} y={pad.t + ih - h} width={bw - 1} height={Math.max(0, h)} rx="2" fill={COLOURS[s % COLOURS.length]}>
+                  <rect key={`${i}-${s}`} x={x} y={pad.t + ih - h} width={bw - 1} height={Math.max(0, h)} rx="2" fill={colours[s % colours.length]}>
                     <title>{`${p.x} · ${labels[s]}: ${format(v ?? 0)}`}</title>
                   </rect>
                 );
@@ -47,12 +47,12 @@ export function ReportChartView({ kind, labels, points, format }: { kind: "bar" 
               <g key={s}>
                 <polyline
                   fill="none"
-                  stroke={COLOURS[s % COLOURS.length]}
+                  stroke={colours[s % colours.length]}
                   strokeWidth="2"
                   points={points.map((p, i) => `${pad.l + i * step + step / 2},${y(p.values[s] ?? 0)}`).join(" ")}
                 />
                 {points.map((p, i) => (
-                  <circle key={i} cx={pad.l + i * step + step / 2} cy={y(p.values[s] ?? 0)} r="3" fill={COLOURS[s % COLOURS.length]}>
+                  <circle key={i} cx={pad.l + i * step + step / 2} cy={y(p.values[s] ?? 0)} r="3" fill={colours[s % colours.length]}>
                     <title>{`${p.x} · ${labels[s]}: ${format(p.values[s] ?? 0)}`}</title>
                   </circle>
                 ))}
@@ -70,7 +70,7 @@ export function ReportChartView({ kind, labels, points, format }: { kind: "bar" 
         <figcaption className="mt-2 flex flex-wrap gap-4 text-meta text-ink-2">
           {labels.map((l, s) => (
             <span key={l} className="inline-flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm" style={{ background: COLOURS[s % COLOURS.length] }} aria-hidden />
+              <span className="size-2.5 rounded-sm" style={{ background: colours[s % colours.length] }} aria-hidden />
               {l}
             </span>
           ))}

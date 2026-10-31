@@ -1,43 +1,38 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { accountSend, getAccount } from "@/src/platform/lib/account";
+import { Download } from "lucide-react";
+import { getAccount } from "@/src/platform/lib/account";
 import { ago } from "@/src/modules/console/lib/words";
-import { FigureCard, FigureCardLoading, Tile, type Figure } from "@/src/platform/ui/figures";
+import { ReportChartView } from "@/src/platform/reports/chart";
+import { buttonClass } from "@/src/platform/ui/button";
+import { Donut } from "@/src/platform/ui/donut";
+import { Pill, TrendCard } from "@/src/platform/ui/figures";
+import { Icon } from "@/src/platform/ui/icons";
 import { Later } from "@/src/platform/ui/later";
-import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
-import { ListRows } from "@/src/platform/ui/skeleton";
+import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { Bone, ListRows } from "@/src/platform/ui/skeleton";
+import { EMPTY_OVERVIEW, loadOverview, type Overview } from "@/src/one/home/overview";
+import { PeriodSelect } from "@/src/one/home/period-select";
+import { PERIODS, periodOf } from "@/src/one/home/periods";
 
 export const metadata = { title: "Home" };
 
-// The Admin Console's Home (2026-10-30): user control at a glance, for the company's administrators:
-// who's here, who signs in, how safe the sign-ins are, and who can open which app. Counted by the
-// Platform alone (/identity/company/overview), so it's quick. No money here: the Admin Console is people.
-// The page is drawn at once; the figures stream in.
+// The Admin Console's Home (2026-10-30; laid out as a dashboard 2026-10-31): user control at a glance, for
+// the company's administrators: who's here, who signs in, how safe the sign-ins are, what waits on them, and
+// who can open which app. Counted by the Platform alone (/identity/company/overview), so it's quick. No
+// money here: the Admin Console is people. The page is drawn at once; the figures stream in.
 
-type Overview = {
-  people: { active: number; off: number; inBin: number; administrators: number; noRole: number; noApps: number };
-  signIns: { today: number; week: number; month: number; never: number; invitesPending: number; passwordsToChange: number };
-  security: {
-    twoStepAdministrators: { on: number; of: number };
-    twoStepEveryone: { on: number; of: number };
-    required: boolean;
-    failedThisWeek: number;
-    lockedNow: number;
-    offDomain: number;
-  };
-  apps: { key: string; name: string; people: number }[];
-  roles: { id: string; name: string; people: number }[];
-  recent: { id: string; at: string; actor: string; action: string; target: string }[];
-};
+type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const PEOPLE = "/platform/roles/people";
-const EMPTY: Overview = {
-  people: { active: 0, off: 0, inBin: 0, administrators: 0, noRole: 0, noApps: 0 },
-  signIns: { today: 0, week: 0, month: 0, never: 0, invitesPending: 0, passwordsToChange: 0 },
-  security: { twoStepAdministrators: { on: 0, of: 0 }, twoStepEveryone: { on: 0, of: 0 }, required: false, failedThisWeek: 0, lockedNow: 0, offDomain: 0 },
-  apps: [],
-  roles: [],
-  recent: [],
+// The chart's three series, in a fixed order (checked for colour-blind separation and contrast on white).
+const SERIES = ["#2a78d6", "#eb6834", "#199e70"];
+const STATUS = { active: "#2a78d6", off: "#eb6834", bin: "#a3a29b" };
+const TINTS = {
+  blue: { bg: "#e8f1fc", ink: "#2a78d6" },
+  green: { bg: "#e3f4ec", ink: "#167a57" },
+  orange: { bg: "#fdeee7", ink: "#c4532a" },
+  violet: { bg: "#eeebfb", ink: "#6250d6" },
 };
 const n = (v: number, one: string, many = `${one}s`) => `${v} ${v === 1 ? one : many}`;
 
@@ -64,34 +59,17 @@ const SAID: Record<string, string> = {
   "company.administrator_removed": "removed as administrator:",
 };
 
-function lead(o: Overview): Figure[] {
-  const admins = o.security.twoStepAdministrators;
-  const missing = admins.of - admins.on;
-  return [
-    { value: String(o.people.active), label: "Active people", note: `${o.people.off} switched off · ${o.people.inBin} in the recycle bin`, href: PEOPLE },
-    { value: String(o.signIns.week), label: "Signed in this week", note: `${o.signIns.today} today · ${n(o.signIns.never, "person has", "people have")} never signed in`, href: "/platform/company/security" },
-    {
-      value: `${admins.on} of ${admins.of}`,
-      label: "Administrators with two-step sign-in",
-      note: `Everyone: ${o.security.twoStepEveryone.on} of ${o.security.twoStepEveryone.of}`,
-      href: "/platform/company/security",
-      pill: admins.of === 0 ? undefined : missing === 0 ? { text: "All protected", tone: "good" } : { text: `${missing} without`, tone: o.security.required ? "bad" : "warn" },
-    },
-    { value: String(o.people.administrators), label: "Administrators", note: "Who runs the company here", href: "/platform/company" },
-  ];
+/** Good morning, afternoon or evening, by the clock in Manila (the company's time zone today). */
+function greeting(): string {
+  const hour = Number(new Intl.DateTimeFormat("en-PH", { hour: "numeric", hourCycle: "h23", timeZone: "Asia/Manila" }).format(new Date()));
+  return hour < 12 ? "Good morning!" : hour < 18 ? "Good afternoon!" : "Good evening!";
 }
 
-function tiles(o: Overview): Figure[] {
-  return [
-    { value: String(o.people.noRole), label: "No role yet", note: "Each module goes by its own until given one", href: PEOPLE, alert: o.people.noRole > 0 },
-    { value: String(o.people.noApps), label: "No apps yet", note: "They can sign in but open nothing", href: PEOPLE, alert: o.people.noApps > 0 },
-    { value: String(o.signIns.invitesPending), label: "Invitations waiting", note: "Sent, not yet accepted", href: PEOPLE },
-    { value: String(o.signIns.passwordsToChange), label: "Passwords to change", note: "Handed over; changed at their first sign-in", href: PEOPLE },
-    { value: String(o.security.failedThisWeek), label: "Wrong passwords this week", note: "Tries with your people's emails", href: "/platform/company/activity", alert: o.security.failedThisWeek > 0 },
-    { value: String(o.security.lockedNow), label: "Locked out now", note: "Too many wrong passwords; they wait a few minutes", href: "/platform/company/security", alert: o.security.lockedNow > 0 },
-    { value: String(o.security.offDomain), label: "Emails to change", note: "Outside your email domain: they can't sign in", href: "/platform/company", alert: o.security.offDomain > 0 },
-    { value: String(o.signIns.month), label: "Signed in this month", note: `Of ${o.people.active} active`, href: "/platform/company/security" },
-  ];
+/** "2026-10" as the chart's label: the month, with the year on January and the first bar. */
+function monthLabel(month: string, first: boolean): string {
+  const [y, m] = month.split("-").map(Number);
+  const name = new Date(Date.UTC(y, m - 1, 15)).toLocaleString("en-PH", { month: "short", timeZone: "UTC" });
+  return first || m === 1 ? `${name} ${y}` : name;
 }
 
 function Bars({ rows, href, total }: { rows: { key: string; name: string; people: number }[]; href: string; total: number }) {
@@ -115,20 +93,74 @@ function Bars({ rows, href, total }: { rows: { key: string; name: string; people
   );
 }
 
-export default async function AdminHome() {
+/** A card's title with "View all" on the right, as on the reference dashboard. */
+function ViewAll({ href }: { href: string }) {
+  return (
+    <Link href={href} className="text-meta font-medium text-sage-deep hover:underline">
+      View all
+    </Link>
+  );
+}
+
+function Share({ label, on, of }: { label: string; on: number; of: number }) {
+  return (
+    <li>
+      <span className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-ink">{label}</span>
+        <span className="shrink-0 text-ink-3 tabular-nums">
+          {on} of {of}
+        </span>
+      </span>
+      <span className="mt-1 block h-2 overflow-hidden rounded-full bg-rule" aria-hidden>
+        <span className="block h-full rounded-full bg-sage-deep" style={{ width: `${of ? Math.round((on / of) * 100) : 0}%` }} />
+      </span>
+    </li>
+  );
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
+export default async function AdminHome({ searchParams }: { searchParams: Search }) {
   const account = await getAccount();
   if (!account.isCompanyAdmin) redirect("/platform/reports");
+  const period = periodOf((await searchParams).period);
+  const since = PERIODS.find((p) => p.value === period)!.since;
   // Never a blank page: a Platform that can't answer (unreachable, or older than this screen) is said plainly.
-  const answer = accountSend<Overview>("GET", "/identity/company/overview").then(
+  const answer = loadOverview(period).then(
     (o) => ({ o, why: null as string | null }),
     (e: unknown) => ({ o: null, why: e instanceof Error ? e.message : "Bishnoi One can't be reached right now." }),
   );
-  const data = answer.then((a) => a.o ?? EMPTY);
-  const leads = ["Active people", "Signed in this week", "Administrators with two-step sign-in", "Administrators"];
+  const data: Promise<Overview> = answer.then((a) => a.o ?? EMPTY_OVERVIEW);
+  const first = account.fullName.split(/\s+/)[0] || account.fullName;
+  const cards = [
+    { label: "Active people", icon: "people", tint: TINTS.blue, href: PEOPLE },
+    { label: "Signed in", icon: "account", tint: TINTS.green, href: "/platform/company/security" },
+    { label: "Wrong passwords", icon: "password", tint: TINTS.orange, href: "/platform/company/activity" },
+    { label: "Administrators with two-step", icon: "roles", tint: TINTS.violet, href: "/platform/company/security" },
+  ] as const;
 
   return (
     <>
-      <PageHeader title="Home">Your company&apos;s people at a glance: who&apos;s here, who signs in, and who can open what.</PageHeader>
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm text-ink-2">Hi {first},</p>
+          <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-ink">{greeting()}</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodSelect value={period} />
+          <a href={`/platform/home/export?period=${period}`} download className={buttonClass("default")}>
+            <Download className="size-4" aria-hidden />
+            Export
+          </a>
+        </div>
+      </header>
       <Later data={answer} fallback={null}>
         {(a) =>
           a.why ? (
@@ -143,16 +175,147 @@ export default async function AdminHome() {
         }
       </Later>
       <div className="space-y-4">
+        {/* The four counts of the period, each with how it moved since the period before. */}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Later data={data} fallback={leads.map((l, i) => <FigureCardLoading key={l} label={l} first={i === 0} />)}>
-            {(o) => lead(o).map((f, i) => <FigureCard key={f.label} figure={f} first={i === 0} />)}
+          <Later data={data} fallback={cards.map((c) => <TrendCard key={c.label} icon={<Icon name={c.icon} />} tint={c.tint} label={c.label} since={since} loading />)}>
+            {(o) => {
+              const p = o.period;
+              const admins = o.security.twoStepAdministrators;
+              return (
+                <>
+                  <TrendCard icon={<Icon name="people" />} tint={TINTS.blue} label="Active people" value={String(o.people.active)} now={o.people.active} before={o.people.active - p.now.added} since={since} href={PEOPLE} />
+                  <TrendCard icon={<Icon name="account" />} tint={TINTS.green} label="Signed in" value={String(p.now.signedIn)} now={p.now.signedIn} before={p.before.signedIn} since={since} href="/platform/company/security" />
+                  <TrendCard icon={<Icon name="password" />} tint={TINTS.orange} label="Wrong passwords" value={String(p.now.failed)} now={p.now.failed} before={p.before.failed} since={since} upIsGood={false} href="/platform/company/activity" />
+                  <TrendCard icon={<Icon name="roles" />} tint={TINTS.violet} label="Administrators with two-step" value={`${admins.on} of ${admins.of}`} since={since} href="/platform/company/security" />
+                </>
+              );
+            }}
           </Later>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Later data={data} fallback={null}>
-            {(o) => tiles(o).map((f) => <Tile key={f.label} figure={f} />)}
-          </Later>
+
+        {/* By month, and people by status. */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Sheet className="px-5 py-4 lg:col-span-2">
+            <SectionTitle icon="trend">Sign-in activity by month</SectionTitle>
+            <Later data={data} fallback={<Bone className="mt-4 h-56 w-full" />}>
+              {(o) =>
+                o.months.length === 0 ? (
+                  <p className="mt-3 text-sm text-ink-3">No sign-ins yet.</p>
+                ) : (
+                  <div className="mt-3">
+                    <p className="mb-2 text-meta text-ink-3">
+                      {monthLabel(o.months[0].month, true)} to {monthLabel(o.months[o.months.length - 1].month, true)}
+                    </p>
+                    <ReportChartView
+                      kind="bar"
+                      labels={["People who signed in", "Wrong passwords", "People added"]}
+                      points={o.months.map((m, i) => ({ x: monthLabel(m.month, i === 0), values: [m.signedIn, m.failed, m.added] }))}
+                      format={(v) => String(Math.round(v))}
+                      colours={SERIES}
+                    />
+                  </div>
+                )
+              }
+            </Later>
+          </Sheet>
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="people">People</SectionTitle>
+            <Later data={data} fallback={<Bone className="mx-auto mt-4 size-44 rounded-full" />}>
+              {(o) => (
+                <div className="mt-3">
+                  <Donut
+                    caption="people"
+                    parts={[
+                      { label: "Active", value: o.people.active, colour: STATUS.active, href: PEOPLE },
+                      { label: "Switched off", value: o.people.off, colour: STATUS.off, href: PEOPLE },
+                      { label: "In the recycle bin", value: o.people.inBin, colour: STATUS.bin, href: `${PEOPLE}/bin` },
+                    ]}
+                  />
+                </div>
+              )}
+            </Later>
+          </Sheet>
         </div>
+
+        {/* Two-step coverage, what waits on you, and the administrators. */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="password">Two-step sign-in</SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={2} columns={2} /></div>}>
+              {(o) => {
+                const all = o.security.twoStepEveryone;
+                return (
+                  <>
+                    <p className="mt-3 text-[2.25rem] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{all.of ? Math.round((all.on / all.of) * 100) : 0}%</p>
+                    <p className="mt-1 text-meta text-ink-3">of your people sign in with a code from their phone{o.security.required ? "; required of administrators" : ""}</p>
+                    <ul className="mt-4 space-y-3">
+                      <Share label="Administrators" on={o.security.twoStepAdministrators.on} of={o.security.twoStepAdministrators.of} />
+                      <Share label="Everyone" on={all.on} of={all.of} />
+                    </ul>
+                  </>
+                );
+              }}
+            </Later>
+          </Sheet>
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="approvals" action={<ViewAll href={PEOPLE} />}>
+              Waiting on you
+            </SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={6} columns={2} /></div>}>
+              {(o) => {
+                const items = [
+                  { label: "No role yet", count: o.people.noRole, href: PEOPLE },
+                  { label: "No apps yet", count: o.people.noApps, href: PEOPLE },
+                  { label: "Invitations waiting", count: o.signIns.invitesPending, href: PEOPLE },
+                  { label: "Passwords to change", count: o.signIns.passwordsToChange, href: PEOPLE },
+                  { label: "Locked out now", count: o.security.lockedNow, href: "/platform/company/security" },
+                  { label: "Emails to change", count: o.security.offDomain, href: "/platform/company" },
+                ];
+                return (
+                  <ul className="mt-2 divide-y divide-rule">
+                    {items.map((i) => (
+                      <li key={i.label}>
+                        <Link href={i.href} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-hema">
+                          <span className={i.count ? "text-ink" : "text-ink-3"}>{i.label}</span>
+                          {i.count ? <Pill tone="warn">{String(i.count)}</Pill> : <span className="text-meta text-ink-3">None</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }}
+            </Later>
+          </Sheet>
+          <Sheet className="px-5 py-4">
+            <SectionTitle icon="roles" action={<ViewAll href="/platform/company" />}>
+              Administrators
+            </SectionTitle>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={3} columns={2} /></div>}>
+              {(o) =>
+                o.administrators.length === 0 ? (
+                  <p className="mt-3 text-sm text-ink-3">None yet.</p>
+                ) : (
+                  <ul className="mt-2 divide-y divide-rule">
+                    {o.administrators.map((a) => (
+                      <li key={a.id} className="flex items-center gap-3 py-2.5">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-bench text-meta font-semibold text-ink-2" aria-hidden>
+                          {initials(a.name)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-ink">{a.name}</span>
+                          <span className="block truncate text-meta text-ink-3">{a.lastSignIn ? `Signed in ${ago(a.lastSignIn)}` : "Never signed in"}</span>
+                        </span>
+                        <Pill tone={a.twoStep ? "good" : o.security.required ? "bad" : "warn"}>{a.twoStep ? "Two-step on" : "No two-step"}</Pill>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </Later>
+          </Sheet>
+        </div>
+
+        {/* Who can open what, and what happened lately. */}
         <div className="grid gap-4 lg:grid-cols-3">
           <Sheet className="px-5 py-4">
             <SectionTitle icon="apps">Access by app</SectionTitle>

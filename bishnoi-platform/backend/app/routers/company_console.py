@@ -361,8 +361,12 @@ def set_administrator(person_id: str, body: AdministratorIn, db: DB, me: Admin) 
 # ---- The Admin Console's Home (2026-10-30): user control at a glance --------------------------------
 
 
+# The Home's period picker (2026-10-31): the cards compare it with the one just before it.
+PERIOD_DAYS = {"week": 7, "month": 30, "quarter": 90, "year": 365}
+
+
 @router.get("/overview")
-def overview(db: DB, me: Admin, settings: SettingsDep) -> dict:
+def overview(db: DB, me: Admin, settings: SettingsDep, period: str = Query("month", pattern="^(week|month|quarter|year)$")) -> dict:
     from datetime import timedelta
     from zoneinfo import ZoneInfo
 
@@ -404,7 +408,39 @@ def overview(db: DB, me: Admin, settings: SettingsDep) -> dict:
              for r in db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name)))]
     recent = db.scalars(select(AuditEntry).where(AuditEntry.company_id == me.company_id, AuditEntry.category == "security")
                         .order_by(AuditEntry.created_at.desc()).limit(8)).all()
+
+    # Sign-ins and wrong passwords as the security log has them (by email), and people added: over the
+    # period and the one before it (the cards' up/down), and by month for the past twelve (the chart).
+    days = PERIOD_DAYS[period]
+    start, before = now - timedelta(days=days), now - timedelta(days=2 * days)
+    here = datetime.now(zone)
+    months = [((here.year * 12 + here.month - 1 - k) // 12, (here.year * 12 + here.month - 1 - k) % 12 + 1) for k in range(11, -1, -1)]
+    first_of = lambda y, m: datetime(y, m, 1, tzinfo=zone).astimezone(UTC)  # noqa: E731
+    since = min(first_of(*months[0]), before)
+    rows = db.execute(select(AuditEntry.action, AuditEntry.target, AuditEntry.created_at)
+                      .where(AuditEntry.action.in_(("identity.signed_in", "identity.sign_in_failed")),
+                             func.lower(AuditEntry.target).in_(emails), AuditEntry.created_at >= since)).all() if emails else []
+    rows = [(a, t.lower(), as_utc(at)) for a, t, at in rows]
+    added_at = [as_utc(p.created_at) for p in everyone if p.created_at]
+
+    def tally(lo: datetime, hi: datetime) -> dict:
+        return {
+            "signedIn": len({t for a, t, at in rows if a == "identity.signed_in" and lo <= at < hi}),
+            "failed": sum(1 for a, _, at in rows if a == "identity.sign_in_failed" and lo <= at < hi),
+            "added": sum(1 for at in added_at if lo <= at < hi),
+        }
+
+    by_month = []
+    for i, (y, m) in enumerate(months):
+        upto = first_of(*months[i + 1]) if i + 1 < len(months) else now + timedelta(seconds=1)
+        by_month.append({"month": f"{y}-{m:02d}", **tally(first_of(y, m), upto)})
     return {
+        "period": {"key": period, "days": days, "now": tally(start, now + timedelta(seconds=1)), "before": tally(before, start)},
+        "months": by_month,
+        "administrators": [
+            {"id": p.id, "name": p.full_name, "email": p.email, "twoStep": on([p]) == 1, "lastSignIn": iso(seen.get(p.id))}
+            for p in sorted(admins, key=lambda p: p.full_name.lower())
+        ],
         "people": {
             "active": len(active),
             "off": sum(1 for p in everyone if p.status != "active" and p.deleted_at is None),

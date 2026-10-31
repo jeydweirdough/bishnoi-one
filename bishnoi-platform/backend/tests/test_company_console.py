@@ -110,6 +110,18 @@ def test_the_home_counts_people_sign_ins_security_and_access(client, getmeds):
     assert client.get("/identity/company/overview", headers=getmeds["jade"]["h"]).status_code == 403
 
 
+def test_the_home_compares_the_period_and_counts_by_month(client, getmeds):
+    h = getmeds["owner"]["h"]
+    client.post("/identity/login", json={"email": "jade@getmeds.test", "password": "wrong-password-1"})
+    body = client.get("/identity/company/overview?period=week", headers=h).json()
+    assert body["period"]["key"] == "week" and body["period"]["days"] == 7
+    assert body["period"]["now"]["signedIn"] == 3 and body["period"]["now"]["failed"] == 1  # the three in the fixture; Jade's wrong try
+    assert body["period"]["now"]["added"] == 3 and body["period"]["before"] == {"signedIn": 0, "failed": 0, "added": 0}
+    assert len(body["months"]) == 12 and body["months"][-1]["signedIn"] == 3
+    assert [a["email"] for a in body["administrators"]] == ["olive@getmeds.test"] and body["administrators"][0]["twoStep"] is False
+    assert client.get("/identity/company/overview?period=decade", headers=h).status_code == 422
+
+
 def test_people_reports_hold_people_never_money(client, getmeds):
     h = getmeds["owner"]["h"]
     keys = [r["key"] for r in client.get("/identity/company/reports", headers=h).json()["reports"]]
