@@ -344,7 +344,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             ) : c?.warnings.length ? (
               <p className="text-sm text-danger">
                 {c.warnings.join(" ")}{" "}
-                <Link href="/finance/tax" className="font-semibold underline">
+                <Link href="/platform/settings/finance/taxes" className="font-semibold underline">
                   Go to Tax, Registration
                 </Link>
                 , then issue it.

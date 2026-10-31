@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
-from app.access import access_of, permitted
+from app.access import access_of, permitted, settings_permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
@@ -202,7 +202,7 @@ def category_values(db: DB, body: CategoryIn, this: ExpenseCategory | None) -> d
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
-def add_category(user: permitted("categories.manage"), db: DB, body: CategoryIn) -> dict:
+def add_category(user: settings_permitted("categories.manage"), db: DB, body: CategoryIn) -> dict:
     values = category_values(db, body, None)
     last = db.scalar(select(func.max(ExpenseCategory.sort_order))) or 0
     c = ExpenseCategory(**values, sort_order=last + 1)
@@ -215,7 +215,7 @@ def add_category(user: permitted("categories.manage"), db: DB, body: CategoryIn)
 
 
 @router.put("/categories/{category_id}")
-def change_category(user: permitted("categories.manage"), db: DB, category_id: str, body: CategoryIn) -> dict:
+def change_category(user: settings_permitted("categories.manage"), db: DB, category_id: str, body: CategoryIn) -> dict:
     c = db.get(ExpenseCategory, category_id)
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such category.")

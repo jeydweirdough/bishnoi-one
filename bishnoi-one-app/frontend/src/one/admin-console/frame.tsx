@@ -25,6 +25,8 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
         { href: "/platform/company/security", label: "Security", icon: "password" },
         { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
+        // Every app's deleted records and recycle bin, an app at a time (2026-10-31).
+        { href: "/platform/company/data-cleanup", label: "Data clean-up", icon: "lists" },
       ],
     });
     groups.push({
@@ -36,6 +38,47 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/organisation", label: "Organisation", icon: "teams" },
       ],
     });
+    // Each app's settings, for company administrators (2026-10-31): an area per app the company has, holding
+    // what that app's own sidebar used to. The pages are the app's (they talk to its API).
+    const has = (key: string) => me.apps.some((a) => a.key === key);
+    const crm = "/platform/settings/crm";
+    if (has("crm")) {
+      groups.push({
+        label: "CRM settings",
+        icon: "settings",
+        pages: [
+          { href: `${crm}/company`, label: "General", icon: "company", also: [`${crm}/company`, `${crm}/quote-templates`, `${crm}/emails`, `${crm}/terms`] },
+          { href: crm, label: "Customization", icon: "settings", exact: true, also: [`${crm}/customer-types`, `${crm}/deal-stages`, `${crm}/associations`, `${crm}/lists`] },
+          { href: `${crm}/pricing`, label: "Sales and pricing", icon: "pricing", also: [`${crm}/pricing`, `${crm}/price-rules`, `${crm}/performance`, `${crm}/retention-windows`, `${crm}/attention`, `${crm}/kpis`] },
+        ],
+      });
+    }
+    const inventory = "/platform/settings/inventory";
+    if (has("inventory")) {
+      groups.push({
+        label: "Inventory settings",
+        icon: "inventory",
+        pages: [
+          { href: `${inventory}/categories`, label: "Categories", icon: "categories" },
+          { href: `${inventory}/brands`, label: "Brands", icon: "brands" },
+          { href: `${inventory}/units`, label: "Units", icon: "units" },
+          { href: `${inventory}/couriers`, label: "Couriers", icon: "issuance" },
+        ],
+      });
+    }
+    const finance = "/platform/settings/finance";
+    if (has("finance")) {
+      groups.push({
+        label: "Finance settings",
+        icon: "finance",
+        pages: [
+          { href: `${finance}/taxes`, label: "Taxes", icon: "money" },
+          { href: `${finance}/number-series`, label: "Transaction number series", icon: "letters" },
+          { href: `${finance}/default-accounts`, label: "Default accounts", icon: "settings" },
+          { href: `${finance}/expense-categories`, label: "Expense categories", icon: "lists" },
+        ],
+      });
+    }
     groups.push({
       label: "Reports",
       icon: "reports",

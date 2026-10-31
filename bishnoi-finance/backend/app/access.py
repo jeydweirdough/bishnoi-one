@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -102,5 +102,41 @@ def permitted(permission: str) -> type[User]:
     def check(access: CurrentAccess) -> User:
         access.require(permission)
         return access.user
+
+    return Annotated[User, Depends(check)]  # type: ignore[return-value]
+
+
+# A settings change (2026-10-31): connected to Bishnoi One, Finance's settings are changed only by the company's
+# administrators, from the Admin Console (the Administrator role the Platform gives them). Standalone (tests,
+# a single install), the permission alone, as before. Reading a setting is never limited here.
+ADMINISTRATORS_ONLY = "Only your company's administrators change Finance's settings, in the Admin Console."
+
+
+def settings_change(permission: str) -> Callable[..., Access]:
+    """require(permission) for a settings route; its changes, once connected, only by an administrator."""
+    inner = require(permission)
+
+    def check(request: Request, access: CurrentAccess) -> Access:
+        inner(access)
+        if request.method != "GET" and request.app.state.settings.platform_api_url and not access.user.role.is_system:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, ADMINISTRATORS_ONLY)
+        return access
+
+    check.permission = permission  # type: ignore[attr-defined]
+    return check
+
+
+def settings_allowed(permission: str) -> type[Access]:
+    """`_: settings_allowed("warehouses.manage")` in a settings endpoint's signature."""
+    return Annotated[Access, Depends(settings_change(permission))]  # type: ignore[return-value]
+
+
+def settings_permitted(permission: str) -> type[User]:
+    """permitted(permission) for a settings endpoint: the person, once their role allows it; its changes,
+    once connected to Bishnoi One, only by an administrator (settings_change)."""
+    check_access = settings_change(permission)
+
+    def check(request: Request, access: CurrentAccess) -> User:
+        return check_access(request, access).user
 
     return Annotated[User, Depends(check)]  # type: ignore[return-value]

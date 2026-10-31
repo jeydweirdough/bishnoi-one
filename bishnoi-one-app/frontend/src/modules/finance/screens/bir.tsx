@@ -44,7 +44,7 @@ function TaxpayerLine({ who }: { who: Taxpayer }) {
         <>
           {" "}
           ·{" "}
-          <Link href="/finance/tax" className="text-danger underline-offset-2 hover:underline">
+          <Link href="/platform/settings/finance/taxes" className="text-danger underline-offset-2 hover:underline">
             Add the {missing.join(", ")} under Tax
           </Link>
         </>

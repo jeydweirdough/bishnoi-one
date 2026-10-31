@@ -25,7 +25,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 
-from app.access import access_of, permissions_of, permitted
+from app.access import access_of, permissions_of, permitted, settings_permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
@@ -321,7 +321,7 @@ class PostingIn(Api):
 
 
 @router.put("/posting")
-def change_posting(user: permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
+def change_posting(user: settings_permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
     s = posting_settings(db)
     for key, account_id in body.accounts.items():
         if key not in POSTING:

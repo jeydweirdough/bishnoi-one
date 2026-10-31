@@ -1,5 +1,6 @@
 ﻿import {NextResponse,type NextRequest} from 'next/server';
 import {apiFor} from '@/src/platform/lib/api';
+import {siteUrl} from '@/src/platform/lib/site';
 
 // Never render codes, log querystrings, or return provider/token payloads to the browser.
 export async function GET(request:NextRequest){
@@ -11,7 +12,7 @@ export async function GET(request:NextRequest){
   });
   result='connected';
  }catch{/* The status page uses a fixed safe message; no codes or provider errors. */}
- const response=NextResponse.redirect(new URL(`/finance/integrations/zoho?result=${result}`,request.url),303);
+ const response=NextResponse.redirect(siteUrl(`/platform/company/integrations/zoho?result=${result}`,request),303);
  response.headers.set('Cache-Control','no-store');
  response.headers.set('Referrer-Policy','no-referrer');
  return response;

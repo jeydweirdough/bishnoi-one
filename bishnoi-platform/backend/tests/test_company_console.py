@@ -21,6 +21,25 @@ def test_the_company_profile(client, getmeds):
     assert log[0]["action"] == "company.updated" and log[0]["fields"] == ["contact_email", "name"]
 
 
+def test_the_profile_keeps_the_number_format_and_the_company_pass_carries_the_profile(client, getmeds):
+    from sqlalchemy import select
+
+    from app import passes
+    from app.models import Application, Company
+
+    h = getmeds["owner"]["h"]
+    r = client.patch("/identity/company", json={"locale": "en-US", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["company"]["locale"] == "en-US"
+    assert client.patch("/identity/company", json={"locale": "english"}, headers=h).status_code == 422
+    with client.app.state.sessions() as db:
+        company = db.get(Company, r.json()["company"]["id"])
+        crm = db.scalar(select(Application).where(Application.key == "crm"))
+        claims = passes.claims_of(passes.company_pass(client.app.state.settings, company, crm, True))
+    assert claims["profile"] == {"name": company.name, "legalName": company.name, "currency": "PHP", "locale": "en-US", "timezone": "Asia/Manila",
+                                 "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "phone": None}
+
+
 def test_apps_and_integrations(client, getmeds):
     h = getmeds["owner"]["h"]
     apps = {a["key"]: a for a in client.get("/identity/company/apps", headers=h).json()["apps"]}

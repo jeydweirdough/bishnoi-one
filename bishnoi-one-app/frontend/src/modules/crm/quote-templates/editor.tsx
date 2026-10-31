@@ -272,7 +272,7 @@ function ExcelForm({ template, onSaved, placeholders }: { template: QuoteTemplat
         icon="lists"
         action={
           excel && (
-            <a href={`/crm/admin/settings/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-ink hover:underline">
+            <a href={`/platform/settings/crm/quote-templates/${template.id}/form`} className="inline-flex items-center gap-1 text-meta font-medium text-ink hover:underline">
               <Download className="size-3.5" aria-hidden />
               Download the form
             </a>

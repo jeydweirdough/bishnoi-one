@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,8 @@ class Access:
     # The teams whose records they reach (team: their own; managed: the ones
     # they manage, and their own). Empty for own and all.
     team_ids: frozenset[str] = frozenset()
+    # The Administrator role: the one Bishnoi One gives its company administrators.
+    administrator: bool = False
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -72,6 +74,7 @@ def access_of(user: User) -> Access:
         scope=user.role.scope,
         team_id=user.team_id,
         permissions=permissions_of(user.role),
+        administrator=bool(user.role.is_system),
         team_ids=teams_reached(user),
     )
 
@@ -140,3 +143,28 @@ def keep_an_administrator(db: Session) -> None:
             status.HTTP_409_CONFLICT,
             "That would leave nobody able to manage users and roles. Give someone else that first.",
         )
+
+
+# A settings change (2026-10-31): connected to Bishnoi One, the CRM's settings are changed only by the company's
+# administrators, from the Admin Console (the Administrator role the Platform gives them). Standalone (tests,
+# a single install), the permission alone, as before. Reading a setting is never limited here.
+ADMINISTRATORS_ONLY = "Only your company's administrators change the CRM's settings, in the Admin Console."
+
+
+def settings_only(request: Request, access: Access) -> None:
+    """Refuses a change to a setting by anyone but an administrator, once connected to Bishnoi One."""
+    if request.method != "GET" and request.app.state.settings.platform_api_url and not access.administrator:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ADMINISTRATORS_ONLY)
+
+
+def settings_change(*permissions: str) -> Callable[..., Access]:
+    """require(*permissions) for a settings route, and settings_only on its changes."""
+    inner = require(*permissions)
+
+    def check(request: Request, access: CurrentAccess) -> Access:
+        inner(access)
+        settings_only(request, access)
+        return access
+
+    check.permission = inner.permission  # type: ignore[attr-defined]
+    return check

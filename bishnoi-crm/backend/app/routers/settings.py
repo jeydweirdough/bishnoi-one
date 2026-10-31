@@ -19,19 +19,19 @@ from pydantic import Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.access import Access, require
+from app.access import Access, require, settings_change
 from app.api import Api, camel, changed
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
 from app.extra import fields_for
 from app.models import FIELD_TYPES, Company, Contact, CustomerType, FormField, FormSection, Product, Quote, Team
 from app import terms as terms_mod
-from app.pricing import sales_settings
+from app.pricing import letterhead, sales_settings
 from app.routers.deals import deal_lists
 
 router = APIRouter(tags=["settings"])
 
-Manage = Annotated[Access, Depends(require("admin.settings"))]
+Manage = Annotated[Access, Depends(settings_change("admin.settings"))]
 Entity = Literal["company", "contact", "product", "quote"]
 RECORDS = {"product": Product, "company": Company, "contact": Contact, "quote": Quote}
 WITH_OPTIONS = ("choice", "multi_choice")
@@ -307,9 +307,15 @@ def save_form(access: Manage, me: CurrentUser, db: DB, entity: Entity, body: Lay
 CURRENCIES = ("PHP", "USD", "EUR", "GBP", "SGD", "MYR", "IDR", "THB", "VND", "JPY", "CNY", "HKD", "AUD", "INR")
 
 
+# Connected to Bishnoi One, these are the Admin Console's Company profile (2026-10-31): shown here, changed there.
+ON_PLATFORM = "The company's name, currency, number format, time zone, address, TIN and phone are kept in the Admin Console's Company profile."
+
+
 def company_out(db: Session, settings) -> dict:
     s = sales_settings(db)
+    head = letterhead(settings, s)
     return {
+        "onPlatform": settings.org_letterhead is not None,
         "orgName": settings.org_name,
         "currency": settings.org_currency,
         "locale": settings.org_locale,
@@ -317,9 +323,9 @@ def company_out(db: Session, settings) -> dict:
         "quotePrefix": s.quote_prefix,
         "quoteValidDays": s.quote_valid_days,
         "quoteTerms": s.quote_terms,
-        "companyAddress": s.company_address,
-        "companyTin": s.company_tin,
-        "companyContact": s.company_contact,
+        "companyAddress": head["address"],
+        "companyTin": head["tin"],
+        "companyContact": head["contact"],
         "currencies": list(CURRENCIES),
     }
 
@@ -357,6 +363,13 @@ class CompanyIn(Api):
 def update_company(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, body: CompanyIn) -> dict:
     s = sales_settings(db)
     wanted = changed(body)
+    if settings.org_letterhead is not None:
+        shown = company_out(db, settings)
+        kept = {"org_name": "orgName", "currency": "currency", "locale": "locale", "timezone": "timezone",
+                "company_address": "companyAddress", "company_tin": "companyTin", "company_contact": "companyContact"}
+        if any(k in wanted and wanted[k] != shown[out] for k, out in kept.items()):
+            raise HTTPException(status.HTTP_409_CONFLICT, ON_PLATFORM)
+        wanted = {k: v for k, v in wanted.items() if k not in kept}
     # Terms and the letterhead can be cleared; the rest can only be changed.
     clearable = {"quote_terms", "company_address", "company_tin", "company_contact"}
     wanted = {k: v for k, v in wanted.items() if v is not None or k in clearable}

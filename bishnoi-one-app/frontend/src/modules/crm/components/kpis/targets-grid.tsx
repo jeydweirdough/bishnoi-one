@@ -173,7 +173,7 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
       <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
         <SectionTitle>People</SectionTitle>
         {rolePeople.length === 0 ? (
-          <Empty icon="goals" art="gauge" title="No measures set up" actions={<LinkButton href="/crm/admin/settings/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
+          <Empty icon="goals" art="gauge" title="No measures set up" actions={<LinkButton href="/platform/settings/crm/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
         ) : (
           <table className="w-full text-sm">
             <thead>{head}</thead>

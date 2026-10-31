@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 import type { ServiceInfo } from "@/src/modules/console/actions/services";
 import { ServiceCard } from "@/src/modules/console/components/organizations/service-card";
 import { ago, when } from "@/src/modules/console/lib/words";
-import { accountSend } from "@/src/platform/lib/account";
+import { accountSend, getAccount } from "@/src/platform/lib/account";
+import { LinkButton } from "@/src/platform/ui/ant-button";
 import { ApiError } from "@/src/platform/lib/api";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { AdministratorsCard, LetterheadForm, ProfileForm, SignOutButton } from "./forms";
 import { CatalogueBoard } from "./catalogue";
+import { PLATFORM, logSources, readLog } from "./activity";
 import type { ActivityEntry, Administrators, CatalogueEntry, CompanyProfile, OffDomainPerson, SecurityData } from "./types";
 
 // The company console (feature plan step 5, 2026-10-28): what a company's own administrators keep
@@ -115,8 +117,13 @@ export async function CompanyAppsPage() {
 }
 
 export async function IntegrationsPage() {
-  const [data, company] = await Promise.all([read<{ services: ServiceInfo[] }>("/identity/company/services"), read<{ company: CompanyProfile }>("/identity/company")]);
+  const [data, company, account] = await Promise.all([
+    read<{ services: ServiceInfo[] }>("/identity/company/services"),
+    read<{ company: CompanyProfile }>("/identity/company"),
+    getAccount(),
+  ]);
   if (!data || !company) return <Page title="Integrations" intro={null}><NotYours /></Page>;
+  const finance = account.apps.some((a) => a.key === "finance");
   return (
     <Page title="Integrations" intro="The outside services your apps use: email sending, Zoho Books, lead channels. Secrets are kept encrypted and never shown again once saved.">
       <div className="max-w-3xl space-y-4">
@@ -131,6 +138,16 @@ export async function IntegrationsPage() {
             updatedWhen={s.updatedAt ? ago(s.updatedAt) : null}
           />
         ))}
+        {/* Finance signs in to Zoho Books itself (its own sign-in, kept by Finance); set up here (2026-10-31). */}
+        {finance && (
+          <Sheet className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <span className="min-w-0">
+              <span className="block font-semibold text-ink">Zoho Books for Finance</span>
+              <span className="block text-sm text-ink-2">Finance&apos;s sign-in to Zoho Books: the organisation it reads from, what it sends, and the queue of records to send.</span>
+            </span>
+            <LinkButton href="/platform/company/integrations/zoho">Open</LinkButton>
+          </Sheet>
+        )}
       </div>
     </Page>
   );
@@ -212,40 +229,75 @@ function said(action: string): string {
   return ACTIONS[action] ?? action.replace(/[._]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
-export async function ActivityPage({ q, category, before }: { q: string; category: string; before: string }) {
-  const params = new URLSearchParams();
-  if (q) params.set("q", q);
-  if (category) params.set("category", category);
-  if (before) params.set("before", before);
-  const data = await read<{ entries: ActivityEntry[]; more: boolean }>(`/identity/company/activity?${params}`);
+export async function ActivityPage({ search }: { search: Record<string, string | string[] | undefined> }) {
+  const one = (k: string) => (typeof search[k] === "string" ? (search[k] as string) : "");
+  const [q, category, app] = [one("q"), one("category"), one("app")];
+  const sources = await logSources();
+  // Searching and the kinds are Bishnoi One's: with either set, its entries only.
+  const narrowed = Boolean(q || category);
+  const wanted = sources.filter((s) => (app ? s.key === app : narrowed ? s.key === PLATFORM : true));
+  const before: Record<string, string> = Object.fromEntries(sources.map((s) => [s.key, one(`before_${s.key}`)]).filter(([, v]) => v));
+  const keep = (over: Record<string, string>) => new URLSearchParams({ ...(q && { q }), ...(category && { category }), ...(app && { app }), ...over });
+  const here = `/platform/company/activity?${keep(Object.fromEntries(Object.entries(before).map(([k, v]) => [`before_${k}`, v])))}`;
+  const skip = new Set((one("unavailable") || "").split(",").filter(Boolean));
+  const data = await readLog({ sources: wanted, before, q, category, here, skip }).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 403) return null;
+    throw error;
+  });
   if (!data) return <Page title="Activity log" intro={null}><NotYours /></Page>;
-  const link = (over: Record<string, string>) => `/platform/company/activity?${new URLSearchParams({ ...(q && { q }), ...(category && { category }), ...over })}`;
+  const link = (over: Record<string, string>) => `/platform/company/activity?${keep(over)}`;
+  const labelOf = Object.fromEntries(sources.map((s) => [s.key, s.label]));
   const tabs: [string, string][] = [["", "Everything"], ["admin", "Changes"], ["security", "Sign-ins and security"]];
+  const showKinds = !app || app === PLATFORM;
   return (
-    <Page title="Activity log" intro="Who did what at your company, newest first. It names what changed, never the values.">
+    <Page title="Activity log" intro="Who did what at your company, in Bishnoi One and in every app, newest first. It names what changed, never the values.">
       <Sheet className="px-5 pt-4 pb-2">
-        <form className="flex flex-wrap items-center gap-3" action="/platform/company/activity">
-          {category && <input type="hidden" name="category" value={category} />}
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Find a person or a change"
-            className="h-9 w-full max-w-xs rounded-lg border border-rule-strong bg-sheet px-3 text-sm"
-            aria-label="Find a person or a change"
-          />
-          <nav className="flex gap-1" aria-label="Kind of activity">
-            {tabs.map(([key, label]) => (
-              <Link
-                key={key}
-                href={link({ category: key })}
-                aria-current={category === key ? "page" : undefined}
-                className={`rounded-md px-3 py-1 text-meta ${category === key ? "bg-hema-tint font-semibold text-ink" : "text-ink-3 hover:bg-bench"}`}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </form>
+        <nav className="mb-3 flex flex-wrap gap-1" aria-label="Where">
+          {[{ key: "", label: "Everything" }, ...sources].map((s) => (
+            <Link
+              key={s.key || "all"}
+              href={`/platform/company/activity${s.key ? `?app=${s.key}` : ""}`}
+              aria-current={app === s.key ? "page" : undefined}
+              className={`rounded-md px-3 py-1 text-meta ${app === s.key ? "bg-hema-tint font-semibold text-ink" : "text-ink-3 hover:bg-bench"}`}
+            >
+              {s.label}
+            </Link>
+          ))}
+        </nav>
+        {showKinds && (
+          <form className="flex flex-wrap items-center gap-3" action="/platform/company/activity">
+            {app && <input type="hidden" name="app" value={app} />}
+            {category && <input type="hidden" name="category" value={category} />}
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Find a person or a change"
+              className="h-9 w-full max-w-xs rounded-lg border border-rule-strong bg-sheet px-3 text-sm"
+              aria-label="Find a person or a change"
+            />
+            <nav className="flex gap-1" aria-label="Kind of activity">
+              {tabs.map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={`/platform/company/activity?${new URLSearchParams({ ...(q && { q }), ...(app && { app }), ...(key && { category: key }) })}`}
+                  aria-current={category === key ? "page" : undefined}
+                  className={`rounded-md px-3 py-1 text-meta ${category === key ? "bg-hema-tint font-semibold text-ink" : "text-ink-3 hover:bg-bench"}`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            {narrowed && !app && <span className="text-meta text-ink-3">Searching and kinds cover Bishnoi One&apos;s own entries.</span>}
+          </form>
+        )}
+        {data.unavailable.length > 0 && (
+          <p role="status" className="mt-3 rounded-lg border border-promo bg-promo-tint px-4 py-2 text-sm text-promo-ink">
+            {data.unavailable.join(", ")} can&apos;t be read just now, so {data.unavailable.length === 1 ? "its" : "their"} entries are left out.{" "}
+            <Link href={`/platform/company/activity${app ? `?app=${app}` : ""}`} className="underline">
+              Try again
+            </Link>
+          </p>
+        )}
         {data.entries.length === 0 ? (
           <Empty icon="auditLog" title="Nothing here yet">
             Changes and sign-ins at your company are listed as they happen.
@@ -257,6 +309,7 @@ export async function ActivityPage({ q, category, before }: { q: string; categor
                 <time dateTime={e.at} title={when(e.at)} className="w-24 shrink-0 text-meta text-ink-3">
                   {ago(e.at)}
                 </time>
+                {!app && <span className="w-24 shrink-0 truncate text-meta text-ink-3">{labelOf[e.source]}</span>}
                 <span className="min-w-0 flex-1">
                   <span className="font-medium text-ink">{e.actor}</span> <span className="text-ink-2">{said(e.action).toLowerCase()}</span>
                   {e.target && <span className="text-ink-2">: {e.target}</span>}
@@ -268,7 +321,7 @@ export async function ActivityPage({ q, category, before }: { q: string; categor
         )}
         {data.more && (
           <div className="py-3">
-            <Link href={link({ before: data.entries[data.entries.length - 1].at })} className="text-sm font-medium text-sage-deep hover:underline">
+            <Link href={link(Object.fromEntries(Object.entries(data.next).map(([k, v]) => [`before_${k}`, v])))} className="text-sm font-medium text-sage-deep hover:underline">
               Older
             </Link>
           </div>

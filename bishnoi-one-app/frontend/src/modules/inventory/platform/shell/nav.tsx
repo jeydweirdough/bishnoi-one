@@ -87,12 +87,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "settings",
       steps: keep([
         { href: "/inventory/warehouses", label: "Warehouses", icon: "warehouses", sees: ["warehouses.view"] },
-        { href: "/inventory/couriers", label: "Couriers", icon: "issuance", sees: ["warehouses.view"] },
-        { href: "/inventory/catalog/categories", label: "Categories", icon: "categories", sees: ["products.view"] },
-        { href: "/inventory/catalog/brands", label: "Brands", icon: "brands", sees: ["products.view"] },
-        { href: "/inventory/catalog/units", label: "Units", icon: "units", sees: ["products.view"] },
-        { href: "/inventory/admin/data-cleanup", label: "Data clean-up", icon: "settings", sees: ["admin.audit"] },
-        { href: "/inventory/admin/audit", label: "Activity log", icon: "auditLog", sees: ["admin.audit"] },
       ]),
     },
   ];

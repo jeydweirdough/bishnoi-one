@@ -24,7 +24,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app import business_events
-from app.access import access_of, permitted
+from app.access import access_of, permitted, settings_permitted
 from app.audit import audit
 from app.crm import CrmUnavailable, find_customers, read_customer
 from app.deps import DB, SettingsDep
@@ -92,7 +92,7 @@ def list_series(user: permitted("invoices.view"), db: DB, settings: SettingsDep)
 
 
 @router.post("/series", status_code=status.HTTP_201_CREATED)
-def add_series(user: permitted("invoices.setup"), db: DB, body: SeriesIn) -> dict:
+def add_series(user: settings_permitted("invoices.setup"), db: DB, body: SeriesIn) -> dict:
     if body.last_number < body.first_number:
         raise field_error("lastNumber", "The last number can't be before the first.")
     # Two series printing the same number would be two invoices with one number.
@@ -108,7 +108,7 @@ def add_series(user: permitted("invoices.setup"), db: DB, body: SeriesIn) -> dic
 
 
 @router.patch("/series/{series_id}")
-def change_series(user: permitted("invoices.setup"), db: DB, series_id: str, body: SeriesPatch) -> dict:
+def change_series(user: settings_permitted("invoices.setup"), db: DB, series_id: str, body: SeriesPatch) -> dict:
     s = db.get(InvoiceSeries, series_id)
     if s is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such series.")
@@ -134,7 +134,7 @@ def automatic(_: permitted("invoices.view"), db: DB) -> dict:
 
 
 @router.put("/automatic")
-def set_automatic(user: permitted("invoices.setup"), db: DB, body: AutomaticIn) -> dict:
+def set_automatic(user: settings_permitted("invoices.setup"), db: DB, body: AutomaticIn) -> dict:
     ledger = posting_settings(db)
     if ledger.auto_invoice != body.auto_invoice:
         ledger.auto_invoice = body.auto_invoice

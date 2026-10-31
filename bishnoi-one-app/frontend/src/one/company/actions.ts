@@ -13,7 +13,7 @@ const enc = encodeURIComponent;
 const refresh = () => revalidatePath("/platform", "layout");
 
 export async function changeCompany(
-  change: Partial<Pick<CompanyProfile, "name" | "contactEmail" | "emailDomain" | "timezone" | "currency" | "legalName" | "address" | "tin" | "phone" | "documentFooter" | "logo">>,
+  change: Partial<Pick<CompanyProfile, "name" | "contactEmail" | "emailDomain" | "timezone" | "currency" | "locale" | "legalName" | "address" | "tin" | "phone" | "documentFooter" | "logo">>,
 ): Promise<Result<{ company: CompanyProfile }>> {
   return attempt(async () => {
     const saved = await accountSend<{ company: CompanyProfile }>("PATCH", "/identity/company", change);

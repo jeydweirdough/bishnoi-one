@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import Field, field_validator, model_validator
 from sqlalchemy import func, select
 
-from app.access import Access, require
+from app.access import Access, require, settings_change
 from app.api import Api, camel, field_error, iso, not_found
 from app.audit import audit
 from app.conditions import ADJUSTMENTS, PRICE_SOURCES, check_procedure, procedure_of, running
@@ -24,7 +24,7 @@ from app.routers.catalogue import check_code
 router = APIRouter(prefix="/pricing", tags=["price rules"])
 
 View = Annotated[Access, Depends(require("products.view"))]
-Edit = Annotated[Access, Depends(require("products.edit"))]
+Edit = Annotated[Access, Depends(settings_change("products.edit"))]
 
 
 def condition_out(c: PriceCondition, on: str, products: dict[str, str], groups: dict[str, str]) -> dict:

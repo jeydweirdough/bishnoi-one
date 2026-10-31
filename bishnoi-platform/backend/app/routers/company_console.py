@@ -54,7 +54,7 @@ PAGE = 50
 
 def company_out(c: Company) -> dict:
     return {"id": c.id, "no": c.no, "name": c.name, "slug": c.slug, "status": c.status, "currency": c.currency,
-            "timezone": c.timezone, "contactEmail": c.contact_email, "emailDomain": c.email_domain, "createdAt": iso(c.created_at),
+            "timezone": c.timezone, "locale": c.locale, "contactEmail": c.contact_email, "emailDomain": c.email_domain, "createdAt": iso(c.created_at),
             # The letterhead (step 10).
             "legalName": c.legal_name, "address": c.address, "tin": c.tin, "phone": c.phone, "documentFooter": c.document_footer,
             "logo": signatures.data_url(c.logo, c.logo_type or "image/png") if c.logo else None}
@@ -108,6 +108,8 @@ class CompanyPatch(Api):
     contact_email: str | None = Field(None, max_length=254)
     timezone: str | None = Field(None, max_length=64)
     currency: str | None = Field(None, min_length=3, max_length=3)
+    # How numbers and dates are written: "en-PH", "en-US"...
+    locale: str | None = Field(None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
     legal_name: str | None = Field(None, max_length=200)
     address: str | None = Field(None, max_length=400)
     tin: str | None = Field(None, max_length=30)

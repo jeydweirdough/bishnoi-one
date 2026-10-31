@@ -122,7 +122,7 @@ function NothingMeasured({ title, me }: { title: string; me: Me }) {
         title={title}
         actions={
           can(me, "admin.settings") && (
-            <LinkButton href="/crm/admin/settings/performance" variant="primary">
+            <LinkButton href="/platform/settings/crm/performance" variant="primary">
               Choose what&apos;s measured
             </LinkButton>
           )
@@ -335,13 +335,13 @@ export function Team({ card, fmt, show, href, targets }: { card: KpiScorecard; f
               ? card.people.map((p) => (
                   <tr key={p.person.id} className="hover:bg-bench/40">
                     <td className="px-5 py-2.5">
-                      <Link href={`/crm/admin/users/${p.person.id}`} className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-2.5">
                         <Avatar name={p.person.name} id={p.person.id} size="sm" />
                         <span className="min-w-0">
                           <span className="block font-medium text-ink">{p.person.name}</span>
                           <span className="block text-meta text-ink-3">{p.team?.name ?? "No team"}</span>
                         </span>
-                      </Link>
+                      </span>
                     </td>
                     {card.kpis.map((k) => (
                       <Cell key={k.id} kpi={k} r={p.results[k.id]} fmt={fmt} />

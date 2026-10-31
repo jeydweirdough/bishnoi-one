@@ -2,5 +2,5 @@
 import { redirect } from "next/navigation";
 
 export default function Page() {
-  redirect("/crm/admin/settings/customer-types");
+  redirect("/platform/settings/crm/customer-types");
 }

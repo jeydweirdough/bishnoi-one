@@ -108,7 +108,7 @@ export function ImportMatching({data}:{data:Matching}){
  }
  return <div className="space-y-5"><Sheet className="space-y-3 p-5">
   <p className="text-sm">Match each label from the Zoho exports once. What the export already says is filled in; same-name accounts are suggested. If you may confirm a section, your save is final; otherwise it waits for someone who may. Only confirmed matches are used by imports.</p>
-  <p className="text-sm text-ink-2">Imported bills post Accounts payable, Input VAT and tax withheld to Finance&apos;s default accounts, like any bill entered here (<Link href="/finance/ledger/posting" className="underline">Accounting → Default accounts</Link>).</p>
+  <p className="text-sm text-ink-2">Imported bills post Accounts payable, Input VAT and tax withheld to Finance&apos;s default accounts, like any bill entered here (<Link href="/platform/settings/finance/default-accounts" className="underline">Accounting → Default accounts</Link>).</p>
   {!data.importsHere&&<p className="text-sm text-due-today">Imports run on the testing site for now; matching can still be prepared here.</p>}
  </Sheet>
  {data.may.propose&&<Sheet className="space-y-4 p-5"><SectionTitle>Load the Zoho exports</SectionTitle><p className="text-sm text-ink-2">Choose both CSV files together: the Bills export and the Vendor Payments export. Labels already here keep their matches. Nothing is imported.</p>

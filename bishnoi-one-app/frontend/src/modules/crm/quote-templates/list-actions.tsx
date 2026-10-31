@@ -26,7 +26,7 @@ export function NewTemplate({ teams }: { teams?: { id: string; name: string }[] 
       const r = await createTemplate({ name: name.trim(), kind, ...(teams ? { teamId: teamId || null } : {}) });
       if (!r.ok) return setError(r.error);
       setOpen(false);
-      router.push(`/crm/admin/settings/quote-templates/${r.data.id}`);
+      router.push(`/platform/settings/crm/quote-templates/${r.data.id}`);
     });
   }
 

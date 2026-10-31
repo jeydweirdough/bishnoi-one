@@ -278,7 +278,7 @@ function People({ fmt, insights, results, params }: { fmt: Format; insights: Peo
       </div>
       {people.length === 0 ? (
         <div className="px-5 py-2">
-          <Empty icon="people" title="No other users" actions={<LinkButton href="/crm/admin/users/new" variant="primary">Add a person</LinkButton>}>
+          <Empty icon="people" title="No other users" actions={<LinkButton href="/platform/roles/people" variant="primary">Add a person</LinkButton>}>
             Add the people who use the CRM, and give each a role.
           </Empty>
         </div>
@@ -325,13 +325,13 @@ function People({ fmt, insights, results, params }: { fmt: Format; insights: Peo
             {shown.map((p) => (
               <tr key={p.id} className="hover:bg-bench/40">
                 <th scope="row" className="px-5 py-2.5 text-left font-normal">
-                  <Link href={`/crm/admin/users/${p.id}`} className="flex items-center gap-2.5">
+                  <span className="flex items-center gap-2.5">
                     <Avatar name={p.name} id={p.id} size="sm" />
                     <span className="min-w-0">
-                      <span className="block font-medium text-ink hover:underline">{p.name}</span>
+                      <span className="block font-medium text-ink">{p.name}</span>
                       <span className="block text-meta text-ink-3">{p.team?.name ?? "No team"}</span>
                     </span>
-                  </Link>
+                  </span>
                 </th>
                 <td className="px-3 py-2.5 text-right">
                   {p.wonCentavos ? fmt.peso(p.wonCentavos) : <span className="text-ink-3">—</span>}

@@ -194,6 +194,8 @@ class Company(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     currency: Mapped[str] = mapped_column(String(3), default="PHP")
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Manila")
+    # How numbers and dates are written in every app ("en-PH"), with the currency and time zone (2026-10-31).
+    locale: Mapped[str] = mapped_column(String(10), default="en-PH", server_default="en-PH")
     contact_email: Mapped[str | None] = mapped_column(String(254), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     # The letterhead every printed document carries (step 10, migration 0018).

@@ -6,7 +6,7 @@ import type { MyModule } from "@/src/one/module-switcher";
 import { Icon, type IconName } from "@/src/platform/ui/icons";
 
 /** A group of the console's pages: one sidebar row that opens to them. `operators`: Bishnoi One's own work, at the foot. */
-export type ConsoleGroup = { label: string; icon?: IconName; flow?: boolean; operators?: boolean; pages: { href: string; label: string; icon: IconName }[] };
+export type ConsoleGroup = { label: string; icon?: IconName; flow?: boolean; operators?: boolean; pages: { href: string; label: string; icon: IconName; also?: string[]; exact?: boolean }[] };
 
 /**
  * The Admin Console's sidebar: the same one every module wears (src/platform/shell/sidebar.tsx). Grouped as the
@@ -17,7 +17,7 @@ export type ConsoleGroup = { label: string; icon?: IconName; flow?: boolean; ope
 export function ConsoleNav({ module = "platform", groups, mine, company, rail = false, actions }: { module?: "platform" | "operations"; groups: ConsoleGroup[]; mine: MyModule[]; company?: string | null; rail?: boolean; actions?: ReactNode }) {
   const area = (g: ConsoleGroup): Process => ({
     label: g.label, icon: g.icon ?? g.pages[0]?.icon,
-    steps: g.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, exact: p.href === "/platform/roles" })),
+    steps: g.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, exact: p.exact ?? p.href === "/platform/roles", also: p.also })),
   });
   const homeGroup = groups.find((g) => g.label === "Home" && g.pages.length === 1);
   const home = homeGroup ? { href: homeGroup.pages[0].href, label: homeGroup.pages[0].label, icon: homeGroup.pages[0].icon, exact: true } : null;

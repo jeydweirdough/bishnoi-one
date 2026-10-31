@@ -33,7 +33,6 @@ function missingOf(unset: Unset, keys: string[]): Missing {
 const NEEDS: [string, string | string[]][] = [
   ["/finance/import-review", "integrations.manage"],
   ["/finance/import-matching", ["imports.propose", "imports.confirm", "imports.confirm_tax", "imports.run"]],
-  ["/finance/integrations/zoho", "integrations.manage"],
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
   ["/finance/sales-orders", "sales_orders.view"],
@@ -51,9 +50,6 @@ const NEEDS: [string, string | string[]][] = [
   ["/finance/bir/sales-dat", "bir.prepare"],
   ["/finance/bir", "bir.view"],
   ["/finance/calendar", "calendar.use"],
-  ["/finance/admin/users", "admin.users"],
-  ["/platform/roles", "admin.roles"],
-  ["/finance/admin/audit", "admin.audit"],
   ["/finance", "dashboard.view"],
 ];
 
@@ -138,15 +134,8 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Settings",
       icon: "settings",
       steps: keep([
-        { href: "/finance/integrations/zoho", label: "Zoho connection", icon: "settings" },
         { href: "/finance/import-review", label: "Import review", icon: "lists" },
         { href: "/finance/import-matching", label: "Import matching", icon: "lists" },
-        { href: "/finance/tax", label: "Taxes", icon: "money", missing: missingOf(unset, ["taxProfile"]) },
-        { href: "/finance/invoices/series", label: "Transaction number series", icon: "letters", missing: missingOf(unset, ["invoiceSeries"]) },
-        { href: "/finance/ledger/posting", label: "Default accounts", icon: "settings", missing: missingOf(unset, ["postingAccounts"]) },
-        { href: "/finance/ledger/categories", label: "Expense categories", icon: "lists", missing: missingOf(unset, ["categoryAccounts"]) },
-        ...(me.isOwner ? [{ href: "/finance/admin/data-cleanup", label: "Data clean-up", icon: "settings" }] : []),
-        { href: "/finance/admin/audit", label: "Activity log", icon: "auditLog" },
       ]),
     },
   ];

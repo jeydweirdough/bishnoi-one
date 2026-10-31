@@ -6,12 +6,12 @@ import secrets
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy import func, or_, select
 from pydantic import Field, field_validator
 
 from app import mailbox as mb
-from app.access import CurrentAccess
+from app.access import CurrentAccess, settings_only
 from app.api import Api, email_address, field_error, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -221,8 +221,9 @@ def check_template(db, body: TemplateIn) -> None:
 
 
 @router.post("/admin/email-templates", status_code=status.HTTP_201_CREATED)
-def add_template(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, body: TemplateIn) -> dict:
+def add_template(request: Request, access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, body: TemplateIn) -> dict:
     access.require("admin.settings")
+    settings_only(request, access)
     check_template(db, body)
     t = EmailTemplate(**body.model_dump())
     db.add(t)
@@ -233,8 +234,9 @@ def add_template(access: CurrentAccess, me: CurrentUser, db: DB, settings: Setti
 
 
 @router.put("/admin/email-templates/{template_id}")
-def change_template(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, template_id: str, body: TemplateIn) -> dict:
+def change_template(request: Request, access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, template_id: str, body: TemplateIn) -> dict:
     access.require("admin.settings")
+    settings_only(request, access)
     t = db.get(EmailTemplate, template_id)
     if t is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such email.")

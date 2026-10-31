@@ -3,6 +3,16 @@ import { borrowedOf, isPublicPath, moduleOfPath, moduleByKey } from "./lib/modul
 import { ACCOUNT_COOKIE, FRAME_HEADER, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie } from "./lib/session-cookie";
 import { siteUrl } from "./lib/site";
 
+// Where each app's old people pages went (the Admin Console).
+const ADMIN_CONSOLE = { users: "/platform/roles/people", roles: "/platform/roles", teams: "/platform/organisation" } as const;
+// Finance's setup pages, now the Admin Console's (2026-10-31): their old addresses and where they went.
+const FINANCE_SETTINGS: Record<string, string> = {
+  "/finance/tax": "taxes",
+  "/finance/invoices/series": "number-series",
+  "/finance/ledger/posting": "default-accounts",
+  "/finance/ledger/categories": "expense-categories",
+};
+
 // The first gate for every page of the one app (decided 2026-10-23):
 //  - no Bishnoi One account here: sign in first (the API checks every request
 //    anyway; this only saves a page that would bounce);
@@ -36,6 +46,29 @@ export async function proxy(request: NextRequest) {
   if (moved) return NextResponse.redirect(siteUrl(`/operations/${moved[1]}${moved[2] ?? ""}${search}`, request), 308);
   // Sales orders moved from their own app into the CRM (2026-10-30): old links and stored ones still land.
   if (pathname === "/sales" || pathname.startsWith("/sales/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
+  // People, roles and teams are kept only in the Admin Console (2026-10-31): each app's old pages land there.
+  const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy|admin)\/admin\/(users|roles|teams)(?:\/.*)?$/);
+  if (kept) return NextResponse.redirect(siteUrl(ADMIN_CONSOLE[kept[1] as keyof typeof ADMIN_CONSOLE], request), 308);
+  // Integrations are set up only in the Admin Console (2026-10-31): the CRM's Connections and Finance's Zoho
+  // sign-in land there. Zoho's callback stays where Zoho was told to send people.
+  if (pathname === "/crm/admin/settings/connections") return NextResponse.redirect(siteUrl("/platform/company/integrations", request), 308);
+  // Each app's settings are the Admin Console's, for company administrators (2026-10-31): the CRM's first.
+  const crmSettings = pathname.match(/^\/crm\/admin\/settings(\/.*)?$/);
+  if (crmSettings) return NextResponse.redirect(siteUrl(`/platform/settings/crm${crmSettings[1] ?? ""}${search}`, request), 308);
+  const inventorySettings = pathname.match(/^\/inventory\/(?:catalog\/)?(couriers|categories|brands|units)$/);
+  if (inventorySettings) return NextResponse.redirect(siteUrl(`/platform/settings/inventory/${inventorySettings[1]}${search}`, request), 308);
+  const financeSettings = FINANCE_SETTINGS[pathname];
+  if (financeSettings) return NextResponse.redirect(siteUrl(`/platform/settings/finance/${financeSettings}${search}`, request), 308);
+  const zoho = pathname.match(/^\/finance\/integrations\/zoho(\/deliveries)?$/);
+  if (zoho) return NextResponse.redirect(siteUrl(`/platform/company/integrations/zoho${zoho[1] ?? ""}${search}`, request), 308);
+  // One activity log, the Admin Console's (2026-10-31): each app's old log lands there, filtered to that app.
+  const log = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/audit$/);
+  if (log) return NextResponse.redirect(siteUrl(`/platform/company/activity?app=${log[1]}`, request), 308);
+  // One data clean-up and recycle bin, the Admin Console's (2026-10-31): each app's old page lands there, on that app.
+  const cleanup = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/data-cleanup$/);
+  if (cleanup) return NextResponse.redirect(siteUrl(`/platform/company/data-cleanup?app=${cleanup[1]}`, request), 308);
+  // Executive Admin's "Settings" only ever led to its users (2026-10-31).
+  if (pathname === "/admin/settings" || pathname.startsWith("/admin/settings/")) return NextResponse.redirect(siteUrl("/platform/roles/people", request), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   headers.delete(FRAME_HEADER);
@@ -57,8 +90,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // The frame's session first (its sidebar is drawn around the page), then the page's own.
-  for (const m of frame ? [frame, here] : [here]) {
+  // The frame's session first (its sidebar is drawn around the page), then the page's own. The Admin Console
+  // works on the account itself, so as a frame it needs no session of its own.
+  for (const m of frame && !frame.accountOnly ? [frame, here] : [here]) {
     if (request.cookies.get(moduleCookie(m.key))?.value) continue;
     const enter = siteUrl(`/auth/enter/${m.key}`, request);
     enter.searchParams.set("next", next);

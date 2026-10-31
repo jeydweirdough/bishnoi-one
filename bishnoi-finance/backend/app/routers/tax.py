@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.alias_generators import to_camel
 from sqlalchemy import select
 
-from app.access import access_of, permitted
+from app.access import access_of, permitted, settings_permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
@@ -237,7 +237,7 @@ class ProfileIn(Api):
 
 
 @router.put("/profile")
-def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
+def update_profile(admin: settings_permitted("tax.manage"), db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
     if body.country not in PACKS:
         raise field_error("country", "There's no tax pack for that country yet.")
     if body.regime not in pack_for(body.country).regimes:
@@ -287,7 +287,7 @@ class RateIn(Api):
 
 
 @router.post("/rates", status_code=status.HTTP_201_CREATED)
-def add_rate(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
+def add_rate(admin: settings_permitted("tax.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
     """A change in a rate, from a day on: the law's, entered ahead of an update."""
     profile = db.get(TaxProfile, 1)
     pack = pack_for(profile.country)

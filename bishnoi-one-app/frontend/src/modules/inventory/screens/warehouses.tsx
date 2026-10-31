@@ -15,13 +15,15 @@ import { context, type Params, type Search } from "@/src/modules/inventory/lib/p
 import type { Warehouse, WarehouseRow } from "@/src/modules/inventory/lib/types";
 
 export async function WarehousesPage({ searchParams }: { searchParams: Search }) {
-  const { fmt, may } = await context();
+  const { me, fmt, may } = await context();
+  // Seen by whoever works with stock; added and changed only by the company's administrators (2026-10-31).
+  const manage = may("warehouses.manage") && me.isOwner;
   if (!may("warehouses.view")) return <NoAccess what="warehouses" />;
   const { warehouses } = await loadQuery<{ warehouses: WarehouseRow[] }>("query Warehouses { warehouses }", {}, ["warehouses"]);
   return (
     <>
       <PageHeader title="Warehouses">All sites where stock is kept. Each warehouse has its own stock and locations (zones, racks and bins).</PageHeader>
-      {may("warehouses.manage") && <div className="mb-5"><AddWarehouse startOpen={(await searchParams).add === "1" || warehouses.length === 0} /></div>}
+      {manage && <div className="mb-5"><AddWarehouse startOpen={(await searchParams).add === "1" || warehouses.length === 0} /></div>}
       <Sheet>
         {warehouses.length === 0 ? (
           <Empty icon="warehouses" title="No warehouses">Add a warehouse, then receive stock into it.</Empty>
@@ -43,7 +45,7 @@ export async function WarehousesPage({ searchParams }: { searchParams: Search })
                       "divider" as const,
                       ...(may("stock.view") ? [{ label: "View stock", icon: <Package />, href: `/inventory/stock?warehouse=${w.id}` }] : []),
                       ...(may("counts.create") ? [{ label: "Start count", icon: <ClipboardCheck />, href: `/inventory/counts?warehouse=${w.id}` }] : []),
-                      ...(may("warehouses.manage")
+                      ...(manage
                         ? [
                             "divider" as const,
                             { label: "Delete", icon: <Trash2 />, run: deleteWarehouse.bind(null, w.id), danger: true, confirm: `Delete ${w.name}? Only a warehouse with no stock movements can be deleted; otherwise deactivate it.`, done: `${w.name} deleted` },
@@ -63,11 +65,11 @@ export async function WarehousesPage({ searchParams }: { searchParams: Search })
 
 export async function WarehousePage({ params }: { params: Params<{ id: string }> }) {
   const { id } = await params;
-  const { fmt, may } = await context();
+  const { me, fmt, may } = await context();
   if (!may("warehouses.view")) return <NoAccess what="warehouses" />;
   const { warehouse: w } = await loadQuery<{ warehouse: Warehouse }>(`query Warehouse($id: String!) { warehouse(id: $id) }`, { id }, ["warehouse"]);
   const s = w.summary;
-  const manage = may("warehouses.manage");
+  const manage = may("warehouses.manage") && me.isOwner;
   return (
     <>
       <div className="relative">

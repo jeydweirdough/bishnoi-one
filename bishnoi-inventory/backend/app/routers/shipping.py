@@ -18,7 +18,7 @@ from pydantic import Field
 from sqlalchemy import func, select
 
 from app import shipping
-from app.access import CurrentAccess, allowed
+from app.access import CurrentAccess, allowed, settings_allowed
 from app.api import Api, changed, conflict, field_error, found
 from app.audit import audit
 from app.deps import DB, CurrentUser
@@ -26,7 +26,8 @@ from app.models import Courier, Order
 
 router = APIRouter(prefix="/inventory", tags=["shipping"])
 
-Manage = allowed("warehouses.manage")
+# Couriers, warehouses and locations: changed by the company administrators (2026-10-31).
+Manage = settings_allowed("warehouses.manage")
 Issue = allowed("orders.issue")
 
 PHOTO_TYPES = {b"\x89PNG\r\n\x1a\n": "image/png", b"\xff\xd8\xff": "image/jpeg"}

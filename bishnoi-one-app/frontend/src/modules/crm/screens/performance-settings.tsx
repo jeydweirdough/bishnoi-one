@@ -8,7 +8,7 @@ import ScorecardsPage from "@/src/modules/crm/screens/scorecards";
 // An administrator's Performance is in Settings: what is measured, the
 // month's targets, and everyone's results, a tab each.
 
-const BASE = "/crm/admin/settings/performance";
+const BASE = "/platform/settings/crm/performance";
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
 export function PerformanceTabs({ current }: { current: "measures" | "targets" | "results" | "scorecards" }) {

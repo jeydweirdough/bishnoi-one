@@ -60,8 +60,7 @@ function menu(me: Me, unset: Unset): { home: Step | null; processes: Process[]; 
       icon: "settings",
       steps: [
         // People, roles and licence numbers are kept only in the Admin Console (2026-10-30).
-        ...admin.filter((p) => !p.href.startsWith("/platform/") && !p.href.endsWith("/users") && !p.href.endsWith("/roles")),
-        ...(me.isOwner ? [{ href: "/pharmacy/admin/data-cleanup", label: "Data clean-up", icon: "settings" }] : []),
+        ...admin.filter((p) => !p.href.startsWith("/platform/") && !p.href.endsWith("/users") && !p.href.endsWith("/roles") && !p.href.endsWith("/audit")),
       ],
     },
   ];

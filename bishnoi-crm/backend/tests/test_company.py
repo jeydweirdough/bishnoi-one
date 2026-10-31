@@ -175,3 +175,29 @@ def test_the_platform_tells_us_at_once_and_nobody_else_can(app, client, platform
     # Reactivated on the platform: back at once.
     assert client.post("/platform/company", json={"pass": company_pass(iat=newer + 20)}).status_code == 204
     assert client.get("/companies", headers=headers).status_code == 200
+
+
+def test_the_company_profile_on_bishnoi_one_is_the_crms(app, client, platform):
+    """Connected, the CRM shows its company as the Admin Console's Company profile has it, puts that on
+    quotes, and keeps only the quote settings of its own (2026-10-31)."""
+    profile = {"name": "Getmeds Philippines Inc.", "legalName": "Getmeds Philippines Inc.", "currency": "PHP", "locale": "en-US",
+               "timezone": "Asia/Manila", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "phone": "+63 2 8123 4567"}
+    platform["answer"] = Answer(200, {"pass": company_pass(profile=profile)})
+    # Signed in with a password while not connected (connected, only Bishnoi One signs people in), then connected again.
+    connected = app.state.settings
+    app.state.settings = connected.model_copy(update={"platform_api_url": None})
+    headers = {"Authorization": f"Bearer {sign_in(client).json()['accessToken']}"}
+    app.state.settings = connected
+    shown = client.get("/admin/company-settings", headers=headers).json()
+    assert shown["onPlatform"] is True
+    assert (shown["orgName"], shown["locale"], shown["companyAddress"], shown["companyTin"], shown["companyContact"]) == (
+        "Getmeds Philippines Inc.", "en-US", "Unit 305, Vatican Bldg.", "605-059-166-00000", "+63 2 8123 4567")
+    assert client.get("/auth/me", headers=headers).json()["org"]["name"] == "Getmeds Philippines Inc."
+    assert client.get("/quote-letterhead", headers=headers).json() == {
+        "name": "Getmeds Philippines Inc.", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "contact": "+63 2 8123 4567"}
+    # Changed only on the Admin Console; sent back as shown, the quote settings still save.
+    refused = client.patch("/admin/company-settings", json={"companyTin": "000-000-000-000"}, headers=headers)
+    assert refused.status_code == 409 and "Company profile" in refused.json()["detail"]
+    saved = client.patch("/admin/company-settings", json={"orgName": "Getmeds Philippines Inc.", "quotePrefix": "GPI", "quoteValidDays": 15}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert (saved.json()["quotePrefix"], saved.json()["quoteValidDays"], saved.json()["orgName"]) == ("GPI", 15, "Getmeds Philippines Inc.")

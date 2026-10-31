@@ -1210,6 +1210,8 @@ export type CompanySettings = {
   companyTin: string | null;
   companyContact: string | null;
   currencies: string[];
+  /** Connected to Bishnoi One: name, currency, format, time zone and letterhead are the Admin Console's (2026-10-31). */
+  onPlatform?: boolean;
 };
 
 // --- insights (a lead's team, the admin's dashboard) ---

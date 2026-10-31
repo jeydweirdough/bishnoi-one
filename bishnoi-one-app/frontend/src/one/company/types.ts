@@ -8,6 +8,8 @@ export type CompanyProfile = {
   status: string;
   currency: string;
   timezone: string;
+  /** How numbers and dates are written ("en-PH"), for every app (2026-10-31). */
+  locale: string;
   contactEmail: string | null;
   /** Its people's email domain (getmeds.ph): they're added, and sign in, only at it (decided 2026-10-29). */
   emailDomain: string | null;

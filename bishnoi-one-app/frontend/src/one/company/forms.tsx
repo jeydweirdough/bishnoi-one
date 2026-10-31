@@ -10,6 +10,7 @@ import { Combobox, Select } from "@/src/platform/ui/pickers";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { changeCompany, setAdministrator, signPersonOut } from "./actions";
 import type { Administrators, CompanyProfile } from "./types";
+import { LOCALES } from "@/src/platform/lib/locales";
 
 const ZONES = ["Asia/Manila", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Tokyo", "Asia/Dubai", "Europe/London", "America/New_York", "America/Los_Angeles", "UTC"];
 const CURRENCIES = [
@@ -19,15 +20,15 @@ const CURRENCIES = [
   { value: "EUR", label: "EUR · Euro" },
 ];
 
-/** The company's name, contact email, email domain, time zone and currency: saved together. */
+/** The company's name, contact email, email domain, time zone, currency and number format: saved together. */
 export function ProfileForm({ company }: { company: CompanyProfile }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency });
+  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency, locale: company.locale ?? "en-PH" });
   const dirty =
     form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") || form.emailDomain !== (company.emailDomain ?? "") ||
-    form.timezone !== company.timezone || form.currency !== company.currency;
+    form.timezone !== company.timezone || form.currency !== company.currency || form.locale !== (company.locale ?? "en-PH");
 
   function save() {
     start(async () => {
@@ -67,6 +68,17 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       </Field>
       <Field label="Currency" size="md" error={errors.currency}>
         {() => <Combobox options={CURRENCIES} value={form.currency} onChange={(v) => setForm({ ...form, currency: String(v) })} />}
+      </Field>
+      <Field label="Number and date format" size="md" error={errors.locale} hint="How every app writes numbers and dates.">
+        {(p) => (
+          <Select {...p} value={form.locale} onChange={(e) => setForm({ ...form, locale: e.target.value })}>
+            {[...LOCALES, ...(LOCALES.some((l) => l.value === form.locale) ? [] : [{ value: form.locale, label: form.locale }])].map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </Select>
+        )}
       </Field>
       <div className="sm:col-span-6">
         <Button variant="primary" onClick={save} loading={busy} disabled={!dirty}>

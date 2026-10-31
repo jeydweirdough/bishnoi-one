@@ -9,14 +9,9 @@ import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platf
 import { SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import type { CompanySettings } from "@/src/platform/lib/types";
 import { saveCompanySettings } from "@/src/modules/crm/actions/settings";
+import { LOCALES } from "@/src/platform/lib/locales";
+import { LinkButton } from "@/src/platform/ui/ant-button";
 
-const LOCALES = [
-  { value: "en-PH", label: "English (Philippines)" },
-  { value: "en-US", label: "English (United States)" },
-  { value: "en-GB", label: "English (United Kingdom)" },
-  { value: "en-SG", label: "English (Singapore)" },
-  { value: "en-AU", label: "English (Australia)" },
-];
 
 const ZONES = ["Asia/Manila", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Jakarta", "Asia/Bangkok", "Asia/Tokyo", "Australia/Sydney", "Europe/London", "America/New_York", "UTC"];
 
@@ -45,6 +40,9 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
     fieldErrors: fields,
     setFieldErrors: setFields,
   } = useAnticipation<typeof v>();
+  // Connected to Bishnoi One: the company's name, currency, format, time zone and letterhead are the Admin
+  // Console's Company profile (2026-10-31); only the quote settings are this page's.
+  const onPlatform = initial.onPlatform === true;
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   const example = `${v.quotePrefix || "Q"}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-0001`;
 
@@ -60,7 +58,10 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
       anticipate: () => ({ ...v }),
       rollback: (prev) => setV(prev),
       request: () =>
-        saveCompanySettings({
+        saveCompanySettings(
+          onPlatform
+            ? { quotePrefix: v.quotePrefix.trim().toUpperCase(), quoteValidDays: days, quoteTerms: v.quoteTerms.trim() || null }
+            : {
           orgName: v.orgName.trim(),
           currency: v.currency,
           locale: v.locale,
@@ -71,7 +72,8 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
           companyAddress: v.companyAddress.trim() || null,
           companyTin: v.companyTin.trim() || null,
           companyContact: v.companyContact.trim() || null,
-        }),
+              },
+        ),
       successMessage: () => ({
         title: "Settings saved",
         description: "Every screen uses them from now on.",
@@ -91,6 +93,20 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
       }}
       className={`grid gap-5 rounded-xl transition-all duration-300 lg:grid-cols-2 lg:items-start ${shakeClass} ${anticipateClass}`}
     >
+      {onPlatform ? (
+        <Sheet className="px-5 pt-4 pb-5">
+          <SectionTitle icon="company">Business details</SectionTitle>
+          <p className="mt-2 text-sm text-ink-2">
+            {initial.orgName} · {initial.currency} · {initial.timezone.replace("_", " ")}
+          </p>
+          <p className="mt-1 text-meta text-ink-3">
+            The name, currency, number format, time zone, address, TIN and phone are set on the Company profile, for every app and every printed document.
+          </p>
+          <LinkButton href="/platform/company" className="mt-3">
+            Open Company profile
+          </LinkButton>
+        </Sheet>
+      ) : (
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="company">Business details</SectionTitle>
         <FormGrid className="mt-3">
@@ -133,6 +149,7 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
           </Field>
         </FormGrid>
       </Sheet>
+      )}
 
       <Sheet className="px-5 pt-4 pb-5">
         <SectionTitle icon="quotes">Quotes</SectionTitle>
@@ -146,6 +163,8 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
           <Field label="Terms" optional error={fields.quoteTerms} size="full" hint="Printed on every new quote: payment, delivery, what the price includes.">
             {(p) => <Textarea {...p} rows={5} value={v.quoteTerms} onChange={set("quoteTerms")} maxLength={5000} />}
           </Field>
+          {!onPlatform && (
+          <>
           <Field label="Business address" optional error={fields.companyAddress} size="full" hint="On the letterhead of a printed quotation.">
             {(p) => <Textarea {...p} rows={2} value={v.companyAddress} onChange={set("companyAddress")} maxLength={300} />}
           </Field>
@@ -155,6 +174,8 @@ export function CompanySettingsForm({ initial }: { initial: CompanySettings }) {
           <Field label="Phone or email" size="lg" optional error={fields.companyContact}>
             {(p) => <Input {...p} value={v.companyContact} onChange={set("companyContact")} maxLength={200} />}
           </Field>
+          </>
+          )}
         </FormGrid>
       </Sheet>
 

@@ -1,0 +1,14 @@
+import Link from 'next/link';
+import {load} from '@/src/modules/finance/platform/lib/api';
+import {PageHeader,Sheet,SectionTitle} from '@/src/modules/finance/platform/ui/sheet';
+export const metadata={title:'Zoho delivery queue'};
+type Queue={counts:Record<string,number>;total:number;page:number;oldestWaitingAt:string|null;liveSendingEnabled:boolean;items:{id:string;kind:string;localId:string;number:string;label:string;message:string|null;attempts:number;updatedAt:string}[]};
+export default async function Deliveries({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const query=await searchParams;const page=Number(query.page)||1;
+ const data=await load<Queue>(`/finance/integrations/zoho/deliveries?page=${Math.max(1,page)}`);
+ return <><PageHeader title="Zoho delivery queue" crumbs={[{href:'/platform/company/integrations/zoho',label:'Zoho connection'}]}>Approved bills and released payments are saved in Finance while their Zoho copies wait here.</PageHeader>
+ <Sheet className="mb-5 space-y-3 p-5"><SectionTitle>{data.liveSendingEnabled?'Background sending enabled':'Sending awaits setup'}</SectionTitle><p className="text-sm text-ink-2">Before sending, IT and Finance must match suppliers, accounts and taxes to Zoho, and confirm which field marks a bill as 2MG. Your current connection reads Zoho. Authorising extra access alone does not start sending.</p><p className="text-sm">{Object.entries(data.counts).map(([state,count])=>`${state.replaceAll('_',' ')}: ${count}`).join(' · ')||'No approved records are waiting.'}</p><p className="text-sm text-ink-2">If a request may have reached Zoho, IT must check the existing record before any retry. Do not create a replacement bill or payment.</p></Sheet>
+ {data.oldestWaitingAt&&<p className="mb-4 text-sm text-ink-2">Oldest waiting record: {new Date(data.oldestWaitingAt).toLocaleString("en-PH",{timeZone:"Asia/Manila"})}.</p>}
+ <Sheet className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b text-ink-3"><tr><th className="p-4">Finance record</th><th className="p-4">Zoho status</th><th className="p-4">Next step</th></tr></thead><tbody>{data.items.map(item=><tr key={item.id} className="border-b"><td className="p-4"><Link className="underline" href={`/finance/${item.kind==='bill'?'bills':'vouchers'}/${item.localId}`}>{item.number}</Link></td><td className="p-4">{item.label}</td><td className="p-4">{item.message||'The background updater handles this record.'}</td></tr>)}</tbody></table>{data.items.length===0&&<p className="p-5 text-sm text-ink-3">Nothing queued. Drafts and historical records are not automatically sent.</p>}</Sheet>
+ <div className="mt-4 flex gap-5 text-sm"><span>{data.total} records</span>{page>1&&<Link href={`?page=${page-1}`}>Previous page</Link>}{page*25<data.total&&<Link href={`?page=${page+1}`}>Next page</Link>}</div></>;
+}

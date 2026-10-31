@@ -42,7 +42,7 @@ export const MODULES: ModuleDef[] = [
   // its Platform key), shown to whoever has Inventory while the company's catalogue has Sales on (src/one/mine.ts).
   { key: "finance", path: "/finance", label: "Finance", blurb: "Invoices and tax", appKey: "finance", apiEnv: "FINANCE_API_URL", apiLocal: "http://127.0.0.1:8303", status: "live", icon: Landmark, tint: "#fcf3dd", ink: "#9a6a12" },
   { key: "pharmacy", path: "/pharmacy", label: "Pharmacy", blurb: "Prescriptions", appKey: "pharmacy", apiEnv: "PHARMACY_API_URL", apiLocal: "http://127.0.0.1:8307", status: "live", icon: HeartPulse, tint: "#fbe7e3", ink: "#c2493a" },
-  { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Company settings", appKey: "exec", apiEnv: "ADMIN_API_URL", apiLocal: "http://127.0.0.1:8300", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
+  { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Office administration", appKey: "exec", apiEnv: "ADMIN_API_URL", apiLocal: "http://127.0.0.1:8300", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
   { key: "inlicensing", path: "/in-licensing", label: "In-Licensing", blurb: "Product licensing", appKey: "inlicensing", apiEnv: "INLICENSING_API_URL", apiLocal: "http://127.0.0.1:8306", status: "soon", icon: FlaskConical, tint: "#e6f3f3", ink: "#2f7d7d" },
   { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiEnv: "REGULATORY_API_URL", apiLocal: "http://127.0.0.1:8308", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
   // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform
@@ -66,7 +66,15 @@ export function moduleOfPath(pathname: string): ModuleDef | null {
 // Pages in one module's frame that run on another's API (decided 2026-10-30: sales orders are kept by
 // Inventory, the Operations service, and worked in the CRM, not in an app of their own). The page and its
 // actions talk to `module`; the sidebar, menu and who-you-are around it are the `frame`'s.
-const BORROWED: { path: string; module: ModuleKey; frame: ModuleKey }[] = [{ path: "/crm/sales", module: "inventory", frame: "crm" }];
+const BORROWED: { path: string; module: ModuleKey; frame: ModuleKey }[] = [
+  { path: "/crm/sales", module: "inventory", frame: "crm" },
+  // Finance's Zoho Books sign-in, under the Admin Console's Integrations (2026-10-31): kept by Finance, set up there.
+  { path: "/platform/company/integrations/zoho", module: "finance", frame: "platform" },
+  // Each app's settings, for company administrators only, in the Admin Console (2026-10-31): the CRM's first.
+  { path: "/platform/settings/crm", module: "crm", frame: "platform" },
+  { path: "/platform/settings/inventory", module: "inventory", frame: "platform" },
+  { path: "/platform/settings/finance", module: "finance", frame: "platform" },
+];
 
 /** The borrowed pages a path is one of, or null. */
 export const borrowedOf = (pathname: string) => BORROWED.find((b) => pathname === b.path || pathname.startsWith(`${b.path}/`)) ?? null;

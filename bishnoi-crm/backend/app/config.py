@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     org_minor_units: int = 2
     org_locale: str = "en-PH"
     org_timezone: str = "Asia/Manila"
+    # Connected to Bishnoi One: the company's letterhead as its Company profile has it (address, tin, phone),
+    # set on each request from the company pass (deps.get_settings_dep). None: this CRM keeps its own (2026-10-31).
+    org_letterhead: dict | None = None
 
     # Host names this API answers to. Anything else gets 400.
     allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
