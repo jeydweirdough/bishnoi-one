@@ -225,7 +225,7 @@ const ACTIONS: Record<string, string> = {
   "security.signed_out_person": "Signed a person out",
 };
 
-function said(action: string): string {
+export function said(action: string): string {
   return ACTIONS[action] ?? action.replace(/[._]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 

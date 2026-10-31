@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "antd";
-import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -248,6 +248,8 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
         always
         label={`Actions for ${person.fullName}`}
         items={[
+          // Everything about them in one place: details, security, apps and roles, activity (2026-10-31).
+          { label: "Open", icon: <UserRound />, href: `/platform/roles/people/${person.id}` },
           { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
           ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
           { label: "Set a new password", icon: <KeyRound />, onSelect: () => setSettingPassword(true) },

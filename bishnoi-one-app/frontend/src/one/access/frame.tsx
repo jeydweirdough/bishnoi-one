@@ -19,7 +19,7 @@ export async function AccessFrame({ current, children }: { current: "people" | "
           current === "bin" ? (
             <>People deleted from {data.company.name}. They can&apos;t sign in, and what they did stays. Restore puts them back on People, switched off until you switch them on.</>
           ) : current === "people" ? (
-            <>Everyone at {data.company.name}, once for every module: add people, give each one role and the modules they may open, set passwords, switch people off. The modules are told at once.</>
+            <>Everyone at {data.company.name}: add people, give them the apps they may open and their role in each, set passwords, switch people off. The apps are told at once.</>
           ) : (
             <>What each role can do, in plain words, and whose records it sees. Start from one of Bishnoi One&apos;s job roles and adjust it. Every app is told at once.</>
           )

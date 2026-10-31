@@ -170,6 +170,25 @@ def test_a_role_in_each_app(client, getmeds, modules):
     assert client.delete(f"/identity/access/roles/{chemist['id']}", headers=h).status_code == 409
 
 
+def test_a_persons_page_has_everything_about_them(client, getmeds):
+    """2026-10-31: one person in one place: details, apps and their role in each, sign-in and security, activity."""
+    h, rio = getmeds["owner"]["h"], getmeds["rio"]
+    role = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    client.put(f"/identity/access/people/{rio['id']}/apps/crm/role", json={"roleId": role["id"]}, headers=h)
+    client.post("/identity/login", json={"email": "rio@getmeds.test", "password": "not-his-password-1"})
+    r = client.get(f"/identity/access/people/{rio['id']}", headers=h)
+    assert r.status_code == 200, r.text
+    page = r.json()
+    assert (page["fullName"], page["email"], page["status"]) == ("Rio Santos", "rio@getmeds.test", "active")
+    assert {a["key"]: a["roleId"] for a in page["apps"]}["crm"] == role["id"]
+    sec = page["security"]
+    assert sec["twoStep"] is False and sec["passwordSet"] is True and sec["lastSignIn"] and sec["openSignIns"] >= 1
+    assert sec["wrongPasswords30Days"] == 1 and sec["lockedNow"] is False
+    assert any(e["action"] == "access.app_role_set" for e in page["activity"])
+    # Only the company's administrators see someone's page.
+    assert client.get(f"/identity/access/people/{rio['id']}", headers=getmeds["jade"]["h"]).status_code == 403
+
+
 def test_importing_the_roles_each_module_has_today(client, getmeds):
     h = getmeds["owner"]["h"]
     r = client.post("/identity/access/import", headers=h)

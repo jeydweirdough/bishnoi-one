@@ -14,7 +14,7 @@ Only a company administrator (Identity.is_company_admin) may; every change is
 in the audit log (names of what changed, never values) and sent to the modules.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -25,11 +25,11 @@ from sqlalchemy.orm import Session
 from app import abilities as ab
 from app import access_roles
 from app.access_roles import ADMINISTRATOR
-from app.api import Api, changed, check_email, conflict, field_error, not_found
+from app.api import Api, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app import passwords
 from app.deps import DB, SettingsDep
-from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp, IdentitySession
+from app.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
 from app import email_rules, sign_in
 from app.accounts import account_of, memberships, runs_company
 from app.routers.identity import Signed
@@ -586,6 +586,51 @@ def give_module(person_id: str, key: str, request: Request, db: DB, me: Admin, s
         db.commit()
         told(request, settings, me.company_id)
     return {"id": p.id, "app": app.key}
+
+
+@router.get("/people/{person_id}")
+def person_page(person_id: str, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """One person, everything about them in one place (2026-10-31): details, apps with their role in each,
+    sign-in and security, and their recent activity at the company."""
+    from app.routers.activity import entry_out
+
+    p = get_person(db, me, person_id)
+    account = account_of(db, p)
+    now = datetime.now(UTC)
+    email = p.email.lower()
+    apps = {a.id: a for a in access_roles.modules_of(db, me.company_id)}
+    grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
+    open_sessions = db.scalar(select(func.count()).select_from(IdentitySession).where(
+        IdentitySession.identity_id == p.id, IdentitySession.revoked_at.is_(None), IdentitySession.expires_at > now)) or 0
+    window = now - timedelta(minutes=settings.login_lockout_minutes)
+    failures = db.scalar(select(func.count()).select_from(SignInFailure).where(func.lower(SignInFailure.email) == email, SignInFailure.at > window)) or 0
+    wrong = db.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action == "identity.sign_in_failed", func.lower(AuditEntry.target) == email,
+                                                                         AuditEntry.created_at > now - timedelta(days=30))) or 0
+    invited = bool(account and db.scalar(select(func.count()).select_from(SignInLink).where(
+        SignInLink.account_id == account.id, SignInLink.kind == "invite", SignInLink.used_at.is_(None), SignInLink.expires_at > now)))
+    activity = db.scalars(select(AuditEntry).where(
+        AuditEntry.company_id == me.company_id, (func.lower(AuditEntry.actor) == email) | func.lower(AuditEntry.target).startswith(email))
+        .order_by(AuditEntry.created_at.desc()).limit(25)).all()
+    return {
+        **person_out(p),
+        "addedAt": iso(p.created_at),
+        "deletedAt": iso(p.deleted_at),
+        "apps": [{"key": apps[g.application_id].key, "name": apps[g.application_id].name, "roleId": g.access_role_id or p.access_role_id,
+                  "grantedAt": iso(g.granted_at), "grantedBy": g.granted_by} for g in grants if g.application_id in apps],
+        "security": {
+            "twoStep": bool(account and sign_in.two_step_on(account)),
+            "twoStepRequired": bool(settings.two_step_required and runs_company(db, p)),
+            "lastSignIn": iso(account.last_sign_in_at) if account else None,
+            "passwordSet": bool(account and account.password_hash),
+            "passwordChangedAt": iso(account.password_changed_at) if account else None,
+            "mustChangePassword": bool(account and account.must_change_password),
+            "openSignIns": open_sessions,
+            "lockedNow": failures >= settings.login_attempts,
+            "wrongPasswords30Days": wrong,
+            "invitationWaiting": invited,
+        },
+        "activity": [entry_out(e) for e in activity],
+    }
 
 
 class AppRoleIn(Api):

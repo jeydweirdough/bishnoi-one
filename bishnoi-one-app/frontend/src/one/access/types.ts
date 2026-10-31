@@ -78,3 +78,23 @@ export type RoleInput = {
 };
 
 export type ImportReport = { rolesMade: number; peopleGiven: number; toChoose: number; unreachable: string[] };
+
+/** One person in one place (/identity/access/people/{id}, 2026-10-31). */
+export type PersonPage = AccessPerson & {
+  addedAt: string | null;
+  deletedAt: string | null;
+  apps: { key: string; name: string; roleId: string | null; grantedAt: string | null; grantedBy: string | null }[];
+  security: {
+    twoStep: boolean;
+    twoStepRequired: boolean;
+    lastSignIn: string | null;
+    passwordSet: boolean;
+    passwordChangedAt: string | null;
+    mustChangePassword: boolean;
+    openSignIns: number;
+    lockedNow: boolean;
+    wrongPasswords30Days: number;
+    invitationWaiting: boolean;
+  };
+  activity: { id: string; at: string; actor: string; action: string; category: string; target: string; fields: string[] }[];
+};
