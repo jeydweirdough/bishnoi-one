@@ -346,7 +346,7 @@ def preview_bills(user: CurrentUser, db: DB, settings: SettingsDep, body: Files)
     testing_only(settings)
     may_import(user, "bills")
     rows = zi.plan_bills(db, pack(body), settings)
-    return {**zi.summary(rows), "rows": zi.rows_out(rows)}
+    return {**zi.summary(rows, source_fingerprint=zi.fingerprint(files_of(body))), "rows": zi.rows_out(rows)}
 
 
 @router.post("/bills")
@@ -361,7 +361,7 @@ def preview_payments(user: CurrentUser, db: DB, settings: SettingsDep, body: Fil
     testing_only(settings)
     may_import(user, "payments")
     rows = zi.plan_payments(db, pack(body), settings)
-    return {**zi.summary(rows), "rows": zi.rows_out(rows)}
+    return {**zi.summary(rows, source_fingerprint=zi.fingerprint(files_of(body))), "rows": zi.rows_out(rows)}
 
 
 @router.post("/supplier-payments")

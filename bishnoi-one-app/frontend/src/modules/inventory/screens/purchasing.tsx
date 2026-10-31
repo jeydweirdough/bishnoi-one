@@ -277,7 +277,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
           {po.salesOrder && (
             <>
               {po.dropship ? "Dropship for " : "Order-on-demand for "}
-              <Link href={`/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
+              <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
               {po.dropship && po.shipTo && <>: the vendor delivers to {po.shipTo.name}{po.shipTo.address && `, ${po.shipTo.address}`}. No stock comes through our warehouse.</>}
             </>
           )}

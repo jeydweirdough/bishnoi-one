@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Sidebar, type Process, type Step } from "@/src/platform/shell/sidebar";
 import type { MyModule } from "@/src/one/module-switcher";
 import { Icon, type IconName } from "@/src/platform/ui/icons";
-import { peoplePagesFor, settingsPagesFor } from "@/src/modules/crm/lib/access";
+import { settingsPagesFor } from "@/src/modules/crm/lib/access";
 import type { Me } from "@/src/platform/lib/types";
 
 // The CRM's menu as Zoho CRM lays it out (decided 2026-10-24, benchmarks/surpass.md §1): Sales
@@ -44,6 +44,8 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       ...when(selling && may("customers.view"), { href: "/crm/contacts", label: "Contacts", icon: "person" }),
       ...when(selling && may("deals.view"), { href: "/crm/deals", label: "Deals", icon: "deals" }),
       ...when(selling && may("quotes.view"), { href: "/crm/quotes", label: "Quotes", icon: "quotes" }),
+      // Kept by Inventory (the Operations service), worked here: a quote's order, then its approval (2026-10-30).
+      ...when(selling && may("quotes.view"), { href: "/crm/sales", label: "Sales orders", icon: "issuance" }),
       ...when(selling && may("quotes.view"), { href: "/crm/order-links", label: "Order links", icon: "orders" }),
       ...when(selling && may("customers.view"), { href: "/crm/retention", label: "Retention", icon: "retention" }),
     ],
@@ -100,7 +102,6 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
   // A field agent's day comes first; everyone else's starts with sales.
   const processes = agent ? [field, work, catalogue, documents, reports] : [sales, work, field, catalogue, documents, reports];
 
-  const people = peoplePagesFor(me);
   const fullSettings = may("admin.settings") || may("admin.types");
   const canSettings = fullSettings || may("department.manage");
   const settingsSteps: Step[] = canSettings
@@ -132,11 +133,7 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       ]
     : [];
 
-  // People and roles are kept on the Admin Console (People, Roles); what the CRM keeps of its own
-  // about people (employee ID, teams) is under Settings (decided 2026-10-28).
-  const own: Step[] = people
-    .filter((p) => !p.href.startsWith("/platform/"))
-    .map((p) => ({ href: p.href, label: p.label === "Users" ? "People's details" : p.label, icon: p.href.includes("teams") ? "teams" : "people" }));
+  // People, roles and teams are kept only in the Admin Console, employee IDs included (2026-10-30).
   const foot: Process[] = [
     {
       label: fullSettings ? "Settings" : "Department settings",
@@ -144,7 +141,7 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       icon: "settings",
       steps: [
         ...settingsSteps,
-        ...own,
+        ...when(admin, { href: "/crm/admin/data-cleanup", label: "Data clean-up", icon: "settings" }),
         ...when(may("admin.audit"), { href: "/crm/admin/audit", label: "Activity log", icon: "auditLog" }),
       ],
     },

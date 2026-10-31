@@ -78,6 +78,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(materials.router)
     app.include_router(platform_connect.router)
     app.include_router(platform_roles.router)
+    # Data clean-up and the recycle bin, for administrators (2026-10-30).
+    from app.recycle_bin import make_router as recycle_router
+    from app.recycle_kinds import KINDS as recycle_kinds
+
+    app.include_router(recycle_router(recycle_kinds))
     # Connected on the Platform as soon as this runs, not when someone first uses it.
     platform_connect.connect_now(settings)
     return app

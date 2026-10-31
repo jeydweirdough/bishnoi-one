@@ -35,7 +35,8 @@ export type RowMenuItem =
 
 const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-bench focus-visible:bg-bench focus-visible:outline-none";
 
-export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] }) {
+/** `always`: the ⋯ shows at all times, not only when its row is hovered (where it's the only way to the row's actions: People). */
+export function RowMenu({ label, items, always = false }: { label: string; items: RowMenuItem[]; always?: boolean }) {
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -102,7 +103,9 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
         className={`relative z-[1] grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-all hover:bg-bench hover:text-ink focus-visible:ring-2 focus-visible:ring-sage focus-visible:outline-none disabled:opacity-40 ${
           at
             ? "bg-bench text-ink opacity-100"
-            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+            : always
+              ? "border border-rule bg-sheet opacity-100"
+              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
         }`}
       >
         <Ellipsis className="size-[1.125rem]" aria-hidden />

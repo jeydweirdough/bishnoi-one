@@ -12,6 +12,16 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.37",
+    date: "2026-10-31",
+    changes: [
+      "Payment imports check the whole amount applied to each bill, including repeated lines and other payments in the same file. Conflicting amounts stay on hold, valid split payments keep their lines, and changed files or account choices need a fresh preview.",
+      "Book reports and bank matching count approved entries only. Entries still waiting for approval or rejected no longer change those figures.",
+      "An entry waiting for approval cannot be approved into a closed period. Approvals and closing use the same check, including when two people save together.",
+      "Data cleanup keeps petty cash accounting entries and their void reversals with the voucher instead of allowing those entries to be deleted on their own.",
+    ],
+  },
+  {
     version: "0.4.36",
     date: "2026-10-31",
     changes: [

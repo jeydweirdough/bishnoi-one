@@ -125,10 +125,30 @@ def test_giving_a_role_tells_every_module_signed(client, getmeds, modules):
     assert crm["kind"] == "roles" and crm["aud"] == "crm" and crm["slug"] == getmeds["company"]["slug"]
     assert {"name": "Medical rep", "description": None, "scope": "own", "permissions": ["customers.view"], "admin": False} in crm["roles"]
     # Everyone who may open the module, with their role here (if any) and whether they're switched on (R2).
-    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True} in crm["people"]
-    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True} in crm["people"]
+    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True, "details": {}} in crm["people"]
+    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}} in crm["people"]
     # Pharmacy is told the roles too: only Rio may open it, with no role from here yet.
-    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True}]
+    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}}]
+
+
+def test_signed_role_messages_keep_person_details_with_their_module(client, getmeds, modules):
+    from app.models import Identity
+
+    with client.app.state.sessions() as db:
+        rio = db.get(Identity, getmeds["rio"]["id"])
+        rio.app_details = {"crm": {"syntheticField": "CRM only"}, "pharmacy": {"syntheticField": "Pharmacy only"}}
+        db.commit()
+    h = getmeds["owner"]["h"]
+    role = client.post("/identity/access/roles", json={"name": "Reader", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    modules.clear()
+    r = client.put(f"/identity/access/people/{getmeds['jade']['id']}/role", json={"roleId": role["id"]}, headers=h)
+    assert r.status_code == 200, r.text
+    key = client.get("/pass/key").json()["publicKey"]
+    notes = {url: claims_of(body["pass"], key) for url, body in modules}
+    for module, expected in (("crm", "CRM only"), ("pharmacy", "Pharmacy only")):
+        people = notes[f"https://{module}-api.example.com/platform/roles"]["people"]
+        person = next(p for p in people if p["email"] == "rio@getmeds.test")
+        assert person["details"] == {"syntheticField": expected}
 
 
 def test_the_pass_carries_the_role_given_here(client, getmeds):
@@ -244,3 +264,51 @@ def test_saved_reports_are_kept_once_and_shared_safely(client, getmeds):
     assert client.patch(f"/identity/reports/{rid}", json={"name": "Theirs"}, headers=owner).status_code == 404  # not the owner
     assert client.get("/identity/reports?app=finance", headers=jade).json() == []  # one module's reports only
     assert client.delete(f"/identity/reports/{rid}", headers=owner).status_code == 204  # a company administrator may
+
+
+def test_deleting_a_person_puts_them_in_the_recycle_bin_and_restore_brings_them_back(client, getmeds):
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    assert client.delete(f"/identity/access/people/{getmeds['owner']['id']}", headers=h).status_code == 409  # never yourself
+    r = client.delete(f"/identity/access/people/{jade['id']}", headers=h)
+    assert r.status_code == 200, r.text
+    assert client.get("/identity/me", headers=jade["h"]).status_code == 401  # her sign-ins ended
+    body = client.get("/identity/access", headers=h).json()
+    assert jade["id"] not in [p["id"] for p in body["people"]] and body["inBin"] == 1
+    bin_ = client.get("/identity/access/bin", headers=h).json()["people"]
+    assert [p["email"] for p in bin_] == ["jade@getmeds.test"] and bin_[0]["status"] == "suspended"
+    # nothing is done to someone in the bin but restoring them; her email isn't taken by someone new either
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "active"}, headers=h).status_code == 409
+    again = client.post("/identity/access/people", json={"fullName": "Jade Again", "email": "jade@getmeds.test"}, headers=h)
+    assert again.status_code == 422 and "recycle bin" in again.text
+    assert client.post(f"/identity/access/people/{jade['id']}/restore", headers=h).status_code == 200
+    body = client.get("/identity/access", headers=h).json()
+    back = next(p for p in body["people"] if p["id"] == jade["id"])
+    assert back["status"] == "suspended" and body["inBin"] == 0  # back on People, switched off until switched on
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"status": "active"}, headers=h).status_code == 200
+    log = [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]
+    assert "access.person_deleted" in log and "access.person_restored" in log
+
+
+def test_each_apps_details_about_a_person_are_kept_here_and_sent(client, getmeds):
+    from app import access_roles
+    from app.models import Application, Company
+
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    r = client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"crm": {"employeeId": "GM-0042"}, "pharmacy": {"licenseNo": "PRC-77"}}}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["person"]["appDetails"] == {"crm": {"employeeId": "GM-0042"}, "pharmacy": {"licenseNo": "PRC-77"}}
+    assert client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"crm": {"shoeSize": "9"}}}, headers=h).status_code == 422
+    # cleared by sending it empty
+    r = client.patch(f"/identity/access/people/{jade['id']}", json={"appDetails": {"pharmacy": {"licenseNo": ""}}}, headers=h)
+    assert r.json()["person"]["appDetails"] == {"crm": {"employeeId": "GM-0042"}}
+    # what the CRM is told about her
+    app_ = client.app
+    with app_.state.sessions() as db:
+        company = db.get(Company, getmeds["company"]["id"])
+        crm = db.query(Application).filter(Application.key == "crm").one()
+        from app.passes import public_key  # noqa: F401  (signing works in tests)
+        token = access_roles.roles_note(db, app_.state.settings, company, crm)
+    import base64, json
+    claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
+    who = next(p for p in claims["people"] if p["email"] == "jade@getmeds.test")
+    assert who["details"] == {"employeeId": "GM-0042"}

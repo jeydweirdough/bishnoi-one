@@ -4,7 +4,7 @@
 // marker in the corner saying so.
 import type { ReactNode } from "react";
 import { ShellLayout } from "@/src/modules/crm/shell/shell-layout";
-import { getFrame, load } from "@/src/platform/lib/api";
+import { apiFor, getFrame } from "@/src/platform/lib/api";
 import type { Prompt } from "@/src/modules/crm/actions/attention";
 import { FieldTracker } from "@/src/modules/crm/components/field/tracker";
 import { CanProvider } from "@/src/modules/crm/components/quick-add/can";
@@ -28,6 +28,7 @@ function menuActions(me: Me): MenuAction[] {
     { group: "Go to", label: "Find leads with AI", href: "/crm/customers/find", keywords: "chatgpt claude deepseek prospects", allowed: may("customers.create") },
     { group: "Go to", label: "Deals", href: "/crm/deals", keywords: "pipeline opportunities", allowed: may("deals.view") },
     { group: "Go to", label: "Quotes", href: "/crm/quotes", keywords: "quotations", allowed: may("quotes.view") },
+    { group: "Go to", label: "Sales orders", href: "/crm/sales", keywords: "orders approval delivery", allowed: may("quotes.view") },
     { group: "Go to", label: "Activities", href: "/crm/activities", keywords: "to do tasks calls", allowed: may("activities.view") && !field },
     { group: "Go to", label: "Calendar", href: "/crm/calendar", keywords: "meetings schedule", allowed: may("activities.view") },
     { group: "Go to", label: "Products", href: "/crm/products", keywords: "catalogue prices", allowed: may("products.view") },
@@ -50,7 +51,8 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const { me, unset: counts } = await getFrame();
   const unset = counts ?? undefined;
   // The bell's notifications are the attention prompts; not awaited, so no page waits for them.
-  const notifications = load<Prompt[]>("/attention").then(withCrmPages).catch(() => [] as Prompt[]);
+  // Named: on the sales order pages the page itself talks to Inventory (modules.ts borrowedOf).
+  const notifications = apiFor("crm").get<Prompt[]>("/attention").then(withCrmPages).catch(() => [] as Prompt[]);
   return (
     <ShellLayout unset={unset} notifications={notifications} allHref="/crm/attention" search={me.org ? <CommandMenuButton /> : undefined}>
       <TermsProvider terms={termsOf(me)}>

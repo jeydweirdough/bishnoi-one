@@ -167,6 +167,13 @@ def take_roles(body: NoteIn, request: Request) -> Response:
             if role is not None and user is not None and user.role_id != role.id:
                 give(user, role)
                 audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["role"])
+            # Their details as the Platform keeps them (2026-10-30): an employee ID, a licence number.
+            if user is not None and isinstance(p.get("details"), dict):
+                moved = [col for key, col in DETAILS.items() if key in p["details"] and hasattr(user, col) and getattr(user, col) != p["details"][key]]
+                for col in moved:
+                    setattr(user, col, next(p["details"][k] for k, c in DETAILS.items() if c == col))
+                if moved:
+                    audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=moved)
             # Switched off (or on) on the Platform: the same here (R2).
             if user is not None and follow_status(db, user, p.get("active")):
                 audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["isActive"])
@@ -196,7 +203,11 @@ def export_roles(body: NoteIn, request: Request) -> dict:
 # request against (taken from the Platform, never edited here) and what is its own about a person.
 # Not connected (a standalone install, the tests): everything here works as before.
 
-PLATFORM_OWNS = {"fullName", "email", "roleId", "isActive", "password"}
+PLATFORM_OWNS = {"fullName", "email", "roleId", "isActive", "password",
+                 # What the app keeps of its own about a person is kept on the Platform too since 2026-10-30.
+                 "employeeId", "licenseNo", "calendarOn"}
+# The Platform's names for those details, and the column each is kept in here (an app has the ones it uses).
+DETAILS = {"employeeId": "employee_id", "licenseNo": "license_no", "calendarOn": "calendar_on"}
 ON_PLATFORM = "People, their roles and passwords, and switching people off are kept in Bishnoi One: change it in People."
 
 

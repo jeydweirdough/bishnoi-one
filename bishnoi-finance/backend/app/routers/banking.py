@@ -29,6 +29,7 @@ from app.bir_reports import balances
 from app.deps import DB, CurrentUser, SettingsDep
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
+from app.ledger import locked_settings
 from app.models import Account, BankAccount, ExchangeRate, TaxProfile, YearClosing
 from app.routers.funds import today
 from app.routers.tax import Api, field_error
@@ -219,7 +220,7 @@ def period_moves(db, start: date, end: date) -> dict[str, tuple[int, int]]:
     from app.models import JournalEntry, JournalLine
 
     q = (select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry)
-         .where(JournalEntry.entry_date >= start, JournalEntry.entry_date <= end, JournalEntry.source != "closing").group_by(JournalLine.account_id))
+         .where(JournalEntry.status == 'approved', JournalEntry.entry_date >= start, JournalEntry.entry_date <= end, JournalEntry.source != "closing").group_by(JournalLine.account_id))
     return {a: (int(d or 0), int(c or 0)) for a, d, c in db.execute(q)}
 
 
@@ -275,6 +276,7 @@ def close_year(user: permitted("accounts.manage"), db: DB, settings: SettingsDep
     dated the year's last day; then (by default) the books locked up to it."""
     if body.year_end not in year_ends(db, settings, 10):
         raise field_error("yearEnd", "Pick the last day of a fiscal year that has ended.")
+    s = locked_settings(db)
     if db.scalar(select(YearClosing).where(YearClosing.year_end == body.year_end)):
         raise HTTPException(status.HTTP_409_CONFLICT, "That year is already closed.")
     capital, drawings, retained = _equity_accounts(db)
@@ -304,7 +306,6 @@ def close_year(user: permitted("accounts.manage"), db: DB, settings: SettingsDep
             legs += [Leg(capital, debit=d - c, description="Drawings closed to capital"), Leg(drawings, credit=d - c, description="Drawings closed to capital")]
     entry = post(db, end, f"Closing the fiscal year ended {end:%d %b %Y}", legs, user.full_name, source="closing", by_id=user.id) if legs else None
     db.add(YearClosing(year_end=end, entry_id=entry.id if entry else None, net_income_centavos=net, closed_by=user.full_name, closed_at=datetime.now(UTC)))
-    s = posting_settings(db)
     if body.lock and (s.locked_until is None or s.locked_until < end):
         s.locked_until = end
     audit(db, user, "books.year_closed", target=end.isoformat(), target_type="year_closing", fields=["locked"] if body.lock else [])
@@ -322,7 +323,7 @@ def period_lock(user: permitted("accounts.manage"), db: DB, settings: SettingsDe
     """Nothing is posted on or before this day (null opens the books again)."""
     if body.locked_until and body.locked_until >= today(settings):
         raise field_error("lockedUntil", "Lock up to a day that has passed.")
-    s = posting_settings(db)
+    s = locked_settings(db)
     before = s.locked_until
     s.locked_until = body.locked_until
     if before != body.locked_until:

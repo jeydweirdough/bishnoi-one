@@ -144,7 +144,7 @@ def cash_receipts(db: Session, start: date, end: date) -> dict:
 
 
 def entries_between(db: Session, start: date, end: date) -> list[JournalEntry]:
-    return list(db.scalars(select(JournalEntry).where(JournalEntry.entry_date >= start, JournalEntry.entry_date <= end).order_by(JournalEntry.entry_date, JournalEntry.number)))
+    return list(db.scalars(select(JournalEntry).where(JournalEntry.status == 'approved', JournalEntry.entry_date >= start, JournalEntry.entry_date <= end).order_by(JournalEntry.entry_date, JournalEntry.number)))
 
 
 def entry_out(e: JournalEntry) -> dict:
@@ -189,7 +189,7 @@ def cash_disbursements(db: Session, start: date, end: date) -> dict:
 
 def balances(db: Session, *, before: date | None = None, start: date | None = None, end: date | None = None) -> dict[str, tuple[int, int]]:
     """By account: (debits, credits) of the lines dated in the range."""
-    q = select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry)
+    q = select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry).where(JournalEntry.status == 'approved')
     if before is not None:
         q = q.where(JournalEntry.entry_date < before)
     if start is not None:
@@ -211,7 +211,7 @@ def general_ledger(db: Session, start: date, end: date) -> dict:
     opening = balances(db, before=start)
     accounts = db.scalars(select(Account).order_by(Account.code)).all()
     lines = db.execute(
-        select(JournalLine, JournalEntry).join(JournalEntry).where(JournalEntry.entry_date >= start, JournalEntry.entry_date <= end)
+        select(JournalLine, JournalEntry).join(JournalEntry).where(JournalEntry.status == 'approved', JournalEntry.entry_date >= start, JournalEntry.entry_date <= end)
         .order_by(JournalEntry.entry_date, JournalEntry.number, JournalLine.position)
     ).all()
     by_account: dict[str, list] = {}

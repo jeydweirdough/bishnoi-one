@@ -44,10 +44,10 @@ def everyone(client, ana, name="Sees everything") -> dict:
     return person(client, ana, name, EVERYTHING)
 
 
-def hand_entry(client, who, memo="Capital put in", amount=500_000) -> dict:
+def hand_entry(client, who, memo="Capital put in", amount=500_000, *, on=ON) -> dict:
     """An entry typed by hand: it waits for someone else, into the bank (a money account)."""
     acc = accounts(client, who)
-    r = client.post("/finance/ledger/entries", json={"date": ON, "memo": memo, "lines": [
+    r = client.post("/finance/ledger/entries", json={"date": on, "memo": memo, "lines": [
         {"accountId": acc["1010"]["id"], "debitCentavos": amount}, {"accountId": acc["3000"]["id"], "creditCentavos": amount}]}, headers=who)
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "waiting"
@@ -144,6 +144,25 @@ def test_a_waiting_or_rejected_entry_changes_no_figure(client, ana, ben):
     after = see(client, malou)["cards"]
     assert after["cash"]["balanceCentavos"] == 500_000 and after["inout"]["inCentavos"] == 500_000
     assert next(s for s in after["books"]["sources"] if s["key"] == "manual")["count"] == 1
+
+
+def test_reading_overview_cannot_approve_or_reopen_a_closed_period(app, client, ana, ben):
+    from app.models import JournalEntry, LedgerSettings
+
+    viewer = everyone(client, ana, "Reads the closed period")
+    on = (TODAY - timedelta(days=1)).isoformat()
+    entry = hand_entry(client, ben, on=on)
+    closed = client.put("/finance/period-lock", json={"lockedUntil": on}, headers=ana)
+    assert closed.status_code == 200, closed.text
+    before = {p: figures(see(client, viewer, p)) for p in ("month", "quarter", "year")}
+    refused = client.post(f"/finance/ledger/entries/{entry['id']}/approve", headers=ana)
+    assert refused.status_code == 409, refused.text
+    for period, expected in before.items():
+        assert figures(see(client, viewer, period)) == expected
+    with app.state.sessions() as db:
+        assert db.get(LedgerSettings, 1).locked_until.isoformat() == on
+        saved = db.get(JournalEntry, entry["id"])
+        assert saved.status == "waiting" and saved.entry_date.isoformat() == on
 
 
 def posted_bill(client, team, number, amount=1_120_000, on=ON, due=None) -> tuple[dict, dict]:

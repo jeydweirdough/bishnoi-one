@@ -14,9 +14,8 @@ export function myModules(me: Account): MyModule[] {
   const given: MyModule[] = byGrant.flatMap((a) => {
     const m = moduleByAppKey(a.key);
     if (!m || m.accountOnly) return [];
-    // Sales runs in the Operations service (Inventory's): it comes with Inventory, while the catalogue has it on (step 11).
-    const withSales = m.key === "inventory" && me.features?.["app:sales"] !== false ? [{ key: "sales" as const, oldUrl: null }] : [];
-    return [{ key: m.key, oldUrl: a.appUrl }, ...withSales];
+    // Sales orders are worked in the CRM (its Sales orders page, 2026-10-30), not a module of their own.
+    return [{ key: m.key, oldUrl: a.appUrl }];
   });
   if (!(me.isCompanyAdmin || me.staff)) return given;
   // A company's administrators, and Bishnoi One's staff, see every module (decided 2026-10-25): what

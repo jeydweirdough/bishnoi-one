@@ -55,7 +55,15 @@ function menu(me: Me, unset: Unset): { home: Step | null; processes: Process[]; 
   const admin = adminPagesFor(me).map((p) => ({ href: p.href, label: p.label === "Roles and permissions" ? "Roles" : p.label, icon: p.icon, also: p.also }));
   const foot: Process[] = [
     // People and roles are on the Admin Console; the pharmacists' licence numbers stay here (decided 2026-10-28).
-    { label: "Settings", icon: "settings", steps: admin.filter((p) => !p.href.startsWith("/platform/")).map((p) => (p.href.endsWith("/users") ? { ...p, label: "Licences" } : p)) },
+    {
+      label: "Settings",
+      icon: "settings",
+      steps: [
+        // People, roles and licence numbers are kept only in the Admin Console (2026-10-30).
+        ...admin.filter((p) => !p.href.startsWith("/platform/") && !p.href.endsWith("/users") && !p.href.endsWith("/roles")),
+        ...(me.isOwner ? [{ href: "/pharmacy/admin/data-cleanup", label: "Data clean-up", icon: "settings" }] : []),
+      ],
+    },
   ];
   return { home: may("dashboard.view") ? { href: "/pharmacy", label: "Home", icon: "home", exact: true } : null, processes, foot };
 }

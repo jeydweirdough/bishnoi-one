@@ -47,8 +47,8 @@ export async function SalesOrdersPage({ searchParams }: { searchParams: Search }
     <>
       <PageHeader
         title="Sales orders"
-        tools={<ToggleLinks current={status} options={STATUSES.map((x) => ({ value: x.value, label: x.label, href: x.value ? `/sales?status=${x.value}` : "/sales" }))} />}
-        actions={may("sales.create") && <LinkButton href="/sales/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New sales order</LinkButton>}
+        tools={<ToggleLinks current={status} options={STATUSES.map((x) => ({ value: x.value, label: x.label, href: x.value ? `/crm/sales?status=${x.value}` : "/crm/sales" }))} />}
+        actions={may("sales.create") && <LinkButton href="/crm/sales/orders/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>New sales order</LinkButton>}
       >
         Orders from approved quotes in the CRM, and orders taken here. Each waits for approval; approving it makes its delivery.
       </PageHeader>
@@ -64,7 +64,7 @@ export async function SalesOrdersPage({ searchParams }: { searchParams: Search }
             {orders.map((o) => (
               <tr key={o.id} className="relative hover:bg-bench/40">
                 <Td>
-                  <Link href={`/sales/orders/${o.id}`} className="font-semibold text-ink hover:underline after:absolute after:inset-0">
+                  <Link href={`/crm/sales/orders/${o.id}`} className="font-semibold text-ink hover:underline after:absolute after:inset-0">
                     {o.number}
                   </Link>
                   {o.quote && <span className="block text-meta text-ink-3">from {o.quote.number}</span>}
@@ -95,7 +95,7 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
   return (
     <>
       <PageHeader
-        crumbs={[{ href: "/sales", label: "Sales orders" }]}
+        crumbs={[{ href: "/crm/sales", label: "Sales orders" }]}
         title={o.number}
         actions={<SalesOrderSteps order={o} may={{ create: may("sales.create"), edit: may("sales.edit"), approve: may("sales.approve") }} />}
       >
@@ -204,7 +204,7 @@ export async function NewSalesOrderPage() {
   const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "warehouses"> }>(`query NewSalesOrder { ${referenceOf("products", "warehouses")} }`, {}, ["reference"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/sales", label: "Sales orders" }]} title="New sales order">
+      <PageHeader crumbs={[{ href: "/crm/sales", label: "Sales orders" }]} title="New sales order">
         For an order taken by phone or in person. Prices are the price list&apos;s; anything else goes through a quote in the CRM. It waits for approval.
       </PageHeader>
       <SalesOrderForm org={me.org} reference={ref} />

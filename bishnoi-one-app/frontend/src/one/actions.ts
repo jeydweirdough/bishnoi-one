@@ -14,9 +14,11 @@ import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie, viewAsCookie 
 // next page may be a module's, whose session is opened by a redirect that sets a
 // cookie (app/auth/enter), and only the browser keeps cookies across redirects
 // (Next follows an action's redirect on the server, with no cookie jar).
-export type SignInState = { error?: string; email?: string; go?: string } | null;
+export type SignInState = { error?: string; email?: string; go?: string; ticket?: string } | null;
 
-type Session = { accessToken: string; expiresIn: number };
+type Session = { accessToken: string; expiresIn: number; mustChangePassword?: boolean; needsTwoStep?: boolean };
+/** A right password with two-step sign-in on: the session waits for the code (2026-10-30). */
+type Waiting = { twoStep: true; ticket: string };
 
 /** Only a page of this site, never somewhere else. */
 const onSite = (next: string) => (next.startsWith("/") && !next.startsWith("//") ? next : "/");
@@ -40,15 +42,85 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
   const password = String(form.get("password") ?? "");
   const next = onSite(String(form.get("next") ?? "/"));
   if (!email || !password) return { error: "Enter your email and password.", email };
-  let session: Session;
+  let session: Session | Waiting;
   try {
-    session = await accountCall<Session>("/identity/login", { email, password }, null, await forwardedFor());
+    session = await accountCall<Session | Waiting>("/identity/login", { email, password }, null, await forwardedFor());
   } catch (e) {
     return { error: e instanceof AccountError ? e.message : "Signing in didn't work. Try again.", email };
   }
+  if ("twoStep" in session) return { ticket: session.ticket, email };
+  return opened(session, next);
+}
+
+/** Signed in: module sessions dropped, the account kept; a handed-over password or a missing two-step goes first. */
+async function opened(session: Session, next: string): Promise<SignInState> {
   await dropModuleSessions();
   (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
+  if (session.mustChangePassword || session.needsTwoStep) return { go: `/login/first?next=${encodeURIComponent(next)}` };
   return { go: next };
+}
+
+/** The second step: the authenticator app's code, or a recovery code. */
+export async function signInCode(_previous: SignInState, form: FormData): Promise<SignInState> {
+  const ticket = String(form.get("ticket") ?? "");
+  const code = String(form.get("code") ?? "").trim();
+  const email = String(form.get("email") ?? "");
+  const next = onSite(String(form.get("next") ?? "/"));
+  if (!code) return { error: "Enter the code from your authenticator app.", ticket, email };
+  try {
+    const session = await accountCall<Session & { recoveryCodesLeft?: number | null }>("/identity/login/code", { ticket, code }, null, await forwardedFor());
+    return opened(session, next);
+  } catch (e) {
+    const error = e instanceof AccountError ? e.message : "That didn't work. Try again.";
+    // The ticket ran out: back to the password.
+    if (e instanceof AccountError && /too long/i.test(error)) return { error, email };
+    return { error, ticket, email };
+  }
+}
+
+/** Forgot password: a link by email when the account exists (the answer is the same either way). */
+export async function forgotPassword(email: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await accountCall("/identity/password/forgot", { email: email.trim() }, null, await forwardedFor());
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof AccountError ? e.message : "That didn't work. Try again." };
+  }
+}
+
+/** A reset or invitation link's new password. */
+export async function setPasswordByLink(token: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await accountCall("/identity/password/set", { token, password }, null, await forwardedFor());
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof AccountError ? e.message : "That didn't work. Try again." };
+  }
+}
+
+export type TwoStepStart = { secret: string; uri: string; qr: string };
+export type TwoStepState = { on: boolean; required: boolean; recoveryCodesLeft: number; recoveryCodes?: string[] };
+
+async function withAccount<T>(path: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const token = await accountToken();
+  if (!token) return { ok: false, error: "Sign in again first." };
+  try {
+    return { ok: true, data: await accountCall<T>(path, body, token) };
+  } catch (e) {
+    return { ok: false, error: e instanceof AccountError ? e.message : "That didn't work. Try again." };
+  }
+}
+
+/** Two-step sign-in (2026-10-30): a new secret for the authenticator app (your password first). */
+export async function startTwoStep(password: string) {
+  return withAccount<TwoStepStart>("/identity/two-step/start", { password });
+}
+/** The first code from the app turns it on; the recovery codes come back once. */
+export async function confirmTwoStep(code: string) {
+  return withAccount<TwoStepState>("/identity/two-step/confirm", { code });
+}
+export async function turnOffTwoStep(password: string, code: string) {
+  return withAccount<TwoStepState>("/identity/two-step/off", { password, code });
 }
 
 export async function signOut(): Promise<void> {

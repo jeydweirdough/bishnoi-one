@@ -343,6 +343,16 @@ def plan_bills(db, docs: list[dict], settings) -> list[dict]:
     return out
 
 
+def payment_totals(pairs):
+    """Keep source allocations intact, but validate their combined amount per bill."""
+    totals = {}
+    for bill, amount in pairs:
+        if bill.id not in totals:
+            totals[bill.id] = [bill, 0]
+        totals[bill.id][1] += amount
+    return list(totals.values())
+
+
 def plan_payments(db, docs: list[dict], settings) -> list[dict]:
     from app.routers.funds import today
     from app.routers.payables import set_aside
@@ -394,7 +404,9 @@ def plan_payments(db, docs: list[dict], settings) -> list[dict]:
             if len({b.supplier_id for b, _ in pairs}) != 1:
                 reasons.append("Its bills belong to different suppliers in Finance.")
             held = set_aside(db, [b.id for b, _ in pairs])
-            for b, amount in pairs:
+            if any(amount <= 0 for _, amount in pairs):
+                reasons.append('Every source allocation must have a positive amount.')
+            for b, amount in payment_totals(pairs):
                 if b.status != "recorded":
                     reasons.append(f"Bill {b.no} isn't recorded (it may have been voided).")
                 elif amount <= 0 or amount > b.payable_centavos - b.paid_centavos - held.get(b.id, 0):
@@ -403,19 +415,36 @@ def plan_payments(db, docs: list[dict], settings) -> list[dict]:
                     reasons.append(f"The payment is dated before bill {b.no}.")
         if not reasons:
             row["voucher"] = {"pairs": pairs, "method": method, "paidFrom": m.account_id}
+            row['choices'] = {'method': method, 'paidFrom': m.account_id, 'pairs': [[b.id, a] for b, a in pairs]}
         else:
             row["outcome"] = "held"
+    # A pack must not silently pick a winner when several otherwise-ready source
+    # payments jointly exceed one bill's capacity. Hold every conflicting record.
+    ready_totals = defaultdict(int)
+    bills = {}
+    for row in out:
+        if row['outcome'] == 'ready':
+            for bill, amount in payment_totals(row['voucher']['pairs']):
+                ready_totals[bill.id] += amount
+                bills[bill.id] = bill
+    reserved = set_aside(db, list(bills)) if bills else {}
+    conflicts = {bid for bid, amount in ready_totals.items()
+                 if amount > bills[bid].payable_centavos - bills[bid].paid_centavos - reserved.get(bid, 0)}
+    for row in out:
+        if row['outcome'] == 'ready' and any(b.id in conflicts for b, _ in row['voucher']['pairs']):
+            row['reasons'].append('Together these source payments exceed what is left to pay on a bill. Resolve the conflicting allocations, then preview again.')
+            row.update(outcome='held', voucher=None)
     return out
 
 
-def summary(rows: list[dict]) -> dict:
+def summary(rows: list[dict], *, source_fingerprint: str | None = None) -> dict:
     counts = Counter(r["outcome"] for r in rows)
     reasons = Counter(reason for r in rows if r["outcome"] == "held" for reason in r["reasons"])
     return {"counts": {k: counts.get(k, 0) for k in ("ready", "held", "skipped", "imported")},
             "reasons": [{"reason": k, "records": n} for k, n in reasons.most_common()],
             # What each ready bill's lines would post to is part of the plan: a choice changed after the
             # preview changes the key, so the import refuses rather than posting something not previewed.
-            "planKey": hashlib.sha256(json.dumps(sorted([r["sourceId"], r["outcome"], r.get("choices") or []] for r in rows)).encode()).hexdigest()}
+            "planKey": hashlib.sha256(json.dumps({'source': source_fingerprint, 'rows': sorted([r["sourceId"], r["outcome"], r.get("choices") or []] for r in rows)}, sort_keys=True).encode()).hexdigest()}
 
 
 def rows_out(rows: list[dict]) -> list[dict]:
@@ -438,9 +467,9 @@ def import_bills(db, settings, user, files: list[dict], plan_key: str) -> dict:
     lock_series(db, "import:zoho")  # one import at a time (PostgreSQL; SQLite's write lock already does it)
     docs = read_pack(files)
     rows = plan_bills(db, docs, settings)
-    result = summary(rows)
+    result = summary(rows, source_fingerprint=fingerprint(files))
     if result["planKey"] != plan_key:
-        raise HTTPException(409, "Something changed since the preview (a match, a supplier or a bill). Preview again, then import.")
+        raise HTTPException(409, "The source files, matches or bills changed since the preview. Preview again, then import.")
     run = ImportRun(kind="bills", files=[f["name"] for f in files], fingerprint=fingerprint(files), counts=result["counts"],
                     created_by=user.full_name[:120], created_by_id=user.id)
     db.add(run); db.flush()
@@ -476,14 +505,19 @@ def import_bills(db, settings, user, files: list[dict], plan_key: str) -> dict:
 
 def import_payments(db, settings, user, files: list[dict], plan_key: str) -> dict:
     from app.routers.vouchers import METHOD_LABELS, bill_payables, event, next_number
+    from app.routers.payables import set_aside
 
     begin_change(db)
     lock_series(db, "import:zoho")  # one import at a time (PostgreSQL; SQLite's write lock already does it)
     docs = read_pack(files)
     rows = plan_payments(db, docs, settings)
-    result = summary(rows)
+    result = summary(rows, source_fingerprint=fingerprint(files))
     if result["planKey"] != plan_key:
-        raise HTTPException(409, "Something changed since the preview (a match or a bill). Preview again, then import.")
+        raise HTTPException(409, "The source files, matches or bills changed since the preview. Preview again, then import.")
+    # Take every bill lock in one fixed order before the first posting/period
+    # lock. Another voucher cannot hold a later bill while waiting for a lock
+    # already held by the first row of this import.
+    locked(db, Bill, [b.id for row in rows if row['outcome'] == 'ready' for b, _ in row['voucher']['pairs']])
     run = ImportRun(kind="supplier_payments", files=[f["name"] for f in files], fingerprint=fingerprint(files), counts=result["counts"],
                     created_by=user.full_name[:120], created_by_id=user.id)
     db.add(run); db.flush()
@@ -495,9 +529,9 @@ def import_payments(db, settings, user, files: list[dict], plan_key: str) -> dic
             record(db, run, "vendor_payment", row)
             continue
         plan = row["voucher"]
-        locked(db, Bill, [b.id for b, _ in plan["pairs"]])
         # Read again under the lock: a voucher released meanwhile in Finance may have paid the bill.
-        if any(a > b.payable_centavos - b.paid_centavos or b.status != "recorded" for b, a in plan["pairs"]):
+        reserved = set_aside(db, [b.id for b, _ in plan['pairs']])
+        if any(a <= 0 for _, a in plan['pairs']) or any(a > b.payable_centavos - b.paid_centavos - reserved.get(b.id, 0) or b.status != "recorded" for b, a in payment_totals(plan["pairs"])):
             raise HTTPException(409, f"A bill of Zoho payment {row['number']} was paid or changed meanwhile. Preview again, then import.")
         paid_on = datetime.fromisoformat(row["date"]).date()
         supplier = plan["pairs"][0][0].supplier

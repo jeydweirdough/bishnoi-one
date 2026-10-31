@@ -14,7 +14,7 @@ const PAGES: Record<string, string[]> = {
   "app:field_sales": ["/crm/field", "/crm/visits"],
   "field_sales.call_plans": ["/crm/field/routes", "/crm/field/doctors"],
   "field_sales.patient_assistance": ["/crm/field/assistance"],
-  "app:sales": ["/sales"],
+  "app:sales": ["/crm/sales"],
   "app:shipping": ["/inventory/couriers"],
   "warehouse.quality": ["/inventory/quality-checks"],
   "warehouse.barcodes": ["/inventory/scan"],

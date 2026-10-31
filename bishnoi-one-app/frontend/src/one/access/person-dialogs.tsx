@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "antd";
-import { Copy, KeyRound, Pencil, Plus, Power, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,7 +9,8 @@ import { Button } from "@/src/platform/ui/button";
 import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { addPerson, changePerson, setPersonPassword } from "./actions";
+import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword } from "./actions";
+import { setAdministrator } from "@/src/one/company/actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
 
@@ -25,7 +26,7 @@ function showPassword(name: string, password: string) {
     okText: "Done",
     content: (
       <div className="mt-2 space-y-2">
-        <p className="text-sm text-ink-2">Give it to them yourself. It isn&apos;t shown again; they can change it after signing in.</p>
+        <p className="text-sm text-ink-2">Give it to them yourself. It isn&apos;t shown again, and they choose their own at their first sign-in. An invitation is safer: they set it themselves.</p>
         <p className="flex items-center gap-2 rounded-lg bg-bench px-3 py-2 font-mono text-sm">
           <span className="min-w-0 flex-1 truncate">{password}</span>
           <button
@@ -43,10 +44,80 @@ function showPassword(name: string, password: string) {
   });
 }
 
-async function newPassword(person: { id: string; fullName: string }) {
-  const r = await setPersonPassword(person.id);
+/** An invitation: emailed when the company sends email; the link shown to pass on either way. */
+async function sendInvitation(person: { id: string; fullName: string }) {
+  const r = await invitePerson(person.id);
   if (!r.ok) return toast.error(r.error);
-  if (r.data.password) showPassword(person.fullName, r.data.password);
+  const { link, emailed } = r.data;
+  Modal.info({
+    title: emailed ? `Invitation sent to ${person.fullName}` : `${person.fullName}'s invitation link`,
+    icon: <Mail className="mr-3 size-5 text-sage-deep" aria-hidden />,
+    okText: "Done",
+    content: (
+      <div className="mt-2 space-y-2">
+        <p className="text-sm text-ink-2">
+          {emailed
+            ? "They choose their own password with the link in the email (it works for a week, once). You can also pass this link on yourself:"
+            : "Your company hasn't set up email sending (Company, Integrations), so nothing was emailed. Pass this link on yourself; it works for a week, once:"}
+        </p>
+        <p className="flex items-center gap-2 rounded-lg bg-bench px-3 py-2 font-mono text-meta">
+          <span className="min-w-0 flex-1 truncate">{link}</span>
+          <button
+            suppressHydrationWarning
+            type="button"
+            aria-label="Copy link"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            onClick={() => navigator.clipboard.writeText(link).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy: select it instead."))}
+          >
+            <Copy className="size-4" aria-hidden />
+          </button>
+        </p>
+      </div>
+    ),
+  });
+}
+
+/** A new password for someone: typed by the administrator, or made up. Either way they choose their own at their next sign-in. */
+function PasswordDialog({ person, open, onClose }: { person: { id: string; fullName: string }; open: boolean; onClose: () => void }) {
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState<string>();
+  const [busy, start] = useTransition();
+  function save(made: boolean) {
+    start(async () => {
+      const r = await setPersonPassword(person.id, made ? undefined : typed);
+      if (!r.ok) return setError(r.error);
+      setTyped("");
+      setError(undefined);
+      onClose();
+      if (r.data.password) showPassword(person.fullName, r.data.password);
+      else toast.success(`${person.fullName}'s password is set`, { description: "Their other sign-ins ended; they choose their own at the next sign-in." });
+    });
+  }
+  return (
+    <Modal
+      open={open}
+      title={`New password for ${person.fullName}`}
+      onCancel={() => !busy && onClose()}
+      destroyOnHidden
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={() => save(true)} disabled={busy}>
+            Make one up
+          </Button>
+          <Button variant="primary" onClick={() => save(false)} loading={busy} disabled={typed.length === 0}>
+            Set this password
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 pt-2">
+        <p className="text-sm text-ink-2">Type one to give them, or let Bishnoi One make one up. They choose their own at their next sign-in, and their other sign-ins end now.</p>
+        <Field label="New password" error={error} hint="At least 8 characters.">
+          {(p) => <Input {...p} type="text" autoComplete="off" value={typed} onChange={(e) => (setTyped(e.target.value), setError(undefined))} maxLength={200} />}
+        </Field>
+      </div>
+    </Modal>
+  );
 }
 
 /** Add person: who they are, their role, and the modules they may open. */
@@ -69,8 +140,8 @@ export function AddPerson({ data }: { data: AccessData }) {
       router.refresh();
       const { person, hasPassword } = r.data;
       toast.success(`${person.fullName} added`, {
-        description: hasPassword ? "They sign in with the password they already have at another company." : "Set their first password to hand over.",
-        action: hasPassword ? undefined : { label: "Set a password", onClick: () => void newPassword(person) },
+        description: hasPassword ? "They sign in with the password they already have at another company." : "Send them an invitation: they choose their own password.",
+        action: hasPassword ? undefined : { label: "Send invitation", onClick: () => void sendInvitation(person) },
         duration: 10_000,
       });
     });
@@ -131,11 +202,19 @@ export function AddPerson({ data }: { data: AccessData }) {
   );
 }
 
-/** A person's ⋯: change their details, set a new password, switch them off or on. */
-export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boolean }) {
+/** A person's ⋯: change their details, set a new password, switch them off or on, delete them to the recycle bin. */
+export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
+  // What each app keeps of its own about them (2026-10-30), for the apps the company has.
+  const [details, setDetails] = useState({
+    employeeId: person.appDetails?.crm?.employeeId ?? "",
+    licenseNo: person.appDetails?.pharmacy?.licenseNo ?? "",
+    calendarOn: Boolean(person.appDetails?.finance?.calendarOn),
+  });
+  const has = (key: string) => modules.includes(key);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
   const off = person.status !== "active";
@@ -144,7 +223,12 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
     start(async () => {
       const email = form.email.trim().toLowerCase();
       const emailChanged = email !== person.email.toLowerCase();
-      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null, ...(emailChanged && { email }) });
+      const appDetails = {
+        ...(has("crm") && { crm: { employeeId: details.employeeId.trim() } }),
+        ...(has("pharmacy") && { pharmacy: { licenseNo: details.licenseNo.trim() } }),
+        ...(has("finance") && { finance: { calendarOn: details.calendarOn } }),
+      };
+      const r = await changePerson(person.id, { fullName: form.fullName.trim(), title: form.title.trim() || null, ...(emailChanged && { email }), appDetails });
       if (!r.ok) {
         setFields(r.fields ?? {});
         if (!r.fields) toast.error(r.error);
@@ -159,14 +243,41 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
 
   return (
     <>
+      <PasswordDialog person={person} open={settingPassword} onClose={() => setSettingPassword(false)} />
       <RowMenu
+        always
         label={`Actions for ${person.fullName}`}
         items={[
           { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
-          { label: "Set a new password", icon: <KeyRound />, onSelect: () => void newPassword(person) },
+          ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
+          { label: "Set a new password", icon: <KeyRound />, onSelect: () => setSettingPassword(true) },
           ...(isMe
             ? []
             : [
+                person.isCompanyAdmin
+                  ? {
+                      label: "Remove as administrator",
+                      icon: <ShieldOff />,
+                      run: () => setAdministrator(person.id, false),
+                      confirm: `Remove ${person.fullName} as administrator? They keep their role and apps, but can't open the Admin Console. Their sign-ins end.`,
+                      done: `${person.fullName} is no longer an administrator`,
+                    }
+                  : off
+                    ? "divider" as const
+                    : {
+                        label: "Make administrator",
+                        icon: <ShieldCheck />,
+                        run: () => setAdministrator(person.id, true),
+                        confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
+                        done: `${person.fullName} is now an administrator`,
+                      },
+                {
+                  label: "Reset two-step sign-in",
+                  icon: <ShieldOff />,
+                  run: () => resetTwoStep(person.id),
+                  confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
+                  done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
+                },
                 "divider" as const,
                 off
                   ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
@@ -178,6 +289,14 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
                       confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
                       done: `${person.fullName} is switched off`,
                     },
+                {
+                  label: "Delete",
+                  icon: <Trash2 />,
+                  run: () => deletePerson(person.id),
+                  danger: true,
+                  confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
+                  done: `${person.fullName} is in the recycle bin`,
+                },
               ]),
         ]}
       />
@@ -192,6 +311,22 @@ export function PersonMenu({ person, isMe }: { person: AccessPerson; isMe: boole
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
           </Field>
+          {has("crm") && (
+            <Field label="Employee ID" size="full" optional hint="Shown in the CRM.">
+              {(p) => <Input {...p} value={details.employeeId} onChange={(e) => setDetails({ ...details, employeeId: e.target.value })} maxLength={40} />}
+            </Field>
+          )}
+          {has("pharmacy") && (
+            <Field label="PRC licence number" size="full" optional hint="For pharmacists: printed on what they dispense in Pharmacy.">
+              {(p) => <Input {...p} value={details.licenseNo} onChange={(e) => setDetails({ ...details, licenseNo: e.target.value })} maxLength={40} />}
+            </Field>
+          )}
+          {has("finance") && (
+            <label className="col-span-full inline-flex items-center gap-2 text-sm text-ink-2">
+              <input type="checkbox" checked={details.calendarOn} onChange={(e) => setDetails({ ...details, calendarOn: e.target.checked })} />
+              Finance calendar on for them
+            </label>
+          )}
         </FormGrid>
       </Modal>
     </>

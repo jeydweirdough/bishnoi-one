@@ -20,6 +20,10 @@ export const HERE_COOKIE = "bishnoi_here";
 // is for, so the shared API client talks to that module's API with its session.
 export const MODULE_HEADER = "x-bishnoi-module";
 
+// Set by the proxy too, on a page that sits in another module's frame (modules.ts borrowedOf): the
+// module whose sidebar and who-you-are the frame shows. Absent, the frame is MODULE_HEADER's.
+export const FRAME_HEADER = "x-bishnoi-frame";
+
 // The company last signed in to on this browser (its short name on Bishnoi One
 // Platform). Signed in, the session says the company.
 export const COMPANY_COOKIE = "bishnoi_company";

@@ -31,6 +31,7 @@ from app.config import Settings
 from app.deps import DB, SettingsDep
 from app.ledger import Leg, account_out, entry_out, post
 from app.ledger import settings as posting_settings
+from app.ledger import locked_settings, require_open_period
 from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
 from app.notify import done, holders, tell
 from app.routers.funds import today
@@ -517,11 +518,14 @@ def decide(db: DB, settings: Settings, user: User, entry_id: str, to: Literal["a
     same moment (Ms. Malou and Ms. Cristal both approve, decided 2026-10-22): the
     change is made only if the entry is still waiting when it's saved, checked in
     the save itself, so the first decision wins and the second is told plainly."""
-    e = db.get(JournalEntry, entry_id)
+    period = locked_settings(db)
+    e = db.scalar(select(JournalEntry).where(JournalEntry.id == entry_id).execution_options(populate_existing=True))
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such entry.")
     if e.status == "waiting" and e.posted_by_id == user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You posted this entry, so someone else approves it.")
+    if to == 'approved' and e.status == 'waiting':
+        require_open_period(e.entry_date, period)
     changed = db.execute(
         update(JournalEntry)
         .where(JournalEntry.id == e.id, JournalEntry.status == "waiting", or_(JournalEntry.posted_by_id.is_(None), JournalEntry.posted_by_id != user.id))

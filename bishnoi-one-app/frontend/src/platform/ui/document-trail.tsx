@@ -14,7 +14,7 @@ type Trail = { document: DocRef; before: DocRef[]; after: DocRef[]; related: Doc
 const PAGES: Record<string, { path: string; label: string }> = {
   "inventory:purchase_order": { path: "/inventory/purchase-orders/", label: "Purchase order" },
   "inventory:receipt": { path: "/inventory/receipts/", label: "Purchase receive" },
-  "inventory:sales_order": { path: "/sales/orders/", label: "Sales order" },
+  "inventory:sales_order": { path: "/crm/sales/orders/", label: "Sales order" },
   "inventory:order": { path: "/inventory/orders/", label: "Delivery" },
   "inventory:transfer": { path: "/inventory/transfers/", label: "Transfer order" },
   "inventory:adjustment": { path: "/inventory/adjustments/", label: "Adjustment" },

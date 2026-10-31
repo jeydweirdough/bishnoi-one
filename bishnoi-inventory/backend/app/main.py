@@ -88,4 +88,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app import company as company_check
 
     app.include_router(company_check.router)
+    # Data clean-up and the recycle bin, for administrators (2026-10-30).
+    from app.recycle_bin import make_router as recycle_router
+    from app.recycle_kinds import KINDS as recycle_kinds
+
+    app.include_router(recycle_router(recycle_kinds))
     return app

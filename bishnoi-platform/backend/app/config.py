@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     # Wrong passwords allowed per email before sign-in waits, and for how long.
     login_attempts: int = 5
     login_lockout_minutes: int = 15
+    # Two-step sign-in (an authenticator app) required of company administrators and operators before
+    # they change anything. Off unless set (decided 2026-10-30: not everyone wants it; those who run a
+    # company without it are reminded on every page instead).
+    require_two_step: bool | None = None
+    # How long a forgot-password link and an invitation last, in hours.
+    reset_link_hours: int = 1
+    invite_link_hours: int = 168
     # A scheduler's key for the nightly check of business events (GET /cron/events-check; Vercel
     # sends it as CRON_SECRET). Unset: run `python -m app.tools.events check` on a schedule instead.
     cron_secret: SecretStr | None = None
@@ -93,6 +100,10 @@ class Settings(BaseSettings):
         if "allowed_hosts" not in self.model_fields_set and self.environment == "production":
             self.allowed_hosts = ["*"]
         return self
+
+    @property
+    def two_step_required(self) -> bool:
+        return bool(self.require_two_step)
 
     @model_validator(mode="after")
     def _this_computer_always(self):

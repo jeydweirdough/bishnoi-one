@@ -46,7 +46,11 @@ export type AccessPerson = {
   roleId: string | null;
   /** The modules they may open, and the role each gives them today. */
   apps: { key: string; role: string | null }[];
+  /** What each app keeps of its own about them, kept here (2026-10-30): CRM employee ID, licence number, Finance calendar. */
+  appDetails?: AppDetails;
 };
+
+export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };
 
 export type AccessData = {
   company: { id: string; name: string };
@@ -55,7 +59,14 @@ export type AccessData = {
   people: AccessPerson[];
   /** People still to be given a role here (each module goes by its own until then). */
   toChoose: string[];
+  /** The administrator looking (their own row has no Switch off or Delete). */
+  meId: string;
+  /** How many people are in the recycle bin (2026-10-30). */
+  inBin: number;
 };
+
+/** A person in the recycle bin: deleted, switched off, restorable. */
+export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null };
 
 export type RoleInput = {
   name: string;

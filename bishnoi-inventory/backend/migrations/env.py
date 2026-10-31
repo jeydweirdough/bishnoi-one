@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.db import Base
 from app.migrate import VERSION_TABLE
 from app import models  # noqa: F401  (registers the tables)
+from app import recycle_bin  # noqa: F401  (its table too)
 
 config = context.config
 if not config.get_main_option("sqlalchemy.url"):

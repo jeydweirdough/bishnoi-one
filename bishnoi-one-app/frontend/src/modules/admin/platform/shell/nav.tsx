@@ -67,6 +67,7 @@ function menu(me: Me, unset: Unset): { home: Step | null; processes: Process[]; 
       steps: [
         // The Settings page opens for whoever may manage settings (screens/layout.tsx checks the same).
         ...(me.canManageSettings ? [{ href: "/admin/settings", label: "Settings", icon: "settings" }] : []),
+        ...(me.isOwner ? [{ href: "/admin/admin/data-cleanup", label: "Data clean-up", icon: "settings" }] : []),
         ...keep([{ href: "/admin/admin/audit", label: "Activity log", icon: "auditLog", sees: "admin.audit" }]),
       ],
     },
