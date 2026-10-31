@@ -63,47 +63,50 @@ or the tax registration). Until it's set, the step that needs it can't be done.
 
 ## 2. The Overview page
 
-**Payables (A+B)** now appears when you may view bills or vouchers, alongside
-the existing Overview. It shows eligible approvals/checks, team draft bills,
-your returned/submitted work, payment preparation/release, missing documents
-and due amounts. Each count opens its matching list. Groups can contain the
-same bill: do not add their amounts together. Unreleased vouchers reserve money
-but do not reduce what is owed. Current supplier aging is linked from this section.
+The Overview (**Home** in the sidebar) is your own page. It shows one large **lead card** and up to **five
+cards**, chosen from your main work, and it fits one screen on a laptop. It's worked out from what your role can
+see and do, never from your name or your role's name, so two people with the same permissions get the same page.
 
-**What you see depends on your role.** A role made for your work shows the
-sections that work calls for, and nothing else:
+**What you see, and what you can do.** A card appears only if your role can open what's behind it. A picture that
+mixes sources (such as Where money went) shows only the slices you may see, and says what's outside your access.
+Buttons and "Waiting for you" need the permission to do the step, not only to view it. Nothing is approved from the
+Overview: every row opens the record.
 
-- **Waiting for you:** cash advances to release, journal entries to approve
-  (not your own), prices and quotes waiting for
-  your approval (asked of the CRM; it fills in a moment after the page opens,
-  and says so if the CRM can't be reached), liquidations to review (not ones
-  you released), refunds and reimbursements to settle, and overdue
-  liquidations. Each shows only if your role does that step: for example, the
-  Finance Head reviews liquidations, and the Finance Deputy releases and settles.
-- **Receivables:** what customers owe, how late, and the most overdue.
-- **Sales invoiced in the Hub:** this month and this year.
-- **Marketing spending by team:** accepted receipts from reviewed liquidations.
-- **Journal:** the latest entries and who posted them, whether the books
-  balance, and how many of your own entries are still waiting for approval.
-- **Tax and setup:** output tax on this quarter's invoices, and anything not yet
-  set up, with a link to fix it.
-- **Balances** (below).
+**Your lead card** comes from what you do, in this order: whoever approves first leads with **Cash position**;
+whoever releases money with **To release**; then BIR work with **VAT**; collections read but not posted with **Owed
+by customers**; recording bills or petty cash with **your bills and petty cash** (returned ones first); then Cash.
 
-Sales, receivables and output tax count **only invoices issued in the Hub**.
-2MG's official invoices are still printed from Oojeema, so those figures stay
-low until the Hub issues them.
+**Tabs:** Overview, then Payables, Receivables, Cash and Tax, each only if you can see that area, with the number
+waiting for you there. Every tab is one lead card and up to five cards.
 
-The **Administrator, Finance Staff and Auditor** roles keep the page as it was:
-what is waiting on Finance today:
+**This month, this quarter, this year** changes every picture. "Waiting for you" stays today's queue: it doesn't
+depend on the period.
 
-- **For release:** approved requests waiting for the money to go out.
-- **For review:** liquidations sent in and waiting to be checked.
-- **For settlement:** refunds due from employees and reimbursements due to them.
-- **Overdue liquidations:** money released whose receipts are past their due date.
+**The agings show two figures.** Owed by customers and Owed to suppliers are always *today's* amounts. The large
+figure is everything owed, as Receivables and Accounts payable aging show it; the picture is the part of it on
+documents dated in the period. Choose This year to see the most of it in the picture.
 
-Below that are today's balances of your cash and bank accounts, of **Advances to
-employees** (money out and not yet accounted for), and of **Due to employees**
-(reimbursements the company still owes).
+**Hover** over a bar, a slice or a row for the exact amount and count. **Click** it to open the list behind it.
+
+**Edit my overview** lets you choose your own five cards from what you may see; **Reset to suggested** goes back.
+Your choice is kept in this browser, for your account only.
+
+**Where the figures come from:**
+
+- Only **approved** journal entries count. An entry waiting for approval, or rejected, changes no figure; it shows
+  only as a hand-off.
+- Bills count once **recorded**, petty cash once **posted**. Drafts and bills waiting for a step show only under
+  your hand-offs.
+- **Cash position** and **Money in vs out** read every account under CASH. Money moved between two of them shows on
+  both sides of Money in vs out, as it does in the Cash Disbursements Journal.
+- **Marketing by team** counts accepted receipts in categories the company covers, on reviewed liquidations.
+- **Zoho invoices** and **Invoices due this week** are labelled "From Zoho (copy, not yet in the books)". They read
+  the saved Zoho copies, 2MG and GPI, and aren't in any book or BIR figure.
+- **Petty cash funds** show each fund's balance in the books. There's no set amount for a fund yet, so the dial
+  stays open and says "No fund amount yet".
+- **BIR deadlines** stays a placeholder until Sir Mel gives his list of forms and dates. Legal dates are never guessed.
+- **Prices to approve** load on their own, a moment after the page, so the CRM can't slow the page. If it can't be
+  reached, the card says so.
 
 ---
 
@@ -723,3 +726,8 @@ Use Suppliers -> Import from a file. The existing inline panel/table recognises 
 
 ### Directory-first import0.4.19 (supersedes0.4.18 review instructions)
 Choose CSV -> optional summary/details -> one Import directory confirmation. No individual vendor reviews. Clear directory facts imported automatically; duplicates/existing/unusable/conflicting identities excluded. Unresolved values/hints retained under Imported details kept for later. Tax defaults unconfirmed;actual bill VAT/withholding must be explicitly chosen and reviewed before submission. Edit suppliers permission allows optional saved defaults from bill or supplier form. Existing values/posted bills preserved;source IDs/bills/payments/opening balances not imported. Recheck before retry after an unknown outcome.
+
+## Petty cash (0.4.34)
+
+One voucher for each paper petty cash voucher, with a line for each official receipt. Whoever may add and edit makes it and attaches a photo or PDF of every receipt; it can't be submitted until all are attached. Someone else with the check permission opens each receipt beside its line, then checks and posts it or returns it with the reason. A posted voucher is voided with a reason, which reverses its entry. Posted receipts appear in the BIR purchase lists. Refilling a fund isn't in Finance yet.
+

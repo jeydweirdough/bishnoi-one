@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 // One tooltip for the whole app (decided 2026-10-25): the dark bubble the short amounts
@@ -28,7 +28,8 @@ export function Tip({
   passive?: boolean;
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
-  const [at, setAt] = useState<{ x: number; y: number; below: boolean } | null>(null);
+  const bubble = useRef<HTMLSpanElement>(null);
+  const [at, setAt] = useState<{ x: number; top: number; bottom: number; below: boolean } | null>(null);
   const [shown, setShown] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
@@ -46,6 +47,12 @@ export function Tip({
     };
   }, [at]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  // A long tip may not fit above even away from the top bar (a page's explanation on its title): measured once drawn,
+  // and put below instead of being cut off at the window's top edge (2026-10-30).
+  useLayoutEffect(() => {
+    if (!at || at.below || !bubble.current) return;
+    if (bubble.current.getBoundingClientRect().top < 4) setAt({ ...at, below: true });
+  }, [at]);
 
   function show() {
     window.clearTimeout(timer.current);
@@ -55,7 +62,7 @@ export function Tip({
       // Above, unless there's no room (the top bar): then below. Kept inside the window sideways.
       const below = r.top < 64;
       const x = Math.min(Math.max(r.left + r.width / 2, 96), window.innerWidth - 96);
-      setAt({ x, y: below ? r.bottom : r.top, below });
+      setAt({ x, top: r.top, bottom: r.bottom, below });
       // The next frame, so it fades and rises in rather than appearing.
       requestAnimationFrame(() => setShown(true));
     }, 120);
@@ -84,8 +91,9 @@ export function Tip({
       {at &&
         createPortal(
           <span
+            ref={bubble}
             role="tooltip"
-            style={{ left: at.x, top: at.y }}
+            style={{ left: at.x, top: at.below ? at.bottom : at.top }}
             className={`pointer-events-none fixed z-[70] -translate-x-1/2 transition-all duration-150 ease-out ${
               at.below ? `pt-2 ${shown ? "opacity-100" : "-translate-y-1 opacity-0"}` : `-translate-y-full pb-2 ${shown ? "opacity-100" : "translate-y-[calc(-100%+4px)] opacity-0"}`
             }`}

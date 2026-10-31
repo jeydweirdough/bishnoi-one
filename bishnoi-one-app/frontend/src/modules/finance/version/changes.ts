@@ -12,6 +12,25 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.36",
+    date: "2026-10-31",
+    changes: [
+      "A new Overview, your own: one lead card and up to five cards with pictures instead of boxes, chosen from what your role can see and do. Hover over a bar or a slice for the exact amount and count; click it to open the list behind it.",
+      "Tabs for Payables, Receivables, Cash and Tax, only the ones you can see, each with the number waiting for you. One switch changes every picture between this month, this quarter and this year; what's waiting for you stays today's queue.",
+      "Your hand-offs shows both sides: what's waiting for you and what you passed on that's waiting on others. Each row opens the record; nothing is approved from the Overview, and nobody sees their own record as theirs to check.",
+      "Edit my overview: choose your own five cards from what you may see, or reset to the suggested ones.",
+      "Only approved journal entries, recorded bills and posted petty cash count in the figures. Zoho's invoices are labelled as copies, not yet in the books. BIR deadlines appear once Sir Mel's list is in.",
+    ],
+  },
+  {
+    version: "0.4.35",
+    date: "2026-10-30",
+    changes: [
+      "Default accounts shows each account's code and name again, and its lists offer the accounts to pick (they had shown only a long code since the searchable lists came in). The same fix for \"Sits under\" when adding or changing an account in the chart.",
+      "A page's ⓘ explanation that's too long to fit above the icon now opens below it, instead of being cut off at the top.",
+    ],
+  },
+  {
     version: "0.4.34",
     date: "2026-10-30",
     changes: [

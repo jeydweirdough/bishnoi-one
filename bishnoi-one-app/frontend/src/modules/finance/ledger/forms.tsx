@@ -11,8 +11,10 @@ import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { postEntry, reverseEntry, saveAccount, savePosting } from "@/src/modules/finance/ledger/actions";
 import { TYPE_LABELS, type Account, type AccountType, type Posting } from "@/src/modules/finance/ledger/types";
 
-/** Accounts for a picker, grouped by type, active ones only. */
-function AccountOptions({ accounts, only }: { accounts: Account[]; only?: AccountType }) {
+/** Accounts for a picker, grouped by type, active ones only. Called as a function, not used as a component: the
+ *  searchable Select (src/platform/ui/pickers.tsx) reads the <option>s written directly inside it and can't see into a
+ *  component, so a component here left its list empty and showed a saved account as its id (found 2026-10-30). */
+function accountOptions(accounts: Account[], only?: AccountType) {
   return (
     <>
       {(Object.keys(TYPE_LABELS) as AccountType[])
@@ -135,7 +137,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
                     className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
                   >
                     <option value="">Select an account…</option>
-                    <AccountOptions accounts={accounts} />
+                    {accountOptions(accounts)}
                   </select>
                 </td>
                 <td className="px-2 py-1.5">
@@ -341,7 +343,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
           {(p) => (
             <Select {...p} value={parentId} onChange={(e) => setParentId(e.target.value)}>
               <option value="">Nothing (at the top)</option>
-              <AccountOptions accounts={accounts.filter((a) => a.id !== account?.id)} />
+              {accountOptions(accounts.filter((a) => a.id !== account?.id))}
             </Select>
           )}
         </Field>
@@ -437,7 +439,7 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
             {(p) => (
               <Select {...p} value={values[i.key]} disabled={!posting.canEdit} onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}>
                 <option value="">Not set</option>
-                <AccountOptions accounts={accounts} only={i.type} />
+                {accountOptions(accounts, i.type)}
               </Select>
             )}
           </Field>

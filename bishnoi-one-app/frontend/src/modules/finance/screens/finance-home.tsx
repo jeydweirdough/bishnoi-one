@@ -1,20 +1,14 @@
 import { Welcome } from "@/src/platform/ui/welcome";
 import { redirect } from "next/navigation";
 import { greeting } from "@/src/modules/finance/platform/lib/format";
-import { Figure } from "@/src/modules/finance/platform/ui/figure";
-import { PageHeader, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
+import { PageHeader } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
-import type { Org } from "@/src/modules/finance/platform/lib/types";
-import { CashBalances } from "@/src/modules/finance/dashboard/cash";
-import { DashboardSection } from "@/src/modules/finance/dashboard/sections";
-import type { Dashboard } from "@/src/modules/finance/dashboard/types";
-import type { FundCounts } from "@/src/modules/finance/funds/types";
-import { PayablesHome } from "@/src/modules/finance/payables/home";
+import { EditOverviewButton, OverviewBody, OverviewProvider } from "@/src/modules/finance/overview/overview";
+import { PricesWaiting } from "@/src/modules/finance/overview/prices";
+import type { OverviewData } from "@/src/modules/finance/overview/types";
 
-// Finance's overview. A role made for the finance team gets the sections its
-// work calls for (GET /finance/dashboard, planned 2026-10-22); the starting
-// roles (Administrator, Finance Staff, Auditor) keep the overview as it was:
-// what's waiting on Finance, and the balances that matter for cash advances.
+// Finance's overview: the Living Overview (src/modules/finance/overview, approved 2026-10-31). One lead card
+// and up to five cards for each person, worked out by the API from what they may see and do.
 
 export const metadata = { title: "Overview" };
 
@@ -27,40 +21,14 @@ export default async function FinanceHome() {
     if (me.permissions?.includes("invoices.view")) redirect("/finance/invoices/zoho");
     if (me.permissions?.includes("sales_orders.view")) redirect("/finance/sales-orders");
   }
-  const dashboard = await load<Dashboard>("/finance/dashboard");
+  const overview = await load<OverviewData>("/finance/overview?period=month");
   return (
-    <>
-      <PageHeader title="Overview">What needs Finance&apos;s action today.</PageHeader>
+    <OverviewProvider initial={overview} userId={me.user.id}>
+      <PageHeader title="Overview" actions={overview.pickable.length > 0 ? <EditOverviewButton /> : undefined}>
+        What needs Finance&apos;s action today.
+      </PageHeader>
       <Welcome module="finance" name={me.user.fullName.split(" ")[0]} greeting={greeting()} />
-      <div className="space-y-5">
-        {(me.permissions?.includes("bills.view") || me.permissions?.includes("vouchers.view")) && <PayablesHome org={me.org} />}
-        {dashboard.kept ? (
-          <KeptOverview org={me.org} />
-        ) : (
-          dashboard.sections.map((s) => <DashboardSection key={s.key} section={s} org={me.org} />)
-        )}
-      </div>
-    </>
-  );
-}
-
-/** The overview as it was before the dashboards: marketing requests by step, and balances. */
-async function KeptOverview({ org }: { org: Org }) {
-  const counts = await load<FundCounts & { to_settle: number }>("/finance/funds/counts");
-  return (
-    <>
-      <Sheet>
-        <div className="px-5 pt-4">
-          <SectionTitle icon="payments">Marketing requests</SectionTitle>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-rule sm:grid-cols-4">
-          <Figure label="For release" value={counts.to_release} href="/finance/funds?stage=to_release" />
-          <Figure label="For review" value={counts.to_check} href="/finance/funds?stage=to_check" />
-          <Figure label="For settlement" value={counts.to_settle} href="/finance/funds?stage=to_settle" />
-          <Figure label="Overdue liquidations" value={counts.overdue} href="/finance/funds?stage=to_liquidate" flag />
-        </div>
-      </Sheet>
-      <CashBalances org={org} />
-    </>
+      <OverviewBody org={me.org} prices={overview.cards.wait?.prices ? <PricesWaiting /> : null} />
+    </OverviewProvider>
   );
 }
