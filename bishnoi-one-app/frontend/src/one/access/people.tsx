@@ -9,7 +9,7 @@ import { AsyncButton, AsyncChip } from "@/src/platform/ui/async-button";
 import { SearchInput } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
-import { givePersonRole, importRoles, setPersonModule } from "./actions";
+import { importRoles, setPersonAppRole, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
 import { AddPerson, PersonMenu } from "./person-dialogs";
 import { ImportPeople } from "./import-people";
@@ -114,13 +114,16 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
   const has = new Set(person.apps.map((a) => a.key));
   const today = person.apps.filter((a) => a.role);
 
-  function giveRole(roleId: string) {
+  // A role in each app they may open (2026-10-31): only the roles with something in that app.
+  function giveAppRole(key: string, roleId: string) {
     start(async () => {
-      const r = await givePersonRole(person.id, roleId || null);
+      const r = await setPersonAppRole(person.id, key, roleId || null);
       if (!r.ok) toast.error(r.error);
       else router.refresh();
     });
   }
+  const rolesFor = (key: string) => data.roles.filter((r) => r.isAdmin || (r.permissions[key]?.length ?? 0) > 0);
+  const opened = data.modules.filter((m) => has.has(m.key));
 
   async function toggle(key: string, on: boolean) {
     const r = await setPersonModule(person.id, key, on);
@@ -129,7 +132,7 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
   }
 
   return (
-    <li className="group grid gap-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_15rem_minmax(0,1.6fr)_auto] lg:items-center">
+    <li className="group grid gap-3 py-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1.5fr)_auto] lg:items-center">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink">
           {person.fullName}
@@ -142,15 +145,36 @@ function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; da
         </p>
       </div>
 
-      <div className="min-w-0">
-        <Select aria-label={`${person.fullName}'s role`} value={person.roleId ?? NONE} onChange={(e) => giveRole(e.target.value)} disabled={saving || data.roles.length === 0}>
-          <option value={NONE}>No role yet</option>
-          {data.roles.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </Select>
+      <div className="min-w-0 space-y-1.5" aria-label={`${person.fullName}'s role in each app`}>
+        {person.isCompanyAdmin ? (
+          <p className="text-sm text-ink-2">Administrator in every app</p>
+        ) : opened.length === 0 ? (
+          <p className="text-meta text-ink-3">Give them an app to choose their role in it.</p>
+        ) : (
+          opened.map((m) => {
+            const current = person.apps.find((a) => a.key === m.key)?.roleId ?? null;
+            const choices = rolesFor(m.key);
+            return (
+              <div key={m.key} className="flex items-center gap-2">
+                <Select
+                  aria-label={`${person.fullName}'s role in ${moduleLabel(m)}`}
+                  className="min-w-0 flex-1"
+                  value={current ?? NONE}
+                  onChange={(e) => giveAppRole(m.key, e.target.value)}
+                  disabled={saving || choices.length === 0}
+                >
+                  <option value={NONE}>No role yet</option>
+                  {[...choices, ...data.roles.filter((r) => r.id === current && !choices.includes(r))].map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </Select>
+                <span className="shrink-0 rounded-md border border-hema bg-hema-tint px-2.5 py-0.5 text-meta font-semibold text-ink">{moduleLabel(m)}</span>
+              </div>
+            );
+          })
+        )}
         {toChoose && today.length > 0 && (
           <p className="mt-1 text-meta text-promo-ink">Today: {today.map((a) => `${names[a.key] ?? a.key} ${a.role}`).join(" · ")}</p>
         )}

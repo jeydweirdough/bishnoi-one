@@ -84,9 +84,14 @@ def role_out(db: Session, role: AccessRole, holders: int = 0) -> dict:
 
 
 def holders_of(db: Session, company_id: str) -> dict[str, int]:
-    return dict(db.execute(
-        select(Identity.access_role_id, func.count()).where(Identity.company_id == company_id, Identity.access_role_id.is_not(None)).group_by(Identity.access_role_id)
-    ).all())
+    """How many people hold each role: as their own, or in any app they may open (2026-10-31)."""
+    held: dict[str, set[str]] = {}
+    for pid, rid in db.execute(select(Identity.id, Identity.access_role_id).where(Identity.company_id == company_id, Identity.access_role_id.is_not(None))):
+        held.setdefault(rid, set()).add(pid)
+    for pid, rid in db.execute(select(IdentityApp.identity_id, IdentityApp.access_role_id).join(Identity, Identity.id == IdentityApp.identity_id)
+                               .where(Identity.company_id == company_id, IdentityApp.access_role_id.is_not(None))):
+        held.setdefault(rid, set()).add(pid)
+    return {rid: len(people) for rid, people in held.items()}
 
 
 @router.get("")
@@ -99,7 +104,9 @@ def overview(db: DB, me: Admin) -> dict:
     for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False), Identity.deleted_at.is_(None))
                         .order_by(func.lower(Identity.full_name))):
         grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
-        given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g)} for g in grants if g.application_id in by_id]
+        # Each app with their role there (2026-10-31): the grant's, else their own.
+        given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g), "roleId": g.access_role_id or p.access_role_id}
+                 for g in grants if g.application_id in by_id]
         people.append({
             "id": p.id,
             "fullName": p.full_name,
@@ -579,6 +586,31 @@ def give_module(person_id: str, key: str, request: Request, db: DB, me: Admin, s
         db.commit()
         told(request, settings, me.company_id)
     return {"id": p.id, "app": app.key}
+
+
+class AppRoleIn(Api):
+    role_id: str | None = None
+
+
+@router.put("/people/{person_id}/apps/{key}/role")
+def set_app_role(person_id: str, key: str, body: AppRoleIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Their role in one app (2026-10-31): a role of the company that has something in that app. None: their own role."""
+    p = get_person(db, me, person_id)
+    app = company_module(db, me, key)
+    grant = db.get(IdentityApp, (p.id, app.id))
+    if grant is None:
+        raise conflict(f"{p.full_name} can't open {app.name} yet. Give it to them first.")
+    role = get_role(db, me, body.role_id) if body.role_id else None
+    if role is not None and not role.is_admin and not access_roles.grants_of(db, role).get(app.key):
+        raise field_error("roleId", f"{role.name} has nothing in {app.name}. Choose a role made for it, or add {app.name} to {role.name} on Roles.")
+    wanted = role.id if role else None
+    if grant.access_role_id != wanted:
+        grant.access_role_id = wanted
+        audit(db, me.email, "access.app_role_set", target=f"{p.email} · {app.name} · {role.name if role else 'their own role'}", target_type="identity",
+              target_id=p.id, company_id=me.company_id, application_id=app.id)
+        db.commit()
+        told(request, settings, me.company_id)
+    return {"id": p.id, "app": app.key, "roleId": grant.access_role_id or p.access_role_id}
 
 
 @router.delete("/people/{person_id}/apps/{key}", status_code=status.HTTP_204_NO_CONTENT)

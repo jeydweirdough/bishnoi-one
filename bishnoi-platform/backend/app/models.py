@@ -594,6 +594,8 @@ class IdentityApp(Base):
     is_app_admin: Mapped[bool] = mapped_column(default=False)
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     granted_by: Mapped[str] = mapped_column(String(254))
+    # Their role in this app (2026-10-31, migration 0024): an AccessRole of the company; None goes by their own role.
+    access_role_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
 
 class AccessRequest(Base):

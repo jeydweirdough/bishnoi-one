@@ -30,7 +30,7 @@ import time
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -153,11 +153,16 @@ def spec(db: Session, role: AccessRole, app_key: str) -> dict:
     return out
 
 
+def role_id_in(db: Session, person: Identity, app_id: str) -> str | None:
+    """Their role in this app (2026-10-31): the one on their grant, else their own."""
+    grant = db.get(IdentityApp, (person.id, app_id))
+    return (grant.access_role_id if grant is not None else None) or person.access_role_id
+
+
 def role_for_pass(db: Session, person: Identity, app: Application) -> dict | None:
-    """Their one role, as this application keeps it, for their sign-in pass; None without one."""
-    if not person.access_role_id:
-        return None
-    role = db.get(AccessRole, person.access_role_id)
+    """Their role in this application, as it keeps it, for their sign-in pass; None without one."""
+    role_id = role_id_in(db, person, app.id)
+    role = db.get(AccessRole, role_id) if role_id else None
     return spec(db, role, app.key) if role else None
 
 
@@ -173,7 +178,8 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
     # Everyone who may open this module: their role (when they have one here) and, since R2, whether
     # they're switched on, so switching someone off on the Platform switches them off in the module.
     people = db.execute(
-        select(Identity.email, Identity.access_role_id, Identity.status, Identity.app_details)
+        # Their role in this module: the one on their grant (2026-10-31), else their own.
+        select(Identity.email, func.coalesce(IdentityApp.access_role_id, Identity.access_role_id), Identity.status, Identity.app_details)
         .join(IdentityApp, (IdentityApp.identity_id == Identity.id) & (IdentityApp.application_id == app.id))
         .where(Identity.company_id == company.id)
         .order_by(Identity.email)

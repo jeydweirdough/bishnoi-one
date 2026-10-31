@@ -142,6 +142,34 @@ def test_the_pass_carries_the_role_given_here(client, getmeds):
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["role"] == "Medical rep"
 
 
+def test_a_role_in_each_app(client, getmeds, modules):
+    """2026-10-31: one person, a role per app they may open; each app's pass and roles note carry that app's."""
+    h, rio = getmeds["owner"]["h"], getmeds["rio"]
+    rep = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    chemist = client.post("/identity/access/roles", json={"name": "Chemist", "permissions": {"pharmacy": ["prescriptions.view"]}}, headers=h).json()
+    assert client.put(f"/identity/access/people/{rio['id']}/apps/crm/role", json={"roleId": rep["id"]}, headers=h).status_code == 200
+    modules.clear()
+    r = client.put(f"/identity/access/people/{rio['id']}/apps/pharmacy/role", json={"roleId": chemist["id"]}, headers=h)
+    assert r.status_code == 200 and r.json()["roleId"] == chemist["id"]
+    # A role with nothing in the app isn't one for it.
+    wrong = client.put(f"/identity/access/people/{rio['id']}/apps/pharmacy/role", json={"roleId": rep["id"]}, headers=h)
+    assert wrong.status_code == 422 and "nothing in" in wrong.text
+    # An app they can't open has no role to set.
+    assert client.put(f"/identity/access/people/{getmeds['jade']['id']}/apps/pharmacy/role", json={"roleId": chemist["id"]}, headers=h).status_code == 409
+    # People shows each app with its role.
+    row = next(p for p in client.get("/identity/access", headers=h).json()["people"] if p["id"] == rio["id"])
+    assert {a["key"]: a["roleId"] for a in row["apps"]} == {"crm": rep["id"], "pharmacy": chemist["id"]}
+    # Each app is told the role there, and its pass carries it.
+    key = client.get("/pass/key").json()["publicKey"]
+    note = {url: claims_of(body["pass"], key) for url, body in modules}["https://pharmacy-api.example.com/platform/roles"]
+    assert {"email": "rio@getmeds.test", "role": "Chemist", "admin": False, "active": True, "details": {}} in note["people"]
+    for app, port, name in (("crm", 4302, "Medical rep"), ("pharmacy", 4307, "Chemist")):
+        r = client.post("/identity/pass", json={"app": app, "returnTo": f"http://localhost:{port}/auth/platform"}, headers=rio["h"])
+        assert claims_of(r.json()["pass"], key)["roleDef"]["name"] == name, app
+    # A role someone holds in an app can't be deleted.
+    assert client.delete(f"/identity/access/roles/{chemist['id']}", headers=h).status_code == 409
+
+
 def test_importing_the_roles_each_module_has_today(client, getmeds):
     h = getmeds["owner"]["h"]
     r = client.post("/identity/access/import", headers=h)

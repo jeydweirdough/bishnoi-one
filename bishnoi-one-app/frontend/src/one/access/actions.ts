@@ -51,6 +51,15 @@ export async function setPersonModule(personId: string, key: string, on: boolean
   });
 }
 
+/** Their role in one app (2026-10-31): a role with something in that app; null goes by their own role. */
+export async function setPersonAppRole(personId: string, key: string, roleId: string | null): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("PUT", `/identity/access/people/${enc(personId)}/apps/${enc(key)}/role`, { roleId });
+    refresh();
+    return null;
+  });
+}
+
 export async function importRoles(): Promise<Result<ImportReport>> {
   return attempt(async () => {
     const report = await accountSend<ImportReport>("POST", "/identity/access/import");
