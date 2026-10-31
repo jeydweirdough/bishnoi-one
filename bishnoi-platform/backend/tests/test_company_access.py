@@ -125,10 +125,10 @@ def test_giving_a_role_tells_every_module_signed(client, getmeds, modules):
     assert crm["kind"] == "roles" and crm["aud"] == "crm" and crm["slug"] == getmeds["company"]["slug"]
     assert {"name": "Medical rep", "description": None, "scope": "own", "permissions": ["customers.view"], "admin": False} in crm["roles"]
     # Everyone who may open the module, with their role here (if any) and whether they're switched on (R2).
-    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True} in crm["people"]
-    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True} in crm["people"]
+    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True, "details": {}} in crm["people"]
+    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}} in crm["people"]
     # Pharmacy is told the roles too: only Rio may open it, with no role from here yet.
-    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True}]
+    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}}]
 
 
 def test_the_pass_carries_the_role_given_here(client, getmeds):

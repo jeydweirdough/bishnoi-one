@@ -11,6 +11,7 @@ password.
 
 import logging
 import os
+import time
 import re
 
 from fastapi import FastAPI, Request
@@ -60,13 +61,32 @@ def _unavailable(diagnosis: dict) -> FastAPI:
     return fallback
 
 
+# At a server's start-up (a reboot, a power cut) the database may come up a little after this API: wait
+# for it rather than answering 503 until someone restarts the API (2026-10-31, the office server). Only
+# for the database, and not on Vercel, where a function has seconds, not minutes.
+START_WAIT = 0 if os.environ.get("VERCEL") else 90
+
+
+def _start() -> FastAPI:
+    waited = 0
+    while True:
+        try:
+            return create_app()
+        except Exception as error:  # noqa: BLE001 (the same as below: told by its kind)
+            if _diagnose(error).get("problem") != "database" or waited >= START_WAIT:
+                raise
+            log.warning("The database isn't answering yet; trying again in 5 seconds.")
+            time.sleep(5)
+            waited += 5
+
+
 if os.environ.get("VERCEL") and not os.environ.get("DATABASE_URL"):
     # Without it the API would make a SQLite file on a disk it can't write to.
     app = _unavailable({"problem": "settings", "check": ["DATABASE_URL"],
                         "hint": "DATABASE_URL isn't set for this environment. Add it (Settings > Environment Variables) and redeploy."})
 else:
     try:
-        app = create_app()
+        app = _start()
     except Exception as error:  # noqa: BLE001 (report it, whatever it is)
         log.exception("The API could not start")
         # The error's kind (e.g. ProgrammingError) but never its text.
