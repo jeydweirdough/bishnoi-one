@@ -19,7 +19,7 @@ function toElement<E extends HTMLElement>(ref: Ref<E> | undefined, el: E | null)
 }
 
 type FieldProps = {
-  label: string;
+  label: ReactNode;
   hint?: ReactNode;
   error?: string;
   optional?: boolean;

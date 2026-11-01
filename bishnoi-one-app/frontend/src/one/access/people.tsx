@@ -1,10 +1,12 @@
 "use client";
 
+import { Download, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Banner } from "@/src/platform/ui/alert";
+import { LinkButton } from "@/src/platform/ui/ant-button";
 import { AsyncButton, AsyncChip } from "@/src/platform/ui/async-button";
 import { SearchInput } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
@@ -78,17 +80,20 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
               Only those still to choose ({toChoose.size})
             </label>
           )}
-          <span className="ml-auto text-meta text-ink-3">
-            {shown.length} of {data.people.length}
-          </span>
-          <Link href="/platform/roles/people/bin" className="text-meta text-ink-2 hover:text-hema hover:underline">
-            Recycle bin{data.inBin > 0 ? ` (${data.inBin})` : ""}
-          </Link>
-          <a href="/platform/roles/people/export" className="text-meta text-ink-2 hover:text-hema hover:underline" download>
-            Export
-          </a>
-          <ImportPeople />
-          <AddPerson data={data} />
+          {/* Quiet where it's a place to go; buttons with an icon and a word for what's done here; the main one solid. */}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Link href="/platform/roles/people/bin" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-ink-2 hover:bg-bench hover:text-ink">
+              <Trash2 className="size-4 shrink-0" aria-hidden />
+              Recycle bin
+              {data.inBin > 0 && <span className="rounded-full bg-rule px-1.5 text-meta font-semibold text-ink-2">{data.inBin}</span>}
+            </Link>
+            <span className="mx-1 hidden h-5 w-px bg-rule sm:block" aria-hidden />
+            <LinkButton href="/platform/roles/people/export" download icon={<Download className="size-4" aria-hidden />}>
+              Export
+            </LinkButton>
+            <ImportPeople />
+            <AddPerson data={data} />
+          </div>
         </div>
 
         {shown.length === 0 ? (

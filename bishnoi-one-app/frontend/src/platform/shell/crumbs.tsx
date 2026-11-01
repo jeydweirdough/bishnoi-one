@@ -158,7 +158,7 @@ export function Breadcrumbs({ module, company, companies, mine, area, page, home
           <Crumb label={area.label} title={area.label} items={area.steps.map((s) => ({ key: s.href, label: s.label, href: s.href, current: s === page }))} />
         </>
       )}
-      {page && !onHome && (
+      {page && !onHome && !(showArea && area.label === page.label) && (
         <>
           <Slash />
           {pathname === page.href.split("?")[0] ? (

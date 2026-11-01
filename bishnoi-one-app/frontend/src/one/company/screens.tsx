@@ -205,6 +205,7 @@ const ACTIONS: Record<string, string> = {
   "service.updated": "Changed an integration",
   "service.checked": "Tested an integration",
   "access.person_added": "Added an employee",
+  "access.person_erased": "Permanently deleted an employee",
   "access.person_changed": "Changed an employee",
   "access.person_suspended": "Switched an employee off",
   "access.person_reactivated": "Switched an employee on",

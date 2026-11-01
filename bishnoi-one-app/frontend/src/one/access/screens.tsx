@@ -24,7 +24,8 @@ export async function AccessPeople({ searchParams }: { searchParams: Promise<Rec
       const activity = person.activity.map((e) => ({
         id: e.id,
         at: e.at,
-        text: `${e.actor} ${said(e.action).toLowerCase()}${e.target ? `: ${e.target}` : ""}`,
+        // Theirs, so their name isn't repeated on every line; the target only when it's someone or something else.
+        text: `${said(e.action)}${e.target && e.target.toLowerCase() !== person.email.toLowerCase() ? `: ${e.target}` : ""}`,
       }));
       panel = <PersonPanel key={row.id} person={person} row={row} data={data} activity={activity} />;
     }

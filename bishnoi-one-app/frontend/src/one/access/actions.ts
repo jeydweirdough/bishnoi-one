@@ -121,6 +121,15 @@ export async function deletePerson(id: string): Promise<Result> {
 }
 
 /** Back from the recycle bin onto People, still switched off until switched on. */
+/** Gone for good, from the recycle bin (2026-11-01): the email is sent as the proof they typed it. */
+export async function erasePerson(id: string, email: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("POST", `/identity/access/people/${enc(id)}/erase`, { email });
+    refresh();
+    return null;
+  });
+}
+
 export async function restorePerson(id: string): Promise<Result> {
   return attempt(async () => {
     await accountSend("POST", `/identity/access/people/${enc(id)}/restore`, {});

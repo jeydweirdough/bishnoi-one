@@ -191,7 +191,8 @@ def test_a_persons_page_has_everything_about_them(client, getmeds):
     sec = page["security"]
     assert sec["twoStep"] is False and sec["passwordSet"] is True and sec["lastSignIn"] and sec["openSignIns"] >= 1
     assert sec["wrongPasswords30Days"] == 1 and sec["lockedNow"] is False
-    assert any(e["action"] == "access.app_role_set" for e in page["activity"])
+    # Their own activity, not what administrators did to them (2026-11-01).
+    assert page["activity"] and all(e["actor"] == "rio@getmeds.test" for e in page["activity"])
     # Only the company's administrators see someone's page.
     assert client.get(f"/identity/access/people/{rio['id']}", headers=getmeds["jade"]["h"]).status_code == 403
 
@@ -346,3 +347,21 @@ def test_each_apps_details_about_a_person_are_kept_here_and_sent(client, getmeds
     claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
     who = next(p for p in claims["people"] if p["email"] == "jade@getmeds.test")
     assert who["details"] == {"employeeId": "GM-0042"}
+
+
+def test_only_someone_in_the_recycle_bin_can_be_deleted_permanently(app, client, getmeds):
+    from app.models import Account, Identity
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    erase = f"/identity/access/people/{jade['id']}/erase"
+    assert client.post(erase, json={"email": "jade@getmeds.test"}, headers=h).status_code == 409  # not in the bin yet
+    assert client.delete(f"/identity/access/people/{jade['id']}", headers=h).status_code == 200
+    assert client.post(erase, json={"email": "someone@getmeds.test"}, headers=h).status_code == 422  # must name them
+    assert client.post(erase, json={"email": "jade@getmeds.test"}, headers=getmeds["rio"]["h"]).status_code == 403
+    assert client.post(erase, json={"email": "JADE@getmeds.test "}, headers=h).status_code == 204
+    assert client.get("/identity/access/bin", headers=h).json()["people"] == []
+    with app.state.sessions() as db:
+        assert db.get(Identity, jade["id"]) is None
+        assert db.query(Account).filter(Account.email == "jade@getmeds.test").first() is None
+    # Their email is free again, and the log says who did it.
+    assert client.post("/identity/access/people", json={"fullName": "Jade Again", "email": "jade@getmeds.test"}, headers=h).status_code == 201
+    assert "access.person_erased" in [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]

@@ -167,7 +167,7 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
         {tab === "activity" &&
           (activity.length === 0 ? (
             <Empty icon="auditLog" title="Nothing yet">
-              Their sign-ins, and changes by them or to them, show here.
+              What they do in their account shows here: sign-ins, passwords, two-step sign-in.
             </Empty>
           ) : (
             <>

@@ -614,9 +614,9 @@ def person_page(person_id: str, db: DB, me: Admin, settings: SettingsDep) -> dic
                                                                          AuditEntry.created_at > now - timedelta(days=30))) or 0
     invited = bool(account and db.scalar(select(func.count()).select_from(SignInLink).where(
         SignInLink.account_id == account.id, SignInLink.kind == "invite", SignInLink.used_at.is_(None), SignInLink.expires_at > now)))
-    activity = db.scalars(select(AuditEntry).where(
-        AuditEntry.company_id == me.company_id, (func.lower(AuditEntry.actor) == email) | func.lower(AuditEntry.target).startswith(email))
-        .order_by(AuditEntry.created_at.desc()).limit(25)).all()
+    # What they did themselves (2026-11-01); what administrators did to them is in the Activity log.
+    activity = db.scalars(select(AuditEntry).where(AuditEntry.company_id == me.company_id, func.lower(AuditEntry.actor) == email)
+                          .order_by(AuditEntry.created_at.desc()).limit(25)).all()
     return {
         **person_out(p),
         "addedAt": iso(p.created_at),
@@ -730,6 +730,31 @@ def restore_person(person_id: str, db: DB, me: Admin) -> dict:
     audit(db, me.email, "access.person_restored", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
     db.commit()
     return {"person": person_out(p)}
+
+
+class EraseIn(Api):
+    email: str = Field(max_length=254)
+
+
+@router.post("/people/{person_id}/erase", status_code=status.HTTP_204_NO_CONTENT)
+def erase_person(person_id: str, body: EraseIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> Response:
+    """Gone for good, from the recycle bin only (2026-11-01): the sign-in, password and two-step with their account
+    when this was their only membership. Records in the apps keep the name; the audit log keeps what was done."""
+    p = get_person(db, me, person_id)
+    if p.deleted_at is None:
+        raise conflict("Only someone in the recycle bin can be deleted permanently.")
+    if body.email.strip().lower() != p.email.lower():
+        raise field_error("email", "That isn't this employee's email.")
+    account = account_of(db, p)
+    audit(db, me.email, "access.person_erased", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
+    others = [m for m in memberships(db, account) if m.id != p.id] if account else []
+    db.delete(p)
+    db.flush()
+    if account is not None and not others and not account.is_operator:
+        db.delete(account)
+    db.commit()
+    told(request, settings, me.company_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---- Invitations, two-step resets, import (2026-10-30, app/sign_in.py) ---------------------------------
