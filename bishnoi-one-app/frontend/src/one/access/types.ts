@@ -49,6 +49,9 @@ export type AccessPerson = {
   apps: { key: string; role: string | null; roleId?: string | null }[];
   /** What each app keeps of its own about them, kept here (2026-10-30): CRM employee ID, licence number, Finance calendar. */
   appDetails?: AppDetails;
+  /** When they were added here, and by whom when the log knows (2026-10-31). */
+  addedAt?: string | null;
+  addedBy?: string | null;
 };
 
 export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };

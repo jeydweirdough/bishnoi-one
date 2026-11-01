@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Banner } from "@/src/platform/ui/alert";
 import { AsyncButton, AsyncChip } from "@/src/platform/ui/async-button";
@@ -18,12 +18,11 @@ import type { AccessData, AccessPerson } from "./types";
 const NONE = "";
 
 /** Everyone at the company, as a table: their role in each app and the apps they may open, each changed where it's shown. */
-export function PeopleList({ data }: { data: AccessData }) {
+export function PeopleList({ data, selected = null, panel = null }: { data: AccessData; selected?: string | null; panel?: ReactNode }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [onlyToChoose, setOnlyToChoose] = useState(false);
   const toChoose = new Set(data.toChoose);
-  const names = Object.fromEntries(data.modules.map((m) => [m.key, moduleLabel(m)]));
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -97,22 +96,31 @@ export function PeopleList({ data }: { data: AccessData }) {
             Try another name or email.
           </Empty>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[56rem] text-sm">
-              <thead>
-                <tr className="border-b border-rule text-left text-meta font-medium text-ink-3">
-                  <th scope="col" className="py-2 pr-4 font-medium">Person</th>
-                  <th scope="col" className="py-2 pr-4 font-medium">Role in each app</th>
-                  <th scope="col" className="py-2 pr-4 font-medium">Apps</th>
-                  <th scope="col" className="w-12 py-2 font-medium"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {shown.map((p) => (
-                  <PersonRow key={p.id} person={p} data={data} names={names} toChoose={toChoose.has(p.id)} />
-                ))}
-              </tbody>
-            </table>
+          <div className={panel ? "mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-start" : "mt-3"}>
+            <div className="overflow-x-auto">
+              <table className={`w-full text-sm ${panel ? "" : "min-w-[48rem]"}`}>
+                <thead>
+                  <tr className="border-b border-rule text-left text-meta text-ink-3">
+                    <th scope="col" className="py-2 pr-4 font-medium">{panel ? "Name / email" : "Name"}</th>
+                    {!panel && (
+                      <>
+                        <th scope="col" className="py-2 pr-4 font-medium">Email</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Date added</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Added by</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Status</th>
+                        <th scope="col" className="w-12 py-2 font-medium"><span className="sr-only">Actions</span></th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rule">
+                  {shown.map((p) => (
+                    <PersonRow key={p.id} person={p} data={data} compact={Boolean(panel)} current={p.id === selected} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {panel}
           </div>
         )}
       </Sheet>
@@ -120,35 +128,46 @@ export function PeopleList({ data }: { data: AccessData }) {
   );
 }
 
-function PersonRow({ person, data, names, toChoose }: { person: AccessPerson; data: AccessData; names: Record<string, string>; toChoose: boolean }) {
-  const today = person.apps.filter((a) => a.role);
-  return (
-    <tr className="group align-top">
-      <td className="max-w-[16rem] py-3 pr-4">
-        <Link href={`/platform/roles/people/${person.id}`} className="block truncate font-semibold text-ink hover:underline">
+const addedOn = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" }) : "—");
+
+/** A person in the table: their name opens them in the panel beside it (Zoho Directory's Users). */
+function PersonRow({ person, data, compact, current }: { person: AccessPerson; data: AccessData; compact: boolean; current: boolean }) {
+  const initials = person.fullName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+  const name = (
+    <Link href={`/platform/roles/people?person=${person.id}`} className="flex min-w-0 items-center gap-3" aria-current={current ? "page" : undefined}>
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-bench text-meta font-semibold text-ink-2" aria-hidden>
+        {initials}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold text-ink hover:underline">
           {person.fullName}
-        </Link>
-        <span className="block truncate text-meta text-ink-3">
-          {person.email}
-          {person.title ? ` · ${person.title}` : ""}
+          {person.isCompanyAdmin && <span className="ml-2 rounded border border-sage-deep px-1 text-[0.625rem] font-semibold tracking-wide text-sage-deep uppercase align-middle">Admin</span>}
         </span>
-        {(person.isCompanyAdmin || person.status !== "active") && (
-          <span className="mt-1 flex flex-wrap gap-1">
-            {person.isCompanyAdmin && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-3">Company administrator</span>}
-            {person.status !== "active" && <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-3">Switched off</span>}
-          </span>
+        {compact && <span className="block truncate text-meta text-ink-3">{person.email}</span>}
+      </span>
+    </Link>
+  );
+  if (compact) {
+    return (
+      <tr className={current ? "bg-hema-tint/60" : "hover:bg-bench/50"}>
+        <td className="max-w-[22rem] px-2 py-2.5">{name}</td>
+      </tr>
+    );
+  }
+  return (
+    <tr className="group hover:bg-bench/40">
+      <td className="max-w-[16rem] py-2.5 pr-4">{name}</td>
+      <td className="max-w-[16rem] truncate py-2.5 pr-4 text-ink-2">{person.email}</td>
+      <td className="py-2.5 pr-4 whitespace-nowrap text-ink-2">{addedOn(person.addedAt)}</td>
+      <td className="max-w-[12rem] truncate py-2.5 pr-4 text-ink-2">{person.addedBy ?? "—"}</td>
+      <td className="py-2.5 pr-4">
+        {person.status === "active" ? (
+          <span className="rounded-full bg-[#e6f2e1] px-2 py-0.5 text-meta text-[#3f6f35]">Active</span>
+        ) : (
+          <span className="rounded-full bg-danger-tint px-2 py-0.5 text-meta text-danger">Switched off</span>
         )}
       </td>
-      <td className="min-w-[16rem] py-3 pr-4">
-        <AppRoles person={person} data={data} />
-        {toChoose && today.length > 0 && (
-          <p className="mt-1 text-meta text-promo-ink">Today: {today.map((a) => `${names[a.key] ?? a.key} ${a.role}`).join(" · ")}</p>
-        )}
-      </td>
-      <td className="py-3 pr-4">
-        <AppChips person={person} data={data} />
-      </td>
-      <td className="py-3 text-right">
+      <td className="py-2.5 text-right">
         <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} />
       </td>
     </tr>

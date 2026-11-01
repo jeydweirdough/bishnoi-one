@@ -101,6 +101,10 @@ def overview(db: DB, me: Admin) -> dict:
     holders = holders_of(db, me.company_id)
     roles = db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name))).all()
     people, to_choose = [], []
+    # Who added each person (2026-10-31): the audit log's "person added", by their email; none for the first ones.
+    added_by = {t.lower(): a for t, a in db.execute(
+        select(AuditEntry.target, AuditEntry.actor).where(AuditEntry.company_id == me.company_id, AuditEntry.action == "access.person_added")
+        .order_by(AuditEntry.created_at))}
     for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False), Identity.deleted_at.is_(None))
                         .order_by(func.lower(Identity.full_name))):
         grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
@@ -117,6 +121,8 @@ def overview(db: DB, me: Admin) -> dict:
             "roleId": p.access_role_id,
             "apps": given,
             "appDetails": p.app_details or {},
+            "addedAt": iso(p.created_at),
+            "addedBy": added_by.get(p.email.lower()),
         })
         if p.access_role_id is None and any(g["role"] for g in given):
             to_choose.append(p.id)

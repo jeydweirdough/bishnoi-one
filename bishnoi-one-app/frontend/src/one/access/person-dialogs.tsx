@@ -202,8 +202,14 @@ export function AddPerson({ data }: { data: AccessData }) {
   );
 }
 
-/** A person's ⋯: change their details, set a new password, switch them off or on, delete them to the recycle bin. */
-export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
+type MenuItem = Exclude<Parameters<typeof RowMenu>[0]["items"][number], "divider">;
+
+/**
+ * Everything that can be done to a person (2026-10-31), once, for the ⋯ on People and the buttons on their
+ * panel: change details (their email too), a new password, invitation, administrator, two-step reset, switch
+ * off or on, delete. `dialogs` must be drawn once wherever these are used.
+ */
+export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = []) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [settingPassword, setSettingPassword] = useState(false);
@@ -241,67 +247,61 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
     });
   }
 
-  return (
+  const invite: MenuItem | null = off ? null : { label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) };
+  const admin: MenuItem | null = isMe
+    ? null
+    : person.isCompanyAdmin
+      ? {
+          label: "Remove as administrator",
+          icon: <ShieldOff />,
+          run: () => setAdministrator(person.id, false),
+          confirm: `Remove ${person.fullName} as administrator? They keep their roles and apps, but can't open the Admin Console. Their sign-ins end.`,
+          done: `${person.fullName} is no longer an administrator`,
+        }
+      : off
+        ? null
+        : {
+            label: "Make administrator",
+            icon: <ShieldCheck />,
+            run: () => setAdministrator(person.id, true),
+            confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
+            done: `${person.fullName} is now an administrator`,
+          };
+  const twoStep: MenuItem | null = isMe
+    ? null
+    : {
+        label: "Reset two-step sign-in",
+        icon: <ShieldOff />,
+        run: () => resetTwoStep(person.id),
+        confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
+        done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
+      };
+  const power: MenuItem | null = isMe
+    ? null
+    : off
+      ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
+      : {
+          label: "Switch off",
+          icon: <Power />,
+          run: () => changePerson(person.id, { status: "suspended" }),
+          danger: true,
+          confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
+          done: `${person.fullName} is switched off`,
+        };
+  const remove: MenuItem | null = isMe
+    ? null
+    : {
+        label: "Delete",
+        icon: <Trash2 />,
+        run: () => deletePerson(person.id),
+        danger: true,
+        confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
+        done: `${person.fullName} is in the recycle bin`,
+      };
+
+  const dialogs = (
     <>
       <PasswordDialog person={person} open={settingPassword} onClose={() => setSettingPassword(false)} />
-      <RowMenu
-        always
-        label={`Actions for ${person.fullName}`}
-        items={[
-          // Everything about them in one place: details, security, apps and roles, activity (2026-10-31).
-          { label: "Open", icon: <UserRound />, href: `/platform/roles/people/${person.id}` },
-          { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
-          ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
-          { label: "Set a new password", icon: <KeyRound />, onSelect: () => setSettingPassword(true) },
-          ...(isMe
-            ? []
-            : [
-                person.isCompanyAdmin
-                  ? {
-                      label: "Remove as administrator",
-                      icon: <ShieldOff />,
-                      run: () => setAdministrator(person.id, false),
-                      confirm: `Remove ${person.fullName} as administrator? They keep their role and apps, but can't open the Admin Console. Their sign-ins end.`,
-                      done: `${person.fullName} is no longer an administrator`,
-                    }
-                  : off
-                    ? "divider" as const
-                    : {
-                        label: "Make administrator",
-                        icon: <ShieldCheck />,
-                        run: () => setAdministrator(person.id, true),
-                        confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
-                        done: `${person.fullName} is now an administrator`,
-                      },
-                {
-                  label: "Reset two-step sign-in",
-                  icon: <ShieldOff />,
-                  run: () => resetTwoStep(person.id),
-                  confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
-                  done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
-                },
-                "divider" as const,
-                off
-                  ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
-                  : {
-                      label: "Switch off",
-                      icon: <Power />,
-                      run: () => changePerson(person.id, { status: "suspended" }),
-                      danger: true,
-                      confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
-                      done: `${person.fullName} is switched off`,
-                    },
-                {
-                  label: "Delete",
-                  icon: <Trash2 />,
-                  run: () => deletePerson(person.id),
-                  danger: true,
-                  confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
-                  done: `${person.fullName} is in the recycle bin`,
-                },
-              ]),
-        ]}
-      />
       <Modal open={editing} title={`Change ${person.fullName}`} onCancel={() => !busy && setEditing(false)} onOk={save} okText="Save" confirmLoading={busy} width={480} destroyOnHidden>
         <FormGrid className="pt-2">
           <Field label="Full name" size="full" error={fields.fullName}>
@@ -331,6 +331,30 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
           )}
         </FormGrid>
       </Modal>
+    </>
+  );
+  return { off, invite, admin, twoStep, power, remove, dialogs, openEdit: () => setEditing(true), openPassword: () => setSettingPassword(true) };
+}
+
+/** A person's ⋯ on People: open their panel, then every action on them. */
+export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
+  const a = usePersonActions(person, isMe, modules);
+  const items = [
+    // Everything about them in one place: the panel beside the list (2026-10-31).
+    { label: "Open", icon: <UserRound />, href: `/platform/roles/people?person=${person.id}` },
+    { label: "Change details", icon: <Pencil />, onSelect: a.openEdit },
+    ...(a.invite ? [a.invite] : []),
+    { label: "Set a new password", icon: <KeyRound />, onSelect: a.openPassword },
+    ...(a.admin ? [a.admin] : []),
+    ...(a.twoStep ? [a.twoStep] : []),
+    ...(a.power || a.remove ? ["divider" as const] : []),
+    ...(a.power ? [a.power] : []),
+    ...(a.remove ? [a.remove] : []),
+  ];
+  return (
+    <>
+      {a.dialogs}
+      <RowMenu always label={`Actions for ${person.fullName}`} items={items} />
     </>
   );
 }

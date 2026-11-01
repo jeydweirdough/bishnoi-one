@@ -181,6 +181,13 @@ def test_a_persons_page_has_everything_about_them(client, getmeds):
     page = r.json()
     assert (page["fullName"], page["email"], page["status"]) == ("Rio Santos", "rio@getmeds.test", "active")
     assert {a["key"]: a["roleId"] for a in page["apps"]}["crm"] == role["id"]
+    # The list says when each person was added, and by whom when the log knows.
+    listed = client.get("/identity/access", headers=h).json()["people"]
+    assert all(x["addedAt"] for x in listed)
+    added = client.post("/identity/access/people", json={"fullName": "Mia Cruz", "email": "mia@getmeds.test"}, headers=h)
+    assert added.status_code == 201, added.text
+    mia = next(x for x in client.get("/identity/access", headers=h).json()["people"] if x["email"] == "mia@getmeds.test")
+    assert mia["addedBy"] == "olive@getmeds.test"
     sec = page["security"]
     assert sec["twoStep"] is False and sec["passwordSet"] is True and sec["lastSignIn"] and sec["openSignIns"] >= 1
     assert sec["wrongPasswords30Days"] == 1 and sec["lockedNow"] is False

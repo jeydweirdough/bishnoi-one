@@ -4,14 +4,32 @@ import { loadAccess } from "./load";
 import { PeopleList } from "./people";
 import { RecycleBin } from "./recycle-bin";
 import { AccessRolesEditor } from "./roles-editor";
-import type { AbilityCatalogue, BinPerson } from "./types";
+import type { AbilityCatalogue, BinPerson, PersonPage } from "./types";
+import { PersonPanel } from "./person-panel";
+import { said } from "@/src/one/company/screens";
 
 // The Platform module's pages in the one app (decided 2026-10-23): people and
 // access for the whole company, for its administrators.
 
-export async function AccessPeople() {
+export async function AccessPeople({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const data = await loadAccess();
-  return <AccessFrame current="people">{data && <PeopleList data={data} />}</AccessFrame>;
+  const asked = (await searchParams).person;
+  const id = typeof asked === "string" ? asked : null;
+  // A person opens in a panel beside the list (2026-10-31, as Zoho Directory's Users).
+  const row = id && data ? data.people.find((p) => p.id === id) : undefined;
+  let panel = null;
+  if (row && data) {
+    const person = await accountSend<PersonPage>("GET", `/identity/access/people/${encodeURIComponent(row.id)}`).catch(() => null);
+    if (person) {
+      const activity = person.activity.map((e) => ({
+        id: e.id,
+        at: e.at,
+        text: `${e.actor} ${said(e.action).toLowerCase()}${e.target ? `: ${e.target}` : ""}`,
+      }));
+      panel = <PersonPanel key={row.id} person={person} row={row} data={data} activity={activity} />;
+    }
+  }
+  return <AccessFrame current="people">{data && <PeopleList data={data} selected={row?.id ?? null} panel={panel} />}</AccessFrame>;
 }
 
 export async function AccessRoles() {
