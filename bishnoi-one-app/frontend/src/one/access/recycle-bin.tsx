@@ -78,8 +78,17 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
             return r.ok ? { ok: true } : { ok: false, error: r.error };
           }}
         >
-          <strong className="font-semibold text-ink">{erasing.fullName}</strong> can&apos;t be restored after this: their sign-in, password, two-step sign-in and place on the organisation chart are removed. Their name stays on records
-          they made in the apps, and the Activity log keeps what was done.
+          {erasing.operator ? (
+            <>
+              <strong className="font-semibold text-ink">{erasing.fullName}</strong> leaves this company for good, but they are also a Bishnoi One operator: they keep their sign-in and can still enter every company until an operator
+              switches that off in Operations.
+            </>
+          ) : (
+            <>
+              <strong className="font-semibold text-ink">{erasing.fullName}</strong> can&apos;t be restored after this: their sign-in, password, two-step sign-in and place on the organisation chart are removed. Their name stays on records
+              they made in the apps, and the Activity log keeps what was done.
+            </>
+          )}
         </TypeToDelete>
       )}
     </Sheet>

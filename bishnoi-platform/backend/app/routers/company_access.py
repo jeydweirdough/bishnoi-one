@@ -718,7 +718,11 @@ def delete_person(person_id: str, request: Request, db: DB, me: Admin, settings:
 def recycle_bin(db: DB, me: Admin) -> dict:
     rows = db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.deleted_at.is_not(None), Identity.via_operator.is_(False))
                       .order_by(Identity.deleted_at.desc())).all()
-    return {"people": [{**person_out(p), "deletedAt": p.deleted_at.isoformat(), "deletedBy": p.deleted_by} for p in rows]}
+    def still_operator(p: Identity) -> bool:
+        account = account_of(db, p)
+        return bool(account and account.is_operator)
+
+    return {"people": [{**person_out(p), "deletedAt": p.deleted_at.isoformat(), "deletedBy": p.deleted_by, "operator": still_operator(p)} for p in rows]}
 
 
 @router.post("/people/{person_id}/restore")

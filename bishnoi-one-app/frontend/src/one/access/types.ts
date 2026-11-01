@@ -70,7 +70,7 @@ export type AccessData = {
 };
 
 /** A person in the recycle bin: deleted, switched off, restorable. */
-export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null };
+export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null; operator?: boolean };
 
 export type RoleInput = {
   name: string;

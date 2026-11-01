@@ -82,6 +82,9 @@ def test_operators_are_a_switch_on_the_account(client, ana, getmeds):
     client.put(f"/platform/operators/{r.json()['operator']['id']}", json={"isOperator": False}, headers=ana)
     assert client.get("/platform/companies", headers=op).status_code == 401
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["staff"] is None
+    # And the doors they had only as an operator close with it (2026-11-01): nothing left to sign in to.
+    assert client.get("/identity/me", headers=op).status_code == 401
+    assert client.post("/identity/login", json={"email": "jade@bishnoione.test", "password": "long enough 1"}).status_code == 403
 
 
 def test_the_staff_sign_in_is_closed_on_a_server(app, client):
