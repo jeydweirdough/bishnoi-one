@@ -6,7 +6,7 @@ import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src
 import { Download, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Banner } from "@/src/platform/ui/alert";
 import { LinkButton } from "@/src/platform/ui/ant-button";
@@ -40,7 +40,29 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
   // A page at a time (2026-11-01). Until a page is picked, the one holding the open employee.
   const [picked, setPicked] = useState<number | null>(null);
   const at = shown.findIndex((p) => p.id === selected);
-  const { rows: onPage, page } = slicePage(shown, picked ?? (at >= 0 ? Math.floor(at / PAGE_SIZE) + 1 : 1));
+  // With an employee open, as many rows as stand beside their panel (2026-11-01): the list ends where the panel does.
+  const panelBox = useRef<HTMLDivElement>(null);
+  const listBox = useRef<HTMLDivElement>(null);
+  const [fits, setFits] = useState<number | null>(null);
+  useEffect(() => {
+    const box = panelBox.current;
+    if (!panel || !box) return setFits(null);
+    const measure = () => {
+      const list = listBox.current;
+      const row = list?.querySelector("tbody tr")?.getBoundingClientRect().height || 61;
+      const head = list?.querySelector("thead")?.getBoundingClientRect().height || 37;
+      const pager = 48;
+      setFits(Math.max(3, Math.floor((box.getBoundingClientRect().height - head - pager) / row)));
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(box);
+    return () => seen.disconnect();
+  }, [panel]);
+  const size = panel ? (fits ?? PAGE_SIZE) : PAGE_SIZE;
+  // Opening or closing an employee shows the page they're on, at that page's size.
+  useEffect(() => setPicked(null), [selected, size]);
+  const { rows: onPage, page } = slicePage(shown, picked ?? (at >= 0 ? Math.floor(at / size) + 1 : 1), size);
 
   async function bringIn() {
     const r = await importRoles();
@@ -112,7 +134,7 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
           </Empty>
         ) : (
           <div className={panel ? "mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-start" : "mt-3"}>
-            <div className="overflow-x-auto">
+            <div ref={listBox} className="overflow-x-auto">
               <table className={`w-full text-sm ${panel ? "" : "min-w-[48rem]"}`}>
                 <thead>
                   <tr className="border-b border-rule text-left text-meta text-ink-3">
@@ -139,9 +161,9 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
                   ))}
                 </tbody>
               </table>
-              <Pager total={shown.length} page={page} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
+              <Pager total={shown.length} page={page} size={size} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
             </div>
-            {panel}
+            {panel && <div ref={panelBox}>{panel}</div>}
           </div>
         )}
       </Sheet>
