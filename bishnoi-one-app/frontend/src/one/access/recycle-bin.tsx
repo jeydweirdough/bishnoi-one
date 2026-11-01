@@ -1,7 +1,7 @@
 "use client";
 
-import { BulkList } from "@/src/platform/bulk/list";
-import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
+import { BulkBar, SelectAllBox, SelectBox, SelectableRow, SelectionProvider, useBulkRun, useSelection } from "@/src/platform/bulk/selection";
+import { plural } from "@/src/platform/lib/format";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,10 +10,53 @@ import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/ant-button";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { TypeToDelete } from "@/src/platform/ui/type-to-delete";
-import { bulkRestorePeople, erasePerson, restorePerson } from "./actions";
+import { bulkErasePeople, bulkRestorePeople, erasePerson, restorePerson } from "./actions";
 import type { BinPerson } from "./types";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Manila" });
+
+const NOUN: [string, string] = ["employee", "employees"];
+
+/** What can be done to several at once. Delete permanently asks as one does: here you type how many (2026-11-01). */
+function BinBar({ people }: { people: BinPerson[] }) {
+  const s = useSelection();
+  const { run, running } = useBulkRun();
+  const [erasing, setErasing] = useState(false);
+  const chosen = people.filter((p) => s.isSelected(p.id));
+  const many = plural(chosen.length, ...NOUN);
+  const operators = chosen.filter((p) => p.operator).length;
+  return (
+    <>
+      <BulkBar noun={NOUN}>
+        <Button size="sm" icon={<RotateCcw className="size-4" aria-hidden />} disabled={running} onClick={() => void run({ doing: "Restoring", did: (n) => `${plural(n, ...NOUN)} restored, switched off` }, bulkRestorePeople)}>
+          Restore
+        </Button>
+        <Button size="sm" variant="danger" icon={<Trash2 className="size-4" aria-hidden />} disabled={running} onClick={() => setErasing(true)}>
+          Delete permanently
+        </Button>
+      </BulkBar>
+      {erasing && (
+        <TypeToDelete
+          open
+          onClose={() => setErasing(false)}
+          title={`Delete ${many} permanently`}
+          name={many}
+          nameLabel="Enter how many"
+          phrase="delete employees"
+          action="Delete permanently"
+          onConfirm={async () => {
+            await run({ doing: "Deleting permanently", did: (n) => `${plural(n, ...NOUN)} permanently deleted` }, () => bulkErasePeople(chosen.map((p) => ({ id: p.id, email: p.email }))));
+            return { ok: true };
+          }}
+        >
+          <strong className="font-semibold text-ink">{many}</strong> can&apos;t be restored after this: their sign-ins, passwords, two-step sign-in and places on the organisation chart are removed. Their names stay on records they made in the
+          apps, and the Activity log keeps what was done.
+          {operators > 0 && <> {plural(operators, "of them is", "of them are")} also a Bishnoi One operator: they keep their sign-in and can still enter every company until an operator switches that off in Operations.</>}
+        </TypeToDelete>
+      )}
+    </>
+  );
+}
 
 /** The company's recycle bin (2026-10-30): who was deleted, when and by whom, each with Restore and Delete permanently beside them. */
 export function RecycleBin({ people }: { people: BinPerson[] }) {
@@ -29,12 +72,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
     );
   }
   return (
-    <BulkList
-      items={people.map((p) => ({ id: p.id, name: p.fullName }))}
-      noun={["employee", "employees"]}
-      // Permanent delete stays one at a time: each is confirmed by typing their email.
-      actions={[{ label: "Restore", icon: <RotateCcw className="size-4" aria-hidden />, doing: "Restoring", done: "restored, switched off", run: bulkRestorePeople }]}
-    >
+    <SelectionProvider items={people.map((p) => ({ id: p.id, name: p.fullName }))}>
     <Sheet className="px-5 py-2">
       <div className="border-b border-rule py-2">
         <SelectAllBox>
@@ -106,6 +144,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
         </TypeToDelete>
       )}
     </Sheet>
-    </BulkList>
+    <BinBar people={people} />
+    </SelectionProvider>
   );
 }

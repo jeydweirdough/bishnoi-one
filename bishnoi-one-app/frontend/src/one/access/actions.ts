@@ -178,6 +178,11 @@ export async function bulkGiveModule(key: string, ids: string[]) {
 export async function bulkDeletePeople(ids: string[]) {
   return eachOf("Delete employees", ids, deletePerson);
 }
+/** Each through erasePerson, with their email as its proof: only people in the recycle bin can go. */
+export async function bulkErasePeople(people: { id: string; email: string }[]) {
+  const emails = new Map(people.map((p) => [p.id, p.email]));
+  return eachOf("Delete permanently", people.map((p) => p.id), (id) => erasePerson(id, emails.get(id) ?? ""));
+}
 export async function bulkRestorePeople(ids: string[]) {
   return eachOf("Restore employees", ids, restorePerson);
 }
