@@ -6,10 +6,11 @@ import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
 import { CrumbsSlot } from "@/src/platform/shell/crumbs";
+import { CRM_SETTINGS, FINANCE_SETTINGS, FINANCE_TABS, INVENTORY_SETTINGS, INVENTORY_TABS } from "./app-settings";
 
 /**
  * The Admin Console (feature plan step 5, 2026-10-28, laid out like Odoo's and Zoho's settings): a company's
- * own administration, for its administrators: Home, Company, People, Reports. Nothing of Bishnoi One's own
+ * own administration, for its administrators: Home, People, Company, Apps, Reports (regrouped 2026-11-01). Nothing of Bishnoi One's own
  * running is here; that is Operations (operationsGroups, /operations), for operators only (2026-10-30).
  */
 export function consoleGroups(me: Account): ConsoleGroup[] {
@@ -17,19 +18,6 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
   if (me.isCompanyAdmin) {
     // The executive Home first: the company in a few figures (decided 2026-10-28).
     groups.push({ label: "Home", pages: [{ href: "/platform/home", label: "Home", icon: "home" }] });
-    groups.push({
-      label: "Company",
-      icon: "company",
-      pages: [
-        { href: "/platform/company", label: "Company profile", icon: "company" },
-        { href: "/platform/company/apps", label: "Apps", icon: "apps" },
-        { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
-        { href: "/platform/company/security", label: "Security", icon: "password" },
-        { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
-        // Every app's deleted records and recycle bin, an app at a time (2026-10-31).
-        { href: "/platform/company/data-cleanup", label: "Data clean-up", icon: "lists" },
-      ],
-    });
     groups.push({
       label: "People",
       icon: "people",
@@ -39,55 +27,34 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/organisation", label: "Organisation", icon: "teams" },
       ],
     });
-    // Each app's settings, for company administrators (2026-10-31): an area per app the company has, holding
-    // what that app's own sidebar used to. The pages are the app's (they talk to its API).
-    const has = (key: string) => me.apps.some((a) => a.key === key);
-    const crm = "/platform/settings/crm";
-    if (has("crm")) {
-      groups.push({
-        label: "CRM settings",
-        icon: "settings",
-        pages: [
-          { href: `${crm}/company`, label: "General", icon: "company", also: [`${crm}/company`, `${crm}/quote-templates`, `${crm}/emails`, `${crm}/terms`] },
-          { href: crm, label: "Customization", icon: "settings", exact: true, also: [`${crm}/customer-types`, `${crm}/deal-stages`, `${crm}/associations`, `${crm}/lists`] },
-          { href: `${crm}/pricing`, label: "Sales and pricing", icon: "pricing", also: [`${crm}/pricing`, `${crm}/price-rules`, `${crm}/performance`, `${crm}/retention-windows`, `${crm}/attention`, `${crm}/kpis`] },
-        ],
-      });
-    }
-    const inventory = "/platform/settings/inventory";
-    if (has("inventory")) {
-      groups.push({
-        label: "Inventory settings",
-        icon: "inventory",
-        pages: [
-          { href: `${inventory}/categories`, label: "Categories", icon: "categories" },
-          { href: `${inventory}/brands`, label: "Brands", icon: "brands" },
-          { href: `${inventory}/units`, label: "Units", icon: "units" },
-          { href: `${inventory}/couriers`, label: "Couriers", icon: "issuance" },
-        ],
-      });
-    }
-    const finance = "/platform/settings/finance";
-    if (has("finance")) {
-      groups.push({
-        label: "Finance settings",
-        icon: "finance",
-        pages: [
-          { href: `${finance}/taxes`, label: "Taxes", icon: "money" },
-          { href: `${finance}/number-series`, label: "Transaction number series", icon: "letters" },
-          { href: `${finance}/default-accounts`, label: "Default accounts", icon: "settings" },
-          { href: `${finance}/expense-categories`, label: "Expense categories", icon: "lists" },
-        ],
-      });
-    }
     groups.push({
-      label: "Reports",
-      icon: "reports",
+      label: "Company",
+      icon: "company",
       pages: [
-        // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
-        { href: "/platform/reports", label: "Reports Center", icon: "reports" },
+        { href: "/platform/company", label: "Company profile", icon: "company" },
+        { href: "/platform/company/security", label: "Security", icon: "password" },
+        { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
+        // Every app's deleted records and recycle bin, an app at a time (2026-10-31).
+        { href: "/platform/company/data-cleanup", label: "Data clean-up", icon: "lists" },
       ],
     });
+    // Everything about the apps in one place (2026-11-01): which are on, how each works, what they connect to.
+    // One row per app the company has; its parts are tabs on the page (app-settings.ts). The pages are the
+    // app's own (they talk to its API).
+    const has = (key: string) => me.apps.some((a) => a.key === key);
+    groups.push({
+      label: "Apps",
+      icon: "apps",
+      pages: [
+        { href: "/platform/company/apps", label: "Apps and features", icon: "apps" },
+        ...(has("crm") ? [{ href: `${CRM_SETTINGS}/company`, label: "CRM", icon: "deals" as const, also: [CRM_SETTINGS] }] : []),
+        ...(has("inventory") ? [{ href: INVENTORY_TABS[0].href, label: "Inventory", icon: "inventory" as const, also: [INVENTORY_SETTINGS] }] : []),
+        ...(has("finance") ? [{ href: FINANCE_TABS[0].href, label: "Finance", icon: "finance" as const, also: [FINANCE_SETTINGS] }] : []),
+        { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
+      ],
+    });
+    // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
+    groups.push({ label: "Reports", pages: [{ href: "/platform/reports", label: "Reports", icon: "reports" }] });
   }
   return groups;
 }

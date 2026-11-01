@@ -56,7 +56,7 @@ type Props = {
 const within = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
 /** The page you're on: the most specific match; a page whose address asks for a query wins when the query matches. */
-function currentOf(steps: Step[], pathname: string, search: URLSearchParams | null): Step | undefined {
+export function currentOf(steps: Step[], pathname: string, search: URLSearchParams | null): Step | undefined {
   let found: Step | undefined;
   let best = -1;
   for (const s of steps) {
