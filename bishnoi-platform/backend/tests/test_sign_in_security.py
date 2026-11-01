@@ -131,6 +131,9 @@ def test_people_are_imported_from_a_file_checked_first_then_all_at_once(client, 
     assert client.post("/identity/access/people/import", json={"rows": rows, "apply": True}, headers=h).status_code == 422  # all or none
     done = client.post("/identity/access/people/import", json={"rows": rows[:2], "apply": True, "invite": True}, headers=h).json()
     assert done["added"] == 1 and done["invited"] == 1 and done["emailed"] == 0
+    # Whoever imported them is who added them (2026-11-01).
+    kay = next(p for p in client.get("/identity/access", headers=h).json()["people"] if p["email"] == "kay@getmeds.test")
+    assert kay["addedBy"] == "olive@getmeds.test"
     people = {p["email"]: p for p in client.get("/identity/access", headers=h).json()["people"]}
     assert people["kay@getmeds.test"]["roleId"] == role["id"] and [a["key"] for a in people["kay@getmeds.test"]["apps"]] == ["crm"]
 

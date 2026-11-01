@@ -28,7 +28,7 @@ from app.access_roles import ADMINISTRATOR
 from app.api import Api, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app import passwords
-from app.deps import DB, SettingsDep
+from app.deps import DB, SettingsDep, as_utc
 from app.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
 from app import email_rules, sign_in
 from app.accounts import account_of, memberships, runs_company
@@ -105,6 +105,15 @@ def overview(db: DB, me: Admin) -> dict:
     added_by = {t.lower(): a for t, a in db.execute(
         select(AuditEntry.target, AuditEntry.actor).where(AuditEntry.company_id == me.company_id, AuditEntry.action == "access.person_added")
         .order_by(AuditEntry.created_at))}
+    # An import logs one line for all it added (2026-11-01): each person belongs to the first one after they were made.
+    imports = [(as_utc(at), a) for at, a in db.execute(
+        select(AuditEntry.created_at, AuditEntry.actor).where(AuditEntry.company_id == me.company_id, AuditEntry.action == "access.people_imported")
+        .order_by(AuditEntry.created_at))]
+
+    def imported_by(p: Identity) -> str | None:
+        made = as_utc(p.created_at)
+        return next((a for at, a in imports if timedelta(0) <= at - made <= IMPORT_TAKES), None)
+
     for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False), Identity.deleted_at.is_(None))
                         .order_by(func.lower(Identity.full_name))):
         grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
@@ -122,7 +131,7 @@ def overview(db: DB, me: Admin) -> dict:
             "apps": given,
             "appDetails": p.app_details or {},
             "addedAt": iso(p.created_at),
-            "addedBy": added_by.get(p.email.lower()),
+            "addedBy": added_by.get(p.email.lower()) or imported_by(p),
         })
         if p.access_role_id is None and any(g["role"] for g in given):
             to_choose.append(p.id)
@@ -364,6 +373,10 @@ def delete_role(role_id: str, request: Request, db: DB, me: Admin, settings: Set
 
 class PersonRoleIn(Api):
     role_id: str | None = None
+
+
+# One import's rows are made within a request of its log line.
+IMPORT_TAKES = timedelta(minutes=10)
 
 
 def get_person(db: Session, me: Identity, person_id: str) -> Identity:
