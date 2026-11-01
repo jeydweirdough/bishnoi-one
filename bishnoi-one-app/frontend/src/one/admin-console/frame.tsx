@@ -5,6 +5,7 @@ import { getAccount, type Account } from "@/src/platform/lib/account";
 import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
+import { CrumbsSlot } from "@/src/platform/shell/crumbs";
 
 /**
  * The Admin Console (feature plan step 5, 2026-10-28, laid out like Odoo's and Zoho's settings): a company's
@@ -143,7 +144,7 @@ export async function AdminConsoleFrame({ children, console: which = "platform" 
         <NavProgress />
       </Suspense>
       <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-        <header className="mb-4 hidden items-center justify-end gap-1 lg:flex">{actions}</header>
+        <header className="mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
         <div className="mx-auto max-w-[80rem]">{children}</div>
       </main>
     </div>
