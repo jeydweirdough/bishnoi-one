@@ -24,7 +24,7 @@ export async function DataCleanupConsolePage({ search }: { search: Record<string
   const tabs = (
     <nav className="mb-4 flex flex-wrap gap-1" aria-label="Which app">
       <Link href="/platform/roles/people/bin" className="rounded-md px-3 py-1 text-meta text-ink-3 hover:bg-bench">
-        People
+        Employees
       </Link>
       {apps.map((a) => (
         <Link

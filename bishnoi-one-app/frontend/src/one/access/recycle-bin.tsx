@@ -17,7 +17,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
     return (
       <Sheet>
         <Empty icon="people" title="The recycle bin is empty">
-          People you delete on People (⋯ → Delete) come here, and can be restored.
+          Employees you delete (⋯ → Delete) come here, and can be restored.
         </Empty>
       </Sheet>
     );
@@ -44,7 +44,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
               onRun={async () => {
                 const r = await restorePerson(p.id);
                 if (!r.ok) return void toast.error(r.error);
-                toast.success(`${p.fullName} is back on People`, { description: "Switched off: switch them on when they should sign in again." });
+                toast.success(`${p.fullName} is back on Employees`, { description: "Switched off: switch them on when they should sign in again." });
                 router.refresh();
               }}
             >

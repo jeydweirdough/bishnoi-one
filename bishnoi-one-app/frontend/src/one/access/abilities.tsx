@@ -44,7 +44,7 @@ export function AbilitiesSection({ role, catalogue, modules }: { role: AccessRol
       const r = await setRoleAbilities(role.id, Object.entries(draft).map(([key, limit]) => ({ key, limit })), scopes);
       if (!r.ok) return setError(r.error);
       setError(null);
-      toast.success(`${role.name} saved`, { description: "Every app is told now; people with this role get it on their next click." });
+      toast.success(`${role.name} saved`, { description: "Every app is told now; employees with this role get it on their next click." });
       router.refresh();
     });
   }
@@ -138,7 +138,7 @@ export function CopyJobRole({ catalogue, onMade }: { catalogue: AbilityCatalogue
     start(async () => {
       const r = await roleFromJob(job.key, name.trim() || null);
       if (!r.ok) return setError(r.error);
-      toast.success(`${r.data.name} added`, { description: "Adjust its abilities, then give it to people on People." });
+      toast.success(`${r.data.name} added`, { description: "Adjust its abilities, then give it to employees on Employees." });
       setOpen(false);
       setPicked(null);
       setName("");

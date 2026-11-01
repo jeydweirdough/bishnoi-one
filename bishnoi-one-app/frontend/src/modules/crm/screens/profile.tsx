@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/src/platform/ui/avatar";
 import { LinkButton, buttonClass } from "@/src/platform/ui/button";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
+import { TwoStepOwed } from "@/src/one/two-step-notice";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { can } from "@/src/modules/crm/lib/access";
 import { getCompanyMe, load, loadQuery } from "@/src/platform/lib/api";
@@ -46,6 +47,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Sear
 
   return (
     <>
+      <TwoStepOwed />
       <Hero me={me} account={account} profile={profile} today={today} />
       {teamWide && (
         <div className="mb-5">

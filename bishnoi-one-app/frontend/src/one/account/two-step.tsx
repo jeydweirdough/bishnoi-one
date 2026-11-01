@@ -29,7 +29,7 @@ export function TwoStepCard({ state }: { state: TwoStepState }) {
             {state.recoveryCodesLeft} recovery {state.recoveryCodesLeft === 1 ? "code" : "codes"} left.
           </p>
           {state.required ? (
-            <p className="text-meta text-ink-3">Administrators keep it on. New phone? Ask another administrator to reset it on People, then set it up again.</p>
+            <p className="text-meta text-ink-3">Administrators keep it on. New phone? Ask another administrator to reset it on Employees, then set it up again.</p>
           ) : turningOff ? (
             <form
               className="max-w-sm space-y-3"

@@ -56,7 +56,7 @@ export function OrganisationChart({ data }: { data: OrgData }) {
             </Button>
           }
         >
-          {data.notPlaced} {data.notPlaced === 1 ? "person isn't" : "people aren't"} on the chart yet. Give each a main unit, so their sales and approvals count in the right place.
+          {data.notPlaced} {data.notPlaced === 1 ? "employee isn't" : "employees aren't"} on the chart yet. Give each a main unit, so their sales and approvals count in the right place.
         </Banner>
       )}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -148,7 +148,7 @@ function UnitRow({ unit, depth, manager, onEdit, onAdd }: { unit: OrgUnit; depth
           )}
         </p>
       </div>
-      <Tip tip="People whose main unit this is">
+      <Tip tip="Employees whose main unit this is">
         <span className="inline-flex items-center gap-1 text-meta text-ink-2">
           <Users className="size-3.5" aria-hidden /> {unit.people}
         </span>
@@ -246,7 +246,7 @@ function UnitDialog({ data, unit, parentId, onClose }: { data: OrgData; unit?: O
           {() => (
             <Combobox
               allowClear
-              placeholder="Choose a person"
+              placeholder="Choose an employee"
               options={data.people.filter((p) => p.status === "active").map((p) => ({ value: p.id, label: p.fullName }))}
               value={form.managerId ?? undefined}
               onChange={(v) => setForm({ ...form, managerId: (v as string | undefined) ?? null })}
@@ -280,7 +280,7 @@ function Branches({ data }: { data: OrgData }) {
       </SectionTitle>
       {shown.length === 0 ? (
         <Empty icon="companies" title="No branches yet">
-          Add the places people work from, such as the main office.
+          Add the places employees work from, such as the main office.
         </Empty>
       ) : (
         <ul className="mt-2 divide-y divide-rule">
@@ -294,7 +294,7 @@ function Branches({ data }: { data: OrgData }) {
                 </span>
                 {b.address && <span className="block truncate text-meta text-ink-3">{b.address}</span>}
               </span>
-              <Tip tip="People who work here">
+              <Tip tip="Employees who work here">
                 <span className="inline-flex items-center gap-1 text-meta text-ink-2">
                   <Users className="size-3.5" aria-hidden /> {b.people}
                 </span>
@@ -368,10 +368,10 @@ function People({ data, onlyUnplaced, setOnlyUnplaced }: { data: OrgData; onlyUn
 
   return (
     <Sheet className="px-5 pt-4 pb-2" id="people">
-      <SectionTitle icon="people">Where people sit</SectionTitle>
+      <SectionTitle icon="people">Where employees sit</SectionTitle>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <div className="w-full max-w-xs">
-          <SearchInput placeholder="Find a person" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+          <SearchInput placeholder="Find an employee" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-2">
           <input suppressHydrationWarning type="checkbox" checked={onlyUnplaced} onChange={(e) => setOnlyUnplaced(e.target.checked)} />

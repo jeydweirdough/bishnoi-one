@@ -16,7 +16,7 @@ import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie, viewAsCookie 
 // (Next follows an action's redirect on the server, with no cookie jar).
 export type SignInState = { error?: string; email?: string; go?: string; ticket?: string } | null;
 
-type Session = { accessToken: string; expiresIn: number; mustChangePassword?: boolean; needsTwoStep?: boolean };
+type Session = { accessToken: string; expiresIn: number; mustChangePassword?: boolean; needsTwoStep?: boolean; offerTwoStep?: boolean };
 /** A right password with two-step sign-in on: the session waits for the code (2026-10-30). */
 type Waiting = { twoStep: true; ticket: string };
 
@@ -52,11 +52,11 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
   return opened(session, next);
 }
 
-/** Signed in: module sessions dropped, the account kept; a handed-over password or a missing two-step goes first. */
+/** Signed in: module sessions dropped, the account kept; a handed-over password or a missing two-step goes first, and two-step is offered to whoever hasn't it (2026-11-01). */
 async function opened(session: Session, next: string): Promise<SignInState> {
   await dropModuleSessions();
   (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
-  if (session.mustChangePassword || session.needsTwoStep) return { go: `/login/first?next=${encodeURIComponent(next)}` };
+  if (session.mustChangePassword || session.needsTwoStep || session.offerTwoStep) return { go: `/login/first?next=${encodeURIComponent(next)}&offer=1` };
   return { go: next };
 }
 
@@ -111,8 +111,8 @@ async function withAccount<T>(path: string, body: unknown): Promise<{ ok: true; 
   }
 }
 
-/** Two-step sign-in (2026-10-30): a new secret for the authenticator app (your password first). */
-export async function startTwoStep(password: string) {
+/** Two-step sign-in (2026-10-30): a new secret for the authenticator app. No password needed right after signing in. */
+export async function startTwoStep(password?: string) {
   return withAccount<TwoStepStart>("/identity/two-step/start", { password });
 }
 /** The first code from the app turns it on; the recovery codes come back once. */

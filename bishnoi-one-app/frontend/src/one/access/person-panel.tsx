@@ -46,7 +46,7 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("info");
   const isMe = row.id === data.meId;
-  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key));
+  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key), data.company.emailDomain);
   const s = person.security;
 
   /** A menu action (with its own confirmation) from a button: said when done, the page read again. */

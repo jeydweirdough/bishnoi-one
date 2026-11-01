@@ -99,7 +99,7 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
       setErrors({ message: null, fields: {} });
       setSelected(result.data.id);
       toast.success(role ? `${result.data.name} saved` : `${result.data.name} added`, {
-        description: "Every module is told now; people with this role get it on their next click.",
+        description: "Every module is told now; employees with this role get it on their next click.",
       });
       router.refresh();
     });
@@ -151,7 +151,7 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
     ...data.roles.map((r) => ({
       key: r.id,
       label: r.name,
-      detail: `${summary(r, data.modules)} · ${r.people} ${r.people === 1 ? "person" : "people"}`,
+      detail: `${summary(r, data.modules)} · ${r.people} ${r.people === 1 ? "employee" : "employees"}`,
       unsaved: r.id in drafts && !same(drafts[r.id], asInput(r)),
     })),
     ...(NEW in drafts || selected === NEW ? [{ key: NEW, label: draft.name.trim() || "New role", detail: "Not saved yet", unsaved: true }] : []),
@@ -182,7 +182,7 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
             action={
               role && role.people > 0 ? (
                 <span className="text-meta text-ink-3">
-                  In use by {role.people} {role.people === 1 ? "person" : "people"}
+                  In use by {role.people} {role.people === 1 ? "employee" : "employees"}
                 </span>
               ) : role ? (
                 <ConfirmButton

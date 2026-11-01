@@ -128,7 +128,7 @@ def overview(db: DB, me: Admin) -> dict:
             to_choose.append(p.id)
     company = db.get(Company, me.company_id)
     return {
-        "company": {"id": company.id, "name": company.name},
+        "company": {"id": company.id, "name": company.name, "emailDomain": company.email_domain},
         "modules": [module_out(a) for a in apps],
         "roles": [role_out(db, r, holders.get(r.id, 0)) for r in roles],
         "people": people,
@@ -351,7 +351,7 @@ def delete_role(role_id: str, request: Request, db: DB, me: Admin, settings: Set
     role = get_role(db, me, role_id)
     holders = holders_of(db, me.company_id).get(role.id, 0)
     if holders:
-        raise conflict(f"{holders} {'person has' if holders == 1 else 'people have'} this role. Give them another one first.")
+        raise conflict(f"{holders} {'employee has' if holders == 1 else 'employees have'} this role. Give them another one first.")
     audit(db, me.email, "access.role_deleted", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id)
     db.delete(role)
     db.commit()
@@ -462,7 +462,7 @@ def add_person(body: PersonIn, request: Request, db: DB, me: Admin, settings: Se
     """Someone new at the company: their account, their role and the modules they may open, in one go."""
     same = db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == body.email.lower()))
     if same is not None:
-        raise field_error("email", "That person is in the recycle bin: restore them instead." if same.deleted_at else "Somebody here already has that email.")
+        raise field_error("email", "That employee is in the recycle bin: restore them instead." if same.deleted_at else "Somebody here already has that email.")
     email_rules.check_company_email(db.get(Company, me.company_id), body.email)
     email_rules.check_available(db, body.email, me.company_id)
     role = get_role(db, me, body.role_id) if body.role_id else None

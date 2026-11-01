@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
   }
   const rows: (string | number)[][] = [
     ["Section", "Figure", label, "Period before"],
-    ["Activity", "People who signed in", o.period.now.signedIn, o.period.before.signedIn],
+    ["Activity", "Employees who signed in", o.period.now.signedIn, o.period.before.signedIn],
     ["Activity", "Wrong passwords", o.period.now.failed, o.period.before.failed],
-    ["Activity", "People added", o.period.now.added, o.period.before.added],
+    ["Activity", "Employees added", o.period.now.added, o.period.before.added],
     ["People", "Active", o.people.active, ""],
     ["People", "Switched off", o.people.off, ""],
     ["People", "In the recycle bin", o.people.inBin, ""],
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
     ["Waiting on you", "Locked out now", o.security.lockedNow, ""],
     ["Waiting on you", "Emails to change", o.security.offDomain, ""],
     ...o.apps.map((a) => ["Access by app", a.name, a.people, ""]),
-    ...o.roles.map((r) => ["People by role", r.name, r.people, ""]),
+    ...o.roles.map((r) => ["Employees by role", r.name, r.people, ""]),
     [],
-    ["Month", "People who signed in", "Wrong passwords", "People added"],
+    ["Month", "Employees who signed in", "Wrong passwords", "Employees added"],
     ...o.months.map((m) => [m.month, m.signedIn, m.failed, m.added]),
   ];
   return new NextResponse(toCsv(rows), {

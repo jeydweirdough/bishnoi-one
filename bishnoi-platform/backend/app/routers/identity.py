@@ -165,8 +165,9 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
 
 
 def after_sign_in(db: Session, settings, account: Account, person: Identity) -> dict:
-    """What the one app does next: change a handed-over password, or set up two-step sign-in where it's required."""
-    return {"mustChangePassword": account.must_change_password, "needsTwoStep": sign_in.needs_two_step(settings, account, runs_company(db, person))}
+    """What the one app does next: change a handed-over password, set up two-step sign-in where it's required, or offer it."""
+    return {"mustChangePassword": account.must_change_password, "needsTwoStep": sign_in.needs_two_step(settings, account, runs_company(db, person)),
+            "offerTwoStep": sign_in.suggests_two_step(account)}
 
 
 class CodeIn(Api):
@@ -276,7 +277,7 @@ def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
         # Sign-in security (2026-10-30): a handed-over password to change; two-step sign-in, and whether it's owed.
         "mustChangePassword": bool(account and account.must_change_password),
         "twoStep": {"on": bool(account and sign_in.two_step_on(account)), "needed": sign_in.needs_two_step(settings, account, runs_company(db, person)),
-                    "suggested": sign_in.suggests_two_step(account, runs_company(db, person))},
+                    "suggested": sign_in.suggests_two_step(account)},
         # The company's app catalogue: each catalogue app ("app:purchasing") and feature, on or off (step 6).
         "features": catalogue.switches(db, person.company_id),
         "apps": [
@@ -574,11 +575,24 @@ def two_step(signed: Signed, db: DB, settings: SettingsDep) -> dict:
     return _two_step_out(settings, db, account_of(db, person), person)
 
 
+class TwoStepStartIn(Api):
+    password: str | None = Field(default=None, max_length=MAX_PASSWORD)
+
+
+# Right after signing in the password was just given: the set-up page shows the QR code without asking again.
+JUST_SIGNED_IN = timedelta(minutes=10)
+
+
 @router.post("/identity/two-step/start")
-def two_step_start(body: PasswordOnly, signed: Signed, db: DB, settings: SettingsDep) -> dict:
+def two_step_start(body: TwoStepStartIn, signed: Signed, db: DB, settings: SettingsDep) -> dict:
     """A new secret for their authenticator app (shown as a QR code and as text); on once a code from it is confirmed."""
-    _, person = signed
-    account = _check_password(db, person, body.password)
+    record, person = signed
+    fresh = datetime.now(UTC) - as_utc(record.created_at) < JUST_SIGNED_IN
+    if body.password is None and not fresh:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"type": "value_error", "loc": ["body", "password"], "msg": "Enter your password."}])
+    account = account_of(db, person) if body.password is None else _check_password(db, person, body.password)
+    if account is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in again.")
     if sign_in.two_step_on(account):
         raise HTTPException(status.HTTP_409_CONFLICT, "Two-step sign-in is already on. Turn it off first to move it to another phone.")
     secret = sign_in.new_secret()

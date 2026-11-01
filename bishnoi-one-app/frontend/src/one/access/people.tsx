@@ -39,7 +39,7 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
       return;
     }
     const { rolesMade, peopleGiven, toChoose: left, unreachable } = r.data;
-    toast.success(`${rolesMade} ${rolesMade === 1 ? "role" : "roles"} brought in, ${peopleGiven} ${peopleGiven === 1 ? "person" : "people"} given theirs`, {
+    toast.success(`${rolesMade} ${rolesMade === 1 ? "role" : "roles"} brought in, ${peopleGiven} ${peopleGiven === 1 ? "employee" : "employees"} given theirs`, {
       description: [left ? `${left} to choose for: they have different roles in different modules.` : "", unreachable.length ? `Not reached: ${unreachable.join(", ")}.` : ""]
         .filter(Boolean)
         .join(" ") || undefined,
@@ -62,7 +62,7 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
         </Banner>
       ) : toChoose.size > 0 ? (
         <Banner tone="warn">
-          {toChoose.size} {toChoose.size === 1 ? "person has" : "people have"} no role here yet. Until you choose one, each module goes by the
+          {toChoose.size} {toChoose.size === 1 ? "employee has" : "employees have"} no role here yet. Until you choose one, each module goes by the
           role it gave them.
         </Banner>
       ) : null}
@@ -70,7 +70,7 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
       <Sheet className="px-5 pt-4 pb-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-full max-w-xs">
-            <SearchInput placeholder="Find a person" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+            <SearchInput placeholder="Find an employee" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           {toChoose.size > 0 && (
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-2">
@@ -168,7 +168,7 @@ function PersonRow({ person, data, compact, current }: { person: AccessPerson; d
         )}
       </td>
       <td className="py-2.5 text-right">
-        <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} />
+        <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} domain={data.company.emailDomain} />
       </td>
     </tr>
   );

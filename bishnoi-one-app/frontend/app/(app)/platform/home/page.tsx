@@ -81,7 +81,7 @@ function Bars({ rows, href, total }: { rows: { key: string; name: string; people
           <Link href={href} className="block rounded-md hover:bg-bench">
             <span className="flex items-baseline justify-between gap-3 text-sm">
               <span className="truncate text-ink">{r.name}</span>
-              <span className="shrink-0 text-ink-3">{n(r.people, "person", "people")}</span>
+              <span className="shrink-0 text-ink-3">{n(r.people, "employee", "employees")}</span>
             </span>
             <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-rule" aria-hidden>
               <span className="block h-full rounded-full bg-sage-deep" style={{ width: `${total ? Math.min(100, Math.round((r.people / total) * 100)) : 0}%` }} />
@@ -140,7 +140,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
   const data: Promise<Overview> = answer.then((a) => a.o ?? EMPTY_OVERVIEW);
   const first = account.fullName.split(/\s+/)[0] || account.fullName;
   const cards = [
-    { label: "Active people", icon: "people", tint: TINTS.blue, href: PEOPLE },
+    { label: "Active employees", icon: "people", tint: TINTS.blue, href: PEOPLE },
     { label: "Signed in", icon: "account", tint: TINTS.green, href: "/platform/company/security" },
     { label: "Wrong passwords", icon: "password", tint: TINTS.orange, href: "/platform/company/activity" },
     { label: "Administrators with two-step", icon: "roles", tint: TINTS.violet, href: "/platform/company/security" },
@@ -208,7 +208,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
                     </p>
                     <ReportChartView
                       kind="bar"
-                      labels={["People who signed in", "Wrong passwords", "People added"]}
+                      labels={["Employees who signed in", "Wrong passwords", "Employees added"]}
                       points={o.months.map((m, i) => ({ x: monthLabel(m.month, i === 0), values: [m.signedIn, m.failed, m.added] }))}
                       format={(v) => String(Math.round(v))}
                       colours={SERIES}
@@ -219,12 +219,12 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
             </Later>
           </Sheet>
           <Sheet className="px-5 py-4">
-            <SectionTitle icon="people">People</SectionTitle>
+            <SectionTitle icon="people">Employees</SectionTitle>
             <Later data={data} fallback={<Bone className="mx-auto mt-4 size-44 rounded-full" />}>
               {(o) => (
                 <div className="mt-3">
                   <Donut
-                    caption="people"
+                    caption="employees"
                     parts={[
                       { label: "Active", value: o.people.active, colour: STATUS.active, href: PEOPLE },
                       { label: "Switched off", value: o.people.off, colour: STATUS.off, href: PEOPLE },
@@ -247,7 +247,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
                 return (
                   <>
                     <p className="mt-3 text-[2.25rem] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{all.of ? Math.round((all.on / all.of) * 100) : 0}%</p>
-                    <p className="mt-1 text-meta text-ink-3">of your people sign in with a code from their phone{o.security.required ? "; required of administrators" : ""}</p>
+                    <p className="mt-1 text-meta text-ink-3">of your employees sign in with a code from their phone{o.security.required ? "; required of administrators" : ""}</p>
                     <ul className="mt-4 space-y-3">
                       <Share label="Administrators" on={o.security.twoStepAdministrators.on} of={o.security.twoStepAdministrators.of} />
                       <Share label="Everyone" on={all.on} of={all.of} />
@@ -324,7 +324,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
             </Later>
           </Sheet>
           <Sheet className="px-5 py-4">
-            <SectionTitle icon="roles">People by role</SectionTitle>
+            <SectionTitle icon="roles">Employees by role</SectionTitle>
             <Later data={data} fallback={<div className="mt-3"><ListRows rows={4} columns={2} /></div>}>
               {(o) => <Bars rows={o.roles.map((r) => ({ key: r.id, name: r.name, people: r.people }))} href="/platform/roles" total={o.people.active} />}
             </Later>

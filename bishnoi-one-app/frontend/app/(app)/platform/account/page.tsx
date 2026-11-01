@@ -5,6 +5,7 @@ import { ChangePasswordButton } from "@/src/platform/account/profile-actions";
 import { accountSend } from "@/src/platform/lib/account";
 import { MySignatureCard } from "@/src/one/account/signature";
 import { TwoStepCard } from "@/src/one/account/two-step";
+import { TwoStepNotice } from "@/src/one/two-step-notice";
 import type { TwoStepState } from "@/src/one/actions";
 import type { PlatformSignature } from "@/src/one/account/signature-actions";
 
@@ -19,6 +20,7 @@ export default async function ConsoleProfile() {
   const roles = [me.staff === "admin" ? "Platform Administrator" : me.staff === "member" ? "Platform Support" : null, me.isCompanyAdmin ? "Company Administrator" : null].filter(Boolean);
   return <>
     <PageHeader title="Your profile">Your Bishnoi One account, company and access.</PageHeader>
+    {me.twoStep?.suggested && <TwoStepNotice href="#two-step" />}
     <Sheet className="mb-5 overflow-hidden">
       <div className="h-24 bg-gradient-to-r from-sage-deep via-sage to-mint sm:h-32" aria-hidden />
       <div className="px-5 pb-5 sm:px-6">

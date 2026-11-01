@@ -13,6 +13,7 @@ import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setP
 import { setAdministrator } from "@/src/one/company/actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
+import { WorkEmailInput } from "./work-email";
 
 // Adding and keeping a company's people, on the Platform, once for every module (R2, decided
 // 2026-10-26): what each module's own Users page used to do, here. A password is made up and
@@ -120,7 +121,7 @@ function PasswordDialog({ person, open, onClose }: { person: { id: string; fullN
   );
 }
 
-/** Add person: who they are, their role, and the modules they may open. */
+/** Add employee: who they are, their role, and the modules they may open. */
 export function AddPerson({ data }: { data: AccessData }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -150,15 +151,15 @@ export function AddPerson({ data }: { data: AccessData }) {
   return (
     <>
       <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
-        Add person
+        Add employee
       </Button>
-      <Modal open={open} title="Add person" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add person" confirmLoading={busy} width={600} destroyOnHidden>
+      <Modal open={open} title="Add employee" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add employee" confirmLoading={busy} width={600} destroyOnHidden>
         <FormGrid className="pt-2">
           <Field label="Full name" size="md" error={errors.fullName}>
             {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} autoFocus maxLength={120} />}
           </Field>
           <Field label="Work email" size="md" error={errors.email} hint="They sign in with this.">
-            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
+            {(p) => <WorkEmailInput {...p} domain={data.company.emailDomain} value={form.email} onChange={(email) => setForm({ ...form, email })} />}
           </Field>
           <Field label="Title" size="md" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} placeholder="e.g. Pharmacist" />}
@@ -209,7 +210,7 @@ type MenuItem = Exclude<Parameters<typeof RowMenu>[0]["items"][number], "divider
  * panel: change details (their email too), a new password, invitation, administrator, two-step reset, switch
  * off or on, delete. `dialogs` must be drawn once wherever these are used.
  */
-export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = []) {
+export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = [], domain?: string | null) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [settingPassword, setSettingPassword] = useState(false);
@@ -224,6 +225,8 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
   const off = person.status !== "active";
+  // Someone not at the domain yet is given a whole new email: only those at it have the fixed @domain.
+  const atDomain = domain && person.email.toLowerCase().endsWith(`@${domain}`) ? domain : null;
 
   function save() {
     start(async () => {
@@ -308,7 +311,7 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
             {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={120} />}
           </Field>
           <Field label="Work email" size="full" error={fields.email} hint="They sign in with this. At your company's email domain; their password stays.">
-            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
+            {(p) => <WorkEmailInput {...p} domain={atDomain} value={form.email} onChange={(email) => setForm({ ...form, email })} />}
           </Field>
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
@@ -337,8 +340,8 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
 }
 
 /** A person's ⋯ on People: open their panel, then every action on them. */
-export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
-  const a = usePersonActions(person, isMe, modules);
+export function PersonMenu({ person, isMe, modules = [], domain }: { person: AccessPerson; isMe: boolean; modules?: string[]; domain?: string | null }) {
+  const a = usePersonActions(person, isMe, modules, domain);
   const items = [
     // Everything about them in one place: the panel beside the list (2026-10-31).
     { label: "Open", icon: <UserRound />, href: `/platform/roles/people?person=${person.id}` },

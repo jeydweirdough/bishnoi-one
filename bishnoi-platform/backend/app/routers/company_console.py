@@ -342,7 +342,7 @@ def set_administrator(person_id: str, body: AdministratorIn, db: DB, me: Admin) 
     if p.is_company_admin == body.on:
         return administrators(db, me)
     if body.on and p.status != "active":
-        raise conflict(f"{p.full_name} is switched off. Switch them on first on People.")
+        raise conflict(f"{p.full_name} is switched off. Switch them on first on Employees.")
     if not body.on:
         if p.id == me.id:
             raise conflict("You can't remove yourself. Another administrator can.")
@@ -476,10 +476,10 @@ def overview(db: DB, me: Admin, settings: SettingsDep, period: str = Query("mont
 # ---- People reports (2026-10-30): the Admin Console's Reports Center is people, never money -----------
 
 PEOPLE_REPORTS = [
-    {"key": "people", "name": "People", "about": "Everyone at the company: role, apps, status, two-step sign-in and last sign-in.", "dated": False},
-    {"key": "sign-ins", "name": "Sign-in activity", "about": "Each person's sign-ins and wrong passwords in the period, and when they last signed in.", "dated": True},
+    {"key": "people", "name": "Employees", "about": "Everyone at the company: role, apps, status, two-step sign-in and last sign-in.", "dated": False},
+    {"key": "sign-ins", "name": "Sign-in activity", "about": "Each employee's sign-ins and wrong passwords in the period, and when they last signed in.", "dated": True},
     {"key": "access-by-app", "name": "Access by app", "about": "Who can open which app. Administrators open every app the company has.", "dated": False},
-    {"key": "roles", "name": "Roles", "about": "Each role, how many people hold it, and how many apps it covers.", "dated": False},
+    {"key": "roles", "name": "Roles", "about": "Each role, how many employees hold it, and how many apps it covers.", "dated": False},
     {"key": "security-events", "name": "Security events", "about": "Sign-ins, password and two-step changes, invitations and access changes in the period.", "dated": True},
 ]
 
@@ -560,7 +560,7 @@ def people_report(key: str, db: DB, me: Admin, date_from: str | None = Query(Non
         for p in people:
             if p.status == "active" and p.access_role_id:
                 holders[p.access_role_id] = holders.get(p.access_role_id, 0) + 1
-        columns = [_col("role", "Role"), _col("people", "People", "number"), _col("everything", "Full access"), _col("apps", "Apps it covers", "number"), _col("about", "Description")]
+        columns = [_col("role", "Role"), _col("people", "Employees", "number"), _col("everything", "Full access"), _col("apps", "Apps it covers", "number"), _col("about", "Description")]
         for r in sorted(roles.values(), key=lambda r: (not r.is_admin, r.name.lower())):
             covered = len(access_roles.grants_of(db, r))
             rows.append([_cell(r.name), _cell(holders.get(r.id, 0)), _cell("Yes" if r.is_admin else ""), _cell(covered), _cell(r.description)])

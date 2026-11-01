@@ -47,7 +47,7 @@ export const MODULES: ModuleDef[] = [
   { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiEnv: "REGULATORY_API_URL", apiLocal: "http://127.0.0.1:8308", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
   // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform
   // staff (same email) see APIs, companies and accounts; a company's administrators its roles.
-  { key: "platform", path: "/platform", label: "Admin Console", blurb: "Your company: profile, people, roles, apps and reports", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
+  { key: "platform", path: "/platform", label: "Admin Console", blurb: "Your company: profile, employees, roles, apps and reports", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
   // Bishnoi One Operations (2026-10-30): Bishnoi One's own operators only, apart from any company's Admin Console:
   // every company, accounts and operators, the services and their connections, and troubleshooting (events).
   { key: "operations", path: "/operations", label: "Operations", blurb: "Bishnoi One: companies, services and troubleshooting", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Wrench, tint: "#eef1f6", ink: "#4a5b78" },

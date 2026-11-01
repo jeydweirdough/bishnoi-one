@@ -19,10 +19,10 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     // The executive Home first: the company in a few figures (decided 2026-10-28).
     groups.push({ label: "Home", pages: [{ href: "/platform/home", label: "Home", icon: "home" }] });
     groups.push({
-      label: "People",
+      label: "Employees",
       icon: "people",
       pages: [
-        { href: "/platform/roles/people", label: "People", icon: "people" },
+        { href: "/platform/roles/people", label: "Employees", icon: "people" },
         { href: "/platform/roles", label: "Roles", icon: "roles" },
         { href: "/platform/organisation", label: "Organisation", icon: "teams" },
       ],

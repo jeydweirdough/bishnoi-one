@@ -63,7 +63,7 @@ export async function CompanyProfilePage() {
         {admins && (
           <Sheet className="px-5 py-4">
             <SectionTitle icon="roles">Administrators</SectionTitle>
-            <p className="mt-1 mb-3 text-meta text-ink-3">They run the company in Bishnoi One: this console, people, roles and apps.</p>
+            <p className="mt-1 mb-3 text-meta text-ink-3">They run the company in Bishnoi One: this console, employees, roles and apps.</p>
             <AdministratorsCard data={admins} />
           </Sheet>
         )}
@@ -110,7 +110,7 @@ export async function CompanyAppsPage() {
   const data = await read<{ apps: CatalogueEntry[] }>("/identity/company/catalogue");
   if (!data) return <Page title="Apps" intro={null}><NotYours /></Page>;
   return (
-    <Page title="Apps" intro="Turn on the apps your company uses and, inside each, the features it needs. What's off is hidden from menus, forms and reports for everyone. Who may open each app is on People.">
+    <Page title="Apps" intro="Turn on the apps your company uses and, inside each, the features it needs. What's off is hidden from menus, forms and reports for everyone. Who may open each app is on Employees.">
       <CatalogueBoard apps={data.apps} />
     </Page>
   );
@@ -157,12 +157,12 @@ export async function SecurityPage() {
   const data = await read<SecurityData>("/identity/company/security");
   if (!data) return <Page title="Security" intro={null}><NotYours /></Page>;
   const figures: [string, number, string][] = [
-    ["Open sign-ins", data.openSignIns, "Across your people, now"],
-    ["Without a password", data.withoutPassword, "Can't sign in yet: set one on People"],
+    ["Open sign-ins", data.openSignIns, "Across your employees, now"],
+    ["Without a password", data.withoutPassword, "Can't sign in yet: set one on Employees"],
     ["Administrators", data.administrators, "Can change every setting"],
   ];
   return (
-    <Page title="Security" intro="Who can sign in, when each person last did, and their open sign-ins. Passwords and switching people off are on People.">
+    <Page title="Security" intro="Who can sign in, when each employee last did, and their open sign-ins. Passwords and switching employees off are on Employees.">
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         {figures.map(([label, n, note]) => (
           <Sheet key={label} className="px-5 py-4">
@@ -173,7 +173,7 @@ export async function SecurityPage() {
         ))}
       </div>
       <Sheet className="px-5 pt-4 pb-2">
-        <SectionTitle icon="password">People</SectionTitle>
+        <SectionTitle icon="password">Employees</SectionTitle>
         <ul className="mt-2 divide-y divide-rule">
           {data.people.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
@@ -204,14 +204,14 @@ const ACTIONS: Record<string, string> = {
   "company.updated": "Changed the company profile",
   "service.updated": "Changed an integration",
   "service.checked": "Tested an integration",
-  "access.person_added": "Added a person",
-  "access.person_changed": "Changed a person",
-  "access.person_suspended": "Switched a person off",
-  "access.person_reactivated": "Switched a person on",
+  "access.person_added": "Added an employee",
+  "access.person_changed": "Changed an employee",
+  "access.person_suspended": "Switched an employee off",
+  "access.person_reactivated": "Switched an employee on",
   "access.password_set": "Set a password",
   "access.granted": "Gave an app",
   "access.withdrawn": "Took an app away",
-  "user.suspended": "Suspended a person",
+  "user.suspended": "Suspended an employee",
   "identity.signed_in": "Signed in",
   "identity.signed_out": "Signed out",
   "identity.switched_company": "Switched company",
@@ -221,8 +221,8 @@ const ACTIONS: Record<string, string> = {
   "organisation.unit_changed": "Changed a unit",
   "organisation.branch_added": "Added a branch",
   "organisation.branch_changed": "Changed a branch",
-  "organisation.person_placed": "Placed a person on the chart",
-  "security.signed_out_person": "Signed a person out",
+  "organisation.person_placed": "Placed an employee on the chart",
+  "security.signed_out_person": "Signed an employee out",
 };
 
 export function said(action: string): string {
@@ -271,9 +271,9 @@ export async function ActivityPage({ search }: { search: Record<string, string |
             <input
               name="q"
               defaultValue={q}
-              placeholder="Find a person or a change"
+              placeholder="Find an employee or a change"
               className="h-9 w-full max-w-xs rounded-lg border border-rule-strong bg-sheet px-3 text-sm"
-              aria-label="Find a person or a change"
+              aria-label="Find an employee or a change"
             />
             <nav className="flex gap-1" aria-label="Kind of activity">
               {tabs.map(([key, label]) => (

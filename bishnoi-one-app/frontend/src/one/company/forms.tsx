@@ -52,7 +52,7 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       <Field label="Contact email" size="md" optional error={errors.contactEmail} hint="Where Bishnoi One writes to the company.">
         {(p) => <Input {...p} type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} maxLength={254} />}
       </Field>
-      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your people are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
+      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your employees are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
         {(p) => <Input {...p} prefix="@" value={form.emailDomain} onChange={(e) => setForm({ ...form, emailDomain: e.target.value })} maxLength={253} placeholder="getmeds.ph" />}
       </Field>
       <Field label="Time zone" size="md" error={errors.timezone}>
@@ -251,8 +251,8 @@ export function AdministratorsCard({ data }: { data: Administrators }) {
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-56 flex-1">
             <Combobox
-              aria-label="Person to make an administrator"
-              placeholder="Choose a person"
+              aria-label="Employee to make an administrator"
+              placeholder="Choose an employee"
               value={pick}
               onChange={(v) => setPick(v as string)}
               options={data.others.map((o) => ({ value: o.id, label: `${o.fullName} · ${o.email}` }))}
@@ -263,7 +263,7 @@ export function AdministratorsCard({ data }: { data: Administrators }) {
           </Button>
         </div>
       ) : (
-        <p className="text-meta text-ink-3">Everyone here is already an administrator. Add people on People first.</p>
+        <p className="text-meta text-ink-3">Everyone here is already an administrator. Add employees on Employees first.</p>
       )}
     </div>
   );

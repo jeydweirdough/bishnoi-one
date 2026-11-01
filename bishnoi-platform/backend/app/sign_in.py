@@ -248,9 +248,10 @@ def needs_two_step(settings: Settings, account: Account | None, runs: bool) -> b
     return bool(settings.two_step_required and account is not None and (runs or account.is_operator) and not two_step_on(account))
 
 
-def suggests_two_step(account: Account | None, runs: bool) -> bool:
-    """Someone who runs a company (or is an operator) without two-step sign-in: reminded on every page, not stopped."""
-    return bool(account is not None and (runs or account.is_operator) and not two_step_on(account))
+def suggests_two_step(account: Account | None) -> bool:
+    """Anyone without two-step sign-in (2026-11-01): offered the set-up page after signing in, which they can skip,
+    and told on their profile. Nobody is stopped, and nobody has to be chased."""
+    return bool(account is not None and not two_step_on(account))
 
 
 def count_unused(db: Session, account_id: str, kind: str) -> int:

@@ -12,14 +12,14 @@ export async function AccessFrame({ current, children }: { current: "people" | "
   return (
     <>
       <PageHeader
-        title={current === "people" ? "People" : current === "bin" ? "Recycle bin" : "Roles"}
+        title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"}
         crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "People" }] : undefined}
       >
         {data ? (
           current === "bin" ? (
-            <>People deleted from {data.company.name}. They can&apos;t sign in, and what they did stays. Restore puts them back on People, switched off until you switch them on.</>
+            <>Employees deleted from {data.company.name}. They can&apos;t sign in, and what they did stays. Restore puts them back on Employees, switched off until you switch them on.</>
           ) : current === "people" ? (
-            <>Everyone at {data.company.name}: add people, give them the apps they may open and their role in each, set passwords, switch people off. The apps are told at once.</>
+            <>Everyone at {data.company.name}: add employees, give them the apps they may open and their role in each, set passwords, switch employees off. The apps are told at once.</>
           ) : (
             <>What each role can do, in plain words, and whose records it sees. Start from one of Bishnoi One&apos;s job roles and adjust it. Every app is told at once.</>
           )
