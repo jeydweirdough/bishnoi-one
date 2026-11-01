@@ -6,7 +6,7 @@ import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src
 import { Download, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Banner } from "@/src/platform/ui/alert";
 import { LinkButton } from "@/src/platform/ui/ant-button";
@@ -22,6 +22,8 @@ import { EmployeesBulk } from "./people-bulk";
 import type { AccessData, AccessPerson } from "./types";
 
 const NONE = "";
+/** Rows a page with an employee's panel open beside the list. */
+const BESIDE_PANEL = 10;
 
 /** Everyone at the company, as a table: their role in each app and the apps they may open, each changed where it's shown. */
 export function PeopleList({ data, selected = null, panel = null }: { data: AccessData; selected?: string | null; panel?: ReactNode }) {
@@ -40,26 +42,9 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
   // A page at a time (2026-11-01). Until a page is picked, the one holding the open employee.
   const [picked, setPicked] = useState<number | null>(null);
   const at = shown.findIndex((p) => p.id === selected);
-  // With an employee open, as many rows as stand beside their panel (2026-11-01): the list ends where the panel does.
-  const panelBox = useRef<HTMLDivElement>(null);
-  const listBox = useRef<HTMLDivElement>(null);
-  const [fits, setFits] = useState<number | null>(null);
-  useEffect(() => {
-    const box = panelBox.current;
-    if (!panel || !box) return setFits(null);
-    const measure = () => {
-      const list = listBox.current;
-      const row = list?.querySelector("tbody tr")?.getBoundingClientRect().height || 61;
-      const head = list?.querySelector("thead")?.getBoundingClientRect().height || 37;
-      const pager = 48;
-      setFits(Math.max(3, Math.floor((box.getBoundingClientRect().height - head - pager) / row)));
-    };
-    measure();
-    const seen = new ResizeObserver(measure);
-    seen.observe(box);
-    return () => seen.disconnect();
-  }, [panel]);
-  const size = panel ? (fits ?? PAGE_SIZE) : PAGE_SIZE;
+  // With an employee open, ten a page whatever the tab (2026-11-02): the same pages every time, and the panel
+  // stands as tall as the list beside it.
+  const size = panel ? BESIDE_PANEL : PAGE_SIZE;
   // Opening or closing an employee shows the page they're on, at that page's size.
   useEffect(() => setPicked(null), [selected, size]);
   const { rows: onPage, page } = slicePage(shown, picked ?? (at >= 0 ? Math.floor(at / size) + 1 : 1), size);
@@ -133,8 +118,8 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
             Try another name or email.
           </Empty>
         ) : (
-          <div className={panel ? "mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-start" : "mt-3"}>
-            <div ref={listBox} className="overflow-x-auto">
+          <div className={panel ? "mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-stretch" : "mt-3"}>
+            <div className="flex flex-col overflow-x-auto">
               <table className={`w-full text-sm ${panel ? "" : "min-w-[48rem]"}`}>
                 <thead>
                   <tr className="border-b border-rule text-left text-meta text-ink-3">
@@ -161,9 +146,11 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
                   ))}
                 </tbody>
               </table>
-              <Pager total={shown.length} page={page} size={size} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
+              <div className="mt-auto">
+                <Pager total={shown.length} page={page} size={size} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
+              </div>
             </div>
-            {panel && <div ref={panelBox}>{panel}</div>}
+            {panel && <div className="flex flex-col [&>*]:flex-1">{panel}</div>}
           </div>
         )}
       </Sheet>
