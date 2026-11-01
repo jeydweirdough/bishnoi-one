@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { accountSend } from "@/src/platform/lib/account";
 import { attempt, type Result } from "@/src/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 import type { AccessRole, AppDetails, ImportReport, RoleInput } from "./types";
 
 // A company administrator's changes to access, on Bishnoi One Platform
@@ -163,5 +164,28 @@ export async function importPeople(rows: ImportPeopleRow[], apply: boolean, invi
     const r = await accountSend<ImportPeopleResult>("POST", "/identity/access/people/import", { rows, apply, invite });
     if (apply) refresh();
     return r;
+  });
+}
+
+// Several employees at once (2026-11-01): each through its own action, so the Platform's rules hold for each
+// (never yourself, never the last administrator).
+export async function bulkSwitchPeople(status: "active" | "suspended", ids: string[]) {
+  return eachOf(status === "active" ? "Switch on" : "Switch off", ids, (id) => changePerson(id, { status }));
+}
+export async function bulkGiveModule(key: string, ids: string[]) {
+  return eachOf("Give an app", ids, (id) => setPersonModule(id, key, true));
+}
+export async function bulkDeletePeople(ids: string[]) {
+  return eachOf("Delete employees", ids, deletePerson);
+}
+export async function bulkRestorePeople(ids: string[]) {
+  return eachOf("Restore employees", ids, restorePerson);
+}
+/** Emailed, or it counts as not done: nobody should think an invitation left when none did. */
+export async function bulkInvitePeople(ids: string[]) {
+  return eachOf("Send invitations", ids, async (id) => {
+    const r = await invitePerson(id);
+    if (!r.ok) return r;
+    return r.data.emailed ? { ok: true as const } : { ok: false as const, error: "No email sent: set up email sending in Integrations, or send their link from ⋯." };
   });
 }

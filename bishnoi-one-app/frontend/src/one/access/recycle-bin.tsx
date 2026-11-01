@@ -1,5 +1,7 @@
 "use client";
 
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -8,7 +10,7 @@ import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/ant-button";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { TypeToDelete } from "@/src/platform/ui/type-to-delete";
-import { erasePerson, restorePerson } from "./actions";
+import { bulkRestorePeople, erasePerson, restorePerson } from "./actions";
 import type { BinPerson } from "./types";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Manila" });
@@ -27,10 +29,22 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
     );
   }
   return (
+    <BulkList
+      items={people.map((p) => ({ id: p.id, name: p.fullName }))}
+      noun={["employee", "employees"]}
+      // Permanent delete stays one at a time: each is confirmed by typing their email.
+      actions={[{ label: "Restore", icon: <RotateCcw className="size-4" aria-hidden />, doing: "Restoring", done: "restored, switched off", run: bulkRestorePeople }]}
+    >
     <Sheet className="px-5 py-2">
+      <div className="border-b border-rule py-2">
+        <SelectAllBox>
+          <span className="text-meta text-ink-3">Select all</span>
+        </SelectAllBox>
+      </div>
       <ul className="divide-y divide-rule">
         {people.map((p) => (
-          <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+          <SelectableRow as="li" key={p.id} id={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+            <SelectBox id={p.id} label={p.fullName} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{p.fullName}</p>
               <p className="truncate text-meta text-ink-3">
@@ -57,7 +71,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
             <Button size="sm" variant="danger" icon={<Trash2 className="size-4" aria-hidden />} onClick={() => setErasing(p)}>
               Delete permanently
             </Button>
-          </li>
+          </SelectableRow>
         ))}
       </ul>
       {erasing && (
@@ -92,5 +106,6 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
         </TypeToDelete>
       )}
     </Sheet>
+    </BulkList>
   );
 }

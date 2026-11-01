@@ -1,3 +1,5 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
 import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { ArrowRight, Ban, ExternalLink, Pencil, Plus, Printer, Trash2 } from "lucide-react";
@@ -6,7 +8,7 @@ import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { ToggleLinks } from "@/src/modules/inventory/platform/ui/toggle-links";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { deleteTransfer, transferStep } from "@/src/modules/inventory/actions/inventory";
+import { bulkDeleteTransfers, deleteTransfer, transferStep } from "@/src/modules/inventory/actions/inventory";
 import { TransferForm } from "@/src/modules/inventory/components/document-forms";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
 import { PickForm, type PickLine } from "@/src/modules/inventory/components/pick-form";
@@ -42,6 +44,7 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
   if (!board) keepInRange(list.items.length, list.total, page, base);
   const transfers = list.items;
   const chip = (status: string, label: string) => ({ value: status, label, href: `/inventory/transfers${query({ q: f.q, status })}` });
+  const bulk = may("transfers.create");
   return (
     <>
       <PageHeader
@@ -71,9 +74,11 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
         {transfers.length === 0 ? (
           <FirstStep icon="transfers" title="No transfer orders" body="Move stock between warehouses, with approval and in-transit tracking." needs={["twoWarehouses", "stock"]} href="/inventory/transfers/new" action="New transfer" permission="transfers.create" filtered={Boolean(f.q || f.status)} clear="/inventory/transfers" may={may} />
         ) : (
-          <Table head={["Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units", <span key="a" className="sr-only">Actions</span>]} min="52rem">
+          <BulkList items={bulk ? transfers.filter((t) => t.status === "draft").map((t) => ({ id: t.id, name: t.number })) : []} noun={["draft transfer", "draft transfers"]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeleteTransfers }]}>
+          <Table head={[bulk ? <SelectAllBox key="s" /> : "", "Transfer", "From → to", "Status", "Requested", "Dispatched", "Received", " Units", <span key="a" className="sr-only">Actions</span>]} min="52rem">
             {transfers.map((t) => (
-              <tr key={t.id} className="relative hover:bg-bench/40">
+              <SelectableRow key={t.id} id={t.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && t.status === "draft" && <SelectBox id={t.id} label={t.number} />}</td>
                 <Td><RowLink href={`/inventory/transfers/${t.id}`} sub={`${t.lineCount} line${t.lineCount === 1 ? "" : "s"}`}>{t.number}</RowLink></Td>
                 <Td className="whitespace-nowrap">{t.from.code} <ArrowRight className="inline size-3.5 text-ink-3" aria-label="to" /> {t.to.code}</Td>
                 <Td><TransferStamp status={t.status} /></Td>
@@ -101,9 +106,10 @@ export async function TransfersPage({ searchParams }: { searchParams: Search }) 
                     ]}
                   />
                 </td>
-              </tr>
+              </SelectableRow>
             ))}
           </Table>
+          </BulkList>
         )}
       </Sheet>
       )}

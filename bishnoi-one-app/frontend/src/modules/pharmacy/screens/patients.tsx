@@ -1,6 +1,8 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { ClipboardPlus, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { deletePatient } from "@/src/modules/pharmacy/actions/pharmacy";
+import { bulkDeletePatients, deletePatient } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Flag } from "@/src/modules/pharmacy/platform/ui/marks";
@@ -21,6 +23,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
   const q = param(search, "q");
   const rows = await load<PatientRow[]>(`/patients?kind=${kind}${q ? `&q=${enc(q)}` : ""}`);
 
+  const bulk = may("patients.delete");
   return (
     <>
       <PageHeader
@@ -50,14 +53,16 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
         {rows.length === 0 ? (
           <Empty icon="patients" title={q ? "Nobody matches" : `No ${kind}s yet`} />
         ) : (
-          <div className="overflow-x-auto">
+          <BulkList items={bulk ? rows.map((p) => ({ id: p.id, name: p.fullName })) : []} noun={[kind, `${kind}s`]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone. Someone with prescriptions or sales can't be deleted and stays ticked.", run: bulkDeletePatients }]}>
+<div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">
-              <Head columns={["Name", "Born", "Phone", kind === "patient" ? "Prescriptions" : "Allergies", { label: "Last visit", right: true }, { label: "", className: "w-12" }]} />
+              <Head columns={[{ label: bulk ? <SelectAllBox /> : "", className: "w-10" }, "Name", "Born", "Phone", kind === "patient" ? "Prescriptions" : "Allergies", { label: "Last visit", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {rows.map((p) => {
                   const years = age(p.birthDate);
                   return (
-                    <tr key={p.id} className="relative hover:bg-bench/40">
+                    <SelectableRow key={p.id} id={p.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && <SelectBox id={p.id} label={p.fullName} />}</td>
                       <td className="py-3 pr-3 pl-5">
                         <Link href={`/pharmacy/patients/${p.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
                           {p.fullName}
@@ -84,12 +89,13 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
                           ]}
                         />
                       </td>
-                    </tr>
+                    </SelectableRow>
                   );
                 })}
               </tbody>
             </table>
           </div>
+</BulkList>
         )}
       </Sheet>
     </>

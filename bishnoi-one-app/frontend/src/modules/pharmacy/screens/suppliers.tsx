@@ -1,6 +1,8 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { deleteSupplier } from "@/src/modules/pharmacy/actions/pharmacy";
+import { bulkDeleteSuppliers, deleteSupplier } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/pharmacy/platform/ui/sheet";
@@ -22,6 +24,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Se
   const state = param(search, "state") === "off" ? "off" : "active";
   const rows = await load<Supplier[]>(`/suppliers?state=${state}${q ? `&q=${enc(q)}` : ""}`);
 
+  const bulk = may("suppliers.delete");
   return (
     <>
       <PageHeader
@@ -50,12 +53,14 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Se
         {rows.length === 0 ? (
           <Empty icon="suppliers" title={q ? "No suppliers match" : state === "off" ? "Nobody switched off" : "No suppliers yet"} />
         ) : (
-          <div className="overflow-x-auto">
+          <BulkList items={bulk ? rows.map((s) => ({ id: s.id, name: s.name })) : []} noun={["supplier", "suppliers"]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone. A supplier with deliveries can't be deleted and stays ticked.", run: bulkDeleteSuppliers }]}>
+<div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">
-              <Head columns={["Supplier", "Contact", { label: "Deliveries", right: true }, { label: "Last delivery", right: true }, { label: "", className: "w-12" }]} />
+              <Head columns={[{ label: bulk ? <SelectAllBox /> : "", className: "w-10" }, "Supplier", "Contact", { label: "Deliveries", right: true }, { label: "Last delivery", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {rows.map((s) => (
-                  <tr key={s.id} className="relative hover:bg-bench/40">
+                  <SelectableRow key={s.id} id={s.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && <SelectBox id={s.id} label={s.name} />}</td>
                     <td className="py-3 pr-3 pl-5">
                       <Link href={`/pharmacy/suppliers/${s.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
                         {s.name}
@@ -78,11 +83,12 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Se
                         ]}
                       />
                     </td>
-                  </tr>
+                  </SelectableRow>
                 ))}
               </tbody>
             </table>
           </div>
+</BulkList>
         )}
       </Sheet>
     </>

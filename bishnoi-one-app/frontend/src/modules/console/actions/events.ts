@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/console/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/console/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 
 export type Delivery = {
   eventId: string;
@@ -50,5 +51,13 @@ export async function checkEvents(): Promise<Result<CheckResult>> {
     const r = await api.post<CheckResult>("/platform/events/check", {});
     refresh();
     return r;
+  });
+}
+
+/** Several stuck deliveries at once (2026-11-01). A delivery's id here is "event|app". */
+export async function bulkDeliveries(what: "retry" | "skip", ids: string[]) {
+  return eachOf(what === "retry" ? "Retry" : "Skip", ids, async (id) => {
+    const [eventId, target] = id.split("|");
+    return what === "retry" ? retryDelivery(eventId, target) : skipDelivery(eventId, target);
   });
 }

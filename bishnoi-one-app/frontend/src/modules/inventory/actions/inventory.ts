@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/inventory/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/inventory/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 
 // Everything the screens change. The API checks the caller's role and every
 // rule on each one (enough stock, the right status, nobody locked out);
@@ -300,4 +301,21 @@ export async function saveRole(id: string | null, input: Json): Promise<Result<I
 }
 export async function deleteRole(id: string): Promise<Result<null>> {
   return send<null>("del", `/admin/roles/${enc(id)}`);
+}
+
+// Several at once (2026-11-01): each goes through its one-at-a-time action, with all its rules.
+export async function bulkDeleteProducts(ids: string[]) {
+  return eachOf("Delete items", ids, deleteProduct);
+}
+export async function bulkDeleteSuppliers(ids: string[]) {
+  return eachOf("Delete vendors", ids, deleteSupplier);
+}
+export async function bulkDeleteOrders(ids: string[]) {
+  return eachOf("Delete orders", ids, deleteOrder);
+}
+export async function bulkDeletePurchaseOrders(ids: string[]) {
+  return eachOf("Delete purchase orders", ids, deletePurchaseOrder);
+}
+export async function bulkDeleteTransfers(ids: string[]) {
+  return eachOf("Delete transfers", ids, deleteTransfer);
 }

@@ -1,7 +1,10 @@
 // Business events (feature plan step 7): what the apps tell each other through the Platform, and
 // the deliveries that are stuck, for an operator to retry or skip.
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
+import { RotateCcw, SkipForward } from "lucide-react";
 import Link from "next/link";
-import type { EventsView } from "@/src/modules/console/actions/events";
+import { bulkDeliveries, type EventsView } from "@/src/modules/console/actions/events";
 import { CheckNow, DeliveryTools } from "@/src/modules/console/components/events/event-tools";
 import { ago, when } from "@/src/modules/console/lib/words";
 import { load } from "@/src/modules/console/platform/lib/api";
@@ -23,6 +26,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const state = STATES.find((x) => x.key === s.state)?.key ?? "stuck";
   const [view, me] = await Promise.all([load<EventsView>(`/platform/events?state=${state}`), getAccount()]);
   const canAct = me.staff === "admin";
+  const open = (d: { status: string }) => d.status === "stuck" || d.status === "pending";
   return (
     <>
       <PageHeader title="Events" actions={canAct && <CheckNow />}>
@@ -47,9 +51,18 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
             {state === "stuck" ? "Every event reached the apps that take it." : "Deliveries in this state are listed here."}
           </Empty>
         ) : (
+          <BulkList
+            items={canAct ? view.deliveries.filter(open).map((d) => ({ id: `${d.eventId}|${d.target}`, name: d.says })) : []}
+            noun={["delivery", "deliveries"]}
+            actions={[
+              { label: "Retry", icon: <RotateCcw className="size-4" aria-hidden />, doing: "Retrying", done: "tried again", run: bulkDeliveries.bind(null, "retry") },
+              { label: "Skip", icon: <SkipForward className="size-4" aria-hidden />, doing: "Skipping", done: "skipped", confirm: "The events behind them go on; these aren't delivered.", run: bulkDeliveries.bind(null, "skip") },
+            ]}
+          >
           <ul className="divide-y divide-rule">
             {view.deliveries.map((d) => (
-              <li key={`${d.eventId}-${d.target}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+              <SelectableRow as="li" key={`${d.eventId}-${d.target}`} id={`${d.eventId}|${d.target}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+                {canAct && open(d) && <SelectBox id={`${d.eventId}|${d.target}`} label={d.says} />}
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-ink">
                     {d.says}{" "}
@@ -66,10 +79,11 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
                     {d.lastError ? ` · ${d.lastError}` : ""}
                   </span>
                 </span>
-                {canAct && (d.status === "stuck" || d.status === "pending") && <DeliveryTools eventId={d.eventId} target={d.target} />}
-              </li>
+                {canAct && open(d) && <DeliveryTools eventId={d.eventId} target={d.target} />}
+              </SelectableRow>
             ))}
           </ul>
+          </BulkList>
         )}
       </Sheet>
       <Sheet className="mt-4 px-5 py-4">

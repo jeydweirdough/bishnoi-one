@@ -11,7 +11,8 @@ import { Icon } from "@/src/modules/inventory/platform/ui/icons";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { deleteOrder, orderStep } from "@/src/modules/inventory/actions/inventory";
+import { Trash2 as BulkTrash } from "lucide-react";
+import { bulkDeleteOrders, deleteOrder, orderStep } from "@/src/modules/inventory/actions/inventory";
 import { OrderForm } from "@/src/modules/inventory/components/document-forms";
 import { ReceivedProof, SignForDelivery } from "@/src/modules/inventory/components/sign-for-delivery";
 import { ShippingCard } from "@/src/modules/inventory/components/shipping";
@@ -136,6 +137,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
           ) : (
             <ExpandableTable
               minWidth="52rem"
+              bulk={{ noun: ["draft order", "draft orders"], actions: [{ label: "Delete", icon: <BulkTrash className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeleteOrders }] }}
               columns={[
                 { key: "order", label: "Order" },
                 { key: "to", label: info ? info.recipient.label : "Recipient" },
@@ -151,6 +153,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
                 return {
                   id: o.id,
                   muted: o.status === "cancelled",
+                  tick: o.status === "draft" && may("orders.edit") ? o.number : undefined,
                   actions: (
                     <RowMenu
                       label={`Actions for ${o.number}`}

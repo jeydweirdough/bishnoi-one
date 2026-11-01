@@ -1,3 +1,5 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { FirstStep } from "@/src/modules/inventory/components/setup";
 import { ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
@@ -5,7 +7,7 @@ import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { deleteSupplier, saveSupplier } from "@/src/modules/inventory/actions/inventory";
+import { bulkDeleteSuppliers, deleteSupplier, saveSupplier } from "@/src/modules/inventory/actions/inventory";
 import { POStamp } from "@/src/modules/inventory/components/stamps";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { StepButton } from "@/src/modules/inventory/components/step-button";
@@ -34,6 +36,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
   );
   keepInRange(list.items.length, list.total, page, base);
   const suppliers = list.items;
+  const bulk = may("suppliers.delete");
   return (
     <>
       <PageHeader
@@ -48,9 +51,11 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
         {suppliers.length === 0 ? (
           <FirstStep icon="suppliers" title="No vendors" body="Vendors you buy from, with their payment terms and lead times." href="/inventory/suppliers/new" action="Add vendor" permission="suppliers.create" filtered={Boolean(f.q || f.state !== "active")} clear="/inventory/suppliers" may={may} />
         ) : (
-          <Table head={["Vendor", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received", <span key="a" className="sr-only">Actions</span>]} min="56rem">
+          <BulkList items={bulk ? suppliers.map((x) => ({ id: x.id, name: x.name })) : []} noun={["vendor", "vendors"]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone. A vendor with purchase orders can't be deleted and stays ticked.", run: bulkDeleteSuppliers }]}>
+          <Table head={[bulk ? <SelectAllBox key="s" /> : "", "Vendor", "Contact", "Payment terms", " Lead time", " Orders", " Fill rate", " On-time delivery", " Received", <span key="a" className="sr-only">Actions</span>]} min="56rem">
             {suppliers.map((x) => (
-              <tr key={x.id} className="relative hover:bg-bench/40">
+              <SelectableRow key={x.id} id={x.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && <SelectBox id={x.id} label={x.name} />}</td>
                 <Td><RowLink href={`/inventory/suppliers/${x.id}`} sub={x.code}>{x.name}</RowLink></Td>
                 <Td className="text-ink-2">{x.contactPerson ?? "—"}<span className="block text-meta text-ink-3">{x.phone ?? x.email ?? ""}</span></Td>
                 <Td className="text-ink-2">{x.paymentTerms ?? "—"}</Td>
@@ -76,9 +81,10 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
                     ]}
                   />
                 </td>
-              </tr>
+              </SelectableRow>
             ))}
           </Table>
+          </BulkList>
         )}
       </Sheet>
       <Pager total={list.total} page={page} size={size} base={base} noun={list.total === 1 ? "vendor" : "vendors"} />

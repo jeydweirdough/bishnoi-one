@@ -1,7 +1,8 @@
 import { loadLetterhead } from "@/src/platform/print/letterhead";
 import { ExternalLink, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { deleteInvoice } from "@/src/modules/finance/invoices/actions";
+import { Trash2 as BulkTrash } from "lucide-react";
+import { bulkDeleteInvoices, deleteInvoice } from "@/src/modules/finance/invoices/actions";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
@@ -136,6 +137,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
           </Empty>
         ) : (
           <ExpandableTable
+            bulk={{ noun: ["draft invoice", "draft invoices"], actions: [{ label: "Delete", icon: <BulkTrash className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeleteInvoices }] }}
             columns={[
               { key: "number", label: "Number" },
               { key: "customer", label: "Customer" },
@@ -150,6 +152,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
               return {
                 id: i.id,
                 muted: i.status === "void",
+                tick: i.status === "draft" && may(me, "invoices.create") ? `Draft for ${i.customer.name}` : undefined,
                 actions: (
                   <RowMenu
                     label={`Actions for invoice ${i.number ?? `draft for ${i.customer.name}`}`}

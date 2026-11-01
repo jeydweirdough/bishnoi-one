@@ -1,11 +1,13 @@
 "use client";
 
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { Power, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addOperator, findPeople, setOperator, type FoundPerson, type Operator } from "@/src/modules/console/actions/operators";
+import { addOperator, bulkRemoveOperators, findPeople, setOperator, type FoundPerson, type Operator } from "@/src/modules/console/actions/operators";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input, PasswordInput, SearchInput } from "@/src/platform/ui/field";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
@@ -87,9 +89,15 @@ export function OperatorsList({ operators, meEmail, canChange }: { operators: Op
             Someone must run Bishnoi One: add an operator.
           </Empty>
         ) : (
+          <BulkList
+            items={canChange ? operators.filter((a) => a.email !== meEmail).map((a) => ({ id: a.id, name: a.fullName })) : []}
+            noun={["operator", "operators"]}
+            actions={[{ label: "Remove", icon: <Power className="size-4" aria-hidden />, doing: "Removing", done: "removed", danger: true, confirm: "They lose Operations and every company they entered only as an operator. A company's own employee stays one.", run: bulkRemoveOperators }]}
+          >
           <ul className="divide-y divide-rule">
             {operators.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
+              <SelectableRow as="li" key={a.id} id={a.id} className="flex flex-wrap items-center gap-3 py-3">
+                {canChange && a.email !== meEmail && <SelectBox id={a.id} label={a.fullName} />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink">
                     {a.fullName}
@@ -102,9 +110,10 @@ export function OperatorsList({ operators, meEmail, canChange }: { operators: Op
                     Remove operator
                   </Button>
                 )}
-              </li>
+              </SelectableRow>
             ))}
           </ul>
+          </BulkList>
         )}
       </Sheet>
     </div>

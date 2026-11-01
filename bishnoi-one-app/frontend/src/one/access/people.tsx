@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import { Download, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { importRoles, setPersonAppRole, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
 import { AddPerson, PersonMenu } from "./person-dialogs";
 import { ImportPeople } from "./import-people";
+import { EmployeesBulk } from "./people-bulk";
 import type { AccessData, AccessPerson } from "./types";
 
 const NONE = "";
@@ -69,6 +71,8 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
         </Banner>
       ) : null}
 
+      {/* Yourself can't be switched off or deleted, so you aren't ticked; nor with an employee open beside the list. */}
+      <SelectionProvider items={panel ? [] : shown.filter((p) => p.id !== data.meId).map((p) => ({ id: p.id, name: p.fullName }))}>
       <Sheet className="px-5 pt-4 pb-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-full max-w-xs">
@@ -106,6 +110,11 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
               <table className={`w-full text-sm ${panel ? "" : "min-w-[48rem]"}`}>
                 <thead>
                   <tr className="border-b border-rule text-left text-meta text-ink-3">
+                    {!panel && (
+                      <th scope="col" className="w-10 py-2">
+                        <SelectAllBox />
+                      </th>
+                    )}
                     <th scope="col" className="py-2 pr-4 font-medium">{panel ? "Name / email" : "Name"}</th>
                     {!panel && (
                       <>
@@ -129,6 +138,8 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
           </div>
         )}
       </Sheet>
+      {!panel && <EmployeesBulk data={data} />}
+      </SelectionProvider>
     </div>
   );
 }
@@ -160,7 +171,8 @@ function PersonRow({ person, data, compact, current }: { person: AccessPerson; d
     );
   }
   return (
-    <tr className="group hover:bg-bench/40">
+    <SelectableRow id={person.id} className="hover:bg-bench/40">
+      <td className="w-10 py-2.5">{person.id !== data.meId && <SelectBox id={person.id} label={person.fullName} />}</td>
       <td className="max-w-[16rem] py-2.5 pr-4">{name}</td>
       <td className="max-w-[16rem] truncate py-2.5 pr-4 text-ink-2">{person.email}</td>
       <td className="py-2.5 pr-4 whitespace-nowrap text-ink-2">{addedOn(person.addedAt)}</td>
@@ -175,7 +187,7 @@ function PersonRow({ person, data, compact, current }: { person: AccessPerson; d
       <td className="py-2.5 text-right">
         <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} domain={data.company.emailDomain} />
       </td>
-    </tr>
+    </SelectableRow>
   );
 }
 

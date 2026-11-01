@@ -1,7 +1,9 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { FirstStep } from "@/src/modules/inventory/components/setup";
 import { ArrowLeftRight, ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { deleteProduct } from "@/src/modules/inventory/actions/inventory";
+import { bulkDeleteProducts, deleteProduct } from "@/src/modules/inventory/actions/inventory";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
@@ -36,8 +38,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const tops = products.filter((p) => !p.parentId || !ids.has(p.parentId));
   const under = (id: string) => products.filter((p) => p.parentId === id);
 
+  const bulk = may("products.delete");
+
   const row = (p: ProductRow, nested = false) => (
-    <tr key={p.id} className="relative hover:bg-bench/40">
+    <SelectableRow key={p.id} id={p.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && <SelectBox id={p.id} label={p.name} />}</td>
       <Td>
         <div className={nested ? "pl-5" : ""}>
           <RowLink href={`/inventory/products/${p.id}`} sub={[p.sku, p.category?.path, p.brand?.name].filter(Boolean).join(" · ")}>
@@ -73,7 +78,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           ]}
         />
       </td>
-    </tr>
+    </SelectableRow>
   );
 
   return (
@@ -107,9 +112,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         {products.length === 0 ? (
           <FirstStep icon="products" title="No items" body="Add stocked items with their SKU, unit and reorder level." href="/inventory/products/new" action="New item" permission="products.create" filtered={Boolean(f.q || f.category || f.brand || f.supplier || f.stock || f.missing || f.cpr || f.status !== "active")} clear="/inventory/products" may={may} />
         ) : (
-          <Table head={["Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock", "CPR", <span key="a" className="sr-only">Actions</span>]} min="60rem">
+          <BulkList items={bulk ? products.map((p) => ({ id: p.id, name: p.name })) : []} noun={["item", "items"]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone. An item with stock or documents can't be deleted and stays ticked.", run: bulkDeleteProducts }]}>
+          <Table head={[bulk ? <SelectAllBox key="s" /> : "", "Product", " On hand", " Available", " Reorder level", " Unit cost", " Selling price", "Stock", "CPR", <span key="a" className="sr-only">Actions</span>]} min="60rem">
             {tops.flatMap((p) => [row(p), ...under(p.id).map((v) => row(v, true))])}
           </Table>
+          </BulkList>
         )}
       </Sheet>
       <Pager total={list.total} page={page} size={size} base={base} noun={`product${list.total === 1 ? "" : "s"}${f.q ? ` matching “${f.q}”` : ""}`} />

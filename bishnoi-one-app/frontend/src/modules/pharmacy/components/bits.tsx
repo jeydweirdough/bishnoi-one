@@ -145,7 +145,7 @@ export function NoAccess({ what }: { what: string }) {
 }
 
 /** A table's head row. */
-export function Head({ columns }: { columns: (string | { label: string; right?: boolean; className?: string })[] }) {
+export function Head({ columns }: { columns: (string | { label: ReactNode; right?: boolean; className?: string })[] }) {
   return (
     <thead>
       <tr className="border-b border-rule text-caps text-ink-3 uppercase">
@@ -153,7 +153,7 @@ export function Head({ columns }: { columns: (string | { label: string; right?: 
           const col = typeof c === "string" ? { label: c } : c;
           return (
             <th
-              key={col.label || i}
+              key={typeof col.label === "string" && col.label ? col.label : i}
               scope="col"
               className={`py-3 font-semibold ${i === 0 ? "pl-5" : "pl-3"} ${i === columns.length - 1 ? "pr-5" : "pr-3"} ${col.right ? "text-right" : ""} ${col.className ?? ""}`}
             >

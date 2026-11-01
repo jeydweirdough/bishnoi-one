@@ -1,6 +1,8 @@
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
 import { Boxes, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { deleteMedicine } from "@/src/modules/pharmacy/actions/pharmacy";
+import { bulkDeleteMedicines, deleteMedicine } from "@/src/modules/pharmacy/actions/pharmacy";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/pharmacy/platform/ui/button";
 import { Flag } from "@/src/modules/pharmacy/platform/ui/marks";
@@ -64,6 +66,7 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
   const inCategory = categories.find((c) => c.id === category);
   const unpriced = medicines.filter((m) => m.priceCentavos === 0).length;
 
+  const bulk = may("medicines.delete");
   return (
     <>
       <PageHeader
@@ -122,12 +125,14 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
             {!q && state === "active" && !inCategory ? "Add the medicines the pharmacy stocks." : null}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <BulkList items={bulk ? medicines.map((m) => ({ id: m.id, name: m.label })) : []} noun={["medicine", "medicines"]} actions={[{ label: "Delete", icon: <Trash2 className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone. A medicine with stock or records can't be deleted and stays ticked.", run: bulkDeleteMedicines }]}>
+<div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] text-left text-sm">
-              <Head columns={["Medicine", "Category", "Class", { label: "Price", right: true }, { label: "On hand", right: true }, { label: "Available", right: true }, { label: "", className: "w-12" }]} />
+              <Head columns={[{ label: bulk ? <SelectAllBox /> : "", className: "w-10" }, "Medicine", "Category", "Class", { label: "Price", right: true }, { label: "On hand", right: true }, { label: "Available", right: true }, { label: "", className: "w-12" }]} />
               <tbody className="divide-y divide-rule">
                 {medicines.map((m) => (
-                  <tr key={m.id} className="relative hover:bg-bench/40">
+                  <SelectableRow key={m.id} id={m.id} className="relative hover:bg-bench/40">
+<td className="w-10 py-3 pl-5">{bulk && <SelectBox id={m.id} label={m.label} />}</td>
                     <td className="py-3 pr-3 pl-5">
                       <span className="flex flex-wrap items-center gap-2">
                         <Link href={`/pharmacy/medicines/${m.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
@@ -162,11 +167,12 @@ export default async function MedicinesPage({ searchParams }: { searchParams: Se
                         ]}
                       />
                     </td>
-                  </tr>
+                  </SelectableRow>
                 ))}
               </tbody>
             </table>
           </div>
+</BulkList>
         )}
       </Sheet>
     </>

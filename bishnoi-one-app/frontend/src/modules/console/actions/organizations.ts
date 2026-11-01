@@ -6,6 +6,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/console/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/console/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 import type { Company, Unit } from "@/src/modules/console/lib/types";
 
 export type CompanyInput = {
@@ -70,4 +71,9 @@ export async function deleteUnit(companyId: string, unitId: string): Promise<Res
     refresh();
     return null;
   });
+}
+
+/** Several at once (2026-11-01), each through updateCompany. */
+export async function bulkCompanyStatus(status: "active" | "suspended", ids: string[]) {
+  return eachOf(status === "active" ? "Reactivate" : "Suspend", ids, (id) => updateCompany(id, { status }));
 }
