@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { loadAccess } from "./load";
+import { ROLE_ACTIONS } from "./labels";
 
 // Plain strings: they sit behind the title's ⓘ, so the page starts with its work (2026-11-01).
 const INTRO = {
@@ -18,7 +19,7 @@ export async function AccessFrame({ current, children }: { current: "people" | "
   const data = await loadAccess();
   return (
     <>
-      <PageHeader title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined}>
+      <PageHeader title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined} actions={current === "roles" && data ? <div id={ROLE_ACTIONS} className="flex flex-wrap items-center gap-2" /> : undefined}>
         {data ? INTRO[current] : null}
       </PageHeader>
       {data ? (

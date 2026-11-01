@@ -150,7 +150,7 @@ export function CopyJobRole({ catalogue, onMade }: { catalogue: AbilityCatalogue
 
   return (
     <>
-      <Button size="sm" variant="quiet" icon={<Copy className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button icon={<Copy className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Copy a job role
       </Button>
       <Modal open={open} title="Copy a job role" onCancel={() => !busy && setOpen(false)} onOk={make} okText="Copy" okButtonProps={{ disabled: !job }} confirmLoading={busy} width={640} destroyOnHidden>
