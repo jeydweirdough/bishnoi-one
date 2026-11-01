@@ -1,6 +1,6 @@
 "use client";
 
-import { AtSign, KeyRound, Pencil, Plus, ShieldOff, X } from "lucide-react";
+import { KeyRound, Pencil, Plus, ShieldOff, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -102,9 +102,6 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
       <div className="mt-4 flex flex-wrap items-center gap-2 px-6">
         <Button size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={a.openEdit}>
           Edit
-        </Button>
-        <Button size="sm" icon={<AtSign className="size-4" aria-hidden />} onClick={a.openEdit}>
-          Manage email address
         </Button>
         <Button size="sm" icon={<KeyRound className="size-4" aria-hidden />} onClick={a.openPassword}>
           Reset password
