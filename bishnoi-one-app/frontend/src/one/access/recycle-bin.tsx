@@ -5,6 +5,8 @@ import { plural } from "@/src/platform/lib/format";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Pager } from "@/src/platform/ui/pager";
+import { slicePage } from "@/src/platform/ui/paging";
 import { toast } from "sonner";
 import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/ant-button";
@@ -62,6 +64,8 @@ function BinBar({ people }: { people: BinPerson[] }) {
 export function RecycleBin({ people }: { people: BinPerson[] }) {
   const router = useRouter();
   const [erasing, setErasing] = useState<BinPerson | null>(null);
+  const [picked, setPicked] = useState(1);
+  const { rows: onPage, page } = slicePage(people, picked);
   if (people.length === 0) {
     return (
       <Sheet>
@@ -72,7 +76,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
     );
   }
   return (
-    <SelectionProvider items={people.map((p) => ({ id: p.id, name: p.fullName }))}>
+    <SelectionProvider items={onPage.map((p) => ({ id: p.id, name: p.fullName }))}>
     <Sheet className="px-5 py-2">
       <div className="border-b border-rule py-2">
         <SelectAllBox>
@@ -80,7 +84,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
         </SelectAllBox>
       </div>
       <ul className="divide-y divide-rule">
-        {people.map((p) => (
+        {onPage.map((p) => (
           <SelectableRow as="li" key={p.id} id={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
             <SelectBox id={p.id} label={p.fullName} />
             <div className="min-w-0 flex-1">
@@ -112,6 +116,7 @@ export function RecycleBin({ people }: { people: BinPerson[] }) {
           </SelectableRow>
         ))}
       </ul>
+      <Pager total={people.length} page={page} onPage={setPicked} noun={people.length === 1 ? "employee" : "employees"} />
       {erasing && (
         <TypeToDelete
           open

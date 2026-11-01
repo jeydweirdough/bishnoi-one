@@ -1,5 +1,7 @@
 "use client";
 
+import { Pager } from "@/src/platform/ui/pager";
+import { PAGE_SIZE, slicePage } from "@/src/platform/ui/paging";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
 import { Download, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +37,10 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.people, query, onlyToChoose, data.toChoose]);
+  // A page at a time (2026-11-01). Until a page is picked, the one holding the open employee.
+  const [picked, setPicked] = useState<number | null>(null);
+  const at = shown.findIndex((p) => p.id === selected);
+  const { rows: onPage, page } = slicePage(shown, picked ?? (at >= 0 ? Math.floor(at / PAGE_SIZE) + 1 : 1));
 
   async function bringIn() {
     const r = await importRoles();
@@ -72,15 +78,15 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
       ) : null}
 
       {/* Yourself can't be switched off or deleted, so you aren't ticked; nor with an employee open beside the list. */}
-      <SelectionProvider items={panel ? [] : shown.filter((p) => p.id !== data.meId).map((p) => ({ id: p.id, name: p.fullName }))}>
+      <SelectionProvider items={panel ? [] : onPage.filter((p) => p.id !== data.meId).map((p) => ({ id: p.id, name: p.fullName }))}>
       <Sheet className="px-5 pt-4 pb-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-full max-w-xs">
-            <SearchInput placeholder="Find an employee" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+            <SearchInput placeholder="Find an employee" allowClear value={query} onChange={(e) => (setQuery(e.target.value), setPicked(1))} />
           </div>
           {toChoose.size > 0 && (
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-2">
-              <input suppressHydrationWarning type="checkbox" checked={onlyToChoose} onChange={(e) => setOnlyToChoose(e.target.checked)} />
+              <input suppressHydrationWarning type="checkbox" checked={onlyToChoose} onChange={(e) => (setOnlyToChoose(e.target.checked), setPicked(1))} />
               Only those still to choose ({toChoose.size})
             </label>
           )}
@@ -128,11 +134,12 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rule">
-                  {shown.map((p) => (
+                  {onPage.map((p) => (
                     <PersonRow key={p.id} person={p} data={data} compact={Boolean(panel)} current={p.id === selected} />
                   ))}
                 </tbody>
               </table>
+              <Pager total={shown.length} page={page} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
             </div>
             {panel}
           </div>
