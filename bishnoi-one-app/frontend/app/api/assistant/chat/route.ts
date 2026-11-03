@@ -3,13 +3,13 @@ import { accountToken, PLATFORM_API } from "@/src/platform/lib/account";
 import { cookies } from "next/headers";
 import { MODULES } from "@/src/platform/lib/modules";
 import { viewAsCookie } from "@/src/platform/lib/session-cookie";
+import { isSameOriginRequest } from "@/src/platform/lib/site";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if ((origin && origin !== request.nextUrl.origin) || request.headers.get("sec-fetch-site") === "cross-site") return Response.json({ error: "Cross-site assistant requests are refused." }, { status: 403 });
+  if (!isSameOriginRequest(request)) return Response.json({ error: "Cross-site assistant requests are refused." }, { status: 403 });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return Response.json({ error: "Send a JSON question." }, { status: 415 });
   const token = await accountToken();
   if (!token) return Response.json({ error: "Please sign in again." }, { status: 401 });

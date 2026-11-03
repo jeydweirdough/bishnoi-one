@@ -18,3 +18,16 @@ export function siteOrigin(headers: Headers, fallback: string): string {
 export function siteUrl(path: string, request: { headers: Headers; url: string }): URL {
   return new URL(path, siteOrigin(request.headers, request.url));
 }
+
+// Cookie-authenticated browser POSTs must come from this site's public origin,
+// not the internal Next container URL. ONE_APP_URL takes precedence over proxy
+// headers; without it, use the same proxy resolution as sign-in redirects.
+export function isSameOriginRequest(request: { headers: Headers; url: string }): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin || request.headers.get("sec-fetch-site") === "cross-site") return false;
+  try {
+    return origin === new URL(siteOrigin(request.headers, request.url)).origin;
+  } catch {
+    return false;
+  }
+}
