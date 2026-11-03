@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, foreign, mapped_column, relationship
 
 from app.db import Base
 
@@ -44,6 +44,12 @@ class Team(Base):
     # The division this team is a branch of (B2B → NBD and CRR; HOS → TeleSales
     # and its field areas). None: a division itself. One level only.
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="SET NULL"), index=True, default=None)
+    branches: Mapped[list["Team"]] = relationship(
+        "Team",
+        primaryjoin="Team.id == foreign(Team.parent_id)",
+        lazy="selectin",
+        viewonly=True,
+    )
     # Its customers named to other divisions (look-alikes, customer fields): app/routers/sharing.py.
     share_customers: Mapped[bool] = mapped_column(default=True, server_default="1")
     # The department's own retention windows (app/routers/retention.py); None:
@@ -131,6 +137,16 @@ class User(Base):
     # The other teams they're in, beside their main one (team_id). Their reach
     # covers all of them; what they make still goes to their main team.
     other_teams: Mapped[list[Team]] = relationship(secondary="nbcm_user_teams", lazy="selectin")
+
+    @property
+    def all_managed_team_ids(self) -> set[str]:
+        """Every team they manage: the ones they manage directly, plus any branch teams under divisions they manage."""
+        ids: set[str] = set()
+        for t in self.managed_teams:
+            ids.add(t.id)
+            for b in getattr(t, "branches", []):
+                ids.add(b.id)
+        return ids
 
     @property
     def all_team_ids(self) -> set[str]:

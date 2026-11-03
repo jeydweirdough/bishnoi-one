@@ -86,7 +86,7 @@ def teams_reached(user: User) -> frozenset[str]:
     if scope == "team":
         return frozenset(own)
     if scope == "managed":
-        return frozenset(own | {t.id for t in user.managed_teams})
+        return frozenset(own | user.all_managed_team_ids)
     return frozenset()
 
 

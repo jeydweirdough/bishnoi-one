@@ -90,3 +90,44 @@ def test_the_org_chart_arrives_as_a_business_event_once(app, client, linked):
         assert db.get(Team, FIELD).parent_id == HOS
         assert db.scalar(select(User).where(func.lower(User.email) == WHO)).team_id == FIELD
         assert db.get(InboxEvent, "ev-22222222").kind == "organisation.changed"
+
+
+def test_manager_of_division_manages_child_teams_without_head(app, client, linked):
+    from app.access import access_of
+    from app.models import Role
+    from app.scope import reachable_people
+
+    with database(app)() as db:
+        role = db.scalar(select(Role).where(Role.name == "Salesperson"))
+        db.add(User(email="sam@example.com", full_name="Sam", password_hash="hash", role_id=role.id))
+        db.commit()
+
+    div_id = "33333333-0000-4000-8000-000000000001"
+    sub_id = "33333333-0000-4000-8000-000000000002"
+    units = [
+        {"id": div_id, "kind": "division", "name": "Rx Business", "parentId": None, "manager": WHO, "areas": [], "active": True},
+        {"id": sub_id, "kind": "team", "name": "B2C Team", "parentId": div_id, "manager": None, "areas": [], "active": True},
+    ]
+    people = [
+        {"email": WHO, "unit": div_id, "otherUnits": []},
+        {"email": "sam@example.com", "unit": sub_id, "otherUnits": []},
+    ]
+    r = client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people)})
+    assert r.status_code == 204, r.text
+    with database(app)() as db:
+        mgr = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        sam = db.scalar(select(User).where(func.lower(User.email) == "sam@example.com"))
+        # sub team inherited manager
+        assert db.get(Team, sub_id).manager_id == mgr.id
+        # sub team is under division
+        assert db.get(Team, sub_id).parent_id == div_id
+        # mgr with managed role reaches sam
+        mgr.role = db.scalar(select(User).where(User.email == "mia@example.com")).role if db.scalar(select(User).where(User.email == "mia@example.com")) else mgr.role
+        # Set mgr to Manager role (scope = managed)
+        from app.models import Role
+        mgr.role = db.scalar(select(Role).where(Role.name == "Manager"))
+        db.flush()
+        access = access_of(mgr)
+        reached = reachable_people(db, access)
+        assert sam in reached
+
