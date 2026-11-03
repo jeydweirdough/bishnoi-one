@@ -9,11 +9,13 @@ The plan is a JSON file made from the HR employee list and the org chart, kept o
              keeps everything, and gets the plan's title only when theirs is empty
   placing    each employee's main unit, set only when they have none (--replace sets it anyway)
 
-Nobody gets a password, a role or an app: send invitations and give roles on Employees after.
+Nobody gets an app or a role: give them on Employees after. --password gives a first password to the employees this
+adds, and to any already there with none (never to anyone who has one), which they must change at their first sign-in.
+--rename-role "Manager=Mentor" renames a role (repeatable), and the apps are told.
 An email the company can't use (another domain, an operator's, another company's person's) is
 reported and left out. Nothing is saved without --apply.
 
-    uv run python -m app.tools.seed_employees --plan employees-plan.json [--apply] [--replace]
+    uv run python -m app.tools.seed_employees --plan employees-plan.json [--apply] [--replace] [--password X] [--rename-role OLD=NEW]
 
 The plan:
     {"companies": [{"slug": "getmeds-philippines-inc",
@@ -31,12 +33,16 @@ from pathlib import Path
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
-from app import email_rules
+from datetime import UTC, datetime
+
+from app import access_roles, email_rules, org_push, passwords
+from app.accounts import account_of
 from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
 from app.migrate import upgrade
-from app.models import Company, Identity, Unit
+from app.models import AccessRole, Company, Identity, Unit
+from app.security import check_password_rules, hash_password
 
 TOOL = "employee seed tool"
 KINDS = {"department", "division", "team"}
@@ -53,8 +59,8 @@ def why(error: HTTPException) -> str:
     return str(detail)
 
 
-def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Counter, list[str]]:
-    said, problems = Counter(), []
+def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Counter, list[str], list[Identity]]:
+    said, problems, added = Counter(), [], []
     members = {m.email.lower(): m for m in db.scalars(select(Identity).where(Identity.company_id == company.id, Identity.deleted_at.is_(None)))}
     units = {key(u.name): u for u in db.scalars(select(Unit).where(Unit.company_id == company.id))}
 
@@ -96,6 +102,7 @@ def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Count
             db.add(person)
             db.flush()
             members[email] = person
+            added.append(person)
             said["employees added"] += 1
             print(f"  + employee   {name} <{email}>")
         elif not person.title and e.get("title"):
@@ -122,7 +129,45 @@ def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Count
     said["not placed"] = db.scalar(select(func.count()).select_from(Identity).where(
         Identity.company_id == company.id, Identity.status == "active", Identity.deleted_at.is_(None),
         Identity.main_unit_id.is_(None), Identity.via_operator.is_(False)))
-    return said, problems
+    return said, problems, added
+
+
+def give_passwords(db, company: Company, password: str, added: list[Identity]) -> int:
+    """A first password for the new employees and any with none; each must choose their own at their first sign-in."""
+    problem = check_password_rules(password)
+    if problem:
+        sys.exit(f"That password won't do: {problem}")
+    hashed, now, given = hash_password(password), datetime.now(UTC), 0
+    fresh = {p.id for p in added}
+    for p in db.scalars(select(Identity).where(Identity.company_id == company.id, Identity.deleted_at.is_(None), Identity.via_operator.is_(False))):
+        account = account_of(db, p)
+        has = bool(account.password_hash if account else p.password_hash)
+        role = db.get(AccessRole, p.access_role_id) if p.access_role_id else None
+        # A shared first password never goes on an administrator's account, nor an operator's.
+        if p.is_company_admin or (role is not None and role.is_admin) or (account is not None and account.is_operator):
+            continue
+        if p.id in fresh or not has:
+            passwords.set_for(db, p.email, hashed, now)
+            account = account_of(db, p)
+            if account is not None:
+                account.must_change_password = True
+            given += 1
+    return given
+
+
+def rename_roles(db, company: Company, pairs: list[str]) -> list[str]:
+    done = []
+    for pair in pairs:
+        old, _, new = pair.partition("=")
+        role = db.scalar(select(AccessRole).where(AccessRole.company_id == company.id, func.lower(AccessRole.name) == old.strip().lower()))
+        taken = db.scalar(select(AccessRole).where(AccessRole.company_id == company.id, func.lower(AccessRole.name) == new.strip().lower()))
+        if role is None or taken is not None or not new.strip():
+            done.append(f"{old}: not renamed ({'no such role' if role is None else 'a role with that name exists'})")
+            continue
+        role.name = new.strip()
+        audit(db, TOOL, "role.renamed", target=role.name, target_type="role", target_id=role.id, company_id=company.id, fields=["name"])
+        done.append(f"{old.strip()} -> {role.name}")
+    return done
 
 
 def main() -> int:
@@ -131,6 +176,8 @@ def main() -> int:
     parser.add_argument("--platform-db", help="the platform database (default: DATABASE_URL)")
     parser.add_argument("--apply", action="store_true", help="save it (without this, only says what it would do)")
     parser.add_argument("--replace", action="store_true", help="also move people and heads already placed to the plan's")
+    parser.add_argument("--password", help="a first password for new employees and any with none (they must change it at first sign-in)")
+    parser.add_argument("--rename-role", action="append", default=[], metavar="OLD=NEW", help="rename a role at each company in the plan")
     args = parser.parse_args()
 
     if args.plan and Path(args.plan).exists():
@@ -141,9 +188,12 @@ def main() -> int:
         plan = DEFAULT_PLAN
         print("[OK] Loaded employee plan from embedded plan data.")
 
-    engine = make_engine(args.platform_db or get_settings().database_url)
+    settings = get_settings()
+    engine = make_engine(args.platform_db or settings.database_url)
     upgrade(engine)
-    with make_sessions(engine)() as db:
+    sessions = make_sessions(engine)
+    told = []
+    with sessions() as db:
         for part in plan["companies"]:
             target_slug = part["slug"]
             company = db.scalar(select(Company).where(Company.slug == target_slug))
@@ -158,21 +208,29 @@ def main() -> int:
                 print(f"There's no company {part['slug']!r}: skipped.")
                 continue
             print(f"\n{company.name} ({company.slug})")
-            said, problems = seed(db, company, part, args.replace)
+            said, problems, added = seed(db, company, part, args.replace)
+            if args.password:
+                said["first passwords"] = give_passwords(db, company, args.password, added)
+            for line in rename_roles(db, company, args.rename_role) if args.rename_role else []:
+                print(f"  role {line}")
             if args.apply:
                 audit(db, TOOL, "employees.seeded", target=company.name, target_type="company", target_id=company.id, company_id=company.id,
                       fields=[f"{n} {what}" for what, n in said.items() if what != "not placed"])
                 db.commit()
+                told.append(company.id)
             print("  " + ", ".join(f"{n} {what}" for what, n in said.items()))
             if problems:
                 print(f"  {len(problems)} left out, to fix in the plan or on Employees:")
                 for p in problems:
                     print(f"    - {p}")
-        if not args.apply:
+        if args.apply:
+            for company_id in told:  # the apps get the chart, and the role names, now
+                org_push._send(sessions, settings, company_id)
+                access_roles._send(sessions, settings, company_id)
+            print(chr(10) + "Saved, and the apps are told (the chart and the role names).")
+        else:
             db.rollback()
             print("\nDry run, nothing saved. Run again with --apply to save it; then open Organisation once so every app gets the chart.")
-        else:
-            print("\nEmployee seed completed. Open Organisation once in Admin Console so every connected app gets the chart.")
     return 0
 
 

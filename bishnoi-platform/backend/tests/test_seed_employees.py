@@ -20,12 +20,24 @@ def test_a_plan_fills_the_chart_and_runs_safely_twice(app, getmeds):
                           {"email": f"jade@{domain}", "fullName": "Jade", "title": "IT Staff", "unit": "PAYROLL"},
                           {"email": "someone@gmail.com", "fullName": "Off Domain", "title": None, "unit": "PAYROLL"}],
         }
-        said, problems = seed(db, company, plan)
+        said, problems, added = seed(db, company, plan)
         db.commit()
         assert said["units made"] == 2 and said["employees added"] == 1 and said["employees placed"] == 2 and said["heads set"] == 1
         assert any("NOWHERE" in p for p in problems) and any("Off Domain" in p for p in problems)
         mia = db.scalar(select(Identity).where(Identity.email == f"mia@{domain}"))
         hr = db.scalar(select(Unit).where(Unit.name == "HR DEPARTMENT"))
         assert mia.full_name == "Mia Cruz" and mia.title == "HR Head" and mia.main_unit_id == hr.id and hr.manager_id == mia.id
-        again, _ = seed(db, company, plan)
+        again, _, _ = seed(db, company, plan)
         assert again["units made"] == 0 and again["employees added"] == 0 and again["employees placed"] == 0 and again["heads set"] == 0
+        # A first password for the new, who must change it; nobody who has one is touched.
+        from app.accounts import account_of
+        from app.security import verify_password
+        from app.tools.seed_employees import give_passwords, rename_roles
+
+        jade = db.scalar(select(Identity).where(Identity.email == f"jade@{domain}"))
+        before = jade.password_hash
+        assert give_passwords(db, company, "2.4Billion", added) == 1 and jade.password_hash == before
+        mia = db.scalar(select(Identity).where(Identity.email == f"mia@{domain}"))
+        assert verify_password("2.4Billion", mia.password_hash) and account_of(db, mia).must_change_password
+        said_roles = rename_roles(db, company, ["Nobody=Else"])
+        assert "not renamed" in said_roles[0]
