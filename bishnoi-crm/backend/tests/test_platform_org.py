@@ -189,3 +189,20 @@ def test_a_chain_of_links_reaches_to_any_depth_and_an_assistant_reaches_what_the
         # The assistant reaches what the manager reaches, though her role alone reaches only herself.
         assert {"mary@example.com", "lead@example.com"} <= {u.email for u in reachable_people(db, access_of(sec))}
         assert access_of(sec).scope == "managed" and "update" not in access_of(sec).permissions
+
+
+def test_the_chart_event_sets_who_reports_to_whom(app, client, linked):
+    """The chart reaches the CRM as an event (business_events), not only as a signed note: both set the links."""
+    from app import business_events
+    from app.models import Role
+
+    with database(app)() as db:
+        role = db.scalar(select(Role).where(Role.name == "Salesperson"))
+        db.add(User(email="ed@example.com", full_name="Ed", password_hash="hash", role_id=role.id))
+        db.commit()
+        data = {"units": [], "people": [{"email": "ed@example.com", "unit": None, "otherUnits": [], "reportsTo": WHO, "assistantOf": None}]}
+        business_events._organisation(db, data, "example")
+        db.commit()
+        boss = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        ed = db.scalar(select(User).where(User.email == "ed@example.com"))
+        assert ed.reports_to_id == boss.id
