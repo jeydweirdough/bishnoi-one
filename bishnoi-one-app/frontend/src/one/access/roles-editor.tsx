@@ -13,10 +13,10 @@ import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
-import { PermissionGrid } from "@/src/platform/ui/permission-grid";
+import { PermissionMatrix } from "@/src/platform/ui/permission-matrix";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
 import { Empty, Sheet } from "@/src/platform/ui/sheet";
-import { createRole, deleteRole, importRoles, updateRole } from "./actions";
+import { createRole, deleteRole, importRoles, standardDefaults, updateRole } from "./actions";
 import { moduleLabel, ROLE_ACTIONS } from "./labels";
 import { AbilitiesSection, CopyJobRole } from "./abilities";
 import type { AbilityCatalogue, AccessData, AccessModule, AccessRole, RoleInput } from "./types";
@@ -239,24 +239,34 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
 
         {!draft.isAdmin && (
           <>
-          {role && catalogue && <AbilitiesSection key={`${role.id}-${JSON.stringify(role.abilities)}-${JSON.stringify(role.scopes)}`} role={role} catalogue={catalogue} modules={data.modules} />}
-          {/* The apps' own permissions, under the abilities (step 6): most roles never need them. */}
-          <details className="group" open={!role || !catalogue}>
-            <summary className="cursor-pointer px-1 text-meta text-ink-3">Technical permissions, app by app</summary>
-            <div className="mt-3 space-y-5">
-          {data.modules.map((m) => (
-            <ModuleSection
-              key={`${selected}-${m.key}`}
-              module={m}
-              granted={draft.permissions[m.key] ?? []}
-              scope={draft.scopes[m.key] ?? m.scopes[0]?.key ?? ""}
-              error={errors.fields.permissions}
-              onPermissions={(perms) => edit({ permissions: { ...draft.permissions, [m.key]: perms } })}
-              onScope={(scope) => edit({ scopes: { ...draft.scopes, [m.key]: scope } })}
+            <StartFrom
+              onLoad={(permissions, scopes) => {
+                edit({ permissions, scopes });
+                toast.info("Loaded into this role: change what you like, then Save.");
+              }}
             />
-          ))}
+            <div className="space-y-5">
+              {data.modules.map((m) => (
+                <ModuleSection
+                  key={`${selected}-${m.key}`}
+                  module={m}
+                  granted={draft.permissions[m.key] ?? []}
+                  scope={draft.scopes[m.key] ?? m.scopes[0]?.key ?? ""}
+                  error={errors.fields.permissions}
+                  onPermissions={(perms) => edit({ permissions: { ...draft.permissions, [m.key]: perms } })}
+                  onScope={(scope) => edit({ scopes: { ...draft.scopes, [m.key]: scope } })}
+                />
+              ))}
             </div>
-          </details>
+            {/* The plain-word abilities, the older way (step 6): saving them sets the permissions above from them. */}
+            {role && catalogue && (
+              <details className="group">
+                <summary className="cursor-pointer px-1 text-meta text-ink-3">Plain-word abilities (the older way)</summary>
+                <div className="mt-3">
+                  <AbilitiesSection key={`${role.id}-${JSON.stringify(role.abilities)}-${JSON.stringify(role.scopes)}`} role={role} catalogue={catalogue} modules={data.modules} />
+                </div>
+              </details>
+            )}
           </>
         )}
 
@@ -272,6 +282,31 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
         )}
       </div>
     </div>
+  );
+}
+
+/** Start a role from what Mentor, Coach or Coachee may do by default: loaded into the role being edited, saved only when you Save. */
+function StartFrom({ onLoad }: { onLoad: (permissions: Record<string, string[]>, scopes: Record<string, string>) => void }) {
+  const [busy, start] = useTransition();
+  const pick = (level: "mentor" | "coach" | "coachee") =>
+    start(async () => {
+      const r = await standardDefaults(level);
+      if (!r.ok) return void toast.error(r.error);
+      onLoad(r.data.permissions, r.data.scopes);
+    });
+  return (
+    <Sheet className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+      <span className="text-sm font-medium text-ink">Start from</span>
+      <AboutTip>
+        What each level may do by default, in every app: a Coachee creates, reads, updates, submits and prints their own; a Coach also approves, rejects, returns, assigns and exports for their coachees; a Mentor also imports, cancels,
+        reopens and transfers for everyone under them. Delete, Post and Void are never given by default. It replaces this role&apos;s permissions below until you Save.
+      </AboutTip>
+      {(["coachee", "coach", "mentor"] as const).map((level) => (
+        <Button key={level} size="sm" disabled={busy} onClick={() => pick(level)}>
+          {level.charAt(0).toUpperCase() + level.slice(1)}
+        </Button>
+      ))}
+    </Sheet>
   );
 }
 
@@ -316,7 +351,7 @@ function ModuleSection({
               </div>
             )}
             {error && <p className="mt-2 text-meta text-danger">{error}</p>}
-            <PermissionGrid catalogue={m.areas} granted={granted} onChange={onPermissions} />
+            <PermissionMatrix catalogue={m.areas} granted={granted} onChange={onPermissions} />
           </>
         ))}
     </Sheet>

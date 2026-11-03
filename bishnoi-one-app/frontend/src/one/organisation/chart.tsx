@@ -79,11 +79,15 @@ function UnitTree({ data }: { data: OrgData }) {
   const under = (parent: string | null) => active.filter((u) => (parent === null ? !u.parentId || !ids.has(u.parentId) : u.parentId === parent));
 
   const byId = new Map(data.units.map((u) => [u.id, u]));
-  // Department > division > team: a unit without a head of its own is headed by the closest head above it.
+  // Department > division > team: any number of heads each, and the heads above see everyone below. A unit with no head
+  // of its own shows the closest heads above it.
+  const headsOf = (u: OrgUnit) => (u.headIds ?? (u.managerId ? [u.managerId] : [])).map((id) => people.get(id)).filter(Boolean) as string[];
   function headOf(u: OrgUnit): { name: string; from?: string } | undefined {
-    if (u.managerId) return { name: people.get(u.managerId) ?? "" };
+    const own = headsOf(u);
+    if (own.length) return { name: own.join(", ") };
     for (let at = u.parentId ? byId.get(u.parentId) : undefined, n = 0; at && n < 8; at = at.parentId ? byId.get(at.parentId) : undefined, n++) {
-      if (at.managerId) return { name: people.get(at.managerId) ?? "", from: at.name };
+      const above = headsOf(at);
+      if (above.length) return { name: above.join(", "), from: at.name };
     }
     return undefined;
   }
@@ -212,7 +216,7 @@ function UnitDialog({ data, unit, parentId, onClose }: { data: OrgData; unit?: O
     kind: unit?.kind ?? (parentId ? "team" : "division"),
     name: unit?.name ?? "",
     parentId: unit ? unit.parentId : parentId,
-    managerId: unit?.managerId ?? null,
+    headIds: unit?.headIds ?? (unit?.managerId ? [unit.managerId] : []),
     areas: unit?.areas ?? [],
   });
 
@@ -252,14 +256,15 @@ function UnitDialog({ data, unit, parentId, onClose }: { data: OrgData; unit?: O
         <Field label="Under" size="md" optional error={errors.parentId} hint="Leave empty for the top of the chart.">
           {() => <Combobox allowClear placeholder="Top of the chart" options={parents} value={form.parentId ?? undefined} onChange={(v) => setForm({ ...form, parentId: (v as string | undefined) ?? null })} />}
         </Field>
-        <Field label="Head" size="md" optional error={errors.managerId}>
+        <Field label="Heads" size="md" optional error={errors.headIds ?? errors.head_ids} hint="Each head sees everyone in this unit and in every unit under it. A head of a unit above sees them too. What each may do is their role's.">
           {() => (
             <Combobox
+              mode="multiple"
               allowClear
-              placeholder="Choose an employee"
+              placeholder="Choose employees"
               options={data.people.filter((p) => p.status === "active").map((p) => ({ value: p.id, label: p.fullName }))}
-              value={form.managerId ?? undefined}
-              onChange={(v) => setForm({ ...form, managerId: (v as string | undefined) ?? null })}
+              value={form.headIds}
+              onChange={(v) => setForm({ ...form, headIds: (v as string[] | undefined) ?? [] })}
             />
           )}
         </Field>

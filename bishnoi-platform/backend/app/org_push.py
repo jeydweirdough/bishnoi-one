@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.access_roles import modules_of
 from app.config import Settings
+from app import unit_heads
 from app.models import Branch, Company, Identity, MembershipUnit, Unit
 
 log = logging.getLogger(__name__)
@@ -46,15 +47,24 @@ def email_of(db: Session, identity_id: str | None) -> str | None:
 
 
 def manager_of(db: Session, units: dict[str, Unit], person: Identity) -> str | None:
-    """Who they report to: the link (2026-11-03), else the closest head above them on the chart."""
+    """Who they report to: the link (2026-11-03), else the closest head above them on the chart (the first, where several)."""
     linked = email_of(db, person.reports_to_id)
     if linked:
         return linked
+    heads = unit_heads.heads_by_unit(db, person.company_id)
     for unit in reversed(path_of(units, person.main_unit_id)):
-        if unit.manager_id and unit.manager_id != person.id:
-            head = db.get(Identity, unit.manager_id)
-            return head.email if head else None
+        for head_id in heads.get(unit.id, []):
+            if head_id != person.id:
+                return email_of(db, head_id)
     return None
+
+
+def managers_for(db: Session, units: dict[str, Unit], person: Identity, others: list[str]) -> list[str]:
+    """Everyone who sees them: the heads of their unit and every unit above it, and who they report to by link."""
+    heads = unit_heads.heads_by_unit(db, person.company_id)
+    ids = {i for hs in heads.values() for i in hs} | {person.reports_to_id}
+    emails = {i.id: i.email.lower() for i in db.scalars(select(Identity).where(Identity.id.in_([x for x in ids if x])))}
+    return unit_heads.managers_of(units, heads, emails, person, others)
 
 
 def placement(db: Session, person: Identity) -> dict | None:
@@ -71,6 +81,7 @@ def placement(db: Session, person: Identity) -> dict | None:
         "otherUnits": others,
         "branch": {"id": branch.id, "name": branch.name} if branch else None,
         "manager": manager_of(db, units, person),
+        "managers": managers_for(db, units, person, others),
         "reportsTo": email_of(db, person.reports_to_id),
         "assistantOf": email_of(db, person.assistant_of_id),
     }
@@ -79,16 +90,20 @@ def placement(db: Session, person: Identity) -> dict | None:
 def chart(db: Session, company: Company) -> dict:
     """The company's units, and where each of its people sits: the "organisation.changed" event's data."""
     units = _units(db, company.id)
-    heads = {i.id: i.email for i in db.scalars(select(Identity).where(Identity.company_id == company.id))}
+    heads = unit_heads.heads_by_unit(db, company.id)
+    emails = {i.id: i.email for i in db.scalars(select(Identity).where(Identity.company_id == company.id))}
     others: dict[str, list[str]] = {}
     for m in db.scalars(select(MembershipUnit).join(Identity, Identity.id == MembershipUnit.membership_id).where(Identity.company_id == company.id)):
         others.setdefault(m.membership_id, []).append(m.unit_id)
     people = db.scalars(select(Identity).where(Identity.company_id == company.id, Identity.via_operator.is_(False))).all()
+    lower = {k: v.lower() for k, v in emails.items()}
     return {
-        "units": [{"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "manager": heads.get(u.manager_id),
+        "units": [{"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "manager": emails.get(u.manager_id),
+                   "managers": [emails[h] for h in heads.get(u.id, []) if h in emails],
                    "areas": u.areas or [], "active": u.is_active} for u in units.values()],
         "people": [{"email": p.email.lower(), "unit": p.main_unit_id, "otherUnits": others.get(p.id, []),
-                    "reportsTo": heads.get(p.reports_to_id, "").lower() or None, "assistantOf": heads.get(p.assistant_of_id, "").lower() or None} for p in people],
+                    "managers": unit_heads.managers_of(units, heads, lower, p, others.get(p.id, [])),
+                    "reportsTo": emails.get(p.reports_to_id, "").lower() or None, "assistantOf": emails.get(p.assistant_of_id, "").lower() or None} for p in people],
     }
 
 

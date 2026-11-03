@@ -207,3 +207,8 @@ export async function bulkInvitePeople(ids: string[]) {
 export async function bulkSetManager(ids: string[], managerId: string | null) {
   return eachOf(managerId ? "Set manager" : "Clear manager", ids, (id) => setReporting(id, { reportsToId: managerId }));
 }
+
+/** What Mentor, Coach or Coachee hold by default in each app, to start a role from (nothing is saved). */
+export async function standardDefaults(level: "mentor" | "coach" | "coachee"): Promise<Result<{ permissions: Record<string, string[]>; scopes: Record<string, string> }>> {
+  return attempt(async () => accountSend<{ permissions: Record<string, string[]>; scopes: Record<string, string> }>("GET", `/identity/access/standard/${level}`));
+}

@@ -5,10 +5,10 @@ the people who report to them and, through those, everyone below, to any depth. 
 assist reaches, and does what their own role allows. Managed scope also includes the units they explicitly head and every unit beneath them; simple membership does not make someone a manager.
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, object_session
 
-from app.models import User
+from app.models import User, UserManager
 
 ORDER = {"own": 0, "team": 1, "managed": 2, "all": 3}
 
@@ -18,7 +18,11 @@ def below(db: Session, ids: set[str]) -> set[str]:
     found: set[str] = set()
     frontier = set(ids)
     while frontier:
-        nxt = set(db.scalars(select(User.id).where(User.reports_to_id.in_(frontier)))) - found - ids
+        emails = {e.lower() for e in db.scalars(select(User.email).where(User.id.in_(frontier)))}
+        nxt = set(db.scalars(select(User.id).where(User.reports_to_id.in_(frontier))))
+        if emails:
+            nxt |= set(db.scalars(select(UserManager.user_id).where(func.lower(UserManager.manager_email).in_(emails))))
+        nxt = nxt - found - ids
         found |= nxt
         frontier = nxt
     return found

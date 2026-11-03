@@ -11,7 +11,7 @@ import type { OrgBranch, OrgUnit, UnitKind } from "./types";
 const enc = encodeURIComponent;
 const refresh = () => revalidatePath("/platform/organisation");
 
-export type UnitInput = { kind: UnitKind; name: string; parentId: string | null; managerId: string | null; areas: string[] };
+export type UnitInput = { kind: UnitKind; name: string; parentId: string | null; managerId?: string | null; headIds: string[]; areas: string[] };
 
 export async function addUnit(input: UnitInput): Promise<Result<{ unit: OrgUnit }>> {
   return attempt(async () => {

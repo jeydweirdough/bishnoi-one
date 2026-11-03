@@ -41,6 +41,7 @@ from app.audit import audit
 from app.config import get_settings
 from app.db import make_engine, make_sessions
 from app.migrate import upgrade
+from app import unit_heads
 from app.models import AccessRole, Company, Identity, Unit
 from app.security import check_password_rules, hash_password
 
@@ -123,7 +124,8 @@ def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Count
         if head not in members:
             problems.append(f"unit {unit.name}: its head {head} isn't an employee here")
         elif unit.manager_id is None or (replace and unit.manager_id != members[head].id):
-            unit.manager_id = members[head].id
+            unit_heads.add_head(db, unit, members[head].id)
+            unit.manager_id = unit.manager_id or members[head].id
             said["heads set"] += 1
     db.flush()
     said["not placed"] = db.scalar(select(func.count()).select_from(Identity).where(

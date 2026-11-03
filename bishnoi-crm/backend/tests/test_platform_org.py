@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app import platform_org
-from app.models import Team, User
+from app.models import UserManager, Team, User
 from tests.test_platform_roles import WHO, database, note
 from tests.test_platform_sign_in import linked  # noqa: F401 (fixture)
 
@@ -206,3 +206,35 @@ def test_the_chart_event_sets_who_reports_to_whom(app, client, linked):
         boss = db.scalar(select(User).where(func.lower(User.email) == WHO))
         ed = db.scalar(select(User).where(User.email == "ed@example.com"))
         assert ed.reports_to_id == boss.id
+
+
+def test_everyone_the_platform_lists_as_seeing_a_person_reaches_them_even_before_signing_in(app, client, linked):
+    """The platform sends each person's managers by email (every head above them); they count whenever they get here."""
+    from app import business_events
+    from app.access import access_of
+    from app.models import Role
+    from app.scope import reachable_people
+
+    with database(app)() as db:
+        role = db.scalar(select(Role).where(Role.name == "Salesperson"))
+        db.add(User(email="kim@example.com", full_name="Kim", password_hash="hash", role_id=role.id))
+        db.commit()
+        data = {"units": [], "people": [{"email": "kim@example.com", "unit": None, "otherUnits": [], "managers": ["late@example.com", WHO, "Kim@example.com"]}]}
+        business_events._organisation(db, data, "example")
+        db.commit()
+        kim = db.scalar(select(User).where(User.email == "kim@example.com"))
+        # Never themselves; lower-cased; replaced when sent again.
+        assert {m.manager_email for m in db.scalars(select(UserManager).where(UserManager.user_id == kim.id))} == {"late@example.com", WHO}
+        manager_role = db.scalar(select(Role).where(Role.name == "Manager"))
+        boss = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        boss.role = manager_role
+        db.flush()
+        assert kim in reachable_people(db, access_of(boss))
+        # A head who signs in later reaches the people already listing them.
+        db.add(User(email="late@example.com", full_name="Late", password_hash="hash", role_id=manager_role.id))
+        db.commit()
+        late = db.scalar(select(User).where(User.email == "late@example.com"))
+        assert kim in reachable_people(db, access_of(late))
+        business_events._organisation(db, {"units": [], "people": [{"email": "kim@example.com", "unit": None, "otherUnits": [], "managers": []}]}, "example")
+        db.commit()
+        assert kim not in reachable_people(db, access_of(late))

@@ -22,6 +22,7 @@ from app.api import Api, changed, conflict, field_error, not_found
 from app.audit import audit
 from app.deps import DB, SettingsDep
 from app.models import Branch, Identity, MembershipUnit, Unit
+from app import unit_heads
 from app.routers.company_access import Admin, get_person
 from app import org_push
 
@@ -30,8 +31,9 @@ router = APIRouter(prefix="/identity/organisation", tags=["organisation"])
 Kind = Literal["division", "department", "team"]
 
 
-def unit_out(u: Unit, people: int = 0) -> dict:
+def unit_out(u: Unit, people: int = 0, heads: dict[str, list[str]] | None = None) -> dict:
     return {"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "managerId": u.manager_id,
+            "headIds": (heads or {}).get(u.id, [u.manager_id] if u.manager_id else []),
             "areas": u.areas or [], "isActive": u.is_active, "people": people}
 
 
@@ -55,9 +57,10 @@ def overview(db: DB, me: Admin) -> dict:
             if p.branch_id:
                 in_branch[p.branch_id] = in_branch.get(p.branch_id, 0) + 1
     units = db.scalars(select(Unit).where(Unit.company_id == me.company_id).order_by(func.lower(Unit.name))).all()
+    heads = unit_heads.heads_by_unit(db, me.company_id)
     branches = db.scalars(select(Branch).where(Branch.company_id == me.company_id).order_by(func.lower(Branch.name))).all()
     return {
-        "units": [unit_out(u, in_unit.get(u.id, 0)) for u in units],
+        "units": [unit_out(u, in_unit.get(u.id, 0), heads) for u in units],
         "branches": [branch_out(b, in_branch.get(b.id, 0)) for b in branches],
         "people": [{"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status,
                     "mainUnitId": p.main_unit_id, "otherUnitIds": others.get(p.id, []), "branchId": p.branch_id} for p in members],
@@ -73,6 +76,8 @@ class UnitIn(Api):
     name: str = Field(min_length=1, max_length=120)
     parent_id: str | None = None
     manager_id: str | None = None
+    # Any number of heads (2026-11-04); when sent it replaces manager_id.
+    head_ids: list[str] | None = Field(None, max_length=30)
     areas: list[str] = Field(default_factory=list, max_length=100)
 
 
@@ -81,6 +86,7 @@ class UnitPatch(Api):
     name: str | None = Field(None, min_length=1, max_length=120)
     parent_id: str | None = None
     manager_id: str | None = None
+    head_ids: list[str] | None = Field(None, max_length=30)
     areas: list[str] | None = Field(None, max_length=100)
     is_active: bool | None = None
 
@@ -126,14 +132,17 @@ def add_unit(body: UnitIn, request: Request, db: DB, me: Admin, settings: Settin
     name = body.name.strip()
     check_parent(db, me, None, body.parent_id)
     check_name(db, me, name, body.parent_id)
-    check_manager(db, me, body.manager_id)
-    u = Unit(company_id=me.company_id, kind=body.kind, name=name, parent_id=body.parent_id, manager_id=body.manager_id, areas=clean(body.areas))
+    wanted = body.head_ids if body.head_ids is not None else [body.manager_id] if body.manager_id else []
+    for head in wanted:
+        check_manager(db, me, head)
+    u = Unit(company_id=me.company_id, kind=body.kind, name=name, parent_id=body.parent_id, areas=clean(body.areas))
     db.add(u)
     db.flush()
+    unit_heads.set_heads(db, u, wanted)
     audit(db, me.email, "organisation.unit_added", target=u.name, target_type="unit", target_id=u.id, company_id=me.company_id)
     db.commit()
     org_push.push(request.app.state.sessions, settings, me.company_id)
-    return {"unit": unit_out(u)}
+    return {"unit": unit_out(u, heads=unit_heads.heads_by_unit(db, me.company_id))}
 
 
 @router.patch("/units/{unit_id}")
@@ -144,19 +153,29 @@ def change_unit(unit_id: str, body: UnitPatch, request: Request, db: DB, me: Adm
         check_parent(db, me, u.id, fields["parent_id"])
     if "name" in fields or "parent_id" in fields:
         check_name(db, me, (fields.get("name") or u.name).strip(), fields.get("parent_id", u.parent_id), other_than=u.id)
-    if "manager_id" in fields:
-        check_manager(db, me, fields["manager_id"])
+    heads = None
+    if "head_ids" in fields or "manager_id" in fields:
+        heads = fields["head_ids"] if fields.get("head_ids") is not None else [fields["manager_id"]] if fields.get("manager_id") else []
+        for head in heads:
+            check_manager(db, me, head)
+        fields.pop("head_ids", None)
+        fields.pop("manager_id", None)
+        fields["heads"] = True
     if fields.get("is_active") is False and db.scalar(select(func.count()).select_from(Unit).where(Unit.parent_id == u.id, Unit.is_active)):
         raise conflict("Units still sit under this one. Move or switch them off first.")
+    if heads is not None:
+        unit_heads.set_heads(db, u, heads)
     for name, value in fields.items():
         if name in ("kind", "name", "is_active") and value is None:
+            continue
+        if name == "heads":
             continue
         setattr(u, name, clean(value) if name == "areas" else value.strip() if name == "name" else value)
     if fields:
         audit(db, me.email, "organisation.unit_changed", target=u.name, target_type="unit", target_id=u.id, company_id=me.company_id, fields=sorted(fields))
         db.commit()
         org_push.push(request.app.state.sessions, settings, me.company_id)
-    return {"unit": unit_out(u)}
+    return {"unit": unit_out(u, heads=unit_heads.heads_by_unit(db, me.company_id))}
 
 
 # ---- Branches -----------------------------------------------------------------------------------

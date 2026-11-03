@@ -62,6 +62,7 @@ def _organisation(db, data: dict, slug: str) -> None:
                 # Who they report to and whose assistant they are (2026-11-03): what a manager reaches follows these.
                 if "reportsTo" in p or "assistantOf" in p:
                     platform_org.link(db, user, p.get("reportsTo"), p.get("assistantOf"))
+                platform_org.keep_managers(db, user, p.get("managers"))
 
 
 # What this application does with each kind it takes: fn(db, data, slug). Invoices and payments are

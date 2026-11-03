@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 
 from app.audit import audit
-from app.models import Team, User
+from app.models import Team, User, UserManager
 from app.platform_roles import PLATFORM, NoteIn, _checked, _nowhere, managed, sessions_for
 
 router = APIRouter(prefix="/platform", tags=["platform"])
@@ -112,6 +112,23 @@ def place(db, user: User, unit_id: str | None, others: list[str] | None) -> bool
     return bool(fields)
 
 
+def keep_managers(db, user: User, managers: object) -> bool:
+    """Everyone who sees this person, by email, exactly as the platform sends them (2026-11-04)."""
+    wanted = {str(e).strip().lower() for e in managers if str(e or "").strip()} - {user.email.lower()} if isinstance(managers, list) else None
+    if wanted is None:
+        return False
+    have = {m.manager_email: m for m in db.scalars(select(UserManager).where(UserManager.user_id == user.id))}
+    for email, row in have.items():
+        if email not in wanted:
+            db.delete(row)
+    for email in wanted - set(have):
+        db.add(UserManager(user_id=user.id, manager_email=email))
+    changed = set(have) != wanted
+    if changed:
+        audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["managers"])
+    return changed
+
+
 def link(db, user: User, reports_to: object, assistant_of: object) -> bool:
     """Who they report to and whose assistant they are, as the platform has them (by email; nobody here by that email: none)."""
     def found(email: object) -> str | None:
@@ -136,6 +153,7 @@ def follow_pass(db, user: User, claims: dict) -> None:
         place(db, user, unit.get("id"), org.get("otherUnits") if isinstance(org.get("otherUnits"), list) else None)
         if "reportsTo" in org or "assistantOf" in org:
             link(db, user, org.get("reportsTo"), org.get("assistantOf"))
+        keep_managers(db, user, org.get("managers"))
 
 
 @router.post("/organisation", status_code=status.HTTP_204_NO_CONTENT)
@@ -153,6 +171,7 @@ def take_chart(body: NoteIn, request: Request) -> Response:
                 place(db, user, p.get("unit"), p.get("otherUnits") if isinstance(p.get("otherUnits"), list) else None)
                 if "reportsTo" in p or "assistantOf" in p:
                     link(db, user, p.get("reportsTo"), p.get("assistantOf"))
+                keep_managers(db, user, p.get("managers"))
         db.commit()
     _newest[claims["slug"]] = claims["iat"]
     return Response(status_code=status.HTTP_204_NO_CONTENT)

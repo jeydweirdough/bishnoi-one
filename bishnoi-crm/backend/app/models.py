@@ -161,6 +161,16 @@ class User(Base):
         return ({self.team_id} if self.team_id else set()) | {t.id for t in self.other_teams}
 
 
+class UserManager(Base):
+    """Who sees a person (2026-11-04, from the platform): the heads of their unit and of every unit above it, and who they
+    were linked to by hand. By email, so it holds whoever has or hasn't signed in here yet."""
+
+    __tablename__ = "nbcm_user_managers"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), primary_key=True)
+    manager_email: Mapped[str] = mapped_column(String(254), primary_key=True, index=True)
+
+
 class PlatformPass(Base):
     """A pass from the platform already taken: each one works once. Kept until it would have expired."""
 

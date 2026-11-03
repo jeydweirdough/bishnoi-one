@@ -30,7 +30,7 @@ from app.audit import audit
 from app import passwords
 from app.deps import DB, SettingsDep, as_utc
 from app.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
-from app import email_rules, org_push, sign_in
+from app import email_rules, org_push, sign_in, standard_actions
 from app.accounts import account_of, memberships, runs_company
 from app.routers.identity import Signed
 
@@ -63,7 +63,7 @@ def module_out(app: Application) -> dict:
         "key": app.key,
         "name": app.name,
         "reachable": found is not None,
-        "areas": found.get("areas", []) if found else [],
+        "areas": standard_actions.describe(found.get("areas", [])) if found else [],
         "scopes": found.get("scopes") or [] if found else [],
     }
 
@@ -537,6 +537,24 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
         db.commit()
         told(request, settings, me.company_id)
     return {"person": person_out(p)}
+
+
+@router.get("/standard/{level}")
+def standard_defaults(level: str, db: DB, me: Admin) -> dict:
+    """What Mentor, Coach or Coachee may do by default in each of the company's apps, in the apps' own permissions (2026-11-04).
+    Nothing is saved: the roles screen loads it into the role being edited, and saving is the administrator's."""
+    if level not in standard_actions.LEVELS:
+        raise not_found("level")
+    permissions, scopes = {}, {}
+    for app in access_roles.modules_of(db, me.company_id):
+        found = access_roles.catalog(app)
+        if found is None:
+            continue
+        held, reach = standard_actions.defaults(found.get("areas", []), found.get("scopes") or [], level)
+        permissions[app.key] = held
+        if reach:
+            scopes[app.key] = reach
+    return {"level": level, "permissions": permissions, "scopes": scopes}
 
 
 class ReportingIn(Api):

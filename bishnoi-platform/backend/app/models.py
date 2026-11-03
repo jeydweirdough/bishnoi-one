@@ -267,6 +267,16 @@ class Branch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class UnitHead(Base):
+    """Who heads a unit (2026-11-04): any number of people. Each sees everyone placed in the unit and in every unit under it;
+    what each may do is their role's. Unit.manager_id stays as the first of them, for what read it before."""
+
+    __tablename__ = "nbpl_unit_heads"
+
+    unit_id: Mapped[str] = mapped_column(ForeignKey("nbpl_units.id", ondelete="CASCADE"), primary_key=True)
+    identity_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
 class MembershipUnit(Base):
     """A unit beyond a membership's main one: widens what they see and approve;
     reports still count them under their main unit."""

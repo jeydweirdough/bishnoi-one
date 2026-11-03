@@ -7,7 +7,8 @@ export type PermissionArea = {
   key: string;
   name: string;
   group: string;
-  actions: { key: string; label: string; permission: string }[];
+  /** `standard` and `kind`: what the action means in the standard vocabulary (Read, Approve...), added by the Platform. */
+  actions: { key: string; label: string; permission: string; standard?: string | null; kind?: string }[];
 };
 
 /**

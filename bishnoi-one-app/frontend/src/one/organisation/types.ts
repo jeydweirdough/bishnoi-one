@@ -8,6 +8,8 @@ export type OrgUnit = {
   name: string;
   parentId: string | null;
   managerId: string | null;
+  /** Everyone who heads it (2026-11-04): each sees everyone in it and under it. */
+  headIds?: string[];
   areas: string[];
   isActive: boolean;
   /** Active people whose main unit it is. */
