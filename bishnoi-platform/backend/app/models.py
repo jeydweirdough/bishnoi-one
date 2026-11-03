@@ -298,6 +298,10 @@ class Application(Base):
     no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     # The app key the screens use (crm, inventory, platform...).
     key: Mapped[str] = mapped_column(String(40), unique=True)
+    # Stable owner of a single-company service database. Kept as a tombstone if
+    # the company is deleted, so removing it never silently selects a new owner.
+    database_company_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
     name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text, default=None)
     # Where people open it, and where the platform asks whether it is up.

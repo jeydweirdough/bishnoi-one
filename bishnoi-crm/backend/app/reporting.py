@@ -2,7 +2,7 @@
 
 The platform keeps who reports to whom (Employees: Reports to, Assistant to) and sends it here. A manager reaches
 the people who report to them and, through those, everyone below, to any depth. An assistant reaches what the one they
-assist reaches, and does what their own role allows. Departments, divisions and teams no longer decide it.
+assist reaches, and does what their own role allows. Managed scope also includes the units they explicitly head and every unit beneath them; simple membership does not make someone a manager.
 """
 
 from sqlalchemy import select
@@ -26,7 +26,7 @@ def below(db: Session, ids: set[str]) -> set[str]:
 
 def reach_of(user: User) -> tuple[str, frozenset[str], frozenset[str]]:
     """(scope, the teams whose records they reach, the people whose records they reach): themselves, and for a manager
-    everyone below; an assistant is added to what the one they assist reaches."""
+    everyone below and the organisational units they head; an assistant is added to what the one they assist reaches."""
     scope = user.role.scope
     db = object_session(user)
     people = [user]
@@ -35,7 +35,15 @@ def reach_of(user: User) -> tuple[str, frozenset[str], frozenset[str]]:
         people.append(boss)
         if ORDER[boss.role.scope] > ORDER[scope]:
             scope = boss.role.scope
-    teams = frozenset(t for p in people for t in p.all_team_ids) if scope in ("team", "managed") else frozenset()
+    if scope == "team":
+        teams = frozenset(t for p in people for t in p.all_team_ids)
+    elif scope == "managed":
+        # Heads reach their own organisational subtree, including teams with
+        # another head below them. Membership in a parent unit alone must not
+        # expose a peer division, its manager, or their records.
+        teams = frozenset(t for p in people for t in p.all_managed_team_ids)
+    else:
+        teams = frozenset()
     ids = {p.id for p in people}
     if scope == "managed" and db is not None:
         ids |= below(db, ids)

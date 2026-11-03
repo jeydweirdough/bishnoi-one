@@ -1,7 +1,7 @@
 """Only correctly delegated, company-bound accounting reads may return figures."""
 import pytest
 from datetime import date
-from app import platform_pass, bir_reports
+from app import platform_pass, bir_reports, platform_links
 from app.models import Account, JournalEntry, JournalLine
 from .test_tax_api import ana, app, ben, client  # noqa: F401
 from .test_invoices import ready, issued
@@ -12,7 +12,8 @@ HEADERS = {"Authorization": "Bearer delegated-pass"}
 
 @pytest.fixture
 def delegated(monkeypatch, app):
-    app.state.settings.assistant_company_slug = "getmeds"
+    owner = {"id": "company-id", "slug": "getmeds", "name": "Getmeds", "currency": "PHP", "timezone": "Asia/Manila", "status": "active"}
+    monkeypatch.setattr(platform_links, "database_company", lambda *args, **kwargs: owner)
     claims = {"kind": "assistant-read", "tool": "monthly-summary", "company": "company-id", "companySlug": "getmeds",
               "email": "reader@example.test", "permissions": ["journal.view"], "admin": False}
     monkeypatch.setattr(platform_pass, "check_for", lambda *args: claims)
@@ -28,12 +29,16 @@ def test_signature_authority_and_binding_are_required(client, app, delegated, mo
     delegated["companySlug"] = "another-company"
     assert read(client).status_code == 403
     delegated["companySlug"] = "getmeds"
+    delegated["company"] = "other-id"
+    assert read(client).status_code == 403
+    delegated["company"] = "company-id"
     delegated["permissions"] = ["invoices.view"]
     assert read(client).status_code == 403
     delegated["permissions"] = ["journal.view"]
-    app.state.settings.assistant_company_slug = None
+    original = platform_links.database_company
+    monkeypatch.setattr(platform_links, "database_company", lambda *args, **kwargs: None)
     assert read(client).status_code == 503
-    app.state.settings.assistant_company_slug = "getmeds"
+    monkeypatch.setattr(platform_links, "database_company", original)
     def invalid(*args): raise platform_pass.PassRefused("bad")
     monkeypatch.setattr(platform_pass, "check_for", invalid)
     assert read(client).status_code == 401

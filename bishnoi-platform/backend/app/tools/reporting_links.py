@@ -52,7 +52,12 @@ def main() -> int:
     upgrade(engine)
     sessions = make_sessions(engine)
     with sessions() as db:
-        company = db.scalar(select(Company).where(Company.slug == args.company.strip().lower()))
+        slug = args.company.strip().lower()
+        company = db.scalar(select(Company).where(Company.slug == slug))
+        if company is None and slug == "getmeds":
+            company = db.scalar(select(Company).where(Company.slug == "getmeds-philippines-inc"))
+        if company is None and slug == "getmeds-philippines-inc":
+            company = db.scalar(select(Company).where(Company.slug == "getmeds"))
         if company is None:
             sys.exit(f"There's no company {args.company!r} on the platform.")
         links = derive(db, company)

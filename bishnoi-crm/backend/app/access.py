@@ -28,12 +28,12 @@ class Access:
     team_id: str | None
     permissions: frozenset[str]
     # The teams whose records they reach (team: their own; managed: the ones
-    # they manage, and their own). Empty for own and all.
+    # they explicitly head, including descendants). Empty for own and all.
     team_ids: frozenset[str] = frozenset()
     # The Administrator role: the one Bishnoi One gives its company administrators.
     administrator: bool = False
-    # Whose records they reach (2026-11-03, app/reporting.py): the teams they work in, and the people they are, manage
-    # (everyone who reports to them, to any depth) or assist. team_ids above stays for departments and settings.
+    # Record reach includes headed units for managers and personal reporting
+    # descendants or assisted people. team_ids above controls settings separately.
     reach_teams: frozenset[str] = frozenset()
     people_ids: frozenset[str] = frozenset()
 
@@ -55,6 +55,8 @@ class Access:
         every one (a role that reaches every record), else the teams they reach."""
         if self.scope == "all":
             return None
+        if self.scope == "managed":
+            return self.team_ids
         return self.team_ids or (frozenset({self.team_id}) if self.team_id else frozenset())
 
     def runs(self, team_id: str | None) -> bool:
@@ -95,7 +97,7 @@ def teams_reached(user: User) -> frozenset[str]:
     if scope == "team":
         return frozenset(own)
     if scope == "managed":
-        return frozenset(own | user.all_managed_team_ids)
+        return frozenset(user.all_managed_team_ids)
     return frozenset()
 
 

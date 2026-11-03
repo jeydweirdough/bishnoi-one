@@ -188,7 +188,7 @@ async def finance(base, token, month, company_id):
     if response.status_code in (401, 403):
         raise HTTPException(403, "Finance refused this read. Check your accounting permissions and the company's Finance database binding.")
     if response.status_code != 200:
-        raise HTTPException(503, "Finance cannot supply these figures. Its assistant endpoint and company binding must be configured.")
+        raise HTTPException(503, "Finance cannot supply these figures. Check that its service is connected and its Database company is selected in Platform.")
     if len(response.content) > 32000:
         raise HTTPException(502, "Finance returned an unexpected response.")
     try:

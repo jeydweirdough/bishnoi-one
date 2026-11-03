@@ -980,4 +980,4 @@ Pushing doesn't deploy. Nothing goes online until someone deploys it by hand
 
 ### Company assistant (Ollama)
 
-The chat icon opens the read-only company assistant. Configure `OLLAMA_BASE_URL` on the Platform backend using a private network origin, install `qwen3:1.7b`, and bind the single-company Finance database with `ASSISTANT_COMPANY_SLUG` (or its existing `CRM_COMPANY`). [Setup, permissions, accounting definitions and limitations](docs/company-assistant.md).
+The chat icon opens the read-only company assistant. Configure `OLLAMA_BASE_URL` on the Platform backend using a private network origin, install `qwen3:1.7b`, and let Platform supply the Finance database company settings. If several companies have Finance, select its Database company in Operations > Services; no additional slug environment variables are needed. [Setup, permissions, accounting definitions and limitations](docs/company-assistant.md).

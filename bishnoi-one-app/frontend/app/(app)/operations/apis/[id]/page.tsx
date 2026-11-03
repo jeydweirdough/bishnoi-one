@@ -1,6 +1,7 @@
 // One application: whether it's working and why, who uses it, what was
 // deployed, what it connects to, and what's gone wrong with it.
 import Link from "next/link";
+import { DatabaseCompany } from "@/src/modules/console/components/applications/database-company";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/console/platform/ui/sheet";
 import { enc, load } from "@/src/modules/console/platform/lib/api";
 import { DeleteRecord } from "@/src/modules/console/components/delete-record";
@@ -101,6 +102,7 @@ export default async function ApplicationPage({ params, searchParams }: { params
         ]}
       />
 
+      {tab === "overview" && app.key === "finance" && <DatabaseCompany app={app} admin={admin} />}
       {tab === "overview" && <Overview app={app} />}
       {tab === "companies" && <Companies app={app} />}
       {tab === "deployments" && <Deployments app={app} admin={admin} />}

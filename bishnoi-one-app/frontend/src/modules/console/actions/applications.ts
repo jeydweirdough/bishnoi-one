@@ -19,6 +19,7 @@ export type ApplicationInput = {
 };
 
 export type ApplicationPatch = Partial<Omit<ApplicationInput, "key">> & {
+  databaseCompanyId?: string;
   isActive?: boolean;
   statusOverride?: Application["statusOverride"];
   statusNote?: string | null;

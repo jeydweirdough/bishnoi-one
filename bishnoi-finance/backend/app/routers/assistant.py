@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from sqlalchemy import func, select
 from app.api import Api
-from app import bir_reports, management, platform_pass
+from app import bir_reports, management, platform_pass, platform_links
 from app.audit import audit
 from app.deps import DB, SettingsDep
 from app.models import Account, Invoice, JournalEntry, JournalLine
@@ -33,18 +33,20 @@ def monthly(body: MonthIn, db: DB, settings: SettingsDep,
         raise HTTPException(401, "The assistant read pass is invalid or expired.") from None
     if claims.get("kind") != "assistant-read" or claims.get("tool") != "monthly-summary":
         raise HTTPException(403, "This pass cannot use financial assistant tools.")
-    # Never learn the binding from the incoming pass or mutable sign-in metadata.
-    bound = settings.assistant_company_slug or settings.crm_company
-    if not bound:
-        raise HTTPException(503, "Finance's company binding is not configured for assistant reads.")
-    if claims.get("companySlug") != bound or not claims.get("company"):
+    # Resolve trusted company configuration from the Platform database, separately
+    # from the incoming request. Never bind this database from a user's read pass.
+    owner = platform_links.database_company(settings, fresh=True)
+    if not owner:
+        raise HTTPException(503, "Finance's database company must be selected in Platform service settings, or the Platform is unavailable.")
+    bound = owner["slug"]
+    if claims.get("companySlug") != bound or claims.get("company") != owner["id"]:
         raise HTTPException(403, "This Finance database belongs to another company.")
     permissions = claims.get("permissions", [])
     if claims.get("admin") is not True and (not isinstance(permissions, list) or "journal.view" not in permissions):
         raise HTTPException(403, "Your role cannot read company accounting reports.")
     year, month = map(int, body.month.split("-"))
     first, last = date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
-    today = datetime.now(ZoneInfo(settings.org_timezone)).date()
+    today = datetime.now(ZoneInfo(owner["timezone"])).date()
     end = min(last, today) if first <= today else last
     future = first > today
     invoice_count = 0 if future else db.scalar(select(func.count()).select_from(Invoice).where(Invoice.status == "issued", Invoice.invoice_date >= first, Invoice.invoice_date <= end))
@@ -52,7 +54,7 @@ def monthly(body: MonthIn, db: DB, settings: SettingsDep,
         .where(JournalEntry.status == "approved", JournalEntry.entry_date >= first, JournalEntry.entry_date <= end, Account.type.in_(("income", "expense"))))
     totals = bir_reports.income_statement(db, first, end)["totals"] if journal_count else None
     result = {
-        "companyId": claims["company"], "companySlug": bound, "currency": settings.org_currency,
+        "companyId": claims["company"], "companySlug": bound, "currency": owner["currency"],
         "from": first.isoformat(), "to": end.isoformat(), "partial": first <= today < last,
         "revenueCentavos": management.revenue(db, first, end) if invoice_count else None,
         "incomeCentavos": totals["incomeCentavos"] if totals else None,

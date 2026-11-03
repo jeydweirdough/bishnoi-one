@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { MessageSquare } from "lucide-react";
 import { cookies } from "next/headers";
 import { getAccount } from "@/src/platform/lib/account";
 import { currentModule, load } from "@/src/platform/lib/api";
@@ -26,7 +24,6 @@ export async function OneActions({ links = [] }: { links?: AccountLink[] }) {
     <>
       {viewing && <ViewingBar name={viewing[1] ?? "someone"} role={viewing[2] ?? ""} />}
       {roles && roles.length > 0 && <ViewAsButton roles={roles} />}
-      <Link href="/assistant" aria-label="Company assistant" title="Company assistant" className="grid size-10 place-items-center rounded-full text-ink-3 hover:bg-sheet"><MessageSquare className="size-5" aria-hidden /></Link>
       <ModuleSwitcher mine={myModules(me)} compact />
       <AccountMenu compact id={me.id} name={me.fullName} email={me.email} companies={me.companies} links={links} viewAs={Boolean(roles && roles.length > 0)} />
     </>

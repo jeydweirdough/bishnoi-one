@@ -30,7 +30,8 @@ from sqlalchemy.orm import Session
 from app import passes
 from app.api import as_utc
 from app.config import Settings
-from app.models import AppLink, Application, utcnow
+from app.models import AppLink, Application, Company, CompanyApp, utcnow
+from app.audit import audit
 
 # How often an application asks again (seconds). A link switched off stops
 # working within this long; one switched on starts within it.
@@ -91,6 +92,32 @@ def app_of_key(db: Session, key: str | None) -> Application | None:
     return found if found is not None and found.is_active else None
 
 
+def database_company(db: Session, app: Application) -> dict | None:
+    """Resolve Finance's existing subscription once, then pin its database owner.
+
+    Multiple companies are never resolved by sign-in order, names or a request's
+    company claim. An operator selects the owner from registered companies.
+    """
+    if app.key != "finance":
+        return None
+    db.flush()  # Preserve a newly created data key before refreshing/locking this row.
+    app = db.scalar(select(Application).where(Application.id == app.id).with_for_update().execution_options(populate_existing=True))
+    if not app.database_company_id:
+        candidates = list(db.scalars(select(Company).join(CompanyApp, CompanyApp.company_id == Company.id)
+            .where(CompanyApp.application_id == app.id, Company.status == "active").limit(2)))
+        if len(candidates) != 1:
+            return None
+        app.database_company_id = candidates[0].id
+        audit(db, "Platform", "application.database_bound", category="system", target=app.name,
+              target_type="application", target_id=app.id, company_id=candidates[0].id, fields=["database_company_id"])
+        db.flush()
+    company = db.get(Company, app.database_company_id)
+    if company is None or company.status != "active" or db.get(CompanyApp, (company.id, app.id)) is None:
+        return None
+    return {"id": company.id, "slug": company.slug, "name": company.name, "currency": company.currency,
+            "timezone": company.timezone, "status": company.status}
+
+
 def links_for(db: Session, settings: Settings, app: Application) -> dict:
     """What an application is told: what it uses, and who uses it."""
     apps = {a.id: a for a in db.scalars(select(Application).where(Application.is_active))}
@@ -105,7 +132,7 @@ def links_for(db: Session, settings: Settings, app: Application) -> dict:
             uses[target.key] = {"apiUrl": target.api_url, "appUrl": target.app_url, "key": secret}
         if target.id == app.id:
             used_by[caller.key] = secret
-    return {"app": app.key, "appUrl": app.app_url, "uses": uses, "usedBy": used_by, "dataKey": data_key(settings, app), "askAgainIn": ASK_AGAIN}
+    return {"app": app.key, "appUrl": app.app_url, "uses": uses, "usedBy": used_by, "dataKey": data_key(settings, app), **({"databaseCompany": database_company(db, app)} if app.key == "finance" else {}), "askAgainIn": ASK_AGAIN}
 
 
 def data_key(settings: Settings, app: Application) -> str | None:

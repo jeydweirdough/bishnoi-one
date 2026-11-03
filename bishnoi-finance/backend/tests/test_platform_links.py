@@ -35,3 +35,37 @@ def test_a_replaced_key_drops_the_links_and_no_key_keeps_env(monkeypatch):
     platform_links.forget()
     plain = Settings(_env_file=None, platform_api_url=None, integration_keys=[SecretStr("crm:in-env-0123456789abcdefghijkl")])
     assert platform_links.effective(plain) is plain
+
+
+OWNER = {"id": "company-id", "slug": "getmeds", "name": "Getmeds", "currency": "PHP", "timezone": "Asia/Manila", "status": "active"}
+
+
+def test_company_settings_come_from_platform_not_legacy_env(monkeypatch):
+    original = connected(monkeypatch, Answer(200, {"databaseCompany": OWNER}))
+    original.crm_company = "old-env-company"
+    settings = platform_links.effective(original)
+    assert settings.crm_company == "getmeds"
+    assert (settings.org_name, settings.org_currency, settings.org_timezone) == ("Getmeds", "PHP", "Asia/Manila")
+    assert platform_links.database_company(settings, fresh=True) == OWNER
+    platform_links.forget()
+
+
+def test_sensitive_binding_fails_closed_even_with_a_cached_owner(monkeypatch):
+    settings = connected(monkeypatch, Answer(200, {"databaseCompany": OWNER}))
+    assert platform_links.database_company(settings) == OWNER
+    def unavailable(*args, **kwargs): raise httpx.ConnectError("offline")
+    monkeypatch.setattr(httpx, "get", unavailable)
+    assert platform_links.database_company(settings, fresh=True) is None
+    # An old .env company never substitutes for missing central ownership.
+    settings.crm_company = "env-company"
+    assert platform_links.database_company(settings, fresh=True) is None
+    platform_links.forget()
+
+
+def test_missing_platform_owner_does_not_reuse_env_company(monkeypatch):
+    settings = connected(monkeypatch, Answer(200, {}))
+    settings.crm_company = "env-company"
+    effective = platform_links.effective(settings)
+    assert effective.crm_company is None
+    assert platform_links.database_company(effective, fresh=True) is None
+    platform_links.forget()

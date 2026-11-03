@@ -92,7 +92,7 @@ def test_the_org_chart_arrives_as_a_business_event_once(app, client, linked):
         assert db.get(InboxEvent, "ev-22222222").kind == "organisation.changed"
 
 
-def test_a_manager_reaches_the_people_linked_to_them_not_a_whole_team(app, client, linked):
+def test_a_unit_head_reaches_its_children_even_without_reporting_links(app, client, linked):
     from app.access import access_of
     from app.models import Role
     from app.scope import reachable_people
@@ -130,8 +130,8 @@ def test_a_manager_reaches_the_people_linked_to_them_not_a_whole_team(app, clien
         db.flush()
         access = access_of(mgr)
         reached = reachable_people(db, access)
-        # In the team under the division, but not linked to the manager: not reached (links decide, not departments).
-        assert sam not in reached
+        # The authoritative org-chart head reaches this child team even without individual reporting links.
+        assert sam in reached
     assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=linked)}).status_code == 204
     with database(app)() as db:
         mgr = db.scalar(select(User).where(func.lower(User.email) == WHO))
@@ -140,14 +140,14 @@ def test_a_manager_reaches_the_people_linked_to_them_not_a_whole_team(app, clien
         db.flush()
         assert sam.reports_to_id == mgr.id
         assert sam in reachable_people(db, access_of(mgr))
-        # Unlinking takes it away again.
+        # Removing a reporting link does not revoke the separate org-head assignment.
     assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people_plain(people))}).status_code == 204
     with database(app)() as db:
         mgr = db.scalar(select(User).where(func.lower(User.email) == WHO))
         sam = db.scalar(select(User).where(func.lower(User.email) == "sam@example.com"))
         mgr.role = db.scalar(select(Role).where(Role.name == "Manager"))
         db.flush()
-        assert sam.reports_to_id is None and sam not in reachable_people(db, access_of(mgr))
+        assert sam.reports_to_id is None and sam in reachable_people(db, access_of(mgr))
 
 
 def people_plain(people):

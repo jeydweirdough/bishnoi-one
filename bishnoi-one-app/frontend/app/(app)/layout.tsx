@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getAccount } from "@/src/platform/lib/account";
+import { FloatingAssistant } from "@/src/one/assistant/floating-assistant";
 import { FeaturesProvider } from "@/src/platform/shell/features";
 
 // Every signed-in page of the one app. No bar across the top (decided
@@ -15,7 +16,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (account.mustChangePassword || account.twoStep?.needed) redirect("/login/first");
   return (
     <div className="min-h-dvh bg-bench">
-      <FeaturesProvider features={account.features ?? null} companies={account.staff ? account.companies : null}>{children}</FeaturesProvider>
+      <FeaturesProvider features={account.features ?? null} companies={account.staff ? account.companies : null}>{children}{account.company && <FloatingAssistant key={`${account.id}:${account.company.id}`} companyId={account.company.id} companyName={account.company.name} />}</FeaturesProvider>
     </div>
   );
 }

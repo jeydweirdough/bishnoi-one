@@ -21,20 +21,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     environment: str = "development"
-    # Finance has one company per database. Assistant reads require an explicit binding.
-    assistant_company_slug: str | None = None
-
-    @field_validator("assistant_company_slug")
-    @classmethod
-    def _assistant_company(cls, value: str | None) -> str | None:
-        if not value:
-            return None
-        value = value.strip().lower()
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,38}[a-z0-9]", value):
-            raise ValueError("ASSISTANT_COMPANY_SLUG must be the Finance database owner's Platform slug.")
-        return value
-
-
     # Dedicated Finance OAuth client. Never returned to the browser.
     zoho_client_id: SecretStr | None = None
     zoho_client_secret: SecretStr | None = None

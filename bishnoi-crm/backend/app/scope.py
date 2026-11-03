@@ -2,7 +2,7 @@
 
 - own:     records they own;
 - team:    records owned in their team (their own too, even without a team);
-- managed: records owned by the people who report to them, to any depth, and in their own team;
+- managed: records owned by their reporting chain or in the units they head and their descendants;
 - all:     every record.
 
 An assistant reaches what the one they assist reaches (app/reporting.py).

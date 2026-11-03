@@ -45,6 +45,7 @@ export type Application = {
   no: number | null;
   id: string;
   key: string;
+  databaseCompanyId?: string | null;
   name: string;
   description: string | null;
   appUrl: string | null;

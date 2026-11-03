@@ -19,6 +19,7 @@ outage changes nothing; after that, the links are dropped until it answers.
 """
 
 import logging
+import re
 import threading
 import time
 
@@ -69,7 +70,7 @@ def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
         return None, RETRY
     try:
         body = r.json()
-        return {"uses": dict(body.get("uses") or {}), "usedBy": dict(body.get("usedBy") or {}), "appUrl": body.get("appUrl")}, float(body.get("askAgainIn") or 300)
+        return {"uses": dict(body.get("uses") or {}), "usedBy": dict(body.get("usedBy") or {}), "appUrl": body.get("appUrl"), "databaseCompany": body.get("databaseCompany")}, float(body.get("askAgainIn") or 300)
     except ValueError:
         log.error("Links: the platform's answer wasn't readable.")
         return None, RETRY
@@ -98,12 +99,42 @@ def answer(settings: Settings) -> dict | None:
     return dict(NOTHING) if last is not None else None
 
 
+def database_company(settings: Settings, *, fresh: bool = False) -> dict | None:
+    """The database owner from the authenticated Platform, never from a user pass.
+
+    Sensitive assistant reads ask fresh and fail closed during a Platform outage,
+    instead of using the ordinary integration links' 24-hour stale-cache grace.
+    """
+    if fresh:
+        from app.platform_connect import connect_key
+        key = connect_key(settings)
+        if not key or not settings.platform_api_url:
+            return None
+        found, _ = _ask(settings, key)
+    else:
+        found = answer(settings)
+    company = found.get("databaseCompany") if found else None
+    if not isinstance(company, dict) or company.get("status") != "active":
+        return None
+    if not isinstance(company.get("id"), str) or not 1 <= len(company["id"]) <= 36:
+        return None
+    if not isinstance(company.get("slug"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,38}[a-z0-9]", company["slug"]):
+        return None
+    if not all(isinstance(company.get(k), str) and company[k] for k in ("currency", "timezone", "name")):
+        return None
+    return company
+
+
 def overrides(settings: Settings) -> dict:
     """What to lay over the settings: every link as the platform says, or nothing when not connected."""
     found = answer(settings)
     if found is None:
         return {}
-    out: dict = {}
+    owner = database_company(settings)
+    # The connected Platform is authoritative; legacy .env slugs never override it.
+    out: dict = {"crm_company": owner["slug"] if owner else None}
+    if owner:
+        out.update(org_name=owner["name"], org_currency=owner["currency"], org_timezone=owner["timezone"])
     for name, (url, key, screens) in USES.items():
         link = found["uses"].get(name)
         out[url] = link.get("apiUrl") if link else None
