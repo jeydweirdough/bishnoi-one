@@ -10,6 +10,7 @@ import { readAssistantStream, type AssistantSource } from "./stream";
 type Turn = { question: string; text: string; sources: AssistantSource[]; range?: { from: string; to: string } | null; definitions?: Record<string, string> | null; retrievedAt?: string; error?: string; done?: boolean };
 const examples = [
   { label: "Find our CEO", question: "Who is our CEO?" },
+  { label: "How many employees?", question: "How many employees do we have?" },
   { label: "Last month's figures", question: "Show our revenue, expenses and profit for last month." },
 ];
 

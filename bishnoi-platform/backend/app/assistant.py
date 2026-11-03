@@ -5,6 +5,7 @@ All names, figures and source references are rendered from backend results.
 """
 import asyncio
 import json
+import re
 import ipaddress
 import socket
 from urllib.parse import urlsplit
@@ -49,7 +50,7 @@ class ChatIn(BaseModel):
 
 class Plan(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    tool: Literal["directory", "finance", "clarify", "unsupported"]
+    tool: Literal["directory", "headcount", "finance", "clarify", "unsupported"]
     query: str | None = Field(max_length=80)
     month: str | None = Field(pattern=r"^(19|20)[0-9]{2}-(0[1-9]|1[0-2])$")
 
@@ -100,12 +101,32 @@ async def ensure_private_ollama(origin):
         raise HTTPException(503, "Ollama must use a private or loopback network address; public model endpoints are refused.")
 
 
+HELP = ("I can look up an employee by name or job title, count your active employees, and report a month's company financials, "
+        "within what your role may read. Try: \"Who is our CEO?\", \"How many employees do we have?\" or \"Revenue for October 2026\".")
+_COUNT = re.compile(r"\b(how many|number of|count of|total)\b.*\b(employees?|people|staff|members|workers)\b|\bheadcount\b", re.I)
+_PLAIN_TOTAL = re.compile(r"\b(in our company|in the company|in total|do we have|we have|are there|do i have|have we got|altogether|overall|all together|currently|right now|now)\b", re.I)
+_NARROWED = re.compile(r"\b(in|per|by|each|every|team|teams|department|division|unit|under|from|with|who|which|active|inactive|male|female)\b", re.I)
+_GREETING = re.compile(r"^\s*(hi|hello|hey|good (morning|afternoon|evening)|thanks?|thank you|ok|okay)\W*$", re.I)
+
+
+def rule_plan(message):
+    """The plain questions need no model: a greeting, or the total number of employees. Anything narrower goes to the model."""
+    if _GREETING.match(message):
+        return Plan(tool="clarify", query=None, month=None)
+    if _COUNT.search(message) and not _NARROWED.search(_PLAIN_TOTAL.sub(" ", message)):
+        return Plan(tool="headcount", query=None, month=None)
+    return None
+
+
 async def plan(body, settings, today):
+    quick = rule_plan(body.message)
+    if quick is not None:
+        return quick
     await ensure_private_ollama(settings.ollama_base_url)
     system = f"""/no_think
 You select a read-only tool, never answer from memory. Reply only with the supplied JSON schema.
 Today in the active company's timezone is {today}. Resolve explicit this/last month using this date.
-Tools: directory searches recorded employee names or job titles; finance returns company-wide monthly revenue, expenses and profit.
+Tools: directory searches recorded employee names or job titles; headcount counts the active employees (query=null, month=null); finance returns company-wide monthly revenue, expenses and profit.
 For directory, query is just the person's name or job title (e.g. CEO); month=null. Never infer CEO from President, owner or seniority.
 For finance, use a single explicitly requested calendar month YYYY-MM; query=null. If month/year is missing or ambiguous, or multiple periods are requested, tool=clarify. Never silently select one period from a range.
 Use history only to resolve the current question, never as verified facts.
@@ -136,13 +157,29 @@ Set unused query/month to null. No financial figures or employee facts belong in
         raise HTTPException(502, "The AI could not identify a supported lookup. Specify a job title/name or one calendar month.") from None
 
 
-def directory(db, person, query):
+def may_read_directory(db, person):
     role = db.get(AccessRole, person.access_role_id) if person.access_role_id else None
     allowed = runs_company(db, person) or (role is not None and role.company_id == person.company_id and role.is_admin)
     if not allowed:
         allowed = bool(role and role.company_id == person.company_id and db.get(AccessRoleAbility, (role.id, "directory.read")))
     if not allowed:
         raise HTTPException(403, "Your role does not have the company directory reading ability. Ask your administrator.")
+
+
+def headcount(db, person):
+    """How many employees the company has: a number from its directory, for whoever may read the directory."""
+    may_read_directory(db, person)
+    base = select(func.count()).select_from(Identity).where(Identity.company_id == person.company_id, Identity.deleted_at.is_(None), Identity.via_operator.is_(False))
+    active = db.scalar(base.where(Identity.status == "active")) or 0
+    off = db.scalar(base.where(Identity.status != "active")) or 0
+    text = f"Your company has {active} active {'employee' if active == 1 else 'employees'}."
+    if off:
+        text += f" {off} more {'is' if off == 1 else 'are'} switched off."
+    return {"answer": text, "sources": [{"label": "Company directory (employee count)", "reference": "directory:count"}]}
+
+
+def directory(db, person, query):
+    may_read_directory(db, person)
     if not query or not query.strip():
         return {"answer": "Which employee name or job title should I look up?", "sources": []}
     q = query.strip().lower()
@@ -155,7 +192,7 @@ def directory(db, person, query):
     found = db.scalars(select(Identity).where(Identity.company_id == person.company_id, Identity.status == "active",
         Identity.deleted_at.is_(None), Identity.via_operator.is_(False), or_(*match)).order_by(Identity.full_name).limit(11)).all()
     if not found:
-        return {"answer": "No active employee with that name or recorded job title was found in your company. I cannot infer who holds the position.", "sources": [{"label": "Active company directory (names and recorded job titles)", "reference": "company-directory"}]}
+        return {"answer": f"No active employee has \"{query.strip()[:60]}\" recorded as a name or job title. Job titles come from each employee's Title on the Employees page, and I cannot infer who holds a position.", "sources": [{"label": "Active company directory (names and recorded job titles)", "reference": "company-directory"}]}
     if len(found) > 10:
         return {"answer": "More than 10 employees match. Please give a more specific name or job title.", "sources": []}
     # Do not send these records back to the model. Only trusted templates display them.
@@ -219,11 +256,13 @@ async def finance(base, token, month, company_id):
 
 async def answer(selected, sessions, token, settings, company_id):
     if selected.tool == "unsupported":
-        return {"answer": "I can look up recorded company employee names/job titles and monthly company financials you may read. I cannot change records, run SQL, forecast figures or look across companies.", "sources": []}
+        return {"answer": HELP + " I cannot change records, run SQL, forecast figures or look across companies.", "sources": []}
     if selected.tool == "clarify" or (selected.tool == "finance" and not selected.month):
-        return {"answer": "Please specify an employee name or job title, or a financial month and year (for example, October 2026).", "sources": []}
+        return {"answer": HELP, "sources": []}
     with sessions() as db:
         person, company = member(db, token, settings, company_id)
+        if selected.tool == "headcount":
+            return headcount(db, person)
         if selected.tool == "directory":
             return directory(db, person, selected.query)
         base, delegated = finance_request(db, person, company, settings)

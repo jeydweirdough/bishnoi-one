@@ -170,3 +170,36 @@ def test_public_ollama_address_is_refused():
     with pytest.raises(Exception) as e:
         asyncio.run(assistant.ensure_private_ollama("http://8.8.8.8:11434"))
     assert e.value.status_code == 503
+
+
+def test_plain_questions_are_planned_without_the_model():
+    for q in ("How many employees do we have?", "how many employees we have?", "What is our headcount?", "How many people are in our company?"):
+        assert assistant.rule_plan(q).tool == "headcount", q
+    # Narrower questions, and everything else, are the model's to place (or refuse).
+    for q in ("How many employees are in HOS?", "How many employees per department?", "Who is our CEO?", "Revenue for October 2026"):
+        assert assistant.rule_plan(q) is None, q
+    assert assistant.rule_plan("Hi").tool == "clarify" and assistant.rule_plan("hello!").tool == "clarify"
+
+
+def test_headcount_counts_this_companys_active_employees_for_those_who_may_read_the_directory(client, getmeds, app):
+    from datetime import UTC, datetime
+    with app.state.sessions() as db:
+        other = Company(name="Other company", slug="other-company")
+        db.add(other); db.flush()
+        db.add(Identity(company_id=other.id, email="x@example.test", full_name="Elsewhere"))
+        db.add(Identity(company_id=getmeds["company"]["id"], email="op@example.test", full_name="Hidden Operator", via_operator=True))
+        gone = db.get(Identity, getmeds["rio"]["id"])
+        gone.deleted_at = datetime.now(UTC)
+        db.get(Identity, getmeds["jade"]["id"]).status = "suspended"
+        db.commit()
+    app.state.settings.ollama_base_url = "http://ollama:11434"
+    r = send(client, getmeds, message="How many employees do we have?")
+    text = "".join(e.get("text", "") for e in events(r))
+    # Olive alone is active; Jade is switched off; Rio is deleted; the operator and the other company don't count.
+    assert "1 active employee." in text and "1 more is switched off" in text, text
+    # Without the directory ability, no count.
+    with app.state.sessions() as db:
+        db.get(Identity, getmeds["rio"]["id"]).deleted_at = None
+        db.commit()
+    denied = send(client, getmeds, who="rio", message="How many employees do we have?")
+    assert any(e.get("type") == "error" for e in events(denied))

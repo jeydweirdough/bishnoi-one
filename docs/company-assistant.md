@@ -29,6 +29,8 @@ With Ollama unset, the rest of the application still works and chat reports that
 
 ## Data and calculations
 
+Plain questions need no model (2026-11-03): a greeting, and the **total number of employees** ("How many employees do we have?") are recognised by fixed rules and answered from the directory count (active, undeleted, non-operator employees of the company; switched-off ones are mentioned), for the same people who may read the directory. A narrower count (per department, per team) isn't supported yet and goes to the model, which refuses it.
+
 Ollama performs **intent planning only** using a strict schema (`directory`, `finance`, `clarify`, `unsupported`). It receives bounded user questions and a trusted current date, not employee records, financial results, credentials or SQL schemas. Raw model output and thinking are never streamed to the user. Fixed backend templates produce answers from authorized tool results, preventing the model from inventing names, numbers or source links.
 
 Finance supports one explicit calendar month per question; an unclear month/year prompts clarification. A current month is truncated to today in Finance's company timezone, and future dates do not return actuals.
