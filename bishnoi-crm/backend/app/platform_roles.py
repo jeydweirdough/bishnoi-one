@@ -172,6 +172,8 @@ def take_roles(body: NoteIn, request: Request) -> Response:
                 continue
             role = boss if p.get("admin") else roles.get(str(p.get("role") or "").strip().lower())
             user = db.scalar(select(User).where(func.lower(User.email) == str(p.get("email") or "").strip().lower()))
+            if user is None:
+                user = provision(db, p, role)
             if role is not None and user is not None and user.role_id != role.id:
                 give(user, role)
                 audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=["role"])
@@ -188,6 +190,28 @@ def take_roles(body: NoteIn, request: Request) -> Response:
         db.commit()
     _newest[claims["slug"]] = claims["iat"]
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def provision(db, person: dict, role: Role | None) -> User | None:
+    """Someone who holds the CRM, switched on, with a role here: made now (2026-11-04), so they are on the org chart, in their
+    manager's team and counted before they first sign in. They sign in with Bishnoi One; this password is never used."""
+    import secrets
+    from datetime import UTC, datetime
+
+    from app.security import hash_password
+
+    email, name = str(person.get("email") or "").strip().lower(), str(person.get("fullName") or "").strip()
+    if role is None or not email or not name or person.get("active") is False:
+        return None
+    identity = str(person.get("identityId") or "")[:36] or None
+    if identity and db.scalar(select(User.id).where(User.platform_identity_id == identity)):
+        identity = None
+    user = User(email=email, full_name=name[:120], password_hash=hash_password(secrets.token_urlsafe(32)), role_id=role.id,
+                platform_identity_id=identity, password_changed_at=datetime.now(UTC))
+    db.add(user)
+    db.flush()
+    audit(db, PLATFORM, "user.created", target=email, target_type="user", target_id=user.id, fields=["from the platform"])
+    return user
 
 
 @router.post("/roles/export")

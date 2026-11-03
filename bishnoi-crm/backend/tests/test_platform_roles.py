@@ -153,3 +153,26 @@ def test_a_persons_crm_details_come_from_the_platform(app, client, linked):
     assert r.status_code == 204, r.text
     with database(app)() as db:
         assert db.scalar(select(User).where(func.lower(User.email) == WHO)).employee_id == "GM-0042"
+
+
+def test_someone_the_platform_lists_with_a_role_here_is_made_before_they_sign_in(app, client, linked):
+    """2026-11-04: the roles note names each person who holds the CRM; one with a role here, switched on, is made."""
+    people = [
+        {"email": "New.Rep@example.com", "identityId": "id-new-rep", "fullName": "New Rep", "role": REP["name"], "admin": False, "active": True, "details": {}},
+        {"email": "off@example.com", "identityId": "id-off", "fullName": "Switched Off", "role": REP["name"], "admin": False, "active": False, "details": {}},
+        {"email": "norole@example.com", "identityId": "id-none", "fullName": "No Role", "role": None, "admin": False, "active": True, "details": {}},
+        {"email": "ghost@example.com", "role": REP["name"], "admin": False, "active": True, "details": {}},  # no name: not made
+    ]
+    assert client.post("/platform/roles", json={"pass": note(roles=[REP], people=people)}).status_code == 204
+    with database(app)() as db:
+        made = db.scalar(select(User).where(User.email == "new.rep@example.com"))
+        assert made is not None and made.full_name == "New Rep" and made.platform_identity_id == "id-new-rep" and made.is_active
+        assert made.role.name == REP["name"]
+        for email in ("off@example.com", "norole@example.com", "ghost@example.com"):
+            assert db.scalar(select(User).where(User.email == email)) is None, email
+        # Sent again, they are the same person: nothing is made twice.
+        before = len(db.scalars(select(User)).all())
+    platform_roles._newest.clear()
+    assert client.post("/platform/roles", json={"pass": note(roles=[REP], people=people[:1])}).status_code == 204
+    with database(app)() as db:
+        assert len(db.scalars(select(User)).all()) == before

@@ -55,3 +55,29 @@ def test_everyone_above_a_person_sees_them_and_nobody_sees_themselves_or_the_nex
         assert chart["jade@getmeds.test"]["managers"] == ["rio@getmeds.test", "olive@getmeds.test"]
         placed = org_push.placement(db, db.get(Identity, jade["id"]))
         assert placed["managers"] == ["rio@getmeds.test", "olive@getmeds.test"] and placed["manager"] == "olive@getmeds.test"  # the link is first for "manager"
+
+
+def test_moving_a_team_or_changing_its_heads_changes_who_sees_it_at_once(app, client, getmeds):
+    """Manager > Admin 1 > Team 1, 2; Admin 2 > Team 3. Move Team 3 under Admin 1: its people are now seen by Admin 1's head."""
+    h = getmeds["owner"]["h"]
+    boss, admin1, admin2 = getmeds["rio"], getmeds["owner"], getmeds["jade"]
+    mia = client.post("/identity/access/people", json={"fullName": "Mia Cruz", "email": "mia@getmeds.test"}, headers=h).json()["person"]
+    top = unit(client, h, "department", "Manager", heads=[boss["id"]])
+    a1 = unit(client, h, "division", "Admin 1", parent=top["id"], heads=[admin1["id"]])
+    a2 = unit(client, h, "division", "Admin 2", parent=top["id"], heads=[admin2["id"]])
+    unit(client, h, "team", "Team 1", parent=a1["id"])
+    unit(client, h, "team", "Team 2", parent=a1["id"])
+    t3 = unit(client, h, "team", "Team 3", parent=a2["id"])
+    client.put(f"/identity/organisation/people/{mia['id']}", json={"mainUnitId": t3["id"]}, headers=h)
+
+    def seen_by():
+        with app.state.sessions() as db:
+            company = db.get(Company, db.get(Identity, mia["id"]).company_id)
+            return next(p for p in org_push.chart(db, company)["people"] if p["email"] == "mia@getmeds.test")["managers"]
+
+    assert seen_by() == ["jade@getmeds.test", "rio@getmeds.test"]  # Admin 2's head, then the Manager
+    assert client.patch(f"/identity/organisation/units/{t3['id']}", json={"parentId": a1["id"]}, headers=h).status_code == 200
+    assert seen_by() == ["olive@getmeds.test", "rio@getmeds.test"]  # now Admin 1's head
+    # Change the head of Admin 1 and it follows.
+    client.patch(f"/identity/organisation/units/{a1['id']}", json={"headIds": [getmeds["jade"]["id"], admin1["id"]]}, headers=h)
+    assert seen_by() == ["jade@getmeds.test", "olive@getmeds.test", "rio@getmeds.test"]

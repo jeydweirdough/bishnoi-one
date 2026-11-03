@@ -36,6 +36,11 @@ TODAY = {  # the roles each module has before the platform keeps them
 }
 
 
+def bare(person: dict) -> dict:
+    """A person in a roles note without the name and identity the CRM makes them from (2026-11-04)."""
+    return {k: v for k, v in person.items() if k not in ("identityId", "fullName")}
+
+
 class Answer:
     def __init__(self, status_code, body=None):
         self.status_code, self._body = status_code, body
@@ -125,10 +130,11 @@ def test_giving_a_role_tells_every_module_signed(client, getmeds, modules):
     assert crm["kind"] == "roles" and crm["aud"] == "crm" and crm["slug"] == getmeds["company"]["slug"]
     assert {"name": "Medical rep", "description": None, "scope": "own", "permissions": ["customers.view"], "admin": False} in crm["roles"]
     # Everyone who may open the module, with their role here (if any) and whether they're switched on (R2).
-    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True, "details": {}} in crm["people"]
-    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}} in crm["people"]
+    assert {"email": "jade@getmeds.test", "role": "Medical rep", "admin": False, "active": True, "details": {}} in [bare(x) for x in crm["people"]]
+    assert {"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}} in [bare(x) for x in crm["people"]]
+    assert next(x for x in crm["people"] if x["email"] == "rio@getmeds.test")["fullName"] == "Rio Santos"
     # Pharmacy is told the roles too: only Rio may open it, with no role from here yet.
-    assert notes["https://pharmacy-api.example.com/platform/roles"]["people"] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}}]
+    assert [bare(x) for x in notes["https://pharmacy-api.example.com/platform/roles"]["people"]] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}}]
 
 
 def test_the_pass_carries_the_role_given_here(client, getmeds):
@@ -162,7 +168,7 @@ def test_a_role_in_each_app(client, getmeds, modules):
     # Each app is told the role there, and its pass carries it.
     key = client.get("/pass/key").json()["publicKey"]
     note = {url: claims_of(body["pass"], key) for url, body in modules}["https://pharmacy-api.example.com/platform/roles"]
-    assert {"email": "rio@getmeds.test", "role": "Chemist", "admin": False, "active": True, "details": {}} in note["people"]
+    assert {"email": "rio@getmeds.test", "role": "Chemist", "admin": False, "active": True, "details": {}} in [bare(x) for x in note["people"]]
     for app, port, name in (("crm", 4302, "Medical rep"), ("pharmacy", 4307, "Chemist")):
         r = client.post("/identity/pass", json={"app": app, "returnTo": f"http://localhost:{port}/auth/platform"}, headers=rio["h"])
         assert claims_of(r.json()["pass"], key)["roleDef"]["name"] == name, app

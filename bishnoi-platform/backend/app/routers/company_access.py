@@ -675,7 +675,8 @@ def give_module(person_id: str, key: str, request: Request, db: DB, me: Admin, s
         db.add(IdentityApp(identity_id=p.id, application_id=app.id, granted_by=me.email))
         audit(db, me.email, "access.granted", target=f"{p.email} · {app.name}", target_type="identity", target_id=p.id, company_id=me.company_id, application_id=app.id)
         db.commit()
-        told(request, settings, me.company_id)
+        # The app makes them from the roles, then places them from the chart.
+        org_push.push_all(request.app.state.sessions, settings, me.company_id)
     return {"id": p.id, "app": app.key}
 
 

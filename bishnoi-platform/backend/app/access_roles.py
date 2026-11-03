@@ -179,7 +179,7 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
     # they're switched on, so switching someone off on the Platform switches them off in the module.
     people = db.execute(
         # Their role in this module: the one on their grant (2026-10-31), else their own.
-        select(Identity.email, func.coalesce(IdentityApp.access_role_id, Identity.access_role_id), Identity.status, Identity.app_details)
+        select(Identity.email, func.coalesce(IdentityApp.access_role_id, Identity.access_role_id), Identity.status, Identity.app_details, Identity.id, Identity.full_name)
         .join(IdentityApp, (IdentityApp.identity_id == Identity.id) & (IdentityApp.application_id == app.id))
         .where(Identity.company_id == company.id)
         .order_by(Identity.email)
@@ -193,10 +193,10 @@ def roles_note(db: Session, settings: Settings, company: Company, app: Applicati
         "slug": company.slug,
         "roles": [spec(db, r, app.key) for r in roles],
         "people": [
-            {"email": e.lower(), "role": by_id[rid].name if rid in by_id else None, "admin": bool(rid in by_id and by_id[rid].is_admin), "active": st == "active",
+            {"email": e.lower(), "identityId": iid, "fullName": name, "role": by_id[rid].name if rid in by_id else None, "admin": bool(rid in by_id and by_id[rid].is_admin), "active": st == "active",
              # What this app keeps of its own about them (an employee ID, a licence number), kept on the Platform.
              "details": (details or {}).get(app.key) or {}}
-            for e, rid, st, details in people
+            for e, rid, st, details, iid, name in people
         ],
         "iat": now,
         "exp": now + PUSH_LIFETIME,

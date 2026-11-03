@@ -130,3 +130,19 @@ def push(sessions, settings: Settings, company_id: str) -> None:
             log.exception("Org chart push: couldn't tell the applications about %s.", company_id)
 
     threading.Thread(target=run, name="org-push", daemon=True).start()
+
+
+def push_all(sessions, settings: Settings, company_id: str) -> None:
+    """The roles, then the chart, one after the other in the background (2026-11-04): an app makes the people it is told
+    about before it places them, so the chart has to follow the roles."""
+    from app import access_roles
+
+    def run() -> None:
+        for what, send in (("Roles", access_roles._send), ("Org chart", _send)):
+            try:
+                send(sessions, settings, company_id)
+            except Exception:  # noqa: BLE001 (each sign-in carries the person's role and place too)
+                log.exception("%s push: couldn't tell the applications about %s.", what, company_id)
+
+    threading.Thread(target=run, name="roles-and-chart-push", daemon=True).start()
+
