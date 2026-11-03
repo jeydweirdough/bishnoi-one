@@ -140,12 +140,15 @@ class User(Base):
 
     @property
     def all_managed_team_ids(self) -> set[str]:
-        """Every team they manage: the ones they manage directly, plus any branch teams under divisions they manage."""
+        """Every team they manage: the ones they manage directly and everything under them, at any depth (department > division > team)."""
         ids: set[str] = set()
-        for t in self.managed_teams:
+        todo = list(self.managed_teams)
+        while todo:
+            t = todo.pop()
+            if t.id in ids:
+                continue
             ids.add(t.id)
-            for b in getattr(t, "branches", []):
-                ids.add(b.id)
+            todo.extend(getattr(t, "branches", []))
         return ids
 
     @property

@@ -78,10 +78,20 @@ function UnitTree({ data }: { data: OrgData }) {
   const ids = new Set(active.map((u) => u.id));
   const under = (parent: string | null) => active.filter((u) => (parent === null ? !u.parentId || !ids.has(u.parentId) : u.parentId === parent));
 
+  const byId = new Map(data.units.map((u) => [u.id, u]));
+  // Department > division > team: a unit without a head of its own is headed by the closest head above it.
+  function headOf(u: OrgUnit): { name: string; from?: string } | undefined {
+    if (u.managerId) return { name: people.get(u.managerId) ?? "" };
+    for (let at = u.parentId ? byId.get(u.parentId) : undefined, n = 0; at && n < 8; at = at.parentId ? byId.get(at.parentId) : undefined, n++) {
+      if (at.managerId) return { name: people.get(at.managerId) ?? "", from: at.name };
+    }
+    return undefined;
+  }
+
   function rows(parent: string | null, depth: number): React.ReactNode {
     return under(parent).map((u) => (
       <div key={u.id}>
-        <UnitRow unit={u} depth={depth} manager={u.managerId ? people.get(u.managerId) : undefined} onEdit={() => setEditing({ unit: u })} onAdd={() => setEditing({ parentId: u.id })} />
+        <UnitRow unit={u} depth={depth} head={headOf(u)} onEdit={() => setEditing({ unit: u })} onAdd={() => setEditing({ parentId: u.id })} />
         {rows(u.id, depth + 1)}
       </div>
     ));
@@ -125,7 +135,7 @@ function UnitTree({ data }: { data: OrgData }) {
   );
 }
 
-function UnitRow({ unit, depth, manager, onEdit, onAdd }: { unit: OrgUnit; depth: number; manager?: string; onEdit: () => void; onAdd: () => void }) {
+function UnitRow({ unit, depth, head, onEdit, onAdd }: { unit: OrgUnit; depth: number; head?: { name: string; from?: string }; onEdit: () => void; onAdd: () => void }) {
   return (
     <div className="group flex items-center gap-3 py-2.5" style={{ paddingLeft: `${depth * 1.25}rem` }}>
       <div className="min-w-0 flex-1">
@@ -137,7 +147,7 @@ function UnitRow({ unit, depth, manager, onEdit, onAdd }: { unit: OrgUnit; depth
           </IconButton>
         </p>
         <p className="truncate text-meta text-ink-3">
-          {manager ? `Headed by ${manager}` : "No head yet"}
+          {head ? `Headed by ${head.name}${head.from ? ` (through ${head.from})` : ""}` : "No head yet"}
           {unit.areas.length > 0 && (
             <Tip tip={unit.areas.join(", ")}>
               <span>

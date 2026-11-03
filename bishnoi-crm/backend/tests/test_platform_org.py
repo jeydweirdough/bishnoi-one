@@ -131,3 +131,29 @@ def test_manager_of_division_manages_child_teams_without_head(app, client, linke
         reached = reachable_people(db, access)
         assert sam in reached
 
+
+def test_a_department_head_reaches_every_level_under_the_department(app, client, linked):
+    """Department > division > team (2026-11-03): the head of the department reaches the people three levels down."""
+    from app.access import access_of
+    from app.models import Role
+    from app.scope import reachable_people
+
+    with database(app)() as db:
+        role = db.scalar(select(Role).where(Role.name == "Salesperson"))
+        db.add(User(email="mary@example.com", full_name="Mary", password_hash="hash", role_id=role.id))
+        db.commit()
+    dept, div, team = (f"44444444-0000-4000-8000-00000000000{n}" for n in (1, 2, 3))
+    units = [
+        {"id": dept, "kind": "department", "name": "Sales", "parentId": None, "manager": WHO, "areas": [], "active": True},
+        {"id": div, "kind": "division", "name": "Prescription", "parentId": dept, "manager": None, "areas": [], "active": True},
+        {"id": team, "kind": "team", "name": "B2C Rx", "parentId": div, "manager": None, "areas": [], "active": True},
+    ]
+    people = [{"email": WHO, "unit": dept, "otherUnits": []}, {"email": "mary@example.com", "unit": team, "otherUnits": []}]
+    assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people)}).status_code == 204
+    with database(app)() as db:
+        head = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        head.role = db.scalar(select(Role).where(Role.name == "Manager"))
+        db.flush()
+        assert db.get(Team, team).parent_id == div and db.get(Team, div).parent_id == dept
+        assert team in access_of(head).team_ids if hasattr(access_of(head), "team_ids") else True
+        assert db.scalar(select(User).where(User.email == "mary@example.com")) in reachable_people(db, access_of(head))
