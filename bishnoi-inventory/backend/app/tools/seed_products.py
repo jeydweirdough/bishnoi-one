@@ -43,6 +43,7 @@ def _init_stdout():
 
 DEFAULT_EXCEL_PATH = r"C:\Users\Getmeds Backend\Downloads\Price List 2026 Finance (1).xlsx"
 DEFAULT_SHEET = "BEA Price List U0725"
+BUNDLED_JSON_PATH = Path(__file__).resolve().parent / "seed_products_data.json"
 
 APP_DIR = Path(__file__).resolve().parent.parent.parent  # bishnoi-inventory/backend
 MODULE_DIR = APP_DIR.parent  # bishnoi-inventory
@@ -144,6 +145,13 @@ UNIT_MAP = {
 
 
 def load_excel_products(file_path: str = DEFAULT_EXCEL_PATH, sheet_name: str = DEFAULT_SHEET) -> list[dict]:
+    excel_file = Path(file_path)
+    if not excel_file.exists():
+        if BUNDLED_JSON_PATH.exists():
+            print(f"Notice: Excel file not found ({excel_file}). Using bundled dataset: {BUNDLED_JSON_PATH.name}")
+            return json.loads(BUNDLED_JSON_PATH.read_text(encoding="utf-8"))
+        raise FileNotFoundError(f"Neither Excel file ({excel_file}) nor bundled JSON ({BUNDLED_JSON_PATH}) was found.")
+
     wb = openpyxl.load_workbook(file_path, data_only=True)
     if sheet_name not in wb.sheetnames:
         raise ValueError(f"Sheet {sheet_name!r} not found. Available sheets: {wb.sheetnames}")
@@ -779,6 +787,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Seed products, prices, and zero stocks from BEA Price List U0725.")
     parser.add_argument("--file", default=DEFAULT_EXCEL_PATH, help=f"Excel workbook path (default: {DEFAULT_EXCEL_PATH})")
     parser.add_argument("--sheet", default=DEFAULT_SHEET, help=f"Sheet name (default: {DEFAULT_SHEET})")
+    parser.add_argument("--database-url", help="Target database URL (PostgreSQL or SQLite). If omitted, uses DATABASE_URL or local files.")
     parser.add_argument("--apply", action="store_true", help="Commit changes (default is dry run)")
     parser.add_argument("--all-databases", action="store_true", help="Sync to all targets: local SQLite, seed SQLite, and Neon")
     args = parser.parse_args()
@@ -786,13 +795,29 @@ def main() -> int:
     print("=" * 70)
     print("      BISHNOI ONE: PRODUCT SEED TOOL (BEA PRICE LIST U0725)     ")
     print("=" * 70)
-    print(f"Excel File : {args.file}")
-    print(f"Sheet Name : {args.sheet}")
     print(f"Mode       : {'APPLY (Saving changes)' if args.apply else 'DRY RUN (No changes saved)'}")
     print("=" * 70)
 
     products = load_excel_products(args.file, args.sheet)
-    print(f"\n[OK] Loaded {len(products)} products from sheet '{args.sheet}'.")
+    print(f"\n[OK] Loaded {len(products)} products.")
+
+    target_db = args.database_url or os.environ.get("DATABASE_URL")
+    if target_db:
+        print(f"\n--- Target Database ({target_db.split('@')[-1] if '@' in target_db else target_db}) ---")
+        if target_db.startswith("postgres"):
+            res = seed_inventory_postgres(target_db, "target", products, apply=args.apply)
+        else:
+            sqlite_p = target_db.replace("sqlite:///", "")
+            res = seed_inventory_sqlite(sqlite_p, products, apply=args.apply)
+        print(f"Result: {res}")
+        if not args.all_databases:
+            print("\n" + "=" * 70)
+            if args.apply:
+                print("          PRODUCT SEED COMPLETED AND APPLIED SUCCESSFULLY        ")
+            else:
+                print("    DRY RUN FINISHED. Run again with --apply to commit changes.   ")
+            print("=" * 70)
+            return 0
 
     # 1. Inventory SQLite: inventory-getmeds.db
     print("\n--- 1. Inventory SQLite (inventory-getmeds.db) ---")
