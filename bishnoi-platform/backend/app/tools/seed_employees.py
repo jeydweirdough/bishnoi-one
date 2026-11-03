@@ -127,22 +127,37 @@ def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Count
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fill a company's employees and organisation chart from a plan file.")
-    parser.add_argument("--plan", required=True, help="the plan file (JSON)")
+    parser.add_argument("--plan", help="optional plan file (JSON). If omitted, uses embedded employee plan.")
     parser.add_argument("--platform-db", help="the platform database (default: DATABASE_URL)")
     parser.add_argument("--apply", action="store_true", help="save it (without this, only says what it would do)")
     parser.add_argument("--replace", action="store_true", help="also move people and heads already placed to the plan's")
     args = parser.parse_args()
 
-    plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+    if args.plan and Path(args.plan).exists():
+        plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+        print(f"[OK] Loaded employee plan from '{args.plan}'.")
+    else:
+        from app.tools.employees_plan_data import DEFAULT_PLAN
+        plan = DEFAULT_PLAN
+        print("[OK] Loaded employee plan from embedded plan data.")
+
     engine = make_engine(args.platform_db or get_settings().database_url)
     upgrade(engine)
     with make_sessions(engine)() as db:
         for part in plan["companies"]:
-            company = db.scalar(select(Company).where(Company.slug == part["slug"]))
+            target_slug = part["slug"]
+            company = db.scalar(select(Company).where(Company.slug == target_slug))
+            if company is None and target_slug == "getmeds-philippines-inc":
+                company = db.scalar(select(Company).where(Company.slug == "getmeds"))
+            if company is None and target_slug == "getmeds":
+                company = db.scalar(select(Company).where(Company.slug == "getmeds-philippines-inc"))
+            if company is None and target_slug == "2mg-incoporated":
+                company = db.scalar(select(Company).where(Company.slug.in_(["2mg", "2mg-inc"])))
+
             if company is None:
                 print(f"There's no company {part['slug']!r}: skipped.")
                 continue
-            print(f"\n{company.name}")
+            print(f"\n{company.name} ({company.slug})")
             said, problems = seed(db, company, part, args.replace)
             if args.apply:
                 audit(db, TOOL, "employees.seeded", target=company.name, target_type="company", target_id=company.id, company_id=company.id,
@@ -156,6 +171,8 @@ def main() -> int:
         if not args.apply:
             db.rollback()
             print("\nDry run, nothing saved. Run again with --apply to save it; then open Organisation once so every app gets the chart.")
+        else:
+            print("\nEmployee seed completed. Open Organisation once in Admin Console so every connected app gets the chart.")
     return 0
 
 
