@@ -81,6 +81,15 @@ export async function addPerson(input: PersonInput): Promise<Result<{ person: { 
   });
 }
 
+/** Who they report to and whose assistant they are; what isn't sent stays (null clears it). */
+export async function setReporting(id: string, links: { reportsToId?: string | null; assistantOfId?: string | null }): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("PUT", `/identity/access/people/${enc(id)}/reporting`, links);
+    refresh();
+    return null;
+  });
+}
+
 export async function changePerson(id: string, change: { fullName?: string; title?: string | null; email?: string; status?: "active" | "suspended"; appDetails?: AppDetails }): Promise<Result> {
   return attempt(async () => {
     await accountSend("PATCH", `/identity/access/people/${enc(id)}`, change);
@@ -193,4 +202,8 @@ export async function bulkInvitePeople(ids: string[]) {
     if (!r.ok) return r;
     return r.data.emailed ? { ok: true as const } : { ok: false as const, error: "No email sent: set up email sending in Integrations, or send their link from ⋯." };
   });
+}
+/** Several employees at once report to one manager (or to nobody), each through setReporting: no circles, never themselves. */
+export async function bulkSetManager(ids: string[], managerId: string | null) {
+  return eachOf(managerId ? "Set manager" : "Clear manager", ids, (id) => setReporting(id, { reportsToId: managerId }));
 }

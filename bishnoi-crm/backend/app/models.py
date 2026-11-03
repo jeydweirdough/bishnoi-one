@@ -129,6 +129,10 @@ class User(Base):
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+    # Who they report to, and whose assistant they are (2026-11-03, kept on the platform): a manager reaches the people who
+    # report to them and theirs below; an assistant reaches what the one they assist reaches (app/reporting.py).
+    reports_to_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    assistant_of_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
     team: Mapped[Team | None] = relationship(lazy="joined", foreign_keys=[team_id])

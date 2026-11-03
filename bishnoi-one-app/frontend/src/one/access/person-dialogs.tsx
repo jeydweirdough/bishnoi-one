@@ -1,5 +1,6 @@
 "use client";
 
+import { Combobox } from "@/src/platform/ui/pickers";
 import { Modal } from "antd";
 import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,7 @@ import { Button } from "@/src/platform/ui/button";
 import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword } from "./actions";
+import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword, setReporting } from "./actions";
 import { setAdministrator } from "@/src/one/company/actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
@@ -210,11 +211,13 @@ type MenuItem = Exclude<Parameters<typeof RowMenu>[0]["items"][number], "divider
  * panel: change details (their email too), a new password, invitation, administrator, two-step reset, switch
  * off or on, delete. `dialogs` must be drawn once wherever these are used.
  */
-export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = [], domain?: string | null) {
+export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = [], domain?: string | null, colleagues: { id: string; name: string }[] = []) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
+  // Who they report to and whose assistant they are (2026-11-03).
+  const [links, setLinks] = useState({ reportsToId: person.reportsToId ?? null, assistantOfId: person.assistantOfId ?? null });
   // What each app keeps of its own about them (2026-10-30), for the apps the company has.
   const [details, setDetails] = useState({
     employeeId: person.appDetails?.crm?.employeeId ?? "",
@@ -242,6 +245,15 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
         setFields(r.fields ?? {});
         if (!r.fields) toast.error(r.error);
         return;
+      }
+      const moved = { ...(links.reportsToId !== (person.reportsToId ?? null) && { reportsToId: links.reportsToId }), ...(links.assistantOfId !== (person.assistantOfId ?? null) && { assistantOfId: links.assistantOfId }) };
+      if (Object.keys(moved).length) {
+        const l = await setReporting(person.id, moved);
+        if (!l.ok) {
+          setFields(l.fields ?? {});
+          if (!l.fields) toast.error(l.error);
+          return;
+        }
       }
       setFields({});
       setEditing(false);
@@ -316,6 +328,28 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
           </Field>
+          <Field label="Reports to" size="full" optional error={fields.reports_to_id} hint="Their manager reaches their records, and their manager's manager above. Not the department they sit in.">
+            {() => (
+              <Combobox
+                allowClear
+                placeholder="Choose an employee"
+                options={colleagues.filter((c) => c.id !== person.id).map((c) => ({ value: c.id, label: c.name }))}
+                value={links.reportsToId ?? undefined}
+                onChange={(v) => setLinks({ ...links, reportsToId: (v as string | undefined) ?? null })}
+              />
+            )}
+          </Field>
+          <Field label="Assistant to" size="full" optional error={fields.assistant_of_id} hint="Sees what the one they assist sees, and does only what their own role allows (a Secretary role, say, without approvals).">
+            {() => (
+              <Combobox
+                allowClear
+                placeholder="Choose an employee"
+                options={colleagues.filter((c) => c.id !== person.id).map((c) => ({ value: c.id, label: c.name }))}
+                value={links.assistantOfId ?? undefined}
+                onChange={(v) => setLinks({ ...links, assistantOfId: (v as string | undefined) ?? null })}
+              />
+            )}
+          </Field>
           {has("crm") && (
             <Field label="Employee ID" size="full" optional hint="Shown in the CRM.">
               {(p) => <Input {...p} value={details.employeeId} onChange={(e) => setDetails({ ...details, employeeId: e.target.value })} maxLength={40} />}
@@ -340,8 +374,8 @@ export function usePersonActions(person: AccessPerson, isMe: boolean, modules: s
 }
 
 /** A person's ⋯ on People: open their panel, then every action on them. */
-export function PersonMenu({ person, isMe, modules = [], domain }: { person: AccessPerson; isMe: boolean; modules?: string[]; domain?: string | null }) {
-  const a = usePersonActions(person, isMe, modules, domain);
+export function PersonMenu({ person, isMe, modules = [], domain, colleagues = [] }: { person: AccessPerson; isMe: boolean; modules?: string[]; domain?: string | null; colleagues?: { id: string; name: string }[] }) {
+  const a = usePersonActions(person, isMe, modules, domain, colleagues);
   const items = [
     // Everything about them in one place: the panel beside the list (2026-10-31).
     { label: "Open", icon: <UserRound />, href: `/platform/roles/people?person=${person.id}` },

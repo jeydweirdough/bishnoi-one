@@ -201,7 +201,7 @@ function PersonRow({ person, data, compact, current }: { person: AccessPerson; d
         )}
       </td>
       <td className="py-2.5 text-right">
-        <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} domain={data.company.emailDomain} />
+        <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} domain={data.company.emailDomain} colleagues={data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }))} />
       </td>
     </SelectableRow>
   );

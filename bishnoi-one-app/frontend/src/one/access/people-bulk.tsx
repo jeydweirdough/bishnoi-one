@@ -1,13 +1,14 @@
 "use client";
 
-import { AppWindow, Mail, Power, PowerOff, Trash2 } from "lucide-react";
+import { AppWindow, Mail, Network, Power, PowerOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { BulkBar, BulkStep, useBulkRun, useSelection } from "@/src/platform/bulk/selection";
 import { plural } from "@/src/platform/lib/format";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Field, Select } from "@/src/platform/ui/field";
-import { bulkDeletePeople, bulkGiveModule, bulkInvitePeople, bulkSwitchPeople } from "./actions";
+import { Combobox } from "@/src/platform/ui/pickers";
+import { bulkDeletePeople, bulkGiveModule, bulkInvitePeople, bulkSetManager, bulkSwitchPeople } from "./actions";
 import { moduleLabel } from "./labels";
 import type { AccessData } from "./types";
 
@@ -18,10 +19,32 @@ export function EmployeesBulk({ data }: { data: AccessData }) {
   const s = useSelection();
   const { run, running } = useBulkRun();
   const [giving, setGiving] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [manager, setManager] = useState<string | undefined>();
   const many = plural(s.ids.length, ...NOUN);
   const did = (what: string) => (n: number) => `${plural(n, ...NOUN)} ${what}`;
 
-  const step = giving ? (
+  const step = managing ? (
+    <BulkStep
+      submitLabel={manager ? `Report to them` : "Clear their manager"}
+      onCancel={() => (setManaging(false), setManager(undefined))}
+      onSubmit={async () => {
+        await run({ doing: manager ? "Setting the manager" : "Clearing the manager", did: did(manager ? "now report to them" : "have no manager") }, (ids) => bulkSetManager(ids, manager ?? null));
+      }}
+    >
+      <Field label="Reports to" className="w-64">
+        {() => (
+          <Combobox
+            allowClear
+            placeholder="Choose an employee (empty clears it)"
+            options={data.people.filter((p) => p.status === "active").map((p) => ({ value: p.id, label: p.fullName }))}
+            value={manager}
+            onChange={(v) => setManager((v as string | undefined) ?? undefined)}
+          />
+        )}
+      </Field>
+    </BulkStep>
+  ) : giving ? (
     <BulkStep
       submitLabel={`Give to ${many}`}
       onCancel={() => setGiving(false)}
@@ -46,6 +69,9 @@ export function EmployeesBulk({ data }: { data: AccessData }) {
 
   return (
     <BulkBar noun={NOUN} step={step}>
+      <Button size="sm" icon={<Network className="size-4" aria-hidden />} disabled={running} onClick={() => setManaging(true)}>
+        Set manager
+      </Button>
       <Button size="sm" icon={<AppWindow className="size-4" aria-hidden />} disabled={running} onClick={() => setGiving(true)}>
         Give an app
       </Button>

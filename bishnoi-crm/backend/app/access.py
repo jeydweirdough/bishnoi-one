@@ -32,6 +32,10 @@ class Access:
     team_ids: frozenset[str] = frozenset()
     # The Administrator role: the one Bishnoi One gives its company administrators.
     administrator: bool = False
+    # Whose records they reach (2026-11-03, app/reporting.py): the teams they work in, and the people they are, manage
+    # (everyone who reports to them, to any depth) or assist. team_ids above stays for departments and settings.
+    reach_teams: frozenset[str] = frozenset()
+    people_ids: frozenset[str] = frozenset()
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -67,11 +71,16 @@ def permissions_of(role: Role) -> frozenset[str]:
 
 
 def access_of(user: User) -> Access:
+    from app.reporting import reach_of
+
+    scope, reach_teams, people_ids = reach_of(user)
     return Access(
         user_id=user.id,
         role_id=user.role_id,
         role_name=user.role.name,
-        scope=user.role.scope,
+        scope=scope,
+        reach_teams=reach_teams,
+        people_ids=people_ids,
         team_id=user.team_id,
         permissions=permissions_of(user.role),
         administrator=bool(user.role.is_system),

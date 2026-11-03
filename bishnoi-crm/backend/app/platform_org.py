@@ -112,11 +112,30 @@ def place(db, user: User, unit_id: str | None, others: list[str] | None) -> bool
     return bool(fields)
 
 
+def link(db, user: User, reports_to: object, assistant_of: object) -> bool:
+    """Who they report to and whose assistant they are, as the platform has them (by email; nobody here by that email: none)."""
+    def found(email: object) -> str | None:
+        wanted = str(email or "").strip().lower()
+        other = db.scalar(select(User.id).where(func.lower(User.email) == wanted)) if wanted else None
+        return other if other != user.id else None
+
+    fields = []
+    for name, wanted in (("reports_to_id", found(reports_to)), ("assistant_of_id", found(assistant_of))):
+        if getattr(user, name) != wanted:
+            setattr(user, name, wanted)
+            fields.append(name)
+    if fields:
+        audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=fields)
+    return bool(fields)
+
+
 def follow_pass(db, user: User, claims: dict) -> None:
     org = claims.get("org")
     if isinstance(org, dict):
         unit = org.get("unit") if isinstance(org.get("unit"), dict) else {}
         place(db, user, unit.get("id"), org.get("otherUnits") if isinstance(org.get("otherUnits"), list) else None)
+        if "reportsTo" in org or "assistantOf" in org:
+            link(db, user, org.get("reportsTo"), org.get("assistantOf"))
 
 
 @router.post("/organisation", status_code=status.HTTP_204_NO_CONTENT)
@@ -132,6 +151,8 @@ def take_chart(body: NoteIn, request: Request) -> Response:
             user = db.scalar(select(User).where(func.lower(User.email) == str(p.get("email") or "").strip().lower()))
             if user is not None:
                 place(db, user, p.get("unit"), p.get("otherUnits") if isinstance(p.get("otherUnits"), list) else None)
+                if "reportsTo" in p or "assistantOf" in p:
+                    link(db, user, p.get("reportsTo"), p.get("assistantOf"))
         db.commit()
     _newest[claims["slug"]] = claims["iat"]
     return Response(status_code=status.HTTP_204_NO_CONTENT)

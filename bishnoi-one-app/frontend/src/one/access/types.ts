@@ -44,6 +44,9 @@ export type AccessPerson = {
   status: string;
   isCompanyAdmin: boolean;
   roleId: string | null;
+  /** Who they report to, and whose assistant they are (2026-11-03): a manager reaches the people who report to them. */
+  reportsToId?: string | null;
+  assistantOfId?: string | null;
   /** The modules they may open: the role each gave them before roles were kept here, and their role in it here
    *  (2026-10-31: a role in each app; their own role when the app has none of its own). */
   apps: { key: string; role: string | null; roleId?: string | null }[];

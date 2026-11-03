@@ -92,7 +92,7 @@ def test_the_org_chart_arrives_as_a_business_event_once(app, client, linked):
         assert db.get(InboxEvent, "ev-22222222").kind == "organisation.changed"
 
 
-def test_manager_of_division_manages_child_teams_without_head(app, client, linked):
+def test_a_manager_reaches_the_people_linked_to_them_not_a_whole_team(app, client, linked):
     from app.access import access_of
     from app.models import Role
     from app.scope import reachable_people
@@ -112,6 +112,7 @@ def test_manager_of_division_manages_child_teams_without_head(app, client, linke
         {"email": WHO, "unit": div_id, "otherUnits": []},
         {"email": "sam@example.com", "unit": sub_id, "otherUnits": []},
     ]
+    linked = [dict(people[0]), {**people[1], "reportsTo": WHO}]
     r = client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people)})
     assert r.status_code == 204, r.text
     with database(app)() as db:
@@ -129,10 +130,31 @@ def test_manager_of_division_manages_child_teams_without_head(app, client, linke
         db.flush()
         access = access_of(mgr)
         reached = reachable_people(db, access)
-        assert sam in reached
+        # In the team under the division, but not linked to the manager: not reached (links decide, not departments).
+        assert sam not in reached
+    assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=linked)}).status_code == 204
+    with database(app)() as db:
+        mgr = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        sam = db.scalar(select(User).where(func.lower(User.email) == "sam@example.com"))
+        mgr.role = db.scalar(select(Role).where(Role.name == "Manager"))
+        db.flush()
+        assert sam.reports_to_id == mgr.id
+        assert sam in reachable_people(db, access_of(mgr))
+        # Unlinking takes it away again.
+    assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people_plain(people))}).status_code == 204
+    with database(app)() as db:
+        mgr = db.scalar(select(User).where(func.lower(User.email) == WHO))
+        sam = db.scalar(select(User).where(func.lower(User.email) == "sam@example.com"))
+        mgr.role = db.scalar(select(Role).where(Role.name == "Manager"))
+        db.flush()
+        assert sam.reports_to_id is None and sam not in reachable_people(db, access_of(mgr))
 
 
-def test_a_department_head_reaches_every_level_under_the_department(app, client, linked):
+def people_plain(people):
+    return [{**p, "reportsTo": None, "assistantOf": None} for p in people]
+
+
+def test_a_chain_of_links_reaches_to_any_depth_and_an_assistant_reaches_what_the_manager_does(app, client, linked):
     """Department > division > team (2026-11-03): the head of the department reaches the people three levels down."""
     from app.access import access_of
     from app.models import Role
@@ -140,7 +162,8 @@ def test_a_department_head_reaches_every_level_under_the_department(app, client,
 
     with database(app)() as db:
         role = db.scalar(select(Role).where(Role.name == "Salesperson"))
-        db.add(User(email="mary@example.com", full_name="Mary", password_hash="hash", role_id=role.id))
+        for who in ("mary", "lead", "sec"):
+            db.add(User(email=f"{who}@example.com", full_name=who.title(), password_hash="hash", role_id=role.id))
         db.commit()
     dept, div, team = (f"44444444-0000-4000-8000-00000000000{n}" for n in (1, 2, 3))
     units = [
@@ -148,12 +171,21 @@ def test_a_department_head_reaches_every_level_under_the_department(app, client,
         {"id": div, "kind": "division", "name": "Prescription", "parentId": dept, "manager": None, "areas": [], "active": True},
         {"id": team, "kind": "team", "name": "B2C Rx", "parentId": div, "manager": None, "areas": [], "active": True},
     ]
-    people = [{"email": WHO, "unit": dept, "otherUnits": []}, {"email": "mary@example.com", "unit": team, "otherUnits": []}]
+    people = [
+        {"email": WHO, "unit": dept, "otherUnits": []},
+        {"email": "lead@example.com", "unit": div, "otherUnits": [], "reportsTo": WHO},
+        {"email": "mary@example.com", "unit": team, "otherUnits": [], "reportsTo": "lead@example.com"},
+        {"email": "sec@example.com", "unit": dept, "otherUnits": [], "assistantOf": WHO},
+    ]
     assert client.post("/platform/organisation", json={"pass": note("organisation", units=units, people=people)}).status_code == 204
     with database(app)() as db:
         head = db.scalar(select(User).where(func.lower(User.email) == WHO))
         head.role = db.scalar(select(Role).where(Role.name == "Manager"))
+        sec = db.scalar(select(User).where(User.email == "sec@example.com"))
+        sec.role = db.scalar(select(Role).where(Role.name == "Salesperson"))  # her own role: only her own records
         db.flush()
-        assert db.get(Team, team).parent_id == div and db.get(Team, div).parent_id == dept
-        assert team in access_of(head).team_ids if hasattr(access_of(head), "team_ids") else True
-        assert db.scalar(select(User).where(User.email == "mary@example.com")) in reachable_people(db, access_of(head))
+        reached = {u.email for u in reachable_people(db, access_of(head))}
+        assert {"mary@example.com", "lead@example.com"} <= reached  # two levels down, through the lead
+        # The assistant reaches what the manager reaches, though her role alone reaches only herself.
+        assert {"mary@example.com", "lead@example.com"} <= {u.email for u in reachable_people(db, access_of(sec))}
+        assert access_of(sec).scope == "managed" and "update" not in access_of(sec).permissions

@@ -46,7 +46,9 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("info");
   const isMe = row.id === data.meId;
-  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key), data.company.emailDomain);
+  const colleagues = data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }));
+  const nameOf = (id?: string | null) => data.people.find((c) => c.id === id)?.fullName ?? null;
+  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key), data.company.emailDomain, colleagues);
   const s = person.security;
 
   /** A menu action (with its own confirmation) from a button: said when done, the page read again. */
@@ -141,6 +143,8 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
               ["Full name", person.fullName],
               ["Work email", person.email],
               ["Title", person.title],
+              ["Reports to", nameOf(row.reportsToId)],
+              ["Assistant to", nameOf(row.assistantOfId)],
               ["Status", a.off ? "Switched off" : "Active"],
               ["Company administrator", person.isCompanyAdmin ? "Yes" : "No"],
               ["Employee ID (CRM)", person.appDetails?.crm?.employeeId ?? null],

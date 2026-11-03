@@ -471,6 +471,10 @@ class Identity(Base):
     # Their place on the org chart, and where they work.
     main_unit_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_units.id", ondelete="SET NULL"), default=None)
     branch_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_branches.id", ondelete="SET NULL"), default=None)
+    # Who they report to, and whose assistant they are (2026-11-03): links between people, not departments, say whose
+    # records a manager reaches. An assistant sees what the one they assist sees, and does what their own role allows.
+    reports_to_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    assistant_of_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
     # Made for an operator (app/platform_admins.py), not added by the company.
     via_operator: Mapped[bool] = mapped_column(default=False)
     # In the recycle bin (2026-10-30): deleted by a company administrator, switched off, out of People; restorable.

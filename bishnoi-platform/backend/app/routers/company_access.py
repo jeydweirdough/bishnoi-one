@@ -19,7 +19,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app import abilities as ab
@@ -30,7 +30,7 @@ from app.audit import audit
 from app import passwords
 from app.deps import DB, SettingsDep, as_utc
 from app.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
-from app import email_rules, sign_in
+from app import email_rules, org_push, sign_in
 from app.accounts import account_of, memberships, runs_company
 from app.routers.identity import Signed
 
@@ -128,6 +128,8 @@ def overview(db: DB, me: Admin) -> dict:
             "status": p.status,
             "isCompanyAdmin": p.is_company_admin,
             "roleId": p.access_role_id,
+            "reportsToId": p.reports_to_id,
+            "assistantOfId": p.assistant_of_id,
             "apps": given,
             "appDetails": p.app_details or {},
             "addedAt": iso(p.created_at),
@@ -467,7 +469,7 @@ class PasswordIn(Api):
 
 def person_out(p: Identity) -> dict:
     return {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status, "isCompanyAdmin": p.is_company_admin, "roleId": p.access_role_id,
-            "appDetails": p.app_details or {}}
+            "reportsToId": p.reports_to_id, "assistantOfId": p.assistant_of_id, "appDetails": p.app_details or {}}
 
 
 @router.post("/people", status_code=status.HTTP_201_CREATED)
@@ -534,6 +536,58 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
         audit(db, me.email, action, target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=sorted(fields))
         db.commit()
         told(request, settings, me.company_id)
+    return {"person": person_out(p)}
+
+
+class ReportingIn(Api):
+    reports_to_id: str | None = None
+    assistant_of_id: str | None = None
+
+
+def colleague(db: Session, me: Identity, p: Identity, wanted: str | None, field: str) -> Identity | None:
+    """Someone at the company who can be reported to or assisted: switched on, not deleted, not themselves."""
+    if wanted is None:
+        return None
+    other = db.get(Identity, wanted)
+    if other is None or other.company_id != me.company_id or other.via_operator or other.deleted_at is not None:
+        raise field_error(field, "Pick an employee of this company.")
+    if other.id == p.id:
+        raise field_error(field, "Pick someone other than themselves.")
+    if other.status != "active":
+        raise field_error(field, f"{other.full_name} is switched off. Switch them on first, or pick someone else.")
+    return other
+
+
+@router.put("/people/{person_id}/reporting")
+def set_reporting(person_id: str, body: ReportingIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Who they report to and whose assistant they are, each optional; what isn't sent stays. A manager reaches the people
+    who report to them, and theirs below, through the apps; an assistant reaches what the one they assist reaches."""
+    p = get_person(db, me, person_id)
+    sent, fields = body.model_fields_set, []
+    if "reports_to_id" in sent:
+        boss = colleague(db, me, p, body.reports_to_id, "reports_to_id")
+        at, seen = boss, set()
+        while at is not None and at.id not in seen:  # a circle: they'd report to someone who reports to them
+            if at.reports_to_id == p.id:
+                raise field_error("reports_to_id", f"{boss.full_name} already reports to {p.full_name}, directly or through others.")
+            seen.add(at.id)
+            at = db.get(Identity, at.reports_to_id) if at.reports_to_id else None
+        if (boss.id if boss else None) != p.reports_to_id:
+            p.reports_to_id = boss.id if boss else None
+            fields.append("reportsTo")
+    if "assistant_of_id" in sent:
+        boss = colleague(db, me, p, body.assistant_of_id, "assistant_of_id")
+        if boss is not None and boss.assistant_of_id:
+            raise field_error("assistant_of_id", f"{boss.full_name} is an assistant. Pick the person they assist.")
+        if boss is not None and db.scalar(select(func.count()).select_from(Identity).where(Identity.assistant_of_id == p.id)):
+            raise field_error("assistant_of_id", f"{p.full_name} has assistants of their own, so can't be one.")
+        if (boss.id if boss else None) != p.assistant_of_id:
+            p.assistant_of_id = boss.id if boss else None
+            fields.append("assistantOf")
+    if fields:
+        audit(db, me.email, "organisation.person_linked", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=fields)
+        db.commit()
+        org_push.push(request.app.state.sessions, settings, me.company_id)
     return {"person": person_out(p)}
 
 
@@ -765,6 +819,8 @@ def erase_person(person_id: str, body: EraseIn, request: Request, db: DB, me: Ad
     account = account_of(db, p)
     audit(db, me.email, "access.person_erased", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
     others = [m for m in memberships(db, account) if m.id != p.id] if account else []
+    for link in ("reports_to_id", "assistant_of_id"):
+        db.execute(update(Identity).where(getattr(Identity, link) == p.id).values({link: None}))
     db.delete(p)
     db.flush()
     if account is not None and not others and not account.is_operator:
