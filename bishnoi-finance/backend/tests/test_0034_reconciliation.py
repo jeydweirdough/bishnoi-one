@@ -47,7 +47,9 @@ def engine(request, tmp_path):
 def source(tmp_path, petty=False):
     location=tmp_path/('feature' if petty else 'main')
     shutil.copytree(API_DIR/'migrations',location)
-    (location/'versions/0034_reconcile_petty_cash_and_recycle_bin.py').unlink()
+    # The history as it stood before 0034: nothing from 0034 on.
+    for later in (location/'versions').glob('*.py'):
+        if later.name[:4]>='0034': later.unlink()
     if petty:
         (location/'versions/0033_recycle_bin.py').unlink()
         shutil.copy2(location/'compat/feature_0033_petty_cash.py',location/'versions/0033_petty_cash.py')
@@ -90,7 +92,7 @@ def test_both_0033_histories_keep_every_row(engine,tmp_path,line):
     assert all(after[t]==rows for t,rows in before.items())
     assert ALL<=after.keys()
     with engine.connect() as c:
-        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0034'
+        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0035'
         if engine.dialect.name=='sqlite':
             assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
             assert not c.execute(text('PRAGMA foreign_key_check')).all()
@@ -137,7 +139,7 @@ def test_original_files_preserved_and_single_head():
     assert hashlib.sha256((API_DIR/'migrations/versions/0033_recycle_bin.py').read_bytes().replace(b'\r\n',b'\n')).hexdigest()=='77b712e4a7ecb73301a2a679d80fa8901403dbaf78a85129a84ae7c2ef892787'
     config=_config(sa.create_engine('sqlite://'))
     script=ScriptDirectory.from_config(config)
-    assert script.get_heads()==['0034']
+    assert script.get_heads()==['0035']
     revisions=list(script.walk_revisions())
     assert len({r.revision for r in revisions})==len(revisions)
 

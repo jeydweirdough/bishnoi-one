@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import InvoicePayment, JournalEntry, LedgerSettings, PettyCashVoucher
+from app.models import ImportedExpense, InvoicePayment, JournalEntry, LedgerSettings, PettyCashVoucher
 from app.recycle_bin import Kind
 
 P = "nbfi_"
@@ -51,6 +51,12 @@ def _guard_for(kind: str):
             raise HTTPException(status.HTTP_409_CONFLICT,
                                 'This entry belongs to petty cash and cannot be deleted in data cleanup. '
                                 'Use the Petty cash voucher to correct or void it; its accounting history must stay together.')
+        # An imported expense is undone only by voiding it, the same way.
+        if ids and (db.scalar(select(JournalEntry.id).where(JournalEntry.id.in_(ids), JournalEntry.source == 'expense').limit(1))
+                    or db.scalar(select(ImportedExpense.id).where(ImportedExpense.entry_id.in_(ids)).limit(1))):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                'This entry belongs to an imported expense and cannot be deleted in data cleanup. '
+                                'Void the imported expense instead; its accounting history must stay together.')
     return guard
 
 
@@ -83,7 +89,7 @@ KINDS: list[Kind] = [
          **posted("fund")),
     Kind("sales-orders", "Sales orders", P + "sales_orders", "number", search=("number", "customer_name"), sub="customer_name"),
     Kind("bank-reconciliations", "Bank reconciliations", P + "bank_reconciliations", lambda r: f"Statement {r.get('statement_date')}", sub="status"),
-    Kind("import-runs", "Import runs", P + "import_runs", lambda r: f"{r.get('kind')} import {str(r.get('created_at') or '')[:16]}", owns=(P + "import_records",)),
+    Kind("import-runs", "Import runs", P + "import_runs", lambda r: f"{r.get('kind')} import {str(r.get('created_at') or '')[:16]}", owns=(P + "import_records", P + "import_links")),
     Kind("import-matches", "Import matches", P + "import_matches", lambda r: r.get("source_label") or r.get("source_code"), owns=(P + "import_rules",),
          search=("source_label", "source_code"), sub="status"),
     # Set-up lists

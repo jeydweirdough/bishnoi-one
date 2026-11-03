@@ -59,6 +59,9 @@ def _organisation(db, data: dict, slug: str) -> None:
             user = db.scalar(select(User).where(func.lower(User.email) == str(p.get("email") or "").strip().lower()))
             if user is not None:
                 platform_org.place(db, user, p.get("unit"), p.get("otherUnits") if isinstance(p.get("otherUnits"), list) else None)
+                # Who they report to and whose assistant they are (2026-11-03): what a manager reaches follows these.
+                if "reportsTo" in p or "assistantOf" in p:
+                    platform_org.link(db, user, p.get("reportsTo"), p.get("assistantOf"))
 
 
 # What this application does with each kind it takes: fn(db, data, slug). Invoices and payments are

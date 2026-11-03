@@ -141,7 +141,7 @@ export default async function FieldPage({ searchParams }: { searchParams: Promis
             icon="people"
             actions={
               can(me, "admin.users") && (
-                <LinkButton href="/crm/admin/users/new" variant="primary">
+                <LinkButton href="/platform/roles/people" variant="primary">
                   Add a person
                 </LinkButton>
               )

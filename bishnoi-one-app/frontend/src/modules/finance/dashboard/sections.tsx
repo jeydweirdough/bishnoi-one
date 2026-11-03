@@ -207,10 +207,10 @@ function Journal({ s, fmt }: { s: Extract<Section, { key: "journal" }>; fmt: Fmt
 
 /** What isn't set up, in the words the sidebar uses, and where to fix it. */
 const NOT_SET_UP: Record<string, { says: (n: number) => string; href: string }> = {
-  taxProfile: { says: () => "The company's tax registration isn't complete", href: "/finance/tax" },
-  invoiceSeries: { says: () => "There are no invoice numbers left: add the series from the BIR's Authority to Print", href: "/finance/invoices/series" },
-  postingAccounts: { says: (n) => `${n} default ${n === 1 ? "account isn't" : "accounts aren't"} set, so some fund steps can't be posted`, href: "/finance/ledger/posting" },
-  categoryAccounts: { says: (n) => `${n} expense ${n === 1 ? "category has" : "categories have"} no account`, href: "/finance/ledger/categories" },
+  taxProfile: { says: () => "The company's tax registration isn't complete", href: "/platform/settings/finance/taxes" },
+  invoiceSeries: { says: () => "There are no invoice numbers left: add the series from the BIR's Authority to Print", href: "/platform/settings/finance/number-series" },
+  postingAccounts: { says: (n) => `${n} default ${n === 1 ? "account isn't" : "accounts aren't"} set, so some fund steps can't be posted`, href: "/platform/settings/finance/default-accounts" },
+  categoryAccounts: { says: (n) => `${n} expense ${n === 1 ? "category has" : "categories have"} no account`, href: "/platform/settings/finance/expense-categories" },
 };
 
 function Tax({ s, fmt }: { s: Extract<Section, { key: "tax" }>; fmt: Fmt }) {

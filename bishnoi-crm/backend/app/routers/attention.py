@@ -11,7 +11,7 @@ from pydantic import Field
 from sqlalchemy import select
 
 from app import attention
-from app.access import DEPARTMENT, Access, CurrentAccess, require
+from app.access import DEPARTMENT, Access, CurrentAccess, require, settings_change
 from app.api import Api, field_error, team_out
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -19,7 +19,7 @@ from app.models import AttentionDismissal, AttentionRule, Team
 from app.pricing import today
 
 router = APIRouter(tags=["attention"])
-Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
+Manage = Annotated[Access, Depends(settings_change(*DEPARTMENT))]
 
 
 @router.get("/attention")

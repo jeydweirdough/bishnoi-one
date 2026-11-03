@@ -22,7 +22,7 @@ from pydantic import Field, field_validator, model_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.access import Access, require
+from app.access import Access, require, settings_change
 from app.api import Api, camel, changed, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -43,6 +43,8 @@ Propose = Annotated[Access, Depends(require("products.edit", "products.prices"))
 # Promos and bundles: the catalogue's editors, or a manager for their departments.
 EditOffers = Annotated[Access, Depends(require("products.edit", "department.manage"))]
 Delete = Annotated[Access, Depends(require("products.delete"))]
+# The CRM's pricing settings: the company administrators', in the Admin Console (2026-10-31).
+PricingSettings = Annotated[Access, Depends(settings_change("products.edit"))]
 
 CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]*")
 
@@ -189,7 +191,7 @@ class SettingsPatch(Api):
 
 
 @router.patch("/pricing/settings")
-def update_settings(access: Edit, me: CurrentUser, db: DB, body: SettingsPatch) -> dict:
+def update_settings(access: PricingSettings, me: CurrentUser, db: DB, body: SettingsPatch) -> dict:
     s = sales_settings(db)
     wanted = {k: v for k, v in changed(body).items() if v is not None}
     at_risk, lost = wanted.get("at_risk_days", s.at_risk_days), wanted.get("lost_days", s.lost_days)

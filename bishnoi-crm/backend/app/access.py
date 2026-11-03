@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -28,8 +28,14 @@ class Access:
     team_id: str | None
     permissions: frozenset[str]
     # The teams whose records they reach (team: their own; managed: the ones
-    # they manage, and their own). Empty for own and all.
+    # they explicitly head, including descendants). Empty for own and all.
     team_ids: frozenset[str] = frozenset()
+    # The Administrator role: the one Bishnoi One gives its company administrators.
+    administrator: bool = False
+    # Record reach includes headed units for managers and personal reporting
+    # descendants or assisted people. team_ids above controls settings separately.
+    reach_teams: frozenset[str] = frozenset()
+    people_ids: frozenset[str] = frozenset()
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -49,6 +55,8 @@ class Access:
         every one (a role that reaches every record), else the teams they reach."""
         if self.scope == "all":
             return None
+        if self.scope == "managed":
+            return self.team_ids
         return self.team_ids or (frozenset({self.team_id}) if self.team_id else frozenset())
 
     def runs(self, team_id: str | None) -> bool:
@@ -65,13 +73,19 @@ def permissions_of(role: Role) -> frozenset[str]:
 
 
 def access_of(user: User) -> Access:
+    from app.reporting import reach_of
+
+    scope, reach_teams, people_ids = reach_of(user)
     return Access(
         user_id=user.id,
         role_id=user.role_id,
         role_name=user.role.name,
-        scope=user.role.scope,
+        scope=scope,
+        reach_teams=reach_teams,
+        people_ids=people_ids,
         team_id=user.team_id,
         permissions=permissions_of(user.role),
+        administrator=bool(user.role.is_system),
         team_ids=teams_reached(user),
     )
 
@@ -83,7 +97,7 @@ def teams_reached(user: User) -> frozenset[str]:
     if scope == "team":
         return frozenset(own)
     if scope == "managed":
-        return frozenset(own | {t.id for t in user.managed_teams})
+        return frozenset(user.all_managed_team_ids)
     return frozenset()
 
 
@@ -140,3 +154,28 @@ def keep_an_administrator(db: Session) -> None:
             status.HTTP_409_CONFLICT,
             "That would leave nobody able to manage users and roles. Give someone else that first.",
         )
+
+
+# A settings change (2026-10-31): connected to Bishnoi One, the CRM's settings are changed only by the company's
+# administrators, from the Admin Console (the Administrator role the Platform gives them). Standalone (tests,
+# a single install), the permission alone, as before. Reading a setting is never limited here.
+ADMINISTRATORS_ONLY = "Only your company's administrators change the CRM's settings, in the Admin Console."
+
+
+def settings_only(request: Request, access: Access) -> None:
+    """Refuses a change to a setting by anyone but an administrator, once connected to Bishnoi One."""
+    if request.method != "GET" and request.app.state.settings.platform_api_url and not access.administrator:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ADMINISTRATORS_ONLY)
+
+
+def settings_change(*permissions: str) -> Callable[..., Access]:
+    """require(*permissions) for a settings route, and settings_only on its changes."""
+    inner = require(*permissions)
+
+    def check(request: Request, access: CurrentAccess) -> Access:
+        inner(access)
+        settings_only(request, access)
+        return access
+
+    check.permission = inner.permission  # type: ignore[attr-defined]
+    return check

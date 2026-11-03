@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/console/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/console/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 
 export type Operator = { id: string; no: number | null; email: string; fullName: string; isOperator: boolean; status: string; lastSignInAt: string | null; createdAt: string };
 
@@ -32,4 +33,9 @@ export async function setOperator(id: string, isOperator: boolean): Promise<Resu
     refresh();
     return r.operator;
   });
+}
+
+/** Several at once (2026-11-01), each through setOperator: never yourself, never the last one. */
+export async function bulkRemoveOperators(ids: string[]) {
+  return eachOf("Remove operators", ids, (id) => setOperator(id, false));
 }

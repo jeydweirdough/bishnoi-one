@@ -21,7 +21,7 @@ from app.import_review import ISSUES, ReviewError, connect, norm, parse
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.locks import begin_change, lock_series, locked
-from app.models import Account, Bill, ImportMatch, ImportRecord, ImportRun, PaymentVoucher, Supplier, VoucherLine
+from app.models import Account, Bill, ImportLink, ImportMatch, ImportRecord, ImportRun, PaymentVoucher, Supplier, VoucherLine
 from app.payables import PURCHASE_TYPES, VAT_KINDS, work_out
 
 SOURCE = "zoho"
@@ -47,16 +47,38 @@ class PackError(ValueError):
     pass
 
 
-def read_pack(files: list[dict]) -> list[dict]:
-    """The Zoho Bills export and the Vendor Payments export, together: a bill's payments tell
-    whether tax was withheld on it, and a payment needs its bills."""
+# Each import reads its own exports: bills with their payments (a bill's payments tell whether tax was
+# withheld on it, and a payment needs its bills), and expenses alone.
+PACKS = {"bills": {"bill", "vendor_payment"}, "expenses": {"expense"}}
+ASK = {"bills": "Choose two files together: the Zoho Bills export and the Zoho Vendor Payments export.",
+       "expenses": "Choose one file: the Zoho Expenses export."}
+# The sheet's rows each pack fills: loading one pack leaves the others' rows as they are.
+ROLES = {"bills": {("company", "bill"), ("account", "line"), ("tax", "line"), ("money", "paid_from")},
+         "expenses": {("company", "expense"), ("account", "expense"), ("tax", "expense"), ("money", "paid_through")}}
+
+
+def identify(files: list[dict]) -> tuple[str | None, list[dict]]:
     try:
         docs, controls, manifests = parse(files)
     except ReviewError as error:
         raise PackError(str(error)) from None
     kinds = Counter(m["kind"] for m in manifests)
-    if controls or set(kinds) != {"bill", "vendor_payment"} or any(n != 1 for n in kinds.values()):
-        raise PackError("Choose two files together: the Zoho Bills export and the Zoho Vendor Payments export.")
+    name = next((k for k, wanted in PACKS.items() if set(kinds) == wanted), None)
+    return (None if controls or any(n != 1 for n in kinds.values()) else name), docs
+
+
+def read_any(files: list[dict]) -> tuple[str, list[dict]]:
+    """Which pack these files are, and what they hold (Import matching loads any of them)."""
+    name, docs = identify(files)
+    if name is None:
+        raise PackError(" ".join(ASK.values()))
+    return name, docs
+
+
+def read_pack(files: list[dict], pack: str = "bills") -> list[dict]:
+    name, docs = identify(files)
+    if name != pack:
+        raise PackError(ASK[pack])
     return docs
 
 
@@ -70,19 +92,19 @@ def fingerprint(files: list[dict]) -> str:
 # --- the keys a match is saved under ---------------------------------------------------------------
 
 def company_key(d):
-    return ("company", "bill", "", d["companySource"])
+    return ("company", d["kind"], "", d["companySource"])
 
 
-def account_key(ln):
-    return ("account", "line", ln["accountCode"], ln["account"])
+def account_key(ln, role="line"):
+    return ("account", role, ln["accountCode"], ln["account"])
 
 
-def tax_key(ln):
-    return ("tax", "line", ln["taxRate"], ln["taxName"])
+def tax_key(ln, role="line"):
+    return ("tax", role, ln["taxRate"], ln["taxName"])
 
 
-def money_key(d):
-    return ("money", "paid_from", d["original"]["moneyCode"], d["original"]["moneyAccount"])
+def money_key(d, role="paid_from"):
+    return ("money", role, d["original"]["moneyCode"], d["original"]["moneyAccount"])
 
 
 def match_key(m: ImportMatch):
@@ -125,11 +147,22 @@ def missing(m: ImportMatch | None, i: int, what: str, label: str, changed: bool)
     return f"Line {i}: {what} “{label}” has no confirmed choice for this line yet."
 
 
+def gap(m: ImportMatch | None, what: str, label: str, changed: bool) -> str:
+    """Why an expense line has no choice, without its line number, so held records group by reason."""
+    if changed:
+        return f"{what} “{label}”: a saved line choice was for a different amount (the export changed). Choose again."
+    if m is None or (m.status != "confirmed" and not m.rules):
+        return f"{what} “{label}” isn't matched and confirmed yet."
+    if m.per_record:
+        return f"{what} “{label}” depends on the record, and no rule or line choice covers a line here yet."
+    return f"{what} “{label}” has no confirmed choice for a line here yet."
+
+
 def companies_from(matches: dict, docs: list[dict]) -> None:
-    """A bill's company comes only from its label's confirmed match; then payments take theirs
-    from their bills (the import review's connect)."""
+    """A bill's or expense's company comes only from its label's confirmed match; then payments take
+    theirs from their bills (the import review's connect)."""
     for d in docs:
-        if d["kind"] == "bill":
+        if d["kind"] in ("bill", "expense"):
             m = matches.get(company_key(d))
             d["company"] = m.company if m is not None and m.company in COMPANIES else "unconfirmed"
     connect(docs)
@@ -137,22 +170,27 @@ def companies_from(matches: dict, docs: list[dict]) -> None:
 
 # --- loading an export: the groups to match ------------------------------------------------------
 
-def load_groups(db, docs: list[dict], user) -> dict:
+def load_groups(db, docs: list[dict], user, pack: str = "bills") -> dict:
     """Saves each label the export uses (with how many records and how much), so people who
-    didn't load the file see the same sheet. Lines of bills whose label is confirmed GPI are left
-    out: they never come into 2MG's books."""
+    didn't load the file see the same sheet. Records of GPI are left out: they never come into
+    2MG's books."""
     companies_from(confirmed(db), docs)
     found = defaultdict(lambda: [0, 0])
+    def count(key, amount):
+        g = found[key]; g[0] += 1; g[1] += amount
     for d in docs:
-        if d["kind"] == "bill":
-            g = found[company_key(d)]; g[0] += 1; g[1] += d["total"]
+        if d["kind"] in ("bill", "expense"):
+            count(company_key(d), d["total"])
             if d["company"] == "gpi":
                 continue
+            role = "line" if d["kind"] == "bill" else "expense"
             for ln in d["lines"]:
-                for key in (account_key(ln), tax_key(ln)):
-                    g = found[key]; g[0] += 1; g[1] += ln["amount"]
+                count(account_key(ln, role), ln["amount"])
+                count(tax_key(ln, role), ln["amount"])
+            if d["kind"] == "expense":
+                count(money_key(d, "paid_through"), d["total"])
         elif d["kind"] == "vendor_payment" and d["company"] != "gpi":
-            g = found[money_key(d)]; g[0] += 1; g[1] += d["total"]
+            count(money_key(d), d["total"])
     rows = saved(db)
     now = datetime.now(UTC)
     for key, (records, amount) in found.items():
@@ -166,12 +204,12 @@ def load_groups(db, docs: list[dict], user) -> dict:
         m.records, m.amount_centavos, m.seen_at = records, amount, now
         if m.status == "open" and m.proposed_by is None:
             fill_in(db, m, now)
-    # Labels the latest export no longer uses (or only GPI's bills use) show 0 records; kept, with their history.
+    # Labels the latest export no longer uses (or only GPI's records use) show 0 records; kept, with their history.
     for key, m in rows.items():
-        if key not in found:
+        if key not in found and (m.section, m.role) in ROLES[pack]:
             m.records, m.amount_centavos = 0, 0
     audit(db, user, "imports.matches_loaded", target=f"{len(found)} labels", target_type="import")
-    return {"labels": len(found), "new": sum(1 for k in found if k not in rows)}
+    return {"labels": len(found), "new": sum(1 for k in found if k not in rows), "pack": pack}
 
 
 def fill_in(db, m: ImportMatch, now) -> None:
@@ -181,7 +219,7 @@ def fill_in(db, m: ImportMatch, now) -> None:
         for k, v in choice.items():
             setattr(m, k, v)
         m.status, m.note, m.confirmed_by, m.confirmed_at = "confirmed", note, AUTOMATIC, now
-    if m.section == "company" and norm(m.source_label) in KNOWN_COMPANIES:
+    if m.section == "company" and m.role == "bill" and norm(m.source_label) in KNOWN_COMPANIES:
         done(COMPANY_NOTE, company=KNOWN_COMPANIES[norm(m.source_label)])
     elif m.section == "tax" and norm(m.source_label) == "vat" and m.source_code == "12.00":
         done("The export says VAT 12%.", vat_kind="vat")
@@ -201,25 +239,36 @@ def records_for(db, docs: list[dict], m: ImportMatch) -> dict:
     companies_from(confirmed(db), docs)
     key, rows = match_key(m), []
     usable = posting_accounts(db)
+    def line_row(d, i, ln, kind):
+        row = {"kind": kind, "number": d["number"], "date": d["date"], "party": d["party"], "amount": ln["amount"],
+               "description": ln["description"], "account": ln["account"], "tax": ln["taxName"] or "blank",
+               "company": d["companySource"], "billSourceId": d["sourceId"], "linePosition": i, "changed": False}
+        for field, name in (("account_id", "accountId"), ("purchase_type", "purchaseType"), ("vat_kind", "vatKind")):
+            value, how, changed = pick(m, d, i, ln, field)
+            row[name], row[name + "From"] = value, how
+            row["changed"] = row["changed"] or changed
+        acc = usable.get(row["accountId"]) if row["accountId"] else None
+        row["accountName"] = f"{acc.code} · {acc.name}" if acc else None
+        return row
     for d in docs:
-        if d["kind"] == "bill" and m.section == "company":
+        if d["kind"] == "expense" and d["company"] != "gpi" and m.role == "expense" and m.section in ("account", "tax"):
+            rows += [line_row(d, i, ln, "expense line") for i, ln in enumerate(d["lines"], 1) if (account_key(ln, "expense") if m.section == "account" else tax_key(ln, "expense")) == key]
+            continue
+        if d["kind"] == "expense" and (m.section, m.role) == ("company", "expense") and company_key(d) == key:
+            rows.append({"kind": "expense", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
+                         "description": f"{len(d['lines'])} line(s)", "account": "", "tax": "", "company": d["companySource"]})
+            continue
+        if d["kind"] == "expense" and m.role == "paid_through" and d["company"] != "gpi" and money_key(d, "paid_through") == key:
+            rows.append({"kind": "expense", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
+                         "description": ", ".join(sorted({ln["account"] for ln in d["lines"]})), "account": "", "tax": "", "company": ""})
+            continue
+        if d["kind"] == "bill" and m.section == "company" and m.role == "bill":
             if company_key(d) == key:
                 rows.append({"kind": "bill", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
                              "description": f"{len(d['lines'])} line(s)", "account": "", "tax": "", "company": d["companySource"]})
-        elif d["kind"] == "bill" and m.section in ("account", "tax") and d["company"] != "gpi":
-            for i, ln in enumerate(d["lines"], 1):
-                if (account_key(ln) if m.section == "account" else tax_key(ln)) == key:
-                    row = {"kind": "bill line", "number": d["number"], "date": d["date"], "party": d["party"], "amount": ln["amount"],
-                           "description": ln["description"], "account": ln["account"], "tax": ln["taxName"] or "blank",
-                           "company": d["companySource"], "billSourceId": d["sourceId"], "linePosition": i, "changed": False}
-                    # What this line takes now, and from where (line choice, supplier rule or the label).
-                    for field, name in (("account_id", "accountId"), ("purchase_type", "purchaseType"), ("vat_kind", "vatKind")):
-                        value, how, changed = pick(m, d, i, ln, field)
-                        row[name], row[name + "From"] = value, how
-                        row["changed"] = row["changed"] or changed
-                    acc = usable.get(row["accountId"]) if row["accountId"] else None
-                    row["accountName"] = f"{acc.code} · {acc.name}" if acc else None
-                    rows.append(row)
+        elif d["kind"] == "bill" and m.section in ("account", "tax") and m.role == "line" and d["company"] != "gpi":
+            # Each line shows what it takes now, and from where (line choice, supplier rule or the label).
+            rows += [line_row(d, i, ln, "bill line") for i, ln in enumerate(d["lines"], 1) if (account_key(ln) if m.section == "account" else tax_key(ln)) == key]
         elif d["kind"] == "vendor_payment" and m.section == "money" and d["company"] != "gpi" and money_key(d) == key:
             rows.append({"kind": "payment", "number": d["number"], "date": d["date"], "party": d["party"], "amount": d["total"],
                          "description": "Pays " + ", ".join(sorted({a["number"] or a["reference"] for a in d["allocations"]})), "account": "",
@@ -231,10 +280,17 @@ def records_for(db, docs: list[dict], m: ImportMatch) -> dict:
 
 # --- planning: what each record would become ------------------------------------------------------
 
-def created_records(db, kind: str) -> dict:
-    """Zoho ID -> the Finance record it already became."""
+def created_records(db, kind: str, source: str = SOURCE) -> dict:
+    """Source ID -> the Finance record it already became."""
     return {r.source_id: r for r in db.scalars(select(ImportRecord).where(
-        ImportRecord.source == SOURCE, ImportRecord.kind == kind, ImportRecord.outcome == "created"))}
+        ImportRecord.source == source, ImportRecord.kind == kind, ImportRecord.outcome == "created"))}
+
+
+def links_by_source(db, kind: str, source: str = SOURCE) -> dict:
+    """Source ID -> what it became, for records whose record has no column for it (ImportLink)."""
+    q = select(ImportRecord.source_id, ImportLink).join(ImportLink, ImportLink.record_id == ImportRecord.id).where(
+        ImportRecord.source == source, ImportRecord.kind == kind, ImportRecord.outcome == "created")
+    return {source_id: link for source_id, link in db.execute(q)}
 
 
 def supplier_index(db) -> dict:
@@ -249,6 +305,13 @@ def posting_accounts(db) -> dict:
     apply_bill), any active expense or asset account. Parent accounts included: Oojeema's chart posts
     to some of them (e.g. Merchandise Inventory, Furniture and Fixtures). Corrected 2026-10-29."""
     return {a.id: a for a in db.scalars(select(Account)) if a.is_active and a.type in ("expense", "asset")}
+
+
+def closed_on(s, on: str) -> str | None:
+    """Said in the plan, so one record in a closed period is held instead of stopping a whole run."""
+    if s.locked_until is not None and on <= s.locked_until.isoformat():
+        return f"The books are closed up to {s.locked_until:%d %b %Y}."
+    return None
 
 
 def peso(centavos: int) -> str:
@@ -448,16 +511,18 @@ def summary(rows: list[dict], *, source_fingerprint: str | None = None) -> dict:
 
 
 def rows_out(rows: list[dict]) -> list[dict]:
-    keep = ("sourceId", "number", "party", "date", "total", "company", "reasons", "outcome", "billId", "voucherId")
+    keep = ("sourceId", "number", "party", "date", "total", "company", "reasons", "outcome", "billId", "voucherId", "kind", "invoiceId", "expenseId")
     return [{k: r[k] for k in keep if k in r} for r in rows]
 
 
 # --- importing ---------------------------------------------------------------------------------
 
-def record(db, run, kind, row, *, bill=None, voucher=None):
-    db.add(ImportRecord(run_id=run.id, source=SOURCE, kind=kind, source_id=row["sourceId"], number=row["number"][:60],
-                        outcome="created" if (bill or voucher) else row["outcome"], reasons=row["reasons"],
-                        bill_id=bill.id if bill else None, voucher_id=voucher.id if voucher else None))
+def record(db, run, kind, row, *, bill=None, voucher=None, created=False, source=SOURCE):
+    r = ImportRecord(run_id=run.id, source=source, kind=kind, source_id=row["sourceId"], number=row["number"][:60],
+                     outcome="created" if (bill or voucher or created) else row["outcome"], reasons=row["reasons"],
+                     bill_id=bill.id if bill else None, voucher_id=voucher.id if voucher else None)
+    db.add(r)
+    return r
 
 
 def import_bills(db, settings, user, files: list[dict], plan_key: str) -> dict:

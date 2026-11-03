@@ -31,7 +31,7 @@ from app import bir_reports as bir
 from app.access import CurrentAccess
 from app.bir_readiness import SOURCE_NAMES
 from app.deps import DB, SettingsDep
-from app.models import Bill, FundRequest, Invoice, JournalEntry, JournalLine, PaymentVoucher, PettyCashVoucher, SalesOrder, ZohoSourceDocument, ZohoSourceRun
+from app.models import Bill, FundRequest, ImportedExpense, Invoice, JournalEntry, JournalLine, PaymentVoucher, PettyCashVoucher, SalesOrder, ZohoSourceDocument, ZohoSourceRun
 from app.money_accounts import money_account_ids
 
 router = APIRouter(tags=["overview"])
@@ -274,6 +274,10 @@ def went_card(c: Ctx) -> dict:
         count, total = c.db.execute(select(func.count(), func.coalesce(func.sum(PettyCashVoucher.total_centavos), 0))
                                     .where(PettyCashVoucher.status == "posted", PettyCashVoucher.voucher_date >= c.start, PettyCashVoucher.voucher_date <= c.end)).one()
         slices.append({"key": "petty", "label": "Petty cash", "short": "Petty cash", "amountCentavos": int(total), "count": count, "noun": "voucher", "href": link("/finance/petty-cash", show="posted")})
+        count, total = c.db.execute(select(func.count(), func.coalesce(func.sum(ImportedExpense.total_centavos), 0))
+                                    .where(ImportedExpense.status == "posted", ImportedExpense.expense_date >= c.start, ImportedExpense.expense_date <= c.end)).one()
+        if count:  # Zoho history: shown only where the period has some
+            slices.append({"key": "imported_expenses", "label": "Imported expenses", "short": "Imported", "amountCentavos": int(total), "count": count, "noun": "expense", "href": link("/finance/petty-cash/imported")})
     else:
         hidden.append("petty cash")
     if c.can("funds.view"):

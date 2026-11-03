@@ -187,3 +187,7 @@ def funds(user: permitted("funds.view"), db: DB, settings: SettingsDep, task: Ta
         "Reimbursement paid", "Closed on", "Cancel reason",
     ]
     return csv_file(f"marketing-requests-{task.replace('_', '-')}-{today(settings).isoformat()}.csv", header, rows)
+
+
+from app.review_exports import router as review_router
+router.include_router(review_router)

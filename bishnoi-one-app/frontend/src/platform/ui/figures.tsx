@@ -127,3 +127,49 @@ export function LeadFigure({ figure: f }: { figure: Figure }) {
     </Linked>
   );
 }
+
+/** How a count moved since the period before, as a dashboard card shows it: up or down and by how much. */
+export function changeOf(now: number, before: number): { pct: number | null; up: boolean } {
+  if (before === 0) return { pct: now === 0 ? 0 : null, up: now > 0 };
+  return { pct: Math.round(((now - before) / before) * 100), up: now >= before };
+}
+
+/** A dashboard's count: its icon in a tinted square, what it is, the number, and how it moved
+ *  since the period before (an arrow and a percentage, never colour alone). `upIsGood` says
+ *  which way is good news: more sign-ins are, more wrong passwords aren't. */
+export function TrendCard({ icon, tint, label, value, now, before, since, upIsGood = true, href, loading = false }: {
+  icon: ReactNode;
+  tint: { bg: string; ink: string };
+  label: string;
+  value?: string;
+  now?: number;
+  before?: number;
+  since: string;
+  upIsGood?: boolean;
+  href?: string;
+  loading?: boolean;
+}) {
+  const c = now !== undefined && before !== undefined ? changeOf(now, before) : null;
+  const good = c && c.pct !== 0 ? c.up === upIsGood : null;
+  return (
+    <Linked href={href} className="block rounded-xl border border-rule bg-sheet px-5 py-4">
+      <span className="flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg [&>svg]:size-[1.125rem]" style={{ background: tint.bg, color: tint.ink }} aria-hidden>
+          {icon}
+        </span>
+        <span className="min-w-0 truncate text-sm font-medium text-ink">{label}</span>
+      </span>
+      <span className="mt-3 flex items-end justify-between gap-3">
+        {loading ? <Bone className="h-8 w-20" /> : <span className="text-[1.875rem] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{value}</span>}
+        {c && !loading && (
+          <span className="shrink-0 text-right">
+            <span className={`block text-meta font-semibold ${good === null ? "text-ink-3" : good ? "text-[#3f6f35]" : "text-danger"}`}>
+              {c.pct === null ? "New" : c.pct === 0 ? "No change" : `${c.up ? "▲" : "▼"} ${Math.abs(c.pct)}%`}
+            </span>
+            <span className="block text-meta text-ink-3">{since}</span>
+          </span>
+        )}
+      </span>
+    </Linked>
+  );
+}

@@ -1,5 +1,9 @@
 // Every company on the platform: who they are, how many people, which
 // applications, and whether anything of theirs is open with Support.
+import { bulkCompanyStatus } from "@/src/modules/console/actions/organizations";
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectAllBox, SelectBox, SelectableRow } from "@/src/platform/bulk/selection";
+import { Ban, RotateCcw } from "lucide-react";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/console/platform/ui/button";
@@ -24,6 +28,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const query = new URLSearchParams({ ...(q && { q }), ...(status && { status }) });
   const [{ companies }, staff] = await Promise.all([load<{ companies: Company[] }>(`/platform/companies?${query}`), getStaff()]);
   const filtered = Boolean(q || status);
+  const bulk = staff.canAdminister;
   const link = (s: string) => {
     const next = new URLSearchParams({ ...(q && { q }), ...(s && { status: s }) });
     return `/operations/companies${next.size ? `?${next}` : ""}`;
@@ -71,19 +76,38 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                 : "A Platform Admin adds companies."}
           </Empty>
         ) : (
-          <>
-            <div className="hidden gap-4 border-b border-rule px-5 py-2 text-meta text-ink-3 md:grid md:grid-cols-[minmax(0,1fr)_6rem_6rem_7rem]">
+          <BulkList
+            items={bulk ? companies.map((c) => ({ id: c.id, name: c.name })) : []}
+            noun={["company", "companies"]}
+            actions={[
+              { label: "Reactivate", icon: <RotateCcw className="size-4" aria-hidden />, doing: "Reactivating", done: "reactivated", run: bulkCompanyStatus.bind(null, "active") },
+              { label: "Suspend", icon: <Ban className="size-4" aria-hidden />, doing: "Suspending", done: "suspended", danger: true, confirm: "Their people can't work until they're reactivated.", run: bulkCompanyStatus.bind(null, "suspended") },
+            ]}
+          >
+            <div className="flex items-center border-b border-rule">
+            {bulk && (
+              <span className="pl-5">
+                <SelectAllBox />
+              </span>
+            )}
+            <div className="hidden min-w-0 flex-1 gap-4 px-5 py-2 text-meta text-ink-3 md:grid md:grid-cols-[minmax(0,1fr)_6rem_6rem_7rem]">
               <span>Company</span>
               <span className="text-right">Users</span>
               <span className="text-right">Applications</span>
               <span className="text-right">Open tickets</span>
             </div>
+            </div>
             <ul className="divide-y divide-rule" role="list">
               {companies.map((c) => (
-                <li key={c.id}>
+                <SelectableRow as="li" key={c.id} id={c.id} className="flex items-center">
+                  {bulk && (
+                    <span className="pl-5">
+                      <SelectBox id={c.id} label={c.name} />
+                    </span>
+                  )}
                   <Link
                     href={`/operations/companies/${c.id}`}
-                    className="grid gap-1 px-5 py-3 hover:bg-bench/40 md:grid-cols-[minmax(0,1fr)_6rem_6rem_7rem] md:items-center md:gap-4"
+                    className="grid min-w-0 flex-1 gap-1 px-5 py-3 hover:bg-bench/40 md:grid-cols-[minmax(0,1fr)_6rem_6rem_7rem] md:items-center md:gap-4"
                   >
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-2">
@@ -110,10 +134,10 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
                       </span>
                     </span>
                   </Link>
-                </li>
+                </SelectableRow>
               ))}
             </ul>
-          </>
+          </BulkList>
         )}
       </Sheet>
     </>

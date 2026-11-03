@@ -20,7 +20,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.access import DEPARTMENT, Access, require
+from app.access import DEPARTMENT, Access, require, settings_change
 from app.api import Api, changed, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -45,7 +45,7 @@ from app.routers.quotes import get_quote
 
 router = APIRouter(tags=["quote templates"])
 
-Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
+Manage = Annotated[Access, Depends(settings_change(*DEPARTMENT))]
 View = Annotated[Access, Depends(require("quotes.view"))]
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

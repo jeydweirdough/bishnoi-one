@@ -44,16 +44,23 @@ export type AccessPerson = {
   status: string;
   isCompanyAdmin: boolean;
   roleId: string | null;
-  /** The modules they may open, and the role each gives them today. */
-  apps: { key: string; role: string | null }[];
+  /** Who they report to, and whose assistant they are (2026-11-03): a manager reaches the people who report to them. */
+  reportsToId?: string | null;
+  assistantOfId?: string | null;
+  /** The modules they may open: the role each gave them before roles were kept here, and their role in it here
+   *  (2026-10-31: a role in each app; their own role when the app has none of its own). */
+  apps: { key: string; role: string | null; roleId?: string | null }[];
   /** What each app keeps of its own about them, kept here (2026-10-30): CRM employee ID, licence number, Finance calendar. */
   appDetails?: AppDetails;
+  /** When they were added here, and by whom when the log knows (2026-10-31). */
+  addedAt?: string | null;
+  addedBy?: string | null;
 };
 
 export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };
 
 export type AccessData = {
-  company: { id: string; name: string };
+  company: { id: string; name: string; emailDomain?: string | null };
   modules: AccessModule[];
   roles: AccessRole[];
   people: AccessPerson[];
@@ -66,7 +73,7 @@ export type AccessData = {
 };
 
 /** A person in the recycle bin: deleted, switched off, restorable. */
-export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null };
+export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null; operator?: boolean };
 
 export type RoleInput = {
   name: string;
@@ -77,3 +84,23 @@ export type RoleInput = {
 };
 
 export type ImportReport = { rolesMade: number; peopleGiven: number; toChoose: number; unreachable: string[] };
+
+/** One person in one place (/identity/access/people/{id}, 2026-10-31). */
+export type PersonPage = AccessPerson & {
+  addedAt: string | null;
+  deletedAt: string | null;
+  apps: { key: string; name: string; roleId: string | null; grantedAt: string | null; grantedBy: string | null }[];
+  security: {
+    twoStep: boolean;
+    twoStepRequired: boolean;
+    lastSignIn: string | null;
+    passwordSet: boolean;
+    passwordChangedAt: string | null;
+    mustChangePassword: boolean;
+    openSignIns: number;
+    lockedNow: boolean;
+    wrongPasswords30Days: number;
+    invitationWaiting: boolean;
+  };
+  activity: { id: string; at: string; actor: string; action: string; category: string; target: string; fields: string[] }[];
+};

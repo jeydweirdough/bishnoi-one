@@ -162,6 +162,61 @@ def test_the_pass_carries_the_role_given_here(client, getmeds):
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["role"] == "Medical rep"
 
 
+def test_a_role_in_each_app(client, getmeds, modules):
+    """2026-10-31: one person, a role per app they may open; each app's pass and roles note carry that app's."""
+    h, rio = getmeds["owner"]["h"], getmeds["rio"]
+    rep = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    chemist = client.post("/identity/access/roles", json={"name": "Chemist", "permissions": {"pharmacy": ["prescriptions.view"]}}, headers=h).json()
+    assert client.put(f"/identity/access/people/{rio['id']}/apps/crm/role", json={"roleId": rep["id"]}, headers=h).status_code == 200
+    modules.clear()
+    r = client.put(f"/identity/access/people/{rio['id']}/apps/pharmacy/role", json={"roleId": chemist["id"]}, headers=h)
+    assert r.status_code == 200 and r.json()["roleId"] == chemist["id"]
+    # A role with nothing in the app isn't one for it.
+    wrong = client.put(f"/identity/access/people/{rio['id']}/apps/pharmacy/role", json={"roleId": rep["id"]}, headers=h)
+    assert wrong.status_code == 422 and "nothing in" in wrong.text
+    # An app they can't open has no role to set.
+    assert client.put(f"/identity/access/people/{getmeds['jade']['id']}/apps/pharmacy/role", json={"roleId": chemist["id"]}, headers=h).status_code == 409
+    # People shows each app with its role.
+    row = next(p for p in client.get("/identity/access", headers=h).json()["people"] if p["id"] == rio["id"])
+    assert {a["key"]: a["roleId"] for a in row["apps"]} == {"crm": rep["id"], "pharmacy": chemist["id"]}
+    # Each app is told the role there, and its pass carries it.
+    key = client.get("/pass/key").json()["publicKey"]
+    note = {url: claims_of(body["pass"], key) for url, body in modules}["https://pharmacy-api.example.com/platform/roles"]
+    assert {"email": "rio@getmeds.test", "role": "Chemist", "admin": False, "active": True, "details": {}} in note["people"]
+    for app, port, name in (("crm", 4302, "Medical rep"), ("pharmacy", 4307, "Chemist")):
+        r = client.post("/identity/pass", json={"app": app, "returnTo": f"http://localhost:{port}/auth/platform"}, headers=rio["h"])
+        assert claims_of(r.json()["pass"], key)["roleDef"]["name"] == name, app
+    # A role someone holds in an app can't be deleted.
+    assert client.delete(f"/identity/access/roles/{chemist['id']}", headers=h).status_code == 409
+
+
+def test_a_persons_page_has_everything_about_them(client, getmeds):
+    """2026-10-31: one person in one place: details, apps and their role in each, sign-in and security, activity."""
+    h, rio = getmeds["owner"]["h"], getmeds["rio"]
+    role = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    client.put(f"/identity/access/people/{rio['id']}/apps/crm/role", json={"roleId": role["id"]}, headers=h)
+    client.post("/identity/login", json={"email": "rio@getmeds.test", "password": "not-his-password-1"})
+    r = client.get(f"/identity/access/people/{rio['id']}", headers=h)
+    assert r.status_code == 200, r.text
+    page = r.json()
+    assert (page["fullName"], page["email"], page["status"]) == ("Rio Santos", "rio@getmeds.test", "active")
+    assert {a["key"]: a["roleId"] for a in page["apps"]}["crm"] == role["id"]
+    # The list says when each person was added, and by whom when the log knows.
+    listed = client.get("/identity/access", headers=h).json()["people"]
+    assert all(x["addedAt"] for x in listed)
+    added = client.post("/identity/access/people", json={"fullName": "Mia Cruz", "email": "mia@getmeds.test"}, headers=h)
+    assert added.status_code == 201, added.text
+    mia = next(x for x in client.get("/identity/access", headers=h).json()["people"] if x["email"] == "mia@getmeds.test")
+    assert mia["addedBy"] == "olive@getmeds.test"
+    sec = page["security"]
+    assert sec["twoStep"] is False and sec["passwordSet"] is True and sec["lastSignIn"] and sec["openSignIns"] >= 1
+    assert sec["wrongPasswords30Days"] == 1 and sec["lockedNow"] is False
+    # Their own activity, not what administrators did to them (2026-11-01).
+    assert page["activity"] and all(e["actor"] == "rio@getmeds.test" for e in page["activity"])
+    # Only the company's administrators see someone's page.
+    assert client.get(f"/identity/access/people/{rio['id']}", headers=getmeds["jade"]["h"]).status_code == 403
+
+
 def test_importing_the_roles_each_module_has_today(client, getmeds):
     h = getmeds["owner"]["h"]
     r = client.post("/identity/access/import", headers=h)
@@ -312,3 +367,21 @@ def test_each_apps_details_about_a_person_are_kept_here_and_sent(client, getmeds
     claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
     who = next(p for p in claims["people"] if p["email"] == "jade@getmeds.test")
     assert who["details"] == {"employeeId": "GM-0042"}
+
+
+def test_only_someone_in_the_recycle_bin_can_be_deleted_permanently(app, client, getmeds):
+    from app.models import Account, Identity
+    h, jade = getmeds["owner"]["h"], getmeds["jade"]
+    erase = f"/identity/access/people/{jade['id']}/erase"
+    assert client.post(erase, json={"email": "jade@getmeds.test"}, headers=h).status_code == 409  # not in the bin yet
+    assert client.delete(f"/identity/access/people/{jade['id']}", headers=h).status_code == 200
+    assert client.post(erase, json={"email": "someone@getmeds.test"}, headers=h).status_code == 422  # must name them
+    assert client.post(erase, json={"email": "jade@getmeds.test"}, headers=getmeds["rio"]["h"]).status_code == 403
+    assert client.post(erase, json={"email": "JADE@getmeds.test "}, headers=h).status_code == 204
+    assert client.get("/identity/access/bin", headers=h).json()["people"] == []
+    with app.state.sessions() as db:
+        assert db.get(Identity, jade["id"]) is None
+        assert db.query(Account).filter(Account.email == "jade@getmeds.test").first() is None
+    # Their email is free again, and the log says who did it.
+    assert client.post("/identity/access/people", json={"fullName": "Jade Again", "email": "jade@getmeds.test"}, headers=h).status_code == 201
+    assert "access.person_erased" in [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]

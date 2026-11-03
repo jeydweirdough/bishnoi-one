@@ -11,6 +11,8 @@ export type PickItem = {
   label: string;
   /** One line under the name: what's set, so the list itself answers most questions. */
   detail?: string;
+  /** At the row's end: a count, a mark. */
+  aside?: ReactNode;
   unsaved?: boolean;
   group?: string;
 };
@@ -27,8 +29,11 @@ export function PickList({
   onSelect,
   footer,
   icon,
+  bare = false,
 }: {
   title: string;
+  /** No heading on the sheet, where the page's title already says it (the phone's label keeps `title`). */
+  bare?: boolean;
   icon?: IconName;
   items: PickItem[];
   selected: string;
@@ -53,10 +58,12 @@ export function PickList({
         {footer}
       </div>
 
-      <Sheet className="hidden px-3 pt-4 pb-3 lg:block">
-        <div className="px-2">
-          <SectionTitle icon={icon}>{title}</SectionTitle>
-        </div>
+      <Sheet className={`hidden px-3 pb-3 lg:block ${bare ? "pt-3" : "pt-4"}`}>
+        {!bare && (
+          <div className="px-2">
+            <SectionTitle icon={icon}>{title}</SectionTitle>
+          </div>
+        )}
         {groups.map((group) => (
           <div key={group} className="mt-1 first:mt-0">
             {group && <p className="px-3 pt-2 pb-1 text-meta font-semibold text-ink-3">{group}</p>}
@@ -71,13 +78,16 @@ export function PickList({
                         type="button"
                         onClick={() => onSelect(i.key)}
                         aria-pressed={on}
-                        className={`w-full rounded-lg px-3 py-2 text-left ${on ? "bg-hema-tint" : "hover:bg-bench/60"}`}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left ${on ? "bg-hema-tint" : "hover:bg-bench/60"}`}
                       >
-                        <span className={`block text-sm ${on ? "font-semibold text-ink" : "text-ink"}`}>
-                          {i.label}
-                          {i.unsaved && <span className="ml-1.5 text-meta font-normal text-ink-3">· unsaved</span>}
+                        <span className="min-w-0 flex-1">
+                          <span className={`block text-sm ${on ? "font-semibold text-ink" : "text-ink"}`}>
+                            {i.label}
+                            {i.unsaved && <span className="ml-1.5 text-meta font-normal text-ink-3">· unsaved</span>}
+                          </span>
+                          {i.detail && <span className="block truncate text-meta text-ink-3">{i.detail}</span>}
                         </span>
-                        {i.detail && <span className="block truncate text-meta text-ink-3">{i.detail}</span>}
+                        {i.aside}
                       </button>
                     </li>
                   );

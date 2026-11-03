@@ -9,6 +9,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { MODULES, type ModuleKey } from "@/src/platform/lib/modules";
 import type { MyModule } from "@/src/one/module-switcher";
+import { Breadcrumbs } from "./crumbs";
 
 // Every module's sidebar (decided 2026-10-24, benchmarks/surpass.md §1, pattern P15), laid out
 // as Bishnoi One Inventory's was (the user's pick) and named the way Zoho names things: the
@@ -55,7 +56,7 @@ type Props = {
 const within = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
 /** The page you're on: the most specific match; a page whose address asks for a query wins when the query matches. */
-function currentOf(steps: Step[], pathname: string, search: URLSearchParams | null): Step | undefined {
+export function currentOf(steps: Step[], pathname: string, search: URLSearchParams | null): Step | undefined {
   let found: Step | undefined;
   let best = -1;
   for (const s of steps) {
@@ -350,6 +351,7 @@ function SidebarBody(given: Props) {
   const current = currentOf(all, pathname, search);
   const group = [...props.processes, ...(props.foot ?? [])].find((p) => current && p.steps.includes(current));
   const place = current ? (group && current !== props.home ? `${group.label} · ${current.label}` : current.label) : null;
+  const companies = useOperatorCompanies();
 
   function toggleRail() {
     const next = !rail;
@@ -360,6 +362,8 @@ function SidebarBody(given: Props) {
 
   return (
     <>
+      {/* Company / App / Area / Page at the top of the page (2026-11-01), into the frame's slot. */}
+      <Breadcrumbs module={props.module} company={props.company} companies={companies} mine={props.mine} area={group} page={current} home={props.home} />
       <aside data-rail={rail} className="group/side sticky top-0 hidden h-dvh w-[16.5rem] overflow-x-hidden overflow-y-auto p-3 transition-[width] duration-200 data-[rail=true]:w-[4.75rem] data-[rail=true]:p-2 lg:block print:!hidden">
        <div className="relative flex min-h-full flex-col justify-between overflow-hidden rounded-2xl border border-mint-2 bg-linear-to-b from-mint via-white to-white px-2.5 pt-3 pb-40 shadow-[0_1px_3px_rgba(20,20,20,0.05)] group-data-[rail=true]/side:px-1.5 group-data-[rail=true]/side:pb-4">
         <Leaves />

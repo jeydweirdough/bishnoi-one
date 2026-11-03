@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
-from app.access import Access, CurrentAccess, require
+from app.access import Access, CurrentAccess, require, settings_change
 from app.api import Api, field_error, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser
@@ -24,7 +24,7 @@ from app.models import ASSOCIATED, Association, AssociationLabel, Company, Conta
 from app.scope import reaches, within
 
 router = APIRouter(tags=["associations"])
-Manage = Annotated[Access, Depends(require("admin.settings"))]
+Manage = Annotated[Access, Depends(settings_change("admin.settings"))]
 Kind = Literal["company", "contact", "deal"]
 MODELS = {"company": Company, "contact": Contact, "deal": Deal}
 EDIT = {"company": "customers.edit", "contact": "customers.edit", "deal": "deals.edit"}

@@ -163,7 +163,7 @@ def approvers_of(db: Session, quote: Quote) -> list[User]:
     people = [u for u in db.scalars(select(User).where(User.is_active)) if "quotes.approve" in permissions_of(u.role) and u.id != quote.owner_id]
     team = [u for u in people if u.role.scope == "team" and quote.team_id and quote.team_id in u.all_team_ids]
     # No team lead to decide: the team's manager, then those who reach every team.
-    managers = [u for u in people if u.role.scope == "managed" and quote.team_id in {t.id for t in u.managed_teams} | (u.all_team_ids)]
+    managers = [u for u in people if u.role.scope == "managed" and quote.team_id in (u.all_managed_team_ids | u.all_team_ids)]
     return team or managers or [u for u in people if u.role.scope == "all"]
 
 

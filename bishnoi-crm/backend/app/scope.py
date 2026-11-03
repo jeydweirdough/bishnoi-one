@@ -2,8 +2,10 @@
 
 - own:     records they own;
 - team:    records owned in their team (their own too, even without a team);
-- managed: records owned in every team they're the manager of, and in their own;
+- managed: records owned by their reporting chain or in the units they head and their descendants;
 - all:     every record.
+
+An assistant reaches what the one they assist reaches (app/reporting.py).
 
 Reading and changing use the same reach; the role's permissions then say what
 they may do within it. A record out of reach is answered as not found, so
@@ -22,15 +24,16 @@ def within(query: Select, model: type[Owned], access: Access) -> Select:
     """The query, narrowed to what this person reaches."""
     if access.scope == "all":
         return query
-    if access.team_ids:
-        return query.where(or_(model.team_id.in_(access.team_ids), model.owner_id == access.user_id))
-    return query.where(model.owner_id == access.user_id)
+    reach = [model.owner_id.in_(access.people_ids | {access.user_id})]
+    if access.reach_teams:
+        reach.append(model.team_id.in_(access.reach_teams))
+    return query.where(or_(*reach))
 
 
 def reaches(record: Owned, access: Access) -> bool:
-    if access.scope == "all" or record.owner_id == access.user_id:
+    if access.scope == "all" or record.owner_id == access.user_id or record.owner_id in access.people_ids:
         return True
-    return record.team_id is not None and record.team_id in access.team_ids
+    return record.team_id is not None and record.team_id in access.reach_teams
 
 
 def reachable_people(db: Session, access: Access) -> list[User]:
@@ -39,9 +42,10 @@ def reachable_people(db: Session, access: Access) -> list[User]:
     q = select(User).where(User.is_active).order_by(User.full_name)
     if access.scope == "all":
         return list(db.scalars(q))
-    if access.team_ids:
-        return list(db.scalars(q.where(or_(User.team_id.in_(access.team_ids), User.id == access.user_id))))
-    return list(db.scalars(q.where(User.id == access.user_id)))
+    reach = [User.id.in_(access.people_ids | {access.user_id})]
+    if access.reach_teams:
+        reach.append(User.team_id.in_(access.reach_teams))
+    return list(db.scalars(q.where(or_(*reach))))
 
 
 def owner_for(db: Session, access: Access, owner_id: str | None) -> User:

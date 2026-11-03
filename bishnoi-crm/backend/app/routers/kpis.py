@@ -20,7 +20,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, object_session
 
-from app.access import Access, CurrentAccess, require
+from app.access import Access, CurrentAccess, require, settings_change
 from app.api import Api, camel, changed, field_error, not_found, person_out, team_out
 from app.audit import audit
 from app.config import Settings
@@ -34,7 +34,7 @@ from app.scope import reachable_people
 
 router = APIRouter(tags=["kpis"])
 
-Configure = Annotated[Access, Depends(require("admin.settings"))]
+Configure = Annotated[Access, Depends(settings_change("admin.settings"))]
 SetGoals = Annotated[Access, Depends(require("goals.manage"))]
 
 

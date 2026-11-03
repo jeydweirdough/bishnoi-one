@@ -2,5 +2,5 @@
 import { redirect } from "next/navigation";
 
 export default function Page() {
-  redirect("/crm/admin/settings/pricing");
+  redirect("/platform/settings/crm/pricing");
 }

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -91,3 +91,28 @@ def keep_an_administrator(db: Session) -> None:
             status.HTTP_409_CONFLICT,
             "That would leave nobody able to manage users and roles. Give someone else that first.",
         )
+
+
+# A settings change (2026-10-31): connected to Bishnoi One, Inventory's settings are changed only by the company's
+# administrators, from the Admin Console (the Administrator role the Platform gives them). Standalone (tests,
+# a single install), the permission alone, as before. Reading a setting is never limited here.
+ADMINISTRATORS_ONLY = "Only your company's administrators change Inventory's settings, in the Admin Console."
+
+
+def settings_change(permission: str) -> Callable[..., Access]:
+    """require(permission) for a settings route; its changes, once connected, only by an administrator."""
+    inner = require(permission)
+
+    def check(request: Request, access: CurrentAccess) -> Access:
+        inner(access)
+        if request.method != "GET" and request.app.state.settings.platform_api_url and not access.user.role.is_system:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, ADMINISTRATORS_ONLY)
+        return access
+
+    check.permission = permission  # type: ignore[attr-defined]
+    return check
+
+
+def settings_allowed(permission: str) -> type[Access]:
+    """`_: settings_allowed("warehouses.manage")` in a settings endpoint's signature."""
+    return Annotated[Access, Depends(settings_change(permission))]  # type: ignore[return-value]

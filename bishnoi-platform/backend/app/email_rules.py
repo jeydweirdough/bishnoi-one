@@ -55,7 +55,7 @@ def check_domain(db: Session, company: Company, value: str | None) -> str | None
 def check_company_email(company: Company, email: str) -> None:
     """A company's people have an email at its domain (when it has set one)."""
     if company.email_domain and domain_of(email) != company.email_domain:
-        raise field_error("email", f"Use a @{company.email_domain} email: {company.name}'s people sign in with it.")
+        raise field_error("email", f"Use a @{company.email_domain} email: {company.name}'s employees sign in with it.")
 
 
 def home(db: Session, account: Account) -> Identity | None:

@@ -156,7 +156,11 @@ def company_pass(settings: Settings, company: Company | None, app: Application, 
     now = int(time.time())
     header = {"alg": "EdDSA", "typ": "JWT", "kid": key_id(settings)}
     who = {"company": gone["id"], "slug": gone["slug"], "companyName": gone["name"], "status": "deleted"} if gone else {
-        "company": company.id, "slug": company.slug, "companyName": company.name, "status": company.status}
+        "company": company.id, "slug": company.slug, "companyName": company.name, "status": company.status,
+        # The Company profile, which every app shows and prints from instead of keeping its own (2026-10-31).
+        "profile": {"name": company.name, "legalName": company.legal_name or company.name, "currency": company.currency,
+                    "locale": company.locale, "timezone": company.timezone, "address": company.address, "tin": company.tin,
+                    "phone": company.phone}}
     claims = {
         "iss": ISSUER,
         "aud": app.key,

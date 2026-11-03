@@ -51,10 +51,12 @@ export async function currentModule(): Promise<ModuleDef | null> {
   return moduleByKey((await headers()).get(MODULE_HEADER));
 }
 
-/** The module whose frame (sidebar, who-you-are) this page is drawn in: its own, or the one it borrows (modules.ts borrowedOf). */
+/** The module whose frame (sidebar, who-you-are) this page is drawn in: its own, or the one it borrows (modules.ts borrowedOf).
+ *  The Admin Console as a frame works on the account, not a module's API: there the page's own module answers. */
 async function frameModule(): Promise<ModuleDef | null> {
   const h = await headers();
-  return moduleByKey(h.get(FRAME_HEADER) ?? h.get(MODULE_HEADER));
+  const frame = moduleByKey(h.get(FRAME_HEADER));
+  return frame && !frame.accountOnly ? frame : moduleByKey(h.get(MODULE_HEADER));
 }
 
 export class ApiError extends Error {

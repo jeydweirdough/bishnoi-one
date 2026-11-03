@@ -1,3 +1,4 @@
+import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -44,7 +45,7 @@ function TaxpayerLine({ who }: { who: Taxpayer }) {
         <>
           {" "}
           ·{" "}
-          <Link href="/finance/tax" className="text-danger underline-offset-2 hover:underline">
+          <Link href="/platform/settings/finance/taxes" className="text-danger underline-offset-2 hover:underline">
             Add the {missing.join(", ")} under Tax
           </Link>
         </>
@@ -275,7 +276,7 @@ function CashReceiptsTable({ data, fmt }: { data: CashReceipts; fmt: Fmt }) {
           <td className={td}>{r.customer}</td>
           <td className={td}>{r.reference ?? ""}</td>
           <td className={`${td} ${num}`}>{fmt.peso(r.cashCentavos)}</td>
-          <td className={`${td} ${num}`}>{r.cwtCentavos ? `${fmt.peso(r.cwtCentavos)} (${r.atc})` : ""}</td>
+          <td className={`${td} ${num}`}>{r.cwtCentavos ? `${fmt.peso(r.cwtCentavos)} (${r.atc ?? "ATC not in Oojeema's file"})` : ""}</td>
           <td className={`${td} ${num}`}>{fmt.peso(r.receivablesCentavos)}</td>
         </tr>
       ))}
@@ -480,7 +481,11 @@ export async function BirVatPage({ searchParams }: { searchParams: Search }) {
       <TaxpayerLine who={vat.taxpayer} />
       <Toolbar>
         <QuarterForm action="/finance/bir/vat" year={vat.year} quarter={vat.quarter} />
+        {isVat && <Link className={buttonClass + " inline-flex items-center"} href={`/finance/bir/vat/draft?year=${vat.year}&quarter=${vat.quarter}`}>Download 2550Q review PDF</Link>}
       </Toolbar>
+      {isVat && <FilingNotice form="2550Q" />}
+      <ReviewExports dates={false} filters={`year=${vat.year}&quarter=${vat.quarter}`} options={[["vat", "Return figures and monthly breakdown"], ["vat-sources", "Records behind the VAT figures"]]} />
+      {isVat && <p className="mb-4 text-sm text-ink-2">Review copy only: missing credits, adjustments and payment details stay blank. The PDF is not a filing-ready return.</p>}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-start">
         <Sheet className="overflow-x-auto">
           <h2 className="px-5 pt-4 text-base font-semibold text-ink">For the return</h2>
@@ -574,7 +579,12 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
       </Toolbar>
       {data.missingTin > 0 && (
         <p className="mb-3 text-meta text-danger">
-          {data.missingTin} {data.missingTin === 1 ? "line has" : "lines have"} no TIN. The BIR needs one for each: {which === "sls" || which === "sawt" ? "add it to the customer in the CRM, then on the invoice" : "add it to the supplier in Inventory, then make the bill again"}.
+          {data.missingTin} {data.missingTin === 1 ? "line has" : "lines have"} no TIN. {which === "sls"
+            ? "Review the affected sales with BIR Compliance before filing; buyer-detail requirements depend on the transaction."
+            : which === "sawt"
+              ? "Check the withholding agent's details against the supporting certificate with BIR Compliance before claiming the tax credit."
+              : "Check supplier or payee details against the supporting documents with BIR Compliance before filing."}
+          {" "}Keep unknown TINs blank; do not invent one. Use the approved correction process for an existing record rather than making the bill again.
         </p>
       )}
       <p className="mb-3 text-meta text-ink-3">
@@ -671,7 +681,7 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
             <tr key={i}>
               <td className={td}>{(r.tin as string) || <span className="text-danger">None</span>}</td>
               <td className={td}>{r.payor as string}</td>
-              <td className={td}>{r.atc as string}</td>
+              <td className={td}>{(r.atc as string) || <span className="text-ink-3">ATC not in Oojeema&apos;s file</span>}</td>
               <td className={`${td} ${num}`}>{fmt.peso(n(r.incomePaymentCentavos))}</td>
               <td className={`${td} ${num}`}>{r.rateBp != null ? `${(n(r.rateBp) / 100).toFixed(2)}%` : ""}</td>
               <td className={`${td} ${num}`}>{fmt.peso(n(r.withheldCentavos))}</td>
@@ -684,6 +694,19 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
 }
 
 // ---- Withholding tax: what you withheld from your suppliers ----------------------------------
+
+async function FilingNotice({ form }: { form: string }) {
+  const g=await load<{ online: string; attachments: string; kind: string }>(`/finance/bir/filing-guidance?form=${encodeURIComponent(form)}`);
+  return <Sheet className="mb-4 px-4 py-3"><p className="text-sm font-semibold">Prepared: review draft ? Online validation: not verified ? Filing evidence: not recorded here</p><p className="mt-2 text-meta text-ink-2">{g.online}</p><p className="mt-1 text-meta text-ink-3">{g.attachments}</p></Sheet>;
+}
+
+function WithholdingPdf({ form, year, quarter, month, supplierId }: { form: string; year: number; quarter?: number; month?: number; supplierId?: string }) {
+  const q = new URLSearchParams({ form, year: String(year) });
+  if (quarter) q.set("quarter", String(quarter));
+  if (month) q.set("month", String(month));
+  if (supplierId) q.set("supplierId", supplierId);
+  return <div className="mb-4 print:hidden"><FilingNotice form={form.toUpperCase()} /><Link href={`/finance/bir/withholding/draft?${q}`} className={buttonClass + " inline-flex items-center"}>Download {form.toUpperCase()} review PDF</Link><p className="mt-2 text-meta text-ink-3">Review draft. Missing filing details and actual payments stay unresolved. This download does not submit a return.</p></div>;
+}
 
 const FORMS = [
   { value: "2307", label: "Form 2307 (to suppliers)" },
@@ -763,7 +786,9 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Monthly remittance (BIR Form 0619E) for {d.period.label}: the expanded withholding on bills dated in the month. Filed for the quarter&apos;s first two months; the third is on the 1601EQ.</>)}
         <TaxpayerLine who={d.taxpayer} />
+        <WithholdingPdf form="0619e" year={d.year} month={d.month} />
         <Toolbar><MonthForm year={d.year} month={d.month} /></Toolbar>
+        <ReviewExports dates={false} filters={`year=${d.year}&month=${d.month}`} options={[["0619e", "Monthly withholding review"], ["withholding-sources", "Records behind monthly withholding"]]} />
         <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
       </>
     );
@@ -775,9 +800,11 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Quarterly return of expanded withholding (BIR Form 1601EQ), {d.period.label}. The Quarterly Alphalist of Payees (QAP) goes with it: under Summary lists.</>)}
         <TaxpayerLine who={d.taxpayer} />
+        <WithholdingPdf form="1601eq" year={d.year} quarter={d.quarter} />
         <Toolbar file={download(`/finance/bir/lists/qap?year=${d.year}&quarter=${d.quarter}`)}>
           <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "1601eq" }} />
         </Toolbar>
+        <ReviewExports dates={false} filters={`year=${d.year}&quarter=${d.quarter}`} options={[["1601eq", "Quarterly withholding review"], ["withholding-sources", "Records behind quarterly withholding"]]} />
         <div className="space-y-5">
           <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
           <Sheet className="max-w-xl overflow-x-auto">
@@ -785,9 +812,9 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
               <tbody className="divide-y divide-rule">
                 <tr><td className={td}>Total withheld for the quarter</td><td className={`${td} ${num}`}>{fmt.peso(d.totalCentavos)}</td></tr>
                 {d.remitted.map((r) => (
-                  <tr key={r.label}><td className={td}>Less: remitted with the 0619E for {r.label}</td><td className={`${td} ${num}`}>{fmt.peso(r.amountCentavos)}</td></tr>
+                  <tr key={r.label}><td className={td}>Withheld in {r.label} (not proof of remittance)</td><td className={`${td} ${num}`}>{fmt.peso(r.calculatedWithholdingCentavos)}</td></tr>
                 ))}
-                <tr className="border-t-2 border-ink font-semibold"><td className={td}>Still due</td><td className={`${td} ${num}`}>{fmt.peso(d.dueCentavos)}</td></tr>
+                <tr className="border-t-2 border-ink font-semibold"><td className={td}>Remaining payable</td><td className={`${td} ${num}`}>{d.dueCentavos === null ? "Not verified" : fmt.peso(d.dueCentavos)}</td></tr>
               </tbody>
             </table>
             {d.notes.map((n) => <p key={n} className="px-5 pb-4 text-meta text-ink-3">{n}</p>)}
@@ -805,6 +832,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Annual information return of expanded withholding (BIR Form 1604E) for {d.year}, with its alphalist of payees.</>)}
         <TaxpayerLine who={d.taxpayer} />
+        <WithholdingPdf form="1604e" year={d.year}  />
         <Toolbar file={download(`/finance/bir/withholding/1604e?year=${d.year}`)}>
           <form className="flex items-end gap-3" action="/finance/bir/withholding">
             <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
@@ -856,6 +884,8 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     <>
       {header("Withholding tax", <>Certificates of creditable tax withheld at source (BIR Form 2307), {d.period.label}: one for each supplier you withheld from, to give them.</>)}
       <TaxpayerLine who={d.taxpayer} />
+      {c && <WithholdingPdf form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} />}
+      <ReviewExports dates={false} filters={q.toString()} options={[["2307", "2307 supporting figures"], ["withholding-sources", "Records behind the certificates"]]} />
       <Toolbar>
         <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "2307" }} />
       </Toolbar>

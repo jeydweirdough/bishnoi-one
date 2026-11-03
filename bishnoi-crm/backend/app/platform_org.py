@@ -33,18 +33,35 @@ ON_PLATFORM = "Divisions and teams, and who is in them, are kept in Bishnoi One:
 
 
 def _top(units: dict[str, dict], unit_id: str | None) -> str | None:
-    """The division a unit sits under here: its parent when that is at the top, else the top of its branch."""
+    """The division a unit sits under here: the closest division above it, else the top of its branch."""
     parent = units.get(unit_id, {}).get("parentId") if unit_id else None
     seen = set()
-    while parent and units.get(parent, {}).get("parentId") and parent not in seen:
+    while parent and parent in units and parent not in seen:
         seen.add(parent)
+        if units[parent].get("kind") == "division":
+            return parent
+        if not units[parent].get("parentId"):
+            return parent
         parent = units[parent]["parentId"]
     return parent
 
 
+def _manager_email_for(by_id: dict[str, dict], unit_id: str | None) -> str | None:
+    """The manager of this unit, or inherited from the closest unit above it."""
+    at = unit_id
+    seen = set()
+    while at and at in by_id and at not in seen:
+        seen.add(at)
+        mgr = str(by_id[at].get("manager") or "").strip().lower()
+        if mgr:
+            return mgr
+        at = by_id[at].get("parentId")
+    return None
+
+
 def keep_units(db, units: list[dict]) -> int:
     by_id = {str(u.get("id")): u for u in units if isinstance(u, dict) and u.get("id") and u.get("name")}
-    emails = {str(u.get("manager") or "").lower() for u in by_id.values()} - {""}
+    emails = {_manager_email_for(by_id, uid) for uid in by_id} - {None, ""}
     managers = {e: uid for e, uid in db.execute(select(func.lower(User.email), User.id).where(func.lower(User.email).in_(emails)))} if emails else {}
     changed = 0
     # Divisions first, so a team finds the one above it.
@@ -54,10 +71,11 @@ def keep_units(db, units: list[dict]) -> int:
         clash = db.scalar(select(Team.id).where(func.lower(Team.name) == name.lower(), Team.id != unit_id))
         if clash:  # the CRM's names are unique: keep its own name until the clash is resolved
             name = team.name if team else f"{name} ({unit_id[:4]})"
+        mgr_email = _manager_email_for(by_id, unit_id)
         wanted = {
             "name": name,
             "parent_id": _top(by_id, unit_id),
-            "manager_id": managers.get(str(u.get("manager") or "").lower()),
+            "manager_id": managers.get(mgr_email) if mgr_email else None,
             "headquarters": [str(a)[:80] for a in u.get("areas") or []],
             "is_active": bool(u.get("active", True)),
         }
@@ -94,11 +112,30 @@ def place(db, user: User, unit_id: str | None, others: list[str] | None) -> bool
     return bool(fields)
 
 
+def link(db, user: User, reports_to: object, assistant_of: object) -> bool:
+    """Who they report to and whose assistant they are, as the platform has them (by email; nobody here by that email: none)."""
+    def found(email: object) -> str | None:
+        wanted = str(email or "").strip().lower()
+        other = db.scalar(select(User.id).where(func.lower(User.email) == wanted)) if wanted else None
+        return other if other != user.id else None
+
+    fields = []
+    for name, wanted in (("reports_to_id", found(reports_to)), ("assistant_of_id", found(assistant_of))):
+        if getattr(user, name) != wanted:
+            setattr(user, name, wanted)
+            fields.append(name)
+    if fields:
+        audit(db, PLATFORM, "user.updated", target=user.email, target_type="user", target_id=user.id, fields=fields)
+    return bool(fields)
+
+
 def follow_pass(db, user: User, claims: dict) -> None:
     org = claims.get("org")
     if isinstance(org, dict):
         unit = org.get("unit") if isinstance(org.get("unit"), dict) else {}
         place(db, user, unit.get("id"), org.get("otherUnits") if isinstance(org.get("otherUnits"), list) else None)
+        if "reportsTo" in org or "assistantOf" in org:
+            link(db, user, org.get("reportsTo"), org.get("assistantOf"))
 
 
 @router.post("/organisation", status_code=status.HTTP_204_NO_CONTENT)
@@ -114,6 +151,8 @@ def take_chart(body: NoteIn, request: Request) -> Response:
             user = db.scalar(select(User).where(func.lower(User.email) == str(p.get("email") or "").strip().lower()))
             if user is not None:
                 place(db, user, p.get("unit"), p.get("otherUnits") if isinstance(p.get("otherUnits"), list) else None)
+                if "reportsTo" in p or "assistantOf" in p:
+                    link(db, user, p.get("reportsTo"), p.get("assistantOf"))
         db.commit()
     _newest[claims["slug"]] = claims["iat"]
     return Response(status_code=status.HTTP_204_NO_CONTENT)

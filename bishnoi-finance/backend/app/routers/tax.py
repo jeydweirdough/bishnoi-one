@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.alias_generators import to_camel
 from sqlalchemy import select
 
-from app.access import access_of, permitted
+from app.access import access_of, permitted, settings_permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
@@ -221,11 +221,14 @@ class ProfileIn(Api):
     # VAT rounded on each line, or once per invoice (step 16b); left off, it stays as it was.
     rounding: Literal["line", "invoice"] | None = None
 
-    @field_validator("rdo_code")
+    @field_validator("rdo_code", mode="before")
     @classmethod
     def _rdo(cls, value: str | None) -> str | None:
-        if value is not None and value.strip() and not re.fullmatch(r"\d{3}", value.strip()):
-            raise ValueError("An RDO code is 3 digits, as on the certificate of registration (Form 2303).")
+        if value is not None and not isinstance(value, str):
+            raise ValueError("Use the RDO code as text, such as 053 or 53A.")
+        value = value.strip().upper() if isinstance(value, str) else value
+        if value is not None and value and not re.fullmatch(r"[0-9]{2}[0-9A-Z]", value):
+            raise ValueError("Use the 3-character RDO code from Form 2303, such as 053 or 53A.")
         return value.strip() or None if value is not None else None
 
     @field_validator("branch_code")
@@ -237,7 +240,7 @@ class ProfileIn(Api):
 
 
 @router.put("/profile")
-def update_profile(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
+def update_profile(admin: settings_permitted("tax.manage"), db: DB, settings: SettingsDep, body: ProfileIn) -> dict:
     if body.country not in PACKS:
         raise field_error("country", "There's no tax pack for that country yet.")
     if body.regime not in pack_for(body.country).regimes:
@@ -287,7 +290,7 @@ class RateIn(Api):
 
 
 @router.post("/rates", status_code=status.HTTP_201_CREATED)
-def add_rate(admin: permitted("tax.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
+def add_rate(admin: settings_permitted("tax.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
     """A change in a rate, from a day on: the law's, entered ahead of an update."""
     profile = db.get(TaxProfile, 1)
     pack = pack_for(profile.country)

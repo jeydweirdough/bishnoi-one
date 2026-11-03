@@ -37,7 +37,7 @@ from app.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from app.finance import TaxUnavailable, add_tax
 from app import business_events, mail, pharmacy, trade
 from app.orders import payload as order_payload
-from app.pricing import Problems, price_book, price_lines, price_list_out, sales_settings, today
+from app.pricing import Problems, letterhead as letterhead_of, price_book, price_lines, price_list_out, sales_settings, today
 from app.scope import reaches, within
 
 router = APIRouter(tags=["quotes"])
@@ -724,7 +724,7 @@ def raise_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, q
 def letterhead(access: View, db: DB, settings: SettingsDep) -> dict:
     """The company as a printed quotation shows it."""
     s = sales_settings(db)
-    return {"name": settings.org_name, "address": s.company_address, "tin": s.company_tin, "contact": s.company_contact}
+    return {"name": settings.org_name, **letterhead_of(settings, s)}
 
 
 @router.delete("/quotes/{quote_id}", status_code=status.HTTP_204_NO_CONTENT)

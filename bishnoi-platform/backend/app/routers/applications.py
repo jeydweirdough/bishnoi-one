@@ -67,6 +67,7 @@ class ApplicationIn(UrlFields):
 
 
 class ApplicationPatch(UrlFields):
+    database_company_id: str | None = Field(None, min_length=1, max_length=36)
     name: str | None = Field(None, min_length=2, max_length=120)
     description: str | None = Field(None, max_length=2000)
     app_url: str | None = Field(None, max_length=500)
@@ -119,6 +120,7 @@ def app_out(a: Application, check: HealthCheck | None = None, **extra) -> dict:
         "appUrl": a.app_url,
         "healthUrl": a.health_url,
         "apiUrl": a.api_url,
+        "databaseCompanyId": a.database_company_id,
         "version": a.version,
         "connected": bool(a.connect_key_hash),
         "connectedAt": iso(a.connected_at),
@@ -340,6 +342,12 @@ def adopt_address(body: AdoptIn, db: DB, me: AdminUser) -> dict:
 def update_application(app_id: str, body: ApplicationPatch, db: DB, me: AdminUser) -> dict:
     a = _app(db, app_id)
     fields = changed(body)
+    if "database_company_id" in fields:
+        if a.key != "finance":
+            raise field_error("databaseCompanyId", "This setting applies to the single-company Finance service.")
+        company = db.get(Company, fields["database_company_id"]) if fields["database_company_id"] else None
+        if company is None or company.status != "active" or db.get(CompanyApp, (company.id, a.id)) is None:
+            raise field_error("databaseCompanyId", "Choose an active company that has this service. An existing owner cannot be cleared.")
     for required in ("name", "is_active", "sort_order"):
         if required in fields and fields[required] is None:
             raise field_error(required, "This can't be empty.")

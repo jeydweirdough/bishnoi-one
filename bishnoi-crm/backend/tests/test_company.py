@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import company
-from tests.conftest import PASSWORD, sign_in
+from tests.conftest import PASSWORD, sign_in as password_sign_in
 
 KEY = Ed25519PrivateKey.generate()
 PUBLIC = base64.b64encode(KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
@@ -27,6 +27,20 @@ def company_pass(status="active", granted=True, slug="getmeds", key=KEY, exp=Non
         "companyName": "GetMeds", "status": status, "granted": granted, "exp": exp or int(time.time()) + 3600, **more,
     }).encode())
     return f"{head}.{body}.{b64(key.sign(f'{head}.{body}'.encode()))}"
+
+
+def sign_in(client, email="ana@example.com", password=PASSWORD):
+    """Company-pass cases use the supported sign-in channel, without bypassing auth.
+
+    The stand-in Platform signs both the company pass and a fresh user pass.
+    Standalone cases still exercise the original password endpoint.
+    """
+    if not client.app.state.settings.platform_api_url:
+        return password_sign_in(client, email=email, password=password)
+    from tests.test_platform_sign_in import make_pass
+    token = make_pass(key=KEY, company="co-1", email=email, sub="company-test-user",
+                      name="Company test administrator", role="Administrator", appAdmin=True)
+    return client.post("/auth/platform", json={"pass": token})
 
 
 class Answer:
@@ -175,3 +189,37 @@ def test_the_platform_tells_us_at_once_and_nobody_else_can(app, client, platform
     # Reactivated on the platform: back at once.
     assert client.post("/platform/company", json={"pass": company_pass(iat=newer + 20)}).status_code == 204
     assert client.get("/companies", headers=headers).status_code == 200
+
+
+def test_the_company_profile_on_bishnoi_one_is_the_crms(app, client, platform):
+    """Connected, the CRM shows its company as the Admin Console's Company profile has it, puts that on
+    quotes, and keeps only the quote settings of its own (2026-10-31)."""
+    profile = {"name": "Getmeds Philippines Inc.", "legalName": "Getmeds Philippines Inc.", "currency": "PHP", "locale": "en-US",
+               "timezone": "Asia/Manila", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "phone": "+63 2 8123 4567"}
+    platform["answer"] = Answer(200, {"pass": company_pass(profile=profile)})
+    # Signed in with a password while not connected (connected, only Bishnoi One signs people in), then connected again.
+    connected = app.state.settings
+    app.state.settings = connected.model_copy(update={"platform_api_url": None})
+    headers = {"Authorization": f"Bearer {sign_in(client).json()['accessToken']}"}
+    app.state.settings = connected
+    shown = client.get("/admin/company-settings", headers=headers).json()
+    assert shown["onPlatform"] is True
+    assert (shown["orgName"], shown["locale"], shown["companyAddress"], shown["companyTin"], shown["companyContact"]) == (
+        "Getmeds Philippines Inc.", "en-US", "Unit 305, Vatican Bldg.", "605-059-166-00000", "+63 2 8123 4567")
+    assert client.get("/auth/me", headers=headers).json()["org"]["name"] == "Getmeds Philippines Inc."
+    assert client.get("/quote-letterhead", headers=headers).json() == {
+        "name": "Getmeds Philippines Inc.", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "contact": "+63 2 8123 4567"}
+    # Changed only on the Admin Console; sent back as shown, the quote settings still save.
+    refused = client.patch("/admin/company-settings", json={"companyTin": "000-000-000-000"}, headers=headers)
+    assert refused.status_code == 409 and "Company profile" in refused.json()["detail"]
+    saved = client.patch("/admin/company-settings", json={"orgName": "Getmeds Philippines Inc.", "quotePrefix": "GPI", "quoteValidDays": 15}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert (saved.json()["quotePrefix"], saved.json()["quoteValidDays"], saved.json()["orgName"]) == ("GPI", 15, "Getmeds Philippines Inc.")
+
+
+def test_connected_password_login_stays_closed_while_signed_platform_login_works(client, platform):
+    refused = password_sign_in(client)
+    assert refused.status_code == 403
+    assert "Sign in with your Bishnoi One account" in refused.json()["detail"]
+    accepted = sign_in(client)
+    assert accepted.status_code == 200, accepted.text

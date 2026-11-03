@@ -11,6 +11,24 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  { version: "0.4.44", date: "2026-11-03", changes: ["Budgets opens the selected fiscal year correctly. Missing-TIN messages distinguish sales, withholding credits and suppliers; they ask for review without telling staff to invent a TIN or recreate an existing bill."] },
+  { version: "0.4.43", date: "2026-11-03", changes: ["Review PDFs for 2307, 0619E, 1601EQ and 1604E use official BIR form backgrounds. 2550Q TIN and RDO placement follows the printed cells. Missing filing information and actual payments stay unverified; printing is separate from electronic validation and filing."] },
+  {version: "0.4.42", date: "2026-11-03", changes: ["Export bills and lines, sales and customer payments, supplier payments and allocations, petty cash and imported expenses as CSV for review. VAT and withholding review exports include source figures. Existing PDF and print options stay available. Quarterly withholding no longer treats calculated monthly tax as already remitted; remaining payable stays unverified without payment evidence."]},
+  {version: "0.4.41", date: "2026-11-03", changes: ["Default money accounts now clearly refer to the company receiving or paying money. A combined Forex Gain/Loss account can be used for gains and losses. RDO codes can include a letter, such as 53A, without losing it."]},
+  {version: "0.4.40", date: "2026-11-03", changes: ["Download a 2550Q review PDF from the VAT return page, with the official form background and a source-to-form check sheet. Missing credits, adjustments and payment details stay blank for review. This is a draft, not a filed return."]},
+  {version: "0.4.39", date: "2026-11-03", changes: ["Oojeema receipt matching offers all active chart accounts, with their codes and types. Non-cash matches remain held for settlement review; selecting an account does not turn it into a bank deposit. Supplier and expense payment choices still use money accounts."]},
+  {
+    version: "0.4.38",
+    date: "2026-10-31",
+    changes: [
+      "Import Oojeema sales, on Sales invoices (testing site): choose Oojeema's Sales Journal and Receipt Journal together, see what's ready, held and skipped with each reason, then import. One invoice for each SI, with Oojeema's number, customer TIN and amounts. Finance's BIR series isn't touched.",
+      "An invoice cancelled in Oojeema comes in voided on the day it was cancelled. A negative row with no original in the file is held, and rows outside January to March are skipped.",
+      "Customer payments come from the Receipt Journal, a whole receipt at a time, and reach Cash receipts and SAWT. A receipt that settles an older invoice, or has an overpayment, is held; older ones wait for opening balances. Tax withheld posts with its ATC blank, because Oojeema's file doesn't have it.",
+      "Imported expenses, under Petty cash: Zoho's expenses as read-only history, with their own Import from Zoho export button. They reach the books, the purchase journal, SLP and the VAT return. They aren't petty cash and nobody edits them; a mistake is voided, which reverses its entry.",
+      "Import matching now has a part for each import: Bills, Oojeema sales (deposit accounts) and Expenses. Bank account numbers aren't kept: only their last four digits show.",
+      "BIR readiness counts imported expenses as a source that reaches the purchase lists.",
+    ],
+  },
   {
     version: "0.4.37",
     date: "2026-10-31",

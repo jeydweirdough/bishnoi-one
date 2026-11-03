@@ -55,13 +55,21 @@ def get_settings_dep(request: Request, tenant: Annotated[Tenant, Depends(current
     overrides: dict = {"company": tenant.slug}
     # Until the company's admin names it in Settings: its name on the platform
     # (ORG_NAME in .env is the default company's, on this computer).
-    if base.is_production or tenant.slug != base.default_company:
+    known = None
+    if base.is_production or tenant.slug != base.default_company or base.platform_api_url:
         from app.company import standing  # here: app.company needs the settings module first
 
-        overrides["org_name"] = standing(base, tenant.slug).name or tenant.slug
+        known = standing(base, tenant.slug)
+        overrides["org_name"] = known.name or tenant.slug
     if row is not None:
         found = {"org_name": row.org_name, "org_currency": row.currency, "org_locale": row.locale, "org_timezone": row.timezone, "terms": row.terms}
         overrides |= {k: v for k, v in found.items() if v}
+    # Connected: the Company profile on Bishnoi One is the one copy of these (2026-10-31), over this CRM's own.
+    profile = known.profile if known is not None and base.platform_api_url else None
+    if profile:
+        found = {"org_name": profile.get("name"), "org_currency": profile.get("currency"), "org_locale": profile.get("locale"), "org_timezone": profile.get("timezone")}
+        overrides |= {k: v for k, v in found.items() if v}
+        overrides["org_letterhead"] = {"address": profile.get("address"), "tin": profile.get("tin"), "contact": profile.get("phone")}
     # What the CRM is linked to, as the platform says (Connections); nothing when not connected.
     from app.platform_links import overrides as links  # here, like app.company above
 

@@ -133,6 +133,29 @@ export function FirstPasswordForm({ onDone }: { onDone: () => void }) {
 }
 
 /** Two-step sign-in: password, then scan the code, then the first six digits; the recovery codes shown once. */
+/** Two-step sign-in is on: the recovery codes, shown this once. */
+export function RecoveryCodes({ codes, onDone, className = "" }: { codes: string[]; onDone: () => void; className?: string }) {
+  return (
+    <div className={`space-y-4 ${className}`}>
+      <p className="text-sm text-ink-2">
+        Two-step sign-in is on. Keep these recovery codes somewhere safe (printed, or in a password manager). Each one signs you in once if you lose your phone.
+        They won&apos;t be shown again.
+      </p>
+      <ul className="grid grid-cols-2 gap-2 rounded-lg border border-rule bg-bench p-3 font-mono text-sm text-ink">
+        {codes.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <Button onClick={() => void navigator.clipboard?.writeText(codes.join("\n"))}>Copy codes</Button>
+        <Button variant="primary" className="flex-1 justify-center" onClick={onDone}>
+          I&apos;ve kept them
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function TwoStepSetup({ onDone, compact = false }: { onDone: () => void; compact?: boolean }) {
   const [password, setPassword] = useState("");
   const [started, setStarted] = useState<TwoStepStart | null>(null);
@@ -141,27 +164,7 @@ export function TwoStepSetup({ onDone, compact = false }: { onDone: () => void; 
   const [error, setError] = useState<string>();
   const [busy, start] = useTransition();
 
-  if (codes) {
-    return (
-      <div className={`${compact ? "" : "mt-8 "}space-y-4`}>
-        <p className="text-sm text-ink-2">
-          Two-step sign-in is on. Keep these recovery codes somewhere safe (printed, or in a password manager). Each one signs you in once if you lose your phone.
-          They won&apos;t be shown again.
-        </p>
-        <ul className="grid grid-cols-2 gap-2 rounded-lg border border-rule bg-bench p-3 font-mono text-sm text-ink">
-          {codes.map((c) => (
-            <li key={c}>{c}</li>
-          ))}
-        </ul>
-        <div className="flex gap-2">
-          <Button onClick={() => void navigator.clipboard?.writeText(codes.join("\n"))}>Copy codes</Button>
-          <Button variant="primary" className="flex-1 justify-center" onClick={onDone}>
-            I&apos;ve kept them
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (codes) return <RecoveryCodes codes={codes} onDone={onDone} className={compact ? "" : "mt-8"} />;
 
   if (!started) {
     return (

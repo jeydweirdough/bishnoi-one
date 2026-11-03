@@ -24,19 +24,18 @@ const DEPARTMENT = ["admin.settings", "department.manage"];
  *  are gated on the catalogue, as their pages and the API are; the department
  *  ones also open to a manager, for their own departments. */
 export const SETTINGS_PAGES = [
-  { href: "/crm/admin/settings", label: "Forms", permission: "admin.settings" },
-  { href: "/crm/admin/settings/company", label: "Company and quotes", permission: "admin.settings" },
-  { href: "/crm/admin/settings/quote-templates", label: "Quotation templates", permission: DEPARTMENT },
-  { href: "/crm/admin/settings/customer-types", label: "Customer types", permission: "admin.types" },
-  { href: "/crm/admin/settings/deal-stages", label: "Deal stages", permission: "admin.settings" },
-  { href: "/crm/admin/settings/performance", label: "Performance", permission: "admin.settings" },
-  { href: "/crm/admin/settings/pricing", label: "Pricing and retention", permission: "products.view" },
-  { href: "/crm/admin/settings/retention-windows", label: "Retention windows", permission: DEPARTMENT },
-  { href: "/crm/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
-  { href: "/crm/admin/settings/associations", label: "Associations", permission: "admin.settings" },
-  { href: "/crm/admin/settings/emails", label: "Email templates", permission: "admin.settings" },
-  { href: "/crm/admin/settings/attention", label: "Attention", permission: DEPARTMENT },
-  { href: "/crm/admin/settings/connections", label: "Connections", permission: "admin.settings" },
+  { href: "/platform/settings/crm", label: "Forms", permission: "admin.settings" },
+  { href: "/platform/settings/crm/company", label: "Company and quotes", permission: "admin.settings" },
+  { href: "/platform/settings/crm/quote-templates", label: "Quotation templates", permission: DEPARTMENT },
+  { href: "/platform/settings/crm/customer-types", label: "Customer types", permission: "admin.types" },
+  { href: "/platform/settings/crm/deal-stages", label: "Deal stages", permission: "admin.settings" },
+  { href: "/platform/settings/crm/performance", label: "Performance", permission: "admin.settings" },
+  { href: "/platform/settings/crm/pricing", label: "Pricing and retention", permission: "products.view" },
+  { href: "/platform/settings/crm/retention-windows", label: "Retention windows", permission: DEPARTMENT },
+  { href: "/platform/settings/crm/price-rules", label: "Price rules", permission: "products.view" },
+  { href: "/platform/settings/crm/associations", label: "Associations", permission: "admin.settings" },
+  { href: "/platform/settings/crm/emails", label: "Email templates", permission: "admin.settings" },
+  { href: "/platform/settings/crm/attention", label: "Attention", permission: DEPARTMENT },
 ] as const satisfies readonly { href: string; label: string; permission: string | readonly string[] }[];
 
 /** Any one of these permissions. */
@@ -63,7 +62,7 @@ export function adminPagesFor(me: Me): AdminPage[] {
   if (people.length) pages.push({ href: people[0].href, label: "People and access", icon: "people", also: PEOPLE_PAGES.map((t) => t.href), subpages: people.map(sub) });
   if (can(me, "admin.settings") || can(me, "admin.types")) {
     const settings = settingsPagesFor(me);
-    pages.push({ href: settings[0].href, label: "Settings", icon: "settings", also: ["/crm/admin/settings"], subpages: settings.map(sub) });
+    pages.push({ href: settings[0].href, label: "Settings", icon: "settings", also: ["/platform/settings/crm"], subpages: settings.map(sub) });
   } else if (can(me, "department.manage")) {
     // A manager: their department's settings only.
     const settings = settingsPagesFor(me);

@@ -4,7 +4,7 @@ import { Modal } from "antd";
 import { Ellipsis } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 // page's More menu, so a person learns one place to look on every table (Jakob's law). Items are
 // the row's pages (open, edit, start a quote) and its actions (delete), only those the person's
 // role allows; anything that can't be undone asks first. The panel floats over the page, so a
-// table's edge never cuts it off.
+// table's edge never cuts it off, and opens below or above, wherever it fits on the screen (2026-11-01).
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -33,6 +33,10 @@ export type RowMenuItem =
     }
   | "divider";
 
+/** Space between the ⋯ and its panel, and what's kept clear at the screen's edge. */
+const GAP = 6;
+const EDGE = 14;
+
 const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-bench focus-visible:bg-bench focus-visible:outline-none";
 
 /** `always`: the ⋯ shows at all times, not only when its row is hovered (where it's the only way to the row's actions: People). */
@@ -40,7 +44,8 @@ export function RowMenu({ label, items, always = false }: { label: string; items
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const [at, setAt] = useState<{ top: number; bottom: number; right: number } | null>(null);
+  const [fit, setFit] = useState<{ up: boolean; room: number } | null>(null);
   const [busy, start] = useTransition();
   const shown = items.filter((x, i, all) => x !== "divider" || (i > 0 && i < all.length - 1 && all[i - 1] !== "divider"));
 
@@ -51,17 +56,28 @@ export function RowMenu({ label, items, always = false }: { label: string; items
       if (!panel.current?.contains(t) && !button.current?.contains(t)) setAt(null);
     };
     const close = () => setAt(null);
+    // Scrolling the page closes it; scrolling inside it doesn't.
+    const scrolled = (e: Event) => !(e.target instanceof Node && panel.current?.contains(e.target)) && setAt(null);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setAt(null);
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", scrolled, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", away);
       document.removeEventListener("keydown", esc);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", scrolled, true);
       window.removeEventListener("resize", close);
     };
+  }, [at]);
+
+  // Measured before it's painted: below the ⋯ if it fits there, else on whichever side has more room.
+  useLayoutEffect(() => {
+    if (!at || !panel.current) return setFit(null);
+    const below = window.innerHeight - at.bottom - EDGE;
+    const above = at.top - EDGE;
+    const up = panel.current.scrollHeight > below && above > below;
+    setFit({ up, room: up ? above : below });
   }, [at]);
 
   if (!shown.some((x) => x !== "divider")) return null;
@@ -72,7 +88,7 @@ export function RowMenu({ label, items, always = false }: { label: string; items
     e.stopPropagation();
     if (at) return setAt(null);
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    if (r) setAt({ top: r.top, bottom: r.bottom, right: window.innerWidth - r.right });
   }
 
   function act(item: Extract<RowMenuItem, { run: unknown }>) {
@@ -116,8 +132,13 @@ export function RowMenu({ label, items, always = false }: { label: string; items
             ref={panel}
             role="menu"
             aria-label={label}
-            style={{ top: at.top, right: at.right }}
-            className="fixed z-[60] w-56 rounded-xl border border-rule bg-white p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
+            style={{
+              ...(fit?.up ? { bottom: window.innerHeight - at.top + GAP } : { top: at.bottom + GAP }),
+              right: at.right,
+              maxHeight: fit?.room,
+              visibility: fit ? "visible" : "hidden",
+            }}
+            className="fixed z-[60] w-56 overflow-y-auto rounded-xl border border-rule bg-white p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
           >
             {shown.map((item, i) => {
               if (item === "divider") return <div key={`d${i}`} role="separator" className="my-1 border-t border-rule" />;

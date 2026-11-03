@@ -1,6 +1,7 @@
 import { PhotoPicker } from "../account/photo-picker";
 import { Particulars, PageHeader, SectionTitle, Sheet } from "../ui/sheet";
 import { removeMyPhoto, saveMyPhoto } from "../actions/account";
+import { TwoStepOwed } from "@/src/one/two-step-notice";
 import { getCompanyMe, load } from "../lib/api";
 import { makeFormat } from "../lib/format";
 
@@ -32,6 +33,7 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader title="Account">Profile photo, details and permissions. Your administrator manages your name, email, role and team.</PageHeader>
+      <TwoStepOwed />
       <AccountDetails me={me} account={account} />
     </>
   );

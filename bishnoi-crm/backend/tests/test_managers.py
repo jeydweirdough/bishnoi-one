@@ -1,5 +1,5 @@
 """Managers: above team leads. A team lead reaches their own team; a manager
-reaches every team they're the manager of, and its people."""
+reaches the people who report to them (filled from the teams they head), and theirs below."""
 
 from sqlalchemy import select
 
@@ -19,6 +19,11 @@ def make_manager(app, client, ana, teams: list[str]) -> dict:
     for name in teams:
         r = client.patch(f"/admin/teams/{ids[name]}", json={"managerId": mia}, headers=ana)
         assert r.status_code == 200 and r.json()["manager"]["name"] == "Mia", r.text
+    # Reach follows who reports to her (2026-11-03): the people in those teams report to her, as app.tools.reporting_links fills it.
+    with app.state.sessions() as db:
+        for user in db.scalars(select(User).where(User.team_id.in_([ids[n] for n in teams]), User.id != mia)):
+            user.reports_to_id = mia
+        db.commit()
     return bearer(sign_in(client, "mia@example.com"))
 
 

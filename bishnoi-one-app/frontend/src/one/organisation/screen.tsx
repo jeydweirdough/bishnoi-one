@@ -8,7 +8,7 @@ export async function Organisation() {
   return (
     <>
       <PageHeader title="Organisation">
-        {data ? <>Your divisions, departments and teams, their heads, your branches, and where each person sits. Every app reads it from here.</> : null}
+        {data ? <>Your divisions, departments and teams, their heads, your branches, and where each employee sits. Every app reads it from here.</> : null}
       </PageHeader>
       {data ? (
         <OrganisationChart data={data} />

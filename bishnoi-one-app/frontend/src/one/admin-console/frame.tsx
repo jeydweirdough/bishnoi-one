@@ -5,10 +5,12 @@ import { getAccount, type Account } from "@/src/platform/lib/account";
 import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
+import { CrumbsSlot } from "@/src/platform/shell/crumbs";
+import { CRM_SETTINGS, FINANCE_SETTINGS, FINANCE_TABS, INVENTORY_SETTINGS, INVENTORY_TABS } from "./app-settings";
 
 /**
  * The Admin Console (feature plan step 5, 2026-10-28, laid out like Odoo's and Zoho's settings): a company's
- * own administration, for its administrators: Home, Company, People, Reports. Nothing of Bishnoi One's own
+ * own administration, for its administrators: Home, People, Company, Apps, Reports (regrouped 2026-11-01). Nothing of Bishnoi One's own
  * running is here; that is Operations (operationsGroups, /operations), for operators only (2026-10-30).
  */
 export function consoleGroups(me: Account): ConsoleGroup[] {
@@ -17,33 +19,42 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     // The executive Home first: the company in a few figures (decided 2026-10-28).
     groups.push({ label: "Home", pages: [{ href: "/platform/home", label: "Home", icon: "home" }] });
     groups.push({
-      label: "Company",
-      icon: "company",
-      pages: [
-        { href: "/platform/company", label: "Company profile", icon: "company" },
-        { href: "/platform/company/apps", label: "Apps", icon: "apps" },
-        { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
-        { href: "/platform/company/security", label: "Security", icon: "password" },
-        { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
-      ],
-    });
-    groups.push({
-      label: "People",
+      label: "Employees",
       icon: "people",
       pages: [
-        { href: "/platform/roles/people", label: "People", icon: "people" },
+        { href: "/platform/roles/people", label: "Employees", icon: "people" },
         { href: "/platform/roles", label: "Roles", icon: "roles" },
         { href: "/platform/organisation", label: "Organisation", icon: "teams" },
       ],
     });
     groups.push({
-      label: "Reports",
-      icon: "reports",
+      label: "Company",
+      icon: "company",
       pages: [
-        // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
-        { href: "/platform/reports", label: "Reports Center", icon: "reports" },
+        { href: "/platform/company", label: "Company profile", icon: "company" },
+        { href: "/platform/company/security", label: "Security", icon: "password" },
+        { href: "/platform/company/activity", label: "Activity log", icon: "auditLog" },
+        // Every app's deleted records and recycle bin, an app at a time (2026-10-31).
+        { href: "/platform/company/data-cleanup", label: "Data clean-up", icon: "lists" },
       ],
     });
+    // Everything about the apps in one place (2026-11-01): which are on, how each works, what they connect to.
+    // One row per app the company has; its parts are tabs on the page (app-settings.ts). The pages are the
+    // app's own (they talk to its API).
+    const has = (key: string) => me.apps.some((a) => a.key === key);
+    groups.push({
+      label: "Apps",
+      icon: "apps",
+      pages: [
+        { href: "/platform/company/apps", label: "Apps and features", icon: "apps" },
+        ...(has("crm") ? [{ href: `${CRM_SETTINGS}/company`, label: "CRM", icon: "deals" as const, also: [CRM_SETTINGS] }] : []),
+        ...(has("inventory") ? [{ href: INVENTORY_TABS[0].href, label: "Inventory", icon: "inventory" as const, also: [INVENTORY_SETTINGS] }] : []),
+        ...(has("finance") ? [{ href: FINANCE_TABS[0].href, label: "Finance", icon: "finance" as const, also: [FINANCE_SETTINGS] }] : []),
+        { href: "/platform/company/integrations", label: "Integrations", icon: "settings" },
+      ],
+    });
+    // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
+    groups.push({ label: "Reports", pages: [{ href: "/platform/reports", label: "Reports", icon: "reports" }] });
   }
   return groups;
 }
@@ -100,7 +111,7 @@ export async function AdminConsoleFrame({ children, console: which = "platform" 
         <NavProgress />
       </Suspense>
       <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-        <header className="mb-4 hidden items-center justify-end gap-1 lg:flex">{actions}</header>
+        <header className="mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
         <div className="mx-auto max-w-[80rem]">{children}</div>
       </main>
     </div>

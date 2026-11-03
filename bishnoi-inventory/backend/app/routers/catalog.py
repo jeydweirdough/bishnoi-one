@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app import cpr
 from app.routers.packagings import packagings_of
-from app.access import allowed
+from app.access import allowed, settings_allowed
 from app.api import Api, changed, conflict, field_error, found, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -46,6 +46,10 @@ View = allowed("products.view")
 Create = allowed("products.create")
 Edit = allowed("products.edit")
 Delete = allowed("products.delete")
+# Categories, brands and units are Inventory's settings: the company administrators', in the Admin Console (2026-10-31).
+SetupCreate = settings_allowed("products.create")
+SetupEdit = settings_allowed("products.edit")
+SetupDelete = settings_allowed("products.delete")
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 IMAGE_BYTES = 2 * 1024 * 1024
@@ -171,7 +175,7 @@ def list_categories(_: View, db: DB) -> list[dict]:
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
-def create_category(_: Create, me: CurrentUser, db: DB, body: CategoryIn) -> dict:
+def create_category(_: SetupCreate, me: CurrentUser, db: DB, body: CategoryIn) -> dict:
     check_parent(db, None, body.parent_id)
     category = Category(**body.model_dump())
     db.add(category)
@@ -182,7 +186,7 @@ def create_category(_: Create, me: CurrentUser, db: DB, body: CategoryIn) -> dic
 
 
 @router.patch("/categories/{category_id}")
-def update_category(_: Edit, me: CurrentUser, db: DB, category_id: str, body: CategoryPatch) -> dict:
+def update_category(_: SetupEdit, me: CurrentUser, db: DB, category_id: str, body: CategoryPatch) -> dict:
     category = found(db, Category, category_id, "category")
     wanted = changed(body)
     if "name" in wanted and not wanted["name"]:
@@ -210,7 +214,7 @@ MoveTo = Query(None, alias="moveTo", max_length=36, description="Move what uses 
 
 
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(_: Delete, me: CurrentUser, db: DB, category_id: str, move_to: str | None = MoveTo) -> Response:
+def delete_category(_: SetupDelete, me: CurrentUser, db: DB, category_id: str, move_to: str | None = MoveTo) -> Response:
     """Deletes a category. One still in use (products, categories inside it,
     counts) is deleted only with `moveTo`: all of that moves there first."""
     category = found(db, Category, category_id, "category")
@@ -267,7 +271,7 @@ def list_brands(_: View, db: DB) -> list[dict]:
 
 
 @router.post("/brands", status_code=status.HTTP_201_CREATED)
-def create_brand(_: Create, me: CurrentUser, db: DB, body: BrandIn) -> dict:
+def create_brand(_: SetupCreate, me: CurrentUser, db: DB, body: BrandIn) -> dict:
     if brand_taken(db, body.name):
         raise field_error("name", "There's already a brand with that name.")
     brand = Brand(**body.model_dump())
@@ -279,7 +283,7 @@ def create_brand(_: Create, me: CurrentUser, db: DB, body: BrandIn) -> dict:
 
 
 @router.patch("/brands/{brand_id}")
-def update_brand(_: Edit, me: CurrentUser, db: DB, brand_id: str, body: BrandPatch) -> dict:
+def update_brand(_: SetupEdit, me: CurrentUser, db: DB, brand_id: str, body: BrandPatch) -> dict:
     brand = found(db, Brand, brand_id, "brand")
     wanted = changed(body)
     if wanted.get("name") and brand_taken(db, wanted["name"], but=brand.id):
@@ -294,7 +298,7 @@ def update_brand(_: Edit, me: CurrentUser, db: DB, brand_id: str, body: BrandPat
 
 
 @router.delete("/brands/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_brand(_: Delete, me: CurrentUser, db: DB, brand_id: str, move_to: str | None = MoveTo) -> Response:
+def delete_brand(_: SetupDelete, me: CurrentUser, db: DB, brand_id: str, move_to: str | None = MoveTo) -> Response:
     """Deletes a brand. One products still carry is deleted only with `moveTo`: they move there first."""
     brand = found(db, Brand, brand_id, "brand")
     products = db.scalar(select(func.count()).select_from(Product).where(Product.brand_id == brand.id)) or 0
@@ -333,7 +337,7 @@ def list_units(_: View, db: DB) -> list[dict]:
 
 
 @router.post("/units", status_code=status.HTTP_201_CREATED)
-def create_unit(_: Create, me: CurrentUser, db: DB, body: UnitIn) -> dict:
+def create_unit(_: SetupCreate, me: CurrentUser, db: DB, body: UnitIn) -> dict:
     if db.get(Unit, body.code):
         raise field_error("code", "There's already a unit with that code.")
     db.add(Unit(code=body.code, name=body.name))
@@ -343,7 +347,7 @@ def create_unit(_: Create, me: CurrentUser, db: DB, body: UnitIn) -> dict:
 
 
 @router.patch("/units/{code}")
-def update_unit(_: Edit, me: CurrentUser, db: DB, code: str, body: UnitPatch) -> dict:
+def update_unit(_: SetupEdit, me: CurrentUser, db: DB, code: str, body: UnitPatch) -> dict:
     unit = found(db, Unit, code, "unit")
     wanted = changed(body)
     fields = [k for k, v in wanted.items() if v is not None and getattr(unit, k) != v]
@@ -356,7 +360,7 @@ def update_unit(_: Edit, me: CurrentUser, db: DB, code: str, body: UnitPatch) ->
 
 
 @router.delete("/units/{code}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_unit(_: Delete, me: CurrentUser, db: DB, code: str, move_to: str | None = MoveTo) -> Response:
+def delete_unit(_: SetupDelete, me: CurrentUser, db: DB, code: str, move_to: str | None = MoveTo) -> Response:
     """Deletes a unit. One products are counted in is deleted only with `moveTo`:
     they're counted in that unit from then on (their quantities stay as they are)."""
     unit = found(db, Unit, code, "unit")

@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 from sqlalchemy import JSON, CheckConstraint, Date, DateTime, FetchedValue, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, event, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, foreign, mapped_column, relationship
 
 from app.db import Base
 
@@ -44,6 +44,12 @@ class Team(Base):
     # The division this team is a branch of (B2B → NBD and CRR; HOS → TeleSales
     # and its field areas). None: a division itself. One level only.
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_teams.id", ondelete="SET NULL"), index=True, default=None)
+    branches: Mapped[list["Team"]] = relationship(
+        "Team",
+        primaryjoin="Team.id == foreign(Team.parent_id)",
+        lazy="selectin",
+        viewonly=True,
+    )
     # Its customers named to other divisions (look-alikes, customer fields): app/routers/sharing.py.
     share_customers: Mapped[bool] = mapped_column(default=True, server_default="1")
     # The department's own retention windows (app/routers/retention.py); None:
@@ -123,6 +129,10 @@ class User(Base):
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     # Their Bishnoi One account on the platform, once they have signed in with it (app/platform_pass.py).
     platform_identity_id: Mapped[str | None] = mapped_column(String(36), unique=True, default=None)
+    # Who they report to, and whose assistant they are (2026-11-03, kept on the platform): a manager reaches the people who
+    # report to them and theirs below; an assistant reaches what the one they assist reaches (app/reporting.py).
+    reports_to_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    assistant_of_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
 
     role: Mapped[Role] = relationship(lazy="joined")
     team: Mapped[Team | None] = relationship(lazy="joined", foreign_keys=[team_id])
@@ -131,6 +141,19 @@ class User(Base):
     # The other teams they're in, beside their main one (team_id). Their reach
     # covers all of them; what they make still goes to their main team.
     other_teams: Mapped[list[Team]] = relationship(secondary="nbcm_user_teams", lazy="selectin")
+
+    @property
+    def all_managed_team_ids(self) -> set[str]:
+        """Every team they manage: the ones they manage directly and everything under them, at any depth (department > division > team)."""
+        ids: set[str] = set()
+        todo = list(self.managed_teams)
+        while todo:
+            t = todo.pop()
+            if t.id in ids:
+                continue
+            ids.add(t.id)
+            todo.extend(getattr(t, "branches", []))
+        return ids
 
     @property
     def all_team_ids(self) -> set[str]:

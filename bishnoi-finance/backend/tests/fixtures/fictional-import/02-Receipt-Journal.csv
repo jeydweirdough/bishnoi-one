@@ -1,0 +1,8 @@
+﻿TAXPAYER TRADE NAME,2MG INCORPORATED
+TEST DATA ONLY - NOT FOR FILING
+
+Receipt Journal
+
+Transaction Date,CR/OR No.,Customer Name,Customer Address,Customer TIN,RV No,INV No,Account Name (DR),Cash Amount,Check Amount,Other Charges,CWT,Overpayment,Accounts Receivable
+"Jan 20, 2026",TEST-CR-001,TEST ONLY - Customer 1,Fictional address,111-222-333-00000,TEST-RV-001,TEST-SI-001,TEST ONLY - Money account (confirm with Sir Mel),1120.00,0.00,0.00,0.00,0.00,1120.00
+"Jan 20, 2026",TEST-CR-002,TEST ONLY - Customer 2,Fictional address,111-222-333-00000,TEST-RV-002,TEST-SI-002,TEST ONLY - Money account (confirm with Sir Mel),560.00,0.00,0.00,0.00,0.00,560.00

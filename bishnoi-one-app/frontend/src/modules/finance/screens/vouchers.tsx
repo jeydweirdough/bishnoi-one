@@ -1,3 +1,4 @@
+import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
@@ -70,6 +71,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
         Paying suppliers&apos; bills once they&apos;re approved: prepared, then released, which posts it. A voucher returned for correction goes back to whoever
         prepared it, with the reason.
       </PageHeader>
+      <ReviewExports filters={query.toString()} options={[ ["supplier-payments", "Supplier payments: one row per voucher"], ["payment-allocations", "Supplier payments: allocations to bills"] ]} />
       {list.queueLabel && <p className="mb-3 text-sm text-ink-2">{list.queueLabel} · {list.items.length} matching vouchers · <Link href="/finance/vouchers" className="text-hema hover:underline">Clear filters</Link></p>}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">

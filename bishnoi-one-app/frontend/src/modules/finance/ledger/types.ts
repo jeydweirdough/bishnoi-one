@@ -96,6 +96,6 @@ export type TrialBalance = {
   creditCentavos: number;
 };
 
-export type Posting = { items: { key: string; label: string; type: AccountType; account: Account | null }[]; canEdit: boolean };
+export type Posting = { items: { key: string; label: string; type: AccountType; types?: AccountType[]; account: Account | null }[]; canEdit: boolean };
 
 export const TYPE_LABELS: Record<AccountType, string> = { asset: "Assets", liability: "Liabilities", equity: "Equity", income: "Income", expense: "Expenses" };

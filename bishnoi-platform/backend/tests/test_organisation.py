@@ -59,7 +59,8 @@ def test_units_branches_and_where_people_sit(client, getmeds, modules, pushed):
     claims = claims_of(notes[-1]["pass"], key)
     assert claims["kind"] == "event" and claims["aud"] == "crm" and claims["event"]["kind"] == "organisation.changed"
     chart = claims["event"]["data"]
-    assert {"email": "jade@getmeds.test", "unit": field["id"], "otherUnits": [train["id"]]} in chart["people"]
+    jade_row = next(p for p in chart["people"] if p["email"] == "jade@getmeds.test")
+    assert (jade_row["unit"], jade_row["otherUnits"]) == (field["id"], [train["id"]]) and jade_row["reportsTo"] is None and jade_row["assistantOf"] is None
     assert next(u for u in chart["units"] if u["id"] == field["id"])["manager"] == "rio@getmeds.test"
 
     # Jade's pass says where she sits, and who her manager is.

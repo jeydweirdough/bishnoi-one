@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/pharmacy/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/pharmacy/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 import type {
   AdminUser,
   Batch,
@@ -273,4 +274,15 @@ export type MaterialDecision = { outcome: "approved" | "returned" | "rejected"; 
 
 export async function decideMaterial(id: string, input: MaterialDecision): Promise<Result<MaterialReviewDetail>> {
   return attempt(async () => done(await api.post<MaterialReviewDetail>(`/material-reviews/${enc(id)}/decision`, input)));
+}
+
+// Several at once (2026-11-01): each goes through its one-at-a-time action, with all its rules.
+export async function bulkDeleteMedicines(ids: string[]) {
+  return eachOf("Delete medicines", ids, deleteMedicine);
+}
+export async function bulkDeletePatients(ids: string[]) {
+  return eachOf("Delete patients", ids, deletePatient);
+}
+export async function bulkDeleteSuppliers(ids: string[]) {
+  return eachOf("Delete suppliers", ids, deleteSupplier);
 }

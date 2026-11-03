@@ -74,6 +74,8 @@ class Standing:
     outage: bool = False
     expires: float = 0.0  # when the pass it came from runs out (0: none)
     issued: float = 0.0  # when the platform signed that pass
+    # The Company profile it carries (name, currency, locale, time zone, letterhead), 2026-10-31.
+    profile: dict | None = None
 
 
 _lock = threading.Lock()
@@ -108,7 +110,8 @@ def _checked(settings: Settings, token: str, slug: str | None = None) -> dict:
 def _standing_of(claims: dict, checked_at: float) -> Standing:
     """What a checked pass says, to be asked again an hour after it was had."""
     name, company_id = claims.get("companyName") or claims["slug"], claims.get("company")
-    common = {"company_id": company_id, "name": name, "until": checked_at + REFRESH, "expires": float(claims["exp"]), "issued": float(claims.get("iat") or 0)}
+    common = {"company_id": company_id, "name": name, "until": checked_at + REFRESH, "expires": float(claims["exp"]), "issued": float(claims.get("iat") or 0),
+              "profile": claims["profile"] if isinstance(claims.get("profile"), dict) else None}
     if claims.get("status") == "deleted":
         return Standing(False, f"The company \"{claims['slug']}\" isn't registered on Bishnoi One Platform any more. Ask your Bishnoi One administrator.", **common)
     if claims.get("status") == "paused":

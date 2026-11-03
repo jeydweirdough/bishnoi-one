@@ -1,3 +1,4 @@
+import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { ExternalLink, Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -138,6 +139,7 @@ export async function PettyCashPage({ searchParams }: { searchParams: Search }) 
         Spending paid out of a petty cash fund, one voucher for each paper petty cash voucher, with the photo or PDF of every official receipt. It&apos;s entered and
         submitted, checked against its receipts by someone else, then posted to the books. Returned, it goes back with the reason.
       </PageHeader>
+      <ReviewExports filters={new URLSearchParams({ show, q }).toString()} options={[ ["petty-cash", "Petty cash: one row per voucher"], ["petty-cash-lines", "Petty cash: individual receipts"] ]} />
       {list.waitingForYou > 0 || list.waitingOnOthers > 0 ? (
         <p className="mb-3 text-sm text-ink-2">
           {list.waitingForYou > 0 && <span className="font-semibold text-ink">{list.waitingForYou === 1 ? "1 voucher is" : `${list.waitingForYou} vouchers are`} waiting for you.</span>}

@@ -6,6 +6,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/admin/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/admin/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 
 export type OperationsPath = "vehicles" | "fleet-cards" | "travel" | "devices";
 
@@ -34,4 +35,9 @@ export async function logStep(path: OperationsPath, id: string, action: string, 
     refresh();
     return res;
   });
+}
+
+/** Several at once (2026-11-01), each through deleteOperation. */
+export async function bulkDeleteOperations(path: OperationsPath, ids: string[]) {
+  return eachOf("Delete records", ids, (id) => deleteOperation(path, id));
 }

@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Bill, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile
+from app.models import Account, Bill, ImportedExpense, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile
 from app import payables
 from app.tax.packs.ph import PERCENTAGE
 from app.tax.rates import lookup
@@ -329,7 +329,7 @@ def vat_return(db: Session, p: Period) -> dict:
             ],
             {"key": "payable", "label": "VAT payable" if output >= input_tax else "Excess input VAT, carried over", "amountCentavos": abs(output - input_tax)},
         ],
-        "notes": ["Input VAT is from recorded supplier bills and posted petty cash receipts dated in the quarter. Taxes customers withheld (the SAWT) are credited on the income tax return, not here."],
+        "notes": ["Input VAT is from recorded supplier bills, posted petty cash receipts and imported expenses dated in the quarter. Taxes customers withheld (the SAWT) are credited on the income tax return, not here."],
     }
 
 
@@ -391,15 +391,16 @@ def camel(key: str) -> str:
 
 @dataclass
 class Purchase:
-    """A purchase as the BIR reports read it: a recorded (or voided) supplier bill, or one receipt on a posted
-    (or voided) petty cash voucher (added 2026-10-30). Its amounts by VAT kind and purchase type, and what
-    was withheld from it, by ATC and rate, worked out line by line exactly as it was posted."""
+    """A purchase as the BIR reports read it: a recorded (or voided) supplier bill, one receipt on a posted
+    (or voided) petty cash voucher (added 2026-10-30), or an imported expense (2026-10-31). Its amounts by VAT
+    kind and purchase type, and what was withheld from it, by ATC and rate, worked out line by line exactly as
+    it was posted."""
 
-    source: str  # bill or petty_cash
+    source: str  # bill, petty_cash or imported_expense
     on: date
     no: str | int | None  # the bill's number, or the petty cash voucher's
     reference: str  # the supplier's invoice number, or the store's receipt number
-    payee_id: str  # a supplier's id, or "store:" and the store's TIN (else its name) for petty cash
+    payee_id: str  # a supplier's id, or "store:" and the store's TIN (else its name) for petty cash and imported expenses
     name: str
     tin: str | None
     address: str | None
@@ -466,8 +467,17 @@ def receipts(db: Session, v: PettyCashVoucher) -> list[Purchase]:
     return out
 
 
+def imported_expense(x: ImportedExpense) -> Purchase:
+    """One imported Zoho expense, from the lines as they were posted. The vendor is as the export names it, or blank:
+    nothing is made up, and the lists count a missing TIN as they do any other."""
+    kinds, types, held = classify([{"purchaseType": ln.purchase_type, "vat": ln.vat, "withholding": ln.withholding, "netCentavos": ln.net_centavos,
+                                    "vatCentavos": ln.vat_centavos, "withheldCentavos": ln.withheld_centavos} for ln in x.lines])
+    return Purchase("imported_expense", x.expense_date, x.number, x.reference or "", "store:" + (x.vendor_tin or " ".join(x.vendor.split()).upper()), x.vendor.strip(), x.vendor_tin, None,
+                    x.status == "void", x.net_centavos, x.vat_centavos, x.withheld_centavos, kinds, types, held)
+
+
 def bills_between(db: Session, start: date, end: date, *, with_void: bool = False, supplier_id: str | None = None) -> list[Purchase]:
-    """Every purchase dated in the period: supplier bills and petty cash receipts, in date order."""
+    """Every purchase dated in the period: supplier bills, petty cash receipts and imported expenses, in date order."""
     statuses = ("recorded", "void") if with_void else ("recorded",)
     out: list[Purchase] = []
     if not supplier_id or not supplier_id.startswith("store:"):
@@ -480,6 +490,12 @@ def bills_between(db: Session, start: date, end: date, *, with_void: bool = Fals
                                           PettyCashVoucher.voucher_date >= start, PettyCashVoucher.voucher_date <= end)
         for v in db.scalars(q.order_by(PettyCashVoucher.voucher_date, PettyCashVoucher.number)):
             out += [pu for pu in receipts(db, v) if not supplier_id or pu.payee_id == supplier_id]
+        q = select(ImportedExpense).where(ImportedExpense.status.in_(("posted", "void") if with_void else ("posted",)),
+                                          ImportedExpense.expense_date >= start, ImportedExpense.expense_date <= end)
+        for x in db.scalars(q.order_by(ImportedExpense.expense_date, ImportedExpense.number)):
+            pu = imported_expense(x)
+            if not supplier_id or pu.payee_id == supplier_id:
+                out.append(pu)
     return sorted(out, key=lambda pu: pu.on)
 
 
@@ -575,16 +591,15 @@ def form_0619e(db: Session, m: Period) -> dict:
 
 
 def form_1601eq(db: Session, p: Period) -> dict:
-    """Quarterly return of expanded withholding: by ATC, less what the 0619Es remitted for the first two months."""
+    """Quarterly withholding by ATC. Monthly calculations do not establish actual remittances."""
     rows = by_atc(withheld_bills(db, p.start, p.end))
     months = months_of(p)
-    remitted = [{"label": m.label, "amountCentavos": form_0619e(db, m)["totalCentavos"]} for m in months[:2]]
+    remitted = [{"label": m.label, "amountCentavos": None, "calculatedWithholdingCentavos": form_0619e(db, m)["totalCentavos"]} for m in months[:2]]
     total = sum(r["taxCentavos"] for r in rows)
-    paid = sum(r["amountCentavos"] for r in remitted)
     return {
         "form": "1601EQ", "title": "Quarterly remittance return of creditable income taxes withheld (expanded)",
-        "rows": rows, "totalCentavos": total, "remitted": remitted, "dueCentavos": total - paid,
-        "notes": ["The 0619E amounts are what the books show withheld in each month. If what was actually remitted differs, use the remitted amounts."],
+        "rows": rows, "totalCentavos": total, "remitted": remitted, "dueCentavos": None,
+        "notes": ["Monthly withholding is calculated from the books, not evidence of payment to BIR. Actual remittances, credits and remaining payable are not verified; no payment is assumed."],
     }
 
 
@@ -622,11 +637,11 @@ def form_2307(db: Session, p: Period, supplier_id: str) -> dict:
             row["baseCentavos"] += base
             row["taxCentavos"] += tax
     if supplier_id.startswith("store:"):  # a store paid from petty cash: as its receipts name it
-        payee = {"id": supplier_id, "name": bills[0].name if bills else None, "tin": bills[0].tin if bills else None, "address": None}
+        payee = {"id": supplier_id, "name": bills[0].name if bills else None, "tin": bills[0].tin if bills else None, "address": None, "branchCode": None}
     else:
         supplier = db.get(Supplier, supplier_id)
         payee = {"id": supplier_id, "name": (supplier.company_name or supplier.name) if supplier else None,
-                 "tin": supplier.tin if supplier else None, "address": supplier.address if supplier else None}
+                 "tin": supplier.tin if supplier else None, "address": supplier.address if supplier else None, "branchCode": supplier.branch_code if supplier else None}
     return {
         "form": "2307", "title": "Certificate of creditable tax withheld at source",
         "payee": payee,

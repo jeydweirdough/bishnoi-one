@@ -24,7 +24,7 @@ async function page(kind: CatalogKind, title: string, blurb: string, searchParam
       (f.status === "active" ? i.isActive : f.status === "inactive" ? !i.isActive : true),
   );
   const canEdit = may("products.edit") && may("products.create");
-  const base = `/inventory/catalog/${kind}`;
+  const base = `/platform/settings/inventory/${kind}`;
   return (
     <>
       <PageHeader title={title} actions={canEdit && <CatalogAddButton kind={kind} items={all} />}>

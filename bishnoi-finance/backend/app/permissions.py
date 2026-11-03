@@ -113,7 +113,7 @@ AREA_LABELS = {
     "imports.propose": "Propose matches (load an export, suggest accounts)",
     "imports.confirm": "Confirm company, account and money matches",
     "imports.confirm_tax": "Confirm tax-label matches",
-    "imports.run": "Import bills and supplier payments (testing site only for now)",
+    "imports.run": "Import bills, sales, payments and expenses (testing site only for now)",
 }
 
 

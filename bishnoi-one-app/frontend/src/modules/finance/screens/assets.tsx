@@ -73,7 +73,7 @@ export async function BudgetsPage({ searchParams }: { searchParams: Promise<Reco
   const years = [next(next(ended[0])), next(ended[0]), ...ended.slice(0, 2)];
   const chosen = one((await searchParams).year) || years[1];
   const [{ items }, { items: accounts }] = await Promise.all([
-    load<{ items: BudgetRow[] }>(`/finance/budgets?yearEnd=${chosen}`),
+    load<{ items: BudgetRow[] }>(`/finance/budgets?year_end=${chosen}`),
     load<{ items: Acc[] }>("/finance/ledger/accounts"),
   ]);
   return (

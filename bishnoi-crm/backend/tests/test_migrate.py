@@ -106,16 +106,19 @@ def test_table_names_are_put_right_whatever_the_recorded_revision_says(tmp_path)
     (a deploy that stopped partway): 0014 brings each one to nbcm_."""
     from sqlalchemy import inspect
 
-    from app.migrate import VERSION_TABLE, upgrade
+    from alembic import command
+    from app.migrate import VERSION_TABLE, _config, upgrade
     from app.db import make_engine
 
     engine = make_engine(f"sqlite:///{(tmp_path / 'mixed.db').as_posix()}")
-    upgrade(engine)  # all the way: every table nbcm_
+    # Start with the actual historical schema. Labelling today's complete
+    # schema as 0013 incorrectly replays later, non-repeatable migrations.
+    command.upgrade(_config(engine), "0013")
     with engine.begin() as db:
-        db.execute(text("ALTER TABLE nbcm_teams RENAME TO teams"))  # never renamed
-        db.execute(text("ALTER TABLE nbcm_users RENAME TO orcm_users"))  # renamed once
-        # nbcm_quotes: already where it belongs
-        db.execute(text(f"UPDATE {VERSION_TABLE} SET version_num = '0013'"))
+        db.execute(text("ALTER TABLE orcm_teams RENAME TO teams"))  # never renamed
+        # orcm_users: renamed once; quotes: partway through the next rename.
+        db.execute(text("ALTER TABLE orcm_quotes RENAME TO nbcm_quotes"))
+        assert db.execute(text(f"SELECT version_num FROM {VERSION_TABLE}")).scalar() == "0013"
     upgrade(engine)
     tables = set(inspect(engine).get_table_names())
     assert {"nbcm_teams", "nbcm_users", "nbcm_quotes"} <= tables

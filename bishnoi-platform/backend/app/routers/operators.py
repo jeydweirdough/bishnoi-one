@@ -23,7 +23,7 @@ from app.accounts import account_by_email, memberships
 from app.api import Api, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, AdminUser, CurrentUser
-from app.models import Account, Company, User
+from app.models import Account, Company, Identity, User
 from app.security import MAX_PASSWORD, check_password_rules, hash_password
 
 router = APIRouter(prefix="/platform/operators", tags=["operators"])
@@ -81,6 +81,10 @@ def set_operator(account_id: str, body: OperatorIn, db: DB, me: AdminUser) -> di
         staff.is_active = False
         staff.password_changed_at = now  # their console sessions end
     a.is_operator = body.is_operator
+    if not body.is_operator:
+        # The doors they had only as an operator close with it (2026-11-01); a company's own membership stays.
+        for m in db.scalars(select(Identity).where(Identity.account_id == a.id, Identity.via_operator)):
+            db.delete(m)
     audit(db, me, "operator.switched_on" if body.is_operator else "operator.switched_off", category="security", target=a.email, target_type="account", target_id=a.id)
     db.commit()
     return {"operator": operator_out(a)}

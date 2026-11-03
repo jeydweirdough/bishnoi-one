@@ -14,23 +14,23 @@ Only a company administrator (Identity.is_company_admin) may; every change is
 in the audit log (names of what changed, never values) and sent to the modules.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app import abilities as ab
 from app import access_roles
 from app.access_roles import ADMINISTRATOR
-from app.api import Api, changed, check_email, conflict, field_error, not_found
+from app.api import Api, changed, check_email, conflict, field_error, iso, not_found
 from app.audit import audit
 from app import passwords
-from app.deps import DB, SettingsDep
-from app.models import AccessRole, Application, Company, CompanyApp, Identity, IdentityApp, IdentitySession
-from app import email_rules, sign_in
+from app.deps import DB, SettingsDep, as_utc
+from app.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
+from app import email_rules, org_push, sign_in
 from app.accounts import account_of, memberships, runs_company
 from app.routers.identity import Signed
 
@@ -84,9 +84,14 @@ def role_out(db: Session, role: AccessRole, holders: int = 0) -> dict:
 
 
 def holders_of(db: Session, company_id: str) -> dict[str, int]:
-    return dict(db.execute(
-        select(Identity.access_role_id, func.count()).where(Identity.company_id == company_id, Identity.access_role_id.is_not(None)).group_by(Identity.access_role_id)
-    ).all())
+    """How many people hold each role: as their own, or in any app they may open (2026-10-31)."""
+    held: dict[str, set[str]] = {}
+    for pid, rid in db.execute(select(Identity.id, Identity.access_role_id).where(Identity.company_id == company_id, Identity.access_role_id.is_not(None))):
+        held.setdefault(rid, set()).add(pid)
+    for pid, rid in db.execute(select(IdentityApp.identity_id, IdentityApp.access_role_id).join(Identity, Identity.id == IdentityApp.identity_id)
+                               .where(Identity.company_id == company_id, IdentityApp.access_role_id.is_not(None))):
+        held.setdefault(rid, set()).add(pid)
+    return {rid: len(people) for rid, people in held.items()}
 
 
 @router.get("")
@@ -96,10 +101,25 @@ def overview(db: DB, me: Admin) -> dict:
     holders = holders_of(db, me.company_id)
     roles = db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id).order_by(AccessRole.is_admin.desc(), func.lower(AccessRole.name))).all()
     people, to_choose = [], []
+    # Who added each person (2026-10-31): the audit log's "person added", by their email; none for the first ones.
+    added_by = {t.lower(): a for t, a in db.execute(
+        select(AuditEntry.target, AuditEntry.actor).where(AuditEntry.company_id == me.company_id, AuditEntry.action == "access.person_added")
+        .order_by(AuditEntry.created_at))}
+    # An import logs one line for all it added (2026-11-01): each person belongs to the first one after they were made.
+    imports = [(as_utc(at), a) for at, a in db.execute(
+        select(AuditEntry.created_at, AuditEntry.actor).where(AuditEntry.company_id == me.company_id, AuditEntry.action == "access.people_imported")
+        .order_by(AuditEntry.created_at))]
+
+    def imported_by(p: Identity) -> str | None:
+        made = as_utc(p.created_at)
+        return next((a for at, a in imports if timedelta(0) <= at - made <= IMPORT_TAKES), None)
+
     for p in db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.via_operator.is_(False), Identity.deleted_at.is_(None))
                         .order_by(func.lower(Identity.full_name))):
         grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
-        given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g)} for g in grants if g.application_id in by_id]
+        # Each app with their role there (2026-10-31): the grant's, else their own.
+        given = [{"key": by_id[g.application_id].key, "role": access_roles.legacy_role(g), "roleId": g.access_role_id or p.access_role_id}
+                 for g in grants if g.application_id in by_id]
         people.append({
             "id": p.id,
             "fullName": p.full_name,
@@ -108,14 +128,18 @@ def overview(db: DB, me: Admin) -> dict:
             "status": p.status,
             "isCompanyAdmin": p.is_company_admin,
             "roleId": p.access_role_id,
+            "reportsToId": p.reports_to_id,
+            "assistantOfId": p.assistant_of_id,
             "apps": given,
             "appDetails": p.app_details or {},
+            "addedAt": iso(p.created_at),
+            "addedBy": added_by.get(p.email.lower()) or imported_by(p),
         })
         if p.access_role_id is None and any(g["role"] for g in given):
             to_choose.append(p.id)
     company = db.get(Company, me.company_id)
     return {
-        "company": {"id": company.id, "name": company.name},
+        "company": {"id": company.id, "name": company.name, "emailDomain": company.email_domain},
         "modules": [module_out(a) for a in apps],
         "roles": [role_out(db, r, holders.get(r.id, 0)) for r in roles],
         "people": people,
@@ -338,7 +362,7 @@ def delete_role(role_id: str, request: Request, db: DB, me: Admin, settings: Set
     role = get_role(db, me, role_id)
     holders = holders_of(db, me.company_id).get(role.id, 0)
     if holders:
-        raise conflict(f"{holders} {'person has' if holders == 1 else 'people have'} this role. Give them another one first.")
+        raise conflict(f"{holders} {'employee has' if holders == 1 else 'employees have'} this role. Give them another one first.")
     audit(db, me.email, "access.role_deleted", target=role.name, target_type="access_role", target_id=role.id, company_id=me.company_id)
     db.delete(role)
     db.commit()
@@ -351,6 +375,10 @@ def delete_role(role_id: str, request: Request, db: DB, me: Admin, settings: Set
 
 class PersonRoleIn(Api):
     role_id: str | None = None
+
+
+# One import's rows are made within a request of its log line.
+IMPORT_TAKES = timedelta(minutes=10)
 
 
 def get_person(db: Session, me: Identity, person_id: str) -> Identity:
@@ -441,7 +469,7 @@ class PasswordIn(Api):
 
 def person_out(p: Identity) -> dict:
     return {"id": p.id, "fullName": p.full_name, "email": p.email, "title": p.title, "status": p.status, "isCompanyAdmin": p.is_company_admin, "roleId": p.access_role_id,
-            "appDetails": p.app_details or {}}
+            "reportsToId": p.reports_to_id, "assistantOfId": p.assistant_of_id, "appDetails": p.app_details or {}}
 
 
 @router.post("/people", status_code=status.HTTP_201_CREATED)
@@ -449,7 +477,7 @@ def add_person(body: PersonIn, request: Request, db: DB, me: Admin, settings: Se
     """Someone new at the company: their account, their role and the modules they may open, in one go."""
     same = db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == body.email.lower()))
     if same is not None:
-        raise field_error("email", "That person is in the recycle bin: restore them instead." if same.deleted_at else "Somebody here already has that email.")
+        raise field_error("email", "That employee is in the recycle bin: restore them instead." if same.deleted_at else "Somebody here already has that email.")
     email_rules.check_company_email(db.get(Company, me.company_id), body.email)
     email_rules.check_available(db, body.email, me.company_id)
     role = get_role(db, me, body.role_id) if body.role_id else None
@@ -508,6 +536,58 @@ def change_person(person_id: str, body: PersonPatch, request: Request, db: DB, m
         audit(db, me.email, action, target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=sorted(fields))
         db.commit()
         told(request, settings, me.company_id)
+    return {"person": person_out(p)}
+
+
+class ReportingIn(Api):
+    reports_to_id: str | None = None
+    assistant_of_id: str | None = None
+
+
+def colleague(db: Session, me: Identity, p: Identity, wanted: str | None, field: str) -> Identity | None:
+    """Someone at the company who can be reported to or assisted: switched on, not deleted, not themselves."""
+    if wanted is None:
+        return None
+    other = db.get(Identity, wanted)
+    if other is None or other.company_id != me.company_id or other.via_operator or other.deleted_at is not None:
+        raise field_error(field, "Pick an employee of this company.")
+    if other.id == p.id:
+        raise field_error(field, "Pick someone other than themselves.")
+    if other.status != "active":
+        raise field_error(field, f"{other.full_name} is switched off. Switch them on first, or pick someone else.")
+    return other
+
+
+@router.put("/people/{person_id}/reporting")
+def set_reporting(person_id: str, body: ReportingIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Who they report to and whose assistant they are, each optional; what isn't sent stays. A manager reaches the people
+    who report to them, and theirs below, through the apps; an assistant reaches what the one they assist reaches."""
+    p = get_person(db, me, person_id)
+    sent, fields = body.model_fields_set, []
+    if "reports_to_id" in sent:
+        boss = colleague(db, me, p, body.reports_to_id, "reports_to_id")
+        at, seen = boss, set()
+        while at is not None and at.id not in seen:  # a circle: they'd report to someone who reports to them
+            if at.reports_to_id == p.id:
+                raise field_error("reports_to_id", f"{boss.full_name} already reports to {p.full_name}, directly or through others.")
+            seen.add(at.id)
+            at = db.get(Identity, at.reports_to_id) if at.reports_to_id else None
+        if (boss.id if boss else None) != p.reports_to_id:
+            p.reports_to_id = boss.id if boss else None
+            fields.append("reportsTo")
+    if "assistant_of_id" in sent:
+        boss = colleague(db, me, p, body.assistant_of_id, "assistant_of_id")
+        if boss is not None and boss.assistant_of_id:
+            raise field_error("assistant_of_id", f"{boss.full_name} is an assistant. Pick the person they assist.")
+        if boss is not None and db.scalar(select(func.count()).select_from(Identity).where(Identity.assistant_of_id == p.id)):
+            raise field_error("assistant_of_id", f"{p.full_name} has assistants of their own, so can't be one.")
+        if (boss.id if boss else None) != p.assistant_of_id:
+            p.assistant_of_id = boss.id if boss else None
+            fields.append("assistantOf")
+    if fields:
+        audit(db, me.email, "organisation.person_linked", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id, fields=fields)
+        db.commit()
+        org_push.push(request.app.state.sessions, settings, me.company_id)
     return {"person": person_out(p)}
 
 
@@ -581,6 +661,76 @@ def give_module(person_id: str, key: str, request: Request, db: DB, me: Admin, s
     return {"id": p.id, "app": app.key}
 
 
+@router.get("/people/{person_id}")
+def person_page(person_id: str, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """One person, everything about them in one place (2026-10-31): details, apps with their role in each,
+    sign-in and security, and their recent activity at the company."""
+    from app.routers.activity import entry_out
+
+    p = get_person(db, me, person_id)
+    account = account_of(db, p)
+    now = datetime.now(UTC)
+    email = p.email.lower()
+    apps = {a.id: a for a in access_roles.modules_of(db, me.company_id)}
+    grants = db.scalars(select(IdentityApp).where(IdentityApp.identity_id == p.id)).all()
+    open_sessions = db.scalar(select(func.count()).select_from(IdentitySession).where(
+        IdentitySession.identity_id == p.id, IdentitySession.revoked_at.is_(None), IdentitySession.expires_at > now)) or 0
+    window = now - timedelta(minutes=settings.login_lockout_minutes)
+    failures = db.scalar(select(func.count()).select_from(SignInFailure).where(func.lower(SignInFailure.email) == email, SignInFailure.at > window)) or 0
+    wrong = db.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action == "identity.sign_in_failed", func.lower(AuditEntry.target) == email,
+                                                                         AuditEntry.created_at > now - timedelta(days=30))) or 0
+    invited = bool(account and db.scalar(select(func.count()).select_from(SignInLink).where(
+        SignInLink.account_id == account.id, SignInLink.kind == "invite", SignInLink.used_at.is_(None), SignInLink.expires_at > now)))
+    # What they did themselves (2026-11-01); what administrators did to them is in the Activity log.
+    activity = db.scalars(select(AuditEntry).where(AuditEntry.company_id == me.company_id, func.lower(AuditEntry.actor) == email)
+                          .order_by(AuditEntry.created_at.desc()).limit(25)).all()
+    return {
+        **person_out(p),
+        "addedAt": iso(p.created_at),
+        "deletedAt": iso(p.deleted_at),
+        "apps": [{"key": apps[g.application_id].key, "name": apps[g.application_id].name, "roleId": g.access_role_id or p.access_role_id,
+                  "grantedAt": iso(g.granted_at), "grantedBy": g.granted_by} for g in grants if g.application_id in apps],
+        "security": {
+            "twoStep": bool(account and sign_in.two_step_on(account)),
+            "twoStepRequired": bool(settings.two_step_required and runs_company(db, p)),
+            "lastSignIn": iso(account.last_sign_in_at) if account else None,
+            "passwordSet": bool(account and account.password_hash),
+            "passwordChangedAt": iso(account.password_changed_at) if account else None,
+            "mustChangePassword": bool(account and account.must_change_password),
+            "openSignIns": open_sessions,
+            "lockedNow": failures >= settings.login_attempts,
+            "wrongPasswords30Days": wrong,
+            "invitationWaiting": invited,
+        },
+        "activity": [entry_out(e) for e in activity],
+    }
+
+
+class AppRoleIn(Api):
+    role_id: str | None = None
+
+
+@router.put("/people/{person_id}/apps/{key}/role")
+def set_app_role(person_id: str, key: str, body: AppRoleIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Their role in one app (2026-10-31): a role of the company that has something in that app. None: their own role."""
+    p = get_person(db, me, person_id)
+    app = company_module(db, me, key)
+    grant = db.get(IdentityApp, (p.id, app.id))
+    if grant is None:
+        raise conflict(f"{p.full_name} can't open {app.name} yet. Give it to them first.")
+    role = get_role(db, me, body.role_id) if body.role_id else None
+    if role is not None and not role.is_admin and not access_roles.grants_of(db, role).get(app.key):
+        raise field_error("roleId", f"{role.name} has nothing in {app.name}. Choose a role made for it, or add {app.name} to {role.name} on Roles.")
+    wanted = role.id if role else None
+    if grant.access_role_id != wanted:
+        grant.access_role_id = wanted
+        audit(db, me.email, "access.app_role_set", target=f"{p.email} · {app.name} · {role.name if role else 'their own role'}", target_type="identity",
+              target_id=p.id, company_id=me.company_id, application_id=app.id)
+        db.commit()
+        told(request, settings, me.company_id)
+    return {"id": p.id, "app": app.key, "roleId": grant.access_role_id or p.access_role_id}
+
+
 @router.delete("/people/{person_id}/apps/{key}", status_code=status.HTTP_204_NO_CONTENT)
 def take_module(person_id: str, key: str, db: DB, me: Admin) -> Response:
     p = get_person(db, me, person_id)
@@ -635,7 +785,11 @@ def delete_person(person_id: str, request: Request, db: DB, me: Admin, settings:
 def recycle_bin(db: DB, me: Admin) -> dict:
     rows = db.scalars(select(Identity).where(Identity.company_id == me.company_id, Identity.deleted_at.is_not(None), Identity.via_operator.is_(False))
                       .order_by(Identity.deleted_at.desc())).all()
-    return {"people": [{**person_out(p), "deletedAt": p.deleted_at.isoformat(), "deletedBy": p.deleted_by} for p in rows]}
+    def still_operator(p: Identity) -> bool:
+        account = account_of(db, p)
+        return bool(account and account.is_operator)
+
+    return {"people": [{**person_out(p), "deletedAt": p.deleted_at.isoformat(), "deletedBy": p.deleted_by, "operator": still_operator(p)} for p in rows]}
 
 
 @router.post("/people/{person_id}/restore")
@@ -647,6 +801,33 @@ def restore_person(person_id: str, db: DB, me: Admin) -> dict:
     audit(db, me.email, "access.person_restored", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
     db.commit()
     return {"person": person_out(p)}
+
+
+class EraseIn(Api):
+    email: str = Field(max_length=254)
+
+
+@router.post("/people/{person_id}/erase", status_code=status.HTTP_204_NO_CONTENT)
+def erase_person(person_id: str, body: EraseIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> Response:
+    """Gone for good, from the recycle bin only (2026-11-01): the sign-in, password and two-step with their account
+    when this was their only membership. Records in the apps keep the name; the audit log keeps what was done."""
+    p = get_person(db, me, person_id)
+    if p.deleted_at is None:
+        raise conflict("Only someone in the recycle bin can be deleted permanently.")
+    if body.email.strip().lower() != p.email.lower():
+        raise field_error("email", "That isn't this employee's email.")
+    account = account_of(db, p)
+    audit(db, me.email, "access.person_erased", category="security", target=p.email, target_type="identity", target_id=p.id, company_id=me.company_id)
+    others = [m for m in memberships(db, account) if m.id != p.id] if account else []
+    for link in ("reports_to_id", "assistant_of_id"):
+        db.execute(update(Identity).where(getattr(Identity, link) == p.id).values({link: None}))
+    db.delete(p)
+    db.flush()
+    if account is not None and not others and not account.is_operator:
+        db.delete(account)
+    db.commit()
+    told(request, settings, me.company_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---- Invitations, two-step resets, import (2026-10-30, app/sign_in.py) ---------------------------------

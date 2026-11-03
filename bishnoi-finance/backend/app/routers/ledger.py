@@ -25,7 +25,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 
-from app.access import access_of, permissions_of, permitted
+from app.access import access_of, permissions_of, permitted, settings_permitted
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
@@ -277,10 +277,10 @@ def run_import(user: permitted("accounts.manage"), db: DB, body: ImportIn) -> di
 POSTING = {
     "advances_account_id": ("asset", "Cash advances to employees"),
     "due_to_employees_account_id": ("liability", "Reimbursements payable to employees"),
-    "cash_account_id": ("asset", "Paid in cash"),
-    "bank_account_id": ("asset", "Paid by bank transfer"),
-    "ewallet_account_id": ("asset", "Paid by e-wallet"),
-    "check_account_id": ("asset", "Paid by check"),
+    "cash_account_id": ("asset", "Company cash account (money received or paid)"),
+    "bank_account_id": ("asset", "Company bank account (transfers received or paid)"),
+    "ewallet_account_id": ("asset", "Company e-wallet account (money received or paid)"),
+    "check_account_id": ("asset", "Company check account (checks received or issued)"),
     "receivables_account_id": ("asset", "What customers owe on invoices"),
     "sales_account_id": ("income", "Sales on invoices"),
     "output_tax_account_id": ("liability", "Tax on invoices (output VAT)"),
@@ -301,11 +301,15 @@ POSTING = {
 }
 
 
+def posting_types(key: str) -> tuple[str, ...]:
+    return ("income", "expense") if key in ("fx_gain_account_id", "fx_loss_account_id") else (POSTING[key][0],)
+
+
 def posting_out(db: DB, can_edit: bool) -> dict:
     s = posting_settings(db)
     return {
         "items": [
-            {"key": key, "label": label, "type": type_, "account": account_out(a) if (a := db.get(Account, getattr(s, key)) if getattr(s, key) else None) else None}
+            {"key": key, "label": label, "type": type_, "types": list(posting_types(key)), "account": account_out(a) if (a := db.get(Account, getattr(s, key)) if getattr(s, key) else None) else None}
             for key, (type_, label) in POSTING.items()
         ],
         "canEdit": can_edit,
@@ -322,14 +326,14 @@ class PostingIn(Api):
 
 
 @router.put("/posting")
-def change_posting(user: permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
+def change_posting(user: settings_permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
     s = posting_settings(db)
     for key, account_id in body.accounts.items():
         if key not in POSTING:
             raise field_error("accounts", f"Unknown default account: {key}.")
         a = db.get(Account, account_id) if account_id else None
-        if account_id and (a is None or a.type != POSTING[key][0] or not a.is_active):
-            raise field_error(key, f"Select an active {POSTING[key][0]} account.")
+        if account_id and (a is None or a.type not in posting_types(key) or not a.is_active):
+            raise field_error(key, f"Select an active {' or '.join(posting_types(key))} account.")
         setattr(s, key, account_id)
     audit(db, user, "posting.updated", target="Default accounts", target_type="settings", fields=body.accounts.keys())
     db.commit()
@@ -345,7 +349,7 @@ def list_entries(
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),

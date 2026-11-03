@@ -40,7 +40,16 @@ def path_of(units: dict[str, Unit], unit_id: str | None) -> list[Unit]:
     return path[::-1]
 
 
+def email_of(db: Session, identity_id: str | None) -> str | None:
+    other = db.get(Identity, identity_id) if identity_id else None
+    return other.email.lower() if other else None
+
+
 def manager_of(db: Session, units: dict[str, Unit], person: Identity) -> str | None:
+    """Who they report to: the link (2026-11-03), else the closest head above them on the chart."""
+    linked = email_of(db, person.reports_to_id)
+    if linked:
+        return linked
     for unit in reversed(path_of(units, person.main_unit_id)):
         if unit.manager_id and unit.manager_id != person.id:
             head = db.get(Identity, unit.manager_id)
@@ -62,6 +71,8 @@ def placement(db: Session, person: Identity) -> dict | None:
         "otherUnits": others,
         "branch": {"id": branch.id, "name": branch.name} if branch else None,
         "manager": manager_of(db, units, person),
+        "reportsTo": email_of(db, person.reports_to_id),
+        "assistantOf": email_of(db, person.assistant_of_id),
     }
 
 
@@ -76,7 +87,8 @@ def chart(db: Session, company: Company) -> dict:
     return {
         "units": [{"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "manager": heads.get(u.manager_id),
                    "areas": u.areas or [], "active": u.is_active} for u in units.values()],
-        "people": [{"email": p.email.lower(), "unit": p.main_unit_id, "otherUnits": others.get(p.id, [])} for p in people],
+        "people": [{"email": p.email.lower(), "unit": p.main_unit_id, "otherUnits": others.get(p.id, []),
+                    "reportsTo": heads.get(p.reports_to_id, "").lower() or None, "assistantOf": heads.get(p.assistant_of_id, "").lower() or None} for p in people],
     }
 
 

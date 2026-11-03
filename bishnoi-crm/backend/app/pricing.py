@@ -41,6 +41,14 @@ def state_of(is_active: bool, starts_on: str | None, ends_on: str | None, on: st
     return "running"
 
 
+def letterhead(settings, s: SalesSettings) -> dict:
+    """The company's address, TIN and phone for quotes: the Admin Console's Company profile when connected
+    to Bishnoi One (settings.org_letterhead), else what this CRM keeps (Settings, Company and quotes)."""
+    if settings.org_letterhead is not None:
+        return settings.org_letterhead
+    return {"address": s.company_address, "tin": s.company_tin, "contact": s.company_contact}
+
+
 def sales_settings(db: Session) -> SalesSettings:
     found = db.get(SalesSettings, 1)
     if found is None:  # made by the migration; this is only a safety net

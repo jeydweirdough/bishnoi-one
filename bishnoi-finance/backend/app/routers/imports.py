@@ -1,8 +1,10 @@
-"""Import matching (Settings → Import matching) and importing Zoho bills and supplier payments.
+"""Import matching (Settings → Import matching) and imports: Zoho bills and supplier payments
+(app/zoho_import.py), Zoho expenses (app/zoho_expense_import.py), and Oojeema's Sales and Receipt
+Journals (app/oojeema_sales_import.py), of which only the deposit accounts need matching.
 
-Matching: someone with "Propose matches" loads the Zoho Bills and Vendor Payments exports; each
-label they use is saved once (app/zoho_import.py). They propose Finance's choice for it; someone
-else confirms it (tax labels: BIR and Compliance). Only confirmed matches are used.
+Matching: someone with "Propose matches" loads an import's exports; each label they use is saved
+once. They propose Finance's choice for it; someone else confirms it (tax labels: BIR and
+Compliance). Only confirmed matches are used.
 
 Importing: preview first, then import exactly what the preview showed. For now only on the
 testing site: Q1 2026 is the historical test basis, not official opening figures (Decisions,
@@ -23,6 +25,8 @@ from app.deps import DB, CurrentUser, SettingsDep
 from app.import_review import norm
 from app.models import Account, ImportMatch, ImportRule, ImportRun
 from app.payables import PURCHASE_TYPES, VAT_KINDS
+from app import oojeema_sales_import as oo
+from app import zoho_expense_import as ze
 from app import zoho_import as zi
 
 router = APIRouter(prefix="/finance/imports", tags=["Imports"])
@@ -36,7 +40,7 @@ class File(Api):
 
 
 class Files(Api):
-    files: list[File] = Field(min_length=2, max_length=2)
+    files: list[File] = Field(min_length=1, max_length=2)
 
 
 class Run(Files):
@@ -77,9 +81,16 @@ def files_of(body: Files) -> list[dict]:
     return [f.model_dump() for f in body.files]
 
 
-def pack(body: Files) -> list[dict]:
+def pack(body: Files, name: str = "bills") -> list[dict]:
     try:
-        return zi.read_pack(files_of(body))
+        return zi.read_pack(files_of(body), name)
+    except zi.PackError as error:
+        raise HTTPException(422, str(error)) from None
+
+
+def any_pack(body: Files) -> tuple[str, list[dict]]:
+    try:
+        return zi.read_any(files_of(body))
     except zi.PackError as error:
         raise HTTPException(422, str(error)) from None
 
@@ -88,7 +99,7 @@ def match_out(m: ImportMatch, user) -> dict:
     can = access_of(user).can
     mine = m.proposed_by_id == user.id
     return {
-        "id": m.id, "section": m.section, "sourceLabel": m.source_label, "sourceCode": m.source_code,
+        "id": m.id, "section": m.section, "role": m.role, "sourceLabel": m.source_label, "sourceCode": m.source_code,
         "records": m.records, "amountCentavos": m.amount_centavos, "status": m.status, "note": m.note,
         "accountId": m.account_id, "account": {"id": m.account.id, "code": m.account.code, "name": m.account.name} if m.account else None,
         "purchaseType": m.purchase_type, "vatKind": m.vat_kind, "company": m.company,
@@ -128,7 +139,7 @@ def list_matches(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
     need(user, *TICKS)
     from app.routers.vouchers import paying_accounts
 
-    rows = list(db.scalars(select(ImportMatch).where(ImportMatch.source == zi.SOURCE).order_by(ImportMatch.section, ImportMatch.amount_centavos.desc(), ImportMatch.source_label)))
+    rows = list(db.scalars(select(ImportMatch).where(ImportMatch.source.in_((zi.SOURCE, oo.SOURCE))).order_by(ImportMatch.section, ImportMatch.amount_centavos.desc(), ImportMatch.source_label)))
     lines = sorted(zi.posting_accounts(db).values(), key=lambda a: a.code)
     can = access_of(user).can
     return {
@@ -137,6 +148,7 @@ def list_matches(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
         "choices": {
             "lineAccounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in lines],
             "moneyAccounts": [{"id": a.id, "code": a.code, "name": a.name} for a in paying_accounts(db)],
+            "receiptAccounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in db.scalars(select(Account).where(Account.is_active).order_by(Account.code))],
             "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
             "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
             "companies": [{"key": k, "label": v} for k, v in zi.COMPANIES.items()],
@@ -151,9 +163,12 @@ def list_matches(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
 @router.post("/matching/load")
 def load(user: CurrentUser, db: DB, body: Files) -> dict:
     need(user, "imports.propose")
-    docs = pack(body)
     try:
-        out = zi.load_groups(db, docs, user)
+        if oo.is_pack(files_of(body)):
+            out = oo.load_groups(db, files_of(body), user)
+        else:
+            name, docs = any_pack(body)
+            out = zi.load_groups(db, docs, user, name)
     except zi.PackError as error:
         raise HTTPException(422, str(error)) from None
     db.commit()
@@ -162,7 +177,7 @@ def load(user: CurrentUser, db: DB, body: Files) -> dict:
 
 def found(db, match_id: str) -> ImportMatch:
     m = db.get(ImportMatch, match_id)
-    if m is None or m.source != zi.SOURCE:
+    if m is None or m.source not in (zi.SOURCE, oo.SOURCE):
         raise HTTPException(404, "There's no such match.")
     return m
 
@@ -172,7 +187,12 @@ def match_records(user: CurrentUser, db: DB, match_id: str, body: Files) -> dict
     """The records behind one label, read from the exports sent (they aren't stored). Saves nothing."""
     need(user, *TICKS)
     m = found(db, match_id)
-    return zi.records_for(db, pack(body), m)
+    if m.source == oo.SOURCE:
+        try:
+            return oo.records_for(files_of(body), m)
+        except zi.PackError as error:
+            raise HTTPException(422, str(error)) from None
+    return zi.records_for(db, any_pack(body)[1], m)
 
 
 @router.put("/matching/{match_id}")
@@ -198,6 +218,14 @@ def propose(user: CurrentUser, db: DB, match_id: str, body: Proposal) -> dict:
             raise HTTPException(422, "Choose an active expense or asset account and the purchase type, or mark it as depending on the record.")
         m.vat_kind = m.company = None
         m.account_id, m.purchase_type = (None, None) if body.per_record else (body.account_id, body.purchase_type)
+    elif m.source == oo.SOURCE and m.section == "money" and m.role == oo.ROLE:
+        # A receipt debit may be a non-cash settlement. Match its actual account;
+        # preview still holds it until that treatment is supported and reviewed.
+        account = db.get(Account, body.account_id) if body.account_id else None
+        if account is None or not account.is_active:
+            raise HTTPException(422, "Choose an active account from the chart.")
+        m.purchase_type = m.vat_kind = m.company = None
+        m.account_id = account.id
     else:
         from app.routers.vouchers import paying_accounts
         if body.account_id not in {a.id for a in paying_accounts(db)}:
@@ -247,7 +275,7 @@ def save_rule(user: CurrentUser, db: DB, match_id: str, body: RuleIn) -> dict:
     Saving again for the same supplier or line replaces the earlier choice."""
     m = found(db, match_id)
     if m.section not in ("account", "tax"):
-        raise HTTPException(422, "Supplier rules and line choices are for bill-line accounts and tax labels.")
+        raise HTTPException(422, "Rules and line choices are for accounts on bill and expense lines and for tax labels.")
     sure = access_of(user).can(zi.CONFIRMS[m.section])
     if not sure:
         need(user, "imports.propose")
@@ -326,9 +354,9 @@ def testing_only(settings) -> None:
 
 def may_import(user, kind: str) -> None:
     need(user, "imports.run")
-    view = "bills.view" if kind == "bills" else "vouchers.view"
+    view = {"bills": "bills.view", "sales": "invoices.view", "expenses": "petty_cash.view"}.get(kind, "vouchers.view")
     if not access_of(user).can(view):
-        raise HTTPException(403, "Importing also needs permission to view them (bills or payment vouchers).")
+        raise HTTPException(403, "Importing also needs permission to view what's imported (bills, payment vouchers, invoices or petty cash).")
 
 
 def run_import(fn, db, settings, user, body):
@@ -369,3 +397,35 @@ def import_payments(user: CurrentUser, db: DB, settings: SettingsDep, body: Run)
     testing_only(settings)
     may_import(user, "payments")
     return run_import(zi.import_payments, db, settings, user, body)
+
+
+@router.post("/oojeema-sales/preview")
+def preview_oojeema_sales(user: CurrentUser, db: DB, settings: SettingsDep, body: Files) -> dict:
+    testing_only(settings)
+    may_import(user, "sales")
+    try:
+        return oo.preview(db, settings, files_of(body))
+    except zi.PackError as error:
+        raise HTTPException(422, str(error)) from None
+
+
+@router.post("/oojeema-sales")
+def import_oojeema_sales(user: CurrentUser, db: DB, settings: SettingsDep, body: Run) -> dict:
+    testing_only(settings)
+    may_import(user, "sales")
+    return run_import(oo.import_sales, db, settings, user, body)
+
+
+@router.post("/expenses/preview")
+def preview_expenses(user: CurrentUser, db: DB, settings: SettingsDep, body: Files) -> dict:
+    testing_only(settings)
+    may_import(user, "expenses")
+    pack(body, "expenses")
+    return ze.preview(db, settings, files_of(body))
+
+
+@router.post("/expenses")
+def import_expenses(user: CurrentUser, db: DB, settings: SettingsDep, body: Run) -> dict:
+    testing_only(settings)
+    may_import(user, "expenses")
+    return run_import(ze.import_expenses, db, settings, user, body)

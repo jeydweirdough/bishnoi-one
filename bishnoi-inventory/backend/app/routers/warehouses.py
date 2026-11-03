@@ -11,7 +11,7 @@ from pydantic import Field
 from sqlalchemy import func, select
 
 from app import documents
-from app.access import allowed
+from app.access import allowed, settings_allowed
 from app.api import Api, changed, conflict, field_error, found, iso
 from app.audit import audit
 from app.deps import DB, CurrentUser
@@ -22,7 +22,8 @@ from app.out import warehouse_ref
 router = APIRouter(prefix="/inventory", tags=["warehouses"])
 
 View = allowed("warehouses.view")
-Manage = allowed("warehouses.manage")
+# Couriers, warehouses and locations: changed by the company administrators (2026-10-31).
+Manage = settings_allowed("warehouses.manage")
 
 CODE = r"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
 

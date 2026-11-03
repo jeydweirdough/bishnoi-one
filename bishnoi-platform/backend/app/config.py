@@ -25,6 +25,20 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     environment: str = "development"
+    # Internal-only Ollama; no browser or public proxy is given this address.
+    ollama_base_url: str | None = None
+
+    @field_validator("ollama_base_url")
+    @classmethod
+    def _ollama_url(cls, value: str | None) -> str | None:
+        from urllib.parse import urlsplit
+        if not value:
+            return None
+        parsed = urlsplit(value)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/"):
+            raise ValueError("OLLAMA_BASE_URL must be an internal HTTP(S) origin without credentials, a path, query or fragment.")
+        return value.rstrip("/")
+
     # This app's own database: its staff, sessions and the platform's records.
     database_url: str = f"sqlite:///{(DATA_DIR / 'platform.db').as_posix()}"
     # The online database (Neon) that `python -m app.tools.copy_database backup`

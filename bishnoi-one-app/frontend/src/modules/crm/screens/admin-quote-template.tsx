@@ -14,7 +14,7 @@ export default async function QuoteTemplatePage({ params }: { params: Promise<{ 
   const [template, list] = await Promise.all([load<QuoteTemplate>(`/admin/quote-templates/${enc(id)}`), load<TemplateList>("/admin/quote-templates")]);
   return (
     <>
-      <PageHeader title={template.name} crumbs={[{ href: "/crm/admin/settings/quote-templates", label: "Quotation templates" }]}>
+      <PageHeader title={template.name} crumbs={[{ href: "/platform/settings/crm/quote-templates", label: "Quotation templates" }]}>
         {template.kind === "excel" ? "An uploaded Excel form, filled in for each quote." : "A quotation designed here, printed from the quote."}
       </PageHeader>
       <TemplateEditor initial={template} options={{ issuers: list.issuers, teams: list.teams, placeholders: list.placeholders, anyTeam: can(me, "admin.settings") }} />

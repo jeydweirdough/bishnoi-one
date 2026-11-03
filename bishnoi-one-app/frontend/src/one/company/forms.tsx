@@ -10,6 +10,7 @@ import { Combobox, Select } from "@/src/platform/ui/pickers";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { changeCompany, setAdministrator, signPersonOut } from "./actions";
 import type { Administrators, CompanyProfile } from "./types";
+import { LOCALES } from "@/src/platform/lib/locales";
 
 const ZONES = ["Asia/Manila", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Tokyo", "Asia/Dubai", "Europe/London", "America/New_York", "America/Los_Angeles", "UTC"];
 const CURRENCIES = [
@@ -19,15 +20,15 @@ const CURRENCIES = [
   { value: "EUR", label: "EUR · Euro" },
 ];
 
-/** The company's name, contact email, email domain, time zone and currency: saved together. */
+/** The company's name, contact email, email domain, time zone, currency and number format: saved together. */
 export function ProfileForm({ company }: { company: CompanyProfile }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency });
+  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency, locale: company.locale ?? "en-PH" });
   const dirty =
     form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") || form.emailDomain !== (company.emailDomain ?? "") ||
-    form.timezone !== company.timezone || form.currency !== company.currency;
+    form.timezone !== company.timezone || form.currency !== company.currency || form.locale !== (company.locale ?? "en-PH");
 
   function save() {
     start(async () => {
@@ -51,7 +52,7 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       <Field label="Contact email" size="md" optional error={errors.contactEmail} hint="Where Bishnoi One writes to the company.">
         {(p) => <Input {...p} type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} maxLength={254} />}
       </Field>
-      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your people are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
+      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your employees are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
         {(p) => <Input {...p} prefix="@" value={form.emailDomain} onChange={(e) => setForm({ ...form, emailDomain: e.target.value })} maxLength={253} placeholder="getmeds.ph" />}
       </Field>
       <Field label="Time zone" size="md" error={errors.timezone}>
@@ -67,6 +68,17 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       </Field>
       <Field label="Currency" size="md" error={errors.currency}>
         {() => <Combobox options={CURRENCIES} value={form.currency} onChange={(v) => setForm({ ...form, currency: String(v) })} />}
+      </Field>
+      <Field label="Number and date format" size="md" error={errors.locale} hint="How every app writes numbers and dates.">
+        {(p) => (
+          <Select {...p} value={form.locale} onChange={(e) => setForm({ ...form, locale: e.target.value })}>
+            {[...LOCALES, ...(LOCALES.some((l) => l.value === form.locale) ? [] : [{ value: form.locale, label: form.locale }])].map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </Select>
+        )}
       </Field>
       <div className="sm:col-span-6">
         <Button variant="primary" onClick={save} loading={busy} disabled={!dirty}>
@@ -239,8 +251,8 @@ export function AdministratorsCard({ data }: { data: Administrators }) {
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-56 flex-1">
             <Combobox
-              aria-label="Person to make an administrator"
-              placeholder="Choose a person"
+              aria-label="Employee to make an administrator"
+              placeholder="Choose an employee"
               value={pick}
               onChange={(v) => setPick(v as string)}
               options={data.others.map((o) => ({ value: o.id, label: `${o.fullName} · ${o.email}` }))}
@@ -251,7 +263,7 @@ export function AdministratorsCard({ data }: { data: Administrators }) {
           </Button>
         </div>
       ) : (
-        <p className="text-meta text-ink-3">Everyone here is already an administrator. Add people on People first.</p>
+        <p className="text-meta text-ink-3">Everyone here is already an administrator. Add employees on Employees first.</p>
       )}
     </div>
   );

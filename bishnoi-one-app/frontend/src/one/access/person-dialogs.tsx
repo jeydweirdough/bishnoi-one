@@ -1,7 +1,8 @@
 "use client";
 
+import { Combobox } from "@/src/platform/ui/pickers";
 import { Modal } from "antd";
-import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,10 +10,11 @@ import { Button } from "@/src/platform/ui/button";
 import { Field, FormGrid, Input } from "@/src/platform/ui/field";
 import { Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
-import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword } from "./actions";
+import { addPerson, changePerson, deletePerson, invitePerson, resetTwoStep, setPersonPassword, setReporting } from "./actions";
 import { setAdministrator } from "@/src/one/company/actions";
 import { moduleLabel } from "./labels";
 import type { AccessData, AccessPerson } from "./types";
+import { WorkEmailInput } from "./work-email";
 
 // Adding and keeping a company's people, on the Platform, once for every module (R2, decided
 // 2026-10-26): what each module's own Users page used to do, here. A password is made up and
@@ -120,7 +122,7 @@ function PasswordDialog({ person, open, onClose }: { person: { id: string; fullN
   );
 }
 
-/** Add person: who they are, their role, and the modules they may open. */
+/** Add employee: who they are, their role, and the modules they may open. */
 export function AddPerson({ data }: { data: AccessData }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -150,15 +152,15 @@ export function AddPerson({ data }: { data: AccessData }) {
   return (
     <>
       <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
-        Add person
+        Add employee
       </Button>
-      <Modal open={open} title="Add person" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add person" confirmLoading={busy} width={600} destroyOnHidden>
+      <Modal open={open} title="Add employee" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add employee" confirmLoading={busy} width={600} destroyOnHidden>
         <FormGrid className="pt-2">
           <Field label="Full name" size="md" error={errors.fullName}>
             {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} autoFocus maxLength={120} />}
           </Field>
           <Field label="Work email" size="md" error={errors.email} hint="They sign in with this.">
-            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
+            {(p) => <WorkEmailInput {...p} domain={data.company.emailDomain} value={form.email} onChange={(email) => setForm({ ...form, email })} />}
           </Field>
           <Field label="Title" size="md" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} placeholder="e.g. Pharmacist" />}
@@ -202,12 +204,20 @@ export function AddPerson({ data }: { data: AccessData }) {
   );
 }
 
-/** A person's ⋯: change their details, set a new password, switch them off or on, delete them to the recycle bin. */
-export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerson; isMe: boolean; modules?: string[] }) {
+type MenuItem = Exclude<Parameters<typeof RowMenu>[0]["items"][number], "divider">;
+
+/**
+ * Everything that can be done to a person (2026-10-31), once, for the ⋯ on People and the buttons on their
+ * panel: change details (their email too), a new password, invitation, administrator, two-step reset, switch
+ * off or on, delete. `dialogs` must be drawn once wherever these are used.
+ */
+export function usePersonActions(person: AccessPerson, isMe: boolean, modules: string[] = [], domain?: string | null, colleagues: { id: string; name: string }[] = []) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({ fullName: person.fullName, title: person.title ?? "", email: person.email });
+  // Who they report to and whose assistant they are (2026-11-03).
+  const [links, setLinks] = useState({ reportsToId: person.reportsToId ?? null, assistantOfId: person.assistantOfId ?? null });
   // What each app keeps of its own about them (2026-10-30), for the apps the company has.
   const [details, setDetails] = useState({
     employeeId: person.appDetails?.crm?.employeeId ?? "",
@@ -218,6 +228,8 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, start] = useTransition();
   const off = person.status !== "active";
+  // Someone not at the domain yet is given a whole new email: only those at it have the fixed @domain.
+  const atDomain = domain && person.email.toLowerCase().endsWith(`@${domain}`) ? domain : null;
 
   function save() {
     start(async () => {
@@ -234,6 +246,15 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
         if (!r.fields) toast.error(r.error);
         return;
       }
+      const moved = { ...(links.reportsToId !== (person.reportsToId ?? null) && { reportsToId: links.reportsToId }), ...(links.assistantOfId !== (person.assistantOfId ?? null) && { assistantOfId: links.assistantOfId }) };
+      if (Object.keys(moved).length) {
+        const l = await setReporting(person.id, moved);
+        if (!l.ok) {
+          setFields(l.fields ?? {});
+          if (!l.fields) toast.error(l.error);
+          return;
+        }
+      }
       setFields({});
       setEditing(false);
       toast.success("Saved", emailChanged ? { description: `${person.fullName} now signs in as ${email}, with the same password.` } : undefined);
@@ -241,75 +262,93 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
     });
   }
 
-  return (
+  const invite: MenuItem | null = off ? null : { label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) };
+  const admin: MenuItem | null = isMe
+    ? null
+    : person.isCompanyAdmin
+      ? {
+          label: "Remove as administrator",
+          icon: <ShieldOff />,
+          run: () => setAdministrator(person.id, false),
+          confirm: `Remove ${person.fullName} as administrator? They keep their roles and apps, but can't open the Admin Console. Their sign-ins end.`,
+          done: `${person.fullName} is no longer an administrator`,
+        }
+      : off
+        ? null
+        : {
+            label: "Make administrator",
+            icon: <ShieldCheck />,
+            run: () => setAdministrator(person.id, true),
+            confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
+            done: `${person.fullName} is now an administrator`,
+          };
+  const twoStep: MenuItem | null = isMe
+    ? null
+    : {
+        label: "Reset two-step sign-in",
+        icon: <ShieldOff />,
+        run: () => resetTwoStep(person.id),
+        confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
+        done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
+      };
+  const power: MenuItem | null = isMe
+    ? null
+    : off
+      ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
+      : {
+          label: "Switch off",
+          icon: <Power />,
+          run: () => changePerson(person.id, { status: "suspended" }),
+          danger: true,
+          confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
+          done: `${person.fullName} is switched off`,
+        };
+  const remove: MenuItem | null = isMe
+    ? null
+    : {
+        label: "Delete",
+        icon: <Trash2 />,
+        run: () => deletePerson(person.id),
+        danger: true,
+        confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
+        done: `${person.fullName} is in the recycle bin`,
+      };
+
+  const dialogs = (
     <>
       <PasswordDialog person={person} open={settingPassword} onClose={() => setSettingPassword(false)} />
-      <RowMenu
-        always
-        label={`Actions for ${person.fullName}`}
-        items={[
-          { label: "Change details", icon: <Pencil />, onSelect: () => setEditing(true) },
-          ...(off ? [] : [{ label: "Send invitation", icon: <Mail />, onSelect: () => void sendInvitation(person) }]),
-          { label: "Set a new password", icon: <KeyRound />, onSelect: () => setSettingPassword(true) },
-          ...(isMe
-            ? []
-            : [
-                person.isCompanyAdmin
-                  ? {
-                      label: "Remove as administrator",
-                      icon: <ShieldOff />,
-                      run: () => setAdministrator(person.id, false),
-                      confirm: `Remove ${person.fullName} as administrator? They keep their role and apps, but can't open the Admin Console. Their sign-ins end.`,
-                      done: `${person.fullName} is no longer an administrator`,
-                    }
-                  : off
-                    ? "divider" as const
-                    : {
-                        label: "Make administrator",
-                        icon: <ShieldCheck />,
-                        run: () => setAdministrator(person.id, true),
-                        confirm: `Make ${person.fullName} an administrator? They can change everything in the Admin Console: people, roles, apps and the company.`,
-                        done: `${person.fullName} is now an administrator`,
-                      },
-                {
-                  label: "Reset two-step sign-in",
-                  icon: <ShieldOff />,
-                  run: () => resetTwoStep(person.id),
-                  confirm: `Reset ${person.fullName}'s two-step sign-in? Use this when they lost their phone. Their sign-ins end; they set it up again next time.`,
-                  done: `${person.fullName} sets up two-step sign-in again at their next sign-in`,
-                },
-                "divider" as const,
-                off
-                  ? { label: "Switch on", icon: <Power />, run: () => changePerson(person.id, { status: "active" }), done: `${person.fullName} can sign in again` }
-                  : {
-                      label: "Switch off",
-                      icon: <Power />,
-                      run: () => changePerson(person.id, { status: "suspended" }),
-                      danger: true,
-                      confirm: `Switch ${person.fullName} off? They can't sign in to any module until switched on again.`,
-                      done: `${person.fullName} is switched off`,
-                    },
-                {
-                  label: "Delete",
-                  icon: <Trash2 />,
-                  run: () => deletePerson(person.id),
-                  danger: true,
-                  confirm: `Delete ${person.fullName}? They go to the recycle bin: switched off and signed out everywhere. What they did stays, and you can restore them from the recycle bin.`,
-                  done: `${person.fullName} is in the recycle bin`,
-                },
-              ]),
-        ]}
-      />
       <Modal open={editing} title={`Change ${person.fullName}`} onCancel={() => !busy && setEditing(false)} onOk={save} okText="Save" confirmLoading={busy} width={480} destroyOnHidden>
         <FormGrid className="pt-2">
           <Field label="Full name" size="full" error={fields.fullName}>
             {(p) => <Input {...p} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={120} />}
           </Field>
           <Field label="Work email" size="full" error={fields.email} hint="They sign in with this. At your company's email domain; their password stays.">
-            {(p) => <Input {...p} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={254} />}
+            {(p) => <WorkEmailInput {...p} domain={atDomain} value={form.email} onChange={(email) => setForm({ ...form, email })} />}
           </Field>
           <Field label="Title" size="full" optional>
             {(p) => <Input {...p} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />}
+          </Field>
+          <Field label="Reports to" size="full" optional error={fields.reports_to_id} hint="Their manager reaches their records, and their manager's manager above. Not the department they sit in.">
+            {() => (
+              <Combobox
+                allowClear
+                placeholder="Choose an employee"
+                options={colleagues.filter((c) => c.id !== person.id).map((c) => ({ value: c.id, label: c.name }))}
+                value={links.reportsToId ?? undefined}
+                onChange={(v) => setLinks({ ...links, reportsToId: (v as string | undefined) ?? null })}
+              />
+            )}
+          </Field>
+          <Field label="Assistant to" size="full" optional error={fields.assistant_of_id} hint="Sees what the one they assist sees, and does only what their own role allows (a Secretary role, say, without approvals).">
+            {() => (
+              <Combobox
+                allowClear
+                placeholder="Choose an employee"
+                options={colleagues.filter((c) => c.id !== person.id).map((c) => ({ value: c.id, label: c.name }))}
+                value={links.assistantOfId ?? undefined}
+                onChange={(v) => setLinks({ ...links, assistantOfId: (v as string | undefined) ?? null })}
+              />
+            )}
           </Field>
           {has("crm") && (
             <Field label="Employee ID" size="full" optional hint="Shown in the CRM.">
@@ -329,6 +368,30 @@ export function PersonMenu({ person, isMe, modules = [] }: { person: AccessPerso
           )}
         </FormGrid>
       </Modal>
+    </>
+  );
+  return { off, invite, admin, twoStep, power, remove, dialogs, openEdit: () => setEditing(true), openPassword: () => setSettingPassword(true) };
+}
+
+/** A person's ⋯ on People: open their panel, then every action on them. */
+export function PersonMenu({ person, isMe, modules = [], domain, colleagues = [] }: { person: AccessPerson; isMe: boolean; modules?: string[]; domain?: string | null; colleagues?: { id: string; name: string }[] }) {
+  const a = usePersonActions(person, isMe, modules, domain, colleagues);
+  const items = [
+    // Everything about them in one place: the panel beside the list (2026-10-31).
+    { label: "Open", icon: <UserRound />, href: `/platform/roles/people?person=${person.id}` },
+    { label: "Change details", icon: <Pencil />, onSelect: a.openEdit },
+    ...(a.invite ? [a.invite] : []),
+    { label: "Set a new password", icon: <KeyRound />, onSelect: a.openPassword },
+    ...(a.admin ? [a.admin] : []),
+    ...(a.twoStep ? [a.twoStep] : []),
+    ...(a.power || a.remove ? ["divider" as const] : []),
+    ...(a.power ? [a.power] : []),
+    ...(a.remove ? [a.remove] : []),
+  ];
+  return (
+    <>
+      {a.dialogs}
+      <RowMenu always label={`Actions for ${person.fullName}`} items={items} />
     </>
   );
 }

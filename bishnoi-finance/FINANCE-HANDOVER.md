@@ -256,3 +256,13 @@ Source safety: original index/unstaged patches plus all88 changed/untracked path
 - **Erica** has no `dashboard.view` in the local test database, so the home page still sends her to Zoho invoices. Her overview exists in the API; adding the permission to her role needs the user's go-ahead.
 - **Saving any `.py` under the backend while `npm run one` runs stops the whole stack** (the reloader ends the batch job).
 
+## 2026-10-31: Q1 imports from Oojeema, and imported expenses (0.4.38)
+
+- **Sales come from Oojeema, not Zoho** (user, 2026-10-31: those are the records used for BIR). `app/oojeema_sales_import.py` reads the Sales Journal and Receipt Journal together: one invoice per SI/BI No, the row's own amounts (the tax engine isn't used), `series_id` empty, Default accounts, no event to other apps, no cost of goods. Zoho's invoice and customer-payment exports feed no postings.
+- **Cancellations:** a negative row exactly undoing a positive one becomes a void (or a payment taken off) on the negative row's date. A negative row with no original is held.
+- **Receipts are all or nothing**, so half a receipt is never posted. Older invoices, overpayments and unexplained negatives hold the whole receipt. CWT posts with `cwt_atc` empty: the file has no ATC, so SAWT shows no code.
+- **Bank numbers:** `label_of` masks the deposit account name before it's stored, with a hash keeping accounts distinct. Raw names stay in memory only.
+- **Imported expenses** (`app/zoho_expense_import.py`, `routers/imported_expenses.py`): read-only, separate from petty cash, voided rather than edited, their own journal source `expense`. A company comes only from a confirmed match on the cost centre label.
+- **Migration 0035:** three new empty tables (`nbfi_imported_expenses`, `nbfi_imported_expense_lines`, `nbfi_import_links`). Nothing existing changes.
+- **Monthly lists differ from Oojeema's where a cancellation crosses months:** Finance leaves a voided invoice out of its own month, while Oojeema keeps it and shows a negative later. The books match Oojeema; which period carries it is a question for Sir Mel.
+- Imports stay on the testing site (`testing_only`). Official imports come with the cut-off plan.

@@ -106,12 +106,27 @@ def test_a_product_made_here_first_is_matched_by_code(client, ana, fake, app):
     assert len(gloves) == 1 and gloves[0].name == "Gloves M" and gloves[0].inventory_id == "inv-GLV-M"
 
 
-def test_inventorys_fields_are_changed_there(client, ana, fake):
+def test_inventorys_fields_are_changed_there(app, client, ana, fake):
     amx = products(client, ana)["AMX-500"]
     assert client.post("/products", json={"code": "X-1", "name": "Made here"}, headers=ana).status_code == 409
     r = client.patch(f"/products/{amx['id']}", json={"name": "Renamed"}, headers=ana)
     assert r.status_code == 422 and "Inventory" in r.text
-    assert client.patch(f"/products/{amx['id']}", json={"prices": {"SRP": 1}}, headers=ana).status_code == 422
+    # Inventory owns identity fields; SRP is curated by Finance/administrators.
+    # Exercise the restriction with an ordinary editor, not the administrator.
+    from app.models import Role, RolePermission
+    with app.state.sessions() as db:
+        editor_role = Role(name="Catalogue editor", scope="all",
+                           grants=[RolePermission(permission="products.edit")])
+        db.add(editor_role)
+        db.flush()
+        db.add(User(email="editor@example.com", full_name="Catalogue test editor",
+                    password_hash=hash_password(PASSWORD), role_id=editor_role.id))
+        db.commit()
+    editor = bearer(sign_in(client, email="editor@example.com"))
+    refused = client.patch(f"/products/{amx['id']}", json={"prices": {"SRP": 1}}, headers=editor)
+    assert refused.status_code == 422 and "Finance / Inventory" in refused.text
+    accepted = client.patch(f"/products/{amx['id']}", json={"prices": {"SRP": 1}}, headers=ana)
+    assert accepted.status_code == 200 and accepted.json()["prices"]["SRP"] == 1
     assert client.delete(f"/products/{amx['id']}", headers=ana).status_code == 409
     # What's the CRM's own stays editable.
     assert client.patch(f"/products/{amx['id']}", json={"strength": "500 mg"}, headers=ana).json()["strength"] == "500 mg"

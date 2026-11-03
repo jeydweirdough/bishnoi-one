@@ -30,7 +30,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.access import DEPARTMENT, Access, require
+from app.access import DEPARTMENT, Access, require, settings_change
 from app.api import Api, field_error
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -41,7 +41,7 @@ from app.scope import within
 router = APIRouter(prefix="/retention", tags=["retention"])
 
 View = Annotated[Access, Depends(require("customers.view"))]
-Manage = Annotated[Access, Depends(require(*DEPARTMENT))]
+Manage = Annotated[Access, Depends(settings_change(*DEPARTMENT))]
 Which = Literal["mine", "team"]
 MONTHS = 6
 

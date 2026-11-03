@@ -13,7 +13,7 @@ from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.access import Access, require
+from app.access import Access, require, settings_change
 from app.api import Api, camel, changed, field_error, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser
@@ -22,7 +22,7 @@ from app.models import Company, CustomerType, Team
 
 router = APIRouter(tags=["customer types"])
 
-Manage = Annotated[Access, Depends(require("admin.types"))]
+Manage = Annotated[Access, Depends(settings_change("admin.types"))]
 Color = Literal["gray", "brand", "green", "blue", "amber", "red", "purple", "muted"]  # app.models.CUSTOMER_COLORS
 
 

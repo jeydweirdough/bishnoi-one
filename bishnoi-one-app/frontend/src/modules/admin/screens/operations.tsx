@@ -1,10 +1,12 @@
 "use client";
 
+import { BulkList } from "@/src/platform/bulk/list";
+import { SelectBox } from "@/src/platform/bulk/selection";
 import Link from "next/link";
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { useState } from "react";
-import { deleteOperation, type OperationsPath } from "@/src/modules/admin/actions/operations";
+import { bulkDeleteOperations, deleteOperation, type OperationsPath } from "@/src/modules/admin/actions/operations";
 import { KINDS, type Cell, type Item } from "@/src/modules/admin/components/operations/kinds";
 import { RecordForm } from "@/src/modules/admin/components/operations/record-form";
 import { DueCell, Initials, RecordTable, Tag } from "@/src/modules/admin/components/record-table";
@@ -80,6 +82,29 @@ export function OperationsScreen({ path, items: initialItems, can }: { path: Ope
         {total} · {kind.intro.charAt(0).toLowerCase() + kind.intro.slice(1)}
       </PageHeader>
 
+      <BulkList
+        items={can.delete ? items.map((i) => ({ id: i.id, name: kind.name(i) })) : []}
+        noun={[kind.one, kind.title.toLowerCase()]}
+        actions={[
+          {
+            label: "Delete",
+            icon: <Trash2 className="size-4" aria-hidden />,
+            doing: "Deleting",
+            done: "deleted",
+            danger: true,
+            confirm: "This can't be undone.",
+            run: async (ids) => {
+              const r = await bulkDeleteOperations(path, ids);
+              // The list holds its rows itself, so what's deleted leaves it here too.
+              if (r.ok) {
+                const kept = new Set(r.data.failures.map((x) => x.id));
+                setItems((all) => all.filter((x) => !ids.includes(x.id) || kept.has(x.id)));
+              }
+              return r;
+            },
+          },
+        ]}
+      >
       <RecordTable
         rows={items}
         searchLabel={`Search ${items.length} ${kind.title.toLowerCase()}`}
@@ -88,6 +113,7 @@ export function OperationsScreen({ path, items: initialItems, can }: { path: Ope
         emptyIcon={kind.icon}
         empty={{ title: `No ${kind.title.toLowerCase()} yet`, body: can.create ? `Add the first ${kind.one}.` : "They appear here once they're added." }}
         columns={[
+          ...(can.delete ? [{ key: "tick", label: "", width: "2.5rem", render: (row: Item) => <SelectBox id={row.id} label={kind.name(row)} /> }] : []),
           ...kind.columns.map((c, n) => ({
             key: c.key,
             label: c.label,
@@ -127,6 +153,7 @@ export function OperationsScreen({ path, items: initialItems, can }: { path: Ope
           },
         ]}
       />
+      </BulkList>
 
       {adding && <RecordForm kind={kind} item={null} onClose={() => setAdding(false)} onSaved={(saved) => setItems((all) => [saved, ...all])} />}
     </>

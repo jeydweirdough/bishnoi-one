@@ -24,7 +24,7 @@ from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import clidp
-from app.access import Access, require
+from app.access import Access, require, settings_change
 from app.api import Api, camel, changed, field_error, iso, not_found, person_out
 from app.audit import audit
 from app.config import Settings
@@ -41,7 +41,7 @@ View = Annotated[Access, Depends(require("deals.view"))]
 Create = Annotated[Access, Depends(require("deals.create"))]
 Edit = Annotated[Access, Depends(require("deals.edit"))]
 Delete = Annotated[Access, Depends(require("deals.delete"))]
-Manage = Annotated[Access, Depends(require("admin.settings"))]
+Manage = Annotated[Access, Depends(settings_change("admin.settings"))]
 
 # A deal still open can be in any of these; "closed" is only for a won one.
 OpenCategory = Literal["pipeline", "best_case", "commit", "omitted"]

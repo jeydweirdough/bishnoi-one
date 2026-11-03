@@ -21,6 +21,25 @@ def test_the_company_profile(client, getmeds):
     assert log[0]["action"] == "company.updated" and log[0]["fields"] == ["contact_email", "name"]
 
 
+def test_the_profile_keeps_the_number_format_and_the_company_pass_carries_the_profile(client, getmeds):
+    from sqlalchemy import select
+
+    from app import passes
+    from app.models import Application, Company
+
+    h = getmeds["owner"]["h"]
+    r = client.patch("/identity/company", json={"locale": "en-US", "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["company"]["locale"] == "en-US"
+    assert client.patch("/identity/company", json={"locale": "english"}, headers=h).status_code == 422
+    with client.app.state.sessions() as db:
+        company = db.get(Company, r.json()["company"]["id"])
+        crm = db.scalar(select(Application).where(Application.key == "crm"))
+        claims = passes.claims_of(passes.company_pass(client.app.state.settings, company, crm, True))
+    assert claims["profile"] == {"name": company.name, "legalName": company.name, "currency": "PHP", "locale": "en-US", "timezone": "Asia/Manila",
+                                 "address": "Unit 305, Vatican Bldg.", "tin": "605-059-166-00000", "phone": None}
+
+
 def test_apps_and_integrations(client, getmeds):
     h = getmeds["owner"]["h"]
     apps = {a["key"]: a for a in client.get("/identity/company/apps", headers=h).json()["apps"]}
@@ -63,6 +82,9 @@ def test_operators_are_a_switch_on_the_account(client, ana, getmeds):
     client.put(f"/platform/operators/{r.json()['operator']['id']}", json={"isOperator": False}, headers=ana)
     assert client.get("/platform/companies", headers=op).status_code == 401
     assert client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["staff"] is None
+    # And the doors they had only as an operator close with it (2026-11-01): nothing left to sign in to.
+    assert client.get("/identity/me", headers=op).status_code == 401
+    assert client.post("/identity/login", json={"email": "jade@bishnoione.test", "password": "long enough 1"}).status_code == 403
 
 
 def test_the_staff_sign_in_is_closed_on_a_server(app, client):
@@ -108,6 +130,18 @@ def test_the_home_counts_people_sign_ins_security_and_access(client, getmeds):
     assert apps["crm"] == 2 and apps["pharmacy"] == 1  # Jade's grant + Olive, the administrator, opens every app
     assert any(e["action"] == "access.person_deleted" for e in body["recent"])
     assert client.get("/identity/company/overview", headers=getmeds["jade"]["h"]).status_code == 403
+
+
+def test_the_home_compares_the_period_and_counts_by_month(client, getmeds):
+    h = getmeds["owner"]["h"]
+    client.post("/identity/login", json={"email": "jade@getmeds.test", "password": "wrong-password-1"})
+    body = client.get("/identity/company/overview?period=week", headers=h).json()
+    assert body["period"]["key"] == "week" and body["period"]["days"] == 7
+    assert body["period"]["now"]["signedIn"] == 3 and body["period"]["now"]["failed"] == 1  # the three in the fixture; Jade's wrong try
+    assert body["period"]["now"]["added"] == 3 and body["period"]["before"] == {"signedIn": 0, "failed": 0, "added": 0}
+    assert len(body["months"]) == 12 and body["months"][-1]["signedIn"] == 3
+    assert [a["email"] for a in body["administrators"]] == ["olive@getmeds.test"] and body["administrators"][0]["twoStep"] is False
+    assert client.get("/identity/company/overview?period=decade", headers=h).status_code == 422
 
 
 def test_people_reports_hold_people_never_money(client, getmeds):

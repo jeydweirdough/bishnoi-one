@@ -44,7 +44,7 @@ export function AbilitiesSection({ role, catalogue, modules }: { role: AccessRol
       const r = await setRoleAbilities(role.id, Object.entries(draft).map(([key, limit]) => ({ key, limit })), scopes);
       if (!r.ok) return setError(r.error);
       setError(null);
-      toast.success(`${role.name} saved`, { description: "Every app is told now; people with this role get it on their next click." });
+      toast.success(`${role.name} saved`, { description: "Every app is told now; employees with this role get it on their next click." });
       router.refresh();
     });
   }
@@ -78,7 +78,7 @@ export function AbilitiesSection({ role, catalogue, modules }: { role: AccessRol
             <ul className="space-y-1">
               {g.abilities.map((a) => {
                 const on = a.key in draft;
-                const usable = a.apps.some((k) => have.has(k));
+                const usable = a.apps.length === 0 || a.apps.some((k) => have.has(k));
                 return (
                   <li key={a.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <label className={`inline-flex min-h-9 flex-1 cursor-pointer items-center gap-2 text-sm ${usable ? "text-ink" : "text-ink-3"}`}>
@@ -138,7 +138,7 @@ export function CopyJobRole({ catalogue, onMade }: { catalogue: AbilityCatalogue
     start(async () => {
       const r = await roleFromJob(job.key, name.trim() || null);
       if (!r.ok) return setError(r.error);
-      toast.success(`${r.data.name} added`, { description: "Adjust its abilities, then give it to people on People." });
+      toast.success(`${r.data.name} added`, { description: "Adjust its abilities, then give it to employees on Employees." });
       setOpen(false);
       setPicked(null);
       setName("");
@@ -150,7 +150,7 @@ export function CopyJobRole({ catalogue, onMade }: { catalogue: AbilityCatalogue
 
   return (
     <>
-      <Button size="sm" variant="quiet" icon={<Copy className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button icon={<Copy className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Copy a job role
       </Button>
       <Modal open={open} title="Copy a job role" onCancel={() => !busy && setOpen(false)} onOk={make} okText="Copy" okButtonProps={{ disabled: !job }} confirmLoading={busy} width={640} destroyOnHidden>

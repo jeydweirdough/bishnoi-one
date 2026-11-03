@@ -14,7 +14,7 @@ export default async function ReportsCenter() {
   const list = await accountSend<{ reports: Info[] }>("GET", "/identity/company/reports").catch(() => null);
   return (
     <>
-      <PageHeader title="Reports Center">Your company&apos;s people in reports: open one, filter, sort and export it. Each app&apos;s own reports are in that app.</PageHeader>
+      <PageHeader title="Reports Center">Your company&apos;s employees in reports: open one, filter, sort and export it. Each app&apos;s own reports are in that app.</PageHeader>
       {!list ? (
         <Sheet>
           <Empty icon="reports" title="Reports can't be loaded right now">

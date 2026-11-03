@@ -194,6 +194,8 @@ class Company(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     currency: Mapped[str] = mapped_column(String(3), default="PHP")
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Manila")
+    # How numbers and dates are written in every app ("en-PH"), with the currency and time zone (2026-10-31).
+    locale: Mapped[str] = mapped_column(String(10), default="en-PH", server_default="en-PH")
     contact_email: Mapped[str | None] = mapped_column(String(254), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
     # The letterhead every printed document carries (step 10, migration 0018).
@@ -296,6 +298,10 @@ class Application(Base):
     no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
     # The app key the screens use (crm, inventory, platform...).
     key: Mapped[str] = mapped_column(String(40), unique=True)
+    # Stable owner of a single-company service database. Kept as a tombstone if
+    # the company is deleted, so removing it never silently selects a new owner.
+    database_company_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
     name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text, default=None)
     # Where people open it, and where the platform asks whether it is up.
@@ -469,6 +475,10 @@ class Identity(Base):
     # Their place on the org chart, and where they work.
     main_unit_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_units.id", ondelete="SET NULL"), default=None)
     branch_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_branches.id", ondelete="SET NULL"), default=None)
+    # Who they report to, and whose assistant they are (2026-11-03): links between people, not departments, say whose
+    # records a manager reaches. An assistant sees what the one they assist sees, and does what their own role allows.
+    reports_to_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    assistant_of_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
     # Made for an operator (app/platform_admins.py), not added by the company.
     via_operator: Mapped[bool] = mapped_column(default=False)
     # In the recycle bin (2026-10-30): deleted by a company administrator, switched off, out of People; restorable.
@@ -592,6 +602,8 @@ class IdentityApp(Base):
     is_app_admin: Mapped[bool] = mapped_column(default=False)
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     granted_by: Mapped[str] = mapped_column(String(254))
+    # Their role in this app (2026-10-31, migration 0024): an AccessRole of the company; None goes by their own role.
+    access_role_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
 
 class AccessRequest(Base):
@@ -894,3 +906,20 @@ class PlatformSetting(Base):
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
 numbered(User, Identity, Company, Application, Account)
+
+
+class AccessPolicyImport(Base):
+    """An administrator-owned preview and, once applied, an immutable policy version."""
+    __tablename__ = "nbpl_access_policy_imports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    actor_id: Mapped[str] = mapped_column(String(36))
+    actor: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+    before: Mapped[list] = mapped_column(JSON)
+    after: Mapped[list | None] = mapped_column(JSON, default=None)
+    preview: Mapped[dict] = mapped_column(JSON)

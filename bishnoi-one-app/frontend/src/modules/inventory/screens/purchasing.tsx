@@ -10,7 +10,8 @@ import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { enc, loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { deletePurchaseOrder, purchaseOrderStep } from "@/src/modules/inventory/actions/inventory";
+import { Trash2 as BulkTrash } from "lucide-react";
+import { bulkDeletePurchaseOrders, deletePurchaseOrder, purchaseOrderStep } from "@/src/modules/inventory/actions/inventory";
 import { PurchaseOrderForm } from "@/src/modules/inventory/components/document-forms";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
 import { ReceiveForm } from "@/src/modules/inventory/components/receive-form";
@@ -133,6 +134,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
           ) : (
             <ExpandableTable
               minWidth="56rem"
+              bulk={{ noun: ["draft purchase order", "draft purchase orders"], actions: [{ label: "Delete", icon: <BulkTrash className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeletePurchaseOrders }] }}
               columns={[
                 { key: "order", label: "Order" },
                 { key: "supplier", label: "Vendor" },
@@ -147,6 +149,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
                 return {
                   id: po.id,
                   muted: po.status === "cancelled",
+                  tick: po.status === "draft" && may("purchasing.edit") ? po.number : undefined,
                   actions: (
                     <RowMenu
                       label={`Actions for ${po.number}`}

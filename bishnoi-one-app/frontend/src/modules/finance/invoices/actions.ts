@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { api, enc } from "@/src/modules/finance/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/finance/platform/lib/result";
+import { eachOf } from "@/src/platform/bulk/each";
 import type { Customer, Invoice, InvoiceLine, Series } from "@/src/modules/finance/invoices/types";
 
 // Invoices. The API works each one out, numbers it from the series when it's
@@ -120,4 +121,9 @@ export async function switchSeries(id: string, isActive: boolean): Promise<Resul
     refresh();
     return saved;
   });
+}
+
+/** Several drafts at once (2026-11-01): each goes through deleteInvoice, so only drafts can go. */
+export async function bulkDeleteInvoices(ids: string[]) {
+  return eachOf("Delete draft invoices", ids, deleteInvoice);
 }

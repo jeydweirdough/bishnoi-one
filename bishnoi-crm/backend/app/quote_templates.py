@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.extra import fields_for
 from app.models import Company, Contact, Issuer, Product, Quote, QuoteControl, QuoteTemplate, StoredFile, Team, User
-from app.pricing import sales_settings
+from app.pricing import letterhead, sales_settings
 
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_EXCEL_BYTES = 5 * 1024 * 1024
@@ -185,9 +185,10 @@ def document(db: Session, quote: Quote, template: QuoteTemplate, settings: Setti
     for key in ("acceptance", "notes", "certification", "heading"):
         design[key] = design[key].replace("{issuer}", issuer or "the issuer")
     design["companyName"] = design["companyName"] or settings.org_name
-    design["address"] = design["address"] or (s.company_address or "")
-    design["phone"] = design["phone"] or (s.company_contact or "")
-    design["tin"] = design["tin"] or (s.company_tin or "")
+    letter_head = letterhead(settings, s)
+    design["address"] = design["address"] or (letter_head["address"] or "")
+    design["phone"] = design["phone"] or (letter_head["contact"] or "")
+    design["tin"] = design["tin"] or (letter_head["tin"] or "")
     design["payableTo"] = design["payableTo"] or design["companyName"]
     address = extra_by(db, quote, "address") or (", ".join(p for p in (company.address, company.city) if p) if company and not contact else None)
     total = (quote.tax or {}).get("totalDueCentavos") or quote.total_centavos

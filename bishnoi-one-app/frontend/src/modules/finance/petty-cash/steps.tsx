@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
 import { Field, FormError, Input } from "@/src/modules/finance/platform/ui/field";
-import { deletePettyCash, pettyCashStep } from "@/src/modules/finance/petty-cash/actions";
+import { deletePettyCash, pettyCashStep, voidImportedExpense } from "@/src/modules/finance/petty-cash/actions";
 import type { PettyCashVoucher } from "@/src/modules/finance/petty-cash/types";
 
 /** A reason box (return, void): at least three characters, as the API asks. */
@@ -126,6 +126,32 @@ export function VoidPettyCash({ id, number }: { id: string; number: string }) {
       onConfirm={(reason) =>
         start(async () => {
           const result = await pettyCashStep(id, "void", { reason });
+          if (!result.ok) return setError(result.error);
+          toast.success(`${number} voided`);
+          setOpen(false);
+        })
+      }
+      onCancel={() => setOpen(false)}
+    />
+  );
+}
+
+export function VoidImportedExpense({ id, number }: { id: string; number: string }) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  if (!open) return <Button onClick={() => setOpen(true)}>Void</Button>;
+  return (
+    <ReasonBox
+      intro={`Void imported expense ${number}? Its entry is reversed in the books today. The record stays, marked void, and it isn't imported again.`}
+      label="Reason for voiding"
+      placeholder="Not 2MG's expense"
+      confirm="Void expense"
+      pending={pending}
+      error={error}
+      onConfirm={(reason) =>
+        start(async () => {
+          const result = await voidImportedExpense(id, reason);
           if (!result.ok) return setError(result.error);
           toast.success(`${number} voided`);
           setOpen(false);

@@ -46,7 +46,7 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
         {(Object.keys(TABS) as Tab[]).map((t) => (
           <Link
             key={t}
-            href={`/finance/tax?tab=${t}`}
+            href={`/platform/settings/finance/taxes?tab=${t}`}
             scroll={false}
             aria-current={t === tab ? "page" : undefined}
             className={`-mb-px border-b-2 px-1 pb-2 text-sm ${t === tab ? "border-hema font-semibold text-hema" : "border-transparent text-ink-2 hover:text-ink"}`}

@@ -33,6 +33,15 @@ export async function pettyCashStep(id: string, step: "submit" | "check" | "retu
   });
 }
 
+/** An imported expense can only be voided: its entry is reversed today, the record kept (app/routers/imported_expenses.py). */
+export async function voidImportedExpense(id: string, reason: string): Promise<Result<null>> {
+  return attempt(async () => {
+    await api.post(`/finance/imported-expenses/${enc(id)}/void`, { reason });
+    refresh();
+    return null;
+  });
+}
+
 /** The photo or PDF of one receipt line: sent as the file itself, handed to the API as base64. Attaching again replaces it. */
 export async function attachReceipt(id: string, lineId: string, form: FormData): Promise<Result<PettyCashVoucher>> {
   return attempt(async () => {

@@ -1,19 +1,23 @@
 "use client";
 
-import { ChevronRight, Plus } from "lucide-react";
+import { Switch } from "antd";
+import { ChevronRight, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { AboutTip } from "@/src/platform/ui/about-tip";
 import { InlineMessage } from "@/src/platform/ui/alert";
 import { AsyncButton } from "@/src/platform/ui/async-button";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
-import { Choice, Field, FormError, FormGrid, Input, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, Input, Textarea } from "@/src/platform/ui/field";
 import { PermissionGrid } from "@/src/platform/ui/permission-grid";
 import { PickList, SaveBar } from "@/src/platform/ui/pick-list";
-import { Empty, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
+import { Empty, Sheet } from "@/src/platform/ui/sheet";
 import { createRole, deleteRole, importRoles, updateRole } from "./actions";
-import { moduleLabel } from "./labels";
+import { moduleLabel, ROLE_ACTIONS } from "./labels";
 import { AbilitiesSection, CopyJobRole } from "./abilities";
 import type { AbilityCatalogue, AccessData, AccessModule, AccessRole, RoleInput } from "./types";
 
@@ -99,7 +103,7 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
       setErrors({ message: null, fields: {} });
       setSelected(result.data.id);
       toast.success(role ? `${result.data.name} saved` : `${result.data.name} added`, {
-        description: "Every module is told now; people with this role get it on their next click.",
+        description: "Every module is told now; employees with this role get it on their next click.",
       });
       router.refresh();
     });
@@ -127,6 +131,10 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
     }
   }
 
+  const [actions, setActions] = useState<HTMLElement | null>(null);
+  useEffect(() => setActions(document.getElementById(ROLE_ACTIONS)), []);
+  const employees = (n: number) => `${n} ${n === 1 ? "employee" : "employees"}`;
+
   if (data.roles.length === 0 && selected !== NEW) {
     return (
       <Sheet>
@@ -151,7 +159,14 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
     ...data.roles.map((r) => ({
       key: r.id,
       label: r.name,
-      detail: `${summary(r, data.modules)} · ${r.people} ${r.people === 1 ? "person" : "people"}`,
+      detail: summary(r, data.modules),
+      aside: (
+        <span title={employees(r.people)} className={`inline-flex shrink-0 items-center gap-1 text-meta ${r.people ? "text-ink-2" : "text-ink-3"}`}>
+          <Users className="size-3.5" aria-hidden />
+          <span className="sr-only">Employees: </span>
+          {r.people}
+        </span>
+      ),
       unsaved: r.id in drafts && !same(drafts[r.id], asInput(r)),
     })),
     ...(NEW in drafts || selected === NEW ? [{ key: NEW, label: draft.name.trim() || "New role", detail: "Not saved yet", unsaved: true }] : []),
@@ -159,76 +174,70 @@ export function AccessRolesEditor({ data, catalogue }: { data: AccessData; catal
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
-      <PickList
-        title="Roles"
-        icon="roles"
-        items={items}
-        selected={selected}
-        onSelect={pick}
-        footer={
-          <div className="mt-3 px-2">
+      {/* At the top right, as Add employee is, not under a long list. */}
+      {actions &&
+        createPortal(
+          <>
             {catalogue && <CopyJobRole catalogue={catalogue} onMade={pick} />}
-            <Button size="sm" variant="quiet" icon={<Plus className="size-4" aria-hidden />} onClick={() => pick(NEW)} disabled={selected === NEW}>
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => pick(NEW)} disabled={selected === NEW}>
               New role
             </Button>
-          </div>
-        }
-      />
+          </>,
+          actions,
+        )}
+
+      <PickList bare title="Roles" items={items} selected={selected} onSelect={pick} />
 
       <div className="min-w-0 space-y-5">
-        <Sheet className="px-5 pt-4 pb-5">
-          <SectionTitle
-            icon="roles"
-            action={
-              role && role.people > 0 ? (
-                <span className="text-meta text-ink-3">
-                  In use by {role.people} {role.people === 1 ? "person" : "people"}
-                </span>
-              ) : role ? (
-                <ConfirmButton
-                  label="Delete"
-                  title={`Delete ${role.name}?`}
-                  body="Nobody has this role, so nothing else changes."
-                  confirmLabel="Delete role"
-                  triggerSize="sm"
-                  triggerVariant="quiet"
-                  onConfirm={remove}
-                />
-              ) : null
-            }
-          >
-            {role ? role.name : "New role"}
-          </SectionTitle>
-          <FormGrid className="mt-4">
-            <Field label="Name" size="md" error={errors.fields.name}>
-              {(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}
-            </Field>
-            <Field label="Description" size="full" optional error={errors.fields.description}>
-              {(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}
-            </Field>
-            <div className="sm:col-span-6">
-              <Choice<"chosen" | "all">
-                name="reach"
-                legend="What it allows"
-                value={draft.isAdmin ? "all" : "chosen"}
-                onChange={(v) => edit({ isAdmin: v === "all" })}
-                options={[
-                  { value: "chosen", label: "What's chosen below, module by module" },
-                  { value: "all", label: "Everything, in every module (Administrator)" },
-                ]}
-              />
+        <Sheet className="space-y-4 px-5 pt-4 pb-5">
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+            <div className="w-full max-w-md">
+              <Field label="Name" error={errors.fields.name}>
+                {(p) => <Input {...p} value={draft.name} onChange={(e) => edit({ name: e.target.value })} autoFocus={selected === NEW} />}
+              </Field>
             </div>
-          </FormGrid>
+            {role && (
+              <div className="ml-auto flex items-center gap-1 pt-7">
+                {role.people > 0 ? (
+                  <Link href="/platform/roles/people" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-ink-2 hover:bg-bench hover:text-ink">
+                    <Users className="size-4 shrink-0" aria-hidden />
+                    {employees(role.people)}
+                  </Link>
+                ) : (
+                  <ConfirmButton
+                    label="Delete"
+                    icon={<Trash2 className="size-4" aria-hidden />}
+                    title={`Delete ${role.name}?`}
+                    body="Nobody has this role, so nothing else changes."
+                    confirmLabel="Delete role"
+                    triggerSize="sm"
+                    triggerVariant="quiet"
+                    onConfirm={remove}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <Field label="Description" optional error={errors.fields.description}>
+            {(p) => <Textarea {...p} rows={1} value={draft.description ?? ""} onChange={(e) => edit({ description: e.target.value })} />}
+          </Field>
+          {/* Two choices, so a switch: on, the role is each app's Administrator. */}
+          <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+            <Switch id="role-full-access" checked={draft.isAdmin} onChange={(on) => edit({ isAdmin: on })} />
+            <label htmlFor="role-full-access" className="cursor-pointer text-sm font-medium text-ink">
+              Full access
+            </label>
+            <AboutTip>Every permission in every app, including ones added later, and every record. Someone must always have it, so there&apos;s always a way to fix access.</AboutTip>
+            {draft.isAdmin && (
+              <span className="inline-flex items-center gap-1.5 text-meta text-sage-deep">
+                <ShieldCheck className="size-3.5" aria-hidden />
+                Administrator in every app
+              </span>
+            )}
+          </div>
         </Sheet>
 
-        {draft.isAdmin ? (
-          <Sheet className="px-5 py-4">
-            <p className="text-meta text-ink-2">
-              This role is each module&apos;s Administrator: every permission there, including ones added later, and every record. Someone must always
-              have it, so there&apos;s always a way to fix access.
-            </p>
-          </Sheet>
-        ) : (
+        {!draft.isAdmin && (
           <>
           {role && catalogue && <AbilitiesSection key={`${role.id}-${JSON.stringify(role.abilities)}-${JSON.stringify(role.scopes)}`} role={role} catalogue={catalogue} modules={data.modules} />}
           {/* The apps' own permissions, under the abilities (step 6): most roles never need them. */}

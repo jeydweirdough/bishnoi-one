@@ -125,3 +125,9 @@ Decided 2026-10-24 (see [surpass.md](surpass.md) §1 and patterns P15, P16).
 | ID | Capability | Reference | Ours today | Decision |
 |---|---|---|---|---|
 | I1 | A record's page in three columns: who and quick actions; overview and activities; associations | HubSpot ★ | **Built 2026-10-03** for customers. Contacts and deals have associations, not yet the three columns. | **ADOPT** (decided 2026-10-03): P14 |
+
+## J. Company assistant
+
+| ID | Capability | Reference | Ours today | Decision |
+|---|---|---|---|---|
+| AI1 | Company-wide assistant with source-grounded read-only tools | Self-hosted Ollama | Built 2026-11-03: shared chat entry, private server-only qwen3:1.7b intent planning with thinking disabled; streaming verified answers; company-scoped directory names/titles and monthly Finance figures with existing accounting permissions, a signed 60-second read pass, explicit database ownership, approved journal definitions, missing-data handling, bounded requests and audit logs. No AI SQL or business writes. Deployment and live-model smoke test pending. | **ADOPT** (user requested 2026-11-03) |

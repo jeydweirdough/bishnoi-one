@@ -88,7 +88,7 @@ export function ImportPeople() {
       const r = await importPeople(fresh, true, invite);
       if (!r.ok) return void toast.error(r.error);
       const { added = 0, invited = 0, emailed = 0 } = r.data;
-      toast.success(`${added} ${added === 1 ? "person" : "people"} added`, {
+      toast.success(`${added} ${added === 1 ? "employee" : "employees"} added`, {
         description: invite ? (emailed ? `${emailed} invitation${emailed === 1 ? "" : "s"} emailed.` : `${invited} invitation links made: email sending isn't set up, so send each from their ⋯ menu.`) : "Send each an invitation from their ⋯ menu.",
         duration: 10_000,
       });
@@ -108,7 +108,7 @@ export function ImportPeople() {
       </Button>
       <Modal
         open={open}
-        title="Import people from a file"
+        title="Import employees from a file"
         width={760}
         onCancel={() => !busy && (setOpen(false), reset())}
         footer={
@@ -124,7 +124,7 @@ export function ImportPeople() {
             </Button>
             {checked ? (
               <Button variant="primary" onClick={add} loading={busy} disabled={checked.counts.new === 0}>
-                Add {checked.counts.new} {checked.counts.new === 1 ? "person" : "people"}
+                Add {checked.counts.new} {checked.counts.new === 1 ? "employee" : "employees"}
               </Button>
             ) : (
               <Button variant="primary" onClick={check} loading={busy} disabled={!head || rows.length === 0}>
@@ -136,7 +136,7 @@ export function ImportPeople() {
         destroyOnHidden
       >
         <div className="space-y-4 pt-2">
-          <FileDrop accept=".csv,text/csv" maxBytes={2_000_000} note="CSV: a row per person. Zoho's users export works as it is." onFile={(f) => void read(f)} />
+          <FileDrop accept=".csv,text/csv" maxBytes={2_000_000} note="CSV: a row per employee. Zoho's users export works as it is." onFile={(f) => void read(f)} />
           {head && !checked && (
             <>
               <p className="text-sm text-ink-2">Match each column to what it holds. {rows.length} rows.</p>

@@ -400,6 +400,11 @@ from app.routers.petty_cash import router as petty_cash_router  # noqa: E402
 
 router.include_router(petty_cash_router)
 
+# --- imported expenses (app/routers/imported_expenses.py): read-only Zoho history (2026-10-31) --------
+from app.routers.imported_expenses import router as imported_expenses_router  # noqa: E402
+
+router.include_router(imported_expenses_router)
+
 # --- the Living Overview (app/overview.py): /finance/overview, the same way (2026-10-31) --------------
 from app.overview import router as overview_router  # noqa: E402
 

@@ -2,4 +2,7 @@
 import { AccessPeople } from "@/src/one/access/screens";
 
 export const metadata = { title: "People" };
-export default AccessPeople;
+
+export default async function People({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  return <AccessPeople searchParams={searchParams} />;
+}

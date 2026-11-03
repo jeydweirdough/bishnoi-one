@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { Sidebar, type Process, type Step } from "@/src/platform/shell/sidebar";
 import type { MyModule } from "@/src/one/module-switcher";
 import { Icon, type IconName } from "@/src/platform/ui/icons";
-import { settingsPagesFor } from "@/src/modules/crm/lib/access";
 import type { Me } from "@/src/platform/lib/types";
 
 // The CRM's menu as Zoho CRM lays it out (decided 2026-10-24, benchmarks/surpass.md §1): Sales
@@ -102,47 +101,15 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
   // A field agent's day comes first; everyone else's starts with sales.
   const processes = agent ? [field, work, catalogue, documents, reports] : [sales, work, field, catalogue, documents, reports];
 
-  const fullSettings = may("admin.settings") || may("admin.types");
-  const canSettings = fullSettings || may("department.manage");
-  const settingsSteps: Step[] = canSettings
-    ? [
-        {
-          href: "/crm/admin/settings/company",
-          label: "General",
-          icon: "company",
-          also: ["/crm/admin/settings/company", "/crm/admin/settings/quote-templates", "/crm/admin/settings/emails", "/crm/admin/settings/terms"],
-        },
-        {
-          href: "/crm/admin/settings",
-          label: "Customization",
-          icon: "settings",
-          also: ["/crm/admin/settings", "/crm/admin/settings/customer-types", "/crm/admin/settings/deal-stages", "/crm/admin/settings/associations"],
-        },
-        {
-          href: "/crm/admin/settings/pricing",
-          label: "Sales & Pricing",
-          icon: "pricing",
-          also: ["/crm/admin/settings/pricing", "/crm/admin/settings/price-rules", "/crm/admin/settings/performance", "/crm/admin/settings/retention-windows", "/crm/admin/settings/attention", "/crm/admin/settings/kpis"],
-        },
-        {
-          href: "/crm/admin/settings/connections",
-          label: "Connections",
-          icon: "apps",
-          also: ["/crm/admin/settings/connections"],
-        },
-      ]
-    : [];
-
+  // The CRM's settings are the Admin Console's (App settings), for company administrators (2026-10-31); managers
+  // keep their teams' monthly targets (Performance). What stays here until it moves too: clean-up and the log.
   // People, roles and teams are kept only in the Admin Console, employee IDs included (2026-10-30).
   const foot: Process[] = [
     {
-      label: fullSettings ? "Settings" : "Department settings",
+      label: "Settings",
       section: "Administration",
       icon: "settings",
       steps: [
-        ...settingsSteps,
-        ...when(admin, { href: "/crm/admin/data-cleanup", label: "Data clean-up", icon: "settings" }),
-        ...when(may("admin.audit"), { href: "/crm/admin/audit", label: "Activity log", icon: "auditLog" }),
       ],
     },
   ];
