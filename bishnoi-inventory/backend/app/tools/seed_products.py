@@ -838,22 +838,54 @@ def main() -> int:
             norm_url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", target_db)
             url_obj = make_url(norm_url)
             db_name = url_obj.database or ""
-            # When pointing to root database without company suffix, target company tenant DB
-            if not db_name.endswith(f"_{company}"):
-                tenant_url = database_url(target_db, company)
-                tenant_norm = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", tenant_url)
-                tenant_db_name = make_url(tenant_norm).database
-                print(f"\n[Tenant] Base cluster DB '{db_name}' detected. Targeting company '{company}' DB: '{tenant_db_name}'")
-                try:
-                    create_postgres_database(target_db, tenant_db_name)
-                except Exception as e:
-                    print(f"[Tenant] Database check note: {e}")
-                target_db = tenant_url
 
-            label = target_db.split("@")[-1] if "@" in target_db else target_db
-            print(f"\n--- Target Database ({label}) ---")
-            res = seed_inventory_postgres(target_db, company, products, apply=args.apply)
-            print(f"Result: {res}")
+            # Check cluster databases to see available tenants
+            detected_dbs: list[str] = []
+            try:
+                from sqlalchemy import create_engine, text
+                inspect_engine = create_engine(norm_url, isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 10})
+                with inspect_engine.connect() as ic:
+                    rows = ic.execute(text("SELECT datname FROM pg_database WHERE datname LIKE 'bishnoi%' OR datname LIKE '%getmeds%'")).fetchall()
+                    detected_dbs = [r[0] for r in rows]
+                inspect_engine.dispose()
+                if detected_dbs:
+                    print(f"\n[Cluster] Detected tenant databases: {', '.join(detected_dbs)}")
+            except Exception as e:
+                print(f"[Cluster] Note checking cluster databases: {e}")
+
+            # Determine list of company slugs to seed
+            companies_to_seed = []
+            if company in ("all", "all-tenants", "all-getmeds"):
+                # Seed every detected getmeds tenant DB, plus defaults
+                companies_to_seed = ["getmeds", "getmeds-philippines-inc"]
+                for d in detected_dbs:
+                    for prefix in ("bishnoione_", "inventory_"):
+                        if d.startswith(prefix):
+                            slug = d[len(prefix):].replace("_", "-")
+                            if slug not in companies_to_seed:
+                                companies_to_seed.append(slug)
+            else:
+                companies_to_seed = [company]
+
+            for co in companies_to_seed:
+                co_suffix = co.replace("-", "_")
+                if not db_name.endswith(f"_{co_suffix}"):
+                    tenant_url = database_url(target_db, co)
+                    tenant_norm = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", tenant_url)
+                    tenant_db_name = make_url(tenant_norm).database
+                    print(f"\n[Tenant] Base cluster DB '{db_name}' detected. Targeting company '{co}' DB: '{tenant_db_name}'")
+                    try:
+                        create_postgres_database(target_db, tenant_db_name)
+                    except Exception as e:
+                        print(f"[Tenant] Database check note: {e}")
+                    curr_target = tenant_url
+                else:
+                    curr_target = target_db
+
+                label = curr_target.split("@")[-1] if "@" in curr_target else curr_target
+                print(f"\n--- Target Database ({label}) ---")
+                res = seed_inventory_postgres(curr_target, co, products, apply=args.apply)
+                print(f"Result: {res}")
         else:
             sqlite_p = target_db.replace("sqlite:///", "")
             print(f"\n--- Target Database ({sqlite_p}) ---")
