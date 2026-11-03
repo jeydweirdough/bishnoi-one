@@ -31,7 +31,8 @@ import shutil
 import sqlite3
 import sys
 import uuid
-import openpyxl
+
+from app.tools.bea_catalog import BEA_PRODUCTS
 
 # Safe console encoding for UTF-8 without disrupting pytest/test runners
 def _init_stdout():
@@ -43,7 +44,6 @@ def _init_stdout():
 
 DEFAULT_EXCEL_PATH = r"C:\Users\Getmeds Backend\Downloads\Price List 2026 Finance (1).xlsx"
 DEFAULT_SHEET = "BEA Price List U0725"
-BUNDLED_JSON_PATH = Path(__file__).resolve().parent / "seed_products_data.json"
 
 APP_DIR = Path(__file__).resolve().parent.parent.parent  # bishnoi-inventory/backend
 MODULE_DIR = APP_DIR.parent  # bishnoi-inventory
@@ -144,14 +144,24 @@ UNIT_MAP = {
 }
 
 
+def get_catalog_products() -> list[dict]:
+    """Return all 64 products directly from the embedded Python catalog."""
+    products = []
+    for p in BEA_PRODUCTS:
+        p_copy = dict(p)
+        p_copy["id"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"bishnoi.product.{p['sku']}"))
+        p_copy["is_vat"] = p.get("tax_rate_bp", 0) > 0
+        products.append(p_copy)
+    return products
+
+
 def load_excel_products(file_path: str = DEFAULT_EXCEL_PATH, sheet_name: str = DEFAULT_SHEET) -> list[dict]:
+    """Optional loader if an Excel file is explicitly supplied."""
     excel_file = Path(file_path)
     if not excel_file.exists():
-        if BUNDLED_JSON_PATH.exists():
-            print(f"Notice: Excel file not found ({excel_file}). Using bundled dataset: {BUNDLED_JSON_PATH.name}")
-            return json.loads(BUNDLED_JSON_PATH.read_text(encoding="utf-8"))
-        raise FileNotFoundError(f"Neither Excel file ({excel_file}) nor bundled JSON ({BUNDLED_JSON_PATH}) was found.")
+        return get_catalog_products()
 
+    import openpyxl
     wb = openpyxl.load_workbook(file_path, data_only=True)
     if sheet_name not in wb.sheetnames:
         raise ValueError(f"Sheet {sheet_name!r} not found. Available sheets: {wb.sheetnames}")
@@ -519,7 +529,7 @@ def seed_crm_sqlite(db_path: Path | str, products: list[dict], apply: bool = Fal
         st = p["strength"]
         form = p["form"]
         unit = p["unit_raw"]
-        vat_cat = "vat" if p["is_vat"] else "exempt"
+        vat_cat = "vat" if p.get("is_vat") or p.get("tax_rate_bp", 0) > 0 else "exempt"
         inv_id = p["id"]
 
         extra_json = json.dumps({
@@ -785,7 +795,7 @@ def seed_inventory_postgres(db_url: str, db_label: str, products: list[dict], ap
 def main() -> int:
     _init_stdout()
     parser = argparse.ArgumentParser(description="Seed products, prices, and zero stocks from BEA Price List U0725.")
-    parser.add_argument("--file", default=DEFAULT_EXCEL_PATH, help=f"Excel workbook path (default: {DEFAULT_EXCEL_PATH})")
+    parser.add_argument("--file", help="Optional Excel workbook path to re-parse from.")
     parser.add_argument("--sheet", default=DEFAULT_SHEET, help=f"Sheet name (default: {DEFAULT_SHEET})")
     parser.add_argument("--database-url", help="Target database URL (PostgreSQL or SQLite). If omitted, uses DATABASE_URL or local files.")
     parser.add_argument("--apply", action="store_true", help="Commit changes (default is dry run)")
@@ -798,8 +808,12 @@ def main() -> int:
     print(f"Mode       : {'APPLY (Saving changes)' if args.apply else 'DRY RUN (No changes saved)'}")
     print("=" * 70)
 
-    products = load_excel_products(args.file, args.sheet)
-    print(f"\n[OK] Loaded {len(products)} products.")
+    if args.file and Path(args.file).exists():
+        products = load_excel_products(args.file, args.sheet)
+        print(f"\n[OK] Loaded {len(products)} products from Excel file '{args.file}'.")
+    else:
+        products = get_catalog_products()
+        print(f"\n[OK] Loaded {len(products)} products from embedded BEA catalog.")
 
     target_db = args.database_url or os.environ.get("DATABASE_URL")
     if target_db:

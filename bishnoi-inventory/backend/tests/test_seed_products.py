@@ -8,11 +8,23 @@ from app.tools.seed_products import (
     DEFAULT_EXCEL_PATH,
     DEFAULT_SHEET,
     clean_sku,
+    get_catalog_products,
     load_excel_products,
     seed_crm_sqlite,
     seed_inventory_sqlite,
     to_centavos,
 )
+
+
+def test_get_catalog_products_standalone():
+    """Verify embedded catalog runs with 0 file dependencies and loads all 64 products."""
+    products = get_catalog_products()
+    assert len(products) == 64
+    p0 = products[0]
+    assert p0["sku"] == "AMIGET-250-MG-ML"
+    assert p0["srp_u_cents"] == 12000
+    assert p0["tax_rate_bp"] == 1200
+    assert p0["id"] is not None
 
 
 def test_clean_sku():
