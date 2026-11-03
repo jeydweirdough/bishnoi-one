@@ -613,6 +613,7 @@ def seed_inventory_postgres(db_url: str, db_label: str, products: list[dict], ap
     engine.dispose()
 
     connect_url = re.sub(r"^postgresql\+[a-z0-9]+://", "postgresql://", db_url)
+    connect_url = re.sub(r"^postgres://", "postgresql://", connect_url)
     now = datetime.now(UTC)
     with psycopg.connect(connect_url) as conn:
         with conn.cursor() as cur:
@@ -831,15 +832,17 @@ def main() -> int:
         from sqlalchemy.engine import make_url
 
         company = clean(args.company) or "getmeds"
-        url_obj = make_url(target_db)
-        backend = url_obj.get_backend_name()
+        is_postgres = target_db.startswith(("postgres://", "postgresql://", "postgresql+"))
 
-        if backend == "postgresql":
+        if is_postgres:
+            norm_url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", target_db)
+            url_obj = make_url(norm_url)
             db_name = url_obj.database or ""
             # When pointing to root database without company suffix, target company tenant DB
             if not db_name.endswith(f"_{company}"):
                 tenant_url = database_url(target_db, company)
-                tenant_db_name = make_url(tenant_url).database
+                tenant_norm = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", tenant_url)
+                tenant_db_name = make_url(tenant_norm).database
                 print(f"\n[Tenant] Base cluster DB '{db_name}' detected. Targeting company '{company}' DB: '{tenant_db_name}'")
                 try:
                     create_postgres_database(target_db, tenant_db_name)
