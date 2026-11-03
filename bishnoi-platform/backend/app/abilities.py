@@ -223,6 +223,7 @@ ABILITIES: tuple[Ability, ...] = (
     }),
     Ability("bir.prepare", "Prepare BIR filings", "Books", {"finance": ("bir.view", "bir.prepare", "tax.view", "tax.manage")}),
     # Company
+    Ability("directory.read", "Read company directory names and job titles", "Company", {}),
     Ability("org.manage", "Manage the organisation", "Company", {"crm": ("admin.teams", "department.manage")}),
     Ability("reports.management", "See management reports", "Company", {
         "crm": ("dashboard.view", "reports.view"),

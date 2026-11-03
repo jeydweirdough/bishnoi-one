@@ -28,6 +28,8 @@ from app.routers import (
     communications,
     companies,
     company_access,
+    assistant as assistant_router,
+    access_policy,
     company_console,
     events as events_router,
     operators,
@@ -117,6 +119,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(company_access.router)
+    app.include_router(assistant_router.router)
+    app.include_router(access_policy.router)
     app.include_router(organisation.router)
     app.include_router(company_console.router)
     app.include_router(operators.router)

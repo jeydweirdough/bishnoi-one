@@ -189,7 +189,7 @@ def cash_disbursements(db: Session, start: date, end: date) -> dict:
 
 def balances(db: Session, *, before: date | None = None, start: date | None = None, end: date | None = None) -> dict[str, tuple[int, int]]:
     """By account: (debits, credits) of the lines dated in the range."""
-    q = select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry)
+    q = select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry).where(JournalEntry.status == "approved")
     if before is not None:
         q = q.where(JournalEntry.entry_date < before)
     if start is not None:

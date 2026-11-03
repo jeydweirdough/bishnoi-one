@@ -234,3 +234,7 @@ and Philippine pharmaceutical/accounting statutory compliance:
 4. **Unified Reports Center**: Reports Center features "My custom reports" and "Shared reports" in the
    navigation rail across all modules (Finance, CRM, Inventory, Admin, Pharmacy) with creator attribution,
    custom badges, and cell drill-downs to source records.
+
+## 2026-11-03: company assistant (user requested)
+
+Adopt a self-hosted Ollama `qwen3:1.7b` assistant with thinking disabled. The model selects an allowlisted read-only tool; trusted backend templates render facts and references. No AI-generated SQL, writes, unrestricted proxy or public model endpoint. Directory reads require company directory authority; monthly Finance reads require existing accounting-report authority and a signed company-bound read pass. Reuse invoiced-revenue and approved profit-and-loss definitions, distinguish missing data from zero, and audit outcomes without logging prompt/data values. See `docs/company-assistant.md`.

@@ -139,6 +139,8 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
         claims = platform_pass.check_for(settings, body.token, APP_KEY)
     except platform_pass.PassRefused as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
+    if claims.get("kind") is not None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This pass is not a sign-in pass.")
     now = datetime.now(UTC)
     db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
     db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))

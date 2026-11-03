@@ -977,3 +977,7 @@ Pushing doesn't deploy. Nothing goes online until someone deploys it by hand
 
 *Looking after the repo (adding people, reviewing new apps, deploying)? See
 [MAINTAINING.md](MAINTAINING.md).*
+
+### Company assistant (Ollama)
+
+The chat icon opens the read-only company assistant. Configure `OLLAMA_BASE_URL` on the Platform backend using a private network origin, install `qwen3:1.7b`, and bind the single-company Finance database with `ASSISTANT_COMPANY_SLUG` (or its existing `CRM_COMPANY`). [Setup, permissions, accounting definitions and limitations](docs/company-assistant.md).

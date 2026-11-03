@@ -902,3 +902,20 @@ class PlatformSetting(Base):
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 
 numbered(User, Identity, Company, Application, Account)
+
+
+class AccessPolicyImport(Base):
+    """An administrator-owned preview and, once applied, an immutable policy version."""
+    __tablename__ = "nbpl_access_policy_imports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    actor_id: Mapped[str] = mapped_column(String(36))
+    actor: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+    before: Mapped[list] = mapped_column(JSON)
+    after: Mapped[list | None] = mapped_column(JSON, default=None)
+    preview: Mapped[dict] = mapped_column(JSON)

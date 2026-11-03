@@ -1,3 +1,4 @@
+import { LinkButton } from "@/src/platform/ui/button";
 import type { ReactNode } from "react";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { loadAccess } from "./load";
@@ -19,7 +20,7 @@ export async function AccessFrame({ current, children }: { current: "people" | "
   const data = await loadAccess();
   return (
     <>
-      <PageHeader title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined} actions={current === "roles" && data ? <div id={ROLE_ACTIONS} className="flex flex-wrap items-center gap-2" /> : undefined}>
+      <PageHeader title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined} actions={current === "roles" && data ? <div className="flex flex-wrap items-center gap-2"><LinkButton href="/platform/roles/policy">AI-assisted import / export</LinkButton><div id={ROLE_ACTIONS} className="flex flex-wrap items-center gap-2" /></div> : undefined}>
         {data ? INTRO[current] : null}
       </PageHeader>
       {data ? (

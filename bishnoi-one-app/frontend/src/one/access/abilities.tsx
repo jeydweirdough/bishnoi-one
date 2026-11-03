@@ -78,7 +78,7 @@ export function AbilitiesSection({ role, catalogue, modules }: { role: AccessRol
             <ul className="space-y-1">
               {g.abilities.map((a) => {
                 const on = a.key in draft;
-                const usable = a.apps.some((k) => have.has(k));
+                const usable = a.apps.length === 0 || a.apps.some((k) => have.has(k));
                 return (
                   <li key={a.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <label className={`inline-flex min-h-9 flex-1 cursor-pointer items-center gap-2 text-sm ${usable ? "text-ink" : "text-ink-3"}`}>
