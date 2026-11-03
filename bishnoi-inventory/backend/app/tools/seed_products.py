@@ -604,9 +604,17 @@ def seed_crm_sqlite(db_path: Path | str, products: list[dict], apply: bool = Fal
 
 def seed_inventory_postgres(db_url: str, db_label: str, products: list[dict], apply: bool = False) -> dict:
     import psycopg
+    from app.db import make_engine
+    from app.migrate import upgrade
 
+    # 0. Ensure schema migrations are up to date on this database
+    engine = make_engine(db_url)
+    upgrade(engine)
+    engine.dispose()
+
+    connect_url = re.sub(r"^postgresql\+[a-z0-9]+://", "postgresql://", db_url)
     now = datetime.now(UTC)
-    with psycopg.connect(db_url) as conn:
+    with psycopg.connect(connect_url) as conn:
         with conn.cursor() as cur:
             # 1. Warehouses & Locations
             cur.execute("SELECT id, name FROM nbin_warehouses")
@@ -798,6 +806,7 @@ def main() -> int:
     parser.add_argument("--file", help="Optional Excel workbook path to re-parse from.")
     parser.add_argument("--sheet", default=DEFAULT_SHEET, help=f"Sheet name (default: {DEFAULT_SHEET})")
     parser.add_argument("--database-url", help="Target database URL (PostgreSQL or SQLite). If omitted, uses DATABASE_URL or local files.")
+    parser.add_argument("--company", default="getmeds", help="The company's short name on Bishnoi One (default: getmeds)")
     parser.add_argument("--apply", action="store_true", help="Commit changes (default is dry run)")
     parser.add_argument("--all-databases", action="store_true", help="Sync to all targets: local SQLite, seed SQLite, and Neon")
     args = parser.parse_args()
@@ -806,6 +815,7 @@ def main() -> int:
     print("      BISHNOI ONE: PRODUCT SEED TOOL (BEA PRICE LIST U0725)     ")
     print("=" * 70)
     print(f"Mode       : {'APPLY (Saving changes)' if args.apply else 'DRY RUN (No changes saved)'}")
+    print(f"Company    : {args.company}")
     print("=" * 70)
 
     if args.file and Path(args.file).exists():
@@ -817,13 +827,36 @@ def main() -> int:
 
     target_db = args.database_url or os.environ.get("DATABASE_URL")
     if target_db:
-        print(f"\n--- Target Database ({target_db.split('@')[-1] if '@' in target_db else target_db}) ---")
-        if target_db.startswith("postgres"):
-            res = seed_inventory_postgres(target_db, "target", products, apply=args.apply)
+        from app.tenants import clean, create_postgres_database, database_url
+        from sqlalchemy.engine import make_url
+
+        company = clean(args.company) or "getmeds"
+        url_obj = make_url(target_db)
+        backend = url_obj.get_backend_name()
+
+        if backend == "postgresql":
+            db_name = url_obj.database or ""
+            # When pointing to root database without company suffix, target company tenant DB
+            if not db_name.endswith(f"_{company}"):
+                tenant_url = database_url(target_db, company)
+                tenant_db_name = make_url(tenant_url).database
+                print(f"\n[Tenant] Base cluster DB '{db_name}' detected. Targeting company '{company}' DB: '{tenant_db_name}'")
+                try:
+                    create_postgres_database(target_db, tenant_db_name)
+                except Exception as e:
+                    print(f"[Tenant] Database check note: {e}")
+                target_db = tenant_url
+
+            label = target_db.split("@")[-1] if "@" in target_db else target_db
+            print(f"\n--- Target Database ({label}) ---")
+            res = seed_inventory_postgres(target_db, company, products, apply=args.apply)
+            print(f"Result: {res}")
         else:
             sqlite_p = target_db.replace("sqlite:///", "")
+            print(f"\n--- Target Database ({sqlite_p}) ---")
             res = seed_inventory_sqlite(sqlite_p, products, apply=args.apply)
-        print(f"Result: {res}")
+            print(f"Result: {res}")
+
         if not args.all_databases:
             print("\n" + "=" * 70)
             if args.apply:

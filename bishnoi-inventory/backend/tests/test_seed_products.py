@@ -183,3 +183,12 @@ def test_seed_inventory_and_crm_idempotent(tmp_path):
     assert inv_res2["stocks_zeroed"] == 1
     assert crm_res2["products_created"] == 0
     assert crm_res2["products_updated"] == 1
+
+
+def test_tenant_postgres_url_resolution():
+    from app.tenants import database_url
+
+    base_url = "postgresql://postgres:secret@localhost:5432/bishnoione"
+    tenant_url = database_url(base_url, "getmeds")
+    assert tenant_url == "postgresql://postgres:secret@localhost:5432/bishnoione_getmeds"
+
