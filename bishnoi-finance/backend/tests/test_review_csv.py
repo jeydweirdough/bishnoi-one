@@ -13,6 +13,18 @@ def read(r):
     return list(csv.DictReader(io.StringIO(r.content.decode('utf-8-sig'))))
 
 
+def test_vat_monthly_export_uses_plain_labels_and_peso_amounts(client, ana):
+    rows = read(client.get('/finance/exports/bir-review/vat.csv?year=2026&quarter=1', headers=ana))
+    monthly = [r for r in rows if r['Section'] == 'Monthly']
+    assert len(monthly) == 21
+    assert all('Centavos' not in r['Item'] for r in monthly)
+    assert {r['Item'].split(': ', 1)[1] for r in monthly} == {
+        'VATable sales', 'Output VAT', 'Zero-rated sales', 'VAT-exempt sales',
+        'Non-VAT sales', 'Purchases before VAT', 'Input VAT',
+    }
+    assert all(r['Amount PHP'] == '0.00' for r in monthly)
+
+
 def test_calculated_monthly_withholding_is_not_remittance(monkeypatch):
     monkeypatch.setattr(bir, 'withheld_bills', lambda *a, **k: [])
     monkeypatch.setattr(bir, 'by_atc', lambda *a: [{'taxCentavos': 10000}])

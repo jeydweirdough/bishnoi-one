@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf } from "@/src/platform/ui/paging";
 import { buttonClass } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -18,8 +20,7 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 const withQuery = (path: string, query: URLSearchParams) => (query.size ? `${path}?${query}` : path);
 
-// The journal shows this many entries; the download has all of them.
-const JOURNAL_LIMIT = 200;
+const JOURNAL_SIZES = [10, 25, 50, 100];
 
 const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
 
@@ -28,19 +29,31 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
+  const size = JOURNAL_SIZES.includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  let page = Math.min(pageOf(sp.page), 1000000);
   const source = one(sp.source);
   const state = one(sp.status);
   const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
   // What the page is showing: kept by the source links, the search form and the download.
   const shown = new URLSearchParams();
-  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill" || source === "voucher") shown.set("source", source);
+  if (["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"].includes(source)) shown.set("source", source);
   if (state === "waiting" || state === "rejected") shown.set("status", state);
   if (isDate(from)) shown.set("from", from);
   if (isDate(to)) shown.set("to", to);
   if (q) shown.set("q", q);
   const query = new URLSearchParams(shown);
-  query.set("limit", String(JOURNAL_LIMIT));
-  const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
+  query.set("limit", String(size));
+  query.set("offset", String((page - 1) * size));
+  let [entries, chart] = await Promise.all([load<{ items: Entry[]; total: number }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
+  const last = Math.max(1, Math.ceil(entries.total / size));
+  if (page > last) {
+    page = last;
+    query.set("offset", String((page - 1) * size));
+    entries = await load<{ items: Entry[]; total: number }>(`/finance/ledger/entries?${query}`);
+  }
+  const paging = new URLSearchParams(shown);
+  paging.set("size", String(size));
+  const pager = <Pager total={entries.total} page={page} size={size} base={withQuery("/finance/ledger", paging)} noun="entries" />;
   // One row of links: where entries came from, or where they stand in approval.
   const filters = [
     { value: "", label: "All" },
@@ -50,11 +63,14 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     { value: "invoice", label: "Invoices", by: "source" },
     { value: "bill", label: "Bills", by: "source" },
     { value: "voucher", label: "Payment vouchers", by: "source" },
+    { value: "petty_cash", label: "Petty cash", by: "source" },
+    { value: "expense", label: "Imported expenses", by: "source" },
     { value: "rejected", label: "Rejected", by: "status" },
   ];
   const current = shown.get("status") ?? shown.get("source") ?? "";
   const filterHref = (f: (typeof filters)[number]) => {
     const next = new URLSearchParams(shown);
+    next.set("size", String(size));
     next.delete("source");
     next.delete("status");
     if (f.by) next.set(f.by, f.value);
@@ -68,7 +84,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
       <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/finance/ledger/export", shown)} />}>
         All entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, invoices when issued or voided, and supplier
         bills when recorded or voided: those count at once. An entry typed by hand, or a reversal, waits until someone who may approve entries, not whoever posted it, approves it; only then does it count.
-        Entries are never edited: reverse an entry and post the correction.
+        Entries are never edited: reverse an entry and post the correction. CSV includes every matching entry, across all pages.
       </PageHeader>
       {me.permissions?.includes("journal.post") && (
         <div className="mb-4">
@@ -102,6 +118,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           Search
           <input suppressHydrationWarning type="search" name="q" defaultValue={q} maxLength={100} placeholder="Entry no., memo or reference" className={`${inputClass} w-64`} />
         </label>
+        <label className="text-meta text-ink-2">Entries per page<select suppressHydrationWarning name="size" defaultValue={size} className={inputClass}>{JOURNAL_SIZES.map(n => <option key={n} value={n}>{n}</option>)}</select></label>
         <button suppressHydrationWarning type="submit" className={buttonClass("default", "sm")}>
           Show
         </button>
@@ -131,8 +148,10 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           )}
         </Sheet>
       ) : (
-        <div className="space-y-3">
-          {several && <ApproveSeveral />}
+        <div className="min-w-0">
+          <div className="mb-3">{pager}</div>
+          <div key={`${page}:${size}:${source}:${state}:${from}:${to}:${q}`} role="region" aria-label={"Journal entries, page " + page} tabIndex={0} className="max-h-[65vh] min-w-0 space-y-3 overflow-auto overscroll-contain rounded-xl border border-rule bg-bench/30 p-2 focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+          {several && <><p className="px-2 text-meta text-ink-3">Approval selections apply to this page only.</p><ApproveSeveral /></>}
           {entries.items.map((e) => (
             <Sheet key={e.id} className={`scroll-mt-4 px-5 py-3 ${e.status === "rejected" ? "opacity-75" : ""}`}>
               <span id={e.number} />
@@ -142,7 +161,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 )}
                 <p className={`font-mono text-meta font-semibold ${e.status === "rejected" ? "line-through" : ""}`}>{e.number}</p>
                 <p className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</p>
-                <p className="min-w-0 flex-1 text-sm">
+                <p className="min-w-[12rem] flex-1 break-words text-sm">
                   {e.memo}
                   {e.reference && <span className="text-ink-3"> · Ref. {e.reference}</span>}
                 </p>
@@ -163,7 +182,9 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 )}
                 {e.status === "approved" && !e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
               </div>
-              <table className="mt-2 w-full text-sm">
+              <table className="mt-2 w-full min-w-[36rem] text-sm">
+                <caption className="sr-only">Lines for {e.number}</caption>
+                <thead><tr className="border-t border-rule text-left text-meta text-ink-3"><th scope="col" className="py-1.5 font-medium">Account</th><th scope="col" className="w-36 py-1.5 text-right font-medium">Debit</th><th scope="col" className="w-36 py-1.5 text-right font-medium">Credit</th></tr></thead>
                 <tbody>
                   {e.lines.map((ln, i) => (
                     <tr key={i} className="border-t border-rule">
@@ -196,11 +217,8 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
               )}
             </Sheet>
           ))}
-          {entries.items.length === JOURNAL_LIMIT && (
-            <p className="px-1 text-meta text-ink-3">
-              Showing the newest {JOURNAL_LIMIT} entries. Pick dates or search to find older ones, or download the CSV for all of them.
-            </p>
-          )}
+          </div>
+          {pager}
         </div>
       )}
     </>

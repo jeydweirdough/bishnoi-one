@@ -18,7 +18,7 @@ debits; liabilities, equity and income with credits.
 
 import re
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -352,6 +352,7 @@ def list_entries(
     source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
+    offset: Annotated[int, Query(ge=0)] = 0,
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> dict:
     query = select(JournalEntry)
@@ -366,11 +367,12 @@ def list_entries(
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(JournalEntry.number).like(like), func.lower(JournalEntry.memo).like(like), func.lower(JournalEntry.reference).like(like)))
-    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc()).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc(), JournalEntry.id.desc()).offset(offset).limit(limit)).all()
     # Where each reversal stands, so an entry whose reversal still waits isn't shown as reversed.
     reversals = [e.reversed_by_id for e in items if e.reversed_by_id]
     standing = dict(db.execute(select(JournalEntry.id, JournalEntry.status).where(JournalEntry.id.in_(reversals))).all()) if reversals else {}
-    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items]}
+    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items], "total": total}
 
 
 def entry_for(user: User, e: JournalEntry, reversal_status: str | None = None) -> dict:

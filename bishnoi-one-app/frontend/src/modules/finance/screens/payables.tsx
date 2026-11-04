@@ -1,3 +1,5 @@
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { Plus } from "lucide-react";
 import Link from "next/link";
@@ -33,7 +35,7 @@ function StatusMark({ state }: { state: BillState }) {
         : state === "void"
           ? "bg-danger-tint text-danger"
           : "bg-bench text-ink-2";
-  return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATE_LABELS[state]}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATE_LABELS[state]}</span>;
 }
 
 /** Unpaid / Partly paid / Paid, always beside the amount (you, 2026-10-23: part-payments must be seen). */
@@ -81,6 +83,19 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   for (const key of ["queue", "supplierId", "bucket"]) if (one(sp[key])) query.set(key, one(sp[key]));
   const list = await load<{ items: (BillSummary & { queueNote?: string | null })[]; counts: Record<BillState | "missing", number>; canCreate: boolean; queueLabel: string | null }>(`/finance/bills?${query}`);
+  const size = [10,25,50,100].includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  const { rows, page } = slicePage(list.items, pageOf(sp.page), size);
+  const navigation = new URLSearchParams(query);
+  navigation.delete("missing");
+  if (show) navigation.set("show", show);
+  navigation.set("size", String(size));
+  const tabHref = (tab: string) => {
+    const next = new URLSearchParams(navigation);
+    next.delete("show");
+    if (tab) next.set("show", tab);
+    return "/finance/bills?" + next;
+  };
+  const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/bills?" + navigation} noun="bills" />;
   // Importing Zoho's bills: its own tick, and the testing site only for now (app/routers/imports.py).
   const canImport = may(me, "imports.run") && me.dataEnvironment === "local_test";
   return (
@@ -107,14 +122,14 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
       {(list.queueLabel || query.has("supplierId") || query.has("bucket")) && <p className="mb-3 text-sm text-ink-2">
         {list.queueLabel ?? "Filtered bills"}{query.has("bucket") ? ` · aging bucket: ${query.get("bucket")}` : ""} · {list.items.length} matching bills · <Link href="/finance/bills" className="text-hema hover:underline">Clear filters</Link> · <Link href="/finance/bills/aging" className="text-hema hover:underline">Accounts payable aging</Link>
       </p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
             const n = t.key ? list.counts[t.key as BillState | "missing"] : 0;
             return (
               <Link
                 key={t.key}
-                href={t.key ? `/finance/bills?show=${t.key}` : "/finance/bills"}
+                href={tabHref(t.key)}
                 aria-current={show === t.key ? "page" : undefined}
                 className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
@@ -124,21 +139,38 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
             );
           })}
         </nav>
-        <form className="flex gap-2">
+        <form action="/finance/bills" className="flex max-w-full flex-wrap items-end gap-2" role="search">
           {["queue", "supplierId", "bucket"].map((key) => query.has(key) ? <input suppressHydrationWarning key={key} type="hidden" name={key} value={query.get(key)!} /> : null)}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
           <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <label className="flex items-center gap-2 text-meta text-ink-2">Rows per page<select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2">{[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+          <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold">Show</button>
         </form>
       </div>
-      <Sheet>
+      <div className="mb-3 print:hidden">{pager}</div>
+      <Sheet className="min-w-0 max-w-full">
         {list.items.length === 0 ? (
           <Empty title={q || show ? "No matching bills" : "No bills yet"} icon="lists">
             {!q && !show && list.canCreate ? "Enter the first one with New bill." : null}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[50rem] text-sm">
-              <thead>
+          <>
+            <div key={navigation.toString() + page} role="region" aria-label={"Bills, page " + page} tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:hidden">
+              <BillsTable bills={rows} fmt={fmt} />
+            </div>
+            <div className="hidden print:block"><BillsTable bills={list.items} fmt={fmt} /></div>
+          </>
+        )}
+      </Sheet>
+      <div className="print:hidden">{pager}</div>
+    </>
+  );
+}
+
+function BillsTable({ bills, fmt }: { bills: (BillSummary & { queueNote?: string | null })[]; fmt: ReturnType<typeof makeFormat> }) {
+  return (
+            <table aria-label="Bills" className="w-full min-w-[50rem] text-sm print:min-w-0">
+              <thead className="sticky top-0 z-[1] bg-sheet print:static">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                   <th className="py-2 pr-3 pl-5 font-semibold">Bill</th>
                   <th className="px-3 py-2 font-semibold">Supplier</th>
@@ -151,7 +183,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
-                {list.items.map((b) => (
+                {bills.map((b) => (
                   <tr key={b.id} className="relative hover:bg-bench/40">
                     <td className="py-2.5 pr-3 pl-5 font-mono text-meta">
                       <Link href={`/finance/bills/${b.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
@@ -175,10 +207,6 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </Sheet>
-    </>
   );
 }
 
