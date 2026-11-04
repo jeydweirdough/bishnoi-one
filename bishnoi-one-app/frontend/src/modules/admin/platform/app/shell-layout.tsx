@@ -36,7 +36,7 @@ export async function ShellLayout({ children, unset, bell }: Props) {
       <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
         <Nav me={me} mine={mine} unset={unset} rail={rail} actions={actions} />
         <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-          <header className="mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
+          <header className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem] mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
           <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             <Notices timeZone={me.org?.timezone} />
             {children}

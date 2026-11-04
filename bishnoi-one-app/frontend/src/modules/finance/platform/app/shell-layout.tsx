@@ -40,7 +40,7 @@ export async function ShellLayout({ children, waiting, unset, bell, footer }: Pr
       <div className="finance-shell group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
         <Nav me={me} mine={mine} waiting={waiting} unset={unset} rail={rail} actions={actions} footer={footer} />
         <main className="finance-shell-main min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-          <header className="finance-shell-actions mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
+          <header className="finance-shell-actions mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem] mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
           <div className="finance-shell-width mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             <div role="status" className="mb-4 rounded-lg border border-rule bg-surface px-4 py-3 text-sm print:hidden"><strong>{me.dataEnvironment === "official" ? "Official Finance · Neon" : "Local test Finance · SQLite"}</strong><span className="ml-2 text-ink-2">{me.dataEnvironment === "official" ? "Records entered here are real company records. Use the separate local site for testing." : "Test entries stay in the local database. Zoho sending is disabled."}</span></div>
             <div className="finance-shell-notices"><Notices timeZone={me.org?.timezone} /></div>

@@ -39,9 +39,12 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
   }, [data.people]);
   const [role, setRole] = useState(roles[0]?.id ?? "");
   const forRole = (k: KpiDef) => k.roles.length === 0 || k.roles.some((r) => r.id === role);
-  const shown = kpis.filter(forRole);
-  const shownManual = manual.filter(forRole);
   const rolePeople = data.people.filter((p) => p.roleId === role);
+  // A measure nobody in this role is measured on isn't a column: a table of dashes says nothing.
+  const usedHere = (k: KpiDef) => rolePeople.some((p) => p.applies.includes(k.id) || k.id in p.targets);
+  const shown = kpis.filter((k) => forRole(k) && usedHere(k));
+  const shownManual = manual.filter((k) => forRole(k) && usedHere(k));
+  const roleName = roles.find((r) => r.id === role)?.name ?? "this role";
   const unitOf = (id: string) => kpis.find((k) => k.id === id)!.unit;
 
   const fill = (src: KpiTargets): { people: Cells; teams: Cells } => {
@@ -117,11 +120,11 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
 
   const head = (
     <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-      <th scope="col" className="sticky left-0 bg-sheet py-2 pr-3 font-semibold">
+      <th scope="col" className="sticky left-0 z-10 w-64 min-w-64 bg-sheet py-2 pr-4 font-semibold">
         Name
       </th>
       {shown.map((k) => (
-        <th key={k.id} scope="col" className="min-w-36 px-2 py-2 text-right font-semibold" title={k.description ?? undefined}>
+        <th key={k.id} scope="col" className="min-w-36 px-2 py-2 text-right align-bottom font-semibold" title={k.description ?? undefined}>
           {k.name}
           {k.unit === "money" ? " (₱)" : k.unit === "percent" ? " (%)" : ""}
         </th>
@@ -172,17 +175,28 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
       )}
       <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
         <SectionTitle>People</SectionTitle>
-        {rolePeople.length === 0 ? (
-          <Empty icon="goals" art="gauge" title="No measures set up" actions={<LinkButton href="/platform/settings/crm/performance" variant="primary">Choose what is measured</LinkButton>}>Say who each measure is for under Settings → Performance, then set their targets here.</Empty>
+        {rolePeople.length === 0 || shown.length === 0 ? (
+          <Empty
+            icon="goals"
+            art="gauge"
+            title={rolePeople.length === 0 ? "No one to set targets for" : `Nothing is measured for ${roleName} yet`}
+            actions={<LinkButton href="/platform/settings/crm/performance" variant="primary">Choose what is measured</LinkButton>}
+          >
+            {rolePeople.length === 0
+              ? "Add people with a role in the CRM, then set their targets here."
+              : `${rolePeople.length} ${rolePeople.length === 1 ? "person has" : "people have"} this role, but no measure is set for it. Say which measures apply to ${roleName} under Settings → Performance, then set their targets here.`}
+          </Empty>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-max text-sm">
             <thead>{head}</thead>
             <tbody className="divide-y divide-rule">
               {rolePeople.map((p) => (
                 <tr key={p.person.id}>
-                  <th scope="row" className="sticky left-0 bg-sheet py-2 pr-3 text-left font-medium">
-                    {p.person.name}
-                    <span className="block text-meta font-normal text-ink-3">
+                  <th scope="row" className="sticky left-0 z-10 w-64 min-w-64 max-w-64 bg-sheet py-2 pr-4 text-left font-medium">
+                    <span className="block truncate" title={p.person.name}>
+                      {p.person.name}
+                    </span>
+                    <span className="block truncate text-meta font-normal text-ink-3" title={`${p.role} · ${p.team?.name ?? "No team"}`}>
                       {p.role} · {p.team?.name ?? "No team"}
                     </span>
                   </th>
@@ -211,17 +225,19 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
         )}
       </Sheet>
 
-      {data.teams.length > 0 && (
+      {data.teams.length > 0 && shown.length > 0 && (
         <Sheet className="overflow-x-auto px-5 pt-3 pb-4">
           <SectionTitle>Teams</SectionTitle>
           <p className="mb-2 text-meta text-ink-3">Leave a box empty to use the team&apos;s people&apos;s targets added up (shown in grey). A percentage needs its own.</p>
-          <table className="w-full text-sm">
+          <table className="w-full min-w-max text-sm">
             <thead>{head}</thead>
             <tbody className="divide-y divide-rule">
               {data.teams.map((t) => (
                 <tr key={t.team.id}>
-                  <th scope="row" className="sticky left-0 bg-sheet py-2 pr-3 text-left font-medium">
-                    {t.team.name}
+                  <th scope="row" className="sticky left-0 z-10 w-64 min-w-64 max-w-64 bg-sheet py-2 pr-4 text-left font-medium">
+                    <span className="block truncate" title={t.team.name}>
+                      {t.team.name}
+                    </span>
                   </th>
                   {shown.map((k) => {
                     const sum = summed(t.team.id, k);
@@ -295,9 +311,11 @@ export function TargetsGrid({ org, data, previous, monthName, previousName, resu
 
       <FormError message={error} />
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" loading={pending}>
-          Save targets
-        </Button>
+        {shown.length > 0 && (
+          <Button type="submit" variant="primary" loading={pending}>
+            Save targets
+          </Button>
+        )}
         <LinkButton href={`${resultsHref}?month=${data.month}`} variant="quiet">
           See the results
         </LinkButton>
