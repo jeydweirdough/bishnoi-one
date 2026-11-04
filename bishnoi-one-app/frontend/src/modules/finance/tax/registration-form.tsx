@@ -97,8 +97,8 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           <Field label="Branch code" size="sm" error={fields.branchCode} hint="00000 for the head office.">
             {(f) => <Input {...f} inputMode="numeric" value={v.branchCode} onChange={(e) => set({ branchCode: e.target.value.replace(/\D/g, "") })} />}
           </Field>
-          <Field label="RDO code" size="sm" error={fields.rdoCode} hint="3 digits, from the certificate of registration (Form 2303). On every BIR form.">
-            {(f) => <Input {...f} inputMode="numeric" maxLength={3} value={v.rdoCode} onChange={(e) => set({ rdoCode: e.target.value.replace(/\D/g, "") })} />}
+          <Field label="RDO code" size="sm" error={fields.rdoCode} hint="3 characters from Form 2303, such as 053 or 53A. Letters are kept on reports and forms.">
+            {(f) => <Input {...f} autoCapitalize="characters" maxLength={3} value={v.rdoCode} onChange={(e) => set({ rdoCode: e.target.value.toUpperCase() })} />}
           </Field>
           <Field label="Fiscal year ends in" size="md" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
             {(f) => (

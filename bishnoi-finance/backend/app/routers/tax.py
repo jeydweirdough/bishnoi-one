@@ -221,11 +221,14 @@ class ProfileIn(Api):
     # VAT rounded on each line, or once per invoice (step 16b); left off, it stays as it was.
     rounding: Literal["line", "invoice"] | None = None
 
-    @field_validator("rdo_code")
+    @field_validator("rdo_code", mode="before")
     @classmethod
     def _rdo(cls, value: str | None) -> str | None:
-        if value is not None and value.strip() and not re.fullmatch(r"\d{3}", value.strip()):
-            raise ValueError("An RDO code is 3 digits, as on the certificate of registration (Form 2303).")
+        if value is not None and not isinstance(value, str):
+            raise ValueError("Use the RDO code as text, such as 053 or 53A.")
+        value = value.strip().upper() if isinstance(value, str) else value
+        if value is not None and value and not re.fullmatch(r"[0-9]{2}[0-9A-Z]", value):
+            raise ValueError("Use the 3-character RDO code from Form 2303, such as 053 or 53A.")
         return value.strip() or None if value is not None else None
 
     @field_validator("branch_code")

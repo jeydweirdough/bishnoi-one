@@ -32,7 +32,7 @@ from app.funds import RELEASE_METHODS as METHODS
 from app.ledger import Leg, account, money_account, post
 from app.ledger import settings as posting_settings
 from app.locks import locked
-from app.models import BankAccount, Invoice, InvoicePayment, InvoiceSeries, JournalEntry
+from app.models import BankAccount, ImportLink, ImportRecord, ImportRun, Invoice, InvoicePayment, InvoiceSeries, JournalEntry
 from app.routers.funds import today
 from app.routers.tax import (
     Api,
@@ -197,12 +197,18 @@ def links(db: Session, invoices: list[Invoice]) -> dict[str, dict]:
     olds = {i.replaces_id for i in invoices if i.replaces_id}
     found_old = {o.id: o for o in db.scalars(select(Invoice).where(Invoice.id.in_(olds)))} if olds else {}
     newer = {n.replaces_id: n for n in db.scalars(select(Invoice).where(Invoice.replaces_id.in_(ids)))} if ids else {}
+    imported = {link.invoice_id: (link, rec, run) for link, rec, run in db.execute(
+        select(ImportLink, ImportRecord, ImportRun).join(ImportRecord, ImportLink.record_id == ImportRecord.id).join(ImportRun, ImportRecord.run_id == ImportRun.id)
+        .where(ImportLink.invoice_id.in_(ids), ImportLink.payment_id.is_(None)))} if ids else {}
     out = {}
     for i in invoices:
         old, new = found_old.get(i.replaces_id), newer.get(i.id)
         out[i.id] = {
             "replaces": {"id": old.id, "number": old.number, "voidedAt": iso(old.voided_at), "reason": old.void_reason} if old else None,
             "replacedBy": {"id": new.id, "number": new.number, "status": new.status} if new else None,
+            # Came from an export (app/oojeema_sales_import.py): where from, who and when. Shown on screen.
+            "imported": {"source": imported[i.id][1].source, "file": next(iter(imported[i.id][2].files), ""), "files": imported[i.id][2].files, "sourceId": imported[i.id][1].source_id, "by": imported[i.id][2].created_by,
+                         "at": iso(imported[i.id][2].created_at)} if i.id in imported else None,
         }
     return out
 
@@ -303,6 +309,11 @@ def found(db: Session, invoice_id: str) -> Invoice:
     if inv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such invoice.")
     return inv
+
+
+def from_export(inv: Invoice) -> bool:
+    """Numbered outside Finance and imported: issued with no BIR series (an invoice issued here always has one)."""
+    return inv.number is not None and inv.series_id is None
 
 
 def must_be_draft(inv: Invoice) -> None:
@@ -483,7 +494,9 @@ def void(user: permitted("invoices.void"), db: DB, settings: SettingsDep, invoic
     inv = found(db, invoice_id)
     locked(db, Invoice, [inv.id])  # a payment saved at the same moment is either seen or waits; never both
     cancel(db, settings, user, inv, body.reason)
-    business_events.emit(db, None, "invoice.voided", {**{"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos}, "reason": body.reason})
+    # An imported invoice was never told to the other apps, so its void isn't either.
+    if not from_export(inv):
+        business_events.emit(db, None, "invoice.voided", {**{"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos}, "reason": body.reason})
     db.commit()
     return invoice_out(db, inv, settings)
 
@@ -517,6 +530,8 @@ def reissue(user: permitted("invoices.create"), db: DB, settings: SettingsDep, i
     inv = found(db, invoice_id)
     if inv.status == "draft":
         raise HTTPException(status.HTTP_409_CONFLICT, "A draft is changed directly: there's nothing to reissue.")
+    if from_export(inv):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This invoice was imported with its own number, so it isn't reissued from a Finance series. Void it, and correct it where it was issued.")
     if inv.status == "issued":
         if not access_of(user).can("invoices.void"):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role doesn't allow voiding invoices.")
@@ -621,11 +636,13 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
     db.add(p)
     db.flush()
     audit(db, user, "invoice.paid", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
-    business_events.emit(db, None, "payment.recorded", {
-        "invoiceId": inv.id, "number": inv.number, "customerId": inv.customer_id, "paidOn": body.paid_on.isoformat(),
-        "amountCentavos": settled, "paidCentavos": inv.paid_centavos, "totalCentavos": inv.total_centavos})
+    # An imported invoice was never told to the other apps: nothing about it goes out afterwards either.
+    if not from_export(inv):
+        business_events.emit(db, None, "payment.recorded", {
+            "invoiceId": inv.id, "number": inv.number, "customerId": inv.customer_id, "paidOn": body.paid_on.isoformat(),
+            "amountCentavos": settled, "paidCentavos": inv.paid_centavos, "totalCentavos": inv.total_centavos})
     # Paid in full (step 13): the sales order's chain is closed, and the CRM hears it.
-    if inv.paid_centavos >= inv.total_centavos:
+    if inv.paid_centavos >= inv.total_centavos and not from_export(inv):
         business_events.emit(db, None, "invoice.paid", {
             "id": inv.id, "number": inv.number, "customerId": inv.customer_id, "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id,
             "paidAt": datetime.now(UTC).isoformat(), "totalCentavos": inv.total_centavos})

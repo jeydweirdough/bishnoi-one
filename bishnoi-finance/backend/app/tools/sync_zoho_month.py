@@ -7,7 +7,7 @@ from app.config import Settings
 from app.db import make_engine,make_sessions
 from app.migrate import upgrade
 from app.zoho_probe import ZohoReader,ProbeStopped
-from app.zoho_month_sync import sync_month,month_window
+from app.zoho_month_sync import sync_month,month_window,WORK_HOURS
 from app.tools.sync_zoho_orders import sync_lock
 
 
@@ -22,7 +22,7 @@ def cycle(settings,sessions,args)->bool:
             reader=ZohoReader(settings,maximum=args.requests,progress=lambda n:print(f'Background source sync: {n} GET reads.',flush=True) if n%10==0 else None)
             reader.daily_limit=args.daily_limit
             start,end=month_window()
-            result=sync_month(sessions,reader,start,end,args.details,args.daily_limit)
+            result=sync_month(sessions,reader,start,end,args.details,args.daily_limit,interval=args.interval,work_hours=(args.work_start,args.work_end))
             print(json.dumps(result),flush=True)
             return True
     except (ProbeStopped,HTTPException,ValueError):
@@ -39,9 +39,12 @@ def main():
     parser.add_argument('--requests',type=int,default=100)
     parser.add_argument('--details',type=int,default=30)
     parser.add_argument('--daily-limit',type=int,default=500)
+    # Older details are filled in only between these hours, Monday to Friday (Manila); changes are read at any hour.
+    parser.add_argument('--work-start',type=int,default=WORK_HOURS[0])
+    parser.add_argument('--work-end',type=int,default=WORK_HOURS[1])
     args=parser.parse_args()
-    if args.interval<300 or not 1<=args.requests<=100 or not 0<=args.details<=60 or not 1<=args.daily_limit<=1000:
-        raise SystemExit('Use interval>=300seconds,1–100requests,0–60details anddailycap1–1000.')
+    if args.interval<300 or not 1<=args.requests<=100 or not 0<=args.details<=60 or not 1<=args.daily_limit<=1000 or not 0<=args.work_start<args.work_end<=24:
+        raise SystemExit('Use interval>=300seconds,1–100requests,0–60details,dailycap1–1000 and work hours 0–24 (start before end).')
     settings=Settings();engine=make_engine(settings.database_url, postgres_driver=settings.postgres_driver);upgrade(engine);sessions=make_sessions(engine)
     # A local stop marker ends this agent-started worker without touching other apps.
     local=settings.database_url.startswith('sqlite:///')

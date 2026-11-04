@@ -1,3 +1,4 @@
+import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
@@ -102,6 +103,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
         Suppliers&apos; invoices, as the company owes them. A bill is made with its invoice attached and submitted; approved; checked if tax is withheld; and
         only then posted to the books and ready to pay. Returned, it goes back with the reason. A posted bill is voided, never changed.
       </PageHeader>
+      <ReviewExports filters={query.toString()} options={[ ["bills", "Bills: one row per bill"], ["bill-lines", "Bill lines: one row per line"] ]} />
       {(list.queueLabel || query.has("supplierId") || query.has("bucket")) && <p className="mb-3 text-sm text-ink-2">
         {list.queueLabel ?? "Filtered bills"}{query.has("bucket") ? ` · aging bucket: ${query.get("bucket")}` : ""} · {list.items.length} matching bills · <Link href="/finance/bills" className="text-hema hover:underline">Clear filters</Link> · <Link href="/finance/bills/aging" className="text-hema hover:underline">Accounts payable aging</Link>
       </p>}

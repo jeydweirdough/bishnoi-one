@@ -21,7 +21,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.locks import lock_series
+from app.locks import lock_series, locked
 from app.models import Account, FundRequest, JournalEntry, JournalLine, LedgerSettings
 
 
@@ -40,6 +40,23 @@ def next_number(db: Session, on: date) -> str:
     return f"{prefix}{(int(last.rsplit('-', 1)[1]) + 1 if last else 1):04d}"
 
 
+def locked_settings(db: Session) -> LedgerSettings:
+    """Coordinate posting/approval with closing, and refresh the current closed date.
+
+    Take this before numbering or deciding a journal entry. SQLite takes its writer
+    lock; PostgreSQL holds the one settings row until this transaction ends.
+    """
+    rows = locked(db, LedgerSettings, [1])
+    if not rows:
+        raise HTTPException(status.HTTP_409_CONFLICT, 'The posting settings are missing. Restore the setup before changing the books.')
+    return rows[0]
+
+
+def require_open_period(on: date, settings: LedgerSettings) -> None:
+    if settings.locked_until is not None and on <= settings.locked_until:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"The books are closed up to {settings.locked_until:%d %b %Y}. Date it after that, or ask the Finance Head to open the period.")
+
+
 def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, reference: str | None = None, source: str = "manual",
          fund: FundRequest | None = None, reverses: JournalEntry | None = None, waits: bool = False, by_id: str | None = None) -> JournalEntry:
     """A balanced entry, posted. Legs of zero are left out; a leg with no
@@ -47,9 +64,7 @@ def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, referen
     step it belongs to doesn't happen either. `waits`: typed by hand, so it
     counts only once someone else approves it (app/routers/ledger.py)."""
     # The books closed up to a day (step 16e): nothing is posted on or before it, not even a reversal.
-    lock = settings(db).locked_until
-    if lock is not None and on <= lock:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"The books are closed up to {lock:%d %b %Y}. Date it after that, or ask the Finance Head to open the period.")
+    require_open_period(on, locked_settings(db))
     legs = [leg for leg in legs if leg.debit or leg.credit]
     missing = [leg for leg in legs if leg.account is None]
     if missing:

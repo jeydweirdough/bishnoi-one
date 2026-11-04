@@ -81,13 +81,17 @@ def paying_accounts(db: DB) -> list[Account]:
     """The accounts a voucher is paid from: those under the chart's CASH account (Oojeema's
     chart groups the banks, petty cash funds and e-wallets there), plus the money accounts set
     under Default accounts. A chart with nothing under CASH offers every asset account.
-    Decided 2026-10-23 (you weren't sure; Cristal would know best: decision 5)."""
-    cash = [a.id for a in db.scalars(select(Account).where(func.upper(func.trim(Account.name)) == "CASH"))]
-    under = list(db.scalars(select(Account).where(Account.parent_id.in_(cash), Account.is_active))) if cash else []
-    if not under:
-        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active).order_by(Account.code)))
+    Decided 2026-10-23 (you weren't sure; Cristal would know best: decision 5).
+    Every account under CASH at any depth (e.g. a dollar account under Cash in Bank), the same rule
+    as the cash disbursements book (app/money_accounts.py); it used to look one level down only,
+    so nested bank accounts couldn't be paid from or matched (fixed 2026-10-30)."""
+    from app.money_accounts import money_account_ids
+
     s = posting_settings(db)
-    ids = {a.id for a in under} | {x for x in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if x}
+    defaults = {x for x in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if x}
+    ids = money_account_ids(db)
+    if not ids - defaults:
+        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active).order_by(Account.code)))
     return list(db.scalars(select(Account).where(Account.id.in_(ids), Account.is_active).order_by(Account.code)))
 
 

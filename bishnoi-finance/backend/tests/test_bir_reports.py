@@ -125,7 +125,8 @@ def test_purchases_and_tax_withheld_from_suppliers_come_from_the_finance_bills(c
     assert [(r["atc"], r["rateBp"], r["baseCentavos"], r["taxCentavos"]) for r in qap["rows"]] == [("WC158", 100, 1_000_000, 10_000)]
     assert qap["rows"][0]["nature"].startswith("Goods")
     eq = client.get(f"/finance/bir/withholding/1601eq?{q}", headers=ana).json()
-    assert eq["totalCentavos"] == 10_000 and eq["remitted"][0]["amountCentavos"] == 10_000  # October's 0619E
+    assert eq["totalCentavos"] == 10_000 and eq["remitted"][0]["calculatedWithholdingCentavos"] == 10_000  # October calculation is not a remittance
+    assert eq["remitted"][0]["amountCentavos"] is None and eq["dueCentavos"] is None
     cert = client.get(f"/finance/bir/withholding/2307?{q}&supplierId={s['id']}", headers=ana).json()
     assert cert["suppliers"][0]["taxCentavos"] == 10_000
     assert cert["certificate"]["rows"][0]["months"] == [1_000_000, 0, 0] and cert["certificate"]["payee"]["tin"] == "123-456-789"

@@ -11,12 +11,14 @@ import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { postEntry, reverseEntry, saveAccount, savePosting } from "@/src/modules/finance/ledger/actions";
 import { TYPE_LABELS, type Account, type AccountType, type Posting } from "@/src/modules/finance/ledger/types";
 
-/** Accounts for a picker, grouped by type, active ones only. */
-function AccountOptions({ accounts, only }: { accounts: Account[]; only?: AccountType }) {
+/** Accounts for a picker, grouped by type, active ones only. Called as a function, not used as a component: the
+ *  searchable Select (src/platform/ui/pickers.tsx) reads the <option>s written directly inside it and can't see into a
+ *  component, so a component here left its list empty and showed a saved account as its id (found 2026-10-30). */
+function accountOptions(accounts: Account[], only?: AccountType | AccountType[]) {
   return (
     <>
       {(Object.keys(TYPE_LABELS) as AccountType[])
-        .filter((t) => !only || t === only)
+        .filter((t) => !only || (Array.isArray(only) ? only.includes(t) : t === only))
         .map((t) => {
           const of = accounts.filter((a) => a.type === t && a.isActive);
           return of.length ? (
@@ -135,7 +137,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
                     className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
                   >
                     <option value="">Select an account…</option>
-                    <AccountOptions accounts={accounts} />
+                    {accountOptions(accounts)}
                   </select>
                 </td>
                 <td className="px-2 py-1.5">
@@ -341,7 +343,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
           {(p) => (
             <Select {...p} value={parentId} onChange={(e) => setParentId(e.target.value)}>
               <option value="">Nothing (at the top)</option>
-              <AccountOptions accounts={accounts.filter((a) => a.id !== account?.id)} />
+              {accountOptions(accounts.filter((a) => a.id !== account?.id))}
             </Select>
           )}
         </Field>
@@ -406,7 +408,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   );
 }
 
-/** Which accounts the marketing request steps post to. */
+/** Defaults used when company transactions post to the books. */
 export function PostingEditor({ posting, accounts }: { posting: Posting; accounts: Account[] }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(posting.items.map((i) => [i.key, i.account?.id ?? ""])));
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -431,13 +433,14 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
       }}
       className="space-y-4"
     >
+      <p className="text-sm text-ink-2">These are the company's own accounts, not a customer's accounts. The money defaults are used for receipts and payments when no specific money account is selected.</p>
       <FormGrid>
         {posting.items.map((i) => (
-          <Field key={i.key} label={i.label} size="md" error={fields[i.key]}>
+          <Field key={i.key} label={i.label} size="md" error={fields[i.key]} hint={i.key.startsWith("fx_") ? "The same combined Forex Gain/Loss account can be selected for both." : undefined}>
             {(p) => (
               <Select {...p} value={values[i.key]} disabled={!posting.canEdit} onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}>
                 <option value="">Not set</option>
-                <AccountOptions accounts={accounts} only={i.type} />
+                {accountOptions(accounts, i.types ?? i.type)}
               </Select>
             )}
           </Field>

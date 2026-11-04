@@ -377,9 +377,8 @@ export async function PostingPage() {
   return (
     <>
       <PageHeader title="Default accounts">
-        The accounts used by the automatic entries for marketing requests. On release: debit Advances to employees, credit the cash or bank account used. On
-        liquidation: debit each category&apos;s expense account, credit Advances to employees, and credit Due to employees for any excess spent. Refunds and
-        reimbursements settle these same accounts.
+        Default destinations for accounting entries created from invoices, bills, expenses, payments and staff advances. Money accounts belong to the company,
+        not the customer. Where a transaction lets you choose a specific account, that choice takes precedence.
       </PageHeader>
       <Sheet className="px-5 py-4">
         <PostingEditor posting={posting} accounts={chart.items} />

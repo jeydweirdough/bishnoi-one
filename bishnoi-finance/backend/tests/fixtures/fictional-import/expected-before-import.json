@@ -1,0 +1,43 @@
+{
+  "fictional": true,
+  "currency": "PHP",
+  "period": [
+    "2026-01-01",
+    "2026-01-31"
+  ],
+  "expected": {
+    "salesNet": 300000,
+    "outputVat": 36000,
+    "salesGross": 336000,
+    "customerReceipts": 168000,
+    "receivables": 168000,
+    "billNet": 200000,
+    "billInputVat": 24000,
+    "billGross": 224000,
+    "supplierPayments": 56000,
+    "payables": 168000,
+    "expenseNet": 10000,
+    "expenseInputVat": 1200,
+    "expenseGross": 11200,
+    "inputVat": 25200,
+    "moneyNetMovement": 100800,
+    "expensesTotal": 210000,
+    "profitBeforeOtherCosts": 90000
+  },
+  "counts": {
+    "invoices": 3,
+    "customerPayments": 2,
+    "bills": 2,
+    "supplierPayments": 1,
+    "importedExpenses": 1
+  },
+  "files": {
+    "00-Fictional-Vendor.csv": "3b553fb2c0f48b59dccde01d976097a39f3d84a7866d221ef04eeb3d84260ef0",
+    "01-Sales-Journal.csv": "9b8d6a8d9c0e24f21071984593a43b5fc4a71b95ff996478794378428acb4154",
+    "02-Receipt-Journal.csv": "705e22dbaaec11634104df4de1fa95d6dadf996661213b91a7896df6676e6d0d",
+    "03-Bills.csv": "83c338ad152688e9f520eef55a496b5fc597b44a775920a7f96e037a1b171ca7",
+    "04-Vendor-Payments.csv": "d8c2627c219c7b96d9d9bf167fda35d953b7917ee7649458ac9bb32990f13933",
+    "05-Expenses.csv": "e8fa725b91a145ecc55aeff42242085d15f13248c388654f3d78c8341586cf80",
+    "Expected-results.csv": "58d3d13fb4e2073f13c6750bba238935ae044a8d60980be8ff689d7e0e00e09d"
+  }
+}

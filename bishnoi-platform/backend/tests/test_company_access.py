@@ -137,6 +137,26 @@ def test_giving_a_role_tells_every_module_signed(client, getmeds, modules):
     assert [bare(x) for x in notes["https://pharmacy-api.example.com/platform/roles"]["people"]] == [{"email": "rio@getmeds.test", "role": None, "admin": False, "active": True, "details": {}}]
 
 
+def test_signed_role_messages_keep_person_details_with_their_module(client, getmeds, modules):
+    from app.models import Identity
+
+    with client.app.state.sessions() as db:
+        rio = db.get(Identity, getmeds["rio"]["id"])
+        rio.app_details = {"crm": {"syntheticField": "CRM only"}, "pharmacy": {"syntheticField": "Pharmacy only"}}
+        db.commit()
+    h = getmeds["owner"]["h"]
+    role = client.post("/identity/access/roles", json={"name": "Reader", "permissions": {"crm": ["customers.view"]}}, headers=h).json()
+    modules.clear()
+    r = client.put(f"/identity/access/people/{getmeds['jade']['id']}/role", json={"roleId": role["id"]}, headers=h)
+    assert r.status_code == 200, r.text
+    key = client.get("/pass/key").json()["publicKey"]
+    notes = {url: claims_of(body["pass"], key) for url, body in modules}
+    for module, expected in (("crm", "CRM only"), ("pharmacy", "Pharmacy only")):
+        people = notes[f"https://{module}-api.example.com/platform/roles"]["people"]
+        person = next(p for p in people if p["email"] == "rio@getmeds.test")
+        assert person["details"] == {"syntheticField": expected}
+
+
 def test_the_pass_carries_the_role_given_here(client, getmeds):
     h = getmeds["owner"]["h"]
     role = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view"]}}, headers=h).json()

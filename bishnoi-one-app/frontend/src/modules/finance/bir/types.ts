@@ -106,7 +106,7 @@ export type Withholding0619E = { taxpayer: Taxpayer; period: PeriodOut; year: nu
 
 export type Withholding1601EQ = {
   taxpayer: Taxpayer; period: PeriodOut; year: number; quarter: number; form: "1601EQ"; title: string;
-  rows: AtcRow[]; totalCentavos: number; remitted: { label: string; amountCentavos: number }[]; dueCentavos: number; notes: string[];
+  rows: AtcRow[]; totalCentavos: number; remitted: { label: string; amountCentavos: number | null; calculatedWithholdingCentavos: number }[]; dueCentavos: number | null; notes: string[];
 };
 
 export type Withholding1604E = {

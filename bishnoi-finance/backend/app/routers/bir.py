@@ -11,6 +11,8 @@
 
 import csv
 import io
+from decimal import Decimal
+import re
 from datetime import date
 from typing import Literal
 
@@ -35,14 +37,16 @@ BOOKS = {
 
 
 def pesos(centavos: int | None) -> str:
-    return f"{(centavos or 0) / 100:.2f}"
+    return f"{Decimal(centavos or 0) / 100:.2f}"
 
 
 def as_csv(name: str, header: list[str], rows: list[list]) -> Response:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(header)
-    writer.writerows(rows)
+    # Protect text cells while preserving exact numeric amounts, including negatives.
+    from app.routers.exports import text
+    writer.writerows([[text(v) if isinstance(v, str) and not re.fullmatch(r"-?\d+(?:\.\d+)?", v) else v for v in row] for row in rows])
     # A byte-order mark, so Excel reads the names' ñ and accents right.
     return Response("﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
 
@@ -222,3 +226,52 @@ def readiness(_: Viewer, db: DB, settings: SettingsDep, start: date | None = Non
 
     start, end = span(start, end, settings)
     return {**compare(db, start, end, ZoneInfo(settings.org_timezone)), "period": period_out(start, end)}
+
+
+@router.get("/returns/vat/draft")
+def vat_draft(_: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quarter: int | None = None) -> dict:
+    from app.bir_form_2550q import build_draft
+    try:
+        return build_draft(vat(_, db, settings, year, quarter))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+
+
+@router.get("/returns/vat/draft.pdf")
+def vat_draft_pdf(_: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quarter: int | None = None) -> Response:
+    from app.bir_pdf import render_draft
+    try:
+        document = render_draft(vat_draft(_, db, settings, year, quarter))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return Response(document, media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="2550Q-review-draft.pdf"', "Cache-Control": "no-store"})
+
+
+@router.get("/withholding/2307/draft.pdf")
+def certificate_draft_pdf(user: Viewer, db: DB, settings: SettingsDep, supplier_id: str = Query(..., alias="supplierId"), year: int | None = None, quarter: int | None = None) -> Response:
+    from app.bir_form_2307 import prepare, render
+    try:
+        report=withholding_2307(user,db,settings,year,quarter,supplier_id)
+        if not report.get('certificate',{}).get('rows'):
+            raise HTTPException(404,'No withholding certificate records for this payee and period.')
+        document=render(prepare(report))
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from None
+    return Response(document,media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="2307-review-certificate.pdf"','Cache-Control':'no-store'})
+
+
+@router.get("/withholding/{form}/draft.pdf")
+def withholding_draft_pdf(form: Literal["0619e", "1601eq", "1604e"], user: Viewer, db: DB, settings: SettingsDep, year: int | None = Query(None, ge=1900, le=9998), month: int | None = Query(None, ge=1, le=12), quarter: int | None = Query(None, ge=1, le=4)) -> Response:
+    from app.bir_withholding_pdf import prepare, render
+    if form=='0619e':report=withholding_0619e(user,db,settings,year,month)
+    elif form=='1601eq':report=withholding_1601eq(user,db,settings,year,quarter)
+    else:report=withholding_1604e(user,db,settings,year,'json')
+    try:document=render(prepare(report))
+    except ValueError as exc:raise HTTPException(422,str(exc)) from None
+    return Response(document,media_type='application/pdf',headers={'Content-Disposition':f'attachment; filename="{form}-review-draft.pdf"','Cache-Control':'no-store'})
+
+
+@router.get("/filing-guidance")
+def filing_guidance(_: Viewer, form: Literal["2550Q", "2307", "0619E", "1601EQ", "1604E"]) -> dict:
+    from app.bir_filing import guidance
+    return guidance(form)

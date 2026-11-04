@@ -11,6 +11,62 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  { version: "0.4.44", date: "2026-11-03", changes: ["Budgets opens the selected fiscal year correctly. Missing-TIN messages distinguish sales, withholding credits and suppliers; they ask for review without telling staff to invent a TIN or recreate an existing bill."] },
+  { version: "0.4.43", date: "2026-11-03", changes: ["Review PDFs for 2307, 0619E, 1601EQ and 1604E use official BIR form backgrounds. 2550Q TIN and RDO placement follows the printed cells. Missing filing information and actual payments stay unverified; printing is separate from electronic validation and filing."] },
+  {version: "0.4.42", date: "2026-11-03", changes: ["Export bills and lines, sales and customer payments, supplier payments and allocations, petty cash and imported expenses as CSV for review. VAT and withholding review exports include source figures. Existing PDF and print options stay available. Quarterly withholding no longer treats calculated monthly tax as already remitted; remaining payable stays unverified without payment evidence."]},
+  {version: "0.4.41", date: "2026-11-03", changes: ["Default money accounts now clearly refer to the company receiving or paying money. A combined Forex Gain/Loss account can be used for gains and losses. RDO codes can include a letter, such as 53A, without losing it."]},
+  {version: "0.4.40", date: "2026-11-03", changes: ["Download a 2550Q review PDF from the VAT return page, with the official form background and a source-to-form check sheet. Missing credits, adjustments and payment details stay blank for review. This is a draft, not a filed return."]},
+  {version: "0.4.39", date: "2026-11-03", changes: ["Oojeema receipt matching offers all active chart accounts, with their codes and types. Non-cash matches remain held for settlement review; selecting an account does not turn it into a bank deposit. Supplier and expense payment choices still use money accounts."]},
+  {
+    version: "0.4.38",
+    date: "2026-10-31",
+    changes: [
+      "Import Oojeema sales, on Sales invoices (testing site): choose Oojeema's Sales Journal and Receipt Journal together, see what's ready, held and skipped with each reason, then import. One invoice for each SI, with Oojeema's number, customer TIN and amounts. Finance's BIR series isn't touched.",
+      "An invoice cancelled in Oojeema comes in voided on the day it was cancelled. A negative row with no original in the file is held, and rows outside January to March are skipped.",
+      "Customer payments come from the Receipt Journal, a whole receipt at a time, and reach Cash receipts and SAWT. A receipt that settles an older invoice, or has an overpayment, is held; older ones wait for opening balances. Tax withheld posts with its ATC blank, because Oojeema's file doesn't have it.",
+      "Imported expenses, under Petty cash: Zoho's expenses as read-only history, with their own Import from Zoho export button. They reach the books, the purchase journal, SLP and the VAT return. They aren't petty cash and nobody edits them; a mistake is voided, which reverses its entry.",
+      "Import matching now has a part for each import: Bills, Oojeema sales (deposit accounts) and Expenses. Bank account numbers aren't kept: only their last four digits show.",
+      "BIR readiness counts imported expenses as a source that reaches the purchase lists.",
+    ],
+  },
+  {
+    version: "0.4.37",
+    date: "2026-10-31",
+    changes: [
+      "Payment imports check the whole amount applied to each bill, including repeated lines and other payments in the same file. Conflicting amounts stay on hold, valid split payments keep their lines, and changed files or account choices need a fresh preview.",
+      "Book reports and bank matching count approved entries only. Entries still waiting for approval or rejected no longer change those figures.",
+      "An entry waiting for approval cannot be approved into a closed period. Approvals and closing use the same check, including when two people save together.",
+      "Data cleanup keeps petty cash accounting entries and their void reversals with the voucher instead of allowing those entries to be deleted on their own.",
+    ],
+  },
+  {
+    version: "0.4.36",
+    date: "2026-10-31",
+    changes: [
+      "A new Overview, your own: one lead card and up to five cards with pictures instead of boxes, chosen from what your role can see and do. Hover over a bar or a slice for the exact amount and count; click it to open the list behind it.",
+      "Tabs for Payables, Receivables, Cash and Tax, only the ones you can see, each with the number waiting for you. One switch changes every picture between this month, this quarter and this year; what's waiting for you stays today's queue.",
+      "Your hand-offs shows both sides: what's waiting for you and what you passed on that's waiting on others. Each row opens the record; nothing is approved from the Overview, and nobody sees their own record as theirs to check.",
+      "Edit my overview: choose your own five cards from what you may see, or reset to the suggested ones.",
+      "Only approved journal entries, recorded bills and posted petty cash count in the figures. Zoho's invoices are labelled as copies, not yet in the books. BIR deadlines appear once Sir Mel's list is in.",
+    ],
+  },
+  {
+    version: "0.4.35",
+    date: "2026-10-30",
+    changes: [
+      "Default accounts shows each account's code and name again, and its lists offer the accounts to pick (they had shown only a long code since the searchable lists came in). The same fix for \"Sits under\" when adding or changing an account in the chart.",
+      "A page's ⓘ explanation that's too long to fit above the icon now opens below it, instead of being cut off at the top.",
+    ],
+  },
+  {
+    version: "0.4.34",
+    date: "2026-10-30",
+    changes: [
+      "New Petty cash page in the sidebar: one voucher for each paper petty cash voucher, with a line for each official receipt (its date, store, receipt number, account, VAT and any tax withheld) and a photo or PDF of every receipt. It can't be submitted until every receipt is attached. Someone else, never whoever made or submitted it, opens each receipt beside its line, then checks and posts it or returns it with the reason. A posted voucher is voided with a reason. Each fund's balance in the books is shown at the top, the voucher prints with every receipt after it, and posted lines are in the BIR purchase lists.",
+      "Marketing requests are back under their own name in the sidebar, on one page with a tab for each stage (to release, to review, to settle, outstanding advances, settled and cancelled) and how many are in each. It opens on the first stage your role can act on. Old links still work.",
+      "The Zoho connection page shows today's Zoho requests against Finance's daily cap, what's kept for changed records, and the daily list check; changed records are read first.",
+    ],
+  },
   {
     version: "0.4.33",
     date: "2026-10-29",

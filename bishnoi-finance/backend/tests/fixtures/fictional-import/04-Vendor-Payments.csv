@@ -1,0 +1,2 @@
+﻿VendorPayment ID,Date,Payment Number,Vendor Name,Payment Status,Currency Code,Amount,Unused Amount,Bank Charges,PIPayment ID,Bill ID,Bill Number,Mode,Bill Date,Bill Payment Applied Date,Bill Amount,Withholding Tax Amount,Paid Through,Paid Through Account Code,Reference Number
+TEST-PAY-ID-1,2026-01-22,TEST-VP-001,TEST ONLY - Fictional Supplies,Paid,PHP,560.00,0.00,0.00,TEST-ALLOC-1,TEST-BILL-ID-1,TEST-BILL-001,Bank Transfer,2026-01-12,2026-01-22,560.00,0.00,TEST ONLY - Money account (confirm with Sir Mel),,TEST-PAY-REF-1
