@@ -64,7 +64,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     { value: "bill", label: "Bills", by: "source" },
     { value: "voucher", label: "Payment vouchers", by: "source" },
     { value: "petty_cash", label: "Petty cash", by: "source" },
-    { value: "expense", label: "Imported expenses", by: "source" },
+    { value: "expense", label: "Zoho expenses", by: "source" },
     { value: "rejected", label: "Rejected", by: "status" },
   ];
   const current = shown.get("status") ?? shown.get("source") ?? "";

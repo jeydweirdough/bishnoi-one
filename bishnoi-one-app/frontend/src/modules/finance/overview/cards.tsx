@@ -80,7 +80,7 @@ export function Card({ id, title, sub, source, span, ctx, style, extra, children
 }
 
 /** Books by source, in a narrow card: the full name stays on hover. */
-const SOURCE_SHORT: Record<string, string> = { bill: "Bills", voucher: "Vouchers", petty_cash: "Petty cash", expense: "Imported expenses", invoice: "Sales", manual: "Typed by hand", fund: "Marketing" };
+const SOURCE_SHORT: Record<string, string> = { bill: "Bills", voucher: "Vouchers", petty_cash: "Petty cash", expense: "Zoho expenses", invoice: "Sales", manual: "Typed by hand", fund: "Marketing" };
 
 function Actions({ actions }: { actions: Action[] }) {
   return (
