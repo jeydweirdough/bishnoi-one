@@ -16,6 +16,22 @@ class ProbeStopped(Exception):
     """A safe reason, never a provider payload or credential."""
 
 
+class ZohoLimit(ProbeStopped):
+    """Zoho answered HTTP 429. Its body code says which limit (Zoho Books API docs, checked 2026-10-30):
+    45 the organisation's daily limit, 44 over 100 requests a minute, 1070 too many requests at once."""
+    KINDS = {45: 'day', 44: 'minute', 1070: 'concurrent'}
+    MESSAGES = {
+        'day': "Zoho says the organisation's daily request limit is used up (shared by every app connected to it). Reading stops until tomorrow; saved records remain available.",
+        'minute': 'Zoho says more than 100 requests reached it this minute. This cycle stopped; the next one continues.',
+        'concurrent': 'Zoho says too many requests are running at once. This cycle stopped; the next one continues.',
+        'unknown': "Zoho said too many requests without saying which limit. Reading stops until tomorrow so the organisation's shared limit isn't strained; saved records remain available.",
+    }
+
+    def __init__(self, code):
+        self.kind = self.KINDS.get(code, 'unknown')
+        super().__init__(self.MESSAGES[self.kind])
+
+
 @dataclass(frozen=True)
 class Limits:
     pages: int = 2
@@ -101,7 +117,11 @@ class ZohoReader:
                         self.refreshes += 1
                         response = read()
                 if response.status_code == 429:
-                    raise ProbeStopped('Zoho rate limit reached; stopped without further retries.')
+                    try:
+                        body = response.json()
+                    except ValueError:
+                        body = None
+                    raise ZohoLimit(body.get('code') if isinstance(body, dict) else None)
                 if response.status_code >= 400:
                     raise ProbeStopped(f'Zoho refused a read (HTTP {response.status_code}); no records changed.')
                 data = response.json()

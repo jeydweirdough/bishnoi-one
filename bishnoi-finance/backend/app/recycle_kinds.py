@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import InvoicePayment, JournalEntry, LedgerSettings
+from app.models import ImportedExpense, InvoicePayment, JournalEntry, LedgerSettings, PettyCashVoucher
 from app.recycle_bin import Kind
 
 P = "nbfi_"
@@ -36,14 +36,27 @@ def _entry_ids(db: Session, kind: str, row: dict) -> list[str]:
 def _guard_for(kind: str):
     def guard(db: Session, row: dict) -> None:
         lock = _locked(db)
-        if lock is None:
-            return
         days = [row["entry_date"]] if kind == "entry" and row.get("entry_date") else []
-        ids = _entry_ids(db, kind, row)
-        if ids:
+        ids = [row['id']] if kind == 'entry' else _entry_ids(db, kind, row)
+        if ids and kind != 'entry':
             days += [d for (d,) in db.execute(select(JournalEntry.entry_date).where(JournalEntry.id.in_(ids)))]
-        if any(d and d <= lock for d in days):
+        if lock is not None and any(d and d <= lock for d in days):
             raise HTTPException(status.HTTP_409_CONFLICT, f"It has entries in a closed period (locked up to {lock:%d %b %Y}). Open the period first (Ledger, Closing).")
+        # Petty cash is corrected/voided through its voucher, never by detaching
+        # its ledger entry in cleanup. The source check also protects reversals:
+        # those have no direct voucher.entry_id link. Check explicit links too
+        # so older entries with a different source label retain their history.
+        if ids and (db.scalar(select(JournalEntry.id).where(JournalEntry.id.in_(ids), JournalEntry.source == 'petty_cash').limit(1))
+                    or db.scalar(select(PettyCashVoucher.id).where(PettyCashVoucher.entry_id.in_(ids)).limit(1))):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                'This entry belongs to petty cash and cannot be deleted in data cleanup. '
+                                'Use the Petty cash voucher to correct or void it; its accounting history must stay together.')
+        # An imported expense is undone only by voiding it, the same way.
+        if ids and (db.scalar(select(JournalEntry.id).where(JournalEntry.id.in_(ids), JournalEntry.source == 'expense').limit(1))
+                    or db.scalar(select(ImportedExpense.id).where(ImportedExpense.entry_id.in_(ids)).limit(1))):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                'This entry belongs to an imported expense and cannot be deleted in data cleanup. '
+                                'Void the imported expense instead; its accounting history must stay together.')
     return guard
 
 
@@ -76,7 +89,7 @@ KINDS: list[Kind] = [
          **posted("fund")),
     Kind("sales-orders", "Sales orders", P + "sales_orders", "number", search=("number", "customer_name"), sub="customer_name"),
     Kind("bank-reconciliations", "Bank reconciliations", P + "bank_reconciliations", lambda r: f"Statement {r.get('statement_date')}", sub="status"),
-    Kind("import-runs", "Import runs", P + "import_runs", lambda r: f"{r.get('kind')} import {str(r.get('created_at') or '')[:16]}", owns=(P + "import_records",)),
+    Kind("import-runs", "Import runs", P + "import_runs", lambda r: f"{r.get('kind')} import {str(r.get('created_at') or '')[:16]}", owns=(P + "import_records", P + "import_links")),
     Kind("import-matches", "Import matches", P + "import_matches", lambda r: r.get("source_label") or r.get("source_code"), owns=(P + "import_rules",),
          search=("source_label", "source_code"), sub="status"),
     # Set-up lists

@@ -56,7 +56,7 @@ def begin_change(db: Session) -> None:
             db.execute(text("BEGIN IMMEDIATE"))
 
 
-def locked(db: Session, model: type[T], ids: Sequence[str]) -> list[T]:
+def locked(db: Session, model: type[T], ids: Sequence[str] | Sequence[int]) -> list[T]:
     """The rows, read again under lock (fresh values replace what this session
     read before), in id order so two steps locking the same rows never deadlock.
     Only the model's own table is locked (FOR UPDATE OF): rows it loads along with

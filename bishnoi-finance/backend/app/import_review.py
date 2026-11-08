@@ -23,7 +23,8 @@ TEXT_FIELDS={'Invoice ID','Bill ID','SalesOrder ID','CustomerPayment ID','Vendor
  'Account','Account Code','Expense Account','Expense Account Code','Accounts Receivable','Accounts Payable','Deposit To','Deposit To Account Code',
  'Paid Through','Paid Through Account Code','InvoicePayment ID','PIPayment ID','Invoice Payment Applied Date','Bill Payment Applied Date',
  'Reference Number','Reference#','Expense Description','Is Reimbursable','Quantity','QuantityOrdered','Item Price','Rate','Tax Type','Item Tax Type',
- 'Tax ID','Shipping Charge Tax ID','Discount','Discount Amount','Item.CF.SC/PWD-Discount','Item.CF.SC/PWD-Tax','Mode'}
+ 'Tax ID','Shipping Charge Tax ID','Discount','Discount Amount','Item.CF.SC/PWD-Discount','Item.CF.SC/PWD-Tax','Mode',
+ 'CF.Type','CF.Voucher','CF.OR Number','CF.PIC','CF.Department'}
 PRESERVE=MONEY_FIELDS|TEXT_FIELDS
 ISSUES={'header_conflict':'Repeated document headers disagree.','line_totals':'Line amounts do not match the subtotal.',
  'components':'Subtotal, tax, charges and adjustments do not explain the total.','duplicate_rows':'Identical rows need review; none were removed.',
@@ -225,7 +226,8 @@ def document(kind,source,group,file_index):
                 'accountCode':row.get('Account Code') or row.get('Expense Account Code') or '',
                 'quantity':row.get('Quantity') or row.get('QuantityOrdered') or '', 'unitPrice':row.get('Item Price') or row.get('Rate') or '',
                 'discount':row.get('Discount Amount') or '', 'taxHints':{'scPwdDiscount':row.get('Item.CF.SC/PWD-Discount',''),'scPwdTax':row.get('Item.CF.SC/PWD-Tax','')},
-                'orderNumber':row.get('Sales Order Number','')}
+                'orderNumber':row.get('Sales Order Number',''),'inclusive':row.get('Is Inclusive Tax',''),
+                'tdsName':row.get('TDS Name',''),'tdsAmount':cents(row.get('TDS Amount')),'sourceType':row.get('CF.Type','').strip()}
             d['lines'].append(ln)
         d['tax']=sum(ln['tax'] for ln in d['lines'])
         if kind=='expense':
@@ -243,12 +245,15 @@ def document(kind,source,group,file_index):
         d['withholdingRows']=withholding_rows
         amounts={row['amount'] for row in withholding_rows}
         d['withheld']=next(iter(amounts)) if len(amounts)==1 else None
-        if len(amounts)>1:problem(d,'withholding_basis')
-        if any(amounts):problem(d,'unsupported_components')
-        if any(d[k] for k in ('shipping','shippingTax','adjustment','discount','roundOff','withheld')):problem(d,'unsupported_components')
+        # An expense's withholding belongs to its line (app/zoho_expense_import.py checks it there).
+        if kind!='expense':
+            if len(amounts)>1:problem(d,'withholding_basis')
+            if any(amounts):problem(d,'unsupported_components')
+        if any(d[k] for k in ('shipping','shippingTax','adjustment','discount','roundOff')) or (kind!='expense' and d['withheld']):problem(d,'unsupported_components')
         d['original']={'arAccount':r.get('Accounts Receivable',''),'apAccount':r.get('Accounts Payable',''),
                        'moneyAccount':r.get('Paid Through',''),'moneyCode':r.get('Paid Through Account Code',''),
-                       'inclusiveTax':r.get('Is Inclusive Tax','')}
+                       'inclusiveTax':r.get('Is Inclusive Tax',''),'reference':r.get('Reference#',''),'voucher':r.get('CF.Voucher',''),
+                       'department':r.get('CF.Department',''),'pic':r.get('CF.PIC','')}
         if kind=='expense' and r.get('Is Reimbursable')!='false':problem(d,'unsupported_components')
         if kind=='invoice' and (not d['tin'] or any(not ln['taxName'] for ln in d['lines'])):problem(d,'tax_details')
     return d

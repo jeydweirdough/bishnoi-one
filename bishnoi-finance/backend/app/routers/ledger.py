@@ -31,6 +31,7 @@ from app.config import Settings
 from app.deps import DB, SettingsDep
 from app.ledger import Leg, account_out, entry_out, post
 from app.ledger import settings as posting_settings
+from app.ledger import locked_settings, require_open_period
 from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
 from app.notify import done, holders, tell
 from app.routers.funds import today
@@ -276,10 +277,10 @@ def run_import(user: permitted("accounts.manage"), db: DB, body: ImportIn) -> di
 POSTING = {
     "advances_account_id": ("asset", "Cash advances to employees"),
     "due_to_employees_account_id": ("liability", "Reimbursements payable to employees"),
-    "cash_account_id": ("asset", "Paid in cash"),
-    "bank_account_id": ("asset", "Paid by bank transfer"),
-    "ewallet_account_id": ("asset", "Paid by e-wallet"),
-    "check_account_id": ("asset", "Paid by check"),
+    "cash_account_id": ("asset", "Company cash account (money received or paid)"),
+    "bank_account_id": ("asset", "Company bank account (transfers received or paid)"),
+    "ewallet_account_id": ("asset", "Company e-wallet account (money received or paid)"),
+    "check_account_id": ("asset", "Company check account (checks received or issued)"),
     "receivables_account_id": ("asset", "What customers owe on invoices"),
     "sales_account_id": ("income", "Sales on invoices"),
     "output_tax_account_id": ("liability", "Tax on invoices (output VAT)"),
@@ -300,11 +301,15 @@ POSTING = {
 }
 
 
+def posting_types(key: str) -> tuple[str, ...]:
+    return ("income", "expense") if key in ("fx_gain_account_id", "fx_loss_account_id") else (POSTING[key][0],)
+
+
 def posting_out(db: DB, can_edit: bool) -> dict:
     s = posting_settings(db)
     return {
         "items": [
-            {"key": key, "label": label, "type": type_, "account": account_out(a) if (a := db.get(Account, getattr(s, key)) if getattr(s, key) else None) else None}
+            {"key": key, "label": label, "type": type_, "types": list(posting_types(key)), "account": account_out(a) if (a := db.get(Account, getattr(s, key)) if getattr(s, key) else None) else None}
             for key, (type_, label) in POSTING.items()
         ],
         "canEdit": can_edit,
@@ -327,8 +332,8 @@ def change_posting(user: settings_permitted("accounts.manage"), db: DB, body: Po
         if key not in POSTING:
             raise field_error("accounts", f"Unknown default account: {key}.")
         a = db.get(Account, account_id) if account_id else None
-        if account_id and (a is None or a.type != POSTING[key][0] or not a.is_active):
-            raise field_error(key, f"Select an active {POSTING[key][0]} account.")
+        if account_id and (a is None or a.type not in posting_types(key) or not a.is_active):
+            raise field_error(key, f"Select an active {' or '.join(posting_types(key))} account.")
         setattr(s, key, account_id)
     audit(db, user, "posting.updated", target="Default accounts", target_type="settings", fields=body.accounts.keys())
     db.commit()
@@ -344,7 +349,7 @@ def list_entries(
     db: DB,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice", "bill", "voucher"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
@@ -517,11 +522,14 @@ def decide(db: DB, settings: Settings, user: User, entry_id: str, to: Literal["a
     same moment (Ms. Malou and Ms. Cristal both approve, decided 2026-10-22): the
     change is made only if the entry is still waiting when it's saved, checked in
     the save itself, so the first decision wins and the second is told plainly."""
-    e = db.get(JournalEntry, entry_id)
+    period = locked_settings(db)
+    e = db.scalar(select(JournalEntry).where(JournalEntry.id == entry_id).execution_options(populate_existing=True))
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such entry.")
     if e.status == "waiting" and e.posted_by_id == user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You posted this entry, so someone else approves it.")
+    if to == 'approved' and e.status == 'waiting':
+        require_open_period(e.entry_date, period)
     changed = db.execute(
         update(JournalEntry)
         .where(JournalEntry.id == e.id, JournalEntry.status == "waiting", or_(JournalEntry.posted_by_id.is_(None), JournalEntry.posted_by_id != user.id))

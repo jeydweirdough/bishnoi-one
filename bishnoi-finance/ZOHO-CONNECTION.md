@@ -133,3 +133,15 @@ No HTTP handler sends bills/payments to Zoho. Bounded `app.tools.send_zoho` requ
 Before activation: match supplier/account/paid-through/VAT/company identities to Zoho; verify default money accounts and tax registration in official Finance. SQLite settings were not copied. Withholding bills/payments remain held until actual Zoho treatment is confirmed. No guessed tax defaults, remote vendor creation or automatic deletion. No outbound worker is running; no live bill/payment was sent by this work. Extra OAuth consent alone does not start sending.
 
 For another host, configure real DATABASE_URL, supported POSTGRES_DRIVER, DATA_ENVIRONMENT=official, separate durable encryption key, ZOHO_DATABASE_ENABLED=true, stable connection/environment IDs, and one supervised reader. Enable capture explicitly; keep outbound off until reviewed. Tests must use a separate database; never point destructive TEST_DATABASE_URL tests at official Neon.
+
+## Request budget (2026-10-30, 0.4.34)
+
+`app/zoho_month_sync.py`. The worker spends its daily cap (`--daily-limit`, 500 unless changed) in this order:
+
+- every cycle, the change scan (200 summaries per request);
+- details of changed records, at any hour, on any date, using the reserve if needed;
+- details of older records ("backfill") only Monday to Friday inside `--work-start`/`--work-end` (07:00 to 16:00 Manila by default), spread evenly over the cycles left in the day, never touching the 20% reserve.
+
+Once a day the scan lists the whole month and records saved documents Zoho no longer lists (`coverage.totalsCheck`); nothing is deleted. A detail older than the saved summary is not saved.
+
+Zoho's HTTP 429 (Zoho Books API docs, checked 2026-10-30): code 45, the organisation's daily limit, stops reading until tomorrow; code 44 (over 100 a minute) and 1070 (too many at once) end only the cycle; a 429 with no recognised code is treated as 45, because every app on the organisation shares the limit. Zoho documents no "requests left" header, so Finance's own count is the measure. Settings, Zoho connection shows all of this. A running worker picks the code up only when restarted.

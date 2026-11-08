@@ -1,0 +1,9 @@
+﻿TAXPAYER TRADE NAME,2MG INCORPORATED
+TEST DATA ONLY - NOT FOR FILING
+
+SALES JOURNAL
+
+Transaction Date,Customer Name,Customer Tin,Description,SI/BI No,Reference No,Amount,Discount,Output VAT,Vatable Sales,Sales to Government,VAT Exempt Sales,Zero-Rated Sales,Non-VAT Sales
+"Jan 10, 2026",TEST ONLY - Customer 1,111-222-333-00000,Fictional sale: Paid,TEST-SI-001,TEST-REF-001,1120.00,0.00,120.00,1000.00,0.00,0.00,0.00,0.00
+"Jan 10, 2026",TEST ONLY - Customer 2,111-222-333-00000,Fictional sale: Part paid,TEST-SI-002,TEST-REF-002,1120.00,0.00,120.00,1000.00,0.00,0.00,0.00,0.00
+"Jan 10, 2026",TEST ONLY - Customer 3,111-222-333-00000,Fictional sale: Unpaid,TEST-SI-003,TEST-REF-003,1120.00,0.00,120.00,1000.00,0.00,0.00,0.00,0.00

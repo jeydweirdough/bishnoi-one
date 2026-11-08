@@ -77,7 +77,7 @@ def one_cycle(monkeypatch):
     def no_lock(settings):
         yield
 
-    def sync(*_):
+    def sync(*_, **__):
         if "raise" in outcome:
             raise outcome["raise"]
         return {"mode": "month-sync"}
@@ -86,7 +86,7 @@ def one_cycle(monkeypatch):
     monkeypatch.setattr(sync_zoho_month, "ZohoReader", lambda *a, **k: SimpleNamespace())
     monkeypatch.setattr(sync_zoho_month, "month_window", lambda: (None, None))
     monkeypatch.setattr(sync_zoho_month, "sync_month", sync)
-    args = SimpleNamespace(requests=60, details=20, daily_limit=500)
+    args = SimpleNamespace(requests=60, details=20, daily_limit=500, interval=300, work_start=7, work_end=16)
     return outcome, (lambda: sync_zoho_month.cycle(None, None, args))
 
 

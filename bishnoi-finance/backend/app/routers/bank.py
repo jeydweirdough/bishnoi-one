@@ -49,7 +49,7 @@ def last_done(db: Session, account_id: str) -> BankReconciliation | None:
 
 
 def book_balance(db: Session, account_id: str, upto: date | None = None) -> int:
-    q = select(func.coalesce(func.sum(JournalLine.debit_centavos - JournalLine.credit_centavos), 0)).join(JournalEntry).where(JournalLine.account_id == account_id)
+    q = select(func.coalesce(func.sum(JournalLine.debit_centavos - JournalLine.credit_centavos), 0)).join(JournalEntry).where(JournalLine.account_id == account_id, JournalEntry.status == 'approved')
     if upto:
         q = q.where(JournalEntry.entry_date <= upto)
     return int(db.scalar(q) or 0)
@@ -113,7 +113,7 @@ def found(db: Session, rec_id: str) -> BankReconciliation:
 
 def candidates(db: Session, r: BankReconciliation) -> list[tuple[JournalLine, JournalEntry]]:
     """The account's movements up to the statement's date that no earlier statement cleared (and, once done, those this one cleared)."""
-    q = select(JournalLine, JournalEntry).join(JournalEntry).where(JournalLine.account_id == r.account_id)
+    q = select(JournalLine, JournalEntry).join(JournalEntry).where(JournalLine.account_id == r.account_id, JournalEntry.status == 'approved')
     if r.status == "open":
         q = q.where(JournalLine.reconciliation_id.is_(None), JournalEntry.entry_date <= r.statement_date)
     else:
@@ -167,6 +167,8 @@ def finish(user: permitted("bank.reconcile"), db: DB, rec_id: str) -> dict:
     if r.status != "open":
         raise HTTPException(status.HTTP_409_CONFLICT, "This statement is already reconciled.")
     d = detail_out(db, r)
+    if set(r.cleared) - {ln.id for ln, _ in candidates(db, r)}:
+        raise HTTPException(status.HTTP_409_CONFLICT, 'Some selected movements no longer belong to the approved books. Review the statement again before finishing it.')
     if d["differenceCentavos"]:
         raise HTTPException(status.HTTP_409_CONFLICT, "The cleared balance doesn't match the statement yet: tick what the bank shows, or enter its charges and interest as journal entries first.")
     for ln in db.scalars(select(JournalLine).where(JournalLine.id.in_(r.cleared))):

@@ -44,8 +44,9 @@ LINES={
     'main':lambda tmp:None,  # the chain itself, stopped part-way
     'feature-old':lambda tmp:history(tmp,'feature_old',MAIN_0023_0026+MAIN_0027_0029,range(23,29),28),
     'ours':lambda tmp:history(tmp,'ours',MAIN_0027_0029,range(27,30),31),
+    'feature-petty':lambda tmp:history(tmp,'feature_petty',('0033_recycle_bin',),(33,),33),
 }
-CASES=[('main',n) for n in range(23,30)]+[('feature-old',n) for n in range(22,29)]+[('ours',n) for n in range(27,32)]
+CASES=[('main',n) for n in range(23,30)]+[('feature-old',n) for n in range(22,29)]+[('ours',n) for n in range(27,32)]+[('main',32),('main',33),('feature-petty',33)]
 
 
 @pytest.mark.parametrize('line,revision',CASES)
@@ -74,7 +75,9 @@ def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revisi
         assert {'nbfi_sales_orders','nbfi_zoho_source_documents','nbfi_zoho_source_runs','nbfi_zoho_connections','nbfi_zoho_runtime',
                 'nbfi_zoho_deliveries','nbfi_zoho_links','nbfi_zoho_delivery_events','nbfi_import_matches','nbfi_import_runs',
                 'nbfi_import_records','nbfi_import_rules','nbfi_events_in','nbfi_events_out','nbfi_bank_accounts',
-                'nbfi_exchange_rates','nbfi_year_closings','nbfi_fixed_assets','nbfi_budgets'}<=tables
+                'nbfi_exchange_rates','nbfi_year_closings','nbfi_fixed_assets','nbfi_budgets',
+                'nbfi_petty_cash_vouchers','nbfi_petty_cash_lines','nbfi_petty_cash_events','nbfi_recycle_bin',
+                'nbfi_imported_expenses','nbfi_imported_expense_lines','nbfi_import_links'}<=tables
         for table,names in {'nbfi_accounts':{'term','cost_behaviour','report_tag'},
                             'nbfi_invoices':{'cost_centavos','line_costs','division_id','team_id','delivery_id','sales_order_id','attention'},
                             'nbfi_suppliers':{'tax_defaults_confirmed','import_details'},'nbfi_bills':{'tax_reviewed','currency','rate_e4'},
@@ -83,5 +86,5 @@ def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revisi
                             'nbfi_import_matches':{'per_record'}}.items():
             assert names<={x['name'] for x in inspect(c).get_columns(table)},table
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
-        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0032'
+        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0035'
     engine.dispose()

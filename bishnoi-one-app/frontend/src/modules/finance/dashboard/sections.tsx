@@ -66,16 +66,16 @@ function Waiting({ s }: { s: Extract<Section, { key: "waiting" }> }) {
         <SectionTitle icon="approvals">Waiting for you</SectionTitle>
       </div>
       <Grid>
-        {s.canRelease && <Figure label="Cash advances to release" value={s.toRelease} href="/finance/funds" flag />}
+        {s.canRelease && <Figure label="Cash advances to release" value={s.toRelease} href="/finance/funds?stage=to_release" flag />}
         {s.canApproveEntries && <Figure label="Journal entries to approve" value={s.entriesToApprove} href="/finance/ledger?status=waiting" flag />}
         {s.canApprovePrices && (
           <Suspense fallback={<Asking />}>
             <PricesWaiting />
           </Suspense>
         )}
-        {s.canReview && <Figure label="Liquidations to review" value={s.toReview} href="/finance/funds/review" flag />}
-        {s.canSettle && <Figure label="Refunds and reimbursements to settle" value={s.toSettle} href="/finance/funds/settlement" flag />}
-        <Figure label="Overdue liquidations" value={s.overdueLiquidations} href="/finance/funds/outstanding" flag />
+        {s.canReview && <Figure label="Liquidations to review" value={s.toReview} href="/finance/funds?stage=to_check" flag />}
+        {s.canSettle && <Figure label="Refunds and reimbursements to settle" value={s.toSettle} href="/finance/funds?stage=to_settle" flag />}
+        <Figure label="Overdue liquidations" value={s.overdueLiquidations} href="/finance/funds?stage=to_liquidate" flag />
       </Grid>
     </Sheet>
   );

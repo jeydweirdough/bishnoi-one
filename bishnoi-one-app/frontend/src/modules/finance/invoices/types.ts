@@ -76,6 +76,8 @@ export type InvoiceSummary = {
   delivery?: { id: string; number: string | null } | null;
   salesOrder?: { id: string; number: string | null } | null;
   attention?: string | null;
+  /** Came from an export (app/oojeema_sales_import.py): where from, who and when. */
+  imported?: { source: string; file: string; files: string[]; sourceId: string; by: string; at: string } | null;
 };
 
 export type Payment = {

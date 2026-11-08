@@ -1,3 +1,4 @@
+import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { loadLetterhead } from "@/src/platform/print/letterhead";
 import { ExternalLink, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
@@ -15,6 +16,7 @@ import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type Invo
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
+import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 
 // Sales invoices (app/routers/invoices.py): drafts, issued with the next
 // number of the BIR's series, and voided rather than changed once issued.
@@ -104,15 +106,19 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
       <PageHeader
         title="Sales invoices"
         actions={
-          may(me, "invoices.create") && (
-            <LinkButton href="/finance/invoices/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              New invoice
-            </LinkButton>
-          )
+          <>
+            {may(me, "imports.run") && me.dataEnvironment === "local_test" && <ZohoImport kind="oojeema-sales" />}
+            {may(me, "invoices.create") && (
+              <LinkButton href="/finance/invoices/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                New invoice
+              </LinkButton>
+            )}
+          </>
         }
       >
         Invoices to customers, numbered from the BIR&apos;s series when issued and posted to the books. Open a row to see its payments.
       </PageHeader>
+      <ReviewExports filters={query.toString()} options={[ ["invoices", "Sales invoices"], ["customer-payments", "Customer payments and withholding"] ]} />
       <ListFrame>
         <FigureStrip
           figures={[
@@ -287,10 +293,11 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
               )}
               {inv.status !== "draft" && <PrintButton />}
               {inv.status === "issued" && may(me, "invoices.void") && inv.number && <VoidInvoice id={inv.id} number={inv.number} />}
-              {inv.status === "issued" && may(me, "invoices.void") && may(me, "invoices.create") && inv.number && (
+              {/* An imported invoice keeps its own number, so it's never reissued through a series. */}
+              {inv.status === "issued" && !inv.imported && may(me, "invoices.void") && may(me, "invoices.create") && inv.number && (
                 <ReissueInvoice id={inv.id} number={inv.number} />
               )}
-              {inv.status === "void" && !inv.replacedBy && may(me, "invoices.create") && inv.number && <ReissueInvoice id={inv.id} number={inv.number} cancelled />}
+              {inv.status === "void" && !inv.imported && !inv.replacedBy && may(me, "invoices.create") && inv.number && <ReissueInvoice id={inv.id} number={inv.number} cancelled />}
             </>
           }
         >
@@ -301,6 +308,17 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             </span>
           )}
         </PageHeader>
+        {inv.imported && (
+          <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+            Imported from {inv.imported.source === "oojeema" ? "Oojeema's Sales Journal" : inv.imported.source} ({inv.imported.file}), source number {inv.imported.sourceId}, by {inv.imported.by} on{" "}
+            {fmt.dateLabel(inv.imported.at.slice(0, 10))}. No number came from Finance&apos;s BIR series, and it can&apos;t be reissued.{" "}
+            {inv.entryId && (
+              <Link href={`/finance/ledger/voucher/${inv.entryId}`} className="font-semibold text-hema hover:underline">
+                Open its journal entry
+              </Link>
+            )}
+          </p>
+        )}
         {/* Made from a delivery (step 13): where it came from, and why it still waits when it does. */}
         {inv.delivery && (
           <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${inv.attention && inv.status === "draft" ? "bg-promo-tint" : "bg-hema-tint"}`}>
@@ -394,8 +412,8 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
           <Particulars
             items={[
               ["Date", fmt.dateLabel(inv.date)],
-              ["Terms", inv.termsDays ? `${inv.termsDays} days` : "Cash on delivery"],
-              ["Due date", fmt.dateLabel(inv.dueDate)],
+              ["Terms", inv.imported ? "Not in Oojeema's file" : inv.termsDays ? `${inv.termsDays} days` : "Cash on delivery"],
+              ["Due date", inv.imported ? "Not in Oojeema's file" : fmt.dateLabel(inv.dueDate)],
               ["Reference", inv.reference],
             ]}
           />
@@ -448,6 +466,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
           <p className="mt-5 text-sm text-ink-3">The amounts appear once the problem above is fixed.</p>
         )}
         {inv.notes && <p className="mt-4 text-meta text-ink-2">{inv.notes}</p>}
+        {inv.imported && <p className="mt-6 border-t border-rule pt-2 text-meta text-ink-3">Copy of a record imported from Oojeema, where it was issued.</p>}
         {inv.series && (
           <p className="mt-6 border-t border-rule pt-2 text-meta text-ink-3">
             ATP No. {inv.series.atpNumber}, issued {fmt.dateLabel(inv.series.atpDate)}. Approved series {inv.series.range}.
@@ -473,7 +492,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
                     {p.reference && <span className="text-ink-3"> · {p.reference}</span>}
                     {p.cwtCentavos > 0 && (
                       <span className="text-ink-2">
-                        {" "}· {fmt.peso(p.cwtCentavos)} withheld ({p.cwtAtc}{p.cwtCertificate ? `, ${p.cwtCertificate}` : ""})
+                        {" "}· {fmt.peso(p.cwtCentavos)} withheld ({p.cwtAtc ?? "ATC not in Oojeema's file"}{p.cwtCertificate ? `, ${p.cwtCertificate}` : ""})
                       </span>
                     )}
                     <span className="text-ink-3"> · {p.recordedBy}</span>

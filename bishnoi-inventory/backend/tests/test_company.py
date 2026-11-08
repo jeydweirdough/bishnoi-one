@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import company
-from tests.conftest import bearer, sign_in
+from tests.conftest import PASSWORD, bearer, sign_in as password_sign_in
 
 KEY = Ed25519PrivateKey.generate()
 PUBLIC = base64.b64encode(KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
@@ -28,6 +28,20 @@ def company_pass(status="active", granted=True, slug="getmeds", key=KEY, exp=Non
         "companyName": "GetMeds", "status": status, "granted": granted, "exp": exp or int(time.time()) + 3600, **more,
     }).encode())
     return f"{head}.{body}.{b64(key.sign(f'{head}.{body}'.encode()))}"
+
+
+def sign_in(client, email="ana@example.com", password=PASSWORD):
+    """Company-pass cases use the supported sign-in channel, without bypassing auth.
+
+    The stand-in Platform signs both the company pass and a fresh user pass.
+    Standalone cases still exercise the original password endpoint.
+    """
+    if not client.app.state.settings.platform_api_url:
+        return password_sign_in(client, email=email, password=password)
+    from tests.test_platform_sign_in import make_pass
+    token = make_pass(key=KEY, company="co-1", email=email, sub="company-test-user",
+                      name="Company test administrator", role="Administrator", appAdmin=True)
+    return client.post("/auth/platform", json={"pass": token})
 
 
 class Answer:
@@ -80,3 +94,11 @@ def test_the_platform_tells_us_at_once_and_nobody_else_can(client, platform):
     assert "/platform/company" not in client.get("/openapi.json").text
     assert client.post("/platform/company", json={"pass": company_pass(iat=newer + 20)}).status_code == 204
     assert client.get("/auth/me", headers=headers).status_code == 200
+
+
+def test_connected_password_login_stays_closed_while_signed_platform_login_works(client, platform):
+    refused = password_sign_in(client)
+    assert refused.status_code == 403
+    assert "Sign in with your Bishnoi One account" in refused.json()["detail"]
+    accepted = sign_in(client)
+    assert accepted.status_code == 200, accepted.text

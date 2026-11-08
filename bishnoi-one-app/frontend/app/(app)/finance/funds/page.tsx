@@ -1,7 +1,7 @@
-// The route: one step of Marketing requests (src/screens/funds.tsx).
+// The route: Marketing requests, one page with a tab for each stage (src/screens/funds.tsx).
 import FundsPage from "@/src/modules/finance/screens/funds";
 
-export const metadata = { title: "For release" };
+export const metadata = { title: "Marketing requests" };
 export default function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  return <FundsPage task="to_release" searchParams={searchParams} />;
+  return <FundsPage searchParams={searchParams} />;
 }

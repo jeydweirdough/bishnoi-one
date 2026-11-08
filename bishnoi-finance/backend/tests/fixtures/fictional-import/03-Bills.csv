@@ -1,0 +1,3 @@
+﻿Bill ID,Bill Date,Bill Number,Vendor Name,Bill Status,Currency Code,CF.Company,SubTotal,Total,Due Date,Is Inclusive Tax,Account,Account Code,Accounts Payable,Item Name,Item Total,Tax Amount,Tax Name,Tax Percentage
+TEST-BILL-ID-1,2026-01-12,TEST-BILL-001,TEST ONLY - Fictional Supplies,Overdue,PHP,2MG,1000.00,1120.00,2026-02-11,false,TEST ONLY - Operating cost (confirm with Sir Mel),,,Fictional operating cost,1000.00,120.00,VAT,12.00
+TEST-BILL-ID-2,2026-01-12,TEST-BILL-002,TEST ONLY - Fictional Supplies,Overdue,PHP,2MG,1000.00,1120.00,2026-02-11,false,TEST ONLY - Operating cost (confirm with Sir Mel),,,Fictional operating cost,1000.00,120.00,VAT,12.00
