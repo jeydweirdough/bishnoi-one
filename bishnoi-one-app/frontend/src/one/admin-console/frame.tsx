@@ -111,7 +111,7 @@ export async function AdminConsoleFrame({ children, console: which = "platform" 
         <NavProgress />
       </Suspense>
       <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-        <header className="mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
+        <header className="mx-auto mb-4 hidden max-w-[80rem] items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
         <div className="mx-auto max-w-[80rem]">{children}</div>
       </main>
     </div>
