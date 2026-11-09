@@ -89,7 +89,7 @@ def test_posted_bill_detail_keeps_line_values_and_foreign_currency(client,ana,be
     from .test_payables import account, cleared
     from decimal import Decimal
     s=supplier(client,ben)
-    line={'accountId':account(client,ben,'6500'),'amountCentavos':11200,'vat':'vat','withholding':None,'purchaseType':'other_goods'}
+    line={'accountId':account(client,ben,'6500'),'amountCentavos':11200,'vat':'vat','withholding':None,'noWithholdingReason':'not_covered','purchaseType':'other_goods'}
     b=bill(client,ben,s['id'],lines=[line,line],currency='USD',rate=56)
     cleared(client,ana,ben,b)
     rows=read(client.get('/finance/exports/review/bill-lines.csv',headers=ana))

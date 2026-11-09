@@ -24,6 +24,8 @@ export type SupplierInput = {
   address: string | null;
   vatRegistered: boolean;
   withholding: string | null;
+  origin?: "local" | "foreign";
+  vatVariesByItem?: boolean;
   termsDays: number;
   email: string | null;
   phone: string | null;

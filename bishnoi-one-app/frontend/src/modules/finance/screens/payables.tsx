@@ -51,7 +51,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "draft", label: "Drafts" },
   { key: "returned", label: "Returned" },
   { key: "to_approve", label: "To approve" },
-  { key: "to_check", label: "To check" },
+  { key: "to_check", label: "Tax check" },
   { key: "ready", label: "Ready to pay" },
   { key: "partly_paid", label: "Partly paid" },
   { key: "paid", label: "Paid" },
@@ -363,7 +363,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
               ["Supplier", <Link key="s" href={`/finance/suppliers/${b.supplier.id}`} className="text-hema hover:underline">{b.supplier.name}</Link>],
               ["TIN", b.supplier.tin ? `${b.supplier.tin}-${b.supplier.branchCode ?? "00000"}` : null],
               ["Their invoice", <span key="n" className="font-mono">{b.billNumber}</span>],
-              ["PO number", b.poNumber],
+              ["Supplier PO number", b.poNumber],
               ["Delivery receipt", b.drNumber],
             ]}
           />
@@ -397,7 +397,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
                 <td className="px-2 py-1.5 text-ink-2">{l.description}</td>
                 <td className="px-2 py-1.5 text-ink-2">{l.purchaseTypeLabel}</td>
                 <td className="px-2 py-1.5 text-meta text-ink-2">{l.vatLabel}</td>
-                <td className="px-2 py-1.5 text-meta text-ink-2">{l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None"}</td>
+                <td className="px-2 py-1.5 text-meta text-ink-2">{l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : l.noWithholdingLabel ? `None · ${l.noWithholdingLabel.toLowerCase()}${l.noWithholdingNote ? `: ${l.noWithholdingNote}` : ""}` : "None · no reason given"}</td>
                 <td className="py-1.5 pl-2 text-right tabular-nums">{fmt.peso(l.amountCentavos)}</td>
               </tr>
             ))}
@@ -623,7 +623,8 @@ export async function SupplierPage({ params, searchParams }: { params: Promise<{
           <Particulars
             items={[
               ["TIN", s.tin ? `${s.tin}-${s.branchCode ?? "00000"}` : null],
-              ["VAT", !s.taxDefaultsConfirmed ? "Tax defaults not confirmed" : s.vatRegistered ? "VAT-registered" : "Not VAT-registered"],
+              ["Where", s.origin === "foreign" ? "Foreign: no tax withheld" : s.origin === "local" ? "Local" : "Not set"],
+              ["VAT", (!s.taxDefaultsConfirmed ? "Tax defaults not confirmed" : s.vatRegistered ? "VAT-registered" : "Not VAT-registered") + (s.vatVariesByItem ? " · differs by item" : "")],
               ["Usually withheld", !s.taxDefaultsConfirmed ? "Not confirmed" : s.withholding ? `${s.withholding.code} · ${s.withholding.name} · ${s.withholding.rateBp / 100}%` : "Nothing"],
               ["Terms", s.termsDays ? `${s.termsDays} days` : "Cash"],
               ["Accounts payable", s.payablesAccount ? `${s.payablesAccount.code} · ${s.payablesAccount.name}` : "The default"],

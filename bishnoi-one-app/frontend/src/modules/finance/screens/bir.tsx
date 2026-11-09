@@ -982,7 +982,13 @@ type ReadinessCheck = {
   accounts: { id: string; code: string; name: string }[];
   otherSources: { source: string; name: string; entries: number; centavos: number; listed: { id: string; number: string; date: string; memo: string; centavos: number }[] }[];
 };
-type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string } };
+// Batch A (2026-11-05): whether every local purchase says what was withheld, or why nothing was.
+type WithholdingReview = {
+  status: "reviewed" | "needs_review"; missingCount: number;
+  missing: { kind: "bill" | "petty_cash"; id: string; label: string; line: number; date: string; centavos: number; href: string }[];
+  originNotSet: { id: string; name: string; bills: number }[]; foreignLines: number; importedWithoutWithholding: number;
+};
+type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string }; withholdingReview?: WithholdingReview };
 const STATUS: Record<ReadinessCheck["status"], { label: string; tone: string }> = {
   agrees: { label: "Agrees with the books", tone: "bg-mint-2 text-sage-deep" },
   differs: { label: "Differs from the books", tone: "bg-due-today/10 text-due-today" },
@@ -1021,7 +1027,41 @@ export async function BirReadinessPage({ searchParams }: { searchParams: Search 
           <td className={td + " align-top"}><span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + STATUS[c.status].tone}>{STATUS[c.status].label}</span></td>
         </tr>)}
       </Table>
+      {data.withholdingReview && <WithholdingReviewPanel review={data.withholdingReview} fmt={fmt} />}
       <p className="mt-4 text-meta text-ink-3">{data.note}</p>
     </>
+  );
+}
+
+/** Totals can agree while tax that should have been withheld is missing (two zeros agree): this lists the posted
+ *  local lines with no withholding code and no reason, so Sir Mel reviews them instead of hunting for them. */
+function WithholdingReviewPanel({ review, fmt }: { review: WithholdingReview; fmt: ReturnType<typeof makeFormat> }) {
+  const done = review.status === "reviewed";
+  return (
+    <section className="mt-6 rounded-lg border border-rule bg-sheet p-4" aria-labelledby="withholding-review">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="withholding-review" className="text-sm font-semibold">Withholding reviewed</h2>
+        <span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + (done ? "bg-mint-2 text-sage-deep" : "bg-due-today/10 text-due-today")}>
+          {done ? "Every local purchase has a decision" : `${review.missingCount + review.originNotSet.length} to review`}
+        </span>
+      </div>
+      <p className="mt-1 text-meta text-ink-3">Posted bill lines and petty cash receipts from local suppliers need a withholding code, or a reason why none is withheld. Foreign suppliers are never withheld from ({review.foreignLines} {review.foreignLines === 1 ? "line" : "lines"} this period).</p>
+      {review.missingCount > 0 && (
+        <div className="mt-3 text-sm">
+          <p className="font-semibold">{review.missingCount} {review.missingCount === 1 ? "line has" : "lines have"} no withholding and no reason</p>
+          <ul className="mt-1 space-y-1 text-meta">
+            {review.missing.map((m) => <li key={`${m.kind}-${m.id}-${m.line}`}><Link href={`/finance${m.href}`} className="text-hema underline">{m.label}</Link> · line {m.line} · {fmt.dateLabel(m.date)} · {fmt.peso(m.centavos)}</li>)}
+          </ul>
+          {review.missingCount > review.missing.length && <p className="mt-1 text-meta text-ink-3">First {review.missing.length} shown.</p>}
+          <p className="mt-1 text-meta text-ink-3">Already posted, so they aren&apos;t changed here: a wrong one is voided and entered again.</p>
+        </div>
+      )}
+      {review.originNotSet.length > 0 && (
+        <p className="mt-3 text-sm">Suppliers with no local or foreign set: {review.originNotSet.map((s) => <Link key={s.id} href={`/finance/suppliers/${s.id}`} className="mr-2 text-hema underline">{s.name}</Link>)}</p>
+      )}
+      {review.importedWithoutWithholding > 0 && (
+        <p className="mt-3 text-meta text-ink-3">Also: {review.importedWithoutWithholding} imported Zoho expense {review.importedWithoutWithholding === 1 ? "line has" : "lines have"} no withholding. They came in as history, without reasons.</p>
+      )}
+    </section>
   );
 }

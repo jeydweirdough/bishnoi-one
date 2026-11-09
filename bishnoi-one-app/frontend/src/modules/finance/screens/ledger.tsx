@@ -234,7 +234,7 @@ export async function ChartPage() {
         one of the expense accounts. A chart can be brought in from a CSV (Oojeema&apos;s or Zoho&apos;s export) with Import from a file.
       </PageHeader>
       <Sheet className="px-5 py-4">
-        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport />} />
+        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport key="import" />} />
       </Sheet>
     </>
   );

@@ -33,7 +33,7 @@ from app.ledger import settings as posting_settings
 from app.models import Account, JournalEntry, JournalLine, PettyCashEvent, PettyCashLine, PettyCashVoucher, StoredFile
 from app.money_accounts import money_account_ids
 from app.notify import done, holders, tell
-from app.payables import PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, withholding_out, work_out
+from app.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, withholding_decision, withholding_out, work_out
 from app.routers.funds import today
 from app.routers.payables import FileIn, peso, store_file
 from app.routers.tax import Api, field_error, split_tin
@@ -87,7 +87,7 @@ def may(user, v: PettyCashVoucher) -> dict:
     mine = user.id in preparers(v)
     return {
         "canEdit": open_ and can("petty_cash.create"),
-        "canSubmit": open_ and can("petty_cash.create") and bool(v.lines) and all(ln.file_ref for ln in v.lines),
+        "canSubmit": open_ and can("petty_cash.create") and bool(v.lines) and all(ln.file_ref and (ln.withholding or ln.no_withholding_reason) for ln in v.lines),
         "canCheck": v.status == "to_check" and can("petty_cash.check") and not mine,
         "canReturn": v.status == "to_check" and can("petty_cash.check") and not mine,
         "canVoid": v.status == "posted" and can("petty_cash.void"),
@@ -124,6 +124,8 @@ def voucher_out(db: DB, v: PettyCashVoucher, user=None) -> dict:
             "description": ln.description, "purchaseType": ln.purchase_type, "purchaseTypeLabel": PURCHASE_TYPES[ln.purchase_type],
             "vat": ln.vat, "vatLabel": VAT_KINDS[ln.vat], "withholding": ln.withholding,
             "withholdingRateBp": WITHHOLDING[ln.withholding][1] if ln.withholding in WITHHOLDING else None,
+            "noWithholdingReason": ln.no_withholding_reason, "noWithholdingNote": ln.no_withholding_note,
+            "noWithholdingLabel": NO_WITHHOLDING.get(ln.no_withholding_reason or ""),
             "amountCentavos": ln.amount_centavos, "netCentavos": ln.net_centavos, "vatCentavos": ln.vat_centavos, "withheldCentavos": ln.withheld_centavos,
             "file": {"name": ln.file_name, "contentType": ln.file_type, "size": ln.file_size, "uploadedBy": ln.file_by,
                      "uploadedAt": ln.file_at.isoformat() if ln.file_at else None} if ln.file_ref else None,
@@ -153,7 +155,7 @@ def choices(user: permitted("petty_cash.view"), db: DB) -> dict:
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
         "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
         "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
-        "withholding": withholding_out(),
+        "withholding": withholding_out(), "noWithholding": no_withholding_out(),
         "people": seen(PettyCashVoucher.person_in_charge), "departments": seen(PettyCashVoucher.department),
     }
 
@@ -211,6 +213,9 @@ class LineIn(Api):
     purchase_type: Literal["services", "capital_goods", "other_goods", "importation"]
     vat: Literal["vat", "zero", "exempt", "none"]
     withholding: str | None = Field(None, max_length=10)
+    # No withholding, and why (app/payables.py NO_WITHHOLDING): needed before submitting. A store is local.
+    no_withholding_reason: str | None = Field(None, max_length=20)
+    no_withholding_note: str | None = Field(None, max_length=200)
     amount_centavos: int = Field(gt=0, lt=10**11)
 
 
@@ -251,6 +256,10 @@ def apply(db: DB, settings, v: PettyCashVoucher, body: VoucherIn, user) -> None:
             raise line_error(i, "accountId", "Pick an active expense or asset account.")
         if line.withholding and line.withholding not in WITHHOLDING:
             raise line_error(i, "withholding", "Pick a withholding code from the list.")
+        try:  # a draft may leave it for later; submitting needs it (submit below)
+            code, reason, note = withholding_decision("local", line.withholding, line.no_withholding_reason, line.no_withholding_note, complete=False)
+        except ValueError as problem:
+            raise line_error(i, "noWithholdingReason", str(problem)) from None
         if line.spent_on > body.voucher_date:
             raise line_error(i, "spentOn", "A receipt can't be dated after its voucher.")
         tin = None
@@ -265,7 +274,8 @@ def apply(db: DB, settings, v: PettyCashVoucher, body: VoucherIn, user) -> None:
         ln = existing.pop(line.id) if line.id else PettyCashLine()
         ln.position, ln.spent_on, ln.store, ln.store_tin = i + 1, line.spent_on, line.store.strip(), tin
         ln.receipt_number, ln.account_id, ln.description = line.receipt_number.strip(), a.id, (line.description or "").strip() or None
-        ln.purchase_type, ln.vat, ln.withholding, ln.amount_centavos = line.purchase_type, line.vat, line.withholding or None, line.amount_centavos
+        ln.purchase_type, ln.vat, ln.withholding, ln.amount_centavos = line.purchase_type, line.vat, code, line.amount_centavos
+        ln.no_withholding_reason, ln.no_withholding_note = reason, note
         kept.append(ln)
     for gone in existing.values():  # removed receipt lines take their files with them
         if gone.file_ref and (stored := db.get(StoredFile, gone.file_ref)):
@@ -405,6 +415,10 @@ def submit(user: permitted("petty_cash.create"), db: DB, voucher_id: str) -> dic
     missing = [ln.position for ln in v.lines if not ln.file_ref]
     if missing:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Attach the receipt for line {', '.join(map(str, missing))} first: every receipt is attached before submitting.")
+    # Every receipt says what's withheld, or why nothing is (Batch A, 2026-11-05).
+    undecided = [ln.position for ln in v.lines if not ln.withholding and not ln.no_withholding_reason]
+    if undecided:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Line {', '.join(map(str, undecided))}: pick a withholding code, or say why none is withheld, before submitting.")
     if not v.fund.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{v.fund.name} is switched off. Pick another fund.")
     set_totals(v, worked(db, v))

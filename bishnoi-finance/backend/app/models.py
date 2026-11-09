@@ -1006,6 +1006,12 @@ class Supplier(Base):
     import_details: Mapped[dict] = mapped_column(JSON, default=dict)
     # The BIR's code for what's usually withheld (app/payables.py WITHHOLDING); none: nothing.
     withholding: Mapped[str | None] = mapped_column(String(10), default=None)
+    # Local or foreign (app/payables.py ORIGINS, migration 0036): only a local supplier is withheld from. Filled from
+    # the name when not given; None only if never set.
+    origin: Mapped[str | None] = mapped_column(String(10), default=None)
+    # Its items differ in VAT (e.g. VAT-exempt medicines beside VATable goods): a bill's lines then start with no VAT
+    # chosen, so each is picked by item (Sir Mel, 2026-11-04), not filled from the supplier.
+    vat_varies_by_item: Mapped[bool] = mapped_column(default=False)
     terms_days: Mapped[int] = mapped_column(Integer, default=30)
     email: Mapped[str | None] = mapped_column(String(254), default=None)
     phone: Mapped[str | None] = mapped_column(String(40), default=None)
@@ -1554,6 +1560,9 @@ class PettyCashLine(Base):
     purchase_type: Mapped[str] = mapped_column(String(20), default="other_goods")
     vat: Mapped[str] = mapped_column(String(10), default="vat")
     withholding: Mapped[str | None] = mapped_column(String(10), default=None)
+    # No withholding, and why (app/payables.py NO_WITHHOLDING; migration 0036): a note for "other".
+    no_withholding_reason: Mapped[str | None] = mapped_column(String(20), default=None)
+    no_withholding_note: Mapped[str | None] = mapped_column(String(200), default=None)
     amount_centavos: Mapped[int] = mapped_column(BigInteger)
     net_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     vat_centavos: Mapped[int] = mapped_column(BigInteger, default=0)

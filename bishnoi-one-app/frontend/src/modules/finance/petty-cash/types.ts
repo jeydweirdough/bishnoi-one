@@ -41,6 +41,10 @@ export type PettyCashLine = {
   vatLabel: string;
   withholding: string | null;
   withholdingRateBp: number | null;
+  /** No withholding, and why (Batch A, 2026-11-05). */
+  noWithholdingReason?: string | null;
+  noWithholdingNote?: string | null;
+  noWithholdingLabel?: string | null;
   amountCentavos: number;
   netCentavos: number;
   vatCentavos: number;
@@ -84,6 +88,7 @@ export type PettyCashChoices = {
   vatKinds: { key: string; label: string }[];
   purchaseTypes: { key: string; label: string }[];
   withholding: { code: string; name: string; rateBp: number }[];
+  noWithholding?: { key: string; label: string }[];
   people: string[];
   departments: string[];
 };
@@ -99,6 +104,8 @@ export type PettyCashLineInput = {
   purchaseType: string;
   vat: string;
   withholding: string | null;
+  noWithholdingReason?: string | null;
+  noWithholdingNote?: string | null;
   amountCentavos: number;
 };
 

@@ -12,6 +12,7 @@ is ₱10,000 and ₱1,200 VAT. Tax is withheld on the amount before VAT, so at 1
 bill pays the supplier ₱11,100 and ₱100 goes to the BIR (for the supplier's 2307).
 """
 
+import re
 from dataclasses import dataclass
 from datetime import date
 
@@ -42,8 +43,52 @@ VAT_KINDS = {"vat": "VAT 12%", "zero": "Zero-rated", "exempt": "VAT-exempt", "no
 PURCHASE_TYPES = {"services": "Services", "capital_goods": "Capital goods", "other_goods": "Other goods", "importation": "Importation"}
 
 
+# Where a supplier is (Sir Mel, recording 12, 2026-11-04): withholding is for local suppliers only; a foreign one
+# has none (an import's VAT is paid at Customs instead). Decided by the user 2026-11-05: a name with "Ltd" or
+# "Limited" makes a supplier foreign, every other local. That fills the field; a person can change it.
+ORIGINS = {"local": "Local", "foreign": "Foreign"}
+FOREIGN_NAME = re.compile(r"\b(ltd|limited)\b", re.IGNORECASE)
+
+
+def origin_by_name(name: str) -> str:
+    return "foreign" if FOREIGN_NAME.search(name or "") else "local"
+
+
+# Why a local supplier's line has no withholding (Batch A, 2026-11-05): every such line says so, so a missing
+# withholding never looks the same as "not needed". Foreign is filled in by itself; "other" needs a note.
+NO_WITHHOLDING = {"foreign": "Foreign supplier", "not_covered": "Payee not covered or exempt", "other": "Other (see note)"}
+
+
+def withholding_decision(origin: str | None, code: str | None, reason: str | None, note: str | None, *, complete: bool) -> tuple[str | None, str | None, str | None]:
+    """A line's withholding choice, checked: (code, reason, note), or a message saying what's wrong.
+
+    A foreign supplier's line can't have withholding, and says so by itself. A local supplier's line has a code,
+    or a reason (with a note for "other"). `complete`: whether a missing choice is refused (submitting) or kept
+    for later (a draft). Raises ValueError with the message."""
+    note = (note or "").strip() or None
+    if origin == "foreign":
+        if code:
+            raise ValueError("This is a foreign supplier: no tax is withheld from them. Clear the withholding code.")
+        return None, "foreign", None
+    if code:
+        return code, None, None
+    if reason is None or reason == "foreign":
+        if complete:
+            raise ValueError("Pick a withholding code, or say why none is withheld.")
+        return None, None, note
+    if reason not in NO_WITHHOLDING:
+        raise ValueError("Pick a reason from the list.")
+    if reason == "other" and not note:
+        raise ValueError("Say why no tax is withheld in the note.")
+    return None, reason, note
+
+
 def withholding_out() -> list[dict]:
     return [{"code": code, "name": name, "rateBp": bp} for code, (name, bp) in WITHHOLDING.items()]
+
+
+def no_withholding_out() -> list[dict]:
+    return [{"key": key, "label": label} for key, label in NO_WITHHOLDING.items() if key != "foreign"]
 
 
 def share(amount: int, bp: int) -> int:

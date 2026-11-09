@@ -332,7 +332,8 @@ function Totals({ v, fmt }: { v: PettyCashVoucher; fmt: Format }) {
   );
 }
 
-const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None");
+const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%`
+  : l.noWithholdingLabel ? `None · ${l.noWithholdingLabel.toLowerCase()}${l.noWithholdingNote ? `: ${l.noWithholdingNote}` : ""}` : "None · no reason given");
 
 export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await getCompanyMe();
@@ -431,7 +432,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
                     ["Description", l.description],
                     ["Purchase type", l.purchaseTypeLabel],
                     ["VAT", `${l.vatLabel} · ${fmt.peso(l.vatCentavos)}`],
-                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : "None"],
+                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : withheldLabel(l)],
                     ["Before VAT", fmt.peso(l.netCentavos)],
                   ]}
                 />

@@ -172,8 +172,9 @@ function CashLine({ c, ctx }: { c: NonNullable<Cards["cash"]>; ctx: Ctx }) {
 const FundGauges = ({ c, ctx }: { c: NonNullable<Cards["petty"]>; ctx: Ctx }) =>
   c.funds.length ? (
     <div className={s.gauges}>
-      {c.funds.map((f) => (
-        <Gauge key={f.name} {...f} peso={ctx.peso} />
+      {c.funds.map((f, i) => (
+        // Two funds can share a name (two "Petty Cash Fund - Finance" accounts): keyed by place, not name.
+        <Gauge key={`${i}-${f.name}`} {...f} peso={ctx.peso} />
       ))}
     </div>
   ) : (

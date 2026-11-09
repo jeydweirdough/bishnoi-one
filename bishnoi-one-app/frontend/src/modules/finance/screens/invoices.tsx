@@ -160,7 +160,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                 muted: i.status === "void",
                 tick: i.status === "draft" && may(me, "invoices.create") ? `Draft for ${i.customer.name}` : undefined,
                 actions: (
-                  <RowMenu
+                  <RowMenu key="actions"
                     label={`Actions for invoice ${i.number ?? `draft for ${i.customer.name}`}`}
                     items={[
                       { label: "Open", icon: <ExternalLink />, href: `/finance/invoices/${i.id}` },
@@ -196,7 +196,7 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                 ],
                 detail:
                   i.status === "draft" ? undefined : (
-                    <div className="space-y-3">
+                    <div key="detail" className="space-y-3">
                       {payments.length === 0 ? (
                         <p className="text-meta text-ink-3">No payments recorded{i.status === "issued" ? "." : " (void)."}</p>
                       ) : (

@@ -33,7 +33,7 @@ from app.funds import RECEIPT_TYPES, decode
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.models import OPEN_VOUCHERS, Account, Bill, BillEvent, BillFile, JournalEntry, PaymentVoucher, StoredFile, Supplier, SupplierFile, VoucherLine
-from app.payables import PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, withholding_out, work_out
+from app.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, origin_by_name, withholding_decision, withholding_out, work_out
 from app.notify import done, holders, tell
 from app.routers.funds import today
 from app.routers.tax import Api, field_error, split_tin
@@ -135,7 +135,7 @@ def supplier_out(db: DB, s: Supplier, owed: int | None = None) -> dict:
         "id": s.id, "no": s.no, "name": s.name, "companyName": s.company_name,
         "salutation": s.salutation, "firstName": s.first_name, "lastName": s.last_name,
         "tin": s.tin, "branchCode": s.branch_code, "address": s.address,
-        "vatRegistered": s.vat_registered,
+        "vatRegistered": s.vat_registered, "origin": s.origin, "vatVariesByItem": s.vat_varies_by_item,
         "taxDefaultsConfirmed": s.tax_defaults_confirmed, "importDetails": s.import_details,
         "withholding": {"code": code, "name": WITHHOLDING[code][0], "rateBp": WITHHOLDING[code][1]} if code in WITHHOLDING else None,
         "termsDays": s.terms_days, "email": s.email, "phone": s.phone, "mobile": s.mobile,
@@ -159,10 +159,13 @@ def payables_accounts(db: DB) -> list[dict]:
 
 
 @router.get("/suppliers")
-def list_suppliers(user: permitted("suppliers.view"), db: DB, q: str | None = Query(None, max_length=100), active: bool | None = None) -> dict:
+def list_suppliers(user: permitted("suppliers.view"), db: DB, q: str | None = Query(None, max_length=100), active: bool | None = None,
+                   origin: Literal["local", "foreign"] | None = None) -> dict:
     query = select(Supplier)
     if active is not None:
         query = query.where(Supplier.is_active == active)
+    if origin is not None:
+        query = query.where(Supplier.origin == origin)
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Supplier.name).like(like), func.lower(func.coalesce(Supplier.company_name, "")).like(like),
@@ -194,6 +197,9 @@ class SupplierIn(Api):
     branch_code: str | None = Field(None, max_length=5)
     address: str | None = Field(None, max_length=300)
     vat_registered: bool = True
+    # Local or foreign: when not given, from the name (Ltd or Limited: foreign; app/payables.py origin_by_name).
+    origin: Literal["local", "foreign"] | None = None
+    vat_varies_by_item: bool = False
     withholding: str | None = Field(None, max_length=10)
     terms_days: int = Field(30, ge=0, le=365)
     email: str | None = Field(None, max_length=254)
@@ -242,7 +248,10 @@ def apply_supplier(db: DB, s: Supplier, body: SupplierIn) -> list[str]:
         if a is None or not a.is_active or a.type != "liability":
             raise field_error("payablesAccountId", "Pick an active liability account, or leave it to the default.")
     contacts = [c.model_dump(by_alias=True) for c in body.contacts if any(v for v in c.model_dump().values())]
-    values = body.model_dump(exclude={"contacts"}) | {"tin": tin, "branch_code": branch if tin else body.branch_code, "contacts": contacts}
+    origin = body.origin or origin_by_name(body.name)
+    if origin == "foreign" and body.withholding:
+        raise field_error("withholding", "A foreign supplier has no tax withheld: leave the usual withholding empty.")
+    values = body.model_dump(exclude={"contacts"}) | {"tin": tin, "branch_code": branch if tin else body.branch_code, "contacts": contacts, "origin": origin}
     changed = [k for k, v in values.items() if getattr(s, k) != v]
     for k, v in values.items():
         setattr(s, k, v)
@@ -429,7 +438,7 @@ STATUS_LABELS = {"draft": "Draft", "recorded": "Recorded", "void": "Void"}
 # Where a bill stands, as the lists and tabs show it (Aubrey's flow, 2026-10-23): made, approved,
 # checked if tax is withheld; posted when it clears and then ready to pay.
 STATE_LABELS = {
-    "draft": "Draft", "returned": "Returned", "to_approve": "To approve", "to_check": "To check",
+    "draft": "Draft", "returned": "Returned", "to_approve": "To approve", "to_check": "Tax check",
     "ready": "Ready to pay", "partly_paid": "Partly paid", "paid": "Paid", "void": "Void",
 }
 STATE = case(
@@ -513,6 +522,7 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
                 "purchaseType": ln.get("purchaseType", "other_goods"),
                 "purchaseTypeLabel": PURCHASE_TYPES[ln.get("purchaseType", "other_goods")],
                 "withholdingRateBp": WITHHOLDING[ln["withholding"]][1] if ln.get("withholding") in WITHHOLDING else None,
+                "noWithholdingLabel": NO_WITHHOLDING.get(ln.get("noWithholding") or ""),
             }
             for ln in lines
         ],
@@ -548,7 +558,7 @@ def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep) -
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
         "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
         "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
-        "withholding": withholding_out(), "canEditSuppliers": access_of(user).can("suppliers.edit"),
+        "withholding": withholding_out(), "noWithholding": no_withholding_out(), "canEditSuppliers": access_of(user).can("suppliers.edit"),
         "today": today(settings).isoformat(),
     }
 
@@ -607,6 +617,9 @@ class BillLineIn(Api):
     amount_centavos: int = Field(gt=0, lt=10**11)
     vat: Literal["vat", "zero", "exempt", "none"] = "vat"
     withholding: str | None = Field(None, max_length=10)
+    # No withholding, and why (app/payables.py NO_WITHHOLDING): needed for a local supplier's line before submitting.
+    no_withholding_reason: str | None = Field(None, max_length=20)
+    no_withholding_note: str | None = Field(None, max_length=200)
 
 
 class BillIn(Api):
@@ -659,7 +672,17 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
             raise line_error(i, "accountId", "Pick an active expense or asset account.")
         if line.withholding and line.withholding not in WITHHOLDING:
             raise line_error(i, "withholding", "Pick a withholding code from the list.")
-        lines.append({"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": line.withholding, "purchaseType": line.purchase_type})
+        # A decision on every line before it's confirmed (Batch A): a code, or why none; never a code for a foreign supplier.
+        try:
+            code, reason, note = withholding_decision(supplier.origin, line.withholding, line.no_withholding_reason, line.no_withholding_note, complete=body.tax_reviewed)
+        except ValueError as problem:
+            raise line_error(i, "noWithholdingReason" if not line.withholding else "withholding", str(problem)) from None
+        entry = {"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": code, "purchaseType": line.purchase_type}
+        if reason:
+            entry["noWithholding"] = reason
+        if note:
+            entry["noWithholdingNote"] = note
+        lines.append(entry)
     b.tax_reviewed = body.tax_reviewed and all("vat" in line.model_fields_set and "withholding" in line.model_fields_set for line in body.lines)
     b.supplier_id, b.bill_number, b.bill_date, b.due_date = supplier.id, number, body.bill_date, due
     b.po_number, b.dr_number, b.checked_po, b.checked_dr = body.po_number, body.dr_number, body.checked_po, body.checked_dr
@@ -799,6 +822,12 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     editable(b)
     if not b.tax_reviewed:
         raise HTTPException(409, "Open this draft and confirm its VAT and withholding choices before submitting.")
+    # Drafts confirmed before Batch A (2026-11-05), or a supplier whose origin changed since: checked again here.
+    for n, ln in enumerate(b.lines, start=1):
+        try:
+            withholding_decision(b.supplier.origin, ln.get("withholding"), ln.get("noWithholding"), ln.get("noWithholdingNote"), complete=True)
+        except ValueError as problem:
+            raise HTTPException(409, f"Line {n}: {problem} Open the draft to fix it.") from None
     if not b.supplier.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or pick another.")
     w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
