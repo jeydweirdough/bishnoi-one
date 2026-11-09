@@ -25,6 +25,7 @@ from typing import Literal
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app import budget_watch
 from app.access import access_of, permitted
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -114,6 +115,14 @@ def line_dict(ln: PettyCashLine) -> dict:
             "purchaseType": ln.purchase_type, "description": ln.description}
 
 
+def spent(v: PettyCashVoucher) -> dict[str, int]:
+    """What the voucher's lines put on each account, before VAT (as last worked out on save)."""
+    out: dict[str, int] = {}
+    for ln in v.lines:
+        out[ln.account_id] = out.get(ln.account_id, 0) + (ln.net_centavos or 0)
+    return out
+
+
 def voucher_out(db: DB, v: PettyCashVoucher, user=None) -> dict:
     # Totals are worked out whenever the voucher is saved, and again when it's submitted and posted.
     return summary(v) | (may(user, v) if user is not None else {}) | {
@@ -132,6 +141,8 @@ def voucher_out(db: DB, v: PettyCashVoucher, user=None) -> dict:
         } for ln in v.lines],
         "netCentavos": v.net_centavos, "vatCentavos": v.vat_centavos, "withheldCentavos": v.withheld_centavos,
         "entryId": v.entry_id,
+        # Over-budget warning (recording 12): not yet posted only; a posted voucher is already in the books.
+        "overBudget": budget_watch.over_budget(db, v.voucher_date, spent(v)) if v.status in ("draft", "returned", "to_check") else [],
         "createdAt": v.created_at.isoformat(), "submittedAt": v.submitted_at.isoformat() if v.submitted_at else None,
         "checkedBy": v.checked_by, "checkedAt": v.checked_at.isoformat() if v.checked_at else None,
         "voidedBy": v.voided_by, "voidedAt": v.voided_at.isoformat() if v.voided_at else None, "voidReason": v.void_reason,

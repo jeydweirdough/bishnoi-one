@@ -1,5 +1,6 @@
 // Payables, as Finance's API answers them (app/routers/payables.py). Money in centavos;
 // rates in basis points (100 = 1%).
+import type { OverBudget } from "@/src/modules/finance/budgets/over-budget";
 
 export type Withholding = { code: string; name: string; rateBp: number };
 
@@ -166,6 +167,7 @@ export type Bill = Omit<BillSummary, "supplier"> & {
   needsCheck: boolean;
   /** Why a draft's amounts can't be worked out (e.g. no VAT rate for its date). */
   problem: string | null;
+  overBudget: OverBudget[];
   files: BillFile[];
   entryId: string | null;
   /** The payment vouchers paying it (not cancelled ones). */

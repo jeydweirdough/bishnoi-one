@@ -33,6 +33,7 @@ from app.funds import RECEIPT_TYPES, decode
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.models import OPEN_VOUCHERS, Account, Bill, BillEvent, BillFile, JournalEntry, PaymentVoucher, StoredFile, Supplier, SupplierFile, VoucherLine
+from app import budget_watch
 from app.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, origin_by_name, withholding_decision, withholding_out, work_out
 from app.notify import done, holders, tell
 from app.routers.funds import today
@@ -493,6 +494,14 @@ def may_bill(user, b: Bill) -> dict:
     }
 
 
+def spent_by_account(lines: list[dict]) -> dict[str, int]:
+    """What worked-out lines put on each account, before VAT (VAT goes to input VAT)."""
+    out: dict[str, int] = {}
+    for ln in lines:
+        out[ln["accountId"]] = out.get(ln["accountId"], 0) + ln.get("netCentavos", 0)
+    return out
+
+
 def bill_out(db: DB, b: Bill, user=None) -> dict:
     from app.zoho_outbox import summary as delivery_summary
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({ln["accountId"] for ln in b.lines})))} if b.lines else {}
@@ -530,6 +539,8 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
         # Bills with tax withheld are checked after approval (Mel); the others skip it.
         "needsCheck": totals[2] > 0,
         "problem": problem,
+        # Over-budget warning (recording 12): drafts only; a posted bill is already in the books.
+        "overBudget": budget_watch.over_budget(db, b.bill_date, spent_by_account(lines)) if worked else [],
         "files": files_out(b.files),
         "entryId": b.entry_id,
         "vouchers": [

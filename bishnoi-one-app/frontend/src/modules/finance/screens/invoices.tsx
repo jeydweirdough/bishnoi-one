@@ -414,7 +414,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
               ["Date", fmt.dateLabel(inv.date)],
               ["Terms", inv.imported ? "Not in Oojeema's file" : inv.termsDays ? `${inv.termsDays} days` : "Cash on delivery"],
               ["Due date", inv.imported ? "Not in Oojeema's file" : fmt.dateLabel(inv.dueDate)],
-              ["Reference", inv.reference],
+              [inv.imported ? "Sales order no." : "Reference", inv.reference],
             ]}
           />
         </div>

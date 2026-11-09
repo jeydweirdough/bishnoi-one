@@ -7,6 +7,7 @@ import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Pi
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
+import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat, type Format } from "@/src/modules/finance/platform/lib/format";
 import { PrintButton } from "@/src/modules/finance/invoices/steps";
@@ -373,6 +374,8 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
+
+      <OverBudgetNotice rows={v.overBudget ?? []} fmt={fmt} className="mb-5 print:hidden" />
 
       <Sheet className="mb-5 px-5 py-4 print:hidden">
         <SectionTitle icon="approvals">Next step</SectionTitle>

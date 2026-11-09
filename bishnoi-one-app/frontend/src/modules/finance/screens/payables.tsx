@@ -7,6 +7,7 @@ import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
+import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
 import { BillEditor } from "@/src/modules/finance/payables/bill-editor";
 import { attachFile, attachSupplierFile, removeFile, removeSupplierFile } from "@/src/modules/finance/payables/actions";
 import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/payables/bill-steps";
@@ -339,6 +340,8 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
+
+      {b.status === "draft" && <OverBudgetNotice rows={b.overBudget ?? []} fmt={fmt} />}
 
       {b.status === "draft" && (
         <Sheet className="mb-5 px-5 py-4">

@@ -1,5 +1,6 @@
 // Petty cash, as Finance's API answers it (app/routers/petty_cash.py). One voucher (PCV) per
 // paper voucher, with a line for each receipt; money in centavos, rates in basis points.
+import type { OverBudget } from "@/src/modules/finance/budgets/over-budget";
 
 export type PettyCashStatus = "draft" | "to_check" | "returned" | "posted" | "void";
 export type PettyCashShow = PettyCashStatus | "all";
@@ -62,6 +63,7 @@ export type PettyCashVoucher = PettyCashSummary & {
   vatCentavos: number;
   withheldCentavos: number;
   entryId: string | null;
+  overBudget: OverBudget[];
   createdAt: string;
   submittedAt: string | null;
   checkedBy: string | null;

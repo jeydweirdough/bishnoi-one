@@ -595,19 +595,45 @@ def revenue_growth(c: Ctx):
 
 def _fiscal(c: Ctx):
     """For a day: (its fiscal year's last day, the month's place in that year, 0 to 11)."""
-    from calendar import monthrange
+    from app.budget_watch import fiscal_place
 
-    from app.models import TaxProfile
+    return fiscal_place(c.db)
 
-    profile = c.db.get(TaxProfile, 1)
-    end_month = profile.fiscal_month_end if profile else 12
 
-    def where(d: date) -> tuple[date, int]:
-        year = d.year if d.month <= end_month else d.year + 1
-        index = (d.month - end_month - 1) % 12
-        return date(year, end_month, monthrange(year, end_month)[1]), index
+def chart_cleanup(c: Ctx):
+    """For Sir Mel and Malou to choose from (recording 12): accounts with the same name as another, accounts never
+    used in an approved or pending entry, and what still points at them. Read-only: nothing is changed or merged."""
+    import re as _re
 
-    return where
+    from app.models import Account, Budget, JournalEntry, JournalLine, LedgerSettings
+
+    accounts = list(c.db.scalars(select(Account).order_by(Account.code)))
+    used = {a: (n, last) for a, n, last in c.db.execute(
+        select(JournalLine.account_id, func.count(), func.max(JournalEntry.entry_date)).join(JournalEntry).group_by(JournalLine.account_id))}
+    settings = c.db.get(LedgerSettings, 1)
+    defaults = {getattr(settings, k) for k in LedgerSettings.__table__.columns.keys() if k.endswith("_account_id")} - {None} if settings else set()
+    budgeted = set(c.db.scalars(select(Budget.account_id).distinct()))
+    parents = {a.parent_id for a in accounts if a.parent_id}
+    plain = lambda name: _re.sub(r"[^a-z0-9]+", " ", name.casefold()).strip()  # noqa: E731
+    same: dict[str, list[Account]] = {}
+    for a in accounts:
+        same.setdefault(plain(a.name), []).append(a)
+    rows = []
+    for a in accounts:
+        twins = [t.code for t in same[plain(a.name)] if t.id != a.id]
+        n, last = used.get(a.id, (0, None))
+        if not twins and n:
+            continue
+        rows.append({"code": a.code, "account": a.name, "type": a.type.capitalize(), "active": "Yes" if a.is_active else "No",
+                     "issue": "; ".join(x for x in (f"Same name as {', '.join(twins)}" if twins else "", "Never used" if not n else "") if x),
+                     "entries": n, "lastUsed": last.isoformat() if last else None,
+                     "pointsHere": ", ".join(x for x in ("a default account" if a.id in defaults else "", "a budget" if a.id in budgeted else "",
+                                                          "a parent of other accounts" if a.id in parents else "") if x) or None})
+    summary = [fig("Accounts", len(accounts)), fig("Same name as another", sum(1 for r in rows if r["issue"].startswith("Same name"))),
+               fig("Never used", sum(1 for r in rows if "Never used" in r["issue"]))]
+    columns = [col("code", "Code"), col("account", "Account"), col("type", "Type"), col("active", "Active"), col("issue", "Why it's listed"),
+               col("entries", "Entries", "number"), col("lastUsed", "Last used", "date"), col("pointsHere", "Still used as")]
+    return columns, rows, summary, None
 
 
 def budget_vs_actual(c: Ctx):
@@ -720,6 +746,7 @@ REPORTS: tuple[Report, ...] = (
     Report("revenue-by-division", "Revenue and margin by division", "Management", "Revenue, cost of goods sold and gross profit for each division in the period, by the salesperson's division when each invoice was made.", gross_margin_by("division", "Division"), "invoices.view", fixed=True),
     Report("revenue-by-team", "Revenue and margin by team", "Management", "Revenue, cost of goods sold and gross profit for each team in the period, by the salesperson's team when each invoice was made.", gross_margin_by("team", "Team"), "invoices.view", fixed=True),
     Report("budget-vs-actual", "Budget against actual", "Management", "Each budgeted account for the period: budget, actual, over or under, and how much of the budget it used.", budget_vs_actual, "journal.view", fixed=True),
+    Report("chart-cleanup", "Chart clean-up list", "Accounting", "Accounts with the same name as another, or never used in any entry, and what still points at them. A list to decide from: nothing is changed.", chart_cleanup, "journal.view", dated=False, fixed=True),
     Report("fixed-assets", "Fixed asset register", "Accounting", "Every fixed asset: what it cost, its depreciation to date and its book value.", fixed_asset_register, "journal.view", dated=False, fixed=True),
     Report("cash-forecast", "Cash forecast", "Management", "Cash now, and what customers and suppliers are due to pay and be paid over the next 12 weeks.", cash_forecast, "journal.view", dated=False, fixed=True),
 )
