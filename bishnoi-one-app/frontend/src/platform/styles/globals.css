@@ -150,10 +150,12 @@
     background: rgb(20 22 30 / 0.35);
   }
 
+  /* Ant's own pieces are left out: Ant switches its motion off itself (ant-theme.tsx), and the
+     near-zero duration kept its dropdowns from ever showing on a PC with animations off. */
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *:not([class*="ant-"]),
+    *:not([class*="ant-"])::before,
+    *:not([class*="ant-"])::after {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
