@@ -113,7 +113,7 @@ def test_both_0033_histories_keep_every_row(engine,tmp_path,line):
     assert all(after[t]==rows for t,rows in before.items())
     assert ALL<=columns(engine).keys()
     with engine.connect() as c:
-        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0036'
+        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0037'
         if engine.dialect.name=='sqlite':
             assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
             assert not c.execute(text('PRAGMA foreign_key_check')).all()
@@ -152,7 +152,7 @@ def test_original_files_preserved_and_single_head():
     assert hashlib.sha256((API_DIR/'migrations/versions/0033_recycle_bin.py').read_bytes().replace(b'\r\n',b'\n')).hexdigest()=='77b712e4a7ecb73301a2a679d80fa8901403dbaf78a85129a84ae7c2ef892787'
     config=_config(sa.create_engine('sqlite://'))
     script=ScriptDirectory.from_config(config)
-    assert script.get_heads()==['0036']
+    assert script.get_heads()==['0037']
     revisions=list(script.walk_revisions())
     assert len({r.revision for r in revisions})==len(revisions)
 

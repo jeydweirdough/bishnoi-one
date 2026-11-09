@@ -1,3 +1,5 @@
+import { SupplierReview } from "@/src/modules/finance/payables/supplier-review";
+import type { SupplierReviewList } from "@/src/modules/finance/payables/supplier-review-types";
 import { Pager } from "@/src/platform/ui/pager";
 import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
@@ -273,7 +275,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
   const lastReturn = [...b.events].reverse().find((e) => e.kind === "returned");
 
   if (editing && b.canEdit) {
-    const choices = await load<BillChoices>("/finance/bills/choices");
+    const choices = await load<BillChoices>(`/finance/bills/choices?billId=${enc(id)}`);
     return (
       <>
         <PageHeader title={title} crumbs={crumbs} />
@@ -485,73 +487,15 @@ const personName = (c: { salutation: string | null; firstName: string | null; la
 /** The suppliers, as Zoho's All Vendors lists them: name, company, email, phone, and what's owed each. */
 export async function SuppliersPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  const fmt = makeFormat(me.org);
   const q = one((await searchParams).q);
-  const list = await load<SupplierList>(`/finance/suppliers${q ? `?q=${enc(q)}` : ""}`);
-  return (
-    <>
-      <PageHeader
-        title="Suppliers"
-        actions={
-          list.canAdd && (
-            <LinkButton href="/finance/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add supplier
-            </LinkButton>
-          )
-        }
-      >
-        Who the company buys from, with what each bill from them needs: their TIN, whether they charge VAT, and the tax usually withheld from them.
-        Payables is what&apos;s owed each on recorded bills.
-      </PageHeader>
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">{list.canAdd && <SupplierImport />}</div>
-        <form>
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
-        </form>
-      </div>
-      <Sheet>
-        {list.items.length === 0 ? (
-          <Empty title={q ? "No matching suppliers" : "No suppliers yet"} icon="people">
-            {!q && list.canAdd ? "Add the first one with Add supplier." : null}
-          </Empty>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-sm">
-              <thead>
-                <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th className="py-2 pr-3 pl-5 font-semibold">Name</th>
-                  <th className="px-3 py-2 font-semibold">Company name</th>
-                  <th className="px-3 py-2 font-semibold">Email</th>
-                  <th className="px-3 py-2 font-semibold">Phone</th>
-                  <th className="py-2 pr-5 pl-3 text-right font-semibold">Payables</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {list.items.map((s) => (
-                  <tr key={s.id} className={`relative hover:bg-bench/40 ${s.isActive ? "" : "text-ink-3"}`}>
-                    <td className="py-2.5 pr-3 pl-5">
-                      <Link href={`/finance/suppliers/${s.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
-                        {s.name}
-                      </Link>
-                      {!s.isActive && <span className="ml-2 text-meta">switched off</span>}
-                      <span className="block text-meta text-ink-3">
-                        {s.tin ? `TIN ${s.tin}-${s.branchCode ?? "00000"}` : "No TIN"}
-                        {s.withholding ? ` · ${s.withholding.code} ${s.withholding.rateBp / 100}%` : ""}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.companyName}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.email}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.phone ?? s.mobile}</td>
-                    <td className="py-2.5 pr-5 pl-3 text-right tabular-nums">{fmt.peso(s.owedCentavos)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Sheet>
-    </>
-  );
+  const list = await load<SupplierReviewList>(`/finance/suppliers/review${q ? `?q=${enc(q)}` : ""}`);
+  return <>
+    <PageHeader title="Suppliers" actions={list.canAdd && <LinkButton href="/finance/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add supplier</LinkButton>}>
+      Review Local/Foreign and usual withholding directly here. Edit one supplier or select several; review and save on this page.
+    </PageHeader>
+    {list.canAdd && <div className="mb-3"><SupplierImport /></div>}
+    <SupplierReview initial={list} initialQuery={q ?? ""} org={me.org} />
+  </>;
 }
 
 export async function NewSupplierPage() {

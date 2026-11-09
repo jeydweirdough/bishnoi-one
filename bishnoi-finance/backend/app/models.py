@@ -1592,6 +1592,37 @@ class PettyCashEvent(Base):
     text: Mapped[str | None] = mapped_column(String(300), default=None)
 
 
+class CompanyReviewBatch(Base):
+    __tablename__ = "nbfi_company_review_batches"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_name: Mapped[str] = mapped_column(String(200))
+    source_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    company: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+
+
+class CompanyReviewRow(Base):
+    __tablename__ = "nbfi_company_review_rows"
+    __table_args__ = (UniqueConstraint("batch_id", "source_line", name="company_review_source_row"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    batch_id: Mapped[str] = mapped_column(ForeignKey("nbfi_company_review_batches.id"))
+    source_line: Mapped[int] = mapped_column(Integer)
+    data: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(40))
+    supplier_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_suppliers.id"), nullable=True)
+
+
+class CompanyScopeReview(Base):
+    __tablename__ = "nbfi_company_scope_reviews"
+    subject_kind: Mapped[str] = mapped_column(String(20), primary_key=True)
+    subject_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(20))
+    evidence: Mapped[dict] = mapped_column(JSON)
+    reviewed_by: Mapped[str] = mapped_column(String(120))
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from app.numbering import numbered  # noqa: E402  (after the models it names)
 

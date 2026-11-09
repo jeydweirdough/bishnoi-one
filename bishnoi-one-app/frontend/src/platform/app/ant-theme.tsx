@@ -2,7 +2,7 @@
 
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { ConfigProvider, theme } from "antd";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo, useSyncExternalStore } from "react";
 
 /**
  * Ant Design for every screen, in the sign-in page's look (Desktop:
@@ -89,10 +89,28 @@ export const ANT_THEME = {
 // In place of Ant's grey "No data" box: a plain line in our words.
 const PICKERS = new Set(["Select", "Cascader", "TreeSelect", "AutoComplete", "Transfer"]);
 
+// A computer with animations switched off (Windows: "Show animations" off) asks for reduced motion.
+// Ant then opens its lists, menus and dialogs without animating. Before 2026-11-09 globals.css shrank
+// every animation to 0.01 ms there, and Ant's dropdowns stayed invisible on that one PC.
+const REDUCED = "(prefers-reduced-motion: reduce)";
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    (changed) => {
+      const query = window.matchMedia(REDUCED);
+      query.addEventListener("change", changed);
+      return () => query.removeEventListener("change", changed);
+    },
+    () => window.matchMedia(REDUCED).matches,
+    () => false,
+  );
+}
+
 export function AntTheme({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
+  const antTheme = useMemo(() => (reduced ? { ...ANT_THEME, token: { ...ANT_THEME.token, motion: false } } : ANT_THEME), [reduced]);
   return (
     <AntdRegistry>
-      <ConfigProvider theme={ANT_THEME} renderEmpty={(component) => <p className="px-1 py-3 text-center text-meta text-ink-3">{PICKERS.has(component ?? "") ? "Nothing to pick yet." : "Nothing here yet."}</p>}>
+      <ConfigProvider theme={antTheme} renderEmpty={(component) => <p className="px-1 py-3 text-center text-meta text-ink-3">{PICKERS.has(component ?? "") ? "Nothing to pick yet." : "Nothing here yet."}</p>}>
         {children}
       </ConfigProvider>
     </AntdRegistry>

@@ -36,6 +36,7 @@ WITHHOLDING: dict[str, tuple[str, int]] = {
     "WI011": ("Professional fees, individual, gross over ₱3M", 1000),
     "WC010": ("Professional fees, company, gross up to ₱720,000", 1000),
     "WC011": ("Professional fees, company, gross over ₱720,000", 1500),
+    "WC140": ("Brokerage fees, company, gross over ₱720,000", 1500),
 }
 
 # A line's VAT: 12% (taken out, or added), zero-rated, exempt, or none (a non-VAT supplier).

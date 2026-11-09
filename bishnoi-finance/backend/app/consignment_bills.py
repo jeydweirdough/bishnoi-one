@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.audit import audit
 from app.ledger import settings as posting_settings
 from app.models import Bill, Supplier
-from app.payables import work_out
+from app.payables import origin_by_name, work_out
 
 ACTOR = "Bishnoi One"
 
@@ -33,7 +33,7 @@ def vendor_for(db: Session, data: dict) -> Supplier:
     found = db.scalar(select(Supplier).where(func.lower(Supplier.name) == name.lower()))
     if found is not None:
         return found
-    s = Supplier(name=name, tin=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}" if len(tin) >= 9 else None, email=v.get("email"), created_by=ACTOR,
+    s = Supplier(name=name, origin=origin_by_name(name), tin=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}" if len(tin) >= 9 else None, email=v.get("email"), created_by=ACTOR,
                  notes=f"Added from Inventory's consignment settlement {data.get('number')} (vendor {v.get('code')}).")
     db.add(s)
     db.flush()

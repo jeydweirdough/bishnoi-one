@@ -1,10 +1,27 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { api, enc } from "@/src/modules/finance/platform/lib/api";
+import { api, enc, ApiError } from "@/src/modules/finance/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/finance/platform/lib/result";
 import type { SupplierRow } from "@/src/modules/finance/payables/csv";
 import type { Bill, BillLineInput, Supplier, SupplierContact, SupplierImportCheck } from "@/src/modules/finance/payables/types";
+import type { SupplierReviewChange, SupplierReviewList, SupplierReviewRow } from "./supplier-review-types";
+
+export async function loadSupplierReview(query: string): Promise<Result<SupplierReviewList>> {
+  return attempt(() => api.get<SupplierReviewList>(`/finance/suppliers/review?${query}`));
+}
+
+export async function saveSupplierReview(changes: SupplierReviewChange[]): Promise<Result<{ changed: number; items: SupplierReviewRow[] }> & { uncertain?: boolean }> {
+  try {
+    const data = await api.post<{ changed: number; items: SupplierReviewRow[] }>("/finance/suppliers/review", { changes });
+    return { ok: true, data };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status >= 500) {
+      return { ok: false, uncertain: true, error: "We could not confirm whether the changes were saved. Reload saved values before making another change." };
+    }
+    return attempt(async () => { throw error; });
+  }
+}
 
 // Suppliers and bills. The API works each bill out, posts it once it's approved (and checked), and
 // checks the person's role for every step (app/routers/payables.py).

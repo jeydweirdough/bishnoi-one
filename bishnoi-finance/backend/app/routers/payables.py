@@ -18,6 +18,8 @@ Included in Finance's own router (app/routers/finance.py), so main.py is untouch
 
 import re
 import secrets
+import hashlib
+import json
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
@@ -26,6 +28,8 @@ from pydantic import Field, field_validator
 from sqlalchemy import case, func, or_, select, text
 
 from app import fx
+from app import company_scope
+from app.locks import locked
 from app.access import access_of, permissions_of, permitted
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
@@ -33,6 +37,7 @@ from app.funds import RECEIPT_TYPES, decode
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.models import OPEN_VOUCHERS, Account, Bill, BillEvent, BillFile, JournalEntry, PaymentVoucher, StoredFile, Supplier, SupplierFile, VoucherLine
+from app.models import CompanyReviewBatch, CompanyReviewRow, CompanyScopeReview
 from app import budget_watch
 from app.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, origin_by_name, withholding_decision, withholding_out, work_out
 from app.notify import done, holders, tell
@@ -265,6 +270,9 @@ def add_supplier(user: permitted("suppliers.add"), db: DB, body: SupplierIn) -> 
     apply_supplier(db, s, body)
     db.add(s)
     db.flush()
+    if company_scope.configured(db, 'supplier'):
+        db.add(CompanyScopeReview(subject_kind='supplier', subject_id=s.id, scope='2mg',
+                                 evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
     audit(db, user, "supplier.created", target=s.name, target_type="supplier", target_id=s.id)
     db.commit()
     return supplier_out(db, s, 0)
@@ -368,6 +376,115 @@ def found_supplier(db: DB, supplier_id: str) -> Supplier:
     if s is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such supplier.")
     return s
+
+
+def supplier_review_version(s: Supplier) -> str:
+    values = [s.id, s.name, s.tin, s.branch_code, s.origin, s.withholding, s.tax_defaults_confirmed, s.vat_registered, s.vat_varies_by_item]
+    return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode()).hexdigest()
+
+
+def supplier_review_row(s: Supplier, owed: int = 0) -> dict:
+    return {"id": s.id, "name": s.name, "origin": s.origin, "withholding": s.withholding,
+            "tin": s.tin, "branchCode": s.branch_code,
+            "companyName": s.company_name, "email": s.email, "phone": s.phone or s.mobile, "owedCentavos": owed,
+            "taxDefaultsConfirmed": s.tax_defaults_confirmed, "isActive": s.is_active,
+            "version": supplier_review_version(s)}
+
+
+@router.get("/suppliers/review")
+def review_suppliers(user: permitted("suppliers.view"), db: DB, q: str = "",
+                     origin: Literal["local", "foreign", "unset"] | None = None,
+                     no_code: bool = False, page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=100),
+                     company_use: Literal['2mg', 'review', 'legacy', 'all'] = '2mg') -> dict:
+    query = select(Supplier)
+    if company_use == '2mg':
+        query = query.where(company_scope.usable_clause('supplier', Supplier.id))
+    elif company_use != 'all':
+        query = query.where(Supplier.id.in_(company_scope.reviewed_ids('supplier', company_use)))
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        query = query.where(or_(func.lower(Supplier.name).like(like), func.lower(func.coalesce(Supplier.company_name, "")).like(like),
+                               func.coalesce(Supplier.tin, "").like(like)))
+    if origin == "unset":
+        query = query.where(Supplier.origin.is_(None))
+    elif origin:
+        query = query.where(Supplier.origin == origin)
+    if no_code:
+        query = query.where(Supplier.withholding.is_(None))
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, pages)
+    rows = db.scalars(query.order_by(func.lower(Supplier.name), Supplier.id).offset((page - 1) * page_size).limit(page_size)).all()
+    owed = owed_by_supplier(db)
+    batch = db.scalar(select(CompanyReviewBatch).where(CompanyReviewBatch.company == '2mg').order_by(CompanyReviewBatch.created_at.desc()).limit(1))
+    reconciliation = None
+    if batch:
+        source_rows = db.scalars(select(CompanyReviewRow).where(CompanyReviewRow.batch_id == batch.id).order_by(CompanyReviewRow.source_line)).all()
+        reconciliation = {'sourceRows': len(source_rows), 'matchedRows': sum(r.status == 'matched' for r in source_rows),
+                          'createdRows': sum(r.status == 'created' for r in source_rows),
+                          'issues': [{'line': r.source_line, 'code': r.data.get('Code'), 'name': r.data.get('Trade Name'),
+                                      'tin': r.data.get('TIN'), 'reason': r.data.get('reviewReason', 'Identity needs confirmation')}
+                                     for r in source_rows if r.status == 'held']}
+    return {"items": [supplier_review_row(s, owed.get(s.id, 0)) for s in rows], "total": total, "page": page, "pages": pages,
+            "reconciliation": reconciliation,
+            "pageSize": page_size, "withholding": withholding_out()} | may_do(user)
+
+
+class SupplierReviewChange(Api):
+    id: str
+    version: str
+    origin: Literal["local", "foreign"] | None = None
+    withholding: str | None = None
+
+
+class SupplierReviewIn(Api):
+    changes: list[SupplierReviewChange] = Field(min_length=1, max_length=100)
+
+
+@router.post("/suppliers/review")
+def save_supplier_review(user: permitted("suppliers.edit"), db: DB, body: SupplierReviewIn) -> dict:
+    ids = [c.id for c in body.changes]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(422, "A supplier appears twice. Nothing was saved.")
+    try:
+        rows = {s.id: s for s in locked(db, Supplier, ids)}
+        prepared = []
+        for change in body.changes:
+            s = rows.get(change.id)
+            if s is None:
+                raise HTTPException(409, "A supplier no longer exists. Reload the list; nothing was saved.")
+            if supplier_review_version(s) != change.version:
+                raise HTTPException(409, f"{s.name} changed since you loaded it. Reload the list; nothing was saved.")
+            fields = change.model_fields_set - {"id", "version"}
+            if not fields or ("origin" in fields and change.origin is None):
+                raise HTTPException(422, "Choose a classification or tax-code change. Nothing was saved.")
+            origin = change.origin if "origin" in fields else s.origin
+            code = change.withholding if "withholding" in fields else s.withholding
+            if code is not None and code not in WITHHOLDING:
+                raise HTTPException(422, "Choose a recognised withholding code. Nothing was saved.")
+            if origin == "foreign" and code:
+                raise HTTPException(422, f"{s.name}: a foreign supplier cannot have withholding. Explicitly clear its code or keep it Local. Nothing was saved.")
+            prepared.append((s, origin, code))
+        changed_count = 0
+        for s, origin, code in prepared:
+            changed = []
+            for field, value in (("origin", origin), ("withholding", code)):
+                if getattr(s, field) != value:
+                    setattr(s, field, value)
+                    changed.append(field)
+            if changed:
+                # As in the supplier form, edited tax defaults need confirmation on a bill.
+                if s.tax_defaults_confirmed:
+                    s.tax_defaults_confirmed = False
+                    changed.append("tax_defaults_confirmed")
+                audit(db, user, "supplier.updated", target=s.name, target_type="supplier", target_id=s.id, fields=changed)
+                changed_count += 1
+        db.commit()
+        owed = owed_by_supplier(db)
+        return {"changed": changed_count, "items": [supplier_review_row(rows[i], owed.get(i, 0)) for i in ids]}
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/suppliers/{supplier_id}")
@@ -559,11 +676,18 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
 
 
 @router.get("/bills/choices")
-def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep) -> dict:
+def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep, bill_id: str | None = Query(None, alias='billId')) -> dict:
     """What the bill form offers: active suppliers, the accounts a line can go to (expenses
     and assets), the VAT kinds and the withholding codes."""
-    suppliers = db.scalars(select(Supplier).where(Supplier.is_active).order_by(func.lower(Supplier.name))).all()
-    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset"))).order_by(Account.code)).all()
+    current = db.get(Bill, bill_id) if bill_id else None
+    eligible = company_scope.usable_clause('supplier', Supplier.id)
+    if current is not None:
+        eligible = or_(eligible, Supplier.id == current.supplier_id)
+    suppliers = db.scalars(select(Supplier).where(Supplier.is_active, eligible).order_by(func.lower(Supplier.name))).all()
+    eligible_accounts = company_scope.usable_clause('account', Account.id)
+    if current is not None:
+        eligible_accounts = or_(eligible_accounts, Account.id.in_([line['accountId'] for line in current.lines]))
+    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset")), eligible_accounts).order_by(Account.code)).all()
     return {
         "suppliers": [supplier_out(db, s, 0) for s in suppliers],
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
@@ -665,6 +789,9 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
     supplier = db.get(Supplier, body.supplier_id)
     if supplier is None or not supplier.is_active:
         raise field_error("supplierId", "Pick an active supplier.")
+    if company_scope.configured(db, 'supplier') and company_scope.scope_for(db, 'supplier', supplier.id) != '2mg':
+        if not b.id or b.supplier_id != supplier.id:
+            raise field_error('supplierId', 'This supplier is not verified for 2MG. Use the company review before starting a new bill.')
     if body.bill_date > today(settings):
         raise field_error("billDate", "The bill date can't be in the future.")
     due = body.due_date or body.bill_date + timedelta(days=supplier.terms_days)
