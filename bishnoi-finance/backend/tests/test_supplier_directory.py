@@ -1,4 +1,4 @@
-﻿"""Directory-first imports need no vendor-by-vendor accounting decisions."""
+"""Directory-first imports need no vendor-by-vendor accounting decisions."""
 from app.models import Supplier
 from .test_tax_api import app, ana, ben, client  # noqa: F401
 from .test_payables import account
@@ -46,7 +46,7 @@ def test_unknown_bill_defaults_require_explicit_document_choices_and_cannot_gran
     assert imported.status_code==201
     vendor=client.get('/finance/suppliers',headers=ana).json()['items'][0]
     maker=person(client,ana,'Creates bills only',VIEW+['suppliers.view','bills.view','bills.create'])
-    line={'accountId':account(client,ana,'6500'),'amountCentavos':10000,'vat':'none','withholding':None}
+    line={'accountId':account(client,ana,'6500'),'amountCentavos':10000,'vat':'none','withholding':None,'noWithholdingReason':'not_covered'}
     body={'supplierId':vendor['id'],'billNumber':'TEST-FIRST-USE','billDate':'2026-10-01','lines':[line]}
     response=client.post('/finance/bills',headers=maker,json=body); assert response.status_code==201,response.text
     bill=response.json(); assert not bill['taxReviewed']
@@ -54,7 +54,8 @@ def test_unknown_bill_defaults_require_explicit_document_choices_and_cannot_gran
     # A boolean alone does not certify silently defaulted line VAT/withholding.
     omitted=body|{'taxReviewed':True,'lines':[{'accountId':line['accountId'],'amountCentavos':10000}]}
     response=client.put(f"/finance/bills/{bill['id']}",headers=maker,json=omitted)
-    assert response.status_code==200 and not response.json()['taxReviewed']
+    # Since Batch A (2026-11-05) it's refused outright: a confirmed bill needs a withholding decision on every line.
+    assert response.status_code==422 and 'say why none is withheld' in response.text
     attempts=body|{'taxReviewed':True,'saveSupplierDefaults':True,'supplierVatRegistered':False,'supplierWithholding':None}
     assert client.put(f"/finance/bills/{bill['id']}",headers=maker,json=attempts).status_code==403
     response=client.put(f"/finance/bills/{bill['id']}",headers=maker,json=body|{'taxReviewed':True})

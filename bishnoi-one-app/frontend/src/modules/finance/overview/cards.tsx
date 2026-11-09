@@ -80,7 +80,7 @@ export function Card({ id, title, sub, source, span, ctx, style, extra, children
 }
 
 /** Books by source, in a narrow card: the full name stays on hover. */
-const SOURCE_SHORT: Record<string, string> = { bill: "Bills", voucher: "Vouchers", petty_cash: "Petty cash", expense: "Imported expenses", invoice: "Sales", manual: "Typed by hand", fund: "Marketing" };
+const SOURCE_SHORT: Record<string, string> = { bill: "Bills", voucher: "Vouchers", petty_cash: "Petty cash", expense: "Zoho expenses", invoice: "Sales", manual: "Typed by hand", fund: "Marketing" };
 
 function Actions({ actions }: { actions: Action[] }) {
   return (
@@ -172,8 +172,9 @@ function CashLine({ c, ctx }: { c: NonNullable<Cards["cash"]>; ctx: Ctx }) {
 const FundGauges = ({ c, ctx }: { c: NonNullable<Cards["petty"]>; ctx: Ctx }) =>
   c.funds.length ? (
     <div className={s.gauges}>
-      {c.funds.map((f) => (
-        <Gauge key={f.name} {...f} peso={ctx.peso} />
+      {c.funds.map((f, i) => (
+        // Two funds can share a name (two "Petty Cash Fund - Finance" accounts): keyed by place, not name.
+        <Gauge key={`${i}-${f.name}`} {...f} peso={ctx.peso} />
       ))}
     </div>
   ) : (

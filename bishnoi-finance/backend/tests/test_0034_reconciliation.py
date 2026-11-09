@@ -63,10 +63,19 @@ def start(engine,tmp_path,line):
         command.upgrade(old,'0032' if line=='0032' else '0033')
 
 
-def snapshot(engine):
+def columns(engine):
     with engine.connect() as c:
-        return {t:sorted(repr(tuple(r)) for r in c.execute(text(f'SELECT * FROM "{t}"')))
-                for t in sa.inspect(c).get_table_names() if t!='nbfi_alembic_version'}
+        inspector=sa.inspect(c)
+        return {t:[x['name'] for x in inspector.get_columns(t)] for t in inspector.get_table_names() if t!='nbfi_alembic_version'}
+
+
+def snapshot(engine, keep=None):
+    """Every row of every table; with `keep`, only those columns, so a later migration's added columns (0036)
+    don't hide whether every original value is still there."""
+    with engine.connect() as c:
+        names=keep or columns(engine)
+        return {t:sorted(repr(tuple(r)) for r in c.execute(text('SELECT '+', '.join(f'"{x}"' for x in cols)+f' FROM "{t}"')))
+                for t,cols in names.items()}
 
 
 def seed(engine,line):
@@ -85,25 +94,29 @@ def seed(engine,line):
 def test_both_0033_histories_keep_every_row(engine,tmp_path,line):
     start(engine,tmp_path,line)
     seed(engine,line)
+    kept=columns(engine)
     before=snapshot(engine)
-    upgrade(engine)
-    upgrade(engine)
-    after=snapshot(engine)
-    assert all(after[t]==rows for t,rows in before.items())
-    assert ALL<=after.keys()
-    with engine.connect() as c:
-        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0035'
-        if engine.dialect.name=='sqlite':
-            assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
-            assert not c.execute(text('PRAGMA foreign_key_check')).all()
-    # A second direct 0034 call validates the state where both sets already exist.
+    # Up to 0035, the state 0034 leaves: a second direct 0034 call validates it, where both sets already exist.
+    # (A later migration, such as 0036 adding petty cash columns, runs after 0034 and is never checked by it.)
+    command.upgrade(_config(engine),'0035')
+    at_0035=snapshot(engine)
     from alembic.operations import Operations
     from alembic.migration import MigrationContext
     with engine.begin() as c:
         step=runpy.run_path(str(API_DIR/'migrations/versions/0034_reconcile_petty_cash_and_recycle_bin.py'))['upgrade']
         step.__globals__['op']=Operations(MigrationContext.configure(c))
         step()
-    assert snapshot(engine)==after
+    assert snapshot(engine)==at_0035
+    upgrade(engine)
+    upgrade(engine)
+    after=snapshot(engine,{t:cols for t,cols in kept.items()})
+    assert all(after[t]==rows for t,rows in before.items())
+    assert ALL<=columns(engine).keys()
+    with engine.connect() as c:
+        assert c.execute(text('SELECT version_num FROM nbfi_alembic_version')).scalar_one()=='0037'
+        if engine.dialect.name=='sqlite':
+            assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
+            assert not c.execute(text('PRAGMA foreign_key_check')).all()
 
 
 @pytest.mark.parametrize('damage', ['partial','column','index','recycle-column','check','fk'])
@@ -139,7 +152,7 @@ def test_original_files_preserved_and_single_head():
     assert hashlib.sha256((API_DIR/'migrations/versions/0033_recycle_bin.py').read_bytes().replace(b'\r\n',b'\n')).hexdigest()=='77b712e4a7ecb73301a2a679d80fa8901403dbaf78a85129a84ae7c2ef892787'
     config=_config(sa.create_engine('sqlite://'))
     script=ScriptDirectory.from_config(config)
-    assert script.get_heads()==['0035']
+    assert script.get_heads()==['0037']
     revisions=list(script.walk_revisions())
     assert len({r.revision for r in revisions})==len(revisions)
 

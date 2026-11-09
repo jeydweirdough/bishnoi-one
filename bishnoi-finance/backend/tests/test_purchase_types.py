@@ -16,7 +16,7 @@ def test_mixed_purchase_types_survive_approval_and_reconcile_reports(client, ana
     s = supplier(client, ben)
     lines = [
         {"accountId": account(client, ben, "6500"), "amountCentavos": 11200 * (i + 1),
-         "vat": "vat", "withholding": None, "purchaseType": kind}
+         "vat": "vat", "withholding": None, "noWithholdingReason": "not_covered", "purchaseType": kind}
         for i, kind in enumerate(bir.payables.PURCHASE_TYPES)
     ]
     # Add a non-VAT service to prove classification doesn't create input VAT.

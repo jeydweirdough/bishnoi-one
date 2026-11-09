@@ -1,5 +1,6 @@
 // Petty cash, as Finance's API answers it (app/routers/petty_cash.py). One voucher (PCV) per
 // paper voucher, with a line for each receipt; money in centavos, rates in basis points.
+import type { OverBudget } from "@/src/modules/finance/budgets/over-budget";
 
 export type PettyCashStatus = "draft" | "to_check" | "returned" | "posted" | "void";
 export type PettyCashShow = PettyCashStatus | "all";
@@ -41,6 +42,10 @@ export type PettyCashLine = {
   vatLabel: string;
   withholding: string | null;
   withholdingRateBp: number | null;
+  /** No withholding, and why (Batch A, 2026-11-05). */
+  noWithholdingReason?: string | null;
+  noWithholdingNote?: string | null;
+  noWithholdingLabel?: string | null;
   amountCentavos: number;
   netCentavos: number;
   vatCentavos: number;
@@ -58,6 +63,7 @@ export type PettyCashVoucher = PettyCashSummary & {
   vatCentavos: number;
   withheldCentavos: number;
   entryId: string | null;
+  overBudget: OverBudget[];
   createdAt: string;
   submittedAt: string | null;
   checkedBy: string | null;
@@ -84,6 +90,7 @@ export type PettyCashChoices = {
   vatKinds: { key: string; label: string }[];
   purchaseTypes: { key: string; label: string }[];
   withholding: { code: string; name: string; rateBp: number }[];
+  noWithholding?: { key: string; label: string }[];
   people: string[];
   departments: string[];
 };
@@ -99,6 +106,8 @@ export type PettyCashLineInput = {
   purchaseType: string;
   vat: string;
   withholding: string | null;
+  noWithholdingReason?: string | null;
+  noWithholdingNote?: string | null;
   amountCentavos: number;
 };
 

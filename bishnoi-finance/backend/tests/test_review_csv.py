@@ -13,6 +13,18 @@ def read(r):
     return list(csv.DictReader(io.StringIO(r.content.decode('utf-8-sig'))))
 
 
+def test_vat_monthly_export_uses_plain_labels_and_peso_amounts(client, ana):
+    rows = read(client.get('/finance/exports/bir-review/vat.csv?year=2026&quarter=1', headers=ana))
+    monthly = [r for r in rows if r['Section'] == 'Monthly']
+    assert len(monthly) == 21
+    assert all('Centavos' not in r['Item'] for r in monthly)
+    assert {r['Item'].split(': ', 1)[1] for r in monthly} == {
+        'VATable sales', 'Output VAT', 'Zero-rated sales', 'VAT-exempt sales',
+        'Non-VAT sales', 'Purchases before VAT', 'Input VAT',
+    }
+    assert all(r['Amount PHP'] == '0.00' for r in monthly)
+
+
 def test_calculated_monthly_withholding_is_not_remittance(monkeypatch):
     monkeypatch.setattr(bir, 'withheld_bills', lambda *a, **k: [])
     monkeypatch.setattr(bir, 'by_atc', lambda *a: [{'taxCentavos': 10000}])
@@ -77,7 +89,7 @@ def test_posted_bill_detail_keeps_line_values_and_foreign_currency(client,ana,be
     from .test_payables import account, cleared
     from decimal import Decimal
     s=supplier(client,ben)
-    line={'accountId':account(client,ben,'6500'),'amountCentavos':11200,'vat':'vat','withholding':None,'purchaseType':'other_goods'}
+    line={'accountId':account(client,ben,'6500'),'amountCentavos':11200,'vat':'vat','withholding':None,'noWithholdingReason':'not_covered','purchaseType':'other_goods'}
     b=bill(client,ben,s['id'],lines=[line,line],currency='USD',rate=56)
     cleared(client,ana,ben,b)
     rows=read(client.get('/finance/exports/review/bill-lines.csv',headers=ana))

@@ -7,6 +7,7 @@ import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Pi
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
+import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat, type Format } from "@/src/modules/finance/platform/lib/format";
 import { PrintButton } from "@/src/modules/finance/invoices/steps";
@@ -332,7 +333,8 @@ function Totals({ v, fmt }: { v: PettyCashVoucher; fmt: Format }) {
   );
 }
 
-const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None");
+const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%`
+  : l.noWithholdingLabel ? `None · ${l.noWithholdingLabel.toLowerCase()}${l.noWithholdingNote ? `: ${l.noWithholdingNote}` : ""}` : "None · no reason given");
 
 export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await getCompanyMe();
@@ -372,6 +374,8 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
+
+      <OverBudgetNotice rows={v.overBudget ?? []} fmt={fmt} className="mb-5 print:hidden" />
 
       <Sheet className="mb-5 px-5 py-4 print:hidden">
         <SectionTitle icon="approvals">Next step</SectionTitle>
@@ -431,7 +435,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
                     ["Description", l.description],
                     ["Purchase type", l.purchaseTypeLabel],
                     ["VAT", `${l.vatLabel} · ${fmt.peso(l.vatCentavos)}`],
-                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : "None"],
+                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : withheldLabel(l)],
                     ["Before VAT", fmt.peso(l.netCentavos)],
                   ]}
                 />

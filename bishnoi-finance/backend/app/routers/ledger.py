@@ -18,7 +18,7 @@ debits; liabilities, equity and income with credits.
 
 import re
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -26,13 +26,14 @@ from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 
 from app.access import access_of, permissions_of, permitted, settings_permitted
+from app import company_scope
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, SettingsDep
 from app.ledger import Leg, account_out, entry_out, post
 from app.ledger import settings as posting_settings
 from app.ledger import locked_settings, require_open_period
-from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
+from app.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User, CompanyScopeReview
 from app.notify import done, holders, tell
 from app.routers.funds import today
 from app.signatures import journal_content, sign
@@ -53,8 +54,13 @@ def balance(type_: str, debit: int, credit: int) -> int:
 
 
 @router.get("/accounts")
-def list_accounts(user: permitted("accounts.view"), db: DB) -> dict:
-    items = db.scalars(select(Account).order_by(Account.code)).all()
+def list_accounts(user: permitted("accounts.view"), db: DB, company_use: Literal['2mg', 'review', 'legacy', 'all'] = 'all') -> dict:
+    query = select(Account)
+    if company_use == '2mg':
+        query = query.where(company_scope.usable_clause('account', Account.id))
+    elif company_use != 'all':
+        query = query.where(Account.id.in_(company_scope.reviewed_ids('account', company_use)))
+    items = db.scalars(query.order_by(Account.code)).all()
     return {"items": [account_out(a) for a in items], "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()], "canEdit": access_of(user).can("accounts.manage")}
 
 
@@ -104,6 +110,9 @@ def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> 
     a = Account(**body.model_dump())
     db.add(a)
     db.flush()
+    if company_scope.configured(db, 'account'):
+        db.add(CompanyScopeReview(subject_kind='account', subject_id=a.id, scope='2mg',
+                                 evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
     audit(db, user, "account.created", target=f"{a.code} {a.name}", target_type="account", target_id=a.id)
     db.commit()
     return account_out(a)
@@ -352,6 +361,7 @@ def list_entries(
     source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
+    offset: Annotated[int, Query(ge=0)] = 0,
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> dict:
     query = select(JournalEntry)
@@ -366,11 +376,12 @@ def list_entries(
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(JournalEntry.number).like(like), func.lower(JournalEntry.memo).like(like), func.lower(JournalEntry.reference).like(like)))
-    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc()).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc(), JournalEntry.id.desc()).offset(offset).limit(limit)).all()
     # Where each reversal stands, so an entry whose reversal still waits isn't shown as reversed.
     reversals = [e.reversed_by_id for e in items if e.reversed_by_id]
     standing = dict(db.execute(select(JournalEntry.id, JournalEntry.status).where(JournalEntry.id.in_(reversals))).all()) if reversals else {}
-    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items]}
+    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items], "total": total}
 
 
 def entry_for(user: User, e: JournalEntry, reversal_status: str | None = None) -> dict:

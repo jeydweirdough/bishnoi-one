@@ -1,3 +1,7 @@
+import { SupplierReview } from "@/src/modules/finance/payables/supplier-review";
+import type { SupplierReviewList } from "@/src/modules/finance/payables/supplier-review-types";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { Plus } from "lucide-react";
 import Link from "next/link";
@@ -5,6 +9,7 @@ import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
+import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
 import { BillEditor } from "@/src/modules/finance/payables/bill-editor";
 import { attachFile, attachSupplierFile, removeFile, removeSupplierFile } from "@/src/modules/finance/payables/actions";
 import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/payables/bill-steps";
@@ -33,7 +38,7 @@ function StatusMark({ state }: { state: BillState }) {
         : state === "void"
           ? "bg-danger-tint text-danger"
           : "bg-bench text-ink-2";
-  return <span className={`rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATE_LABELS[state]}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-meta font-medium ${tone}`}>{BILL_STATE_LABELS[state]}</span>;
 }
 
 /** Unpaid / Partly paid / Paid, always beside the amount (you, 2026-10-23: part-payments must be seen). */
@@ -49,7 +54,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "draft", label: "Drafts" },
   { key: "returned", label: "Returned" },
   { key: "to_approve", label: "To approve" },
-  { key: "to_check", label: "To check" },
+  { key: "to_check", label: "Tax check" },
   { key: "ready", label: "Ready to pay" },
   { key: "partly_paid", label: "Partly paid" },
   { key: "paid", label: "Paid" },
@@ -81,6 +86,19 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   for (const key of ["queue", "supplierId", "bucket"]) if (one(sp[key])) query.set(key, one(sp[key]));
   const list = await load<{ items: (BillSummary & { queueNote?: string | null })[]; counts: Record<BillState | "missing", number>; canCreate: boolean; queueLabel: string | null }>(`/finance/bills?${query}`);
+  const size = [10,25,50,100].includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  const { rows, page } = slicePage(list.items, pageOf(sp.page), size);
+  const navigation = new URLSearchParams(query);
+  navigation.delete("missing");
+  if (show) navigation.set("show", show);
+  navigation.set("size", String(size));
+  const tabHref = (tab: string) => {
+    const next = new URLSearchParams(navigation);
+    next.delete("show");
+    if (tab) next.set("show", tab);
+    return "/finance/bills?" + next;
+  };
+  const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/bills?" + navigation} noun="bills" />;
   // Importing Zoho's bills: its own tick, and the testing site only for now (app/routers/imports.py).
   const canImport = may(me, "imports.run") && me.dataEnvironment === "local_test";
   return (
@@ -107,14 +125,14 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
       {(list.queueLabel || query.has("supplierId") || query.has("bucket")) && <p className="mb-3 text-sm text-ink-2">
         {list.queueLabel ?? "Filtered bills"}{query.has("bucket") ? ` · aging bucket: ${query.get("bucket")}` : ""} · {list.items.length} matching bills · <Link href="/finance/bills" className="text-hema hover:underline">Clear filters</Link> · <Link href="/finance/bills/aging" className="text-hema hover:underline">Accounts payable aging</Link>
       </p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
             const n = t.key ? list.counts[t.key as BillState | "missing"] : 0;
             return (
               <Link
                 key={t.key}
-                href={t.key ? `/finance/bills?show=${t.key}` : "/finance/bills"}
+                href={tabHref(t.key)}
                 aria-current={show === t.key ? "page" : undefined}
                 className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
@@ -124,21 +142,38 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
             );
           })}
         </nav>
-        <form className="flex gap-2">
+        <form action="/finance/bills" className="flex max-w-full flex-wrap items-end gap-2" role="search">
           {["queue", "supplierId", "bucket"].map((key) => query.has(key) ? <input suppressHydrationWarning key={key} type="hidden" name={key} value={query.get(key)!} /> : null)}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
           <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <label className="flex items-center gap-2 text-meta text-ink-2">Rows per page<select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2">{[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+          <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold">Show</button>
         </form>
       </div>
-      <Sheet>
+      <div className="mb-3 print:hidden">{pager}</div>
+      <Sheet className="min-w-0 max-w-full">
         {list.items.length === 0 ? (
           <Empty title={q || show ? "No matching bills" : "No bills yet"} icon="lists">
             {!q && !show && list.canCreate ? "Enter the first one with New bill." : null}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[50rem] text-sm">
-              <thead>
+          <>
+            <div key={navigation.toString() + page} role="region" aria-label={"Bills, page " + page} tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:hidden">
+              <BillsTable bills={rows} fmt={fmt} />
+            </div>
+            <div className="hidden print:block"><BillsTable bills={list.items} fmt={fmt} /></div>
+          </>
+        )}
+      </Sheet>
+      <div className="print:hidden">{pager}</div>
+    </>
+  );
+}
+
+function BillsTable({ bills, fmt }: { bills: (BillSummary & { queueNote?: string | null })[]; fmt: ReturnType<typeof makeFormat> }) {
+  return (
+            <table aria-label="Bills" className="w-full min-w-[50rem] text-sm print:min-w-0">
+              <thead className="sticky top-0 z-[1] bg-sheet print:static">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
                   <th className="py-2 pr-3 pl-5 font-semibold">Bill</th>
                   <th className="px-3 py-2 font-semibold">Supplier</th>
@@ -151,7 +186,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
-                {list.items.map((b) => (
+                {bills.map((b) => (
                   <tr key={b.id} className="relative hover:bg-bench/40">
                     <td className="py-2.5 pr-3 pl-5 font-mono text-meta">
                       <Link href={`/finance/bills/${b.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
@@ -175,10 +210,6 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </Sheet>
-    </>
   );
 }
 
@@ -244,7 +275,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
   const lastReturn = [...b.events].reverse().find((e) => e.kind === "returned");
 
   if (editing && b.canEdit) {
-    const choices = await load<BillChoices>("/finance/bills/choices");
+    const choices = await load<BillChoices>(`/finance/bills/choices?billId=${enc(id)}`);
     return (
       <>
         <PageHeader title={title} crumbs={crumbs} />
@@ -312,6 +343,8 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         </p>
       )}
 
+      {b.status === "draft" && <OverBudgetNotice rows={b.overBudget ?? []} fmt={fmt} />}
+
       {b.status === "draft" && (
         <Sheet className="mb-5 px-5 py-4">
           <SectionTitle icon="approvals">Approval</SectionTitle>
@@ -335,7 +368,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
               ["Supplier", <Link key="s" href={`/finance/suppliers/${b.supplier.id}`} className="text-hema hover:underline">{b.supplier.name}</Link>],
               ["TIN", b.supplier.tin ? `${b.supplier.tin}-${b.supplier.branchCode ?? "00000"}` : null],
               ["Their invoice", <span key="n" className="font-mono">{b.billNumber}</span>],
-              ["PO number", b.poNumber],
+              ["Supplier PO number", b.poNumber],
               ["Delivery receipt", b.drNumber],
             ]}
           />
@@ -369,7 +402,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
                 <td className="px-2 py-1.5 text-ink-2">{l.description}</td>
                 <td className="px-2 py-1.5 text-ink-2">{l.purchaseTypeLabel}</td>
                 <td className="px-2 py-1.5 text-meta text-ink-2">{l.vatLabel}</td>
-                <td className="px-2 py-1.5 text-meta text-ink-2">{l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None"}</td>
+                <td className="px-2 py-1.5 text-meta text-ink-2">{l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : l.noWithholdingLabel ? `None · ${l.noWithholdingLabel.toLowerCase()}${l.noWithholdingNote ? `: ${l.noWithholdingNote}` : ""}` : "None · no reason given"}</td>
                 <td className="py-1.5 pl-2 text-right tabular-nums">{fmt.peso(l.amountCentavos)}</td>
               </tr>
             ))}
@@ -454,73 +487,15 @@ const personName = (c: { salutation: string | null; firstName: string | null; la
 /** The suppliers, as Zoho's All Vendors lists them: name, company, email, phone, and what's owed each. */
 export async function SuppliersPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  const fmt = makeFormat(me.org);
   const q = one((await searchParams).q);
-  const list = await load<SupplierList>(`/finance/suppliers${q ? `?q=${enc(q)}` : ""}`);
-  return (
-    <>
-      <PageHeader
-        title="Suppliers"
-        actions={
-          list.canAdd && (
-            <LinkButton href="/finance/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Add supplier
-            </LinkButton>
-          )
-        }
-      >
-        Who the company buys from, with what each bill from them needs: their TIN, whether they charge VAT, and the tax usually withheld from them.
-        Payables is what&apos;s owed each on recorded bills.
-      </PageHeader>
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">{list.canAdd && <SupplierImport />}</div>
-        <form>
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
-        </form>
-      </div>
-      <Sheet>
-        {list.items.length === 0 ? (
-          <Empty title={q ? "No matching suppliers" : "No suppliers yet"} icon="people">
-            {!q && list.canAdd ? "Add the first one with Add supplier." : null}
-          </Empty>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-sm">
-              <thead>
-                <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th className="py-2 pr-3 pl-5 font-semibold">Name</th>
-                  <th className="px-3 py-2 font-semibold">Company name</th>
-                  <th className="px-3 py-2 font-semibold">Email</th>
-                  <th className="px-3 py-2 font-semibold">Phone</th>
-                  <th className="py-2 pr-5 pl-3 text-right font-semibold">Payables</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {list.items.map((s) => (
-                  <tr key={s.id} className={`relative hover:bg-bench/40 ${s.isActive ? "" : "text-ink-3"}`}>
-                    <td className="py-2.5 pr-3 pl-5">
-                      <Link href={`/finance/suppliers/${s.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
-                        {s.name}
-                      </Link>
-                      {!s.isActive && <span className="ml-2 text-meta">switched off</span>}
-                      <span className="block text-meta text-ink-3">
-                        {s.tin ? `TIN ${s.tin}-${s.branchCode ?? "00000"}` : "No TIN"}
-                        {s.withholding ? ` · ${s.withholding.code} ${s.withholding.rateBp / 100}%` : ""}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.companyName}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.email}</td>
-                    <td className="px-3 py-2.5 text-ink-2">{s.phone ?? s.mobile}</td>
-                    <td className="py-2.5 pr-5 pl-3 text-right tabular-nums">{fmt.peso(s.owedCentavos)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Sheet>
-    </>
-  );
+  const list = await load<SupplierReviewList>(`/finance/suppliers/review${q ? `?q=${enc(q)}` : ""}`);
+  return <>
+    <PageHeader title="Suppliers" actions={list.canAdd && <LinkButton href="/finance/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add supplier</LinkButton>}>
+      Review Local/Foreign and usual withholding directly here. Edit one supplier or select several; review and save on this page.
+    </PageHeader>
+    {list.canAdd && <div className="mb-3"><SupplierImport /></div>}
+    <SupplierReview initial={list} initialQuery={q ?? ""} org={me.org} />
+  </>;
 }
 
 export async function NewSupplierPage() {
@@ -595,7 +570,8 @@ export async function SupplierPage({ params, searchParams }: { params: Promise<{
           <Particulars
             items={[
               ["TIN", s.tin ? `${s.tin}-${s.branchCode ?? "00000"}` : null],
-              ["VAT", !s.taxDefaultsConfirmed ? "Tax defaults not confirmed" : s.vatRegistered ? "VAT-registered" : "Not VAT-registered"],
+              ["Where", s.origin === "foreign" ? "Foreign: no tax withheld" : s.origin === "local" ? "Local" : "Not set"],
+              ["VAT", (!s.taxDefaultsConfirmed ? "Tax defaults not confirmed" : s.vatRegistered ? "VAT-registered" : "Not VAT-registered") + (s.vatVariesByItem ? " · differs by item" : "")],
               ["Usually withheld", !s.taxDefaultsConfirmed ? "Not confirmed" : s.withholding ? `${s.withholding.code} · ${s.withholding.name} · ${s.withholding.rateBp / 100}%` : "Nothing"],
               ["Terms", s.termsDays ? `${s.termsDays} days` : "Cash"],
               ["Accounts payable", s.payablesAccount ? `${s.payablesAccount.code} · ${s.payablesAccount.name}` : "The default"],

@@ -23,6 +23,16 @@ KINDS = {
     "imported-expenses": "petty_cash.view", "imported-expense-lines": "petty_cash.view",
 }
 
+VAT_MONTHLY_LABELS = {
+    'taxableSalesCentavos': 'VATable sales',
+    'taxCentavos': 'Output VAT',
+    'zeroRatedSalesCentavos': 'Zero-rated sales',
+    'exemptSalesCentavos': 'VAT-exempt sales',
+    'nonTaxableSalesCentavos': 'Non-VAT sales',
+    'purchasesCentavos': 'Purchases before VAT',
+    'inputTaxCentavos': 'Input VAT',
+}
+
 def val(d, path):
     for key in path.split('.'):
         d = d.get(key) if isinstance(d, dict) else None
@@ -176,7 +186,9 @@ def tax_review(kind: str, user: CurrentUser, db: DB, settings: SettingsDep,
         for m in d['months']:
             for k,v in m.items():
                 if k.endswith('Centavos'):
-                    rows.append([m['start'],m['end'],'Monthly',text(m['label'] + ': ' + k),money(settings,v),'',''])
+                    if k not in VAT_MONTHLY_LABELS:
+                        raise HTTPException(409, 'A VAT amount has no review label. Update the export labels before downloading.')
+                    rows.append([m['start'],m['end'],'Monthly',text(m['label'] + ': ' + VAT_MONTHLY_LABELS[k]),money(settings,v),'',''])
     elif kind == 'vat-sources':
         header = ['Period from','Period to','Source','Date','Record reference','External reference','Party','TIN','Net PHP','VAT PHP','Withheld PHP','VATable net PHP','Zero-rated net PHP','Exempt net PHP','Non-VAT net PHP']
         for inv in bir.issued_between(db,p.start,p.end):

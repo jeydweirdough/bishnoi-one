@@ -7,6 +7,8 @@ import { ModuleActions } from "@/src/platform/shell/module-actions";
 import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getMe } from "../lib/api";
 import { Nav } from "../shell/nav";
+import { SectionTabs } from "../shell/section-tabs";
+import { sectionsFor } from "../shell/sections";
 import { FinancePrintFrame } from "@/src/modules/finance/printing/frame";
 import { getAccount } from "@/src/platform/lib/account";
 import { CrumbsSlot } from "@/src/platform/shell/crumbs";
@@ -44,6 +46,7 @@ export async function ShellLayout({ children, waiting, unset, bell, footer }: Pr
           <div className="finance-shell-width mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
             <div role="status" className="mb-4 rounded-lg border border-rule bg-surface px-4 py-3 text-sm print:hidden"><strong>{me.dataEnvironment === "official" ? "Official Finance · Neon" : "Local test Finance · SQLite"}</strong><span className="ml-2 text-ink-2">{me.dataEnvironment === "official" ? "Records entered here are real company records. Use the separate local site for testing." : "Test entries stay in the local database. Zoho sending is disabled."}</span></div>
             <div className="finance-shell-notices"><Notices timeZone={me.org?.timezone} /></div>
+            <SectionTabs sections={sectionsFor(me)} />
             <FinancePrintFrame org={me.org} company={account.company}>{children}</FinancePrintFrame>
           </div>
         </main>

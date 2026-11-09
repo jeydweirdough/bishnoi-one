@@ -1,3 +1,4 @@
+import { parseSRGrid } from "./source-safety";
 /* Preparing a month's Sales DAT: the converter's own steps (converter.html: loadReports,
    take, selectMonth, recMonth, recYear, defaultRole, irSource, runCore), followed line by line
    but with the settings passed in instead of read off its page. tests/bir-sales-dat.test.mjs
@@ -5,7 +6,7 @@
 
 import {
   C, LISTING_LABEL, MON, addressBook, buildCorrectedDAT, checkDAT, classify, correctListing, entryMonth, fmt, irChecks, isFigures,
-  listingFromSR, mergeGLAccounts, parseCSV, parseDATListing, parseGL, parseIS, parseSJ, parseSRGrid, readXlsx, reconcile, sjSales, tinChecks,
+  listingFromSR, mergeGLAccounts, parseCSV, parseDATListing, parseGL, parseIS, parseSJ, readXlsx, reconcile, sjSales, tinChecks,
 } from "@/src/modules/finance/bir/sales-dat/engine"; // the tests' loader (src/modules/finance/tests/support) adds ".ts" for plain Node
 
 /** What a GL account is used for (the converter's step "What each General Ledger account is used for"). */

@@ -1,5 +1,6 @@
 // Payables, as Finance's API answers them (app/routers/payables.py). Money in centavos;
 // rates in basis points (100 = 1%).
+import type { OverBudget } from "@/src/modules/finance/budgets/over-budget";
 
 export type Withholding = { code: string; name: string; rateBp: number };
 
@@ -39,6 +40,10 @@ export type Supplier = {
   branchCode: string | null;
   address: string | null;
   vatRegistered: boolean;
+  /** Local or foreign (Batch A): only a local supplier is withheld from. */
+  origin?: "local" | "foreign" | null;
+  /** Its items differ in VAT (e.g. medicines): bill lines start with VAT to choose. */
+  vatVariesByItem?: boolean;
   withholding: Withholding | null;
   termsDays: number;
   email: string | null;
@@ -87,7 +92,7 @@ export const BILL_STATE_LABELS: Record<BillState, string> = {
   draft: "Draft",
   returned: "Returned",
   to_approve: "To approve",
-  to_check: "To check",
+  to_check: "Tax check",
   ready: "Ready to pay",
   partly_paid: "Partly paid",
   paid: "Paid",
@@ -123,13 +128,19 @@ export type VatKind = "vat" | "zero" | "exempt" | "none";
 export type PurchaseType = "services" | "capital_goods" | "other_goods" | "importation";
 
 /** A line as the form sends it. */
-export type BillLineInput = { accountId: string; description: string | null; amountCentavos: number; vat: VatKind; withholding: string | null; purchaseType: PurchaseType };
+export type BillLineInput = {
+  accountId: string; description: string | null; amountCentavos: number; vat: VatKind; withholding: string | null; purchaseType: PurchaseType;
+  /** No withholding, and why (Batch A): "not_covered" or "other" (with a note); the API fills in "foreign". */
+  noWithholdingReason?: string | null; noWithholdingNote?: string | null;
+};
 
-export type BillLine = BillLineInput & {
+export type BillLine = Omit<BillLineInput, "noWithholdingReason"> & {
   account: { id: string; code: string; name: string } | null;
   vatLabel: string;
   purchaseTypeLabel: string;
   withholdingRateBp: number | null;
+  noWithholding?: string | null;
+  noWithholdingLabel?: string | null;
   netCentavos?: number;
   vatCentavos?: number;
   withheldCentavos?: number;
@@ -156,6 +167,7 @@ export type Bill = Omit<BillSummary, "supplier"> & {
   needsCheck: boolean;
   /** Why a draft's amounts can't be worked out (e.g. no VAT rate for its date). */
   problem: string | null;
+  overBudget: OverBudget[];
   files: BillFile[];
   entryId: string | null;
   /** The payment vouchers paying it (not cancelled ones). */
@@ -188,5 +200,7 @@ export type BillChoices = {
   vatKinds: { key: VatKind; label: string }[];
   purchaseTypes: { key: PurchaseType; label: string }[];
   withholding: Withholding[];
+  /** Why a local line may have no withholding (app/payables.py NO_WITHHOLDING, without "foreign"). */
+  noWithholding?: { key: string; label: string }[];
   today: string;
 };

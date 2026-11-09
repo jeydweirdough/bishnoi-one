@@ -36,7 +36,7 @@ def fund(app) -> str:
 def line(client, who, **extra) -> dict:
     return {"spentOn": "2026-10-05", "store": "Corner Hardware", "storeTin": "123-456-789-00000", "receiptNumber": "OR 1001",
             "accountId": account(client, who, "6500"), "description": "Cleaning materials", "purchaseType": "other_goods",
-            "vat": "vat", "withholding": None, "amountCentavos": 112_000} | extra
+            "vat": "vat", "withholding": None, "noWithholdingReason": "not_covered", "amountCentavos": 112_000} | extra
 
 
 def voucher(client, who, fund_id, number="2MG PCV 01682", lines=None) -> dict:
