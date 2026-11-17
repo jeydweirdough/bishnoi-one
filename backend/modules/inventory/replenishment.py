@@ -105,7 +105,7 @@ def make_drafts(db: Session, me: User | None, warehouse: Warehouse, product_ids:
     made = []
     for supplier_id, lines in by_vendor.items():
         po = PurchaseOrder(number=next_number(db, "PO"), supplier_id=supplier_id, warehouse_id=warehouse.id, created_by_id=me.id if me else None,
-                           replenishment=True, notes="Made by replenishment: what's due from use and lead time. Check it, then place it.",
+                           replenishment=True, reason="Made by replenishment: what's due from use and lead time. Check it, then place it.",
                            expected_on=documents.today() + timedelta(days=max(r["leadDays"] for r in lines)))
         po.lines = [PurchaseOrderLine(position=i, product_id=r["product"]["id"], quantity=r["suggested"], unit_cost=r["unitCost"]) for i, r in enumerate(lines)]
         db.add(po)

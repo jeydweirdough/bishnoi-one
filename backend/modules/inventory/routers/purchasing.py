@@ -292,8 +292,9 @@ def po_out(db: DB, po: PurchaseOrder) -> dict:
         **po_brief(po),
         "notes": po.notes,
         # Raised for a sales order (order-on-demand, 15b); made by replenishment (15a).
-        "salesOrder": {"id": po.sales_order_id, "number": so.number} if po.sales_order_id and (so := db.get(SalesOrder, po.sales_order_id)) else None,
+        "salesOrder": {"id": po.sales_order_id, "number": so.number, "customer": so.customer_name} if po.sales_order_id and (so := db.get(SalesOrder, po.sales_order_id)) else None,
         "replenishment": po.replenishment,
+        "reason": po.reason,
         "createdBy": person(po.created_by),
         "orderedBy": person(po.ordered_by),
         "lines": [

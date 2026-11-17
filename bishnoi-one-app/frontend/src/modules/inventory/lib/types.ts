@@ -330,7 +330,9 @@ export type ReceiptBrief = {
 };
 export type POExtras = {
   /** Raised for a sales order (order-on-demand 15b), or made by replenishment (15a). */
-  salesOrder?: { id: string; number: string } | null; replenishment?: boolean;
+  salesOrder?: { id: string; number: string; customer?: string } | null; replenishment?: boolean;
+  /** Why the system made it (order-on-demand, replenishment): read-only, apart from `notes`. */
+  reason?: string | null;
 };
 
 export type Receipt = ReceiptBrief & {

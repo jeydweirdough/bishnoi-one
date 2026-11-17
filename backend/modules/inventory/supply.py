@@ -24,12 +24,19 @@ def _price(db: Session, product: Product) -> int:
 
 def _po(db: Session, me: User, order: SalesOrder, supplier_id: str, lines: list[tuple[Product, int]], slug: str | None) -> PurchaseOrder:
     po = PurchaseOrder(number=next_number(db, "PO"), supplier_id=supplier_id, warehouse_id=order.warehouse_id, created_by_id=me.id,
-                       sales_order_id=order.id, notes=f"Order-on-demand for {order.number}: what the warehouse can't fill ({order.number}).")
+                       sales_order_id=order.id, reason=on_demand_reason(order, lines))
     po.lines = [PurchaseOrderLine(position=i, product_id=p.id, quantity=q, unit_cost=_price(db, p)) for i, (p, q) in enumerate(lines)]
     db.add(po)
     db.flush()
     business_events.link(db, slug, business_events.ref("sales_order", order.id, order.number), business_events.ref("purchase_order", po.id, po.number))
     return po
+
+
+def on_demand_reason(order: SalesOrder, lines: list[tuple[Product, int]]) -> str:
+    """Why an order-on-demand purchase order was made, in plain words (2026-11-18)."""
+    short = ", ".join(f"{p.name} ×{q:,}" for p, q in lines)
+    when = f" It's due to the customer on {order.scheduled_on:%d %b %Y}." if order.scheduled_on else ""
+    return f"Made when sales order {order.number} for {order.customer_name} was approved: the warehouse is short of {short}.{when}"
 
 
 def by_vendor(db: Session, wanted: list[tuple[Product, int]]) -> tuple[dict[str, list[tuple[Product, int]]], list[Product]]:

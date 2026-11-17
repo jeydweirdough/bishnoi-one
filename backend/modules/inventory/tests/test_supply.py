@@ -19,6 +19,9 @@ def test_an_order_without_the_stock_raises_a_draft_purchase_order(ana, world):
     assert len(pos) == 1 and pos[0]["status"] == "draft" and pos[0]["supplier"] == "ABC Medical Supply"
     po = ana.get(f"/inventory/purchase-orders/{pos[0]['id']}")
     assert po["lines"][0]["quantity"] == 7 and po["salesOrder"]["number"] == made["number"]
+    # Why it was made, apart from the buyer's own notes (2026-11-18)
+    assert po["reason"].startswith(f"Made when sales order {made['number']} for ") and "×7" in po["reason"]
+    assert po["notes"] is None and po["salesOrder"]["customer"]
     # Enough stock: nothing raised.
     other = a_sales_order(ana, world, 2)
     assert ana.post(f"/inventory/sales-orders/{other['id']}/approve")["purchaseOrders"] == []

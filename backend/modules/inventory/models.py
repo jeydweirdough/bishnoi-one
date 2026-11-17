@@ -559,6 +559,9 @@ class PurchaseOrder(Stamped, Base):
     replenishment: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
     # Raised for a sales order (order-on-demand, 15b).
     sales_order_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    # Why the system made it (2026-11-18): for which sales order and customer, and what was short. Read-only; the
+    # buyer's own words go in `notes`.
+    reason: Mapped[str | None] = mapped_column(Text, default=None)
 
     supplier: Mapped[Supplier] = relationship(lazy="joined")
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")

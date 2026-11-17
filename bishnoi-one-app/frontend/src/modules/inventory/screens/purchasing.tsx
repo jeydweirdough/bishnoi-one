@@ -272,13 +272,15 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
       >
         <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.warehouse.name}</span>
       </PageHeader>
-      {(po.salesOrder || po.replenishment) && (
+      {(po.reason || po.salesOrder || po.replenishment) && (
+        // Why the system made it (2026-11-18): read-only; the buyer's own notes are below.
         <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
-          {po.replenishment && "Made by replenishment from use and lead time. "}
+          {po.reason ?? (po.replenishment ? "Made by replenishment from use and lead time." : null)}
           {po.salesOrder && (
             <>
-              Order-on-demand for{" "}
-              <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
+              {" "}
+              <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">Open {po.salesOrder.number}</Link>
+              {po.salesOrder.customer && !po.reason && <span className="text-ink-2"> · {po.salesOrder.customer}</span>}
             </>
           )}
         </p>
