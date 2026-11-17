@@ -117,8 +117,11 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
                 <LinkButton href="/crm/field/doctors">Clear search</LinkButton>
               ) : (
                 <>
-                  {can(me, "customers.create") && (
-<NewCustomerButton label={`Add a ${one}`} kind={terms.visitedType ?? undefined} icon={false} />
+                  {can(me, "customers.create") ? (
+                    <NewCustomerButton label={`Add a ${one}`} kind={terms.visitedType ?? undefined} icon={false} />
+                  ) : (
+                    // A field agent adds to their own list (owner's Step 2, 2026-11-18); their coach sees it on the week's review.
+                    can(me, "visits.create") && terms.visitedType && <LinkButton href={`/crm/customers/new?type=${encodeURIComponent(terms.visitedType)}`}>{`Add a ${one}`}</LinkButton>
                   )}
                   {can(me, "goals.import") && <LinkButton href="/crm/field/balances/import">Upload balances</LinkButton>}
                 </>

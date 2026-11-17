@@ -130,6 +130,8 @@ export type WeekPlan = {
   days: { day: string; stops: PlanStop[] }[];
   status: { sentAt: string | null; changedAt: string | null; reviewedAt: string | null; reviewedBy: { id: string; name: string } | null; note: string | null };
   can: { plan: boolean; review: boolean };
+  /** Accounts they added to their own list that week (2026-11-18), for the coach's review. */
+  added?: { id: string; name: string; city: string | null; tier: number | null; zone: string | null }[];
 };
 
 /** A government assistance application (PAP, Rx playbook) for a doctor's patient. */

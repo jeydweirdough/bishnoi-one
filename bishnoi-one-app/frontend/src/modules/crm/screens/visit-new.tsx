@@ -38,7 +38,7 @@ export default async function VisitNewPage({ searchParams }: { searchParams: Pro
         initial={initial}
         requireLocation={isFieldAgent(me)}
         back={back}
-        canAdd={can(me, "customers.create")}
+        canAdd={can(me, "customers.create") || (can(me, "visits.create") && Boolean(terms.visitedType))}
         visitedType={terms.visitedType ?? undefined}
       />
     </>

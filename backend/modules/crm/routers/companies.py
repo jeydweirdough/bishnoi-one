@@ -30,6 +30,8 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 
 View = Annotated[Access, Depends(require("customers.view"))]
 Create = Annotated[Access, Depends(require("customers.create"))]
+# Adding a customer: anyone who may, or a field agent adding a doctor to their own list (owner's Step 2, 2026-11-18).
+AddCustomer = Annotated[Access, Depends(require("customers.create", "visits.create"))]
 Edit = Annotated[Access, Depends(require("customers.edit"))]
 Delete = Annotated[Access, Depends(require("customers.delete"))]
 
@@ -222,7 +224,15 @@ def find_lookalikes(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_company(access: Create, me: CurrentUser, db: DB, body: CompanyIn) -> dict:
+def create_company(access: AddCustomer, me: CurrentUser, db: DB, settings: SettingsDep, body: CompanyIn) -> dict:
+    if not access.can("customers.create"):
+        # A field agent: a doctor of the type field agents visit, on their own list; their coach sees it on the week's review.
+        from modules.crm.terms import terms_of
+
+        visited = terms_of(settings.terms)["visited_type"]
+        if not visited or (body.status and body.status != visited):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role doesn't allow that.")
+        body.status, body.owner_id = visited, None
     owner = owner_for(db, access, body.owner_id)
     values = body.model_dump(exclude={"owner_id", "allow_duplicate"}, exclude_none=True)
     values["status"] = check_type(db, body.status, team_id=owner.team_id) if body.status else first_type(db, team_id=owner.team_id)

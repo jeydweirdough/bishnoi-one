@@ -39,7 +39,7 @@ def field(app, client, ana) -> dict[str, dict]:
 
 
 def doctor(client, field, name: str, agent: str) -> dict:
-    """A doctor given to an agent (agents don't add customers; their lead or an admin does)."""
+    """A doctor given to an agent by an admin (agents may add their own too, test_field_plan)."""
     r = client.post("/companies", json={"name": name, "status": "doctor", "ownerId": field["ids"][agent], "allowDuplicate": True}, headers=field["ana"])
     assert r.status_code == 201, r.text
     return r.json()

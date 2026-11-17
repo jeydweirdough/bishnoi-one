@@ -128,7 +128,16 @@ def read_plan(access: CurrentAccess, me: CurrentUser, db: DB, settings: Settings
             "note": record.note if record else None,
         },
         "can": {"plan": own and access.can("visits.create"), "review": not own and access.can("goals.view")},
+        # Accounts they added to their own list that week, for the coach going over it (2026-11-18).
+        "added": [{"id": c.id, "name": c.name, "city": c.city, "tier": c.field_tier, "zone": c.field_zone} for c in added_in(db, user, monday)],
     }
+
+
+def added_in(db, user: User, monday: date) -> list[Company]:
+    """The customers this person made in the week (Monday to Sunday, UTC days are close enough for a list)."""
+    start = datetime.combine(monday, datetime.min.time(), UTC)
+    return list(db.scalars(select(Company).where(Company.created_by_id == user.id, Company.created_at >= start,
+                                                  Company.created_at < start + timedelta(days=7)).order_by(Company.name)))
 
 
 class StopIn(Api):

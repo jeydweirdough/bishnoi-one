@@ -69,3 +69,19 @@ def test_a_visit_ticks_off_its_stop(client, field):
     week = client.get("/field/plan", headers=field["fay"]).json()
     stops = [s for d in week["days"] for s in d["stops"]]
     assert [s["visited"] for s in stops] == [True]
+
+
+def test_an_agent_adds_a_doctor_to_their_own_list_and_the_coach_sees_it(client, field):
+    # Owner's Step 2 (2026-11-18): reps edit their own plan, adding their own accounts, without their head.
+    r = client.post("/companies", json={"name": "Dr. Bautista", "city": "Quezon City", "allowDuplicate": True}, headers=field["fay"])
+    assert r.status_code == 201, r.text
+    made = r.json()
+    assert made["status"] == "doctor" and made["owner"]["id"] == field["ids"]["fay"]
+    # Only a doctor, and only for themselves
+    assert client.post("/companies", json={"name": "Big Hospital", "status": "hospital", "allowDuplicate": True}, headers=field["fay"]).status_code == 403
+    assert client.post("/companies", json={"name": "Dr. Other", "ownerId": field["ids"]["finn"], "allowDuplicate": True}, headers=field["fay"]).json()["owner"]["id"] == field["ids"]["fay"]
+    # On their list, so on their plan; tier and zone are theirs to set
+    assert client.put(f"/field/doctors/{made['id']}/plan", json={"tier": 2, "zone": "yellow"}, headers=field["fay"]).status_code == 200
+    this_week = (TODAY - timedelta(days=TODAY.weekday())).isoformat()
+    assert client.get("/field/plan", params={"week": this_week, "person": field["ids"]["fay"]}, headers=field["lia"]).json()["added"][0]["name"] in ("Dr. Bautista", "Dr. Other")
+    assert any(a["name"] == "Dr. Bautista" for a in client.get("/field/plan", params={"week": this_week}, headers=field["fay"]).json()["added"])
