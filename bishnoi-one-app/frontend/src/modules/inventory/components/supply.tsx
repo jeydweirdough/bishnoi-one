@@ -9,6 +9,7 @@ import { deleteProductDocument, saveProductDocument, sendSaleDocuments, settleCo
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
+import { Pill } from "@/src/platform/ui/figures";
 
 // Documents with products and consignment (feature plan steps 15d, 15e). Dropshipping (15c) was removed 2026-11-17.
 
@@ -31,7 +32,7 @@ export function ProductDocuments({ productId, documents, canEdit }: { productId:
     start(async () => {
       const r = await uploadProductDocument(productId, form);
       if (!r.ok) return void toast.error(r.error);
-      toast.success("Document added", { description: "It goes with every sale of this item." });
+      toast.success("Document added", { description: /cpr/i.test(`${name} ${f.name}`) ? "Kept as the CPR file; its name fills the CPR number and validity when they're missing." : "It goes with every sale of this item." });
       setName("");
       if (file.current) file.current.value = "";
       router.refresh();
@@ -50,16 +51,21 @@ export function ProductDocuments({ productId, documents, canEdit }: { productId:
   return (
     <div>
       {documents.length === 0 ? (
-        <p className="text-meta text-ink-3">None yet. Keep its certificate of analysis, leaflet or CPR certificate here; they go with every sale.</p>
+        <p className="text-meta text-ink-3">None yet. Keep its certificate of analysis, leaflet or CPR certificate here; they go with every sale. A file named with &ldquo;CPR&rdquo; (e.g. CPR DR-XY12345 2027-05-31.pdf) is the CPR file and fills its number and validity.</p>
       ) : (
         <ul className="divide-y divide-rule text-sm">
           {documents.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-3 py-1.5">
               <FileText className="size-4 text-ink-3" aria-hidden />
               <a href={d.href} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-medium text-hema hover:underline">{d.name}</a>
+              {d.tag === "cpr" && <Pill tone="good">CPR file</Pill>}
               <span className="text-meta text-ink-3">{d.fileName} · {size(d.size)}</span>
               {canEdit ? (
                 <>
+                  {/* The item's FDA registration certificate (2026-11-18): shown at an FDA inspection. */}
+                  <Checkbox checked={d.tag === "cpr"} disabled={busy} onChange={(e) => run(() => saveProductDocument(productId, d.id, { tag: e.target.checked ? "cpr" : "" }), e.target.checked ? `${d.name} is the CPR file` : `${d.name} isn't the CPR file`)}>
+                    CPR file
+                  </Checkbox>
                   <Checkbox checked={d.sendWithSales} disabled={busy} onChange={(e) => run(() => saveProductDocument(productId, d.id, { sendWithSales: e.target.checked }), e.target.checked ? "Goes with every sale" : "Kept here only")}>
                     With every sale
                   </Checkbox>

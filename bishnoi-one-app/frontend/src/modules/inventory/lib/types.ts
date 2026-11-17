@@ -193,7 +193,7 @@ export type SerialRow = {
 export type WarehouseRow = Ref & { address: string | null; isActive: boolean; locationCount: number; units: number; value: number; products: number; qualityCheck?: boolean };
 
 /** A file kept with an item, and whether it goes with every sale (step 15e). */
-export type ProductDocument = { id: string; productId: string; name: string; fileName: string; contentType: string; size: number; sendWithSales: boolean; createdAt: string; href: string };
+export type ProductDocument = { id: string; productId: string; name: string; fileName: string; contentType: string; size: number; sendWithSales: boolean; createdAt: string; href: string; tag?: "cpr" | null };
 
 /** Replenishment (step 15a). */
 export type ReplenishmentSettings = { safetyDays: number; defaultLeadDays: number; historyDays: number; automatic: boolean; lastRunAt: string | null };

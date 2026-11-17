@@ -95,3 +95,31 @@ def test_without_an_email_service_it_says_how_to_set_one_up(ana, world):
     o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 1}])
     r = ana.c.post(f"/inventory/orders/{o['id']}/documents/send", headers=ana.h, json={"to": ["buyer@pgh.gov.ph"]})
     assert r.status_code == 409 and "connected" in r.json()["detail"]
+
+
+def test_a_cpr_file_is_the_proof_and_fills_the_registration(ana, world):
+    from datetime import date
+
+    from modules.inventory.cpr import from_file_name
+
+    assert from_file_name("CPR DR-XY12345 valid 2027-05-31.pdf") == ("DR-XY12345", date(2027, 5, 31))
+    assert from_file_name("cpr_31-05-2028.pdf") == (None, date(2028, 5, 31))
+    assert from_file_name("Certificate of analysis.pdf") == (None, None)
+    gloves = world["gloves"]
+    # Named with CPR: tagged as the CPR file, and its name gives the number and validity the item lacked
+    r = ana.c.post(f"/inventory/products/{gloves}/documents", headers=ana.h,
+                   files={"file": ("CPR DR-XY12345 valid 2027-05-31.pdf", b"%PDF-1.4 cpr", "application/pdf")})
+    assert r.status_code == 201, r.text
+    doc = next(d for d in r.json() if d["tag"] == "cpr")
+    product = ana.get(f"/inventory/products/{gloves}")
+    assert product["cpr"]["number"] == "DR-XY12345" and product["cpr"]["validUntil"] == "2027-05-31"
+    # Another file isn't one, unless marked
+    other = ana.c.post(f"/inventory/products/{gloves}/documents", headers=ana.h, files={"file": ("leaflet.pdf", b"%PDF-1.4 x", "application/pdf")}).json()
+    leaflet = next(d for d in other if d["name"] == "leaflet")
+    assert leaflet["tag"] is None
+    assert next(d for d in ana.patch(f"/inventory/products/{gloves}/documents/{leaflet['id']}", {"tag": "cpr"}) if d["id"] == leaflet["id"])["tag"] == "cpr"
+    ana.patch(f"/inventory/products/{gloves}/documents/{leaflet['id']}", {"tag": ""})
+    # The FDA inspection list: the item, its CPR and the file to open
+    files = ana.get("/inventory/cpr-files")
+    row = next(x for x in files["items"] if x["product"]["id"] == gloves)
+    assert row["cprNumber"] == "DR-XY12345" and row["file"]["id"] == doc["id"] and files["withFile"] >= 1

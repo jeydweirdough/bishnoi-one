@@ -81,7 +81,7 @@ export function buildMenu(me: Account): OneMenu {
     group("Stock", "stock", [
       { href: "/inventory", label: "Stock overview", icon: "overview", exact: true, show: may("inventory", "dashboard.view") },
       { href: "/inventory/products", label: "Items", icon: "products", exact: true, also: ["/inventory/products"], show: may("inventory", "products.view") },
-      { href: "/inventory/products/cpr", label: "Item registrations (CPR)", icon: "info", show: may("inventory", "products.edit") },
+      { href: "/inventory/products/cpr", label: "Item registrations (CPR)", icon: "info", show: may("inventory", "products.view") },
       { href: "/inventory/stock", label: "Stock on hand", icon: "stock", show: may("inventory", "stock.view") },
       { href: "/inventory/scan", label: "Scan", icon: "scan", show: may("inventory", "stock.view") },
       { href: "/inventory/transfers", label: "Transfer orders", icon: "transfers", show: may("inventory", "transfers.view") },

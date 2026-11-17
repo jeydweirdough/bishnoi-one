@@ -3,9 +3,13 @@ leaflet, CPR certificate) and whether each goes with every sale. A delivery and 
 of their items to send with them; the delivery note names them as enclosed.
 
     GET    /inventory/products/{id}/documents
-    POST   /inventory/products/{id}/documents            multipart: file, name, sendWithSales
+    POST   /inventory/products/{id}/documents            multipart: file, name, sendWithSales, tag ("cpr" or blank)
     GET    /inventory/products/{id}/documents/{doc}      the file
-    PATCH  /inventory/products/{id}/documents/{doc}      {name, sendWithSales}
+    PATCH  /inventory/products/{id}/documents/{doc}      {name, sendWithSales, tag}
+    GET    /inventory/cpr-files                          FDA inspection: every item needing a CPR, its number, date and file
+
+A CPR file (tag "cpr", 2026-11-18: the file is the proof, no extra fields): a document named with "CPR" is one; its
+name gives the item's CPR number when it has none, and the day it's valid until when the item has none or an earlier one.
     DELETE /inventory/products/{id}/documents/{doc}
     GET    /inventory/orders/{id}/documents              what goes with this delivery
     GET    /inventory/sales-orders/{id}/documents        what goes with this sales order
@@ -15,12 +19,15 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, Response, Upl
 from pydantic import Field
 from sqlalchemy import select
 
+from typing import Literal
+
+from modules.inventory import cpr
 from modules.inventory.access import allowed
 from modules.inventory.api import Api, changed, conflict, found, iso
 from modules.inventory.audit import audit
-from modules.inventory.deps import DB, CurrentUser
+from modules.inventory.deps import DB, CurrentUser, SettingsDep
 from modules.inventory.models import Order, Product, ProductDocument, SalesOrder
-from modules.inventory.out import product_ref
+from modules.inventory.out import product_ref, today
 
 router = APIRouter(prefix="/inventory", tags=["product documents"])
 
@@ -33,7 +40,23 @@ PER_PRODUCT = 20
 
 def document_out(d: ProductDocument) -> dict:
     return {"id": d.id, "productId": d.product_id, "name": d.name, "fileName": d.file_name, "contentType": d.content_type, "size": d.size,
-            "sendWithSales": d.send_with_sales, "createdAt": iso(d.created_at), "href": f"/inventory/products/{d.product_id}/documents/{d.id}"}
+            "sendWithSales": d.send_with_sales, "createdAt": iso(d.created_at), "href": f"/inventory/products/{d.product_id}/documents/{d.id}",
+            "tag": d.tag}
+
+
+def read_cpr(db: DB, me, product: Product, d: ProductDocument) -> list[str]:
+    """What a CPR file's name tells the item: its number when it has none, its validity when later. The fields changed."""
+    number, until = cpr.from_file_name(f"{d.name} {d.file_name}")
+    fields = []
+    if number and not product.cpr_number:
+        product.cpr_number = number
+        fields.append("cpr_number")
+    if until and (product.cpr_valid_until is None or until > product.cpr_valid_until):
+        product.cpr_valid_until = until
+        fields.append("cpr_valid_until")
+    if fields:
+        audit(db, me, "product.updated", target=f"{product.sku} {product.name}", target_type="product", target_id=product.id, fields=fields)
+    return fields
 
 
 def of_product(db: DB, product_id: str) -> list[dict]:
@@ -57,7 +80,8 @@ def list_documents(_: allowed("products.view"), db: DB, product_id: str) -> list
 
 @router.post("/products/{product_id}/documents", status_code=status.HTTP_201_CREATED)
 async def add_document(_: allowed("products.edit"), me: CurrentUser, db: DB, product_id: str, file: UploadFile = File(...),
-                       name: str = Form("", max_length=120), send_with_sales: bool = Form(True, alias="sendWithSales")) -> list[dict]:
+                       name: str = Form("", max_length=120), send_with_sales: bool = Form(True, alias="sendWithSales"),
+                       tag: str = Form("", max_length=20)) -> list[dict]:
     product = found(db, Product, product_id, "product")
     if file.content_type not in TYPES:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Use a PDF, a PNG or JPEG picture, or a Word or Excel file.")
@@ -69,8 +93,12 @@ async def add_document(_: allowed("products.edit"), me: CurrentUser, db: DB, pro
     file_name = (file.filename or "document")[:200]
     d = ProductDocument(product_id=product.id, name=(name.strip() or file_name.rsplit(".", 1)[0])[:120], file_name=file_name,
                         content_type=file.content_type, data=data, size=len(data), send_with_sales=send_with_sales)
+    # A CPR file: asked for, or named so.
+    d.tag = "cpr" if tag.strip().lower() == "cpr" or (not tag.strip() and "CPR" in f"{d.name} {file_name}".upper()) else None
     db.add(d)
     db.flush()
+    if d.tag == "cpr":
+        read_cpr(db, me, product, d)
     audit(db, me, "product.document_added", target=f"{product.sku} · {d.name}", target_type="product", target_id=product.id)
     db.commit()
     return of_product(db, product.id)
@@ -93,16 +121,23 @@ def download(_: allowed("orders.view"), db: DB, product_id: str, document_id: st
 class DocumentPatch(Api):
     name: str | None = Field(None, min_length=1, max_length=120)
     send_with_sales: bool | None = None
+    # "cpr" marks it as the CPR file, "" unmarks it.
+    tag: Literal["cpr", ""] | None = None
 
 
 @router.patch("/products/{product_id}/documents/{document_id}")
 def change_document(_: allowed("products.edit"), me: CurrentUser, db: DB, product_id: str, document_id: str, body: DocumentPatch) -> list[dict]:
     d = _doc(db, product_id, document_id)
-    fields = {k: v for k, v in changed(body).items() if v is not None and getattr(d, k) != v}
+    asked = changed(body)
+    if "tag" in asked:
+        asked["tag"] = asked["tag"] or None
+    fields = {k: v for k, v in asked.items() if (v is not None or k == "tag") and getattr(d, k) != v}
     for k, v in fields.items():
         setattr(d, k, v.strip() if isinstance(v, str) else v)
     if fields:
         audit(db, me, "product.document_changed", target=d.name, target_type="product", target_id=product_id, fields=sorted(fields))
+        if fields.get("tag") == "cpr":
+            read_cpr(db, me, found(db, Product, product_id, "product"), d)
         db.commit()
     return of_product(db, product_id)
 
@@ -175,3 +210,21 @@ def send_delivery_documents(_: allowed("orders.view"), me: CurrentUser, db: DB, 
 def send_sales_order_documents(_: allowed("sales.view"), me: CurrentUser, db: DB, order_id: str, body: SendIn, request: Request) -> dict:
     o = found(db, SalesOrder, order_id, "sales order")
     return _send(db, request, me, {line.product_id for line in o.lines}, o.number, o.customer_name, body, "sales_order", o.id)
+
+
+@router.get("/cpr-files")
+def cpr_files(_: allowed("products.view"), db: DB, settings: SettingsDep) -> dict:
+    """For an FDA inspection (2026-11-18): every item that needs a CPR, with its number, the day it's valid until, its
+    state and its newest CPR file to open; the ones needing attention first."""
+    state = cpr.state_sql(today(), settings.expiry_warning_days)
+    rows = db.execute(select(Product, state).where(state != "not_needed").order_by(Product.name)).all()
+    files: dict[str, ProductDocument] = {}
+    for d in db.scalars(select(ProductDocument).where(ProductDocument.tag == "cpr").order_by(ProductDocument.created_at)):
+        files[d.product_id] = d  # the newest wins
+    order = {s: i for i, s in enumerate(("expired", "missing", "no_date", "expiring", "valid"))}
+    items = [{
+        "product": product_ref(p), "cprNumber": p.cpr_number, "validUntil": p.cpr_valid_until.isoformat() if p.cpr_valid_until else None,
+        "state": st, "stateLabel": cpr.LABELS[st], "file": document_out(files[p.id]) if p.id in files else None,
+    } for p, st in rows]
+    items.sort(key=lambda x: (order.get(x["state"], 9), x["file"] is not None, x["product"]["name"].lower()))
+    return {"items": items, "withFile": sum(1 for x in items if x["file"]), "total": len(items), "warningDays": settings.expiry_warning_days}

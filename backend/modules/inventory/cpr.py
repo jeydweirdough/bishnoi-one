@@ -36,6 +36,32 @@ LABELS = {
 }
 
 
+DAY_IN_NAME = (
+    re.compile(r"(?<!\d)(20\d{2})[-_. ]?(0[1-9]|1[0-2])[-_. ]?(0[1-9]|[12]\d|3[01])(?!\d)"),  # 2027-05-31, 20270531
+    re.compile(r"(?<!\d)(0?[1-9]|[12]\d|3[01])[-_. ](0?[1-9]|1[0-2])[-_. ](20\d{2})(?!\d)"),  # 31-05-2027, day first
+)
+
+
+def from_file_name(name: str) -> tuple[str | None, date | None]:
+    """A CPR file's number and the day it's valid until, when its name carries them (2026-11-18: the file is the
+    proof, typed once): "CPR DR-XY12345 valid 2027-05-31.pdf". Either may be None."""
+    number = None
+    for m in re.finditer(r"[A-Z]{2,6}(?:-[A-Z0-9]+)+", name.upper()):
+        if SHAPE.fullmatch(m.group(0)) and any(ch.isdigit() for ch in m.group(0)):
+            number = m.group(0)
+            break
+    day = None
+    for i, pattern in enumerate(DAY_IN_NAME):
+        if m := pattern.search(name):
+            y, mo, d = (m.group(1), m.group(2), m.group(3)) if i == 0 else (m.group(3), m.group(2), m.group(1))
+            try:
+                day = date(int(y), int(mo), int(d))
+                break
+            except ValueError:
+                continue
+    return number, day
+
+
 def clean(value: str | None) -> str | None:
     """The number as the FDA prints it: capitals, no spaces. Blank is None; a wrong shape raises ValueError."""
     if value is None:

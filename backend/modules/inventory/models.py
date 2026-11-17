@@ -845,6 +845,8 @@ class ProductDocument(Base):
     size: Mapped[int] = mapped_column(Integer)
     send_with_sales: Mapped[bool] = mapped_column(default=True, server_default=sa_true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # "cpr": the item's FDA registration certificate, the proof shown at an FDA inspection (2026-11-18).
+    tag: Mapped[str | None] = mapped_column(String(20), default=None, index=True)
 
 
 # --- units with conversions (step 14e) ----------------------------------------------------
