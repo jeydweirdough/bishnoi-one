@@ -2,9 +2,8 @@
 // its screens run on this PC.
 //
 // The port is read from the app's own frontend/package.json (its dev script),
-// the same place scripts/run-app.mjs reads it, so it is written down once. An
-// app with no screens yet (In-licensing, Regulatory) has no dev script and is
-// left out.
+// the same place scripts/run-one.mjs reads it, so it is written down once.
+// Behind it, the one backend (backend/main.py) serves every module's API.
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -19,9 +18,10 @@ const KNOWN = {
   "bishnoi-one-app": { name: "Bishnoi One", mark: "B", color: "#e2701b" },
 };
 
-// The app's API port, from its backend/main.py (--port's default), as scripts/run-app.mjs reads it.
-function apiPort(folder) {
-  const file = join(ROOT, folder, "backend", "main.py");
+// The one backend's port (every module's API, since 2026-11-17), from backend/main.py
+// (--port's default), as scripts/run-one.mjs reads it: the window waits for it before the screens.
+function apiPort() {
+  const file = join(ROOT, "backend", "main.py");
   if (!existsSync(file)) return null;
   const found = readFileSync(file, "utf8").match(/"--port",[^)]*default=(\d+)/)?.[1];
   return found ? Number(found) : null;
@@ -36,7 +36,7 @@ function port(folder) {
 
 export const APPS = Object.fromEntries(
   Object.entries(KNOWN)
-    .map(([folder, app]) => [folder, { ...app, port: port(folder), apiPort: apiPort(folder) }])
+    .map(([folder, app]) => [folder, { ...app, port: port(folder), apiPort: apiPort() }])
     .filter(([, app]) => app.port),
 );
 

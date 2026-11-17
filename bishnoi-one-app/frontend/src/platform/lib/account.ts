@@ -9,7 +9,9 @@ import { siteOrigin } from "./site";
 // one sign-in for every module. Only the Next server talks to it, with the
 // account's token from its httpOnly cookie.
 
-export const PLATFORM_API = (process.env.PLATFORM_API_URL ?? "http://127.0.0.1:8305").replace(/\/$/, "");
+import { PLATFORM_API } from "./backend";
+
+export { PLATFORM_API };
 
 // Where this site is: a module's pass names it as the return. ONE_APP_URL when
 // set; else the address it was reached at (decided 2026-10-27: nothing to set),

@@ -1,14 +1,14 @@
-# Checks every pull request into main before it is merged.
+# Checks every pull request into main before it is merged: that the one backend is laid out
+# as the code expects (2026-11-17: every module's API is part of one backend, backend/).
 #
-# For each app folder (bishnoi-*) it checks that:
-# - the name is bishnoi-<name>: small letters, digits and dashes
-# - it has backend/, .gitignore and README.md, and no frontend/: every
-#   module's screens are in the one app, bishnoi-one-app (decided 2026-10-23;
-#   the app frontends were removed 2026-10-24)
-# - no secrets (.env, .env.local, keys) or local data (.data/) are committed
-#
-# Everyone works on main: the per-app branches and the Sync branches action
-# were retired on 2026-10-24.
+# For each module, backend/modules/<module>/ (a Python package: small letters, digits, _):
+# - it has __init__.py, main.py, config.py, alembic.ini, migrations/versions/, tests/ and README.md;
+# - every table it declares (__tablename__) starts with its prefix (nbcm_ for the CRM...),
+#   so modules can share one database; a new module adds its prefix to PREFIXES below;
+# - backend/main.py starts it (it's in MODULES).
+# And for the repository: no per-app API folders (bishnoi-<x>/backend) are back, no screens
+# outside the one app (bishnoi-one-app/frontend), and no secrets (.env, keys) or local data
+# (.data/) are committed.
 name: Check apps
 
 on:
@@ -26,29 +26,40 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check each app folder
+      - name: Check the backend's modules
         run: |
           problems=0
           fail() { echo "::error::$1"; echo "- $1" >> "$GITHUB_STEP_SUMMARY"; problems=$((problems + 1)); }
+          declare -A PREFIXES=([platform]=nbpl_ [crm]=nbcm_ [inventory]=nbin_ [finance]=nbfi_ [admin]=nbad_ [pharmacy]=nbph_ [in_licensing]=nbil_ [regulatory]=nbrg_)
 
-          echo "### Checking the app folders" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Checking the backend's modules" >> "$GITHUB_STEP_SUMMARY"
+          [ -f backend/main.py ] || fail "backend/main.py is missing"
+          for dir in backend/modules/*/; do
+            module="$(basename "$dir")"
+            [ "$module" = "__pycache__" ] && continue
+            [[ "$module" =~ ^[a-z][a-z0-9_]*$ ]] || fail "backend/modules/$module: name a module in small letters, digits and _ (it's a Python package)"
+            for file in __init__.py main.py config.py alembic.ini README.md; do
+              [ -f "$dir$file" ] || fail "backend/modules/$module: $file is missing"
+            done
+            [ -d "${dir}migrations/versions" ] || fail "backend/modules/$module: migrations/versions/ is missing"
+            [ -d "${dir}tests" ] || fail "backend/modules/$module: tests/ is missing"
+            grep -q "(\"$module\", \"/" backend/main.py || fail "backend/modules/$module: backend/main.py doesn't start it (add it to MODULES)"
+            prefix="${PREFIXES[$module]:-}"
+            if [ -z "$prefix" ]; then
+              fail "backend/modules/$module: give it a table prefix (nb<2 letters>_) in PREFIXES in .github/workflows/check-apps.yml"
+              continue
+            fi
+            while read -r table; do
+              [ -n "$table" ] || continue
+              [[ "$table" == "$prefix"* ]] || fail "backend/modules/$module: table $table must start with $prefix"
+            done < <(grep -rhoE '__tablename__ = "[^"]+"' --include=*.py "$dir" --exclude-dir=tests --exclude-dir=migrations | sed -E 's/.*"([^"]+)"/\1/' | sort -u)
+          done
+
           for dir in bishnoi-*/; do
             [ -d "$dir" ] || continue
             app="${dir%/}"
-            if ! [[ "$app" =~ ^bishnoi-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-              fail "$app: name it bishnoi-<name>, in small letters, digits and dashes (e.g. bishnoi-hr)"
-            fi
-            # The one app (decided 2026-10-23): every module's screens, no API.
-            if [ "$app" = "bishnoi-one-app" ]; then
-              [ -d "$app/frontend" ] || fail "$app: the frontend/ folder is missing"
-              [ -f "$app/README.md" ] || fail "$app: README.md is missing"
-              continue
-            fi
-            [ -d "$app/backend" ] || fail "$app: the backend/ folder is missing"
-            [ ! -d "$app/frontend" ] || fail "$app: screens go in the one app (bishnoi-one-app/frontend), not $app/frontend"
-            for file in .gitignore README.md; do
-              [ -f "$app/$file" ] || fail "$app: $file is missing (copy it from another app and adjust it)"
-            done
+            [ -z "$(git ls-files "$app/backend" | head -1)" ] || fail "$app/backend: APIs are modules of the one backend now (backend/modules/<module>), not folders of their own"
+            [ "$app" = "bishnoi-one-app" ] || [ -z "$(git ls-files "$app/frontend" | head -1)" ] || fail "$app/frontend: screens go in the one app (bishnoi-one-app/frontend)"
           done
 
           secrets="$(git ls-files | grep -E '(^|/)(\.env(\.[^/]*)?|[^/]*\.(pem|key))$|(^|/)\.data/' | grep -vE '(^|/)\.env\.example$' || true)"
@@ -61,4 +72,4 @@ jobs:
             echo "Fix these on your branch, then push again. This check runs again by itself." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          echo "All app folders look right." >> "$GITHUB_STEP_SUMMARY"
+          echo "The backend's modules look right." >> "$GITHUB_STEP_SUMMARY"

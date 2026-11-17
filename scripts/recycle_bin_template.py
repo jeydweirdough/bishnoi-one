@@ -16,7 +16,7 @@ can be deleted too: they ask for a second confirmation, and a closed accounting 
     DELETE /data-cleanup/bin/{id}              erased now
     DELETE /data-cleanup/bin                   the bin emptied
 
-The kinds are this app's (app/recycle_kinds.py). Every delete, restore and erase is in the audit log.
+The kinds are this app's (recycle_kinds.py). Every delete, restore and erase is in the audit log.
 """
 
 import base64
@@ -34,9 +34,9 @@ from sqlalchemy import JSON, DateTime, String, Table, and_, delete, func, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from app.audit import audit
-from app.db import Base
-from app.deps import DB, CurrentUser
+from __PACKAGE__.audit import audit
+from __PACKAGE__.db import Base
+from __PACKAGE__.deps import DB, CurrentUser
 
 PREFIX = "__PREFIX__"
 DAYS = 30

@@ -1,0 +1,60 @@
+"""Whose records a person reaches: their role's scope, applied to owned records.
+
+- own:     records they own;
+- team:    records owned in their team (their own too, even without a team);
+- managed: records owned by their reporting chain or in the units they head and their descendants;
+- all:     every record.
+
+An assistant reaches what the one they assist reaches (app/reporting.py).
+
+Reading and changing use the same reach; the role's permissions then say what
+they may do within it. A record out of reach is answered as not found, so
+nobody learns what exists outside what they can see.
+"""
+
+from fastapi import HTTPException, status
+from sqlalchemy import Select, or_, select
+from sqlalchemy.orm import Session
+
+from modules.crm.access import Access
+from modules.crm.models import Owned, User
+
+
+def within(query: Select, model: type[Owned], access: Access) -> Select:
+    """The query, narrowed to what this person reaches."""
+    if access.scope == "all":
+        return query
+    reach = [model.owner_id.in_(access.people_ids | {access.user_id})]
+    if access.reach_teams:
+        reach.append(model.team_id.in_(access.reach_teams))
+    return query.where(or_(*reach))
+
+
+def reaches(record: Owned, access: Access) -> bool:
+    if access.scope == "all" or record.owner_id == access.user_id or record.owner_id in access.people_ids:
+        return True
+    return record.team_id is not None and record.team_id in access.reach_teams
+
+
+def reachable_people(db: Session, access: Access) -> list[User]:
+    """Who this person may give a record to: anyone they could then still see
+    the record of. Switched-off people get nothing new."""
+    q = select(User).where(User.is_active).order_by(User.full_name)
+    if access.scope == "all":
+        return list(db.scalars(q))
+    reach = [User.id.in_(access.people_ids | {access.user_id})]
+    if access.reach_teams:
+        reach.append(User.team_id.in_(access.reach_teams))
+    return list(db.scalars(q.where(or_(*reach))))
+
+
+def owner_for(db: Session, access: Access, owner_id: str | None) -> User:
+    """The owner a new or changed record gets: the one asked for if this person
+    may give it to them, else a field error. Nobody asked for: themselves."""
+    wanted = owner_id or access.user_id
+    if wanted not in {u.id for u in reachable_people(db, access)}:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            [{"type": "value_error", "loc": ["body", "ownerId"], "msg": "Pick someone you can give records to."}],
+        )
+    return db.get(User, wanted)

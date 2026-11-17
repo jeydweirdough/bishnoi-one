@@ -1,67 +1,55 @@
+#!/usr/bin/env node
 /**
- * Bishnoi One's one app on this computer, with everything it needs, in one go
- * (decided 2026-10-23): every module's screens at http://localhost:4301, and
- * the Platform's API (the one sign-in) and each module's API behind them.
+ * Bishnoi One on this computer, in one go: the one backend (every module's API, port 8300)
+ * and the one app (every module's screens, http://localhost:4301).
  *
- *   npm run one              # prepare what's missing, then run it all; Ctrl+C stops it all
- *   npm run one -- --setup   # prepare only
+ *   npm run one                  # prepare what's missing, then run both; Ctrl+C stops both
+ *   npm run one -- --setup       # prepare only (npm run setup)
+ *   npm run backend              # the backend only   (= npm run one -- --backend)
+ *   npm run bishnoi-one-app      # the screens only   (= npm run one -- --web)
+ *   npm run bishnoi-one-app:app  # both, the screens in a desktop window (desktop/main.mjs)
  *
- * Each part's output is labelled ([platform], [crm], …, [one]). Preparing is
- * what `npm run bishnoi-<app> -- --setup` does for each (.env files, the APIs'
- * .venv, the screens' node_modules); quick when nothing changed.
+ * Each line is marked [backend], [one] or [app]. If one part stops, the others are stopped too.
+ * The backend starts first and the screens once it answers /health.
  */
+
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { BACKEND, DESKTOP, FRONTEND, ROOT, WINDOWS, fail, line, paint, prepare } from "./setup-all.mjs";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const WINDOWS = process.platform === "win32";
-const COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
-const paint = (code, text) => (COLOR ? `\x1b[${code}m${text}\x1b[0m` : text);
+const flags = process.argv.slice(2);
+const setupOnly = flags.includes("--setup");
+const asApp = flags.includes("--app");
+const runBackend = !flags.includes("--web") || asApp;
+const runWeb = !flags.includes("--backend");
+if (!runBackend && !runWeb) fail("--backend and --web together leave nothing to run.");
 
-// The APIs behind the one app, and the one app's screens. Platform first: the others ask it.
-const PARTS = [
-  { label: "platform", color: "33", app: "bishnoi-platform", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8305 },
-  { label: "crm", color: "34", app: "bishnoi-crm", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8302 },
-  { label: "inventory", color: "32", app: "bishnoi-inventory", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8304 },
-  { label: "finance", color: "36", app: "bishnoi-finance", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8303 },
-  { label: "admin", color: "35", app: "bishnoi-admin", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8300 },
-  { label: "pharmacy", color: "31", app: "bishnoi-pharmacy", dir: "backend", cmd: "uv", args: ["run", "main.py"], port: 8307 },
-  { label: "one", color: "1", app: "bishnoi-one-app", dir: "frontend", cmd: "npm", args: ["run", "dev"], port: 4301 },
-];
+// The backend's port, from backend/main.py (--port's default), the one place it's written.
+const BACKEND_PORT = Number(readFileSync(join(BACKEND, "main.py"), "utf8").match(/"--port",[^)]*default=(\d+)/)?.[1] ?? 8300);
+const WEB_PORT = Number(JSON.parse(readFileSync(join(FRONTEND, "package.json"), "utf8")).scripts?.dev?.match(/--port\s+(\d+)/)?.[1] ?? 4301);
 
-const setupOnly = process.argv.includes("--setup");
-const line = (command, args) => (WINDOWS ? [[command, ...args].join(" "), []] : [command, args]);
-
-// ---- Get ready -----------------------------------------------------------------------------
-for (const app of [...new Set(PARTS.map((p) => p.app))]) {
-  const part = PARTS.find((p) => p.app === app);
-  const flag = part.dir === "backend" ? "--api" : "--web";
-  console.log(paint("36", `→ Preparing ${app}`));
-  const r = spawnSync(process.execPath, [join(ROOT, "scripts", "run-app.mjs"), app, "--setup", flag], { cwd: ROOT, stdio: "inherit" });
-  if (r.status !== 0) {
-    console.error(paint("31", `✗ ${app} couldn't be prepared (see above).`));
-    process.exit(r.status ?? 1);
-  }
-}
+// ---- Get ready -------------------------------------------------------------------------------
+prepare({ backend: runBackend, web: runWeb, desktop: asApp });
 if (setupOnly) {
   console.log(paint("32", "✓ Ready. Run it with: npm run one"));
   process.exit(0);
 }
 
-// ---- Run -----------------------------------------------------------------------------------
-console.log(paint("32", "\n  Bishnoi One: http://localhost:4301   (sign in with your Bishnoi One account)"));
-console.log(paint("2", `  APIs: ${PARTS.filter((p) => p.dir === "backend").map((p) => `${p.label} ${p.port}`).join(", ")}`));
+// ---- Run -------------------------------------------------------------------------------------
+if (runWeb) console.log(paint("32", `\n  Bishnoi One: http://localhost:${WEB_PORT}   (sign in with your Bishnoi One account)`));
+if (runBackend) console.log(paint("2", `  Backend:     http://127.0.0.1:${BACKEND_PORT}  (/health; each module under its path, docs at /<module>/docs)`));
 console.log(paint("2", "  Ctrl+C stops everything.\n"));
 
 const children = [];
 let stopping = false;
+
 function stopAll(code = 0) {
   if (stopping) return;
   stopping = true;
   for (const child of children) {
     if (child.exitCode !== null) continue;
+    // uvicorn's reloader and Next start children of their own: stop the whole tree.
     if (WINDOWS) spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     else {
       try {
@@ -76,35 +64,13 @@ function stopAll(code = 0) {
 process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));
 
-/** Whether a part's API answers its /health yet. */
-async function answers(port) {
-  try {
-    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
-    return r.ok;
-  } catch {
-    return false;
-  }
-}
-
-// The Platform first, and only then the rest (2026-10-26): every module asks it for its links the
-// moment it starts, so it must already be answering, or they each log "can't reach the platform".
-let platformWaited = false;
-for (const part of PARTS) {
-  if (platformWaited === false && part.label !== "platform" && PARTS.some((p) => p.label === "platform")) {
-    platformWaited = true;
-    const until = Date.now() + 90_000;
-    while (!stopping && Date.now() < until && !(await answers(8305))) await new Promise((r) => setTimeout(r, 1000));
-    console.log(paint("2", (await answers(8305)) ? "  Platform is answering: starting the rest." : "  Platform isn't answering yet: starting the rest anyway."));
-  }
-  const cwd = join(ROOT, part.app, part.dir);
-  if (!existsSync(cwd)) {
-    console.log(paint("33", `! ${part.app}/${part.dir} isn't here: skipped.`));
-    continue;
-  }
-  const env = { ...process.env, FORCE_COLOR: COLOR ? "1" : "0" };
+// direct: a program run as it is, with no shell between (its arguments may hold spaces).
+function start(label, color, command, args, cwd, direct = false) {
+  const env = { ...process.env, FORCE_COLOR: process.stdout.isTTY && !process.env.NO_COLOR ? "1" : "0" };
+  // Set by some editors' terminals: with it, the desktop window would start as plain Node and open nothing.
   delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(...line(part.cmd, part.args), { cwd, shell: WINDOWS, detached: !WINDOWS, env });
-  const tag = paint(part.color, `[${part.label}]`);
+  const child = spawn(...(direct ? [command, args] : line(command, args)), { cwd, shell: WINDOWS && !direct, detached: !WINDOWS, env });
+  const tag = paint(color, `[${label}]`);
   for (const stream of [child.stdout, child.stderr]) {
     let rest = "";
     stream.on("data", (chunk) => {
@@ -116,8 +82,33 @@ for (const part of PARTS) {
   }
   child.on("exit", (code) => {
     if (stopping) return;
-    console.log(paint(code ? "31" : "2", `${tag} stopped${code ? ` (exit ${code})` : ""}; stopping the rest.`));
+    console.log(paint(code ? "31" : "2", `${tag} ${label === "app" && !code ? "closed" : "stopped"}${code ? ` (exit ${code})` : ""}; stopping the rest.`));
     stopAll(code ?? 0);
   });
   children.push(child);
 }
+
+/** Whether the backend answers /health yet. */
+async function backendAnswers() {
+  try {
+    return (await fetch(`http://127.0.0.1:${BACKEND_PORT}/health`, { signal: AbortSignal.timeout(2000) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+if (runBackend) start("backend", "35", "uv", ["run", "main.py"], BACKEND);
+if (runBackend && runWeb) {
+  // The screens ask the backend for every page: start them once it answers (its modules run their migrations first).
+  const until = Date.now() + 120_000;
+  while (!stopping && Date.now() < until && !(await backendAnswers())) await new Promise((r) => setTimeout(r, 1000));
+  if (!stopping) console.log(paint("2", (await backendAnswers()) ? "  The backend is answering: starting the screens." : "  The backend isn't answering yet: starting the screens anyway."));
+}
+if (runWeb && !stopping) start("one", "34", "npm", ["run", "dev"], FRONTEND);
+if (asApp && !stopping) {
+  const electron = join(DESKTOP, "node_modules", "electron", "cli.js");
+  if (!existsSync(electron)) fail("The desktop window's packages are missing: run npm install in desktop/.");
+  start("app", "33", process.execPath, [electron, DESKTOP, "--bishnoi-app=bishnoi-one-app"], ROOT, true);
+}
+
+process.title = "bishnoi-one";

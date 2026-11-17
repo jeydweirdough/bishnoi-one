@@ -1,11 +1,12 @@
 import { Info, Megaphone, TriangleAlert, Wrench } from "lucide-react";
 import { THIS_APP } from "@/src/modules/finance/platform/lib/apps";
+import { PLATFORM_API } from "@/src/platform/lib/backend";
 
 /**
  * Announcements from Bishnoi One Platform, above every page: the ones showing now
  * for this app (or for everyone), and maintenance coming up. Platform keeps
- * them in Discord and serves them at /public/notices; PLATFORM_API_URL says
- * where Platform's API is. If Platform can't be reached, nothing shows and the
+ * them in Discord and serves them at /public/notices, in the one backend
+ * (BACKEND_URL + /platform). If Platform can't be reached, nothing shows and the
  * page carries on.
  *
  * The same file is in every app's shared kit (src/platform/app/notices.tsx).
@@ -22,7 +23,7 @@ type Notice = {
   state: "showing" | "scheduled";
 };
 
-const PLATFORM_API_URL = (process.env.PLATFORM_API_URL || "http://127.0.0.1:8305").replace(/\/$/, "");
+const PLATFORM_API_URL = PLATFORM_API;
 
 // Asked at most once a minute per server. When Platform can't be reached,
 // nothing shows (never an old answer, which could be something since taken

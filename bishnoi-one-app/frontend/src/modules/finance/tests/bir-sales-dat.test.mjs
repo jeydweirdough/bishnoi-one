@@ -7,9 +7,9 @@
 //
 // The files hold real customers and amounts, so they stay on this computer, outside
 // the repo: set BIR_CONVERTER_DIR to the converter's folder (default: the sibling
-// folder "BIR DAT Converter"). Without it, these tests are skipped.
+// folder of the repository, "BIR DAT Converter"). Without it, these tests are skipped.
 //
-// Run:  node --test tests/        (from bishnoi-finance/frontend; Node 24+, nothing to install)
+// Run:  node --test src/modules/finance/tests/   (from bishnoi-one-app/frontend; Node 24+, nothing to install)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -175,7 +175,7 @@ run("the engine is the converter's own code", () => {
   // Lines 369-1417 of the converter, unchanged, inside ours.
   const lines = html.toString("binary").split("\n");
   const block = lines.slice(368, 1417).join("\n");
-  assert.ok(ours.toString("binary").includes(block), "src/bir/sales-dat/engine.ts no longer holds converter.html's lines 369-1417 unchanged");
+  assert.ok(ours.toString("binary").includes(block), "src/modules/finance/bir/sales-dat/engine.ts no longer holds converter.html's lines 369-1417 unchanged");
 });
 
 for (const [label, files] of HAVE ? sets() : []) {

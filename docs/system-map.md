@@ -19,7 +19,7 @@ Settings are listed by name only. The feature plan (Desktop, `bishnoi-one-featur
 
 ## Platform (Admin Console)
 
-Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
+Code in `backend/modules/platform`, its API under `/platform` in the one backend, screens at `/platform` in the one app.
 
 ### Screens (the sidebar)
 
@@ -93,7 +93,7 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 
 ### Settings (names only)
 
-`ENVIRONMENT`, `DATABASE_URL`, `BACKUP_FROM`, `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD`, `SESSION_HOURS`, `IDENTITY_SESSION_HOURS`, `PASS_SIGNING_KEY`, `LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`, `REQUIRE_TWO_STEP`, `RESET_LINK_HOURS`, `INVITE_LINK_HOURS`, `CRON_SECRET`, `ORG_NAME`, `ORG_CURRENCY`, `ORG_MINOR_UNITS`, `ORG_LOCALE`, `ORG_TIMEZONE`, `ALLOWED_HOSTS`, `CORS_ORIGINS`, `ONE_APP_URL`, `DISCORD_ENABLED`, `DISCORD_MODE`, `DISCORD_BOT_TOKEN`, `DISCORD_LOGS_WEBHOOK_URL`, `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL`, `DISCORD_MAX_PER_MINUTE`
+`ENVIRONMENT`, `DATABASE_URL`, `BACKUP_FROM`, `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD`, `SESSION_HOURS`, `IDENTITY_SESSION_HOURS`, `PASS_SIGNING_KEY`, `LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`, `REQUIRE_TWO_STEP`, `RESET_LINK_HOURS`, `INVITE_LINK_HOURS`, `CRON_SECRET`, `ORG_NAME`, `ORG_CURRENCY`, `ORG_MINOR_UNITS`, `ORG_LOCALE`, `ORG_TIMEZONE`, `ALLOWED_HOSTS`, `CORS_ORIGINS`, `ONE_APP_URL`, `BACKEND_URL`, `DISCORD_ENABLED`, `DISCORD_MODE`, `DISCORD_BOT_TOKEN`, `DISCORD_LOGS_WEBHOOK_URL`, `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL`, `DISCORD_MAX_PER_MINUTE`
 
 ### API endpoints
 
@@ -129,7 +129,7 @@ Folder `bishnoi-platform/backend`, screens at `/platform` in the one app.
 
 ## CRM
 
-Folder `bishnoi-crm/backend`, screens at `/crm` in the one app.
+Code in `backend/modules/crm`, its API under `/crm` in the one backend, screens at `/crm` in the one app.
 
 ### Screens (the sidebar)
 
@@ -285,7 +285,7 @@ Folder `bishnoi-crm/backend`, screens at `/crm` in the one app.
 
 ## Inventory
 
-Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
+Code in `backend/modules/inventory`, its API under `/inventory` in the one backend, screens at `/inventory` in the one app.
 
 ### Screens (the sidebar)
 
@@ -418,7 +418,7 @@ Folder `bishnoi-inventory/backend`, screens at `/inventory` in the one app.
 
 ## Finance (Books)
 
-Folder `bishnoi-finance/backend`, screens at `/finance` in the one app.
+Code in `backend/modules/finance`, its API under `/finance` in the one backend, screens at `/finance` in the one app.
 
 ### Screens (the sidebar)
 
@@ -569,7 +569,7 @@ Folder `bishnoi-finance/backend`, screens at `/finance` in the one app.
 
 ## Pharmacy
 
-Folder `bishnoi-pharmacy/backend`, screens at `/pharmacy` in the one app.
+Code in `backend/modules/pharmacy`, its API under `/pharmacy` in the one backend, screens at `/pharmacy` in the one app.
 
 ### Screens (the sidebar)
 
@@ -665,7 +665,7 @@ Folder `bishnoi-pharmacy/backend`, screens at `/pharmacy` in the one app.
 
 ## Executive Admin (Office)
 
-Folder `bishnoi-admin/backend`, screens at `/admin` in the one app.
+Code in `backend/modules/admin`, its API under `/admin` in the one backend, screens at `/admin` in the one app.
 
 ### Screens (the sidebar)
 
@@ -753,7 +753,7 @@ Folder `bishnoi-admin/backend`, screens at `/admin` in the one app.
 
 ## In-Licensing
 
-Folder `bishnoi-in-licensing/backend`, screens at `/in-licensing` in the one app.
+Code in `backend/modules/in_licensing`, its API under `/in-licensing` in the one backend, screens at `/in-licensing` in the one app.
 
 ### Screens (the sidebar)
 
@@ -793,7 +793,7 @@ Folder `bishnoi-in-licensing/backend`, screens at `/in-licensing` in the one app
 
 ## Regulatory
 
-Folder `bishnoi-regulatory/backend`, screens at `/regulatory` in the one app.
+Code in `backend/modules/regulatory`, its API under `/regulatory` in the one backend, screens at `/regulatory` in the one app.
 
 ### Screens (the sidebar)
 

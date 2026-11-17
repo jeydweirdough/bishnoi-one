@@ -1,9 +1,9 @@
 import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, Users, Wrench, type LucideIcon } from "lucide-react";
 
 // Every Bishnoi One module in the one app (decided 2026-10-23,
-// benchmarks/decisions.md): where its screens live on this site, which API it
-// talks to, and its key on Bishnoi One Platform. Each module keeps its own API
-// and database; only the screens are together, under its path.
+// benchmarks/decisions.md): where its screens live on this site, where its API
+// is, and its key on Bishnoi One Platform. Since 2026-11-17 every module's API
+// is part of one backend: BACKEND_URL + apiPath (src/platform/lib/backend.ts).
 //
 // status says where its screens are today:
 //   live    here, under its path (the proxy opens its session on first use);
@@ -22,9 +22,8 @@ export type ModuleDef = {
   blurb: string;
   /** Its key on Bishnoi One Platform (Applications, passes, grants). */
   appKey: string;
-  /** The setting with its API's address, and the address on this computer. */
-  apiEnv: string;
-  apiLocal: string;
+  /** Its API's path in the one backend (BACKEND_URL + apiPath). */
+  apiPath: string;
   status: "live" | "moving" | "soon";
   /** Works on the Bishnoi One account itself: no module session is opened for it. */
   accountOnly?: boolean;
@@ -36,21 +35,21 @@ export type ModuleDef = {
 };
 
 export const MODULES: ModuleDef[] = [
-  { key: "crm", path: "/crm", label: "CRM", blurb: "Customers and sales", appKey: "crm", apiEnv: "CRM_API_URL", apiLocal: "http://127.0.0.1:8302", status: "live", public: ["/crm/order"], icon: Users, tint: "#e9f0fb", ink: "#4c78c8" },
-  { key: "inventory", path: "/inventory", label: "Inventory", blurb: "Stock and orders", appKey: "inventory", apiEnv: "INVENTORY_API_URL", apiLocal: "http://127.0.0.1:8304", status: "live", icon: Package, tint: "#e7f1ea", ink: "#3f5e4a" },
+  { key: "crm", path: "/crm", label: "CRM", blurb: "Customers and sales", appKey: "crm", apiPath: "/crm", status: "live", public: ["/crm/order"], icon: Users, tint: "#e9f0fb", ink: "#4c78c8" },
+  { key: "inventory", path: "/inventory", label: "Inventory", blurb: "Stock and orders", appKey: "inventory", apiPath: "/inventory", status: "live", icon: Package, tint: "#e7f1ea", ink: "#3f5e4a" },
   // The Sales app (feature plan step 11): its own place, running in the Operations service (Inventory's API,
   // its Platform key), shown to whoever has Inventory while the company's catalogue has Sales on (src/one/mine.ts).
-  { key: "finance", path: "/finance", label: "Finance", blurb: "Invoices and tax", appKey: "finance", apiEnv: "FINANCE_API_URL", apiLocal: "http://127.0.0.1:8303", status: "live", icon: Landmark, tint: "#fcf3dd", ink: "#9a6a12" },
-  { key: "pharmacy", path: "/pharmacy", label: "Pharmacy", blurb: "Prescriptions", appKey: "pharmacy", apiEnv: "PHARMACY_API_URL", apiLocal: "http://127.0.0.1:8307", status: "live", icon: HeartPulse, tint: "#fbe7e3", ink: "#c2493a" },
-  { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Office administration", appKey: "exec", apiEnv: "ADMIN_API_URL", apiLocal: "http://127.0.0.1:8300", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
-  { key: "inlicensing", path: "/in-licensing", label: "In-Licensing", blurb: "Product licensing", appKey: "inlicensing", apiEnv: "INLICENSING_API_URL", apiLocal: "http://127.0.0.1:8306", status: "soon", icon: FlaskConical, tint: "#e6f3f3", ink: "#2f7d7d" },
-  { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiEnv: "REGULATORY_API_URL", apiLocal: "http://127.0.0.1:8308", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
+  { key: "finance", path: "/finance", label: "Finance", blurb: "Invoices and tax", appKey: "finance", apiPath: "/finance", status: "live", icon: Landmark, tint: "#fcf3dd", ink: "#9a6a12" },
+  { key: "pharmacy", path: "/pharmacy", label: "Pharmacy", blurb: "Prescriptions", appKey: "pharmacy", apiPath: "/pharmacy", status: "live", icon: HeartPulse, tint: "#fbe7e3", ink: "#c2493a" },
+  { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Office administration", appKey: "exec", apiPath: "/admin", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
+  { key: "inlicensing", path: "/in-licensing", label: "In-Licensing", blurb: "Product licensing", appKey: "inlicensing", apiPath: "/in-licensing", status: "soon", icon: FlaskConical, tint: "#e6f3f3", ink: "#2f7d7d" },
+  { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiPath: "/regulatory", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
   // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform
   // staff (same email) see APIs, companies and accounts; a company's administrators its roles.
-  { key: "platform", path: "/platform", label: "Admin Console", blurb: "Your company: profile, employees, roles, apps and reports", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
+  { key: "platform", path: "/platform", label: "Admin Console", blurb: "Your company: profile, employees, roles, apps and reports", appKey: "platform", apiPath: "/platform", status: "live", accountOnly: true, icon: Network, tint: "#fdeedf", ink: "#b75a10" },
   // Bishnoi One Operations (2026-10-30): Bishnoi One's own operators only, apart from any company's Admin Console:
   // every company, accounts and operators, the services and their connections, and troubleshooting (events).
-  { key: "operations", path: "/operations", label: "Operations", blurb: "Bishnoi One: companies, services and troubleshooting", appKey: "platform", apiEnv: "PLATFORM_API_URL", apiLocal: "http://127.0.0.1:8305", status: "live", accountOnly: true, icon: Wrench, tint: "#eef1f6", ink: "#4a5b78" },
+  { key: "operations", path: "/operations", label: "Operations", blurb: "Bishnoi One: companies, services and troubleshooting", appKey: "platform", apiPath: "/platform", status: "live", accountOnly: true, icon: Wrench, tint: "#eef1f6", ink: "#4a5b78" },
 ];
 
 export const moduleByKey = (key: string | null | undefined): ModuleDef | null => MODULES.find((m) => m.key === key) ?? null;

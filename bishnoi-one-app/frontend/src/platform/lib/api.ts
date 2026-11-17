@@ -3,6 +3,7 @@ import { sendToErrorPage } from "./fail";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { moduleApiAddress } from "./backend";
 import { moduleByKey, type ModuleDef, type ModuleKey } from "./modules";
 import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, FRAME_HEADER, MODULE_HEADER, VIEW_AS_HEADER, moduleCookie, viewAsCookie } from "./session-cookie";
 import type { Me, Org } from "./types";
@@ -11,39 +12,15 @@ import type { Me, Org } from "./types";
 // the Next server with the token kept in an httpOnly cookie, so the token
 // never reaches browser scripts.
 //
-// One app, eight APIs (decided 2026-10-23): a request is for the module its
+// One app, one backend with a module per path (2026-11-17): a request is for the module its
 // path belongs to (the proxy sets MODULE_HEADER from the path, never the
 // browser), so `api.get("/deals")` on a /crm page goes to the CRM's API with
 // the CRM session, and module code needs no change. `apiFor("finance")` names
 // another module's API outright.
 
-// Each module's API address, as the Platform's Applications says (decided
-// 2026-10-27): so this site needs only PLATFORM_API_URL. Asked again as often
-// as the Platform says; while it can't be reached, the last answer stands.
-let addresses: { apis: Record<string, string>; until: number } | null = null;
-
-async function addressesOnPlatform(): Promise<Record<string, string>> {
-  if (addresses && addresses.until > Date.now()) return addresses.apis;
-  const platform = (process.env.PLATFORM_API_URL || "http://127.0.0.1:8305").replace(/\/$/, "");
-  try {
-    const r = await fetch(`${platform}/public/applications`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const body = (await r.json()) as { apis?: Record<string, string>; askAgainIn?: number };
-      addresses = { apis: body.apis ?? {}, until: Date.now() + (body.askAgainIn ?? 300) * 1000 };
-      return addresses.apis;
-    }
-  } catch {
-    // Not answering yet: the last answer, or this computer's addresses, until the next try.
-  }
-  addresses = { apis: addresses?.apis ?? {}, until: Date.now() + 30_000 };
-  return addresses.apis;
-}
-
-/** A module's API address: its setting (CRM_API_URL...) when set, else the Platform's Applications, else the one on this computer. */
+/** A module's API address: BACKEND_URL + its path, in the one backend (src/platform/lib/backend.ts). */
 export async function moduleApi(m: ModuleDef): Promise<string> {
-  const set = process.env[m.apiEnv];
-  if (set || m.accountOnly) return (set || m.apiLocal).replace(/\/$/, "");
-  return ((await addressesOnPlatform())[m.appKey] || m.apiLocal).replace(/\/$/, "");
+  return moduleApiAddress(m);
 }
 
 /** The module this request is for (from its path, via the proxy), or null outside any module. */

@@ -1,7 +1,7 @@
-# Deploy with `npm run deploy -- <app>`: it writes this file for the app being
-# deployed (only its folder is sent) and puts this back. As it stands, it only
-# keeps secrets, local data and installed packages off Vercel: the CLI doesn't
-# read .gitignore (decided 2026-10-27).
+# Nothing is deployed on Vercel any more (2026-11-17: one backend and the one app, on Coolify).
+# Kept so the Vercel CLI, if anyone runs it here, sends no secrets, local data or installed
+# packages (it doesn't read .gitignore). bishnoi-one-app/frontend/vercel.json keeps Vercel
+# from building on push.
 .env
 .env.*
 !.env.example

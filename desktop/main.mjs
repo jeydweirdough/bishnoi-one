@@ -1,7 +1,7 @@
-// One Bishnoi One app in a window of its own: `npm run bishnoi-crm:app`.
+// Bishnoi One in a window of its own: `npm run bishnoi-one-app:app`.
 //
-// scripts/run-app.mjs starts the app's API and screens, then this, which waits
-// for the screens to answer and opens them. Each app is a program of its own:
+// scripts/run-one.mjs starts the one backend and the one app's screens, then this,
+// which waits for the backend and the screens to answer and opens them. Each app is a program of its own:
 // its own window, taskbar button, sign-in and saved settings. A link to
 // another Bishnoi One app opens in that app's window.
 //
@@ -51,13 +51,9 @@ function ownerOf(url) {
   }
 }
 
-/**
- * This app's own pages stay in this window. So does signing in with a Bishnoi One
- * account: the Platform's sign-in page (/go) sends the person straight back here.
- */
+/** This app's own pages (sign-in included, it's the one app's /login) stay in this window. */
 function stays(url) {
-  const owner = ownerOf(url);
-  return owner === folder || (owner === "bishnoi-platform" && new URL(url).pathname === "/go");
+  return ownerOf(url) === folder;
 }
 
 function guard(contents) {
@@ -124,7 +120,7 @@ async function open(url) {
     // being prepared, 2 opening. Each step is real.
     const step = (n) => win?.webContents.send("start:step", n);
     step(0);
-    // The API listens on 127.0.0.1 (localhost can mean ::1 on Windows).
+    // The one backend listens on 127.0.0.1 (localhost can mean ::1 on Windows).
     while (win && me.apiPort && !(await answers(me.apiPort, "127.0.0.1"))) await sleep(700);
     step(1);
     while (win && !(await answers(me.port))) await sleep(700);
