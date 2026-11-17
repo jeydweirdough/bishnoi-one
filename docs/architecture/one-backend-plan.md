@@ -55,7 +55,12 @@ backend/
 - One session cookie for the whole system, instead of a session per module plus Platform passes. Employees, roles and the org chart live once (Platform), and modules read them directly. The per-module user and role copies become read-only, then are dropped.
 - Behaviour visible to users: one sign-in, no "Opening CRM…" between areas.
 
-**M4. One menu by work** (plan Step 4G): Customers, Selling, Stock, Deliveries, Money, Team, Office, Admin.
+**M4. One menu by work** (plan Step 4G). Built 2026-11-18 (owner agreed the preview Desktop/bishnoi-one-menu-by-work.html with its recommendations):
+- One sidebar for everybody, built from the account (`bishnoi-one-app/frontend/src/one/menu/one-menu.ts`, given by `app/(app)/layout.tsx`, drawn by the shared `src/platform/shell/sidebar.tsx`): Home, Customers, Selling, Field, Stock, Buying, Deliveries, Money, Accounting, Pharmacy, Office, Team, Reports; Admin and (operators) Operations at the foot. Every page keeps its address.
+- A group lists only what the role allows in the module keeping the page: Platform `/identity/me` `apps[].permissions` (null = every page there). Pages still check.
+- No module switcher, no app grid at the top right, breadcrumbs Company / Group / Page. One Home (`/`, the person's groups and pages) and one Reports page (`/reports`, each part's Reports Center).
+- Pages that exist twice (CRM products and Inventory items, vendors and suppliers, two sales order lists, two calendars) are placed as they are; merging is Step 3. Promotional materials are one row opening the person's step.
+- Each module's own `nav.tsx` now only lends its red "not set up" marks, matched by address.
 
 ## Rules while moving
 

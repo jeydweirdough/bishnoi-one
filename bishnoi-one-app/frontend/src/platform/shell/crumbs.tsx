@@ -110,7 +110,8 @@ const Slash = () => (
  * page you're on, and the area it sits in); `companies` only for operators, who work in any company.
  */
 export function Breadcrumbs({ module, company, companies, mine, area, page, home }: {
-  module: ModuleKey;
+  /** The app crumb; none with the one menu (M4, 2026-11-18): Company / Group / Page. */
+  module?: ModuleKey;
   company?: string | null;
   companies: { name: string; slug: string; current: boolean }[] | null;
   mine: MyModule[];
@@ -123,7 +124,7 @@ export function Breadcrumbs({ module, company, companies, mine, area, page, home
   useEffect(() => setSlot(document.getElementById(SLOT)), [pathname]);
   if (!slot) return null;
 
-  const here = MODULES.find((m) => m.key === module)!;
+  const here = module ? MODULES.find((m) => m.key === module) : undefined;
   const rank = (k: string) => (k === "platform" ? 0 : k === "operations" ? 1 : 2);
   const apps = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => rank(a.key) - rank(b.key));
   const onHome = !page || page === home;
@@ -138,8 +139,8 @@ export function Breadcrumbs({ module, company, companies, mine, area, page, home
         ) : (
           <span className="truncate px-1.5 py-1 text-sm font-medium text-ink-2">{company}</span>
         ))}
-      {company && <Slash />}
-      <Crumb
+      {company && here && <Slash />}
+      {here && <Crumb
         label={here.label}
         title="Your apps"
         items={apps.map((m) => {
@@ -151,16 +152,16 @@ export function Breadcrumbs({ module, company, companies, mine, area, page, home
             All modules
           </Link>
         }
-      />
+      />}
       {showArea && (
         <>
-          <Slash />
+          {(company || here) && <Slash />}
           <Crumb label={area.label} title={area.label} items={area.steps.map((s) => ({ key: s.href, label: s.label, href: s.href, current: s === page }))} />
         </>
       )}
       {page && !onHome && !(showArea && area.label === page.label) && (
         <>
-          <Slash />
+          {(company || here || showArea) && <Slash />}
           {pathname === page.href.split("?")[0] ? (
             <span className="truncate px-1.5 py-1 text-sm font-semibold text-ink" aria-current="page">
               {page.label}

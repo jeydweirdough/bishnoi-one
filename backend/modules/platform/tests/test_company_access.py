@@ -391,3 +391,14 @@ def test_only_someone_in_the_recycle_bin_can_be_deleted_permanently(app, client,
     # Their email is free again, and the log says who did it.
     assert client.post("/identity/access/people", json={"fullName": "Jade Again", "email": "jade@getmeds.test"}, headers=h).status_code == 201
     assert "access.person_erased" in [e["action"] for e in client.get("/identity/company/activity", headers=h).json()["entries"]]
+
+
+def test_the_one_menu_is_told_what_each_role_allows(client, getmeds):
+    h = getmeds["owner"]["h"]
+    role = client.post("/identity/access/roles", json={"name": "Medical rep", "permissions": {"crm": ["customers.view", "customers.edit"]}}, headers=h).json()
+    client.put(f"/identity/access/people/{getmeds['jade']['id']}/role", json={"roleId": role["id"]}, headers=h)
+    apps = {a["key"]: a for a in client.get("/identity/me", headers=getmeds["jade"]["h"]).json()["apps"]}
+    assert apps["crm"]["permissions"] == ["customers.edit", "customers.view"]
+    # the company's administrator reaches every page of every module
+    owner = client.get("/identity/me", headers=h).json()["apps"]
+    assert owner and all(a["permissions"] is None for a in owner)

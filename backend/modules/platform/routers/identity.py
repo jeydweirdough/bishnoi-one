@@ -232,6 +232,16 @@ def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityAp
     return [(a, g) for a, g in rows if g is not None]
 
 
+def app_permissions(db: Session, person: Identity, app: Application, grant: IdentityApp) -> list[str] | None:
+    """Their permissions in one module, for the one menu; None when they reach every page of it."""
+    if grant.is_app_admin:
+        return None
+    role = role_for_pass(db, person, app)
+    if role is None or role.get("admin"):
+        return None
+    return list(role.get("permissions") or [])
+
+
 @router.get("/identity/me")
 def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
     _, person = signed
@@ -265,7 +275,10 @@ def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
         "apps": [
             {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": role.name if role else g.role, "isAppAdmin": g.is_app_admin or bool(role and role.is_admin),
              # When it was given to them: the first one given is where they start (the one app opens it after sign-in).
-             "grantedAt": as_utc(g.granted_at).isoformat() if g.granted_at else None}
+             "grantedAt": as_utc(g.granted_at).isoformat() if g.granted_at else None,
+             # What their role allows there (M4, 2026-11-18): the one menu offers only those pages. None: every
+             # page of it (an administrator there, or no Platform role yet, when the module goes by its own role).
+             "permissions": app_permissions(db, person, a, g)}
             for a, g in granted(db, person)
         ],
     }

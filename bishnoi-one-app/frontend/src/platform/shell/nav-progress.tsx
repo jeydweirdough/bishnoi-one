@@ -12,8 +12,8 @@ import { Dots } from "@/src/platform/ui/dots";
  * sidebar itself never reloads: only the page beside it does, and
  * app/(app)/loading.tsx fills that in with the page's shape meanwhile.
  *
- * Opening another app (the CRM from Inventory, the Admin Console from Finance) has no shape to show yet:
- * the 4-dot loader says which app is opening (decided 2026-10-30).
+ * A page kept by another module (Stock from Selling) may first open its session, with no shape to show yet:
+ * the 4-dot loader (decided 2026-10-30), saying only "Opening…" since the one menu has no apps (M4, 2026-11-18).
  *
  * It listens to clicks on the whole document, so every link in every screen
  * gets this without being changed. The styles are in styles/globals.css
@@ -70,7 +70,7 @@ export function NavProgress() {
   if (opening) {
     return (
       <div className="dots-overlay">
-        <Dots size="lg" label={`Opening ${opening}…`} show />
+        <Dots size="lg" label="Opening…" show />
       </div>
     );
   }

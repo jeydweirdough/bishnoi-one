@@ -94,7 +94,8 @@ export type Account = {
   company: { id: string; name: string; slug: string } | null;
   companies: { id: string; name: string; slug: string; current: boolean }[];
   /** The applications given to them, that their company has: a module each (by its Platform key). */
-  apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null }[];
+  /** `permissions`: what their role allows there, for the one menu (src/one/menu); null = every page of it. */
+  apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null; permissions?: string[] | null }[];
   /** Sign-in security (2026-10-30): a handed-over password still to change; two-step sign-in, and whether it's owed. */
   mustChangePassword?: boolean;
   /** `needed`: required and missing (only when the Platform requires it); `suggested`: anyone without it, offered the set-up after signing in and told on their profile. */
