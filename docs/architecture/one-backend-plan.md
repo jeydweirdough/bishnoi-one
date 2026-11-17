@@ -54,6 +54,7 @@ backend/
 **M3. One sign-in session.**
 - One session cookie for the whole system, instead of a session per module plus Platform passes. Employees, roles and the org chart live once (Platform), and modules read them directly. The per-module user and role copies become read-only, then are dropped.
 - Behaviour visible to users: one sign-in, no "Opening CRM…" between areas.
+- Built 2026-11-18, first part (what users see): signing in, or moving to another company, opens every part the person may open at once (`bishnoi-one-app/frontend/src/platform/lib/module-session.ts` `openEveryPart`, called by `src/one/actions.ts`); `app/auth/enter` is only the fallback for a session that ran out; no "Opening X…" loader. Not yet: one session cookie read by every module, and dropping the per-module user copies (after M2, when modules read the Platform directly).
 
 **M4. One menu by work** (plan Step 4G). Built 2026-11-18 (owner agreed the preview Desktop/bishnoi-one-menu-by-work.html with its recommendations):
 - One sidebar for everybody, built from the account (`bishnoi-one-app/frontend/src/one/menu/one-menu.ts`, given by `app/(app)/layout.tsx`, drawn by the shared `src/platform/shell/sidebar.tsx`): Home, Customers, Selling, Field, Stock, Buying, Deliveries, Money, Accounting, Pharmacy, Office, Team, Reports; Admin and (operators) Operations at the foot. Every page keeps its address.
