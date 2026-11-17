@@ -345,7 +345,8 @@ export type OrderStatus = "draft" | "confirmed" | "picking" | "issued" | "cancel
 export type Pick = { locationId: string; locationCode: string; batchId: string | null; batchNo: string | null; expiresOn: string | null; quantity: number };
 
 /** A delivery company (step 12). */
-export type Courier = { id: string; code: string; name: string; trackingUrl: string | null; sortOrder: number; isActive: boolean };
+/** `defaultFee`: its usual fee in centavos, filled into a delivery when it is picked (2026-11-18). */
+export type Courier = { id: string; code: string; name: string; trackingUrl: string | null; sortOrder: number; isActive: boolean; defaultFee: number };
 export type DeliveryMethod = "courier" | "own" | "pickup";
 /** How a customer's delivery goes and where it is (step 12). */
 export type Shipping = {

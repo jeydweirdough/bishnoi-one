@@ -95,3 +95,18 @@ def _png(width: int, height: int) -> str:
 
 
 PNG_SIGNATURE = _png(40, 20)
+
+
+def test_a_couriers_default_fee_fills_the_delivery_unless_another_is_given(ana, world):
+    lbc = courier(ana, "LBC")
+    assert lbc["defaultFee"] == 0
+    assert ana.patch(f"/inventory/couriers/{lbc['id']}", {"defaultFee": 12000})["defaultFee"] == 12000
+    assert ana.post("/inventory/couriers", {"code": "grab", "name": "Grab Express", "defaultFee": 8000})["defaultFee"] == 8000
+    d = a_delivery(ana, world)
+    # No fee given: the courier's default
+    assert ana.put(f"/inventory/orders/{d['id']}/shipping", {"method": "courier", "courierId": lbc["id"]})["fee"] == 12000
+    # A fee given wins, a nought too
+    assert ana.put(f"/inventory/orders/{d['id']}/shipping", {"method": "courier", "courierId": lbc["id"], "fee": 15000})["fee"] == 15000
+    assert ana.put(f"/inventory/orders/{d['id']}/shipping", {"method": "courier", "courierId": lbc["id"], "fee": 0})["fee"] == 0
+    # Not a courier: no default
+    assert ana.put(f"/inventory/orders/{d['id']}/shipping", {"method": "own"})["fee"] == 0

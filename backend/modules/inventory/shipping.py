@@ -26,7 +26,7 @@ STATE_LABELS = {"out": "Out for delivery", "delivered": "Delivered", "failed": "
 
 
 def courier_out(c: Courier) -> dict:
-    return {"id": c.id, "code": c.code, "name": c.name, "trackingUrl": c.tracking_url, "sortOrder": c.sort_order, "isActive": c.is_active}
+    return {"id": c.id, "code": c.code, "name": c.name, "trackingUrl": c.tracking_url, "sortOrder": c.sort_order, "isActive": c.is_active, "defaultFee": c.default_fee or 0}
 
 
 def tracking_link(o: Order) -> str | None:

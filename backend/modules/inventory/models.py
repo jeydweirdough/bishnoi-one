@@ -189,6 +189,8 @@ class Courier(Stamped, Base):
     tracking_url: Mapped[str | None] = mapped_column(String(300), default=None)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # What a delivery with this courier usually costs, in centavos (2026-11-18): filled in when it's picked, still editable.
+    default_fee: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 # How a delivery goes, and where it is once issued (step 12).

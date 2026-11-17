@@ -41,6 +41,8 @@ class CourierIn(Api):
     code: str = Field(min_length=1, max_length=20)
     name: str = Field(min_length=1, max_length=80)
     tracking_url: str | None = Field(None, max_length=300)
+    # In centavos.
+    default_fee: int = Field(0, ge=0, le=10**9)
 
 
 class CourierPatch(Api):
@@ -48,6 +50,7 @@ class CourierPatch(Api):
     tracking_url: str | None = Field(None, max_length=300)
     sort_order: int | None = Field(None, ge=0, le=999)
     is_active: bool | None = None
+    default_fee: int | None = Field(None, ge=0, le=10**9)
 
 
 def check_url(value: str | None) -> str | None:
@@ -68,7 +71,7 @@ def add_courier(_: Manage, me: CurrentUser, db: DB, body: CourierIn) -> dict:
     if db.scalar(select(Courier.id).where(func.upper(Courier.code) == code)):
         raise field_error("code", "There's already a courier with that code.")
     last = db.scalar(select(func.max(Courier.sort_order))) or 0
-    c = Courier(code=code, name=body.name.strip(), tracking_url=check_url(body.tracking_url), sort_order=last + 1)
+    c = Courier(code=code, name=body.name.strip(), tracking_url=check_url(body.tracking_url), sort_order=last + 1, default_fee=body.default_fee)
     db.add(c)
     db.flush()
     audit(db, me, "courier.created", target=c.name, target_type="courier", target_id=c.id)
@@ -98,8 +101,8 @@ class ShippingIn(Api):
     method: Literal["courier", "own", "pickup"]
     courier_id: str | None = Field(None, max_length=36)
     tracking_number: str | None = Field(None, max_length=60)
-    # In centavos.
-    fee: int = Field(0, ge=0, le=10**10)
+    # In centavos. Left out: the courier's default fee when it's a courier delivery (2026-11-18), else none.
+    fee: int | None = Field(None, ge=0, le=10**10)
     fee_charged: bool = False
 
 
@@ -133,7 +136,8 @@ def set_shipping(access: CurrentAccess, me: CurrentUser, db: DB, order_id: str, 
     o.courier_id = courier.id if courier else None
     o.courier = courier
     o.tracking_number = (body.tracking_number or "").strip() or None if body.method == "courier" else None
-    o.shipping_fee, o.fee_charged = body.fee, body.fee_charged and body.fee > 0
+    fee = body.fee if body.fee is not None else (courier.default_fee or 0) if courier else 0
+    o.shipping_fee, o.fee_charged = fee, body.fee_charged and fee > 0
     after = (o.delivery_method, o.courier_id, o.tracking_number, o.shipping_fee, o.fee_charged)
     if before != after:
         names = ("deliveryMethod", "courier", "trackingNumber", "shippingFee", "feeCharged")
