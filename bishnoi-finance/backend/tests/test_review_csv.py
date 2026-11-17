@@ -73,16 +73,16 @@ def test_export_is_not_limited_to_screen_page_and_permissions_are_kept(client,an
     assert client.get('/finance/exports/bir-review/vat.csv',headers=outsider).status_code==403
 
 
-def test_posted_bill_detail_keeps_line_values_and_foreign_currency(client,ana,ben):
+def test_posted_bill_detail_keeps_line_values_in_pesos(client,ana,ben):
     from .test_payables import account, cleared
     from decimal import Decimal
     s=supplier(client,ben)
     line={'accountId':account(client,ben,'6500'),'amountCentavos':11200,'vat':'vat','withholding':None,'purchaseType':'other_goods'}
-    b=bill(client,ben,s['id'],lines=[line,line],currency='USD',rate=56)
+    b=bill(client,ben,s['id'],lines=[line,line])
     cleared(client,ana,ben,b)
     rows=read(client.get('/finance/exports/review/bill-lines.csv',headers=ana))
-    assert len(rows)==2 and all(r['Currency']=='USD' for r in rows)
-    assert sum(Decimal(r['Net (bill currency)']) for r in rows)==200
-    assert sum(Decimal(r['VAT (bill currency)']) for r in rows)==24
+    assert len(rows)==2 and 'Currency' not in rows[0] and 'Exchange rate' not in rows[0]
+    assert sum(Decimal(r['Net PHP']) for r in rows)==200
+    assert sum(Decimal(r['VAT PHP']) for r in rows)==24
     docs=read(client.get('/finance/exports/review/bills.csv',headers=ana))
-    assert docs[0]['Gross PHP']=='12544.00'
+    assert docs[0]['Gross PHP']=='224.00'

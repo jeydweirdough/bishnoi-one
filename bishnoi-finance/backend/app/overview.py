@@ -385,7 +385,7 @@ def ap_card(c: Ctx) -> dict:
 def zoho_saved(c: Ctx) -> list[dict] | None:
     """The saved Zoho invoices of the connected organisation; None when no organisation is confirmed here."""
     def read():
-        from app.routers.zoho_source import organization
+        from app.zoho_source import organization
 
         try:
             org = organization(c.settings)
@@ -394,6 +394,11 @@ def zoho_saved(c: Ctx) -> list[dict] | None:
         return [r.data for r in c.db.scalars(select(ZohoSourceDocument).where(ZohoSourceDocument.organization_id == org, ZohoSourceDocument.kind == "invoice"))]
 
     return c.once("zoho", read)
+
+
+# The read-only Zoho invoice list was removed (owner's decision, 2026-11-17): the saved copies are still counted
+# here, and their cards open customer aging.
+ZOHO_HREF = "/finance/invoices/receivables"
 
 
 def zoho_unpaid(saved: list[dict]) -> tuple[list[dict], int]:
@@ -416,9 +421,8 @@ def zoho_card(c: Ctx) -> dict:
     if saved is None:
         return {"available": False}
     unpaid, skipped = zoho_unpaid(saved)
-    list_period = "month" if c.key == "month" else "all"
     buckets = blank_buckets() | {"no_due": {"key": "no_due", "label": "No due date saved", "amountCentavos": 0, "count": 0}}
-    companies = {k: {"key": k, "label": label, "amountCentavos": 0, "count": 0, "href": link("/finance/invoices/zoho", company="2mg" if k == "2mg" else "all", period=list_period)}
+    companies = {k: {"key": k, "label": label, "amountCentavos": 0, "count": 0, "href": ZOHO_HREF}
                  for k, label in ZOHO_COMPANIES.items()}
     for r in unpaid:
         if not c.within(date.fromisoformat(r["date"])):
@@ -431,11 +435,11 @@ def zoho_card(c: Ctx) -> dict:
         company["amountCentavos"] += r["balanceCentavos"]
         company["count"] += 1
     for b in buckets.values():
-        b["href"] = link("/finance/invoices/zoho", company="all", period=list_period)
+        b["href"] = ZOHO_HREF
     return {"available": True, "buckets": [b for b in buckets.values() if b["key"] != "no_due" or b["count"]],
             "companies": [x for x in companies.values() if x["key"] != "unknown" or x["count"]],
             "totalCentavos": sum(b["amountCentavos"] for b in buckets.values()), "count": sum(b["count"] for b in buckets.values()),
-            "notCounted": skipped, "href": link("/finance/invoices/zoho", company="all", period=list_period)}
+            "notCounted": skipped, "href": ZOHO_HREF}
 
 
 def due_card(c: Ctx) -> dict:
@@ -445,8 +449,8 @@ def due_card(c: Ctx) -> dict:
     unpaid, _ = zoho_unpaid(saved)
     until = c.on + timedelta(days=WEEK - 1)
     due = sorted((r for r in unpaid if r.get("dueDate") and c.on <= date.fromisoformat(r["dueDate"]) <= until), key=lambda r: (r["dueDate"], r["number"]))
-    return {"available": True, "total": len(due), "href": link("/finance/invoices/zoho", company="all", period="all"), "rows": [
-        row(f"{r['number']} · {r['customerName']}", ZOHO_COMPANIES.get(r.get("company"), ZOHO_COMPANIES["unknown"]), f"/finance/invoices/zoho/{r['id']}",
+    return {"available": True, "total": len(due), "href": ZOHO_HREF, "rows": [
+        row(f"{r['number']} · {r['customerName']}", ZOHO_COMPANIES.get(r.get("company"), ZOHO_COMPANIES["unknown"]), ZOHO_HREF,
             r["balanceCentavos"], ("Due today", "warn") if r["dueDate"] == c.on.isoformat() else None, date.fromisoformat(r["dueDate"]))
         for r in due[:RANKED]]}
 
@@ -587,7 +591,7 @@ def soon_card(c: Ctx) -> dict:
 
 def link_card(c: Ctx) -> dict:
     """How the Zoho reader stands, from its own run records. Zoho itself isn't asked."""
-    from app.routers.zoho_source import organization
+    from app.zoho_source import organization
     from app.zoho_month_sync import usage_today, zoho_day_limit_hit
 
     try:
@@ -864,7 +868,7 @@ def lead_vat(c: Ctx) -> dict:
 
 def lead_recv(c: Ctx) -> dict:
     return {"key": "recv", "viewOnly": not c.can("invoices.collect"), "actions": primary_first([
-        action("Open customer aging", "/finance/invoices/receivables"), action("Open Zoho invoices", link("/finance/invoices/zoho", company="all", period="all"))])}
+        action("Open customer aging", "/finance/invoices/receivables")])}
 
 
 def lead_sup(c: Ctx) -> dict:

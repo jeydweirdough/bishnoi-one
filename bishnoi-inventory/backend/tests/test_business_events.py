@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 
 from app.business_events import OutboxEvent
-from tests.conftest import receive
+from tests.conftest import receive, sold
 from tests.test_platform_roles import database
 
 LATER = (date.today() + timedelta(days=400)).isoformat()
@@ -14,7 +14,7 @@ LATER = (date.today() + timedelta(days=400)).isoformat()
 
 def test_issuing_a_sales_order_is_told_as_a_delivery(app, ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 100}])
-    sale = ana.post("/inventory/orders", {"recipient": "St. Luke's", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 40}]})
+    sale = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 40}], "St. Luke's")
     ana.post(f"/inventory/orders/{sale['id']}/confirm")
     ana.post(f"/inventory/orders/{sale['id']}/issue", {})
     # Stock sent to a department isn't a sale: not told.
@@ -22,8 +22,9 @@ def test_issuing_a_sales_order_is_told_as_a_delivery(app, ana, world):
     ana.post(f"/inventory/orders/{internal['id']}/confirm")
     ana.post(f"/inventory/orders/{internal['id']}/issue", {})
     with database(app)() as db:
-        out = db.scalars(select(OutboxEvent)).all()
-        assert [e.kind for e in out] == ["delivery.done"]
+        # The sales order tells its own news too (sales_order.updated, document.linked); one delivery is told.
+        out = db.scalars(select(OutboxEvent).where(OutboxEvent.kind == "delivery.done")).all()
+        assert len(out) == 1
         assert out[0].data["number"] == sale["number"] and out[0].data["lines"][0]["sku"] == "GLV-M" and out[0].data["lines"][0]["quantity"] == 40
         assert out[0].slug == "getmeds" and out[0].sent_at is None  # not connected here: kept
 

@@ -99,20 +99,10 @@ def answer(settings: Settings) -> dict | None:
     return dict(NOTHING) if last is not None else None
 
 
-def database_company(settings: Settings, *, fresh: bool = False) -> dict | None:
-    """The database owner from the authenticated Platform, never from a user pass.
-
-    Sensitive assistant reads ask fresh and fail closed during a Platform outage,
-    instead of using the ordinary integration links' 24-hour stale-cache grace.
-    """
-    if fresh:
-        from app.platform_connect import connect_key
-        key = connect_key(settings)
-        if not key or not settings.platform_api_url:
-            return None
-        found, _ = _ask(settings, key)
-    else:
-        found = answer(settings)
+def database_company(settings: Settings) -> dict | None:
+    """The company this Finance database belongs to, from the authenticated Platform (Operations >
+    Services > Finance > Database company), never from a user pass or an old .env value."""
+    found = answer(settings)
     company = found.get("databaseCompany") if found else None
     if not isinstance(company, dict) or company.get("status") != "active":
         return None

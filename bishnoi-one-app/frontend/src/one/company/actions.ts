@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { ServiceInfo } from "@/src/modules/console/actions/services";
 import { accountSend } from "@/src/platform/lib/account";
 import { attempt, type Result } from "@/src/platform/lib/result";
-import type { Administrators, CatalogueEntry, CompanyProfile } from "./types";
+import type { Administrators, CompanyProfile } from "./types";
 
 // A company administrator's changes to their own company, on Bishnoi One Platform
 // (/identity/company, feature plan step 5).
@@ -13,7 +13,7 @@ const enc = encodeURIComponent;
 const refresh = () => revalidatePath("/platform", "layout");
 
 export async function changeCompany(
-  change: Partial<Pick<CompanyProfile, "name" | "contactEmail" | "emailDomain" | "timezone" | "currency" | "locale" | "legalName" | "address" | "tin" | "phone" | "documentFooter" | "logo">>,
+  change: Partial<Pick<CompanyProfile, "name" | "contactEmail" | "timezone" | "currency" | "locale" | "legalName" | "address" | "tin" | "phone" | "documentFooter" | "logo">>,
 ): Promise<Result<{ company: CompanyProfile }>> {
   return attempt(async () => {
     const saved = await accountSend<{ company: CompanyProfile }>("PATCH", "/identity/company", change);
@@ -41,15 +41,6 @@ export async function checkOwnService(key: string): Promise<Result<ServiceInfo>>
 export async function signPersonOut(id: string): Promise<Result<{ ended: number }>> {
   return attempt(async () => {
     const r = await accountSend<{ ended: number }>("POST", `/identity/company/security/people/${enc(id)}/sign-out`, {});
-    refresh();
-    return r;
-  });
-}
-
-/** A catalogue app (its key) or a feature ("inventory.batches"), on or off (step 6). */
-export async function switchCatalogue(key: string, on: boolean): Promise<Result<{ apps: CatalogueEntry[] }>> {
-  return attempt(async () => {
-    const r = await accountSend<{ apps: CatalogueEntry[] }>("PUT", `/identity/company/catalogue/${enc(key)}`, { on });
     refresh();
     return r;
   });

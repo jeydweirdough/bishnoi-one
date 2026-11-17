@@ -34,7 +34,6 @@ export const SETTINGS_PAGES = [
   { href: "/platform/settings/crm/retention-windows", label: "Retention windows", permission: DEPARTMENT },
   { href: "/platform/settings/crm/price-rules", label: "Price rules", permission: "products.view" },
   { href: "/platform/settings/crm/associations", label: "Associations", permission: "admin.settings" },
-  { href: "/platform/settings/crm/emails", label: "Email templates", permission: "admin.settings" },
   { href: "/platform/settings/crm/attention", label: "Attention", permission: DEPARTMENT },
 ] as const satisfies readonly { href: string; label: string; permission: string | readonly string[] }[];
 

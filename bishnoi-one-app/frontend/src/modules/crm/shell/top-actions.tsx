@@ -8,7 +8,7 @@ import { Suspense, use, useState } from "react";
 
 // The top right of the CRM's pages, as before the one app: its search and its
 // notification bell (the attention prompts), then `children`: your modules and
-// you (src/one/one-actions.tsx, with your CRM profile and mailbox in its menu).
+// you (src/one/one-actions.tsx, with your CRM profile in its menu).
 
 /** One notification: what, why, and where it's dealt with. */
 export type Notification = { key: string; title: string; reason?: string; href: string };

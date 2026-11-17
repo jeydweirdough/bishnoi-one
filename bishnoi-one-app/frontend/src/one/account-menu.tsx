@@ -10,7 +10,7 @@ import { VIEW_AS_EVENT } from "./view-as";
 
 type Company = { slug: string; name: string; current: boolean };
 
-/** One of the module's own pages for you (your profile there, your mailbox), listed under your name. */
+/** One of the module's own pages for you (your profile there), listed under your name. */
 export type AccountLink = { href: string; label: string };
 
 /**

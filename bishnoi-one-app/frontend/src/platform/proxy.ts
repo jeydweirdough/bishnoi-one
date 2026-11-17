@@ -5,6 +5,34 @@ import { siteUrl } from "./lib/site";
 
 // Where each app's old people pages went (the Admin Console).
 const ADMIN_CONSOLE = { users: "/platform/roles/people", roles: "/platform/roles", teams: "/platform/organisation" } as const;
+// The CRM's dropped pages (2026-11-17, owner decision) and where their bookmarks land.
+const DROPPED_CRM: readonly (readonly [string, string])[] = [
+  ["/crm/inbox", "/crm/customers"],
+  ["/crm/customers/find", "/crm/customers"],
+  ["/crm/email", "/crm/activities"],
+  ["/crm/account/mailbox", "/crm/account"],
+  ["/crm/admin/settings/emails", "/platform/settings/crm"],
+  ["/platform/settings/crm/emails", "/platform/settings/crm"],
+];
+// Inventory features the owner dropped (2026-11-17): wave picking, and the sale typed in Inventory (every sale
+// is a CRM sales order, approved first). Dropshipping had no page of its own.
+const DROPPED_INVENTORY: readonly (readonly [string, string])[] = [
+  ["/inventory/waves", "/inventory/orders"],
+  ["/inventory/print/waves", "/inventory/orders"],
+  ["/inventory/orders/new/customer", "/crm/sales/orders/new"],
+];
+// Finance's read-only Zoho lists, dropped by the owner (2026-11-17): Finance's own sales orders and invoices stay.
+// (Foreign-currency bills and exchange rates went too; they had no page of their own.)
+const DROPPED_FINANCE: readonly (readonly [string, string])[] = [
+  ["/finance/sales-orders/zoho", "/finance/sales-orders/local"],
+  ["/finance/invoices/zoho", "/finance/invoices"],
+];
+// Bishnoi One features the owner removed (2026-11-17): the "Ask Bishnoi" assistant and the Admin Console's
+// "Apps and features" switches (every company runs everything it has as one operation).
+const DROPPED_PLATFORM: readonly (readonly [string, string])[] = [
+  ["/assistant", "/"],
+  ["/platform/company/apps", "/platform"],
+];
 // Finance's setup pages, now the Admin Console's (2026-10-31): their old addresses and where they went.
 const FINANCE_SETTINGS: Record<string, string> = {
   "/finance/tax": "taxes",
@@ -46,6 +74,10 @@ export async function proxy(request: NextRequest) {
   if (moved) return NextResponse.redirect(siteUrl(`/operations/${moved[1]}${moved[2] ?? ""}${search}`, request), 308);
   // Sales orders moved from their own app into the CRM (2026-10-30): old links and stored ones still land.
   if (pathname === "/sales" || pathname.startsWith("/sales/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
+  // CRM features the owner dropped (2026-11-17): the lead inbox, finding leads with AI, email through
+  // your own mailbox and its approved email templates. Bookmarks land on the nearest page still there.
+  const dropped = [...DROPPED_CRM, ...DROPPED_INVENTORY, ...DROPPED_FINANCE, ...DROPPED_PLATFORM].find(([from]) => pathname === from || pathname.startsWith(`${from}/`));
+  if (dropped) return NextResponse.redirect(siteUrl(dropped[1], request), 308);
   // People, roles and teams are kept only in the Admin Console (2026-10-31): each app's old pages land there.
   const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy|admin)\/admin\/(users|roles|teams)(?:\/.*)?$/);
   if (kept) return NextResponse.redirect(siteUrl(ADMIN_CONSOLE[kept[1] as keyof typeof ADMIN_CONSOLE], request), 308);

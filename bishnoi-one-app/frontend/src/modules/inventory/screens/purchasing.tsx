@@ -1,4 +1,3 @@
-import { DropshipDelivered } from "@/src/modules/inventory/components/supply";
 import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
 import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Ban, ExternalLink, FileText, PackageCheck, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
@@ -256,7 +255,6 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
         actions={
           <>
             <PrintLink href={`/inventory/print/purchase-orders/${po.id}`} />
-            {po.dropship && (po.status === "ordered" || po.status === "partial") && may("receiving.receive") && <DropshipDelivered poId={po.id} />}
             {po.status === "draft" && may("purchasing.approve") && (
               <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve and place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "Once placed, it cannot be edited, only received or cancelled.", danger: false }} />
             )}
@@ -272,16 +270,15 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
           </>
         }
       >
-        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.dropship && po.shipTo ? `${po.shipTo.name} (dropship)` : po.warehouse.name}</span>
+        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.warehouse.name}</span>
       </PageHeader>
       {(po.salesOrder || po.replenishment) && (
         <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
           {po.replenishment && "Made by replenishment from use and lead time. "}
           {po.salesOrder && (
             <>
-              {po.dropship ? "Dropship for " : "Order-on-demand for "}
+              Order-on-demand for{" "}
               <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
-              {po.dropship && po.shipTo && <>: the vendor delivers to {po.shipTo.name}{po.shipTo.address && `, ${po.shipTo.address}`}. No stock comes through our warehouse.</>}
             </>
           )}
         </p>

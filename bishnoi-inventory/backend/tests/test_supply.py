@@ -1,6 +1,6 @@
-"""Order-on-demand, dropshipping, consignment and documents with products (feature plan steps 15b–15e)."""
+"""Order-on-demand, consignment and documents with products (feature plan steps 15b, 15d, 15e; dropshipping, 15c, removed 2026-11-17)."""
 
-from tests.conftest import receive
+from tests.conftest import receive, sold
 from tests.test_sales import outbox
 
 
@@ -16,7 +16,7 @@ def test_an_order_without_the_stock_raises_a_draft_purchase_order(ana, world):
     approved = ana.post(f"/inventory/sales-orders/{made['id']}/approve")
     assert approved["delivery"] is not None
     pos = approved["purchaseOrders"]
-    assert len(pos) == 1 and pos[0]["status"] == "draft" and not pos[0]["dropship"] and pos[0]["supplier"] == "ABC Medical Supply"
+    assert len(pos) == 1 and pos[0]["status"] == "draft" and pos[0]["supplier"] == "ABC Medical Supply"
     po = ana.get(f"/inventory/purchase-orders/{pos[0]['id']}")
     assert po["lines"][0]["quantity"] == 7 and po["salesOrder"]["number"] == made["number"]
     # Enough stock: nothing raised.
@@ -24,35 +24,18 @@ def test_an_order_without_the_stock_raises_a_draft_purchase_order(ana, world):
     assert ana.post(f"/inventory/sales-orders/{other['id']}/approve")["purchaseOrders"] == []
 
 
-def test_a_dropshipped_order_goes_from_the_vendor_and_is_invoiced(app, ana, world):
-    made = a_sales_order(ana, world, 4)
-    assert ana.put(f"/inventory/sales-orders/{made['id']}/dropship", {"dropship": True})["dropship"] is True
-    approved = ana.post(f"/inventory/sales-orders/{made['id']}/approve")
-    assert approved["delivery"] is None and approved["purchaseOrders"][0]["dropship"]
-    po_id = approved["purchaseOrders"][0]["id"]
-    po = ana.get(f"/inventory/purchase-orders/{po_id}")
-    assert po["shipTo"] == {"name": "PGH", "address": "Taft Ave, Manila"}
-    assert ana.c.post(f"/inventory/purchase-orders/{po_id}/dropship-delivered", headers=ana.h, json={}).status_code == 409  # placed first
-    ana.post(f"/inventory/purchase-orders/{po_id}/place")
-    done = ana.post(f"/inventory/purchase-orders/{po_id}/dropship-delivered", {})
-    assert done["status"] == "received" and done["salesOrder"]["status"] == "delivered"
-    event = [e for e in outbox(app, "delivery.done") if e["orderId"] == po_id][0]
-    assert event["dropship"] and event["salesOrder"]["lines"][0]["quantity"] == 4
-    assert all(w["onHand"] == 0 for w in ana.get(f"/inventory/products/{world['gloves']}")["warehouses"])  # nothing passed through us
-
-
 def test_consignment_stock_is_the_vendors_until_it_sells(ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 10}], supplierId=world["supplier"], consignment=True)
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 5}])
     value = ana.get("/inventory/reports/valuation")["rows"][0]
     assert value["onHand"] == 5  # ours only
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 12}]})
+    o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 12}])
     ana.post(f"/inventory/orders/{o['id']}/confirm")
     ana.post(f"/inventory/orders/{o['id']}/issue", {})
     rows = ana.get("/inventory/reports/consignment")["rows"]
-    sold = sum(r["sold"] for r in rows)
+    gone = sum(r["sold"] for r in rows)
     left = sum(r["left"] for r in rows)
-    assert sold + left == 10 and rows[0]["vendor"] == "ABC Medical Supply" and rows[0]["toPay"] == rows[0]["sold"] * rows[0]["unitCost"]
+    assert gone + left == 10 and rows[0]["vendor"] == "ABC Medical Supply" and rows[0]["toPay"] == rows[0]["sold"] * rows[0]["unitCost"]
 
 
 def test_documents_go_with_every_sale(ana, world):
@@ -63,7 +46,7 @@ def test_documents_go_with_every_sale(ana, world):
     assert doc["name"] == "Certificate of analysis" and doc["sendWithSales"]
     assert ana.c.post(f"/inventory/products/{world['gloves']}/documents", headers=ana.h, files={"file": ("x.exe", b"MZ", "application/x-msdownload")}).status_code == 415
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 5}])
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 1}]})
+    o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 1}])
     assert [d["name"] for d in ana.get(f"/inventory/orders/{o['id']}/documents")] == ["Certificate of analysis"]
     assert ana.c.get(doc["href"], headers=ana.h).content.startswith(b"%PDF")
     ana.patch(f"/inventory/products/{world['gloves']}/documents/{doc['id']}", {"sendWithSales": False})
@@ -76,7 +59,7 @@ def test_consignment_is_settled_once_and_sent_to_finance(app, ana, world):
     assert product["consigned"] == 10 and product["value"] == 0  # theirs, not ours
     stock = ana.get("/inventory/stock")["items"]
     assert sum(r["value"] for r in stock) == 0
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 4}]})
+    o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 4}])
     ana.post(f"/inventory/orders/{o['id']}/confirm")
     ana.post(f"/inventory/orders/{o['id']}/issue", {})
     vendor = ana.get("/inventory/consignment")["vendors"][0]
@@ -97,7 +80,7 @@ def test_a_sales_documents_are_emailed_to_the_customer(ana, world, monkeypatch):
     monkeypatch.setattr(mail, "send", lambda settings, company, to, subject, text, attachments: sent.append((to, subject, [a[0] for a in attachments])))
     ana.c.post(f"/inventory/products/{world['gloves']}/documents", headers=ana.h, files={"file": ("coa.pdf", b"%PDF-1.4 x", "application/pdf")}, data={"name": "COA"})
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 2}])
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 1}]})
+    o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 1}])
     assert ana.c.post(f"/inventory/orders/{o['id']}/documents/send", headers=ana.h, json={"to": ["not-an-email"]}).status_code == 422
     r = ana.post(f"/inventory/orders/{o['id']}/documents/send", {"to": ["Buyer@PGH.gov.ph"], "message": "Good day."})
     assert r == {"sent": 1, "to": ["buyer@pgh.gov.ph"]}
@@ -106,6 +89,6 @@ def test_a_sales_documents_are_emailed_to_the_customer(ana, world, monkeypatch):
 
 def test_without_an_email_service_it_says_how_to_set_one_up(ana, world):
     ana.c.post(f"/inventory/products/{world['gloves']}/documents", headers=ana.h, files={"file": ("coa.pdf", b"%PDF-1.4 x", "application/pdf")}, data={"name": "COA"})
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 1}]})
+    o = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 1}])
     r = ana.c.post(f"/inventory/orders/{o['id']}/documents/send", headers=ana.h, json={"to": ["buyer@pgh.gov.ph"]})
     assert r.status_code == 409 and "connected" in r.json()["detail"]

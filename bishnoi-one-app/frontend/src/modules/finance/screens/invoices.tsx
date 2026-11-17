@@ -133,7 +133,6 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
               ? [{ href: "/finance/invoices?attention=1", label: "From deliveries to check", count: list.counts.attention, current: attention }]
               : []),
             { href: "/finance/invoices/receivables", label: "Receivables", current: false },
-            { href: "/finance/invoices/zoho", label: "Zoho records", current: false },
           ]}
         />
         <ListToolbar q={q} placeholder="Search customer, number or reference" keep={{ status }} />

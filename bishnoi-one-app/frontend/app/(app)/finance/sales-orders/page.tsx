@@ -1,3 +1,3 @@
-﻿import {ZohoSalesOrdersPage} from '@/src/modules/finance/screens/zoho-sales-orders';
+import {LocalSalesOrdersPage} from '@/src/modules/finance/screens/sales-orders';
 export const metadata={title:'Sales orders'};
-export default ZohoSalesOrdersPage;
+export default LocalSalesOrdersPage;

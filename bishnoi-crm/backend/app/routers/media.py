@@ -5,26 +5,24 @@ the screens can send up), or a link to one kept elsewhere (a shared drive,
 for big decks and videos). Each has an approval date and, if it has one, an
 expiry: before and after, it isn't shown. It can be for some divisions only.
 
-Everyone else sees what's current for their division, and each opening is
-counted, with the customer when opened from their page.
+Everyone else sees what's current for their division. Who opened what isn't
+kept (dropped 2026-11-17, owner decision).
 """
 
 import secrets
-from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import quote as url_quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.access import Access, CurrentAccess, require
 from app.api import Api, changed, field_error, iso, not_found
 from app.audit import audit
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Company, MediaItem, MediaView, Product, StoredFile, Team, User
+from app.models import MediaItem, Product, StoredFile, Team, User
 from app.pricing import today
-from app.scope import reaches
 
 router = APIRouter(tags=["media"])
 Manage = Annotated[Access, Depends(require("admin.settings"))]
@@ -62,8 +60,6 @@ def media_out(db, item: MediaItem, on: str, *, admin: bool) -> dict:
         "isCurrent": current(item, on),
     }
     if admin:
-        since = datetime.now(UTC) - timedelta(days=30)
-        out["opened30d"] = db.scalar(select(func.count()).select_from(MediaView).where(MediaView.media_id == item.id, MediaView.at >= since)) or 0
         out["url"] = item.url
     return out
 
@@ -88,19 +84,12 @@ def get_media(db, item_id: str) -> MediaItem:
     return item
 
 
-class OpenIn(Api):
-    company_id: str | None = Field(None, max_length=36)
-
-
-@router.post("/media/{item_id}/opened")
-def opened(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, item_id: str, body: OpenIn) -> dict:
-    """Counts an opening (for a customer, when opened from their page); answers where it is."""
+@router.get("/media/{item_id}/link")
+def link(access: CurrentAccess, me: CurrentUser, db: DB, settings: SettingsDep, item_id: str) -> dict:
+    """Where a material is, to open it: its link, or that it's a file kept here. Nothing is recorded."""
     item = get_media(db, item_id)
     if not access.can("admin.settings") and not (current(item, today(settings.org_timezone)) and for_them(item, me.team_id)):
         raise not_found("material")
-    company = db.get(Company, body.company_id) if body.company_id else None
-    db.add(MediaView(media_id=item.id, user_id=me.id, company_id=company.id if company and reaches(company, access) else None))
-    db.commit()
     return {"url": item.url, "file": bool(item.file_ref)}
 
 

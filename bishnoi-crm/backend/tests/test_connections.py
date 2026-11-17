@@ -9,7 +9,7 @@ from pydantic import SecretStr
 from app import company, connections, platform_links
 from tests.test_company import PUBLIC, Answer, company_pass
 
-GMAIL = {"client_id": "123.apps.googleusercontent.com", "client_secret": "google-secret-value"}
+ZOHO = {"data_centre": "com", "organization_id": "123", "client_id": "1000.ABC", "client_secret": "zoho-secret-value", "refresh_token": "rt"}
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def platform(app, monkeypatch):
     connections.forget()
     platform_links.forget()
     app.state.settings = app.state.settings.model_copy(update={"platform_app_key": SecretStr("bpk.crm.test"), "platform_api_url": "https://platform.test", "platform_public_key": PUBLIC})
-    state = {"services": {"gmail": GMAIL}, "asked": 0, "down": False}
+    state = {"services": {"zoho_books": ZOHO}, "asked": 0, "down": False}
 
     def get(url, params=None, headers=None, timeout=None):
         if url.endswith("/public/company-pass"):
@@ -49,15 +49,15 @@ def test_only_administrators_see_connections(client, ana, ben):
 
 def test_the_platform_says_which_services_are_on(client, ana, platform):
     page = client.get("/admin/connections", headers=ana).json()
-    assert page["connected"] is True and {s["key"]: s["on"] for s in page["services"]} == {"zoho_books": False, "gmail": True, "outlook": False, "zoho_mail": False, "smtp": False, "facebook": False, "whatsapp": False, "viber": False, "tawkto": False, "web_forms": False}
+    assert page["connected"] is True and {s["key"]: s["on"] for s in page["services"]} == {"zoho_books": True, "smtp": False}
     # Asked once, then the answer is kept; while the platform is down, the last answer stands.
     client.get("/admin/connections", headers=ana)
     assert platform["asked"] == 1
     connections._known["getmeds"] = (connections._known["getmeds"][0], connections._known["getmeds"][1], 0.0)
     platform["down"] = True
-    assert next(s for s in client.get("/admin/connections", headers=ana).json()["services"] if s["key"] == "gmail")["on"] is True
+    assert next(s for s in client.get("/admin/connections", headers=ana).json()["services"] if s["key"] == "zoho_books")["on"] is True
     # Nothing to save here any more: it's done on the platform.
-    assert client.put("/admin/connections/gmail", json={"values": GMAIL}, headers=ana).status_code in (404, 405)
+    assert client.put("/admin/connections/zoho_books", json={"values": ZOHO}, headers=ana).status_code in (404, 405)
 
 
 def test_the_crms_own_secrets_use_the_platforms_key(app, platform):

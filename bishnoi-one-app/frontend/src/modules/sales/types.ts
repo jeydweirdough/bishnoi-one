@@ -22,9 +22,8 @@ export type SalesOrderBrief = {
 };
 
 export type SalesOrder = SalesOrderBrief & {
-  /** The vendor ships it straight to the customer (15c); the purchase orders it raised (15b, 15c). */
-  dropship?: boolean;
-  purchaseOrders?: { id: string; number: string; status: string; dropship: boolean; supplier: string | null }[];
+  /** The purchase orders it raised for what the warehouse lacked (order-on-demand, 15b). */
+  purchaseOrders?: { id: string; number: string; status: string; supplier: string | null }[];
   /** Invoiced from its delivery by Finance, and paid (step 13). */
   invoice?: { id: string; number: string | null; invoicedAt: string | null; total: number | null; paidAt: string | null } | null;
   payer: { kind: string; issuer?: string; letterNumber?: string; amountCentavos?: number } | null;

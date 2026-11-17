@@ -165,7 +165,7 @@ def check(db, settings, company: Company, key: str, actor: User | str) -> dict:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Fill in {', '.join(gaps) or 'the details'} and save first.")
     try:
         checker = svc.CHECKS.get(key)
-        message = checker({**row.values, **secrets}) if checker else "Filled in. Each person now connects their own mailbox in the CRM (Account → Mailbox): that sign-in is the real test."
+        message = checker({**row.values, **secrets}) if checker else "Filled in."
         row.check_message, row.check_ok = message[:300], True
     except svc.CheckFailed as e:
         row.check_message, row.check_ok = str(e)[:300], False

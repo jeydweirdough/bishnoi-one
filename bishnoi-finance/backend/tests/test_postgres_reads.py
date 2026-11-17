@@ -13,8 +13,6 @@ from .test_tax_api import ana, client  # noqa: F401 (fixtures)
 from .test_vouchers import prepare, ready_bill, team  # noqa: F401 (fixtures)
 
 
-ZOHO_LISTS = {"/finance/zoho-invoices", "/finance/zoho-sales-orders"}
-
 
 def plain_reads(app):  # noqa: F811
     """GET endpoints with no path parameters (lists, dashboards, reports, settings), from the
@@ -34,9 +32,6 @@ def test_no_page_fails_on_either_database(client, ana, team, app):  # noqa: F811
     failed = {}
     for path in plain_reads(app):
         r = client.get(path, headers=ana)
-        # The Zoho lists refuse plainly where no Zoho connection is set up, as in these tests.
-        if path in ZOHO_LISTS and r.status_code == 503 and "Zoho" in r.json()["detail"]:
-            continue
         if r.status_code >= 500:
             failed[path] = (r.status_code, r.text[:200])
     assert not failed, failed

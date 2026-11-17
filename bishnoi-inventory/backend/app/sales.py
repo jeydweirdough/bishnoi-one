@@ -151,18 +151,13 @@ def from_quote(db: Session, data: dict, slug: str | None) -> SalesOrder | None:
     return order
 
 
-def approve(db: Session, order: SalesOrder, me: User, slug: str | None) -> Order | None:
+def approve(db: Session, order: SalesOrder, me: User, slug: str | None) -> Order:
     """Confirmed: its delivery is made for the warehouse to reserve, pick and issue, and draft purchase orders
-    for what the warehouse lacks (order-on-demand, 15b). A dropshipped order makes the vendors' purchase orders
-    instead, shipping to the customer (15c); then there's no delivery."""
+    for what the warehouse lacks (order-on-demand, 15b). This is the only way a sale delivery (kind "sale") is
+    made: the Inventory API refuses one typed directly (2026-11-17)."""
     from app import supply
 
     now = datetime.now(UTC)
-    if order.dropship:
-        supply.dropship(db, me, order, slug)  # refuses before anything changes when an item has no vendor
-        order.status, order.decided_by_id, order.decided_at, order.decision_note = "confirmed", me.id, now, None
-        told(db, slug, order)
-        return None
     order.status, order.decided_by_id, order.decided_at, order.decision_note = "confirmed", me.id, now, None
     supply.on_demand(db, me, order, slug)
     delivery = Order(number=next_number(db, "DR"), kind="sale", recipient=order.customer_name[:160], warehouse_id=order.warehouse_id,

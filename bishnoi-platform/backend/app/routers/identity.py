@@ -37,7 +37,7 @@ from app.api import Api
 from app.access_roles import role_for_pass
 from app.org_push import placement
 from app.audit import audit
-from app import catalogue, document_chain, email_rules, platform_admins, sign_in, signatures
+from app import document_chain, platform_admins, sign_in, signatures
 from app.accounts import account_by_email, account_of, memberships, runs_company
 from app.deps import DB, Address, SettingsDep, as_utc, get_db
 from app.models import AccessRole, Account, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
@@ -69,16 +69,7 @@ def current_identity(
     changed = account and account.password_changed_at and as_utc(record.created_at) < as_utc(account.password_changed_at)
     if person is None or person.status != "active" or account is None or account.status != "active" or changed:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your Bishnoi One sign-in has ended. Please sign in again.")
-    if email_rules.off_domain(db, person):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, not_at_domain(db, person))
     return record, person
-
-
-def not_at_domain(db: Session, person: Identity) -> str:
-    """Why someone whose email isn't at their company's domain can't sign in (decided 2026-10-29)."""
-    company = db.get(Company, person.company_id)
-    return (f"{company.name} signs in with @{company.email_domain} emails, and yours is {person.email}. "
-            "Ask your company's administrator to change it, then sign in with the new one.")
 
 
 Signed = Annotated[tuple[IdentitySession, Identity], Depends(current_identity)]
@@ -148,11 +139,6 @@ def login(body: LoginIn, db: DB, settings: SettingsDep, address: Address, respon
         if all(r.status != "active" for r in rows):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "This Bishnoi One account is suspended. Ask your company's administrator.")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
-    # Someone whose email isn't at their company's domain waits for their administrator to change it.
-    at_domain = [(row, c) for row, c in open_rows if not email_rules.off_domain(db, row)]
-    if not at_domain:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, not_at_domain(db, open_rows[0][0]))
-    open_rows = at_domain
     sign_in.cleared(db, email)
     response.headers["Cache-Control"] = "no-store"
     # Two-step sign-in: the password was right; the session opens once the code is (POST /identity/login/code).
@@ -241,8 +227,6 @@ def granted(db: Session, person: Identity) -> list[tuple[Application, IdentityAp
         .where(Application.is_active)
         .order_by(Application.sort_order, Application.name)
     ).all()
-    # A service whose catalogue apps the company switched off isn't opened (step 6).
-    rows = [(a, g) for a, g in rows if catalogue.service_on(db, person.company_id, a.key)]
     if runs_company(db, person):
         return [(a, grant_of(db, person, a)) for a, _ in rows]
     return [(a, g) for a, g in rows if g is not None]
@@ -278,8 +262,6 @@ def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
         "mustChangePassword": bool(account and account.must_change_password),
         "twoStep": {"on": bool(account and sign_in.two_step_on(account)), "needed": sign_in.needs_two_step(settings, account, runs_company(db, person)),
                     "suggested": sign_in.suggests_two_step(account)},
-        # The company's app catalogue: each catalogue app ("app:purchasing") and feature, on or off (step 6).
-        "features": catalogue.switches(db, person.company_id),
         "apps": [
             {"key": a.key, "name": a.name, "appUrl": a.app_url, "role": role.name if role else g.role, "isAppAdmin": g.is_app_admin or bool(role and role.is_admin),
              # When it was given to them: the first one given is where they start (the one app opens it after sign-in).
@@ -356,8 +338,6 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
     if db.get(CompanyApp, (company.id, app.id)) is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} doesn't have {app.name}. Ask your company's administrator.")
-    if not catalogue.service_on(db, company.id, app.key):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, f"{company.name} has switched {app.name} off. Ask your company's administrator.")
     grant = grant_of(db, person, app)
     if grant is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your Bishnoi One account doesn't include {app.name}. Ask your company's administrator for access.")

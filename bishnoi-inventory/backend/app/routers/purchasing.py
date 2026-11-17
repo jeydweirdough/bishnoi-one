@@ -291,9 +291,8 @@ def po_out(db: DB, po: PurchaseOrder) -> dict:
     return {
         **po_brief(po),
         "notes": po.notes,
-        # Raised for a sales order (order-on-demand, 15b) or shipped straight to its customer (dropship, 15c); made by replenishment (15a).
+        # Raised for a sales order (order-on-demand, 15b); made by replenishment (15a).
         "salesOrder": {"id": po.sales_order_id, "number": so.number} if po.sales_order_id and (so := db.get(SalesOrder, po.sales_order_id)) else None,
-        "dropship": po.dropship, "shipTo": {"name": po.ship_to_name, "address": po.ship_to_address} if po.dropship else None,
         "replenishment": po.replenishment,
         "createdBy": person(po.created_by),
         "orderedBy": person(po.ordered_by),
@@ -479,22 +478,6 @@ def delete_po(_: allowed("purchasing.edit"), me: CurrentUser, db: DB, po_id: str
     db.delete(po)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-class DropshipDoneIn(Api):
-    note: str | None = Field(None, max_length=300)
-
-
-@router.post("/purchase-orders/{po_id}/dropship-delivered")
-def dropship_delivered(_: allowed("receiving.receive"), me: CurrentUser, db: DB, po_id: str, body: DropshipDoneIn, request: Request) -> dict:
-    """The vendor delivered a dropship order to our customer (15c): no stock comes in; the sale is delivered and invoiced."""
-    from app import supply
-
-    po = found(db, PurchaseOrder, po_id, "purchase order")
-    order = supply.dropship_delivered(db, me, po, getattr(request.state, "company", None))
-    audit(db, me, "purchase_order.dropship_delivered", target=f"{po.number} · {order.number}", target_type="purchase_order", target_id=po.id)
-    db.commit()
-    return {"id": po.id, "status": po.status, "salesOrder": {"id": order.id, "number": order.number, "status": order.status}}
 
 
 @router.get("/backorders")

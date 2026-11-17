@@ -555,11 +555,8 @@ class PurchaseOrder(Stamped, Base):
     ordered_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     # Made by replenishment, by hand from its page or at night (step 15a, migration 0020).
     replenishment: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
-    # Raised for a sales order (order-on-demand, 15b; dropshipping, 15c), and shipped straight to that customer.
+    # Raised for a sales order (order-on-demand, 15b).
     sales_order_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
-    dropship: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
-    ship_to_name: Mapped[str | None] = mapped_column(String(200), default=None)
-    ship_to_address: Mapped[str | None] = mapped_column(String(400), default=None)
 
     supplier: Mapped[Supplier] = relationship(lazy="joined")
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
@@ -677,8 +674,6 @@ class SalesOrder(Stamped, Base):
     decided_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     decision_note: Mapped[str | None] = mapped_column(String(500), default=None)
-    # The vendor ships it straight to the customer (15c).
-    dropship: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # The invoice Finance made from its delivery, and when it was paid in full (step 13, migration 0015).
     invoice_id: Mapped[str | None] = mapped_column(String(36), default=None)
@@ -763,8 +758,6 @@ class Order(DocumentHeader, Stamped, Base):
     # The courier's proof-of-delivery photo, when the customer signed the courier's device instead.
     received_photo: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
     received_photo_type: Mapped[str | None] = mapped_column(String(20), default=None)
-    # The wave it is picked in, with other deliveries (step 14d, migration 0018).
-    wave_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
     warehouse: Mapped[Warehouse] = relationship(lazy="joined")
     courier: Mapped[Courier | None] = relationship(lazy="joined")
@@ -866,7 +859,7 @@ class Packaging(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-# --- packages and waves (step 14d): pick → pack → ship -----------------------------------
+# --- packages (step 14d): pick → pack → ship ---------------------------------------------
 
 
 class Package(Base):
@@ -896,25 +889,6 @@ class PackageLine(Base):
     quantity: Mapped[int] = mapped_column(Integer)
 
     package: Mapped[Package] = relationship(back_populates="lines")
-
-
-class Wave(Base):
-    """Several held deliveries from one warehouse, picked together from one pick list."""
-
-    __tablename__ = "nbin_waves"
-    __table_args__ = (CheckConstraint("status IN ('open', 'done')", name="wave_status"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    number: Mapped[str] = mapped_column(String(20), unique=True)
-    warehouse_id: Mapped[str] = mapped_column(ForeignKey("nbin_warehouses.id"), index=True)
-    status: Mapped[str] = mapped_column(String(10), default="open", index=True)
-    notes: Mapped[str | None] = mapped_column(String(300), default=None)
-    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-
-    warehouse: Mapped[Warehouse] = relationship(lazy="joined")
-    created_by: Mapped["User | None"] = relationship(foreign_keys=[created_by_id], lazy="joined")
 
 
 # --- quality checks on receipt (step 14a) -------------------------------------------------

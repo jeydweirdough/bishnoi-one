@@ -38,15 +38,14 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
         { href: "/platform/company/data-cleanup", label: "Data clean-up", icon: "lists" },
       ],
     });
-    // Everything about the apps in one place (2026-11-01): which are on, how each works, what they connect to.
-    // One row per app the company has; its parts are tabs on the page (app-settings.ts). The pages are the
-    // app's own (they talk to its API).
+    // How each app works and what it connects to (2026-11-01): one row per app the company has; its parts
+    // are tabs on the page (app-settings.ts). The pages are the app's own (they talk to its API). The
+    // "Apps and features" switches were removed on 2026-11-17 (owner's decision: no more per-app on/off).
     const has = (key: string) => me.apps.some((a) => a.key === key);
     groups.push({
-      label: "Apps",
+      label: "App settings",
       icon: "apps",
       pages: [
-        { href: "/platform/company/apps", label: "Apps and features", icon: "apps" },
         ...(has("crm") ? [{ href: `${CRM_SETTINGS}/company`, label: "CRM", icon: "deals" as const, also: [CRM_SETTINGS] }] : []),
         ...(has("inventory") ? [{ href: INVENTORY_TABS[0].href, label: "Inventory", icon: "inventory" as const, also: [INVENTORY_SETTINGS] }] : []),
         ...(has("finance") ? [{ href: FINANCE_TABS[0].href, label: "Finance", icon: "finance" as const, also: [FINANCE_SETTINGS] }] : []),

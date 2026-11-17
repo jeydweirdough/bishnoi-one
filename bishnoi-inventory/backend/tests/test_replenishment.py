@@ -6,7 +6,7 @@ from tests.conftest import receive
 
 def test_what_to_order_and_the_drafts_it_makes(ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 60}])
-    o = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 45}]})
+    o = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 45}]})
     ana.post(f"/inventory/orders/{o['id']}/confirm")
     ana.post(f"/inventory/orders/{o['id']}/issue", {})  # 15 left; reorder point 50
     plan = ana.get("/inventory/replenishment", warehouse=world["mnl"])

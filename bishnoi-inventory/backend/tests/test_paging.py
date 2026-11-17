@@ -29,7 +29,7 @@ def busy_world(ana, world, products=7):
     for i, pid in enumerate(ids[:5]):
         receive(ana, world["mnl"], [{"productId": pid, "quantity": 10 * (i + 1)}])
     receive(ana, world["ceb"], [{"productId": ids[0], "quantity": 5}, {"productId": world["gloves"], "quantity": 80}])
-    order = ana.post("/inventory/orders", {"recipient": "Ward 3", "warehouseId": world["mnl"], "lines": [{"productId": ids[4], "quantity": 50}]})
+    order = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": ids[4], "quantity": 50}]})
     ana.post(f"/inventory/orders/{order['id']}/confirm")
     t = ana.post("/inventory/transfers", {"fromWarehouseId": world["mnl"], "toWarehouseId": world["ceb"], "lines": [{"productId": ids[3], "quantity": 15}]})
     ana.post(f"/inventory/transfers/{t['id']}/approve")

@@ -73,18 +73,12 @@ export async function deleteCatalogItem(list: CatalogList, key: string, moveTo?:
 export async function saveWarehouse(id: string | null, input: Json): Promise<Result<Id>> {
   return id ? send<Id>("patch", `/inventory/warehouses/${enc(id)}`, input) : send<Id>("post", "/inventory/warehouses", input);
 }
-// Order-on-demand, dropshipping, consignment and documents with products (steps 15b–15e).
+// Consignment and documents with products (steps 15d, 15e).
 export async function sendSaleDocuments(kind: "orders" | "sales-orders", id: string, to: string[], message: string | null): Promise<Result<{ sent: number; to: string[] }>> {
   return send<{ sent: number; to: string[] }>("post", `/inventory/${kind}/${enc(id)}/documents/send`, { to, message });
 }
 export async function settleConsignment(supplierId: string): Promise<Result<{ id: string; number: string; total: number }>> {
   return send<{ id: string; number: string; total: number }>("post", `/inventory/consignment/${enc(supplierId)}/settle`, {});
-}
-export async function setDropship(orderId: string, dropship: boolean): Promise<Result<unknown>> {
-  return send("put", `/inventory/sales-orders/${enc(orderId)}/dropship`, { dropship });
-}
-export async function dropshipDelivered(poId: string): Promise<Result<unknown>> {
-  return send("post", `/inventory/purchase-orders/${enc(poId)}/dropship-delivered`, {});
 }
 export async function uploadProductDocument(productId: string, form: FormData): Promise<Result<unknown>> {
   return attempt(async () => {
@@ -118,21 +112,12 @@ export async function deletePackaging(productId: string, id: string): Promise<Re
   return send<null>("del", `/inventory/products/${enc(productId)}/packagings/${enc(id)}`);
 }
 
-// Packages and waves (step 14d).
+// Packages (step 14d).
 export async function packDelivery(orderId: string, input: Json): Promise<Result<unknown>> {
   return send("post", `/inventory/orders/${enc(orderId)}/packages`, input);
 }
 export async function unpackDelivery(orderId: string, packageId: string): Promise<Result<unknown>> {
   return send("del", `/inventory/orders/${enc(orderId)}/packages/${enc(packageId)}`);
-}
-export async function makeWave(orderIds: string[]): Promise<Result<{ id: string; number: string }>> {
-  return send<{ id: string; number: string }>("post", "/inventory/waves", { orderIds });
-}
-export async function waveStep(id: string, step: "done" | "remove", orderId?: string): Promise<Result<unknown>> {
-  return send("post", `/inventory/waves/${enc(id)}/${step}`, orderId ? { orderId } : {});
-}
-export async function deleteWave(id: string): Promise<Result<null>> {
-  return send<null>("del", `/inventory/waves/${enc(id)}`);
 }
 
 // Scanning (step 14c).

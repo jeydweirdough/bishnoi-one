@@ -18,7 +18,6 @@ from app.routers import admin, assets, auth, banking, exports, finance, funds, i
 from app.routers import bank as bank_router
 from app.routers import bir as bir_router
 from app.routers import reports as reports_router
-from app.routers import assistant as assistant_router
 from app.tax import rates as tax_rates
 from app.guard import install as install_guard
 
@@ -92,7 +91,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(receivables.router)
     app.include_router(bir_router.router)
     app.include_router(reports_router.router)
-    app.include_router(assistant_router.router)
     app.include_router(bank_router.router)
     app.include_router(prices.router)
     app.include_router(unset.router)
@@ -101,10 +99,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(integration.sales_router)
     from app.routers import zoho
     app.include_router(zoho.router)
-    from app.routers import zoho_source
-    app.include_router(zoho_source.router)
-    from app.routers import zoho_invoices
-    app.include_router(zoho_invoices.router)
     from app.routers import zoho_deliveries
     app.include_router(zoho_deliveries.router)
     from app.routers import import_review

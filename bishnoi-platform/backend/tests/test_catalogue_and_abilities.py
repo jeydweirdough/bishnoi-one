@@ -1,5 +1,5 @@
-"""The app catalogue and abilities (feature plan step 6): a company turns apps and features on or off;
-roles are copied from Bishnoi One's job roles and adjusted in plain words, and their permissions follow."""
+"""Abilities (feature plan step 6): roles are copied from Bishnoi One's job roles and adjusted in plain
+words, and their permissions follow. The app catalogue's on/off switches were removed on 2026-11-17."""
 
 from app import abilities as ab
 from tests.test_company_access import getmeds, modules  # noqa: F401 (fixtures)
@@ -52,36 +52,14 @@ def test_the_company_administrator_job_role_has_everything(client, getmeds):
     assert client.put(f"/identity/access/roles/{r['id']}/abilities", json={"abilities": []}, headers=getmeds["owner"]["h"]).status_code == 409
 
 
-def test_the_catalogue_turns_apps_and_features_on_and_off(client, getmeds):
+def test_there_are_no_catalogue_switches_any_more(client, getmeds):
+    """Removed 2026-11-17 (owner decision): every company runs everything it is subscribed to."""
     h = getmeds["owner"]["h"]
-    apps = {a["key"]: a for a in client.get("/identity/company/catalogue", headers=h).json()["apps"]}
-    assert apps["crm"]["on"] and apps["field_sales"]["on"] and not apps["inventory"]["on"]
-    assert not apps["warehouse"]["later"] and not apps["warehouse"]["on"]  # quality checks built (step 14a); runs in Inventory, which this company hasn't got
-    assert not apps["sales"]["later"] and not apps["sales"]["on"]  # built (step 11); runs in Inventory, which this company hasn't got
-    # A feature of an app the company hasn't got, and a feature not built yet, are refused.
-    assert client.put("/identity/company/catalogue/inventory.batches", json={"on": True}, headers=h).status_code == 409
-    assert client.put("/identity/company/catalogue/field_sales.samples", json={"on": True}, headers=h).status_code == 409
-    # Purchasing on: the company gets the Inventory service it runs in.
-    after = {a["key"]: a for a in client.put("/identity/company/catalogue/purchasing", json={"on": True}, headers=h).json()["apps"]}
-    assert after["purchasing"]["on"] and after["inventory"]["on"]
-    # A feature off: everyone's /identity/me says so, and the company pass carries it.
-    client.put("/identity/company/catalogue/crm.lead_inbox", json={"on": False}, headers=h)
+    assert client.get("/identity/company/catalogue", headers=h).status_code == 404
+    assert client.put("/identity/company/catalogue/crm", json={"on": False}, headers=h).status_code == 404
     me = client.get("/identity/me", headers=getmeds["jade"]["h"]).json()
-    assert me["features"]["crm.lead_inbox"] is False and me["features"]["crm.deals"] is True
+    assert "features" not in me and "crm" in {a["key"] for a in me["apps"]}
     slug = getmeds["company"]["slug"]
     pass_claims = claims_of(client.get(f"/public/company-pass?app=crm&company={slug}").json()["pass"], key(client))
-    assert pass_claims["features"]["crm.lead_inbox"] is False and "inventory.batches" not in pass_claims["features"]
-    log = client.get("/identity/company/activity", headers=h).json()["entries"]
-    assert log[0]["action"] == "catalogue.switched_off"
-
-
-def test_a_service_whose_apps_are_all_off_isnt_opened(client, getmeds):
-    h = getmeds["owner"]["h"]
-    for app in ("crm", "field_sales"):
-        client.put(f"/identity/company/catalogue/{app}", json={"on": False}, headers=h)
-    jade = getmeds["jade"]["h"]
-    assert "crm" not in {a["key"] for a in client.get("/identity/me", headers=jade).json()["apps"]}
-    r = client.post("/identity/pass", json=CRM_PASS, headers=jade)
-    assert r.status_code == 403 and "switched" in r.json()["detail"]
-    client.put("/identity/company/catalogue/field_sales", json={"on": True}, headers=h)
-    assert client.post("/identity/pass", json=CRM_PASS, headers=jade).status_code == 200
+    assert "features" not in pass_claims
+    assert client.post("/identity/pass", json=CRM_PASS, headers=getmeds["jade"]["h"]).status_code == 200

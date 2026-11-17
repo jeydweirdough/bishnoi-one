@@ -66,25 +66,31 @@ def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revisi
     command.upgrade(_config(engine),'head')
     with engine.connect() as c:
         for table,rows in before.items():
+            if table=='nbfi_exchange_rates':continue  # dropped by 0036 (2026-11-17)
             after=[dict(row._mapping) for row in c.execute(text(f'SELECT * FROM "{table}"'))]
             assert len(after)==len(rows),table
-            assert [{k:r[k] for k in rows[0]} for r in after]==rows if rows else not after
+            # 0036 (2026-11-17) dropped the foreign-currency bill columns: compare what is still there.
+            kept=set(after[0]) if after else set()
+            assert [{k:r[k] for k in rows[0] if k in kept} for r in after]==[{k:v for k,v in r.items() if k in kept} for r in rows] if rows else not after
         tables=set(inspect(c).get_table_names())
         # Both lines' tables: the feature's (sales orders, Zoho cache, connection, delivery queue, imports)
-        # and main's (business events, bank accounts, exchange rates, year closings, fixed assets, budgets).
+        # and main's (business events, bank accounts, year closings, fixed assets, budgets).
         assert {'nbfi_sales_orders','nbfi_zoho_source_documents','nbfi_zoho_source_runs','nbfi_zoho_connections','nbfi_zoho_runtime',
                 'nbfi_zoho_deliveries','nbfi_zoho_links','nbfi_zoho_delivery_events','nbfi_import_matches','nbfi_import_runs',
                 'nbfi_import_records','nbfi_import_rules','nbfi_events_in','nbfi_events_out','nbfi_bank_accounts',
-                'nbfi_exchange_rates','nbfi_year_closings','nbfi_fixed_assets','nbfi_budgets',
+                'nbfi_year_closings','nbfi_fixed_assets','nbfi_budgets',
                 'nbfi_petty_cash_vouchers','nbfi_petty_cash_lines','nbfi_petty_cash_events','nbfi_recycle_bin',
                 'nbfi_imported_expenses','nbfi_imported_expense_lines','nbfi_import_links'}<=tables
         for table,names in {'nbfi_accounts':{'term','cost_behaviour','report_tag'},
                             'nbfi_invoices':{'cost_centavos','line_costs','division_id','team_id','delivery_id','sales_order_id','attention'},
-                            'nbfi_suppliers':{'tax_defaults_confirmed','import_details'},'nbfi_bills':{'tax_reviewed','currency','rate_e4'},
-                            'nbfi_payment_vouchers':{'rate_e4','exchange_centavos','bank_account_id'},
-                            'nbfi_ledger_settings':{'auto_invoice','locked_until','fx_gain_account_id'},
+                            'nbfi_suppliers':{'tax_defaults_confirmed','import_details'},'nbfi_bills':{'tax_reviewed'},
+                            'nbfi_payment_vouchers':{'bank_account_id'},
+                            'nbfi_ledger_settings':{'auto_invoice','locked_until'},
                             'nbfi_import_matches':{'per_record'}}.items():
             assert names<={x['name'] for x in inspect(c).get_columns(table)},table
+        assert 'nbfi_exchange_rates' not in tables
+        assert not {'currency','rate_e4','foreign_total','foreign_payable'}&{x['name'] for x in inspect(c).get_columns('nbfi_bills')}
+        assert not {'rate_e4','exchange_centavos'}&{x['name'] for x in inspect(c).get_columns('nbfi_payment_vouchers')}
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
-        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0035'
+        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0036'
     engine.dispose()

@@ -6,7 +6,7 @@ import { PrintButton } from "@/src/modules/inventory/components/print-button";
 import { NoAccess } from "@/src/modules/inventory/components/ui";
 import { kindOf } from "@/src/modules/inventory/lib/order-kinds";
 import { context, type Params, type Search } from "@/src/modules/inventory/lib/page";
-import type { Order, Packing, PO, Receipt, SupplierRow, Transfer, Wave, WarehouseRow } from "@/src/modules/inventory/lib/types";
+import type { Order, Packing, PO, Receipt, SupplierRow, Transfer, WarehouseRow } from "@/src/modules/inventory/lib/types";
 
 // Each document on paper, to keep or send as proof: the purchase order to the
 // supplier, the goods receipt for a delivery, the issue slip for an order and
@@ -449,7 +449,7 @@ export async function TransferPrint({ params, searchParams }: { params: Params<{
   );
 }
 
-// --- packages and waves (step 14d) ----------------------------------------------------------
+// --- packages (step 14d) --------------------------------------------------------------------
 
 /** A delivery's box labels, one to a page: box number, which of how many, who it's for, the courier and what's inside. */
 export async function PackageLabels({ params, searchParams }: { params: Params<{ id: string }>; searchParams: Search }) {
@@ -482,42 +482,6 @@ export async function PackageLabels({ params, searchParams }: { params: Params<{
           </ul>
         </section>
       ))}
-    </Frame>
-  );
-}
-
-/** A wave's pick list: each product once, where to take it, and which delivery each part goes to. */
-export async function WavePickList({ params, searchParams }: { params: Params<{ id: string }>; searchParams: Search }) {
-  const [{ id }, s] = await Promise.all([params, searchParams]);
-  const ctx = await context();
-  if (!ctx.may("orders.view")) return <NoAccess what="waves" />;
-  const w = await load<Wave>(`/inventory/waves/${encodeURIComponent(id)}`);
-  return (
-    <Frame back={`/inventory/waves/${w.id}`} backLabel="Back to wave" auto={s.auto === "1"}>
-      <h1 className="text-[16pt] font-bold">Pick list {w.number}</h1>
-      <p className="text-[10pt]">{w.warehouse.name} · {w.orders.length} deliveries ({w.orders.map((o) => o.number).join(", ")}) · {w.units} units</p>
-      <table className="mt-4 w-full border-collapse">
-        <thead>
-          <tr className="border-y border-black text-left text-[9pt]">
-            <th scope="col" className={th}>✓</th>
-            <th scope="col" className={th}>Take from</th>
-            <th scope="col" className={th}>Product</th>
-            <th scope="col" className={`${th} text-right`}>Total</th>
-            <th scope="col" className={th}>For</th>
-          </tr>
-        </thead>
-        <tbody>
-          {w.pickList.map((r) => (
-            <tr key={r.product.id} className="break-inside-avoid border-b border-neutral-300 align-top text-[10pt]">
-              <td className={td}>☐</td>
-              <td className={td}>{r.short > 0 ? "Not enough on hand" : r.from.map((f, i) => <span key={i} className="block font-mono">{f.quantity} · {f.location.code}{f.batch ? ` · ${f.batch.batchNo}` : ""}</span>)}</td>
-              <td className={td}>{r.product.name}<span className="block text-[8.5pt] text-neutral-600">{r.product.sku}</span></td>
-              <td className={`${td} text-right font-semibold tabular-nums`}>{r.total}</td>
-              <td className={td}>{r.orders.map((o) => <span key={o.orderId} className="block">{o.quantity} → {o.number} {o.recipient}</span>)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </Frame>
   );
 }

@@ -33,7 +33,6 @@ export const SETTINGS_PAGES = [
   { href: "/admin/settings/retention-windows", label: "Retention windows", permission: DEPARTMENT },
   { href: "/admin/settings/price-rules", label: "Price rules", permission: "products.view" },
   { href: "/admin/settings/associations", label: "Associations", permission: "admin.settings" },
-  { href: "/admin/settings/emails", label: "Email templates", permission: "admin.settings" },
   { href: "/admin/settings/attention", label: "Attention", permission: DEPARTMENT },
   { href: "/admin/settings/connections", label: "Connections", permission: "admin.settings" },
 ] as const satisfies readonly { href: string; label: string; permission: string | readonly string[] }[];

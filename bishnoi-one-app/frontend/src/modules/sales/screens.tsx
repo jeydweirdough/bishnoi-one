@@ -9,7 +9,7 @@ import type { Reference } from "@/src/modules/inventory/lib/types";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { SalesOrderForm, SalesOrderSteps } from "./components";
-import { DropshipSwitch, SaleDocuments } from "@/src/modules/inventory/components/supply";
+import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import type { SalesOrder, SalesOrderBrief, SalesStatus } from "./types";
 
@@ -152,13 +152,12 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           ) : null}
         </Sheet>
       </div>
-      {/* Dropship (15c), the purchase orders it raised (15b, 15c), and the documents to send with it (15e). */}
-      {(["draft", "pending", "rejected"].includes(o.status) && may("sales.edit")) || o.dropship || (o.purchaseOrders ?? []).length > 0 || docs.length > 0 ? (
+      {/* The purchase orders it raised (15b), and the documents to send with it (15e). */}
+      {(o.purchaseOrders ?? []).length > 0 || docs.length > 0 ? (
         <Sheet className="mb-5 space-y-3 px-5 py-4">
-          {["draft", "pending", "rejected"].includes(o.status) && may("sales.edit") ? <DropshipSwitch orderId={o.id} on={Boolean(o.dropship)} /> : o.dropship && <p className="text-sm text-ink">Dropship: the vendor delivers straight to the customer.</p>}
           {(o.purchaseOrders ?? []).length > 0 && (
             <p className="text-sm">
-              <span className="text-ink-3">{o.dropship ? "Vendor orders: " : "Ordered for it (not enough stock): "}</span>
+              <span className="text-ink-3">Ordered for it (not enough stock): </span>
               {o.purchaseOrders!.map((po, i) => (
                 <span key={po.id}>
                   {i > 0 && ", "}

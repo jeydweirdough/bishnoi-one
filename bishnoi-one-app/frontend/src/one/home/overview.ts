@@ -15,7 +15,6 @@ export type Overview = {
     required: boolean;
     failedThisWeek: number;
     lockedNow: number;
-    offDomain: number;
   };
   apps: { key: string; name: string; people: number }[];
   roles: { id: string; name: string; people: number }[];
@@ -32,7 +31,7 @@ const NONE: Counts = { signedIn: 0, failed: 0, added: 0 };
 export const EMPTY_OVERVIEW: Overview = {
   people: { active: 0, off: 0, inBin: 0, administrators: 0, noRole: 0, noApps: 0 },
   signIns: { today: 0, week: 0, month: 0, never: 0, invitesPending: 0, passwordsToChange: 0 },
-  security: { twoStepAdministrators: { on: 0, of: 0 }, twoStepEveryone: { on: 0, of: 0 }, required: false, failedThisWeek: 0, lockedNow: 0, offDomain: 0 },
+  security: { twoStepAdministrators: { on: 0, of: 0 }, twoStepEveryone: { on: 0, of: 0 }, required: false, failedThisWeek: 0, lockedNow: 0 },
   apps: [],
   roles: [],
   recent: [],

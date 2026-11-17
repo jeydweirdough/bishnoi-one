@@ -28,13 +28,13 @@ def test_reps_see_what_is_current_for_them(client, ana, crew):
     assert client.post("/admin/media", json={"title": "x", "approvedOn": TODAY}, headers=crew["ria"]).status_code == 403
 
 
-def test_a_file_and_its_openings(client, ana, crew):
+def test_a_file_opened_without_being_tracked(client, ana, crew):
     item = add(client, ana)
     r = client.put(f"/admin/media/{item['id']}/file", files={"file": ("deck.pdf", PDF, "application/pdf")}, headers=ana)
     assert r.status_code == 200 and r.json()["kind"] == "file"
     assert client.put(f"/admin/media/{item['id']}/file", files={"file": ("x.exe", b"MZ...", "application/octet-stream")}, headers=ana).status_code == 422
-    acme = company(client, crew["ria"])
-    assert client.post(f"/media/{item['id']}/opened", json={"companyId": acme["id"]}, headers=crew["ria"]).json() == {"url": None, "file": True}
+    assert client.get(f"/media/{item['id']}/link", headers=crew["ria"]).json() == {"url": None, "file": True}
     got = client.get(f"/media/{item['id']}/file", headers=crew["ria"])
     assert got.status_code == 200 and got.content == PDF
-    assert client.get("/media?all=true", headers=ana).json()["items"][0]["opened30d"] == 1
+    # Who opened what isn't kept (dropped 2026-11-17).
+    assert "opened30d" not in client.get("/media?all=true", headers=ana).json()["items"][0]

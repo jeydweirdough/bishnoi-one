@@ -4,7 +4,7 @@ filtered by type and by late or on time."""
 
 from datetime import date, timedelta
 
-from tests.conftest import receive
+from tests.conftest import receive, sold
 
 from app.documents import today  # noqa: E402 (the company's day, not the computer's or UTC's)
 
@@ -36,10 +36,10 @@ def test_a_receipt_names_its_purchase_order_and_whether_it_came_late(ana, world)
 
 def test_an_order_is_overdue_until_issued_and_its_type_can_be_chosen(ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 100}])
-    sale = ana.post("/inventory/orders", {"recipient": "St. Luke's", "warehouseId": world["mnl"], "neededOn": YESTERDAY, "sourceDocument": "Customer PO 7781",
+    sale = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "neededOn": YESTERDAY, "sourceDocument": "Customer PO 7781",
                                           "lines": [{"productId": world["gloves"], "quantity": 5}]})
     order = ana.get(f"/inventory/orders/{sale['id']}")
-    assert order["header"]["operationType"]["kind"] == "delivery" and order["header"]["timing"] == "overdue"
+    assert order["header"]["operationType"]["kind"] == "issue" and order["header"]["timing"] == "overdue"
     assert order["header"]["sourceDocument"] == "Customer PO 7781"
     assert [o["id"] for o in ana.get("/inventory/orders", timing="overdue")] == [sale["id"]]
     ana.post(f"/inventory/orders/{sale['id']}/confirm")
@@ -47,12 +47,12 @@ def test_an_order_is_overdue_until_issued_and_its_type_can_be_chosen(ana, world)
     assert ana.get(f"/inventory/orders/{sale['id']}")["header"]["timing"] == "late"
     # A type of the wrong kind is refused; one the company made is taken.
     count_type = types(ana)["count"]["id"]
-    r = ana.c.post("/inventory/orders", headers=ana.h, json={"recipient": "X", "warehouseId": world["mnl"], "operationTypeId": count_type,
+    r = ana.c.post("/inventory/orders", headers=ana.h, json={"recipient": "X", "kind": "department", "warehouseId": world["mnl"], "operationTypeId": count_type,
                                                              "lines": [{"productId": world["gloves"], "quantity": 1}]})
     assert r.status_code == 422
     rush = ana.post("/inventory/operation-types", {"code": "rush", "name": "Rush deliveries", "kind": "delivery"})
     assert rush["code"] == "RUSH"
-    fast = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "operationTypeId": rush["id"], "scheduledOn": TOMORROW,
+    fast = ana.post("/inventory/orders", {"recipient": "Ward 4", "kind": "department", "warehouseId": world["mnl"], "operationTypeId": rush["id"], "scheduledOn": TOMORROW,
                                           "lines": [{"productId": world["gloves"], "quantity": 1}]})
     header = ana.get(f"/inventory/orders/{fast['id']}")["header"]
     assert header["operationType"]["name"] == "Rush deliveries" and header["timing"] == "due"
@@ -88,7 +88,7 @@ def test_the_customer_signs_for_a_delivery(ana, world):
     png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", 200, 60) + b"\x08\x06\x00\x00\x00" + b"\x00" * 40
     signature = "data:image/png;base64," + base64.b64encode(png).decode()
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 20}])
-    sale = ana.post("/inventory/orders", {"recipient": "St. Luke's", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 5}]})
+    sale = sold(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 5}], "St. Luke's")
     ana.post(f"/inventory/orders/{sale['id']}/confirm")
     early = ana.c.post(f"/inventory/orders/{sale['id']}/received", headers=ana.h, json={"name": "Maria Santos", "signature": signature})
     assert early.status_code == 409  # not issued yet

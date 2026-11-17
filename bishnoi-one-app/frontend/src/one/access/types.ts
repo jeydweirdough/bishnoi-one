@@ -60,7 +60,7 @@ export type AccessPerson = {
 export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };
 
 export type AccessData = {
-  company: { id: string; name: string; emailDomain?: string | null };
+  company: { id: string; name: string };
   modules: AccessModule[];
   roles: AccessRole[];
   people: AccessPerson[];

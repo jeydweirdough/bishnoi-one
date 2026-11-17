@@ -151,34 +151,12 @@ def persist(db, organization, staged, coverage, started):
     db.commit()
 
 
-def saved_orders(db, organization):
-    records = list(db.scalars(select(ZohoSourceDocument).where(ZohoSourceDocument.organization_id==organization)))
-    invoices = {r.source_id:r for r in records if r.kind=='invoice'}
-    by_order = defaultdict(set)
-    for identifier, invoice in invoices.items():
-        for order_id in invoice.data['orderIds']: by_order[order_id].add(identifier)
-    result = []
-    for record in records:
-        if record.kind != 'salesorder': continue
-        data = record.data
-        ids = set(data['invoiceIds']) | by_order[record.source_id]
-        linked = [invoices[i].data for i in sorted(ids) if i in invoices]
-        missing = len(ids-set(invoices))
-        conflicts = [i for i in linked if i['orderIds'] and record.source_id not in i['orderIds']]
-        pending_links = [i for i in linked if i.get('relationshipsFresh') is False]
-        valid = [i for i in linked if i not in conflicts and i not in pending_links]
-        companies = {i['company'] for i in valid}
-        totals = defaultdict(int)
-        for invoice in valid:
-            if invoice['company']=='2mg': totals[invoice['currency']] += invoice['totalCentavos']
-        label = 'Mixed: 2MG and GPI' if {'2mg','gpi'} <= companies else '2MG' if '2mg' in companies else 'GPI' if 'gpi' in companies else 'Not yet attributed'
-        declared_2mg = data.get('declaredCompany')=='2mg'
-        if not companies and declared_2mg:
-            label = '2MG indicated on order · invoices pending'
-        elif not companies and data.get('declaredCompany')=='gpi':
-            label = 'GPI indicated on order · invoices pending'
-        if missing or conflicts or pending_links or 'unknown' in companies: label += ' · attribution incomplete'
-        result.append({**data, 'invoices':linked, 'has2mg':'2mg' in companies or declared_2mg, 'companyLabel':label,
-                       'missingInvoiceDetails':missing, 'relationshipIssues':len(conflicts), 'pendingInvoiceLinks':len(pending_links), 'twoMgInvoiceTotals':[{'currency':c,'centavos':v} for c,v in sorted(totals.items())],
-                       'fetchedAt':record.fetched_at.isoformat()})
-    return sorted(result, key=lambda x:(x['date'], x['number'], x['id']), reverse=True)
+def organization(settings):
+    """The confirmed Zoho organisation's id, read from the saved connection (no Zoho call, no network lock)."""
+    from fastapi import HTTPException
+    from app import zoho_connection as oauth
+
+    record = oauth.saved_record(settings)
+    selected = (record.get('connection') or {}).get('organization')
+    if not selected: raise HTTPException(409, 'Confirm the Zoho organisation on the connection page first.')
+    return selected['id']

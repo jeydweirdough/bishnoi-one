@@ -4,7 +4,7 @@ Purchases by Item, Inventory summary, Committed stock, Batch details.
 """
 
 from datetime import date, timedelta
-from tests.conftest import Api, receive
+from tests.conftest import Api, receive, sold
 
 LATER = (date.today() + timedelta(days=400)).isoformat()
 
@@ -14,7 +14,7 @@ def test_zoho_aggregated_reports(ana, world):
     receive(ana, world["mnl"], [{"productId": world["pcm"], "quantity": 100, "batchNo": "Z1", "expiresOn": LATER}])
 
     # Create and issue an order
-    order = ana.post("/inventory/orders", {"recipient": "Makati Medical Center", "warehouseId": world["mnl"], "lines": [{"productId": world["pcm"], "quantity": 25}]})
+    order = sold(ana, world["mnl"], [{"productId": world["pcm"], "quantity": 25}], "Makati Medical Center")
     ana.post(f"/inventory/orders/{order['id']}/confirm")
     ana.post(f"/inventory/orders/{order['id']}/issue")
 

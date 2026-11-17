@@ -213,16 +213,6 @@ export type Packing = {
   allPacked: boolean;
 };
 
-/** Several held deliveries picked together (step 14d). */
-export type WaveBrief = {
-  id: string; number: string; status: "open" | "done"; warehouse: Ref; notes: string | null; createdBy: Person | null; createdAt: string; doneAt: string | null;
-  orders: { id: string; number: string; recipient: string; status: string; units: number }[]; units: number;
-};
-export type Wave = WaveBrief & {
-  pickList: { product: ProductRef; total: number; short: number; from: { location: { id: string; code: string }; batch: { id: string; batchNo: string; expiresOn: string | null } | null; quantity: number }[];
-              orders: { orderId: string; number: string; recipient: string; quantity: number }[] }[];
-};
-
 /** A cycle count that comes round every so many days (step 14b). */
 export type CountSchedule = {
   id: string; name: string; warehouse: Ref; category: { id: string; name: string } | null; everyDays: number; nextOn: string; lastCountedOn: string | null;
@@ -339,8 +329,8 @@ export type ReceiptBrief = {
   total: number;
 };
 export type POExtras = {
-  /** Raised for a sales order (order-on-demand 15b, dropship 15c), or made by replenishment (15a). */
-  salesOrder?: { id: string; number: string } | null; dropship?: boolean; shipTo?: { name: string | null; address: string | null } | null; replenishment?: boolean;
+  /** Raised for a sales order (order-on-demand 15b), or made by replenishment (15a). */
+  salesOrder?: { id: string; number: string } | null; replenishment?: boolean;
 };
 
 export type Receipt = ReceiptBrief & {
@@ -395,8 +385,6 @@ export type OrderBrief = {
   items: { sku: string; product: string; quantity: number; unitPrice: number }[];
   /** A customer's delivery's shipping (step 12); null for an issue to a department or project. */
   shipping?: Shipping | null;
-  /** The wave it is picked in (step 14d). */
-  waveId?: string | null;
 };
 export type Order = OrderBrief & {
   /** Proof of delivery: who signed for it, and their signature (step 10). */

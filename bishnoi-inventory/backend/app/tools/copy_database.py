@@ -54,8 +54,8 @@ RECORDS = {
     "nbcm_": (
         "companies", "contacts", "deals", "quotes", "quote_links", "activities", "activity_links", "visits", "balances",
         "assistance", "associations", "attention_dismissals", "plan_stops", "route_days", "week_plans", "trail_batches",
-        "inbox_leads", "fund_requests", "material_requests", "media_views", "merged_records", "not_duplicates",
-        "kpi_entries", "mail_accounts", "connections",
+        "fund_requests", "material_requests", "merged_records", "not_duplicates",
+        "kpi_entries", "connections",
     ),
     "nbin_": ("orders", "order_lines"),
     "nbfi_": (

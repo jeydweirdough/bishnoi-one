@@ -131,6 +131,6 @@ def find_people(db: DB, _: CurrentUser, q: str = Query(min_length=2, max_length=
         companies = {c.id: c for c in db.scalars(select(Company).where(Company.id.in_([m.company_id for m in rows])))} if rows else {}
         out.append({**operator_out(a), "memberships": [
             {"id": m.id, "companyId": m.company_id, "company": companies[m.company_id].name, "companySlug": companies[m.company_id].slug,
-             "status": m.status, "isCompanyAdmin": m.is_company_admin, "offDomain": bool(email_rules.off_domain(db, m))}
+             "status": m.status, "isCompanyAdmin": m.is_company_admin}
             for m in rows if m.company_id in companies]})
     return {"people": out}

@@ -292,17 +292,15 @@ POSTING = {
     # The cost of goods sold, with each invoice, from Inventory's costs (2026-10-28).
     "cogs_account_id": ("expense", "Cost of goods sold (booked with each invoice)"),
     "inventory_account_id": ("asset", "Inventory (the stock goods sold come out of)"),
-    # Owner's equity and closing the year (step 16d); exchange differences on foreign bills (16c).
+    # Owner's equity and closing the year (step 16d).
     "capital_account_id": ("equity", "Owner's capital"),
     "drawings_account_id": ("equity", "Owner's drawings"),
     "retained_earnings_account_id": ("equity", "Retained earnings (the year's net income is closed to it)"),
-    "fx_gain_account_id": ("income", "Exchange gains (foreign bills paid for fewer pesos)"),
-    "fx_loss_account_id": ("expense", "Exchange losses (foreign bills paid for more pesos)"),
 }
 
 
 def posting_types(key: str) -> tuple[str, ...]:
-    return ("income", "expense") if key in ("fx_gain_account_id", "fx_loss_account_id") else (POSTING[key][0],)
+    return (POSTING[key][0],)
 
 
 def posting_out(db: DB, can_edit: bool) -> dict:

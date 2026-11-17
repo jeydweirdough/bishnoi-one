@@ -20,7 +20,6 @@ export type Material = {
   isActive: boolean;
   isCurrent: boolean;
   /** For administrators only. */
-  opened30d?: number;
   url?: string | null;
 };
 
@@ -65,7 +64,7 @@ export async function deleteMaterial(id: string): Promise<Result> {
   });
 }
 
-/** Counts an opening (for the customer, when there is one) and answers where it is. */
-export async function openMaterial(id: string, companyId: string | null): Promise<Result<{ url: string | null; file: boolean }>> {
-  return attempt(() => api.post<{ url: string | null; file: boolean }>(`/media/${enc(id)}/opened`, { companyId }));
+/** Where a material is, to open it (nothing is recorded about who opens it). */
+export async function openMaterial(id: string): Promise<Result<{ url: string | null; file: boolean }>> {
+  return attempt(() => api.get<{ url: string | null; file: boolean }>(`/media/${enc(id)}/link`));
 }

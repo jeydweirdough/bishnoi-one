@@ -18,8 +18,6 @@ export type Company = {
   currency: string;
   timezone: string;
   contactEmail: string | null;
-  /** Its people's email domain (decided 2026-10-29). */
-  emailDomain?: string | null;
   notes: string | null;
   createdAt: string;
   suspendedAt: string | null;

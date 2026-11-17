@@ -52,7 +52,6 @@ KINDS: list[Kind] = [
     Kind("adjustments", "Adjustments", P + "adjustments", "number", owns=(P + "adjustment_lines",), search=("number", "reason"), sub="status",
          posted=lambda r: r.get("status") == "approved", **posted_doc),
     Kind("counts", "Counts", P + "counts", "number", owns=(P + "count_lines",), search=("number",), sub="status"),
-    Kind("waves", "Waves", P + "waves", "number", search=("number",), sub="status"),
     Kind("quality-checks", "Quality checks", P + "quality_checks", "number", owns=(P + "quality_check_lines",), search=("number",), sub="status"),
     Kind("consignment-settlements", "Consignment settlements", P + "consignment_settlements", "number", search=("number",)),
     # Set-up lists

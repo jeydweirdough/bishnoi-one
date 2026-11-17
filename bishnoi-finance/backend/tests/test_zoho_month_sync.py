@@ -58,23 +58,6 @@ def test_summary_does_not_claim_old_detail_is_fresh(app):
         assert row.data['balanceCentavos']==2000
 
 
-def test_source_invoice_permissions_separation_and_readonly_org_file(client,ana,ben,app,configured,monkeypatch):
-    from .test_dashboard import person
-    none=person(client,ana,'No source invoice access',[])
-    settings,_=configured;connect(client,ana)
-    with oauth.locked(settings) as record:record['connection']['organization']={'id':'org','name':'Example'}
-    with app.state.sessions() as db:persist(db,'org',staged(),coverage(),datetime.now(timezone.utc))
-    # Page endpoints must not acquire the network/token lock or make Zoho calls.
-    monkeypatch.setattr(oauth,'locked',lambda *args: (_ for _ in ()).throw(AssertionError('Page acquired network lock')))
-    r=client.get('/finance/zoho-invoices?period=all',headers=ana)
-    assert r.status_code==200 and r.json()['total']==2 and r.json()['savedCount']==4
-    assert client.get('/finance/zoho-invoices?period=all&company=all',headers=ana).json()['total']==4
-    assert client.get('/finance/zoho-invoices/a',headers=ana).json()['number']=='GPI-A'
-    assert client.get('/finance/zoho-invoices',headers=none).status_code==403
-    assert client.get('/finance/zoho-invoices',headers=ben).status_code==200  # Existing invoices.view grant.
-    assert client.get('/finance/zoho-sales-orders?period=all',headers=ana).status_code==200
-    assert client.post('/finance/zoho-invoices',headers=ana,json={}).status_code==405
-
 def test_daily_self_cap_stops_before_another_provider_read(app):
     data={('/invoices',1):{'invoices':[summary('a')],'page_context':{'has_more_page':False}},
           ('/salesorders',1):{'salesorders':[],'page_context':{'has_more_page':False}}}

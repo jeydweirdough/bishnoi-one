@@ -414,7 +414,7 @@ def test_zoho_copies_are_counted_apart_and_only_when_connected(app, client, ana,
     # Not connected here: said plainly, no figures.
     assert see(client, who)["cards"]["zoho"] == {"available": False}
     assert see(client, who)["cards"]["due"]["available"] is False
-    monkeypatch.setattr("app.routers.zoho_source.organization", lambda settings: "org-1")
+    monkeypatch.setattr("app.zoho_source.organization", lambda settings: "org-1")
     last_week, tomorrow = (TODAY - timedelta(days=7)).isoformat(), (TODAY + timedelta(days=1)).isoformat()
     with app.state.sessions() as db:
         zoho_invoice(db, "1", "2mg", ON, tomorrow, 100_000)
@@ -433,7 +433,7 @@ def test_zoho_copies_are_counted_apart_and_only_when_connected(app, client, ana,
     assert {x["key"]: x["amountCentavos"] for x in z["buckets"]} == {"current": 150_000, "d1_30": 10_000, "d31_60": 0, "d61_90": 0, "over_90": 0, "no_due": 25_000}
     # Due this week, soonest first, each opening the saved copy. None of it is in the books.
     assert [r["title"] for r in c["due"]["rows"]] == ["INV-2 · Customer 2", "INV-1 · Customer 1"]
-    assert c["due"]["rows"][0]["chip"]["text"] == "Due today" and c["due"]["rows"][1]["href"] == "/finance/invoices/zoho/1"
+    assert c["due"]["rows"][0]["chip"]["text"] == "Due today" and c["due"]["rows"][1]["href"] == "/finance/invoices/receivables"
     assert c["ar"]["wholeCentavos"] == 0
 
 

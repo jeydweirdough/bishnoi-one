@@ -15,8 +15,8 @@ import { deleteMaterial, openMaterial, saveMaterial, switchMaterial, type Materi
 
 type Option = { value: string; label: string };
 
-/** Opens a material: counted (for the customer, when opened from their page), then shown in a new tab. */
-export function OpenButton({ item, companyId }: { item: Material; companyId: string | null }) {
+/** Opens a material in a new tab. */
+export function OpenButton({ item }: { item: Material }) {
   const [pending, start] = useTransition();
   return (
     <Button
@@ -28,7 +28,7 @@ export function OpenButton({ item, companyId }: { item: Material; companyId: str
         // Opened now, while the click still counts as the person's own: browsers block tabs opened later.
         const tab = window.open("about:blank", "_blank");
         start(async () => {
-          const r = await openMaterial(item.id, companyId);
+          const r = await openMaterial(item.id);
           if (!r.ok) {
             tab?.close();
             return void toast.error(r.error);
@@ -169,13 +169,11 @@ function MaterialForm({
 export function Materials({
   items,
   canManage,
-  companyId,
   products,
   teams,
 }: {
   items: Material[];
   canManage: boolean;
-  companyId: string | null;
   products: Option[];
   teams: Option[];
 }) {
@@ -271,14 +269,9 @@ export function Materials({
               {/* The one thing to do with it, and its dates. */}
               <div className="mt-auto pt-4">
                 <div className="flex items-center justify-between gap-3 border-t border-rule pt-3">
-                  <OpenButton item={m} companyId={companyId} />
+                  <OpenButton item={m} />
                   <p className="text-right text-meta text-ink-3">
                     {m.expiresOn ? `Until ${dayjs(m.expiresOn).format("D MMM YYYY")}` : `Approved ${dayjs(m.approvedOn).format("D MMM YYYY")}`}
-                    {canManage && m.opened30d !== undefined && (
-                      <span className="block">
-                        Opened {m.opened30d} {m.opened30d === 1 ? "time" : "times"} in 30 days
-                      </span>
-                    )}
                   </p>
                 </div>
               </div>

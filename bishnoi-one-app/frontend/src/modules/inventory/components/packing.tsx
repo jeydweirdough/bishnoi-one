@@ -6,12 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteWave, makeWave, packDelivery, unpackDelivery, waveStep } from "@/src/modules/inventory/actions/inventory";
+import { packDelivery, unpackDelivery } from "@/src/modules/inventory/actions/inventory";
 import type { Packing } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { CellInput, Field, FormError, Input } from "@/src/platform/ui/field";
 
-// Packages and wave picking (feature plan step 14d): pick → pack → ship.
+// Packages (feature plan step 14d): pick → pack → ship. Wave picking was removed 2026-11-17.
 
 /** A delivery's boxes: pack everything left in one go, or choose what goes in this box; print the labels. */
 export function PackingCard({ orderId, packing, canPack }: { orderId: string; packing: Packing; canPack: boolean }) {
@@ -112,80 +112,6 @@ export function PackingCard({ orderId, packing, canPack }: { orderId: string; pa
           <FormError message={error} />
         </div>
       </Modal>
-    </div>
-  );
-}
-
-/** Pick several held deliveries together. */
-export function NewWave({ orders }: { orders: { id: string; number: string; recipient: string; warehouse: string; units: number }[] }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  const [chosen, setChosen] = useState<string[]>([]);
-  const warehouse = orders.find((o) => o.id === chosen[0])?.warehouse;
-
-  function make() {
-    start(async () => {
-      const r = await makeWave(chosen);
-      if (!r.ok) return void toast.error(r.error);
-      toast.success(`${r.data.number} started`, { description: "Its deliveries are being picked." });
-      router.push(`/inventory/waves/${r.data.id}`);
-    });
-  }
-
-  if (orders.length === 0) return <p className="text-meta text-ink-3">No deliveries waiting to be picked: confirm deliveries first, so their stock is held.</p>;
-  return (
-    <div>
-      <p className="mb-2 text-sm font-medium text-ink">Deliveries waiting to be picked</p>
-      <ul className="divide-y divide-rule text-sm">
-        {orders.map((o) => {
-          const other = warehouse !== undefined && o.warehouse !== warehouse;
-          return (
-            <li key={o.id} className="py-1.5">
-              <label className={`flex items-center gap-3 ${other ? "opacity-50" : ""}`}>
-                <input suppressHydrationWarning type="checkbox" disabled={other} checked={chosen.includes(o.id)} onChange={(e) => setChosen(e.target.checked ? [...chosen, o.id] : chosen.filter((x) => x !== o.id))} className="size-4" />
-                <span className="font-mono font-semibold">{o.number}</span>
-                <span className="min-w-0 flex-1 truncate">{o.recipient}</span>
-                <span className="text-meta text-ink-3">{o.warehouse} · {o.units} units</span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-      <Button className="mt-3" variant="primary" loading={busy} disabled={chosen.length === 0} onClick={make}>
-        Pick {chosen.length || ""} together
-      </Button>
-    </div>
-  );
-}
-
-/** A wave's steps: done, take a delivery out, or let the wave go. */
-export function WaveSteps({ waveId, open, orders }: { waveId: string; open: boolean; orders: { id: string; number: string }[] }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  function run(task: () => Promise<{ ok: boolean; error?: string }>, done: string, go?: string) {
-    start(async () => {
-      const r = await task();
-      if (!r.ok) return void toast.error(r.error ?? "That didn't work.");
-      toast.success(done);
-      if (go) router.push(go);
-      else router.refresh();
-    });
-  }
-  if (!open) return null;
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={busy} onClick={() => run(() => waveStep(waveId, "done"), "Wave picked: issue its deliveries")}>
-        Picked
-      </Button>
-      {orders.length > 1 &&
-        orders.map((o) => (
-          <Button key={o.id} size="sm" variant="quiet" disabled={busy} onClick={() => run(() => waveStep(waveId, "remove", o.id), `${o.number} taken out`)}>
-            Take out {o.number}
-          </Button>
-        ))}
-      <Button variant="quiet" disabled={busy} onClick={() => run(() => deleteWave(waveId), "Wave let go", "/inventory/waves")}>
-        Let go of the wave
-      </Button>
     </div>
   );
 }

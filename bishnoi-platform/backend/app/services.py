@@ -1,5 +1,5 @@
-"""Outside services a company's applications connect to (Zoho Books, the email
-providers), and what each one needs. Kept here, per company, so no application
+"""Outside services a company's applications connect to (Zoho Books, email
+sending), and what each one needs. Kept here, per company, so no application
 keeps a key of its own for them: a Platform Admin fills them in on the
 company's Connections tab, and each application asks for its company's
 (GET /connect/services, with its connect key).
@@ -56,10 +56,6 @@ ZOHO_CENTRES = (
     ("com.cn", "China (zoho.com.cn)"),
 )
 
-# The email providers: the company registers the CRM with each once (here); each
-# person then connects their own mailbox in the CRM (Account → Mailbox).
-REDIRECT_HINT = "When registering the CRM with them, give this as the redirect address: the CRM's address followed by /account/mailbox/callback."
-
 SERVICES: tuple[Service, ...] = (
     Service(
         key="zoho_books",
@@ -85,99 +81,6 @@ SERVICES: tuple[Service, ...] = (
                 secret=True,
                 required=False,
             ),
-        ),
-    ),
-    Service(
-        key="gmail",
-        name="Gmail (Google Workspace)",
-        purpose="Each person sends from their own Gmail address in the CRM, and every email sent is kept on the customer.",
-        help_url="https://developers.google.com/workspace/guides/create-credentials#oauth-client-id",
-        apps=("crm",),
-        details=(
-            Detail("client_id", "Client ID", "Google Cloud console → APIs and services → Credentials → OAuth client (web application). Turn on the Gmail API. " + REDIRECT_HINT),
-            Detail("client_secret", "Client secret", "Shown beside the Client ID.", secret=True),
-        ),
-    ),
-    Service(
-        key="outlook",
-        name="Outlook (Microsoft 365)",
-        purpose="Each person sends from their own Outlook address in the CRM, and every email sent is kept on the customer.",
-        help_url="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
-        apps=("crm",),
-        details=(
-            Detail("tenant_id", "Directory (tenant) ID", "Microsoft Entra admin centre → App registrations → the CRM's app → Overview."),
-            Detail("client_id", "Application (client) ID", "On the same page. Give it the Mail.Send and User.Read permissions. " + REDIRECT_HINT),
-            Detail("client_secret", "Client secret", "Certificates and secrets → New client secret: copy its value.", secret=True),
-        ),
-    ),
-    Service(
-        key="zoho_mail",
-        name="Zoho Mail",
-        purpose="Each person sends from their own Zoho Mail address in the CRM, and every email sent is kept on the customer.",
-        help_url="https://www.zoho.com/mail/help/api/using-oauth-2.html",
-        apps=("crm",),
-        details=(
-            Detail("data_centre", "Data centre", "Where your Zoho account is: the end of the address you sign in at.", options=ZOHO_CENTRES),
-            Detail("client_id", "Client ID", "api-console.zoho.com → Add client → Server-based application. " + REDIRECT_HINT),
-            Detail("client_secret", "Client secret", "Shown beside the Client ID.", secret=True),
-        ),
-    ),
-    # The CRM's lead inbox: each channel calls the CRM's address for it,
-    # <CRM API address>/hooks/<channel>?company=<this company's short name>
-    # (the CRM's Lead inbox page shows each one, ready to copy).
-    Service(
-        key="facebook",
-        name="Facebook (lead forms and Messenger)",
-        purpose="Answers to the page's lead forms, and Messenger messages to the page, arrive in the CRM's lead inbox.",
-        help_url="https://developers.facebook.com/docs/graph-api/webhooks/getting-started",
-        apps=("crm",),
-        details=(
-            Detail("page_id", "Page ID", "The Facebook page's ID: the page → About → Page transparency, or Meta Business Suite → Settings."),
-            Detail("app_secret", "App secret", "developers.facebook.com → your app → App settings → Basic. Facebook signs each call with it.", secret=True),
-            Detail("verify_token", "Verify token", "Any long random text. Type the same in the app's Webhooks settings (product Page, fields leadgen and messages), with the CRM's address /hooks/facebook.", secret=True),
-            Detail("page_access_token", "Page access token", "A long-lived page token with leads_retrieval, pages_messaging and pages_manage_metadata, so the CRM can read each form's answers.", secret=True),
-        ),
-    ),
-    Service(
-        key="whatsapp",
-        name="WhatsApp Business",
-        purpose="Messages to the company's WhatsApp number arrive in the CRM's lead inbox.",
-        help_url="https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks",
-        apps=("crm",),
-        details=(
-            Detail("phone_number_id", "Phone number ID", "developers.facebook.com → your app → WhatsApp → API setup: the ID under the number."),
-            Detail("app_secret", "App secret", "App settings → Basic. Meta signs each call with it.", secret=True),
-            Detail("verify_token", "Verify token", "Any long random text. Type the same in WhatsApp → Configuration → Webhook, with the CRM's address /hooks/whatsapp, and subscribe to messages.", secret=True),
-        ),
-    ),
-    Service(
-        key="viber",
-        name="Viber",
-        purpose="Messages to the company's Viber bot arrive in the CRM's lead inbox.",
-        help_url="https://developers.viber.com/docs/api/rest-bot-api/",
-        apps=("crm",),
-        details=(
-            Detail("auth_token", "Authentication token", "partners.viber.com → your bot account → Info. Then set the webhook to the CRM's address /hooks/viber.", secret=True),
-        ),
-    ),
-    Service(
-        key="tawkto",
-        name="Tawk.to",
-        purpose="Chats and tickets from the website's Tawk.to box arrive in the CRM's lead inbox.",
-        help_url="https://help.tawk.to/article/using-webhooks",
-        apps=("crm",),
-        details=(
-            Detail("webhook_secret", "Webhook secret", "Tawk.to → Administration → Settings → Webhooks → Create: the CRM's address /hooks/tawkto, events Chat start and New ticket. Copy its secret key here.", secret=True),
-        ),
-    ),
-    Service(
-        key="web_forms",
-        name="Website forms, Make and Zapier",
-        purpose="Enquiries sent by the website's own forms, or by Make or Zapier, arrive in the CRM's lead inbox.",
-        help_url="https://www.make.com/en/help/tools/http",
-        apps=("crm",),
-        details=(
-            Detail("form_key", "Form key", "Any long random text. The website or tool sends it in the X-Bishnoi-Key header with each enquiry (name, business, phone, email, city, message) to the CRM's address /hooks/form.", secret=True),
         ),
     ),
     # The CRM's own emails (quotes waiting for approval, price approvals): sent

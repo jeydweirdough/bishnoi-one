@@ -149,7 +149,7 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
 COMPANY_LIFETIME = 30 * 24 * 3600  # seconds
 
 
-def company_pass(settings: Settings, company: Company | None, app: Application, granted: bool, gone: dict | None = None, features: dict | None = None) -> str:
+def company_pass(settings: Settings, company: Company | None, app: Application, granted: bool, gone: dict | None = None) -> str:
     """Signed: this company, its status, and whether it may use this application.
     The application checks it with the platform's public key, as a sign-in pass.
     `gone` ({"id", "slug", "name"}): the company has been deleted."""
@@ -167,8 +167,6 @@ def company_pass(settings: Settings, company: Company | None, app: Application, 
         "kind": "company",
         **who,
         "granted": granted and not gone,
-        # Its catalogue apps and features, on or off (step 6): the application hides what's off.
-        **({"features": features} if features is not None else {}),
         "iat": now,
         "exp": now + COMPANY_LIFETIME,
         "jti": secrets.token_urlsafe(12),

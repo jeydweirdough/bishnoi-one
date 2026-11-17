@@ -1,4 +1,4 @@
-"""Outside services the CRM uses (Zoho Books, the email providers), and the key
+"""Outside services the CRM uses (Zoho Books, email sending), and the key
 it keeps its own secrets with.
 
 The services are connected on Bishnoi One Platform, per company (Companies →
@@ -8,7 +8,7 @@ key (PLATFORM_APP_KEY), and is given each service that's switched on and filled
 in, with its details. The answer is kept for as long as the platform says (5
 minutes); while it can't be reached, the last answer stands for up to a day.
 
-The CRM's own secrets (each person's mailbox sign-in, its order links) are
+The CRM's own secrets (its order links) are
 encrypted with the key the platform gives it with its links (dataKey,
 app/platform_links.py): the same key through new connect keys. On this
 computer, with no platform connected, a key of its own is kept in .data/.
@@ -41,20 +41,10 @@ class Service:
 
 SERVICES: tuple[Service, ...] = (
     Service("zoho_books", "Zoho Books", "Invoices under each customer's name, for the monthly rebate, and registering the rebate back in Zoho."),
-    Service("gmail", "Gmail (Google Workspace)", "Each person sends from their own Gmail address, and every email sent is kept on the customer."),
-    Service("outlook", "Outlook (Microsoft 365)", "Each person sends from their own Outlook address, and every email sent is kept on the customer."),
-    Service("zoho_mail", "Zoho Mail", "Each person sends from their own Zoho Mail address, and every email sent is kept on the customer."),
     # The CRM's own emails (app/mail.py), unless SMTP_* is set on this server.
     Service("smtp", "Email sending (Brevo or any SMTP service)", "The CRM's own emails: quotes waiting for approval, price approvals and other notices."),
-    # The lead inbox's channels (app/routers/inbox.py): each calls the CRM's /hooks/<channel>.
-    Service("facebook", "Facebook (lead forms and Messenger)", "Answers to the page's lead forms, and Messenger messages to the page, arrive in the lead inbox."),
-    Service("whatsapp", "WhatsApp Business", "Messages to the company's WhatsApp number arrive in the lead inbox."),
-    Service("viber", "Viber", "Messages to the company's Viber bot arrive in the lead inbox."),
-    Service("tawkto", "Tawk.to", "Chats and tickets from the website's Tawk.to box arrive in the lead inbox."),
-    Service("web_forms", "Website forms, Make and Zapier", "Enquiries sent by the website's own forms, or by Make or Zapier, arrive in the lead inbox."),
 )
 BY_KEY = {s.key: s for s in SERVICES}
-MAIL_PROVIDERS = ("gmail", "outlook", "zoho_mail")
 
 
 # --- the company's services, from the platform ---

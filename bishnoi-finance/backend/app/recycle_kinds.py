@@ -102,5 +102,4 @@ KINDS: list[Kind] = [
     Kind("fixed-assets", "Fixed assets", P + "fixed_assets", "name", group="Set-up", search=("name",), sub="status"),
     Kind("budgets", "Budget lines", P + "budgets", lambda r: f"Budget {r.get('year_end')} {r.get('division_name') or ''}".strip(), group="Set-up"),
     Kind("tax-rates", "Tax rates", P + "tax_rates", lambda r: f"{r.get('code')} from {r.get('valid_from')}", group="Set-up", search=("code",)),
-    Kind("exchange-rates", "Exchange rates", P + "exchange_rates", lambda r: f"{r.get('currency')} on {r.get('on')}", group="Set-up", search=("currency",)),
 ]

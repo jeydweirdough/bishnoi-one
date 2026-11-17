@@ -23,7 +23,6 @@ import { ActivityList } from "@/src/modules/crm/components/crm/activity-list";
 import { DeleteRecord, EditRecord } from "@/src/modules/crm/components/crm/list-controls";
 import { LogActivityButton } from "@/src/modules/crm/components/crm/log-activity-button";
 import { NewCallButton } from "@/src/modules/crm/components/crm/new-call";
-import { EmailButton } from "@/src/modules/crm/components/mailbox/email-button";
 import { Icon } from "@/src/platform/ui/icons";
 import type { CrmKind } from "@/src/platform/lib/types";
 import { RecordTabs } from "@/src/modules/crm/components/crm/record-tabs";
@@ -93,7 +92,6 @@ export async function generateMetadata({ params }: { params: Params }) {
 }
 
 // The customer page's quick actions, under the name.
-// Email is its own (sent from the person's mailbox), second in the row.
 const QUICK: { kind: CrmKind; label: string; icon: "note" | "email" | "call" | "task" | "visit" }[] = [
   { kind: "note", label: "Note", icon: "note" },
   { kind: "call", label: "Call", icon: "call" },
@@ -304,10 +302,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
         {mayLog && (
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rule pt-4">
             <span className="mr-1 text-meta text-ink-3">Log</span>
-            {QUICK.map((q, n) => [
-              n === 1 && <EmailButton key="email" companyId={company.id} companyName={company.name} />,
-              <LogActivityButton key={q.kind} kind={q.kind} label={q.label} quick={<Icon name={q.icon} className="size-4" />} {...logProps} />,
-            ])}
+            {QUICK.map((q) => (
+              <LogActivityButton key={q.kind} kind={q.kind} label={q.label} quick={<Icon name={q.icon} className="size-4" />} {...logProps} />
+            ))}
             <span className="mx-1 h-5 w-px bg-rule" aria-hidden />
             <NewCallButton variant="default" customer={{ id: company.id, name: company.name }} />
             <LinkButton href={`/crm/media?for=${company.id}`} variant="quiet">

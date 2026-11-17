@@ -43,6 +43,7 @@ class OrderLineIn(Api):
 
 
 class OrderIn(documents.HeaderIn):
+    # "sale" stays the default so a sale delivery's draft can be saved as it is; a new one is refused (create_order).
     kind: str = "sale"
     recipient: str = Field(min_length=1, max_length=160)
     warehouse_id: str = Field(max_length=36)
@@ -87,8 +88,6 @@ def order_brief(o: Order) -> dict:
         "createdAt": iso(o.created_at),
         "confirmedAt": iso(o.confirmed_at),
         "issuedAt": iso(o.issued_at),
-        # The wave it's picked in (step 14d).
-        "waveId": o.wave_id,
         # How it goes and where it is (step 12): courier, tracking, fee; out for delivery, delivered or failed.
         "shipping": shipping.shipping_out(o) if o.kind == "sale" else None,
     }
@@ -228,11 +227,17 @@ def reservations(_: View, db: DB, warehouse: str | None = Query(None, max_length
     return {"items": out, "total": total(db, query)} if limit is not None else out
 
 
+SALE_FROM_SALES_ORDER = "A sale to a customer starts as a sales order in the CRM; its delivery is made when the order is approved."
+
+
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
 def create_order(_: allowed("orders.create"), me: CurrentUser, db: DB, body: OrderIn) -> dict:
+    # A sale delivery (DR-…) is made only by approving a sales order (app/sales.py approve, 2026-11-17): every
+    # sale is approved first. Typed here: internal use, department, project and distribution issues (IS-…).
+    if body.kind == "sale":
+        raise field_error("kind", SALE_FROM_SALES_ORDER)
     check_order(db, body)
-    # A delivery (step 11: sales orders are the Sales app's own, SO-…): DR-…; an issue: IS-….
-    o = Order(number=next_number(db, "DR" if body.kind == "sale" else "IS"), kind=body.kind, recipient=body.recipient, warehouse_id=body.warehouse_id, needed_on=body.needed_on, notes=body.notes, created_by_id=me.id)
+    o = Order(number=next_number(db, "IS"), kind=body.kind, recipient=body.recipient, warehouse_id=body.warehouse_id, needed_on=body.needed_on, notes=body.notes, created_by_id=me.id)
     set_lines(db, o, body)
     # Its header (step 8): scheduled for the day it's needed, unless another is given.
     o.scheduled_on = body.needed_on
@@ -254,6 +259,9 @@ def update_order(_: allowed("orders.edit"), me: CurrentUser, db: DB, order_id: s
     o = found(db, Order, order_id, "order")
     if o.status != "draft":
         raise conflict("Only a draft can be changed. Cancel it and write it again, or issue it as it is.")
+    # A sale delivery stays one (it belongs to its sales order), and nothing else becomes one.
+    if body.kind != o.kind and "sale" in (body.kind, o.kind):
+        raise field_error("kind", SALE_FROM_SALES_ORDER if body.kind == "sale" else "A sale delivery stays a sale delivery: cancel its sales order instead.")
     check_order(db, body)
     o.kind, o.recipient, o.warehouse_id, o.needed_on, o.notes = body.kind, body.recipient, body.warehouse_id, body.needed_on, body.notes
     set_lines(db, o, body)

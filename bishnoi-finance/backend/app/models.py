@@ -442,12 +442,10 @@ class LedgerSettings(Base):
     inventory_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     # A delivery's invoice (step 13, migration 0027): "issue" at once from the series, or "draft" for Finance to issue.
     auto_invoice: Mapped[str] = mapped_column(String(8), default="issue", server_default="issue")
-    # Owner's equity and closing the year (step 16d); exchange differences (16c); the books locked up to a day (16e).
+    # Owner's equity and closing the year (step 16d); the books locked up to a day (16e).
     capital_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
     drawings_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
     retained_earnings_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
-    fx_gain_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
-    fx_loss_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
     locked_until: Mapped[date | None] = mapped_column(Date, default=None)
 
 
@@ -470,20 +468,6 @@ class BankAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     account: Mapped["Account"] = relationship(lazy="joined")
-
-
-class ExchangeRate(Base):
-    """Pesos per unit of a currency on a day (rate_e4 = rate x 10,000), as Finance records it (step 16c)."""
-
-    __tablename__ = "nbfi_exchange_rates"
-    __table_args__ = (UniqueConstraint("currency", "on", name="exchange_rate_day"),)
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    currency: Mapped[str] = mapped_column(String(3))
-    on: Mapped[date] = mapped_column(Date)
-    rate_e4: Mapped[int] = mapped_column(Integer)
-    created_by: Mapped[str] = mapped_column(String(120))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class YearClosing(Base):
@@ -1056,12 +1040,6 @@ class Bill(Base):
     checked_po: Mapped[bool] = mapped_column(default=False)
     checked_dr: Mapped[bool] = mapped_column(default=False)
     amounts_include_vat: Mapped[bool] = mapped_column(default=True)
-    # In a foreign currency (step 16c): its lines are in it; booked in pesos at the rate on the bill's day
-    # (rate_e4 = pesos per unit x 10,000); what's owed in that currency is kept beside the peso amounts.
-    currency: Mapped[str] = mapped_column(String(3), default="PHP", server_default="PHP")
-    rate_e4: Mapped[int | None] = mapped_column(Integer, default=None)
-    foreign_total: Mapped[int | None] = mapped_column(Integer, default=None)
-    foreign_payable: Mapped[int | None] = mapped_column(Integer, default=None)
     # The same bill in the other systems while they run side by side (Aubrey Q9, Q13).
     zoho_ref: Mapped[str | None] = mapped_column(String(60), default=None)
     oojeema_ref: Mapped[str | None] = mapped_column(String(60), default=None)
@@ -1178,10 +1156,7 @@ class PaymentVoucher(Base):
     # Set at release: when it was paid, and the bank's reference or the check's number and date.
     paid_on: Mapped[date | None] = mapped_column(Date, default=None)
     bank_reference: Mapped[str | None] = mapped_column(String(80), default=None)
-    # Paying a foreign-currency bill (step 16c): the rate on the day paid, and the exchange gain (+) or loss (-) it made;
-    # the company bank account it went out of (16a).
-    rate_e4: Mapped[int | None] = mapped_column(Integer, default=None)
-    exchange_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
+    # The company bank account it went out of (step 16a).
     bank_account_id: Mapped[str | None] = mapped_column(String(36), default=None)
     check_number: Mapped[str | None] = mapped_column(String(40), default=None)
     check_date: Mapped[date | None] = mapped_column(Date, default=None)

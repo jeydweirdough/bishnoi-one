@@ -1,10 +1,10 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 import pytest
 from sqlalchemy import select,func
 from app import zoho_connection as oauth
 from app.models import ZohoSourceDocument,SalesOrder,Invoice,JournalEntry,ZohoSourceRun
-from app.zoho_source import normalize,persist,saved_orders,capture,money
+from app.zoho_source import normalize,persist,capture,money
 from .test_tax_api import app,client,ana,ben  # noqa: F401
 from .test_zoho_connection import configured,connect  # noqa: F401
 
@@ -47,35 +47,19 @@ def test_company_from_field_not_prefix_and_money_precision():
     assert normalize('invoice',bad)['company']=='unknown'  # no unapproved substring aliases
 
 
-def test_source_upsert_filters_org_isolation_no_financial_writes(client,ana,ben,app,configured):
-    s,_=configured;connect(client,ana)
-    with oauth.locked(s) as record:record['connection']['organization']={'id':'org-one','name':'Example','currency':'PHP'}
+def test_source_upsert_filters_org_isolation_no_financial_writes(app):
+    # The saved Zoho copies feed import review and the overview; the read-only Zoho lists were removed (2026-11-17).
     with app.state.sessions() as db:
         for _ in range(2):persist(db,'org-one',staged(),coverage(),datetime.now(timezone.utc))
         persist(db,'other-org',{('salesorder','foreign'):normalize('salesorder',order('foreign',[]))},coverage(),datetime.now(timezone.utc))
         assert db.scalar(select(func.count()).select_from(ZohoSourceDocument).where(ZohoSourceDocument.organization_id=='org-one'))==7
-        assert len(saved_orders(db,'org-one'))==3
+        assert db.scalar(select(func.count()).select_from(ZohoSourceDocument).where(ZohoSourceDocument.organization_id=='other-org'))==1
         for model in (SalesOrder,Invoice,JournalEntry):assert db.scalar(select(func.count()).select_from(model))==0
-    base='/finance/zoho-sales-orders'
-    assert client.get(base,headers=ben).status_code==403
-    two=client.get(base+'?period=all',headers=ana).json();assert two['total']==2 and two['savedCount']==3
-    mixed=next(r for r in two['items'] if r['id']=='one');assert mixed['companyLabel']=='Mixed: 2MG and GPI'
-    assert mixed['twoMgInvoiceTotals']==[{'currency':'PHP','centavos':112000}]
-    assert len(mixed['invoices'])==2
-    assert client.get(base+'?company=all&period=all',headers=ana).json()['total']==3
-    assert client.get(base+'?company=all&period=all&q=INV-C',headers=ana).json()['total']==1
-    assert client.get(base+'/foreign',headers=ana).status_code==404
-    assert client.get(base+'/one',headers=ben).status_code==403
-    assert client.put(base+'/one',headers=ana,json={}).status_code==405
 
 
-def test_unread_and_conflicting_links_not_counted_as_two_mg(app):
-    docs=staged();docs['salesorder','three']['invoiceIds']+=['missing','a']
-    with app.state.sessions() as db:
-        persist(db,'org',docs,coverage(),datetime.now(timezone.utc))
-        row=next(r for r in saved_orders(db,'org') if r['id']=='three')
-        assert row['missingInvoiceDetails']==1 and row['relationshipIssues']==1
-        assert not row['has2mg'] and row['twoMgInvoiceTotals']==[]
+def test_the_read_only_zoho_lists_are_gone(client,ana):
+    for path in ('/finance/zoho-sales-orders','/finance/zoho-sales-orders/one','/finance/zoho-invoices','/finance/zoho-invoices/a'):
+        assert client.get(path,headers=ana).status_code==404
 
 
 def test_capture_bounded_complete_documents_and_field_allowlist():

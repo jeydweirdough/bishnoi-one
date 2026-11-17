@@ -91,8 +91,8 @@ def test_restoration_cannot_edit_source_ids_or_write_source_routes(client,ana,ap
   db.add(ZohoSourceDocument(organization_id='test-org',kind='salesorder',source_id='source-only-id',data={'id':'source-only-id','number':'SO-SOURCE'}))
   db.commit()
  assert client.put('/finance/sales-orders/source-only-id',headers=ana,json=BODY).status_code==404
- assert client.put('/finance/zoho-sales-orders/source-only-id',headers=ana,json=BODY).status_code==405
- assert client.post('/finance/zoho-sales-orders',headers=ana,json=BODY).status_code==405
+ assert client.put('/finance/zoho-sales-orders/source-only-id',headers=ana,json=BODY).status_code==404
+ assert client.post('/finance/zoho-sales-orders',headers=ana,json=BODY).status_code==404
  with app.state.sessions() as db:
   assert db.get(ZohoSourceDocument,('test-org','salesorder','source-only-id')).data=={'id':'source-only-id','number':'SO-SOURCE'}
   for model in (SalesOrder,Invoice,JournalEntry):assert db.scalar(select(func.count()).select_from(model))==0

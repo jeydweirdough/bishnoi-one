@@ -5,56 +5,12 @@ import { FileText, Trash2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteProductDocument, dropshipDelivered, saveProductDocument, sendSaleDocuments, setDropship, settleConsignment, uploadProductDocument } from "@/src/modules/inventory/actions/inventory";
+import { deleteProductDocument, saveProductDocument, sendSaleDocuments, settleConsignment, uploadProductDocument } from "@/src/modules/inventory/actions/inventory";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
 
-// Order-on-demand, dropshipping and documents with products (feature plan steps 15b, 15c, 15e).
-
-/** Before approval: whether the vendor ships this order straight to the customer. */
-export function DropshipSwitch({ orderId, on }: { orderId: string; on: boolean }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  return (
-    <Checkbox
-      checked={on}
-      disabled={busy}
-      onChange={(e) =>
-        start(async () => {
-          const r = await setDropship(orderId, e.target.checked);
-          if (!r.ok) return void toast.error(r.error);
-          toast.success(e.target.checked ? "The vendor ships it straight to the customer" : "It ships from our warehouse");
-          router.refresh();
-        })
-      }
-    >
-      Dropship: the vendor delivers straight to the customer
-    </Checkbox>
-  );
-}
-
-/** A placed dropship purchase order: the vendor says it was delivered to our customer. */
-export function DropshipDelivered({ poId }: { poId: string }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  return (
-    <Button
-      variant="primary"
-      loading={busy}
-      onClick={() =>
-        start(async () => {
-          const r = await dropshipDelivered(poId);
-          if (!r.ok) return void toast.error(r.error);
-          toast.success("Delivered to the customer", { description: "No stock came through us; Finance invoices the sale." });
-          router.refresh();
-        })
-      }
-    >
-      Vendor delivered it
-    </Button>
-  );
-}
+// Documents with products and consignment (feature plan steps 15d, 15e). Dropshipping (15c) was removed 2026-11-17.
 
 const size = (n: number) => (n > 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`);
 

@@ -20,19 +20,19 @@ const CURRENCIES = [
   { value: "EUR", label: "EUR · Euro" },
 ];
 
-/** The company's name, contact email, email domain, time zone, currency and number format: saved together. */
+/** The company's name, contact email, time zone, currency and number format: saved together. */
 export function ProfileForm({ company }: { company: CompanyProfile }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", emailDomain: company.emailDomain ?? "", timezone: company.timezone, currency: company.currency, locale: company.locale ?? "en-PH" });
+  const [form, setForm] = useState({ name: company.name, contactEmail: company.contactEmail ?? "", timezone: company.timezone, currency: company.currency, locale: company.locale ?? "en-PH" });
   const dirty =
-    form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") || form.emailDomain !== (company.emailDomain ?? "") ||
+    form.name !== company.name || form.contactEmail !== (company.contactEmail ?? "") ||
     form.timezone !== company.timezone || form.currency !== company.currency || form.locale !== (company.locale ?? "en-PH");
 
   function save() {
     start(async () => {
-      const r = await changeCompany({ ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim() || null, emailDomain: form.emailDomain.trim() });
+      const r = await changeCompany({ ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim() || null });
       if (!r.ok) {
         setErrors("fields" in r && r.fields ? r.fields : {});
         return void toast.error(r.error);
@@ -51,9 +51,6 @@ export function ProfileForm({ company }: { company: CompanyProfile }) {
       </Field>
       <Field label="Contact email" size="md" optional error={errors.contactEmail} hint="Where Bishnoi One writes to the company.">
         {(p) => <Input {...p} type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} maxLength={254} />}
-      </Field>
-      <Field label="Email domain" size="md" optional error={errors.emailDomain} hint="Your employees are added and sign in with emails at it, such as getmeds.ph. Public ones (gmail.com) can't be used.">
-        {(p) => <Input {...p} prefix="@" value={form.emailDomain} onChange={(e) => setForm({ ...form, emailDomain: e.target.value })} maxLength={253} placeholder="getmeds.ph" />}
       </Field>
       <Field label="Time zone" size="md" error={errors.timezone}>
         {(p) => (

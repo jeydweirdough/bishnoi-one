@@ -12,7 +12,7 @@ The plan is a JSON file made from the HR employee list and the org chart, kept o
 Nobody gets an app or a role: give them on Employees after. --password gives a first password to the employees this
 adds, and to any already there with none (never to anyone who has one), which they must change at their first sign-in.
 --rename-role "Manager=Mentor" renames a role (repeatable), and the apps are told.
-An email the company can't use (another domain, an operator's, another company's person's) is
+An email the company can't use (an operator's, another company's person's) is
 reported and left out. Nothing is saved without --apply.
 
     uv run python -m app.tools.seed_employees --plan employees-plan.json [--apply] [--replace] [--password X] [--rename-role OLD=NEW]
@@ -94,7 +94,6 @@ def seed(db, company: Company, plan: dict, replace: bool = False) -> tuple[Count
         person = members.get(email)
         if person is None:
             try:
-                email_rules.check_company_email(company, email)
                 email_rules.check_available(db, email, company.id)
             except HTTPException as error:
                 problems.append(f"{name} <{email}>: {why(error)}")

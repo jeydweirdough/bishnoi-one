@@ -59,7 +59,6 @@ def out(db: DB, o: SalesOrder) -> dict:
         "decidedBy": person(o.decided_by), "decidedAt": iso(o.decided_at), "decisionNote": o.decision_note, "deliveredAt": iso(o.delivered_at),
         "lines": [{"id": line.id, "product": product_ref(line.product), "quantity": line.quantity, "freeQuantity": line.free_quantity,
                    "unitPrice": line.unit_price, "discount": line.discount, "total": line.total, "delivered": line.delivered} for line in o.lines],
-        "dropship": o.dropship,
         "purchaseOrders": purchase_orders_of(db, o),
         "deliveries": [{"id": d.id, "number": d.number, "status": d.status, "issuedAt": iso(d.issued_at), "shipping": shipping.shipping_out(d)} for d in deliveries],
         # Invoiced from its delivery, and paid (step 13).
@@ -163,33 +162,16 @@ def approve_order(_: allowed("sales.approve"), me: CurrentUser, db: DB, order_id
     if not o.lines:
         raise conflict("This order has no lines to deliver.")
     delivery = sales.approve(db, o, me, company_of(request))
-    audit(db, me, "sales_order.approved", target=o.number, target_type="sales_order", target_id=o.id, fields=[delivery.number] if delivery else ["dropship"])
+    audit(db, me, "sales_order.approved", target=o.number, target_type="sales_order", target_id=o.id, fields=[delivery.number])
     db.commit()
-    return {"id": o.id, "status": o.status, "delivery": {"id": delivery.id, "number": delivery.number} if delivery else None,
+    return {"id": o.id, "status": o.status, "delivery": {"id": delivery.id, "number": delivery.number},
             "purchaseOrders": purchase_orders_of(db, o)}
 
 
 def purchase_orders_of(db: DB, o: SalesOrder) -> list[dict]:
-    """The purchase orders it raised: order-on-demand (15b) or dropship (15c)."""
-    return [{"id": po.id, "number": po.number, "status": po.status, "dropship": po.dropship, "supplier": po.supplier.name if po.supplier else None}
+    """The purchase orders it raised: order-on-demand (15b)."""
+    return [{"id": po.id, "number": po.number, "status": po.status, "supplier": po.supplier.name if po.supplier else None}
             for po in db.scalars(select(PurchaseOrder).where(PurchaseOrder.sales_order_id == o.id).order_by(PurchaseOrder.number))]
-
-
-class DropshipIn(Api):
-    dropship: bool
-
-
-@router.put("/sales-orders/{order_id}/dropship")
-def set_dropship(_: allowed("sales.edit"), me: CurrentUser, db: DB, order_id: str, body: DropshipIn) -> dict:
-    """The vendor ships it straight to the customer (15c): set before it's approved."""
-    o = found(db, SalesOrder, order_id, "sales order")
-    if o.status not in ("draft", "pending", "rejected"):
-        raise conflict("Choose dropshipping before the order is approved.")
-    if o.dropship != body.dropship:
-        o.dropship = body.dropship
-        audit(db, me, "sales_order.dropship_set", target=o.number, target_type="sales_order", target_id=o.id, fields=["dropship"])
-        db.commit()
-    return {"id": o.id, "dropship": o.dropship}
 
 
 class RejectIn(Api):

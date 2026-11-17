@@ -139,7 +139,7 @@ def overview(db: DB, me: Admin) -> dict:
             to_choose.append(p.id)
     company = db.get(Company, me.company_id)
     return {
-        "company": {"id": company.id, "name": company.name, "emailDomain": company.email_domain},
+        "company": {"id": company.id, "name": company.name},
         "modules": [module_out(a) for a in apps],
         "roles": [role_out(db, r, holders.get(r.id, 0)) for r in roles],
         "people": people,
@@ -453,7 +453,7 @@ class PersonPatch(Api):
     full_name: str | None = Field(None, min_length=2, max_length=120)
     title: str | None = Field(None, max_length=120)
     app_details: dict[str, dict] | None = None
-    # Their sign-in email, at the company's domain (app/email_rules.py, decided 2026-10-29).
+    # Their sign-in email: any address, nobody else's anywhere (app/email_rules.py).
     email: str | None = Field(None, max_length=254)
     status: Literal["active", "suspended"] | None = None
 
@@ -478,7 +478,6 @@ def add_person(body: PersonIn, request: Request, db: DB, me: Admin, settings: Se
     same = db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == body.email.lower()))
     if same is not None:
         raise field_error("email", "That employee is in the recycle bin: restore them instead." if same.deleted_at else "Somebody here already has that email.")
-    email_rules.check_company_email(db.get(Company, me.company_id), body.email)
     email_rules.check_available(db, body.email, me.company_id)
     role = get_role(db, me, body.role_id) if body.role_id else None
     apps = [company_module(db, me, key) for key in dict.fromkeys(body.apps)]
@@ -610,11 +609,10 @@ def set_reporting(person_id: str, body: ReportingIn, request: Request, db: DB, m
 
 
 def change_email(db: Session, me: Identity, p: Identity, new: str) -> None:
-    """A person's sign-in email, changed by their company's administrator: at the company's domain, and
-    nobody else's anywhere. Their account keeps its password and history; they sign in with the new one."""
+    """A person's sign-in email, changed by their company's administrator: any address, nobody else's
+    anywhere. Their account keeps its password and history; they sign in with the new one."""
     if db.scalar(select(Identity).where(Identity.company_id == me.company_id, func.lower(Identity.email) == new, Identity.id != p.id)):
         raise field_error("email", "Somebody here already has that email.")
-    email_rules.check_company_email(db.get(Company, me.company_id), new)
     account = account_of(db, p)
     email_rules.check_available(db, new, me.company_id, but_account=account.id if account else None)
     if account is not None and (account.is_operator or any(
@@ -916,7 +914,6 @@ class ImportIn(Api):
 def import_people(body: ImportIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
     """People from a file (already read and mapped in the browser): each row checked first (new,
     already here, or a problem with why); with apply, every new one added at once, or none."""
-    company = db.get(Company, me.company_id)
     roles = {r.name.strip().lower(): r for r in db.scalars(select(AccessRole).where(AccessRole.company_id == me.company_id))}
     apps = {a.key: a for a in access_roles.modules_of(db, me.company_id)}
     by_name = {a.name.strip().lower(): a for a in apps.values()} | {k: a for k, a in apps.items()}
@@ -940,11 +937,10 @@ def import_people(body: ImportIn, request: Request, db: DB, me: Admin, settings:
         if not reasons and email in here:
             outcome = "already"
         elif not reasons:
-            for check in (lambda: email_rules.check_company_email(company, email), lambda: email_rules.check_available(db, email, me.company_id)):
-                try:
-                    check()
-                except HTTPException as e:
-                    reasons.append(e.detail if isinstance(e.detail, str) else str(e.detail[0].get("msg", "Not allowed.")))
+            try:
+                email_rules.check_available(db, email, me.company_id)
+            except HTTPException as e:
+                reasons.append(e.detail if isinstance(e.detail, str) else str(e.detail[0].get("msg", "Not allowed.")))
         role = roles.get((row.role or "").strip().lower()) if row.role and row.role.strip() else None
         if row.role and row.role.strip() and role is None:
             reasons.append(f"No role called \"{row.role.strip()}\" here.")

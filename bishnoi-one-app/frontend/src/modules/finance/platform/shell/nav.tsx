@@ -82,7 +82,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       flow: true,
       steps: keep([
         { href: "/finance/sales-orders", label: "Sales orders", icon: "orders" },
-        { href: "/finance/invoices/zoho", label: "Zoho invoices", icon: "letters" },
         { href: "/finance/invoices", label: "Finance invoices", icon: "letters", exact: true },
         { href: "/finance/invoices/receivables", label: "Receivables", icon: "money" },
       ]),
@@ -102,7 +101,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       ]),
     },
     { label: "Approvals", icon: "approvals", steps: keep([{ href: "/finance/prices", label: "Price approvals", icon: "pricing" }]) },
-    { label: "Banking", icon: "money", steps: keep([{ href: "/finance/bank/accounts", label: "Bank accounts and rates", icon: "money" }, { href: "/finance/bank", label: "Bank reconciliation", icon: "money", exact: true }]) },
+    { label: "Banking", icon: "money", steps: keep([{ href: "/finance/bank/accounts", label: "Bank accounts", icon: "money" }, { href: "/finance/bank", label: "Bank reconciliation", icon: "money", exact: true }]) },
     {
       label: "Accountant",
       icon: "lists",

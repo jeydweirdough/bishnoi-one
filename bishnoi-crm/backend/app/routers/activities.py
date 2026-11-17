@@ -13,17 +13,17 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, object_session
 
-from app.access import Access, require
+from app.access import Access, CurrentAccess, require
 from app.api import Api, as_utc, camel, changed, field_error, iso, not_found, person_out
 from app.audit import audit
 from app.config import Settings
 from app.deps import DB, CurrentUser, SettingsDep
-from app.models import Product, PLANNED_KINDS, Activity, ActivityLink, Company, Contact, Visit
+from app.models import Product, PLANNED_KINDS, Activity, ActivityLink, Company, Contact, StoredFile, Visit
 from app.scope import owner_for, reaches, within
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -166,7 +166,7 @@ def activity_out(activity: Activity, access: Access) -> dict:
         "outcome": activity.outcome,
         "discussed": product_names(object_session(activity), activity.discussed or []),
         "alsoOn": also_on(object_session(activity), activity),
-        # Sent from the person's own email app: a screenshot of it sent is kept as proof.
+        # Emails logged before 2026-11-17 with a screenshot of them sent, kept as proof.
         "hasProof": bool(activity.proof_ref),
         "company": {"id": activity.company.id, "name": activity.company.name} if activity.company else None,
         "contact": {"id": activity.contact.id, "name": activity.contact.full_name} if activity.contact else None,
@@ -394,3 +394,13 @@ def delete_activity(access: Delete, me: CurrentUser, db: DB, activity_id: str) -
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+
+@router.get("/{activity_id}/proof")
+def email_proof(access: CurrentAccess, db: DB, activity_id: str) -> Response:
+    """The screenshot an email was logged with (before email from the CRM was dropped
+    on 2026-11-17), for whoever can see the email."""
+    activity = get_activity(db, access, activity_id)
+    stored = db.get(StoredFile, activity.proof_ref) if activity.proof_ref else None
+    if stored is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This email has no screenshot.")
+    return Response(stored.data, media_type=stored.content_type, headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"})

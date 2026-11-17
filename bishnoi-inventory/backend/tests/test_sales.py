@@ -91,3 +91,28 @@ def test_the_sales_order_reports(app, client, ana, world):
     row = fill["rows"][0]
     assert (row["ordered"], row["delivered"], row["fillRate"]) == (5, 0, 0)
     assert next(c for c in fill["columns"] if c["key"] == "fillRate")["ratio"] == ["delivered", "ordered"]
+
+
+def test_a_sale_delivery_is_made_only_by_approving_a_sales_order(ana, world):
+    """2026-11-17: every sale is approved first. Inventory refuses a sale delivery typed directly (with or without
+    the kind given); other kinds are typed as before; approval still makes the DR, which stays a sale."""
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 20}])
+    line = [{"productId": world["gloves"], "quantity": 2}]
+    for body in ({"kind": "sale"}, {}):
+        r = ana.c.post("/inventory/orders", headers=ana.h, json={"recipient": "PGH", "warehouseId": world["mnl"], "lines": line, **body})
+        assert r.status_code == 422 and "sales order" in r.text
+    issue = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "lines": line})
+    assert issue["number"].startswith("IS-")
+    # A department issue can't be turned into a sale either.
+    r = ana.c.put(f"/inventory/orders/{issue['id']}", headers=ana.h, json={"recipient": "PGH", "kind": "sale", "warehouseId": world["mnl"], "lines": line})
+    assert r.status_code == 422
+    made = ana.post("/inventory/sales-orders", {"customerName": "PGH", "lines": line})
+    ana.post(f"/inventory/sales-orders/{made['id']}/submit")
+    delivery = ana.post(f"/inventory/sales-orders/{made['id']}/approve")["delivery"]
+    assert delivery["number"].startswith("DR-")
+    got = ana.get(f"/inventory/orders/{delivery['id']}")
+    assert got["kind"] == "sale" and got["status"] == "draft"
+    # Its draft can still be saved as a sale, but not turned into another kind.
+    keep = {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 2, "unitPrice": 32000}]}
+    ana.put(f"/inventory/orders/{delivery['id']}", keep)
+    assert ana.c.put(f"/inventory/orders/{delivery['id']}", headers=ana.h, json={**keep, "kind": "department"}).status_code == 422

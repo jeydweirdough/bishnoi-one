@@ -93,8 +93,6 @@ export type Account = {
   companies: { id: string; name: string; slug: string; current: boolean }[];
   /** The applications given to them, that their company has: a module each (by its Platform key). */
   apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null }[];
-  /** The company's app catalogue (step 6): "app:purchasing", "inventory.batches"… on or off. */
-  features?: Record<string, boolean>;
   /** Sign-in security (2026-10-30): a handed-over password still to change; two-step sign-in, and whether it's owed. */
   mustChangePassword?: boolean;
   /** `needed`: required and missing (only when the Platform requires it); `suggested`: anyone without it, offered the set-up after signing in and told on their profile. */

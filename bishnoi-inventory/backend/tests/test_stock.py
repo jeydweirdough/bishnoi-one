@@ -57,7 +57,7 @@ def test_stock_goes_out_first_expired_first_out(ana, world):
     # The later batch arrives first; the one expiring sooner must still go first.
     receive(ana, world["mnl"], [{"productId": world["pcm"], "quantity": 50, "batchNo": "LATE", "expiresOn": LATER}])
     receive(ana, world["mnl"], [{"productId": world["pcm"], "quantity": 30, "batchNo": "SOON", "expiresOn": SOON}])
-    order = ana.post("/inventory/orders", {"recipient": "St. Luke's", "warehouseId": world["mnl"], "lines": [{"productId": world["pcm"], "quantity": 40}]})
+    order = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": world["pcm"], "quantity": 40}]})
     ana.post(f"/inventory/orders/{order['id']}/confirm")
     ana.post(f"/inventory/orders/{order['id']}/issue", {})
     picks = ana.get(f"/inventory/orders/{order['id']}")["lines"][0]["picks"]
@@ -68,13 +68,13 @@ def test_stock_goes_out_first_expired_first_out(ana, world):
 
 def test_confirming_an_order_reserves_it_and_others_cant_take_it(ana, world):
     receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 20}])
-    first = ana.post("/inventory/orders", {"recipient": "A", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 20}]})
+    first = ana.post("/inventory/orders", {"recipient": "A", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 20}]})
     ana.post(f"/inventory/orders/{first['id']}/confirm")
     lv = level(ana, world["gloves"])
     assert (lv["onHand"], lv["reserved"], lv["available"]) == (20, 20, 0)
     assert ana.get(f"/inventory/products/{world['gloves']}")["state"] == "out"
 
-    second = ana.post("/inventory/orders", {"recipient": "B", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 1}]})
+    second = ana.post("/inventory/orders", {"recipient": "B", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 1}]})
     r = ana.c.post(f"/inventory/orders/{second['id']}/confirm", headers=ana.h)
     assert r.status_code == 409 and "Not enough" in r.text
     # Nor can a transfer or an adjustment take what's held.

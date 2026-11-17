@@ -180,7 +180,6 @@ def add_user(body: UserIn, db: DB, me: AdminUser) -> dict:
         raise field_error("companyId", "Pick the company they work for.")
     if _email_taken(db, body.email, company.id):
         raise field_error("email", f"Somebody at {company.name} already has that email.")
-    email_rules.check_company_email(company, body.email)
     email_rules.check_available(db, body.email, company.id)
     allowed = _company_apps(db, company.id)
     for g in body.applications:
@@ -255,8 +254,6 @@ def update_user(user_id: str, body: UserPatch, db: DB, me: AdminUser) -> dict:
         raise field_error("email", "Somebody at that company already has that email.")
     if "email" in fields or "company_id" in fields:
         target = db.get(Company, fields.get("company_id") or p.company_id)
-        if target is not None:
-            email_rules.check_company_email(target, fields.get("email", p.email))
         account = account_of(db, p)
         email_rules.check_available(db, fields.get("email", p.email), target.id if target else None, but_account=account.id if account else None)
     if "email" in fields:

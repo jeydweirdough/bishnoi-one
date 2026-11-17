@@ -21,10 +21,9 @@ from app.routers.tax import profile_complete
 router = APIRouter(prefix="/finance", tags=["unset"])
 
 
-# Needed only when their feature is used (cost of goods sold, step 3; equity, closing and exchange differences,
-# step 16): empty, they aren't owed; set to an account switched off, they are.
-OPTIONAL = {"cogs_account_id", "inventory_account_id", "capital_account_id", "drawings_account_id", "retained_earnings_account_id",
-            "fx_gain_account_id", "fx_loss_account_id"}
+# Needed only when their feature is used (cost of goods sold, step 3; equity and closing, step 16):
+# empty, they aren't owed; set to an account switched off, they are.
+OPTIONAL = {"cogs_account_id", "inventory_account_id", "capital_account_id", "drawings_account_id", "retained_earnings_account_id"}
 
 
 def posting_gaps(db: Session) -> int:

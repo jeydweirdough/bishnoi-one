@@ -38,7 +38,6 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
     icon: "deals",
     flow: true,
     steps: [
-      ...when(may("customers.inbox"), { href: "/crm/inbox", label: "Leads", icon: "inbox" }),
       ...when(selling && may("customers.view"), { href: "/crm/customers", label: "Customers", icon: "customers", also: ["/crm/customers"] }),
       ...when(selling && may("customers.view"), { href: "/crm/contacts", label: "Contacts", icon: "person" }),
       ...when(selling && may("deals.view"), { href: "/crm/deals", label: "Deals", icon: "deals" }),
@@ -56,7 +55,6 @@ function menu(me: Me, unset: Unset): { home: Step; processes: Process[]; foot: P
       ...when(may("activities.view"), { href: "/crm/calendar", label: "Calendar", icon: "calendar" }),
       // A field agent's calls are their visits: one log, not two.
       ...when(!agent && may("activities.view"), { href: "/crm/activities", label: "Activities", icon: "activity", also: ["/crm/follow-ups"] }),
-      ...when(!agent && may("activities.create"), { href: "/crm/email", label: "Emails", icon: "email" }),
     ],
   };
   // A field agent's week: their accounts, planned, visited, on the road; patients helped.

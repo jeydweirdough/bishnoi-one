@@ -4,9 +4,6 @@ Bank accounts and payment channels (16a)
     GET   /finance/bank-accounts                 the company's bank accounts and e-wallets, and the providers to pick from
     POST  /finance/bank-accounts                 one more (with the ledger account its money is kept in)
     PATCH /finance/bank-accounts/{id}            name, number, default, switched on or off
-Exchange rates (16c)
-    GET   /finance/exchange-rates?currency=      the latest rates recorded
-    PUT   /finance/exchange-rates                {currency, on, rate}: the day's rate (pesos per unit)
 Owner's equity and closing (16d), the period lock (16e)
     POST  /finance/equity/entries                capital put in, or drawings taken out
     GET   /finance/equity/statement?yearEnd=     the statement of changes in equity for a fiscal year
@@ -22,7 +19,6 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import Field
 from sqlalchemy import func, select
 
-from app import fx
 from app.access import permitted
 from app.audit import audit
 from app.bir_reports import balances
@@ -30,7 +26,7 @@ from app.deps import DB, CurrentUser, SettingsDep
 from app.ledger import Leg, post
 from app.ledger import settings as posting_settings
 from app.ledger import locked_settings
-from app.models import Account, BankAccount, ExchangeRate, TaxProfile, YearClosing
+from app.models import Account, BankAccount, TaxProfile, YearClosing
 from app.routers.funds import today
 from app.routers.tax import Api, field_error
 
@@ -122,41 +118,6 @@ def change_bank_account(user: permitted("accounts.manage"), db: DB, bank_id: str
         audit(db, user, "bank_account.updated", target=b.name, target_type="bank_account", target_id=b.id, fields=sorted(fields))
         db.commit()
     return bank_out(b)
-
-
-# --- exchange rates (16c) ----------------------------------------------------------------------------------
-
-
-def rate_out(r: ExchangeRate) -> dict:
-    return {"currency": r.currency, "on": r.on.isoformat(), "rate": r.rate_e4 / fx.SCALE, "createdBy": r.created_by}
-
-
-@router.get("/exchange-rates")
-def exchange_rates(_: CurrentUser, db: DB, currency: str = "USD") -> dict:
-    rows = db.scalars(select(ExchangeRate).where(ExchangeRate.currency == currency.upper()).order_by(ExchangeRate.on.desc()).limit(60)).all()
-    return {"currency": currency.upper(), "items": [rate_out(r) for r in rows]}
-
-
-class RateIn(Api):
-    currency: str = Field(min_length=3, max_length=3)
-    on: date
-    rate: float = Field(gt=0, le=100000)
-
-
-@router.put("/exchange-rates")
-def set_rate(user: permitted("accounts.manage"), db: DB, settings: SettingsDep, body: RateIn) -> dict:
-    if body.currency.upper() == fx.BASE:
-        raise field_error("currency", "Pesos need no rate.")
-    if body.on > today(settings):
-        raise field_error("on", "A rate is recorded for a day that has come.")
-    r = db.scalar(select(ExchangeRate).where(ExchangeRate.currency == body.currency.upper(), ExchangeRate.on == body.on))
-    if r is None:
-        r = ExchangeRate(currency=body.currency.upper(), on=body.on, rate_e4=0, created_by=user.full_name)
-        db.add(r)
-    r.rate_e4, r.created_by = fx.rate_e4_of(body.rate), user.full_name
-    audit(db, user, "exchange_rate.set", target=f"{r.currency} {r.on.isoformat()}", target_type="exchange_rate", fields=["rate"])
-    db.commit()
-    return rate_out(r)
 
 
 # --- owner's equity (16d) ------------------------------------------------------------------------------------

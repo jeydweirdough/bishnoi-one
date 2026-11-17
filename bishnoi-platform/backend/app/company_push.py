@@ -70,7 +70,6 @@ def record_asked(db, company: Company, app: Application, claims: dict) -> None:
 def _send(sessions, settings: Settings, company_id: str, app_ids: set[str], gone: dict | None) -> None:
     import httpx
 
-    from app.catalogue import for_service
     from app.passes import company_pass, claims_of
 
     with sessions() as db:
@@ -84,7 +83,7 @@ def _send(sessions, settings: Settings, company_id: str, app_ids: set[str], gone
                 continue
             else:
                 granted = db.get(CompanyApp, (company.id, app.id)) is not None
-                token = company_pass(settings, company, app, granted, features=for_service(db, company.id, app.key))
+                token = company_pass(settings, company, app, granted)
                 slug = company.slug
             url = app.api_url.rstrip("/") + "/platform/company"
             try:

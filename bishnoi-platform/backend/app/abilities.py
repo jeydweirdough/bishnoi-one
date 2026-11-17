@@ -1,12 +1,9 @@
-"""The app catalogue, abilities and ready-made job roles (feature plan step 6, decisions 10, 20–25).
+"""Abilities and ready-made job roles (feature plan step 6, decisions 20–25).
 
-Bishnoi One defines all three here; companies choose from them.
+Bishnoi One defines both here; companies choose from them. (The app catalogue that let a company
+turn apps and features on or off was removed on 2026-11-17, owner's decision: every company runs
+everything it is subscribed to as one operation.)
 
-- CATALOGUE: what a company turns on and sees (CRM, Field sales, Purchasing…), each running inside
-  a service (an Application: crm, inventory, finance…), with the feature switches inside it. A
-  company's choices are kept in nbpl_company_switches ("app:purchasing", "inventory.batches");
-  anything not chosen yet is as the catalogue says (switches(), below). Off: its menus, fields and
-  reports are hidden. Switches still marked `later` aren't built yet and can't be turned on.
 - ABILITIES: one business task in plain words ("Approve discounts"), bundling the technical
   permissions it needs in each app (each app still declares and enforces those). Some take a limit
   (a discount percentage, an amount): kept on the role and sent with it, for approval workflows to
@@ -16,130 +13,6 @@ Bishnoi One defines all three here; companies choose from them.
 """
 
 from dataclasses import dataclass, field
-
-# ---- The catalogue --------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Switch:
-    key: str  # "<catalogue app>.<feature>"
-    label: str
-    hint: str = ""
-    on: bool = True  # before the company chooses
-    later: bool = False  # not built yet: shown, can't be turned on
-
-
-@dataclass(frozen=True)
-class CatalogueApp:
-    key: str
-    name: str
-    job: str
-    service: str  # the Application that runs it
-    switches: tuple[Switch, ...] = ()
-    later: bool = False  # not built yet
-
-
-CATALOGUE: tuple[CatalogueApp, ...] = (
-    CatalogueApp("crm", "CRM", "Win customers and keep them", "crm", (
-        Switch("crm.deals", "Deals and forecast"),
-        Switch("crm.quotes", "Quotes and approvals"),
-        Switch("crm.prices", "Price rules and promos"),
-        Switch("crm.lead_inbox", "Lead inbox", "Facebook, Messenger, WhatsApp, Viber and website leads in one inbox."),
-        Switch("crm.retention", "Retention", "Customers at risk and lost, by department."),
-        Switch("crm.kpis", "KPIs and scorecards"),
-    )),
-    CatalogueApp("field_sales", "Field sales", "Reps' visits to doctors and clinics", "crm", (
-        Switch("field_sales.call_plans", "Call plans, tiers and zones"),
-        Switch("field_sales.patient_assistance", "Patient assistance"),
-        Switch("field_sales.collections", "Collections"),
-        Switch("field_sales.samples", "Samples", later=True),
-    )),
-    CatalogueApp("sales", "Sales", "Orders from approved quotes, approved, delivered and invoiced", "inventory", (
-        Switch("sales.backorders", "Backorders", later=True),
-        Switch("sales.returns", "Returns", later=True),
-        Switch("sales.order_on_demand", "Order-on-demand"),  # built in step 15b
-        Switch("sales.dropship", "Dropshipping"),  # built in step 15c
-        Switch("sales.credit_check", "Credit check", later=True),
-        Switch("sales.rx_check", "Rx check", later=True),
-    )),
-    CatalogueApp("purchasing", "Purchasing", "Buying from vendors", "inventory", (
-        Switch("purchasing.approvals", "Purchase approvals"),
-        Switch("purchasing.auto_draft", "Automatic draft purchase orders"),  # built in step 15a
-        Switch("purchasing.price_lists", "Vendor price lists"),  # vendor prices per item, used by replenishment (15a)
-        Switch("purchasing.consignment", "Consignment"),  # built in step 15d
-        Switch("purchasing.product_documents", "Documents sent with products"),  # built in step 15e
-    )),
-    CatalogueApp("inventory", "Inventory", "Stock and its traceability", "inventory", (
-        Switch("inventory.batches", "Batches and expiry"),
-        Switch("inventory.serials", "Serial numbers"),
-        Switch("inventory.cpr", "CPR", "The FDA's certificate of product registration on each product."),
-        Switch("inventory.warehouses", "Several warehouses"),
-        Switch("inventory.counts", "Stock counts"),
-        Switch("inventory.locations", "Locations in a warehouse"),
-        Switch("inventory.units", "Units and packaging"),  # packs with conversions, step 14e
-    )),
-    CatalogueApp("warehouse", "Warehouse", "Moving goods in and out", "inventory", (
-        Switch("warehouse.routes", "Multi-step routes", later=True),
-        Switch("warehouse.packages", "Packages"),  # built in step 14d
-        Switch("warehouse.waves", "Wave picking"),  # built in step 14d
-        Switch("warehouse.barcodes", "Barcode scanning"),  # built in step 14c
-        Switch("warehouse.quality", "Quality checks"),  # built in step 14a
-    )),
-    # Built in step 12 (2026-10-29); booking and tracking through the couriers' own systems come later.
-    CatalogueApp("shipping", "Shipping", "Getting orders to customers", "inventory", (
-        Switch("shipping.couriers", "Couriers (LBC, J&T, Lalamove)"),
-        Switch("shipping.tracking", "Tracking numbers"),
-        Switch("shipping.proof", "Proof of delivery"),
-        Switch("shipping.courier_api", "Booking and tracking with the couriers' systems", later=True),
-    )),
-    CatalogueApp("invoicing", "Invoicing", "Bill customers, collect payments", "finance", (
-        Switch("invoicing.payments", "Record payments"),
-        Switch("invoicing.auto", "Automatic invoices"),  # built in step 13
-        Switch("invoicing.channels", "Payment channels (GCash, Maya)"),  # built in step 16a
-        Switch("invoicing.statements", "Customer statements", later=True),
-    )),
-    CatalogueApp("accounting", "Accounting", "The books and the BIR", "finance", (
-        Switch("accounting.bills", "Bills and vouchers"),
-        Switch("accounting.funds", "Expenses and advances"),
-        Switch("accounting.bank", "Bank reconciliation"),
-        Switch("accounting.bir", "BIR files"),
-        Switch("accounting.foreign_currency", "Foreign-currency bills"),  # built in step 16c
-        Switch("accounting.closing", "Owner's equity, closing and period lock"),  # built in step 16d, 16e
-        Switch("accounting.budgets", "Budgets"),  # built in step 17
-        Switch("accounting.fixed_assets", "Fixed assets"),  # built in step 17
-    )),
-    CatalogueApp("pharmacy", "Pharmacy", "Prescriptions and counter dispensing", "pharmacy", (
-        Switch("pharmacy.controlled", "Controlled drugs register"),
-        Switch("pharmacy.patients", "Patient records"),
-    )),
-    CatalogueApp("office", "Office", "The office and its compliance", "admin", (
-        Switch("office.permits", "Permits"),
-        Switch("office.fleet", "Fleet and travel"),
-        Switch("office.devices", "Devices"),
-        Switch("office.requests", "Office requests"),
-    )),
-)
-
-APPS = {a.key: a for a in CATALOGUE}
-SWITCHES = {s.key: (a, s) for a in CATALOGUE for s in a.switches}
-
-
-def app_switch(key: str) -> str:
-    return f"app:{key}"
-
-
-def effective(chosen: dict[str, bool], services: set[str]) -> dict[str, bool]:
-    """Every catalogue app and feature, on or off for a company: what it chose, else the catalogue's
-    default. A catalogue app is on only when the company has its service and it isn't switched off;
-    a feature only when its app is on. Nothing not built yet is on."""
-    out: dict[str, bool] = {}
-    for a in CATALOGUE:
-        on = not a.later and a.service in services and chosen.get(app_switch(a.key), True)
-        out[app_switch(a.key)] = on
-        for s in a.switches:
-            out[s.key] = on and not s.later and chosen.get(s.key, s.on)
-    return out
-
 
 # ---- Abilities ------------------------------------------------------------------------------------
 
@@ -165,7 +38,6 @@ ABILITIES: tuple[Ability, ...] = (
         "crm": ("dashboard.view", *_crud("customers", "view", "create", "edit"), *_crud("activities", "view", "create", "edit", "delete"),
                 *_crud("visits", "view", "create", "edit", "delete"), *_crud("deals", "view", "create", "edit"), "goals.view", "products.view"),
     }),
-    Ability("leads.inbox", "Work the lead inbox", "CRM and Sales", {"crm": ("customers.inbox",)}),
     Ability("quotes.make", "Make quotes and sales orders", "CRM and Sales", {
         "crm": (*_crud("quotes", "view", "create", "edit"), *_crud("orders", "view", "create", "edit")),
         "inventory": ("orders.view", "stock.view", "products.view", "sales.view", "sales.create", "sales.edit"),
@@ -223,7 +95,6 @@ ABILITIES: tuple[Ability, ...] = (
     }),
     Ability("bir.prepare", "Prepare BIR filings", "Books", {"finance": ("bir.view", "bir.prepare", "tax.view", "tax.manage")}),
     # Company
-    Ability("directory.read", "Read company directory names and job titles", "Company", {}),
     Ability("org.manage", "Manage the organisation", "Company", {"crm": ("admin.teams", "department.manage")}),
     Ability("reports.management", "See management reports", "Company", {
         "crm": ("dashboard.view", "reports.view"),
@@ -264,7 +135,7 @@ class JobRole:
 
 
 _REP = ("customers.work", "quotes.make", "discounts.give", "stock.see")
-_LEAD = (*_REP, "leads.inbox", "discounts.approve", "sales.approve")
+_LEAD = (*_REP, "discounts.approve", "sales.approve")
 _DIVISION = (*_LEAD, "orders.credit", "prices.manage", "margins.see", "targets.set", "records.remove", "reports.management")
 _WAREHOUSE = ("stock.see", "stock.receive", "stock.deliver", "stock.move", "stock.count")
 _FINANCE = ("invoices.make", "payments.record", "bills.enter")

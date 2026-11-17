@@ -11,7 +11,7 @@ def test_goods_wait_for_their_check_then_pass_or_fail(ana, world):
     held = level(ana, world["gloves"], world["mnl"])
     assert (held["onHand"], held["onHold"], held["available"]) == (50, 50, 0)  # on hand, not usable yet
     # Nothing on hold can be reserved.
-    order = ana.post("/inventory/orders", {"recipient": "PGH", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 5}]})
+    order = ana.post("/inventory/orders", {"recipient": "Ward 3", "kind": "department", "warehouseId": world["mnl"], "lines": [{"productId": world["gloves"], "quantity": 5}]})
     assert ana.c.post(f"/inventory/orders/{order['id']}/confirm", headers=ana.h).status_code == 409
 
     checks = ana.get("/inventory/quality-checks")

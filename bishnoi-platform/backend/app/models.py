@@ -183,8 +183,7 @@ UNIT_KINDS = ("department", "branch")
 class Company(Base):
     __tablename__ = "nbpl_companies"
     __mapper_args__ = {"eager_defaults": True}
-    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True),
-                      Index("nbpl_companies_email_domain", "email_domain", unique=True))
+    __table_args__ = (_one_of("status", COMPANY_STATUSES, "nbpl_company_status"), Index("nbpl_companies_no", "no", unique=True))
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     # Its number, from 40000001 up (app/numbering.py): for paging and lookups; id stays the key.
@@ -206,8 +205,6 @@ class Company(Base):
     logo: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
     logo_type: Mapped[str | None] = mapped_column(String(20), default=None)
     document_footer: Mapped[str | None] = mapped_column(String(400), default=None)
-    # Its people's email domain (getmeds.ph): one per company, never a public one (migration 0019, app/email_rules.py).
-    email_domain: Mapped[str | None] = mapped_column(String(253), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -329,7 +326,7 @@ class Application(Base):
     connect_key_made_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # When it last asked for its links: how the platform knows it's connected.
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    # The key it encrypts its own secrets with (each person's mailbox, its order
+    # The key it encrypts its own secrets with (its order
     # links), given with its links: made once, kept encrypted, the same through new connect keys.
     data_key: Mapped[str | None] = mapped_column(Text, default=None)
     # Retired applications stay for their history, out of the lists.
@@ -531,18 +528,6 @@ class AccessRoleAbility(Base):
     role_id: Mapped[str] = mapped_column(ForeignKey("nbpl_access_roles.id", ondelete="CASCADE"), primary_key=True)
     ability: Mapped[str] = mapped_column(String(60), primary_key=True)
     limit_value: Mapped[int | None] = mapped_column(BigInteger, default=None)
-
-
-class CompanySwitch(Base):
-    """A company's choice in the app catalogue (step 6): "app:purchasing" or "inventory.batches", on or off."""
-
-    __tablename__ = "nbpl_company_switches"
-
-    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), primary_key=True)
-    key: Mapped[str] = mapped_column(String(80), primary_key=True)
-    is_on: Mapped[bool] = mapped_column()
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_by: Mapped[str] = mapped_column(String(254))
 
 
 class AccessRolePermission(Base):

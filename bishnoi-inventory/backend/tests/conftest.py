@@ -137,6 +137,15 @@ def receive(api: Api, warehouse: str, lines: list[dict], **extra) -> dict:
     return api.post("/inventory/receipts", {"warehouseId": warehouse, "lines": lines, **extra})
 
 
+def sold(api: Api, warehouse: str, lines: list[dict], customer: str = "PGH", **extra) -> dict:
+    """A sale delivery, made the only way one is (2026-11-17): a sales order, sent for approval and approved.
+    The delivery (DR-…) comes back as a draft, at the price list's prices."""
+    made = api.post("/inventory/sales-orders", {"customerName": customer, "warehouseId": warehouse,
+                                                "lines": [{"productId": x["productId"], "quantity": x["quantity"]} for x in lines], **extra})
+    api.post(f"/inventory/sales-orders/{made['id']}/submit")
+    return {**api.post(f"/inventory/sales-orders/{made['id']}/approve")["delivery"], "salesOrder": made}
+
+
 def level(api: Api, product: str, warehouse: str | None = None) -> dict:
     p = api.get(f"/inventory/products/{product}")
     if warehouse is None:

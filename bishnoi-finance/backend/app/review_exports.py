@@ -32,7 +32,7 @@ def columns(spec):
     return [tuple(s.split('=', 1)) for s in spec.split('|')]
 
 IDENTITY = "Record ID=id|Status=status|Entry ID=entryId"
-BILL = columns("Internal bill=no|Supplier invoice=billNumber|Bill date=billDate|Due date=dueDate|Supplier=supplier.name|Supplier TIN=supplier.tin|Currency=currency|Exchange rate=rate|Net PHP=netCentavos|VAT PHP=vatCentavos|Withheld PHP=withheldCentavos|Gross PHP=totalCentavos|Payable PHP=payableCentavos|Paid PHP=paidCentavos|Remaining PHP=leftCentavos|Approval stage=state|Approved by=approvedBy|Checked by=checkedBy|Recorded by=recordedBy|Voided at=voidedAt|Void reason=voidReason|Source Zoho reference=zohoRef|Source Oojeema reference=oojeemaRef")
+BILL = columns("Internal bill=no|Supplier invoice=billNumber|Bill date=billDate|Due date=dueDate|Supplier=supplier.name|Supplier TIN=supplier.tin|Net PHP=netCentavos|VAT PHP=vatCentavos|Withheld PHP=withheldCentavos|Gross PHP=totalCentavos|Payable PHP=payableCentavos|Paid PHP=paidCentavos|Remaining PHP=leftCentavos|Approval stage=state|Approved by=approvedBy|Checked by=checkedBy|Recorded by=recordedBy|Voided at=voidedAt|Void reason=voidReason|Source Zoho reference=zohoRef|Source Oojeema reference=oojeemaRef")
 LINE = columns("Account code=account.code|Account=account.name|Description=description|Purchase type=purchaseTypeLabel|VAT treatment=vatLabel|ATC=withholding|Withholding rate percent=withholdingRateBp|Net=netCentavos|VAT=vatCentavos|Withheld=withheldCentavos")
 INV = columns("Invoice=number|Invoice date=date|Due date=dueDate|Customer=customer.name|Customer TIN=customer.tin|Reference=reference|Gross PHP=totalCentavos|VAT PHP=taxCentavos|Settled PHP=paidCentavos|Remaining PHP=balanceCentavos|Created by=createdBy|Issued by=issuedBy|Voided at=voidedAt|Void reason=voidReason")
 PAY = columns("Payment ID=id|Paid on=paidOn|Cash PHP=amountCentavos|Customer withholding PHP=cwtCentavos|ATC=cwtAtc|2307 reference=cwtCertificate|Method=methodLabel|Payment reference=reference|Check number=checkNumber|Check date=checkDate|Recorded by=recordedBy|Removed at=removedAt|Removed by=removedBy")
@@ -81,13 +81,12 @@ def records(kind: str, user: CurrentUser, db: DB, settings: SettingsDep,
         if kind == 'bills':
             base += BILL
         else:
-            # Foreign bill lines stay in source currency. Do not label them PHP.
-            base += columns('Internal bill=no|Supplier invoice=billNumber|Bill date=billDate|Supplier=supplier.name|Currency=currency|Exchange rate=rate')
-            detail_cols = [('Line', '_line')] + [(label + ' (bill currency)' if key.endswith('Centavos') else label, key) for label, key in LINE]
+            base += columns('Internal bill=no|Supplier invoice=billNumber|Bill date=billDate|Supplier=supplier.name')
+            detail_cols = [('Line', '_line')] + [(label + ' PHP' if key.endswith('Centavos') else label, key) for label, key in LINE]
             for d in docs:
                 bill = db.get(Bill, d['id'])
                 worked = payables.work_out(db, bill.lines or [], bill.bill_date, bill.amounts_include_vat)
-                posted = payables.pesos(worked, bill.rate_e4) if bill.currency and bill.currency != 'PHP' and bill.rate_e4 else worked
+                posted = worked
                 if bill.status != 'draft' and (posted.net,posted.vat,posted.withheld,posted.total,posted.payable) != (bill.net_centavos,bill.vat_centavos,bill.withheld_centavos,bill.total_centavos,bill.payable_centavos):
                     raise HTTPException(409, 'Saved bill totals differ from its calculated lines. Review the bill before downloading line detail.')
                 d['lines'] = [shown | calculated for shown, calculated in zip(d['lines'], worked.lines)]

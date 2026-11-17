@@ -62,13 +62,13 @@ def test_an_application_is_given_its_companys_services(client, ana):
     other = make_company(client, ana, name="Northwind", apps=("inventory",))
     crm = connect(client, ana, "crm")
     inventory = connect(client, ana, "inventory")
-    gmail = {"client_id": "gmail-client", "client_secret": "gmail-secret-123456"}
-    client.put(f"/platform/companies/{getmeds['id']}/services/gmail", json={"values": gmail, "enabled": True}, headers=ana)
+    smtp = {"host": "smtp-relay.brevo.com", "username": "crm@smtp-brevo.com", "password": "xsmtpsib-secret-123456", "from_email": "crm@getmeds.ph"}
+    client.put(f"/platform/companies/{getmeds['id']}/services/smtp", json={"values": smtp, "enabled": True}, headers=ana)
     client.put(f"/platform/companies/{getmeds['id']}/services/zoho_books", json={"values": ZOHO}, headers=ana)  # filled in, but off
 
     asked = client.get("/connect/services", params={"company": getmeds["slug"]}, headers={"X-Bishnoi-App-Key": crm})
     assert asked.status_code == 200
-    assert asked.json()["services"] == {"gmail": gmail}
+    assert asked.json()["services"] == {"smtp": smtp}
     # Another application isn't given the CRM's services; a company without the CRM gives nothing.
     assert client.get("/connect/services", params={"company": getmeds["slug"]}, headers={"X-Bishnoi-App-Key": inventory}).json()["services"] == {}
     assert client.get("/connect/services", params={"company": other["slug"]}, headers={"X-Bishnoi-App-Key": crm}).json()["services"] == {}

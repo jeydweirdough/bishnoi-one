@@ -1251,28 +1251,6 @@ class AttentionDismissal(Base):
 # --- approved materials (Media) --------------------------------------------------------------
 
 
-class Mailbox(Base):
-    """One of a person's own mailboxes, connected to send from (app/mailbox.py):
-    Gmail, Outlook or Zoho Mail by their sign-in, or any provider by SMTP. A
-    person may have several (work and personal providers) and picks which one
-    each email goes from; one is their default. Its secrets (a refresh token,
-    or the SMTP password) are kept encrypted."""
-
-    __tablename__ = "nbcm_mail_accounts"
-    __table_args__ = (UniqueConstraint("user_id", "address", name="mail_account_once"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
-    is_default: Mapped[bool] = mapped_column(default=False)
-    provider: Mapped[str] = mapped_column(String(20))
-    address: Mapped[str] = mapped_column(String(254))
-    # Not secret: the SMTP server and port, Zoho's account id.
-    values: Mapped[dict] = mapped_column(JSON, default=dict)
-    secrets: Mapped[str | None] = mapped_column(Text, default=None)
-    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    last_error: Mapped[str | None] = mapped_column(String(300), default=None)
-
-
 class MediaItem(Base):
     """An approved presentation, PDF or video that reps show customers: a file
     kept here (StoredFile), or a link to one kept elsewhere (a shared drive).
@@ -1295,18 +1273,6 @@ class MediaItem(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-
-class MediaView(Base):
-    """A material opened, and for which customer when opened from their page."""
-
-    __tablename__ = "nbcm_media_views"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    media_id: Mapped[str] = mapped_column(ForeignKey("nbcm_media.id", ondelete="CASCADE"), index=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("nbcm_users.id", ondelete="CASCADE"), index=True)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), index=True, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 # --- associations: records linked to one another, with a label (HubSpot) ----------------------
@@ -1352,24 +1318,6 @@ class ActivityLink(Base):
 
     activity_id: Mapped[str] = mapped_column(ForeignKey("nbcm_activities.id", ondelete="CASCADE"), primary_key=True)
     company_id: Mapped[str] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="CASCADE"), primary_key=True, index=True)
-
-
-class EmailTemplate(Base):
-    """An approved email (Veeva's idea): written and approved once, sent by reps
-    with a personal note of their own. Its wording can't be changed when sent.
-    {customer}, {contact} and {me} are filled in."""
-
-    __tablename__ = "nbcm_email_templates"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    name: Mapped[str] = mapped_column(String(120))
-    subject: Mapped[str] = mapped_column(String(200))
-    body: Mapped[str] = mapped_column(Text)
-    only_teams: Mapped[list] = mapped_column(JSON, default=list)
-    approved_on: Mapped[str] = mapped_column(String(10))
-    expires_on: Mapped[str | None] = mapped_column(String(10), default=None)
-    is_active: Mapped[bool] = mapped_column(default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class QuoteLink(Base):
@@ -1557,45 +1505,3 @@ class SavedView(Base):
 
     owner: Mapped[User] = relationship(lazy="joined")
 
-
-INBOX_CHANNELS = ("facebook", "messenger", "whatsapp", "viber", "tawkto", "form")
-INBOX_STATES = ("new", "added", "dismissed")
-
-
-class InboxLead(Base):
-    """Someone who reached the company on its own channels (decided 2026-10-19):
-    a Facebook lead form, a Messenger, WhatsApp or Viber message, a Tawk.to chat
-    on the website, or a form sent by the website or a tool like Make. It waits
-    in the lead inbox until someone adds it to the customers (or finds it's one
-    already) or dismisses it. More messages from the same sender while it waits
-    join it, newest last. What came in is data: only the known fields are kept."""
-
-    __tablename__ = "nbcm_inbox_leads"
-    __table_args__ = (
-        CheckConstraint("channel IN ('facebook', 'messenger', 'whatsapp', 'viber', 'tawkto', 'form')", name="inbox_channel"),
-        CheckConstraint("status IN ('new', 'added', 'dismissed')", name="inbox_status"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    channel: Mapped[str] = mapped_column(String(12), index=True)
-    # Who sent it on that channel (a phone number, a Messenger or Viber id, a
-    # visitor's email): more messages from them join this lead while it's open.
-    sender: Mapped[str | None] = mapped_column(String(120), index=True, default=None)
-    status: Mapped[str] = mapped_column(String(10), index=True, default="new")
-    name: Mapped[str] = mapped_column(String(160))
-    business: Mapped[str | None] = mapped_column(String(160), default=None)
-    phone: Mapped[str | None] = mapped_column(String(40), default=None)
-    email: Mapped[str | None] = mapped_column(String(254), default=None)
-    city: Mapped[str | None] = mapped_column(String(80), default=None)
-    # [{"at": iso, "text": "..."}], newest last, at most 30.
-    messages: Mapped[list] = mapped_column(JSON, default=list)
-    # What else the channel said, by label: the form's name, the ad, the page.
-    details: Mapped[dict] = mapped_column(JSON, default=dict)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
-    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_companies.id", ondelete="SET NULL"), index=True, default=None)
-    handled_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
-    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-
-    company: Mapped[Company | None] = relationship(lazy="joined")
-    handled_by: Mapped[User | None] = relationship(lazy="joined")

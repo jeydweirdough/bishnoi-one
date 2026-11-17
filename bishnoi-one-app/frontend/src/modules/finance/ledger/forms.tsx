@@ -436,7 +436,7 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
       <p className="text-sm text-ink-2">These are the company's own accounts, not a customer's accounts. The money defaults are used for receipts and payments when no specific money account is selected.</p>
       <FormGrid>
         {posting.items.map((i) => (
-          <Field key={i.key} label={i.label} size="md" error={fields[i.key]} hint={i.key.startsWith("fx_") ? "The same combined Forex Gain/Loss account can be selected for both." : undefined}>
+          <Field key={i.key} label={i.label} size="md" error={fields[i.key]}>
             {(p) => (
               <Select {...p} value={values[i.key]} disabled={!posting.canEdit} onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}>
                 <option value="">Not set</option>
