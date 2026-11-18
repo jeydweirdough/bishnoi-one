@@ -247,8 +247,100 @@ def from_quote(db: Session, data: dict, slug: str | None) -> SalesOrder | None:
     db.add(order)
     db.flush()
     business_events.link(db, slug, business_events.ref("quote", order.quote_id, order.quote_number, app="crm"), business_events.ref("sales_order", order.id, order.number))
+    raised = data.get("raisedBy") or {}
+    ask_for_approval(db, slug, order, {"email": raised.get("email"), "name": raised.get("name")}, quote=quote, payer=data.get("payer"))
     told(db, slug, order)
     return order
+
+
+# ---- The approval slip (Step 4C, 2026-11-18) -------------------------------------------------
+# Every order waiting for approval asks the Platform for a slip (approval.requested): numbered, with what proves it,
+# signed up the requester's chart (coach, then mentor), else by whoever holds sales.approve. Its end comes back as
+# approval.decided: approved (confirmed as the last signer) or returned (rejected with the note). No Finance step
+# yet: Inventory has no signal that an order needs Finance (a typed order takes the price list's prices only, and a
+# quote's prices, credit and price types were already checked in the CRM), so none is added.
+
+
+def requester_of(me: User) -> dict:
+    return {"identityId": me.platform_identity_id, "email": me.email, "name": me.full_name}
+
+
+def ask_for_approval(db: Session, slug: str | None, order: SalesOrder, requester: dict, *, quote: dict | None = None, payer: dict | None = None) -> None:
+    """The order goes on an approval slip: what the approvers read, and its attachments as links."""
+    quote = quote or ({"id": order.quote_id, "number": order.quote_number} if order.quote_id else None)
+    payer = payer if payer is not None else order.payer
+    attachments = []
+    if quote and quote.get("id"):
+        attachments.append({"label": f"Quote {quote.get('number') or ''}".strip(), "app": "crm", "kind": "quote", "id": quote["id"],
+                            "number": quote.get("number"), "url": f"/crm/quotes/{quote['id']}"})
+        if quote.get("rx"):
+            attachments.append({"label": "Rx check: the quote's prescription", "app": "crm", "kind": "quote", "id": quote["id"],
+                                "number": quote.get("number"), "url": f"/crm/quotes/{quote['id']}"})
+        if quote.get("priceType"):
+            attachments.append({"label": f"Price type {quote['priceType']}, approved by Finance", "app": "crm", "kind": "price_type"})
+    if isinstance(payer, dict) and payer.get("kind") == "guarantee_letter":
+        number = payer.get("letterNumber")
+        attachments.append({"label": f"Guarantee letter{' ' + str(number) if number else ''} from {payer.get('issuer') or 'the issuer'}",
+                            "app": "crm", "kind": "guarantee_letter", "id": quote.get("id") if quote else None,
+                            "url": f"/crm/quotes/{quote['id']}" if quote and quote.get("id") else None})
+    db.flush()
+    lines = [{"name": line.product.name if line.product else "", "quantity": line.quantity, "freeQuantity": line.free_quantity or 0,
+              "soldAs": sold_as(line.quantity, line.unit_name, line.per), "totalCentavos": line.total or 0} for line in order.lines[:30]]
+    warehouse = db.get(Warehouse, order.warehouse_id) if order.warehouse_id else None
+    business_events.emit(db, slug, "approval.requested", {
+        "kind": "sales_order", "id": order.id, "number": order.number, "title": f"Sales order {order.number} for {order.customer_name}",
+        "url": f"/crm/sales/orders/{order.id}", "requester": requester,
+        "summary": {"customer": order.customer_name, "totalCentavos": order.total_centavos, "grossCentavos": order.gross_centavos,
+                    "discountCentavos": order.discount_centavos, "currency": order.currency, "units": sum(line.quantity for line in order.lines),
+                    "lines": lines, "moreLines": max(0, len(order.lines) - len(lines)), "warehouse": warehouse.name if warehouse else None,
+                    "scheduledOn": order.scheduled_on.isoformat() if order.scheduled_on else None, "notes": order.notes,
+                    "salesperson": order.salesperson_name, "quote": quote.get("number") if quote else None},
+        "attachments": attachments,
+    })
+
+
+def withdraw_approval(db: Session, slug: str | None, order: SalesOrder, reason: str, by: str) -> None:
+    """Decided here instead (an administrator, or cancelled): its waiting slip is cancelled."""
+    business_events.emit(db, slug, "approval.withdrawn", {"kind": "sales_order", "id": order.id, "reason": reason[:500], "by": by})
+
+
+def _signer(db: Session, by: dict):
+    """Who signed last, as Inventory knows them; someone who never opened Inventory stands in by name only."""
+    from types import SimpleNamespace
+
+    from sqlalchemy import func
+
+    found = None
+    if by.get("identityId"):
+        found = db.scalar(select(User).where(User.platform_identity_id == str(by["identityId"])))
+    if found is None and by.get("email"):
+        found = db.scalar(select(User).where(func.lower(User.email) == str(by["email"]).lower()))
+    if found is not None:
+        return found
+    return SimpleNamespace(id=None, email=str(by.get("email") or "Bishnoi One")[:254], full_name=str(by.get("name") or "")[:120])
+
+
+def decided_on_slip(db: Session, data: dict, slug: str | None) -> None:
+    """The slip's end (approval.decided): approved, the order is confirmed as its last signer (its delivery made);
+    returned, it is rejected with the note. An order no longer waiting (decided or cancelled here) stays as it is."""
+    from modules.inventory.audit import audit
+
+    order = db.get(SalesOrder, str(data.get("id") or ""))
+    if order is None or order.status != "pending":
+        return
+    signer = _signer(db, data.get("by") or {})
+    slip = str((data.get("approval") or {}).get("number") or "")
+    actor = signer if isinstance(signer, User) else signer.email
+    decision = data.get("decision")
+    if decision == "approved" and order.lines:
+        delivery = approve(db, order, signer, slug)
+        audit(db, actor, "sales_order.approved", target=order.number, target_type="sales_order", target_id=order.id, fields=[delivery.number, slip])
+    elif decision in ("approved", "returned"):
+        note = str(data.get("note") or "") or ("Approved, but it has no lines to deliver." if decision == "approved" else "Returned")
+        order.status, order.decided_by_id, order.decided_at = "rejected", signer.id, datetime.now(UTC)
+        order.decision_note = (f"{note[:470]} ({slip})" if slip else note)[:500]
+        told(db, slug, order)
+        audit(db, actor, "sales_order.rejected", target=order.number, target_type="sales_order", target_id=order.id, fields=[slip])
 
 
 def approve(db: Session, order: SalesOrder, me: User, slug: str | None) -> Order:

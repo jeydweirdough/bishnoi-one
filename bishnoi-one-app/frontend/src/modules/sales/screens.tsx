@@ -12,6 +12,9 @@ import { SalesOrderForm, SalesOrderSteps } from "./components";
 import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import type { SalesOrder, SalesOrderBrief, SalesStatus } from "./types";
+import { loadRecordSlip } from "@/src/one/approvals/load";
+import { SlipActions } from "@/src/one/approvals/slip-actions";
+import { SlipCard } from "@/src/one/approvals/slip-view";
 
 // The Sales app's screens (feature plan step 11): sales orders, made from approved CRM quotes or typed here at the
 // price list's prices; each waits for approval, and approving makes its delivery in Inventory.
@@ -94,6 +97,9 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
   if (!may("sales.view")) return <NoAccess what="sales orders" />;
   const o = await load<SalesOrder>(`/inventory/sales-orders/${encodeURIComponent(id)}`);
   const docs = await load<(ProductDocument & { product: { name: string } })[]>(`/inventory/sales-orders/${encodeURIComponent(id)}/documents`);
+  // Its approval slip (Step 4C), signed up the chart on the Platform: while it waits, it is approved there, not here.
+  const slips = await loadRecordSlip("inventory", "sales_order", id);
+  const slip = slips?.slip ?? null;
   // The lines as ordered keep the order's own totals; the invoice's figures show above them once invoiced (Step 4D).
   const own = o.ordered ?? { discountCentavos: o.discountCentavos, totalCentavos: o.totalCentavos };
   return (
@@ -101,10 +107,16 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
       <PageHeader
         crumbs={[{ href: "/crm/sales", label: "Sales orders" }]}
         title={o.number}
-        actions={<SalesOrderSteps order={o} may={{ create: may("sales.create"), edit: may("sales.edit"), approve: may("sales.approve") }} />}
+        actions={<SalesOrderSteps order={o} may={{ create: may("sales.create"), edit: may("sales.edit"), approve: may("sales.approve") && slip?.status !== "pending" }} />}
       >
         <Stamp status={o.status} label={o.statusLabel} invoiceState={o.invoiceState} /> <span className="ml-1">for <strong>{o.customer.name}</strong>, from {o.warehouse.name}{o.scheduledOn && <>, due {day(o.scheduledOn)}</>}</span>
       </PageHeader>
+      {slip && (
+        <SlipCard
+          slip={slip}
+          actions={slip.status === "pending" ? <SlipActions id={slip.id} number={slip.number} canSign={slip.canSign} actingAs={slip.actingAs} canAddFiles={slip.canAddFiles} /> : null}
+        />
+      )}
       {o.status === "rejected" && o.decisionNote && (
         <p className="mb-4 rounded-[3px] bg-danger-tint px-4 py-2 text-sm text-ink">
           Rejected by {o.decidedBy?.name ?? "an approver"}: {o.decisionNote}

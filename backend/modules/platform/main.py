@@ -22,6 +22,7 @@ from modules.platform.migrate import upgrade
 from modules.platform.models import AuditEntry
 from modules.platform.routers import (
     access,
+    approvals as approvals_router,
     activity,
     applications,
     auth,
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(identity.router)
     app.include_router(company_access.router)
     app.include_router(hr_records.router)
+    app.include_router(approvals_router.router)
     app.include_router(access_policy.router)
     app.include_router(organisation.router)
     app.include_router(company_console.router)

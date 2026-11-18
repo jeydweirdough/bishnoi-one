@@ -83,8 +83,16 @@ def nightly(db) -> None:
         db.rollback()
 
 
+def _approval_decided(db, data: dict, slug: str) -> None:
+    """An approval slip ended (Step 4C): the sales order it was for is approved or rejected (app/sales.py)."""
+    from modules.inventory import sales
+
+    if data.get("kind") == "sales_order":
+        sales.decided_on_slip(db, data, slug)
+
+
 HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid,
-                                 "invoice.voided": _invoice_voided}
+                                 "invoice.voided": _invoice_voided, "approval.decided": _approval_decided}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])

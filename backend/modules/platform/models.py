@@ -891,6 +891,100 @@ class DocumentLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+# ---- Approval slips (Step 4C, 2026-11-18) ----------------------------------------
+# One request that passes up the chain, like a routing slip (approvals.py): a number, what is asked, its
+# attachments, and its steps from the requester's managers on the org chart (or the holders of a permission).
+
+APPROVAL_STATUSES = ("pending", "approved", "returned", "cancelled")
+APPROVAL_STEP_STATUSES = ("waiting", "signed", "returned", "skipped")
+
+
+class Approval(Base):
+    """One approval slip: a record of an app (a sales order) waiting to be signed up the chain."""
+
+    __tablename__ = "nbpl_approvals"
+    __table_args__ = (
+        _one_of("status", APPROVAL_STATUSES, "nbpl_approval_status"),
+        UniqueConstraint("company_id", "number", name="nbpl_approval_number_once"),
+        Index("nbpl_approvals_record", "company_id", "app", "kind", "record_id"),
+        Index("nbpl_approvals_no", "no", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Its number, from 40000001 up (app/numbering.py); `number` is the one people read (AR-000001, per company).
+    no: Mapped[int | None] = mapped_column(Integer, server_default=FetchedValue())
+    company_id: Mapped[str] = mapped_column(ForeignKey("nbpl_companies.id", ondelete="CASCADE"), index=True)
+    number: Mapped[str] = mapped_column(String(20))
+    app: Mapped[str] = mapped_column(String(40))
+    kind: Mapped[str] = mapped_column(String(40))
+    record_id: Mapped[str] = mapped_column(String(36))
+    record_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    record_url: Mapped[str | None] = mapped_column(String(300), default=None)
+    title: Mapped[str] = mapped_column(String(200))
+    # What the approvers read: customer, amounts, a brief of the lines (as the app sent them).
+    summary: Mapped[dict | None] = mapped_column(JSON, default=None)
+    requested_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="SET NULL"), default=None, index=True)
+    requested_by_name: Mapped[str] = mapped_column(String(120))
+    requested_by_email: Mapped[str | None] = mapped_column(String(254), default=None)
+    status: Mapped[str] = mapped_column(String(12), default="pending", index=True)
+    # The slip it was sent again after (a returned one), and the last word on it (a return's note, a cancel's reason).
+    replaces_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    note: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class ApprovalStep(Base):
+    """One step of a slip: a named person (from the org chart) or anyone holding a permission in an app."""
+
+    __tablename__ = "nbpl_approval_steps"
+    __table_args__ = (
+        _one_of("status", APPROVAL_STEP_STATUSES, "nbpl_approval_step_status"),
+        UniqueConstraint("approval_id", "position", name="nbpl_approval_step_once"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    approval_id: Mapped[str] = mapped_column(ForeignKey("nbpl_approvals.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(String(80))
+    approver_id: Mapped[str | None] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="SET NULL"), default=None, index=True)
+    approver_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    # A group step: anyone whose role holds this permission in this app.
+    app_key: Mapped[str | None] = mapped_column(String(40), default=None)
+    permission: Mapped[str | None] = mapped_column(String(64), default=None)
+    status: Mapped[str] = mapped_column(String(10), default="waiting")
+    note: Mapped[str | None] = mapped_column(String(500), default=None)
+    acted_by_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    acted_by_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    # approver (the step's own), holder (of the group's permission) or administrator (acting for the step).
+    acted_as: Mapped[str | None] = mapped_column(String(16), default=None)
+    acted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Their Platform signature when they signed (nbpl_signatures; a replaced one is kept).
+    signature_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
+
+class ApprovalAttachment(Base):
+    """What proves the request: a link to a record (the quote, the Rx check, a guarantee letter) or a file."""
+
+    __tablename__ = "nbpl_approval_attachments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    approval_id: Mapped[str] = mapped_column(ForeignKey("nbpl_approvals.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))  # record or file
+    label: Mapped[str] = mapped_column(String(120))
+    app: Mapped[str | None] = mapped_column(String(40), default=None)
+    record_kind: Mapped[str | None] = mapped_column(String(40), default=None)
+    record_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    record_number: Mapped[str | None] = mapped_column(String(60), default=None)
+    url: Mapped[str | None] = mapped_column(String(300), default=None)
+    file_name: Mapped[str | None] = mapped_column(String(200), default=None)
+    content_type: Mapped[str | None] = mapped_column(String(100), default=None)
+    data: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
+    size: Mapped[int | None] = mapped_column(Integer, default=None)
+    added_by: Mapped[str] = mapped_column(String(254))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 # ---- Communications ------------------------------------------------------------
 
 NOTICE_KINDS = ("announcement", "notification", "maintenance")
@@ -941,7 +1035,7 @@ class PlatformSetting(Base):
 # Numbers on SQLite as records are saved (on Postgres the database gives them).
 from modules.platform.numbering import numbered  # noqa: E402  (after the models it names)
 
-numbered(User, Identity, Company, Application, Account)
+numbered(User, Identity, Company, Application, Account, Approval)
 
 
 class AccessPolicyImport(Base):

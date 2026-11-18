@@ -63,6 +63,11 @@ KINDS: dict[str, Kind] = {
     "sales_order.updated": Kind("inventory", ("crm",), "A sales order was approved, rejected, delivered or cancelled"),
     # Any app (ANY) links its documents into the chain; the platform keeps it (app/document_chain.py).
     "document.linked": Kind("*", (), "Two documents were linked: one came from the other"),
+    # Approval slips (Step 4C, approvals.py): any app asks for one, or withdraws it; the slip's end goes back to the
+    # app that asked (only to it: see accept).
+    "approval.requested": Kind("*", (), "An approval slip was asked for"),
+    "approval.withdrawn": Kind("*", (), "An approval slip was withdrawn: the record was decided another way"),
+    "approval.decided": Kind(PLATFORM, ("inventory", "crm"), "An approval slip was signed through or returned"),
 }
 ANY = "*"
 
@@ -80,9 +85,16 @@ def accept(db: Session, source: str, company: Company, event_id: str, kind: str,
         from modules.platform.document_chain import keep
 
         keep(db, company.id, source, data)
+    if kind in ("approval.requested", "approval.withdrawn") and source != PLATFORM:
+        from modules.platform import approvals
+
+        (approvals.open_slip if kind == "approval.requested" else approvals.withdraw)(db, company, source, data)
     has = set(db.scalars(select(Application.key).join(CompanyApp, CompanyApp.application_id == Application.id).where(CompanyApp.company_id == company.id)))
     now = datetime.now(UTC)
-    for target in KINDS[kind].takers:
+    takers = KINDS[kind].takers
+    if kind == "approval.decided":
+        takers = tuple(t for t in takers if t == data.get("app"))  # only the app whose record it is
+    for target in takers:
         if target in has and target != source:
             db.add(EventDelivery(event_id=event_id, target=target, status="pending", next_at=now))
     db.flush()

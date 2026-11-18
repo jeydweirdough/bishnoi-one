@@ -4,9 +4,11 @@
     GET  /inventory/sales-orders/{id}            one, with its lines and its deliveries
     POST /inventory/sales-orders                 typed here: a draft at the price list's prices
     PUT  /inventory/sales-orders/{id}            a draft changed
-    POST /inventory/sales-orders/{id}/submit     the draft goes for approval
-    POST /inventory/sales-orders/{id}/approve    confirmed, and its delivery made (sales.approve)
-    POST /inventory/sales-orders/{id}/reject     back to the rep, with the reason (sales.approve)
+    POST /inventory/sales-orders/{id}/submit     the draft goes for approval: on its approval slip (Step 4C)
+    POST /inventory/sales-orders/{id}/approve    confirmed, and its delivery made (sales.approve); while connected to
+                                                 Bishnoi One, only an administrator (the slip is withdrawn); others
+                                                 sign the slip, whose end comes back as approval.decided
+    POST /inventory/sales-orders/{id}/reject     back to the rep, with the reason (sales.approve; the same rule)
     POST /inventory/sales-orders/{id}/cancel     while nothing has left the warehouse
 """
 
@@ -178,14 +180,30 @@ def update_order(_: allowed("sales.edit"), me: CurrentUser, db: DB, order_id: st
 
 
 @router.post("/sales-orders/{order_id}/submit")
-def submit_order(_: allowed("sales.create"), me: CurrentUser, db: DB, order_id: str) -> dict:
+def submit_order(_: allowed("sales.create"), me: CurrentUser, db: DB, order_id: str, request: Request) -> dict:
     o = found(db, SalesOrder, order_id, "sales order")
     if o.status not in ("draft", "rejected"):
         raise conflict("Only a draft goes for approval.")
     o.status, o.decision_note = "pending", None
+    # On its approval slip (Step 4C): signed up the chart on the Platform, which tells us the end.
+    sales.ask_for_approval(db, company_of(request), o, sales.requester_of(me))
     audit(db, me, "sales_order.submitted", target=o.number, target_type="sales_order", target_id=o.id)
     db.commit()
     return {"id": o.id, "status": o.status}
+
+
+def on_slip(request: Request) -> bool:
+    """Connected to Bishnoi One: orders are approved on their approval slip (Step 4C), not here."""
+    return bool(getattr(request.app.state.settings, "platform_api_url", None))
+
+
+def decided_here(request: Request, db: DB, me, o: SalesOrder, what: str) -> None:
+    """While connected, only an administrator decides an order here, and its waiting slip is withdrawn."""
+    if not on_slip(request):
+        return
+    if not me.role.is_system:
+        raise conflict(f"This order is {what} on its approval slip: open Approvals, or the slip on this order.")
+    sales.withdraw_approval(db, company_of(request), o, f"Decided in Inventory by {me.full_name} (administrator).", me.email)
 
 
 @router.post("/sales-orders/{order_id}/approve")
@@ -195,6 +213,7 @@ def approve_order(_: allowed("sales.approve"), me: CurrentUser, db: DB, order_id
         raise conflict("Only an order waiting for approval can be approved.")
     if not o.lines:
         raise conflict("This order has no lines to deliver.")
+    decided_here(request, db, me, o, "approved")
     delivery = sales.approve(db, o, me, company_of(request))
     audit(db, me, "sales_order.approved", target=o.number, target_type="sales_order", target_id=o.id, fields=[delivery.number])
     db.commit()
@@ -218,6 +237,7 @@ def reject_order(_: allowed("sales.approve"), me: CurrentUser, db: DB, order_id:
     o = found(db, SalesOrder, order_id, "sales order")
     if o.status != "pending":
         raise conflict("Only an order waiting for approval can be rejected.")
+    decided_here(request, db, me, o, "returned")
     from datetime import UTC, datetime
 
     o.status, o.decided_by_id, o.decided_at, o.decision_note = "rejected", me.id, datetime.now(UTC), body.note.strip()
@@ -241,6 +261,8 @@ def cancel_order(_: allowed("sales.edit"), me: CurrentUser, db: DB, order_id: st
         raise conflict("The warehouse has already reserved or issued its delivery: cancel the delivery first.")
     for d in deliveries:
         d.status = "cancelled"
+    if o.status == "pending":
+        sales.withdraw_approval(db, company_of(request), o, f"The order was cancelled by {me.full_name}.", me.email)
     o.status = "cancelled"
     sales.told(db, company_of(request), o)
     audit(db, me, "sales_order.cancelled", target=o.number, target_type="sales_order", target_id=o.id)

@@ -63,6 +63,8 @@ export function buildMenu(me: Account): OneMenu {
       { href: "/crm/deals", label: "Deals", icon: "deals", show: sells && may("crm", "deals.view") },
       { href: "/crm/quotes", label: "Quotes", icon: "quotes", show: sells && may("crm", "quotes.view") },
       { href: "/crm/sales", label: "Sales orders", icon: "issuance", show: sells && may("crm", "quotes.view") },
+      // One approvals inbox (Step 4C): slips waiting on me and my requests, whatever app the record is in.
+      { href: "/approvals", label: "Approvals", icon: "approvals", show: admin || (sells && may("crm", "quotes.view")) || may("inventory", "sales.create", "sales.approve") },
       { href: "/crm/order-links", label: "Order links", icon: "orders", show: sells && may("crm", "quotes.view") },
       { href: "/crm/products", label: "Products and prices", icon: "products", show: may("crm", "products.view") },
       { href: "/crm/prices", label: "Price books", icon: "pricing", show: may("crm", "products.prices") },
