@@ -22,7 +22,7 @@ BASE = "http://127.0.0.1:8300"
 HOSTS = ["testserver", "127.0.0.1"]
 # Module package -> (its key on the Platform, its path in the one backend).
 MODULES = {"crm": ("crm", "/crm"), "inventory": ("inventory", "/inventory"), "finance": ("finance", "/finance"),
-           "admin": ("exec", "/admin"), "pharmacy": ("pharmacy", "/pharmacy")}
+           "pharmacy": ("pharmacy", "/pharmacy")}
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def platform(tmp_path):
     app.state.sessions.kw["bind"].dispose()
 
 
-def person(platform, given=("crm", "inventory", "finance", "exec", "pharmacy"), company_apps=("crm", "inventory", "finance", "exec", "pharmacy")) -> dict:
+def person(platform, given=("crm", "inventory", "finance", "pharmacy"), company_apps=("crm", "inventory", "finance", "pharmacy")) -> dict:
     """Jade at GetMeds, given `given` as Administrator there, signed in to Bishnoi One: her account token."""
     with TestClient(platform) as c:
         ana = bearer(sign_in(c))
@@ -91,7 +91,7 @@ def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.mark.parametrize("name", ["crm", "inventory", "finance", "admin", "pharmacy"])
+@pytest.mark.parametrize("name", ["crm", "inventory", "finance", "pharmacy"])
 def test_a_module_takes_the_account_token(platform, tmp_path, name):
     jade = person(platform)
     app = build(name, tmp_path)
@@ -190,7 +190,7 @@ def test_nothing_outside_can_ask_who_a_session_is(platform):
 
 def test_outside_the_one_backend_a_module_takes_only_its_own_sessions(platform, tmp_path):
     jade = person(platform)
-    app = build("admin", tmp_path)
+    app = build("pharmacy", tmp_path)
     try:
         inprocess.clear()  # a module run alone: the account token is nothing to it
         with TestClient(app) as c:

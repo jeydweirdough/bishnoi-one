@@ -25,7 +25,6 @@ APPS = [
     ("inventory", "Inventory", "inventory", "/inventory"),
     ("finance", "Finance (Books)", "finance", "/finance"),
     ("pharmacy", "Pharmacy", "pharmacy", "/pharmacy"),
-    ("admin", "Executive Admin (Office)", "admin", "/admin"),
     ("in_licensing", "In-Licensing", "inlicensing", "/in-licensing"),
     ("regulatory", "Regulatory", "regulatory", "/regulatory"),
 ]

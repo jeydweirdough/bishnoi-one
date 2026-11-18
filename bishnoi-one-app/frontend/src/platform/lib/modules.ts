@@ -1,4 +1,4 @@
-import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, Users, Wrench, type LucideIcon } from "lucide-react";
+import { FlaskConical, HeartPulse, Landmark, Network, Package, ShieldCheck, Users, Wrench, type LucideIcon } from "lucide-react";
 
 // Every Bishnoi One module in the one app (decided 2026-10-23,
 // benchmarks/decisions.md): where its screens live on this site, where its API
@@ -11,7 +11,7 @@ import { Building2, FlaskConical, HeartPulse, Landmark, Network, Package, Shield
 //   soon    not built yet (a "Coming soon" page, for companies that have it).
 // A module brought in (Phase 2) changes from "moving" to "live" here, and that's all.
 
-export type ModuleKey = "platform" | "operations" | "crm" | "inventory" | "finance" | "admin" | "pharmacy" | "inlicensing" | "regulatory";
+export type ModuleKey = "platform" | "operations" | "crm" | "inventory" | "finance" | "pharmacy" | "inlicensing" | "regulatory";
 
 export type ModuleDef = {
   key: ModuleKey;
@@ -41,7 +41,6 @@ export const MODULES: ModuleDef[] = [
   // its Platform key), shown to whoever has Inventory while the company's catalogue has Sales on (src/one/mine.ts).
   { key: "finance", path: "/finance", label: "Finance", blurb: "Invoices and tax", appKey: "finance", apiPath: "/finance", status: "live", icon: Landmark, tint: "#fcf3dd", ink: "#9a6a12" },
   { key: "pharmacy", path: "/pharmacy", label: "Pharmacy", blurb: "Prescriptions", appKey: "pharmacy", apiPath: "/pharmacy", status: "live", icon: HeartPulse, tint: "#fbe7e3", ink: "#c2493a" },
-  { key: "admin", path: "/admin", label: "Executive Admin", blurb: "Office administration", appKey: "exec", apiPath: "/admin", status: "live", icon: Building2, tint: "#efeafb", ink: "#7a5cc4" },
   { key: "inlicensing", path: "/in-licensing", label: "In-Licensing", blurb: "Product licensing", appKey: "inlicensing", apiPath: "/in-licensing", status: "soon", icon: FlaskConical, tint: "#e6f3f3", ink: "#2f7d7d" },
   { key: "regulatory", path: "/regulatory", label: "Regulatory", blurb: "Registrations and permits", appKey: "regulatory", apiPath: "/regulatory", status: "soon", icon: ShieldCheck, tint: "#eef1f6", ink: "#4a5b78" },
   // The Admin Console (decided 2026-10-24): on the Bishnoi One account itself, no module session. Platform

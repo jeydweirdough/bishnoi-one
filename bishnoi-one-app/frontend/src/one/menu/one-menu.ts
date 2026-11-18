@@ -6,8 +6,8 @@
 //
 // Pages that exist twice today (CRM products and Inventory items, vendors and suppliers, the two sales
 // order lists, two calendars) are placed as they are; merging them is Step 3, one at a time with the owner.
-// Promotional materials are one row, opening the step of the work the person does (Office designs,
-// Pharmacy reviews, CRM gives them out).
+// Promotional materials are one row, opening the step of the work the person does (Pharmacy reviews,
+// CRM gives them out). Office administration is not part of Bishnoi One (another app, 2026-11-19).
 
 import type { Account } from "@/src/platform/lib/account";
 import type { IconName } from "@/src/platform/ui/icons";
@@ -20,7 +20,7 @@ export type OneMenu = { home: MenuStep; processes: MenuGroup[]; foot: MenuGroup[
 /** Every module's Reports Center: the one Reports row is current on any of them. */
 export const REPORT_PATHS = [
   "/reports", "/crm/reports", "/inventory/reports", "/inventory/alerts", "/inventory/serials", "/inventory/movements",
-  "/finance/reports", "/finance/bir/statements", "/admin/reports", "/pharmacy/reports", "/platform/reports",
+  "/finance/reports", "/finance/bir/statements", "/pharmacy/reports", "/platform/reports",
 ];
 
 type Page = MenuStep & { show: boolean };
@@ -43,11 +43,9 @@ export function buildMenu(me: Account): OneMenu {
   const group = (label: string, icon: IconName, pages: Page[]): MenuGroup => ({ label, icon, steps: keep(pages) });
 
   // Promotional materials: one row, at the step this person works (design, review, giving out).
-  const materials: Page = may("exec", "materials.view")
-    ? { href: "/admin/materials", label: "Promotional materials", icon: "approvals", also: ["/pharmacy/material-reviews", "/crm/materials"], show: true }
-    : may("pharmacy", "materials.view")
-      ? { href: "/pharmacy/material-reviews", label: "Promotional materials", icon: "approvals", also: ["/admin/materials", "/crm/materials"], show: true }
-      : { href: "/crm/materials", label: "Promotional materials", icon: "approvals", also: ["/admin/materials", "/pharmacy/material-reviews"], show: may("crm", "department.manage", "admin.settings") };
+  const materials: Page = may("pharmacy", "materials.view")
+    ? { href: "/pharmacy/material-reviews", label: "Promotional materials", icon: "approvals", also: ["/crm/materials"], show: true }
+    : { href: "/crm/materials", label: "Promotional materials", icon: "approvals", also: ["/pharmacy/material-reviews"], show: may("crm", "department.manage", "admin.settings") };
 
   const processes: MenuGroup[] = [
     group("Customers", "customers", [
@@ -57,6 +55,7 @@ export function buildMenu(me: Account): OneMenu {
       { href: "/crm/calendar", label: "Calendar", icon: "calendar", show: may("crm", "activities.view") },
       { href: "/crm/retention", label: "Retention", icon: "retention", show: sells && may("crm", "customers.view") },
       { href: "/crm/media", label: "Customer documents", icon: "letters", show: may("crm", "customers.view", "admin.settings") },
+      materials,
     ]),
     group("Selling", "deals", [
       { href: "/crm", label: "Sales overview", icon: "overview", exact: true, show: has("crm") },
@@ -147,20 +146,6 @@ export function buildMenu(me: Account): OneMenu {
       { href: "/pharmacy/suppliers", label: "Pharmacy suppliers", icon: "suppliers", show: may("pharmacy", "suppliers.view") },
       { href: "/pharmacy/admin/settings", label: "Pharmacy settings", icon: "settings", also: ["/pharmacy/admin"], show: may("pharmacy", "admin.settings") },
     ]),
-    group("Office", "properties", [
-      { href: "/admin", label: "Office overview", icon: "overview", exact: true, show: may("exec", "dashboard.view") },
-      { href: "/admin/notifications", label: "Renewal alerts", icon: "notifications", show: may("exec", "notifications.view") },
-      { href: "/admin/permits", label: "Permits", icon: "permits", show: may("exec", "permits.view") },
-      { href: "/admin/documents", label: "Company documents", icon: "documents", show: may("exec", "documents.view") },
-      { href: "/admin/immigration", label: "Expatriates", icon: "immigration", show: may("exec", "immigration.view") },
-      { href: "/admin/properties", label: "Properties", icon: "properties", show: may("exec", "properties.view") },
-      { href: "/admin/vehicles", label: "Vehicles", icon: "vehicles", show: may("exec", "vehicles.view") },
-      { href: "/admin/fuel-cards", label: "Fuel cards", icon: "fuelCards", show: may("exec", "vehicles.view") },
-      { href: "/admin/travel", label: "Hotel and flights", icon: "travel", show: may("exec", "travel.view") },
-      { href: "/admin/devices", label: "Devices issued", icon: "devices", show: may("exec", "devices.view") },
-      { href: "/admin/tickets", label: "Office requests", icon: "tickets", show: may("exec", "tickets.view") },
-      materials,
-    ]),
     group("Team", "people", [
       { href: "/platform/home", label: "Employee overview", icon: "overview", show: admin },
       { href: "/platform/roles/people", label: "Employees", icon: "people", show: admin },
@@ -213,8 +198,6 @@ export function reportCentres(me: Account): ReportCentre[] {
   if (may("inventory", "reports.view", "stock.view")) out.push({ href: "/inventory/reports", label: "Stock, buying and deliveries", says: "Stock, expiry, movements, purchasing and delivery", icon: "stock" });
   if (may("finance")) out.push({ href: "/finance/reports", label: "Money and accounting", says: "Statements, books, receivables, payables and taxes", icon: "money" });
   if (may("pharmacy", "reports.view")) out.push({ href: "/pharmacy/reports", label: "Pharmacy", says: "Prescriptions, dispensing, sales and stock", icon: "prescriptions" });
-  if (may("exec", "permits.view", "immigration.view", "documents.view", "properties.view", "vehicles.view", "travel.view", "devices.view", "tickets.view", "materials.view"))
-    out.push({ href: "/admin/reports", label: "Office", says: "Permits, documents, fleet, travel and requests", icon: "properties" });
   if (me.isCompanyAdmin) out.push({ href: "/platform/reports", label: "Employees", says: "People, sign-ins, access and security", icon: "people" });
   return out;
 }

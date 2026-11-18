@@ -1,7 +1,7 @@
 # Bishnoi One
 
-Bishnoi One is a set of business modules (CRM, Inventory, Finance, Pharmacy,
-Executive Admin, and more) kept in one GitHub repo: **one backend** with every
+Bishnoi One is a set of business modules (CRM, Inventory, Finance, Pharmacy
+and more; office administration is another app, apart from this repo since 2026-11-19) kept in one GitHub repo: **one backend** with every
 module's API, and **one web app** with every module's screens and one sign-in.
 This page shows you how to:
 
@@ -60,7 +60,6 @@ bishnoi/
 │       ├── crm/            /crm
 │       ├── inventory/      /inventory
 │       ├── finance/        /finance
-│       ├── admin/          /admin         Executive Admin
 │       ├── pharmacy/       /pharmacy
 │       ├── in_licensing/   /in-licensing
 │       └── regulatory/     /regulatory
@@ -74,7 +73,6 @@ bishnoi/
 | CRM | `/crm` | `/crm` |
 | Inventory | `/inventory` | `/inventory` |
 | Finance | `/finance` | `/finance` |
-| Executive Admin | `/admin` | `/admin` |
 | Pharmacy | `/pharmacy` | `/pharmacy` |
 | Admin Console (company administrators) | `/platform` | `/platform` |
 | Operations (Bishnoi One's operators) | `/operations` | `/platform` |
@@ -471,9 +469,9 @@ database without clashing (**Check apps** checks it):
 
 | Module | Prefix | | Module | Prefix |
 |---|---|---|---|---|
-| Admin | `nbad_` | | Inventory | `nbin_` |
-| CRM | `nbcm_` | | Platform | `nbpl_` |
-| Finance | `nbfi_` | | Pharmacy | `nbph_` |
+| CRM | `nbcm_` | | Inventory | `nbin_` |
+| Finance | `nbfi_` | | Platform | `nbpl_` |
+| Pharmacy | `nbph_` | | | |
 | In-Licensing | `nbil_` | | Regulatory | `nbrg_` |
 
 ---

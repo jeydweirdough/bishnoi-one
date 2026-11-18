@@ -12,7 +12,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 /**
  * One Home for everyone (M4, the one menu by work, 2026-11-18): the work this person does, grouped as the
- * menu groups it, each group's pages one click away; the overviews (Sales, Stock, Finance, Office, Pharmacy,
+ * menu groups it, each group's pages one click away; the overviews (Sales, Stock, Finance, Pharmacy,
  * Employees) lead each group. In place of going straight into a first app (2026-10-24). A page that couldn't
  * be opened sends people here with a notice.
  */

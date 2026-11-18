@@ -83,7 +83,6 @@ MODULE_PATHS: dict[str, str] = {
     "crm": "/crm",
     "inventory": "/inventory",
     "finance": "/finance",
-    "admin": "/admin",
     "pharmacy": "/pharmacy",
     "in_licensing": "/in-licensing",
     "regulatory": "/regulatory",

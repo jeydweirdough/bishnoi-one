@@ -36,7 +36,6 @@ def test_every_module_is_reported_at_the_one_backend(backend_client):
     assert apis["crm"] == "http://10.0.1.1:8300/crm"
     assert apis["inventory"] == "http://10.0.1.1:8300/inventory"
     assert apis["finance"] == "http://10.0.1.1:8300/finance"
-    assert apis["exec"] == "http://10.0.1.1:8300/admin"
     assert apis["platform"] == "http://10.0.1.1:8300/platform"
 
     listed = {a["key"]: a for a in client.get("/platform/applications", headers=ana).json()["applications"]}

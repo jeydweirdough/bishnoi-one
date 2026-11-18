@@ -7,7 +7,7 @@
 Each module is its former API, unchanged: its own create_app() with its own middleware,
 errors, sessions, permissions, database and Alembic history. It answers under its path:
 
-    /platform  /crm  /inventory  /finance  /admin  /pharmacy  /in-licensing  /regulatory
+    /platform  /crm  /inventory  /finance  /pharmacy  /in-licensing  /regulatory
 
 so /crm/customers here is what /customers was on the CRM's own API. GET /health is the
 backend's own (which modules started).
@@ -55,7 +55,6 @@ MODULES: list[tuple[str, str]] = [
     ("platform", "/platform"),
     ("crm", "/crm"),
     ("inventory", "/inventory"),
-    ("admin", "/admin"),
     ("pharmacy", "/pharmacy"),
     ("in_licensing", "/in-licensing"),
     ("regulatory", "/regulatory"),
@@ -63,7 +62,7 @@ MODULES: list[tuple[str, str]] = [
 ]
 
 # Each module's key on the Platform (Applications), the name it calls and is called by in-process.
-KEYS: dict[str, str] = {"admin": "exec", "in_licensing": "inlicensing"}
+KEYS: dict[str, str] = {"in_licensing": "inlicensing"}
 
 
 def _unavailable(name: str, error: BaseException) -> FastAPI:

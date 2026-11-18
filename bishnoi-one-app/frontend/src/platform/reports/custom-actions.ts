@@ -69,9 +69,6 @@ export async function fetchBaseReport(app: string, baseKey: string): Promise<Res
     if (mod === "pharmacy") {
       return await apiFor("pharmacy").get<ReportData>(`/reports/${key}`);
     }
-    if (mod === "admin") {
-      return await apiFor("admin").get<ReportData>(`/admin/reports/${key}`);
-    }
     return await apiFor(mod).get<ReportData>(`/reports/${key}`);
   });
 }

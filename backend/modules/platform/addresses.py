@@ -19,8 +19,6 @@ PATHS: dict[str, str] = {
     "crm": "/crm",
     "inventory": "/inventory",
     "finance": "/finance",
-    "exec": "/admin",
-    "admin": "/admin",
     "pharmacy": "/pharmacy",
     "inlicensing": "/in-licensing",
     "in-licensing": "/in-licensing",

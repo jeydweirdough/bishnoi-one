@@ -30,7 +30,7 @@ jobs:
         run: |
           problems=0
           fail() { echo "::error::$1"; echo "- $1" >> "$GITHUB_STEP_SUMMARY"; problems=$((problems + 1)); }
-          declare -A PREFIXES=([platform]=nbpl_ [crm]=nbcm_ [inventory]=nbin_ [finance]=nbfi_ [admin]=nbad_ [pharmacy]=nbph_ [in_licensing]=nbil_ [regulatory]=nbrg_)
+          declare -A PREFIXES=([platform]=nbpl_ [crm]=nbcm_ [inventory]=nbin_ [finance]=nbfi_ [pharmacy]=nbph_ [in_licensing]=nbil_ [regulatory]=nbrg_)
 
           echo "### Checking the backend's modules" >> "$GITHUB_STEP_SUMMARY"
           [ -f backend/main.py ] || fail "backend/main.py is missing"

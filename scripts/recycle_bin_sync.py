@@ -5,7 +5,7 @@ Edit the template, then run: python scripts/recycle_bin_sync.py"""
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-MODULES = {"crm": "nbcm_", "inventory": "nbin_", "finance": "nbfi_", "admin": "nbad_", "pharmacy": "nbph_"}
+MODULES = {"crm": "nbcm_", "inventory": "nbin_", "finance": "nbfi_", "pharmacy": "nbph_"}
 template = (ROOT / "scripts" / "recycle_bin_template.py").read_text(encoding="utf-8")
 for module, prefix in MODULES.items():
     text = template.replace("__PREFIX__", prefix).replace("__PACKAGE__", f"modules.{module}")

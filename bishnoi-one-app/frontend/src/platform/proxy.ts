@@ -79,7 +79,7 @@ export async function proxy(request: NextRequest) {
   const dropped = [...DROPPED_CRM, ...DROPPED_INVENTORY, ...DROPPED_FINANCE, ...DROPPED_PLATFORM].find(([from]) => pathname === from || pathname.startsWith(`${from}/`));
   if (dropped) return NextResponse.redirect(siteUrl(dropped[1], request), 308);
   // People, roles and teams are kept only in the Admin Console (2026-10-31): each app's old pages land there.
-  const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy|admin)\/admin\/(users|roles|teams)(?:\/.*)?$/);
+  const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy)\/admin\/(users|roles|teams)(?:\/.*)?$/);
   if (kept) return NextResponse.redirect(siteUrl(ADMIN_CONSOLE[kept[1] as keyof typeof ADMIN_CONSOLE], request), 308);
   // Integrations are set up only in the Admin Console (2026-10-31): the CRM's Connections and Finance's Zoho
   // sign-in land there. Zoho's callback stays where Zoho was told to send people.
@@ -94,13 +94,13 @@ export async function proxy(request: NextRequest) {
   const zoho = pathname.match(/^\/finance\/integrations\/zoho(\/deliveries)?$/);
   if (zoho) return NextResponse.redirect(siteUrl(`/platform/company/integrations/zoho${zoho[1] ?? ""}${search}`, request), 308);
   // One activity log, the Admin Console's (2026-10-31): each app's old log lands there, filtered to that app.
-  const log = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/audit$/);
+  const log = pathname.match(/^\/(crm|inventory|finance|pharmacy)\/admin\/audit$/);
   if (log) return NextResponse.redirect(siteUrl(`/platform/company/activity?app=${log[1]}`, request), 308);
   // One data clean-up and recycle bin, the Admin Console's (2026-10-31): each app's old page lands there, on that app.
-  const cleanup = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/data-cleanup$/);
+  const cleanup = pathname.match(/^\/(crm|inventory|finance|pharmacy)\/admin\/data-cleanup$/);
   if (cleanup) return NextResponse.redirect(siteUrl(`/platform/company/data-cleanup?app=${cleanup[1]}`, request), 308);
-  // Executive Admin's "Settings" only ever led to its users (2026-10-31).
-  if (pathname === "/admin/settings" || pathname.startsWith("/admin/settings/")) return NextResponse.redirect(siteUrl("/platform/roles/people", request), 308);
+  // Office administration left Bishnoi One for an app of its own (2026-11-19): its old pages go Home.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return NextResponse.redirect(siteUrl("/", request), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   headers.delete(FRAME_HEADER);

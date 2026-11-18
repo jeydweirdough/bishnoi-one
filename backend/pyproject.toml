@@ -1,7 +1,7 @@
 [project]
 name = "bishnoi-one-backend"
 version = "0.1.0"
-description = "Bishnoi One's backend: every module's API (platform, crm, inventory, finance, admin, pharmacy, in-licensing, regulatory) in one process"
+description = "Bishnoi One's backend: every module's API (platform, crm, inventory, finance, pharmacy, in-licensing, regulatory) in one process"
 requires-python = ">=3.13"
 # The eight former APIs' dependencies together, each at the highest version any of them asked for.
 dependencies = [
