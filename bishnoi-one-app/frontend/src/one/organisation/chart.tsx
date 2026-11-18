@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "antd";
-import { Building2, MapPin, Pencil, Plus, Power, Users } from "lucide-react";
+import { Building2, ChevronDown, MapPin, Network, Pencil, Plus, Power, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -59,11 +59,9 @@ export function OrganisationChart({ data }: { data: OrgData }) {
           {data.notPlaced} {data.notPlaced === 1 ? "employee isn't" : "employees aren't"} on the chart yet. Give each a main unit, so their sales and approvals count in the right place.
         </Banner>
       )}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <UnitTree data={data} />
-        <Branches data={data} />
-      </div>
+      <UnitTree data={data} />
       <People data={data} onlyUnplaced={onlyUnplaced} setOnlyUnplaced={setOnlyUnplaced} />
+      <Branches data={data} />
     </div>
   );
 }
@@ -72,11 +70,27 @@ export function OrganisationChart({ data }: { data: OrgData }) {
 
 function UnitTree({ data }: { data: OrgData }) {
   const [editing, setEditing] = useState<{ unit?: OrgUnit; parentId?: string | null } | null>(null);
+  const [query, setQuery] = useState("");
   const active = data.units.filter((u) => u.isActive);
   const off = data.units.filter((u) => !u.isActive);
   const people = new Map(data.people.map((p) => [p.id, p.fullName]));
   const ids = new Set(active.map((u) => u.id));
-  const under = (parent: string | null) => active.filter((u) => (parent === null ? !u.parentId || !ids.has(u.parentId) : u.parentId === parent));
+  const children = new Map<string | null, OrgUnit[]>();
+  for (const u of active) {
+    const key = u.parentId && ids.has(u.parentId) ? u.parentId : null;
+    children.set(key, [...(children.get(key) ?? []), u]);
+  }
+  for (const list of children.values()) list.sort((x, y) => x.name.localeCompare(y.name));
+  const under = (parent: string | null) => children.get(parent) ?? [];
+  // The top level opens at first, so its units show; deeper ones open on a click.
+  const [open, setOpen] = useState<Set<string>>(() => new Set(under(null).map((u) => u.id)));
+  const toggle = (id: string) =>
+    setOpen((was) => {
+      const next = new Set(was);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const byId = new Map(data.units.map((u) => [u.id, u]));
   // Department > division > team: any number of heads each, and the heads above see everyone below. A unit with no head
@@ -91,16 +105,54 @@ function UnitTree({ data }: { data: OrgData }) {
     }
     return undefined;
   }
-
-  function rows(parent: string | null, depth: number): React.ReactNode {
-    return under(parent).map((u) => (
-      <div key={u.id}>
-        <UnitRow unit={u} depth={depth} head={headOf(u)} onEdit={() => setEditing({ unit: u })} onAdd={() => setEditing({ parentId: u.id })} />
-        {rows(u.id, depth + 1)}
-      </div>
-    ));
+  /** Units under it at every level, and employees in it and under it. */
+  function totals(u: OrgUnit, seen = new Set<string>()): { units: number; people: number } {
+    seen.add(u.id);
+    let units = 0;
+    let count = u.people;
+    for (const c of under(u.id)) {
+      if (seen.has(c.id)) continue;
+      const t = totals(c, seen);
+      units += 1 + t.units;
+      count += t.people;
+    }
+    return { units, people: count };
   }
 
+  // Searching shows each match with the units above it, opened.
+  const q = query.trim().toLowerCase();
+  const matches = (u: OrgUnit) =>
+    u.name.toLowerCase().includes(q) || (headOf(u)?.name.toLowerCase().includes(q) ?? false) || u.areas.some((a) => a.toLowerCase().includes(q));
+  const keeps = (u: OrgUnit, depth = 0): boolean => !q || matches(u) || (depth < 12 && under(u.id).some((c) => keeps(c, depth + 1)));
+
+  function rows(parent: string | null, depth: number): React.ReactNode[] {
+    if (depth > 12) return [];
+    return under(parent)
+      .filter((u) => keeps(u))
+      .map((u) => {
+        const kids = under(u.id).filter((c) => keeps(c));
+        const expanded = kids.length > 0 && (q ? true : open.has(u.id));
+        return (
+          <li key={u.id}>
+            <UnitRow
+              unit={u}
+              depth={depth}
+              head={headOf(u)}
+              totals={totals(u)}
+              hasChildren={kids.length > 0}
+              expanded={expanded}
+              lit={!!q && matches(u)}
+              onToggle={() => toggle(u.id)}
+              onEdit={() => setEditing({ unit: u })}
+              onAdd={() => (setEditing({ parentId: u.id }), setOpen((was) => new Set(was).add(u.id)))}
+            />
+            {expanded && <ul className="ml-[1.6rem] border-l border-rule pl-3">{rows(u.id, depth + 1)}</ul>}
+          </li>
+        );
+      });
+  }
+
+  const shown = rows(null, 0);
   return (
     <Sheet className="px-5 pt-4 pb-3">
       <SectionTitle
@@ -118,7 +170,28 @@ function UnitTree({ data }: { data: OrgData }) {
           Add your divisions and departments, then the teams under them.
         </Empty>
       ) : (
-        <div className="mt-2 divide-y divide-rule">{rows(null, 0)}</div>
+        <>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="w-full max-w-md flex-1">
+              <SearchInput placeholder="Find a unit, head or area" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <span className="ml-auto inline-flex gap-2">
+              <Button size="sm" onClick={() => setOpen(new Set(active.map((u) => u.id)))}>
+                Open all
+              </Button>
+              <Button size="sm" onClick={() => setOpen(new Set())}>
+                Close all
+              </Button>
+            </span>
+          </div>
+          {shown.length === 0 ? (
+            <Empty icon="teams" title="No unit matches">
+              Try another name.
+            </Empty>
+          ) : (
+            <ul className="mt-3 space-y-0.5">{shown}</ul>
+          )}
+        </>
       )}
       {off.length > 0 && (
         <details className="mt-3 text-sm">
@@ -139,16 +212,61 @@ function UnitTree({ data }: { data: OrgData }) {
   );
 }
 
-function UnitRow({ unit, depth, head, onEdit, onAdd }: { unit: OrgUnit; depth: number; head?: { name: string; from?: string }; onEdit: () => void; onAdd: () => void }) {
+const KIND_TONE: Record<UnitKind, string> = { department: "bg-ink text-white", division: "bg-sage-deep text-white", team: "bg-bench text-ink-2" };
+
+/** "Prescription Business" -> "PB": the unit's badge. */
+function initials(name: string): string {
+  const words = name.replace(/[^\p{L}\p{N} ]/gu, " ").split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
+}
+
+function UnitRow({
+  unit,
+  depth,
+  head,
+  totals,
+  hasChildren,
+  expanded,
+  lit,
+  onToggle,
+  onEdit,
+  onAdd,
+}: {
+  unit: OrgUnit;
+  depth: number;
+  head?: { name: string; from?: string };
+  totals: { units: number; people: number };
+  hasChildren: boolean;
+  expanded: boolean;
+  lit: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onAdd: () => void;
+}) {
+  const top = depth === 0;
   return (
-    <div className="group flex items-center gap-3 py-2.5" style={{ paddingLeft: `${depth * 1.25}rem` }}>
+    <div className={`group flex items-center gap-2.5 rounded-xl px-1.5 py-1.5 hover:bg-bench/60 ${lit ? "bg-bench" : ""}`}>
+      <IconButton label={`Add a unit under ${unit.name}`} onClick={onAdd}>
+        <Plus className="size-3.5" aria-hidden />
+      </IconButton>
+      <span aria-hidden className={`grid shrink-0 place-items-center rounded-lg font-semibold ${KIND_TONE[unit.kind]} ${top ? "size-9 text-xs" : "size-7 text-[0.65rem]"}`}>
+        {initials(unit.name)}
+      </span>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-2 text-sm">
-          <span className={depth === 0 ? "font-semibold text-ink" : "font-medium text-ink"}>{unit.name}</span>
-          <span className="rounded-full bg-bench px-2 py-0.5 text-meta text-ink-3">{KIND_LABEL[unit.kind]}</span>
-          <IconButton label={`Add a unit under ${unit.name}`} onClick={onAdd}>
-            <Plus className="size-3.5" aria-hidden />
-          </IconButton>
+          <span className={top ? "font-semibold text-ink" : "font-medium text-ink"}>{unit.name}</span>
+          <span className="rounded-full border border-rule px-2 py-px text-meta text-ink-3">{KIND_LABEL[unit.kind]}</span>
+          {hasChildren && (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-label={expanded ? `Close ${unit.name}` : `Open ${unit.name}`}
+              className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-bench hover:text-ink"
+            >
+              <ChevronDown className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
+            </button>
+          )}
         </p>
         <p className="truncate text-meta text-ink-3">
           {head ? `Headed by ${head.name}${head.from ? ` (through ${head.from})` : ""}` : "No head yet"}
@@ -162,15 +280,23 @@ function UnitRow({ unit, depth, head, onEdit, onAdd }: { unit: OrgUnit; depth: n
           )}
         </p>
       </div>
-      <Tip tip="Employees whose main unit this is">
-        <span className="inline-flex items-center gap-1 text-meta text-ink-2">
-          <Users className="size-3.5" aria-hidden /> {unit.people}
+      {totals.units > 0 && (
+        <Tip tip="Units under it, at every level">
+          <span className="inline-flex w-14 items-center justify-end gap-1 text-meta text-ink-2 tabular-nums">
+            <Network className="size-3.5" aria-hidden /> {totals.units}
+          </span>
+        </Tip>
+      )}
+      <Tip tip={totals.people === unit.people ? "Employees whose main unit this is" : `Employees in it and under it (${unit.people} in this unit itself)`}>
+        <span className="inline-flex w-14 items-center justify-end gap-1 text-meta text-ink-2 tabular-nums">
+          <Users className="size-3.5" aria-hidden /> {totals.people}
         </span>
       </Tip>
       <RowMenu
         label={`Actions for ${unit.name}`}
         items={[
           { label: "Change", icon: <Pencil />, onSelect: onEdit },
+          { label: "Add a unit under it", icon: <Plus />, onSelect: onAdd },
           "divider",
           {
             label: "Switch off",
