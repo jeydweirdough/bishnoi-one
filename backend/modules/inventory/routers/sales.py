@@ -21,7 +21,8 @@ from modules.inventory.access import allowed
 from modules.inventory.api import Api, conflict, field_error, found, iso
 from modules.inventory.audit import audit
 from modules.inventory.deps import DB, CurrentUser
-from modules.inventory.models import Order, Product, PurchaseOrder, SalesOrder, SalesOrderLine, Warehouse
+from modules.inventory.models import Order, Packaging, Product, PurchaseOrder, SalesOrder, SalesOrderLine, Warehouse
+from modules.inventory.packs import pack_price, plural, sold_as
 from modules.inventory.out import person, product_ref, warehouse_ref
 from modules.inventory.paging import Limit, Offset, cut, total
 from modules.inventory.stock import next_number
@@ -58,7 +59,8 @@ def out(db: DB, o: SalesOrder) -> dict:
         "grossCentavos": o.gross_centavos, "discountCentavos": o.discount_centavos,
         "decidedBy": person(o.decided_by), "decidedAt": iso(o.decided_at), "decisionNote": o.decision_note, "deliveredAt": iso(o.delivered_at),
         "lines": [{"id": line.id, "product": product_ref(line.product), "quantity": line.quantity, "freeQuantity": line.free_quantity,
-                   "unitPrice": line.unit_price, "discount": line.discount, "total": line.total, "delivered": line.delivered} for line in o.lines],
+                   "unitPrice": line.unit_price, "discount": line.discount, "total": line.total, "delivered": line.delivered,
+                   "unit": line_unit(line)} for line in o.lines],
         "purchaseOrders": purchase_orders_of(db, o),
         "deliveries": [{"id": d.id, "number": d.number, "status": d.status, "issuedAt": iso(d.issued_at), "shipping": shipping.shipping_out(d)} for d in deliveries],
         # Invoiced from its delivery, and paid (step 13).
@@ -88,7 +90,9 @@ def read_order(_: View, db: DB, order_id: str) -> dict:
 
 class LineIn(Api):
     product_id: str = Field(max_length=36)
+    # Always in the base unit; with a pack (step 4A), a whole number of that pack.
     quantity: int = Field(gt=0, le=10**9)
+    packaging_id: str | None = Field(None, max_length=36)
 
 
 class OrderIn(Api):
@@ -115,9 +119,34 @@ def fill(db: DB, o: SalesOrder, body: OrderIn) -> None:
         product = db.get(Product, line.product_id)
         if product is None or product.status != "active" or product.product_type == "service":
             raise field_error(f"lines.{i}.productId", "Pick a stocked product that's on sale.")
-        o.lines.append(SalesOrderLine(position=i, product_id=product.id, quantity=line.quantity, unit_price=product.selling_price,
-                                      total=product.selling_price * line.quantity))
+        o.lines.append(sold_line(db, i, product, line))
     sales.totals(o)
+
+
+def sold_line(db: DB, i: int, product: Product, line: LineIn) -> SalesOrderLine:
+    """A typed line in the unit chosen (step 4A): the base unit, or one of the item's packs that may be sold, at
+    that pack's price when it has one. The quantity and price stay per base unit."""
+    if not line.packaging_id:
+        if not product.base_sellable:
+            raise field_error(f"lines.{i}.packagingId", f"{product.name} isn't sold by the {product.unit.name}: pick one of its packs.")
+        return SalesOrderLine(position=i, product_id=product.id, quantity=line.quantity, unit_price=product.selling_price,
+                              total=product.selling_price * line.quantity)
+    pack = db.get(Packaging, line.packaging_id)
+    if pack is None or pack.product_id != product.id:
+        raise field_error(f"lines.{i}.packagingId", f"That pack isn't one of {product.name}'s.")
+    if not pack.sellable:
+        raise field_error(f"lines.{i}.packagingId", f"{product.name} isn't sold by the {pack.name}.")
+    if line.quantity % pack.quantity:
+        raise field_error(f"lines.{i}.quantity", f"Sell whole {plural(pack.name, 2)} of {pack.quantity:,}.")
+    each = pack_price(product, pack) // pack.quantity
+    return SalesOrderLine(position=i, product_id=product.id, quantity=line.quantity, unit_price=each, total=each * line.quantity,
+                          packaging_id=pack.id, unit_name=pack.name, per=pack.quantity)
+
+
+def line_unit(line: SalesOrderLine) -> dict:
+    """The unit a line was sold in: a pack ("Box", per 10) or the base unit."""
+    return {"packagingId": line.packaging_id, "name": line.unit_name or line.product.unit.name, "per": line.per or 1,
+            "soldAs": sold_as(line.quantity, line.unit_name, line.per)}
 
 
 @router.post("/sales-orders", status_code=201)

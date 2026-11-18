@@ -46,7 +46,7 @@ export type Reference = {
   units: { code: string; name: string; isActive: boolean }[];
   suppliers: (Ref & { isActive: boolean })[];
   warehouses: (Ref & { isActive: boolean; locations: { id: string; code: string; name: string; isDefault: boolean; isActive: boolean }[] })[];
-  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null; packagings?: { name: string; quantity: number }[] })[];
+  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null; packagings?: PackagingRow[]; baseSellable?: boolean })[];
 };
 
 export type ProductType = "stock" | "consumable" | "asset" | "service";
@@ -95,6 +95,9 @@ export type Product = ProductRow & {
   consigned?: number;
   /** Its packs (step 14e); stock stays in its base unit. */
   packagings?: PackagingRow[];
+  /** Whether the base unit may be sold on its own, and stock in packs (step 4A). */
+  baseSellable?: boolean;
+  inPacks?: { onHand: string | null; available: string | null };
   description: string | null;
   unitName: string;
   taxRateBp: number;
@@ -105,7 +108,7 @@ export type Product = ProductRow & {
   parent: { id: string; sku: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
-  warehouses: (Level & { warehouse: Ref })[];
+  warehouses: (Level & { warehouse: Ref; inPacks?: string | null })[];
   balances: { warehouse: Ref; location: { id: string; code: string; name: string }; batch: BatchRef | null; onHand: number; damaged: number }[];
   batches: (BatchRef & { onHand: number })[];
   variants: ProductRow[];
@@ -127,7 +130,8 @@ export type CategoryRow = {
 export type BrandRow = { id: string; name: string; isActive: boolean; productCount: number };
 export type UnitRow = { code: string; name: string; isActive: boolean; productCount: number };
 
-export type StockRow = Level & { product: ProductRef; warehouse: Ref; reorderPoint: number; state: StockState; value: number };
+/** `inPacks`: on hand written in the item's packs, "2 Boxes + 4 Strips" (step 4A). */
+export type StockRow = Level & { product: ProductRef; warehouse: Ref; reorderPoint: number; state: StockState; value: number; inPacks?: string | null };
 /** One page of the stock list: `total` sums every matching row, `count` is how many there are. */
 export type StockOverview = { items: StockRow[]; total: Level & { value: number }; count: number };
 
@@ -203,7 +207,8 @@ export type ReplenishmentRow = {
 };
 
 /** A pack of an item and how many of its base unit it holds (step 14e). */
-export type PackagingRow = { id: string; name: string; quantity: number; barcode: string | null };
+/** A pack of an item (step 14e); `sellable` and `price` (centavos per pack, null = base price x quantity): step 4A. */
+export type PackagingRow = { id: string; name: string; quantity: number; barcode: string | null; sellable?: boolean; price?: number | null };
 
 /** A delivery's packages (step 14d). */
 export type Packing = {
@@ -396,7 +401,7 @@ export type Order = OrderBrief & {
   createdBy: Person;
   confirmedBy: Person;
   issuedBy: Person;
-  lines: { id: string; product: ProductRef; quantity: number; unitPrice: number; total: number; available: number | null; picks: Pick[]; serials: string[] }[];
+  lines: { id: string; product: ProductRef; quantity: number; unitPrice: number; total: number; available: number | null; picks: Pick[]; serials: string[]; soldAs?: string | null }[];
 };
 export type Reservation = {
   order: { id: string; number: string; status: OrderStatus; recipient: string; neededOn: string | null };

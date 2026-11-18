@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from modules.inventory import cpr
+from modules.inventory.packs import in_packs
 from modules.inventory.routers.packagings import packagings_of
 from modules.inventory.access import allowed, settings_allowed
 from modules.inventory.api import Api, changed, conflict, field_error, found, iso, not_found
@@ -110,7 +111,7 @@ def reference_products(db: Session) -> list[dict]:
     products = db.scalars(select(Product).where(Product.product_type != "service", Product.variant_count == 0).order_by(func.lower(Product.name))).all()
     packs = packagings_of(db)  # entered in packs on the forms (step 14e)
     return [{**product_ref(p), "status": p.status, "costPrice": p.cost_price, "sellingPrice": p.selling_price, "supplierId": p.supplier_id,
-             "packagings": packs.get(p.id, [])} for p in products]
+             "packagings": packs.get(p.id, []), "baseSellable": p.base_sellable} for p in products]
 
 
 REFERENCE = {
@@ -422,6 +423,8 @@ class ProductFields(Api):
     track_batches: bool | None = None
     track_expiry: bool | None = None
     track_serials: bool | None = None
+    # Whether the base unit may be sold on its own (step 4A).
+    base_sellable: bool | None = None
     attributes: Attributes | None = None
     parent_id: str | None = Field(None, max_length=36)
     variant_label: str | None = Field(None, max_length=80)
@@ -625,10 +628,11 @@ def create_product(_: Create, me: CurrentUser, db: DB, body: ProductIn) -> dict:
 def read_product(_: View, db: DB, settings: SettingsDep, product_id: str) -> dict:
     p = get_product(db, product_id)
     warn = settings.expiry_warning_days
+    packs = packagings_of(db, [p.id]).get(p.id, [])
     level = by_product(db, [p.id]).get(p.id, dict(ZERO))
     warehouses = {w.id: w for w in db.scalars(select(Warehouse))}
     per_warehouse = [
-        {"warehouse": warehouse_ref(warehouses[wh]), **row}
+        {"warehouse": warehouse_ref(warehouses[wh]), **row, "inPacks": in_packs(row["onHand"], packs, p.unit.name)}
         for (pid, wh), row in by_warehouse(db, [p.id]).items()
         if wh in warehouses
     ]
@@ -646,7 +650,10 @@ def read_product(_: View, db: DB, settings: SettingsDep, product_id: str) -> dic
     return {
         **product_row(p, level, warn),
         # Its packs (step 14e): Strip = 10, Box = 100…; stock stays in its base unit.
-        "packagings": packagings_of(db, [p.id]).get(p.id, []),
+        "packagings": packs,
+        # Which levels may be sold, and its stock written in packs (step 4A): "2 Boxes + 4 Strips".
+        "baseSellable": p.base_sellable,
+        "inPacks": {"onHand": in_packs(level["onHand"], packs, p.unit.name), "available": in_packs(level["available"], packs, p.unit.name)},
         # Vendors' consignment stock (15d): on hand, not ours, so not in its value.
         **consignment_value(db, p, level),
         "description": p.description,
@@ -705,7 +712,7 @@ def update_product(_: Edit, me: CurrentUser, db: DB, product_id: str, body: Prod
     product = get_product(db, product_id)
     wanted = changed(body)
     required = {"sku", "name", "product_type", "unit_code", "status", "cost_price", "selling_price", "tax_rate_bp", "tax_inclusive",
-                "min_stock", "reorder_point", "reorder_qty", "track_batches", "track_expiry", "track_serials", "attributes"}
+                "min_stock", "reorder_point", "reorder_qty", "track_batches", "track_expiry", "track_serials", "attributes", "base_sellable"}
     for key in required & set(wanted):
         if wanted[key] is None:
             raise field_error(key, "This can't be empty.")

@@ -349,7 +349,7 @@ export async function OrderPrint({ params, searchParams }: { params: Params<{ id
                   ))}
                 </td>
               )}
-              <td className={`${td} text-right tabular-nums`}>{fmt.count(l.quantity)} {l.product.unit}</td>
+              <td className={`${td} text-right tabular-nums`}>{fmt.count(l.quantity)} {l.product.unit}{l.soldAs && <span className="block text-neutral-600">{l.soldAs}</span>}</td>
               {priced && <td className={`${td} text-right tabular-nums`}>{l.unitPrice ? fmt.peso(l.unitPrice) : "—"}</td>}
               {priced && <td className={`${td} text-right font-medium tabular-nums`}>{l.total ? fmt.peso(l.total) : "—"}</td>}
             </tr>

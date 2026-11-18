@@ -309,6 +309,8 @@ class Product(Stamped, Base):
     # Its Certificate of Product Registration from the FDA, and the day it's valid until (app/cpr.py).
     cpr_number: Mapped[str | None] = mapped_column(String(40), index=True, default=None)
     cpr_valid_until: Mapped[date | None] = mapped_column(Date, default=None)
+    # Whether its base unit (tablet, strip) may be sold on its own, or only in its packs (step 4A, 2026-11-18).
+    base_sellable: Mapped[bool] = mapped_column(default=True, server_default=sa_true())
 
     category: Mapped[Category | None] = relationship(lazy="joined")
     brand: Mapped[Brand | None] = relationship(lazy="joined")
@@ -710,6 +712,11 @@ class SalesOrderLine(Base):
     delivered: Mapped[int] = mapped_column(Integer, default=0)
     # The product's VAT category as the CRM gave it, for the invoice (step 13).
     vat_category: Mapped[str] = mapped_column(String(20), default="standard", server_default="standard")
+    # The unit it was sold in (step 4A): quantity stays in base units; a pack line says which pack and how
+    # many base units each holds, kept as written so the documents still say "2 Boxes" if the pack changes.
+    packaging_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    unit_name: Mapped[str | None] = mapped_column(String(40), default=None)
+    per: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     order: Mapped[SalesOrder] = relationship(back_populates="lines")
     product: Mapped["Product"] = relationship(lazy="joined")
@@ -787,6 +794,8 @@ class OrderLine(Base):
     # What went out, batch by batch: [{"batchId", "batchNo", "expiresOn", "locationId", "quantity"}].
     picks: Mapped[list[dict]] = mapped_column(JSON, default=list)
     serials: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # How its sale line was sold, for the delivery note: "2 Boxes of 10" (step 4A).
+    sold_as: Mapped[str | None] = mapped_column(String(80), default=None)
 
     order: Mapped[Order] = relationship(back_populates="lines")
     product: Mapped[Product] = relationship(lazy="joined")
@@ -863,6 +872,10 @@ class Packaging(Base):
     name: Mapped[str] = mapped_column(String(40))
     quantity: Mapped[int] = mapped_column(Integer)
     barcode: Mapped[str | None] = mapped_column(String(64), index=True, default=None)
+    # Packs that can be broken (step 4A): whether this pack may be sold, and its own selling price in
+    # centavos (None = the item's selling price x quantity).
+    sellable: Mapped[bool] = mapped_column(default=True, server_default=sa_true())
+    price: Mapped[int | None] = mapped_column(Integer, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

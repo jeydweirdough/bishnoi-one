@@ -113,3 +113,14 @@ def test_a_consignment_settlement_becomes_a_draft_vendor_bill(app, client, ana):
         assert len(bills) == 1 and bills[0].status == "draft" and bills[0].bill_number == "CS-00001"
         assert bills[0].total_centavos == 74000 and "Gloves M" in bills[0].lines[0]["description"]
         assert db.scalar(select(Supplier).where(Supplier.name == "ABC Medical Supply")) is not None
+
+
+def test_the_unit_sold_is_in_the_line_description_only():
+    """Inventory step 4A: a line sold in packs says so in its description; quantity and price are untouched."""
+    from modules.finance.delivery_invoices import lines_of
+
+    sale = {"lines": [{"sku": "AML-5", "name": "Amlodipine 5 mg", "quantity": 20, "freeQuantity": 10, "unitPriceCentavos": 1500, "soldAs": "2 Boxes of 10"},
+                      {"sku": "PCM", "name": "Paracetamol", "quantity": 3, "unitPriceCentavos": 500}]}
+    paid, free, plain = lines_of(sale, None)
+    assert paid["description"] == "Amlodipine 5 mg — 2 Boxes of 10" and paid["quantity"] == 20 and paid["unitPriceCentavos"] == 1500
+    assert free["description"] == "Amlodipine 5 mg (free)" and plain["description"] == "Paracetamol"

@@ -322,7 +322,7 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
           {o.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/inventory/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
-              <Td num>{fmt.count(l.quantity)} {l.product.unit}</Td>
+              <Td num>{fmt.count(l.quantity)} {l.product.unit}{l.soldAs && <span className="block text-meta text-ink-3">{l.soldAs}</span>}</Td>
               {o.status === "draft" && <Td num className={l.available !== null && l.available < l.quantity ? "font-semibold text-eosin" : "text-ink-2"}>{fmt.count(l.available ?? 0)}</Td>}
               {o.status === "issued" && (
                 <Td className="text-meta text-ink-2">

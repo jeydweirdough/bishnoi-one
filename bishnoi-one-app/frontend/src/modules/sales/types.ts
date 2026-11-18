@@ -34,6 +34,8 @@ export type SalesOrder = SalesOrderBrief & {
   decidedAt: string | null;
   decisionNote: string | null;
   deliveredAt: string | null;
-  lines: { id: string; product: { id: string; sku: string; name: string; unit: string }; quantity: number; freeQuantity: number; unitPrice: number; discount: number; total: number; delivered: number }[];
+  lines: { id: string; product: { id: string; sku: string; name: string; unit: string }; quantity: number; freeQuantity: number; unitPrice: number; discount: number; total: number; delivered: number;
+    /** The unit sold (step 4A): a pack, or the base unit (per 1); quantity stays in the base unit. */
+    unit?: { packagingId: string | null; name: string; per: number; soldAs: string | null } }[];
   deliveries: { id: string; number: string; status: string; issuedAt: string | null; shipping?: import("@/src/modules/inventory/lib/types").Shipping | null }[];
 };

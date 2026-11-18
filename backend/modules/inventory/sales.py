@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from modules.inventory import business_events, documents
 from modules.inventory.models import Order, OrderLine, Product, SalesOrder, SalesOrderLine, User, Warehouse
+from modules.inventory.packs import sold_as
 from modules.inventory.stock import next_number
 
 
@@ -59,7 +60,9 @@ def for_invoice(order: SalesOrder) -> dict:
         "payer": order.payer, "currency": order.currency,
         "pricesIncludeTax": (order.tax or {}).get("pricesIncludeTax") if isinstance(order.tax, dict) else None,
         "lines": [{"sku": line.product.sku, "name": line.product.name, "quantity": line.quantity, "freeQuantity": line.free_quantity or 0,
-                   "unitPriceCentavos": line.unit_price, "discountCentavos": line.discount or 0, "vatCategory": line.vat_category or "standard"}
+                   "unitPriceCentavos": line.unit_price, "discountCentavos": line.discount or 0, "vatCategory": line.vat_category or "standard",
+                   # The unit sold (step 4A), words only: "2 Boxes of 10"; quantity and price stay per base unit.
+                   "soldAs": sold_as(line.quantity, line.unit_name, line.per)}
                   for line in order.lines],
     }
 
@@ -165,7 +168,7 @@ def approve(db: Session, order: SalesOrder, me: User, slug: str | None) -> Order
                      scheduled_on=order.scheduled_on, source_document=order.number)
     for i, line in enumerate(order.lines):
         delivery.lines.append(OrderLine(position=i, product_id=line.product_id, quantity=line.quantity + (line.free_quantity or 0),
-                                        unit_price=line.unit_price))
+                                        unit_price=line.unit_price, sold_as=sold_as(line.quantity + (line.free_quantity or 0), line.unit_name, line.per)))
     documents.apply(db, delivery, ("delivery",), None, me, order.warehouse_id, new=True)
     db.add(delivery)
     db.flush()

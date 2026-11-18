@@ -11,9 +11,30 @@ import type { Format } from "@/src/modules/inventory/platform/lib/format";
 import type { Org } from "@/src/modules/inventory/platform/lib/types";
 import { QuickAdd, type Added } from "@/src/modules/inventory/components/quick-add";
 
-export type PickableProduct = { id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string; packagings?: { name: string; quantity: number }[] };
-/** `per`: how many base units one of what's typed is (a pack, step 14e); 1 or none: the base unit. Quantities go out in the base unit. */
-export type Line = { productId: string; quantity: string; money: string; per?: number };
+export type PickableProduct = {
+  id: string; sku: string; name: string; unit: string; costPrice: number; sellingPrice: number; status: string;
+  packagings?: { id?: string; name: string; quantity: number; sellable?: boolean; price?: number | null }[];
+  /** Whether the base unit may be sold on its own (step 4A); packs say `sellable` themselves. */
+  baseSellable?: boolean;
+};
+/** `per`: how many base units one of what's typed is (a pack, step 14e); 1 or none: the base unit. Quantities go out in the base unit.
+ *  `packagingId`: the pack picked (step 4A: a sale line keeps the unit sold). */
+export type Line = { productId: string; quantity: string; money: string; per?: number; packagingId?: string | null };
+
+/** The units a line may be in: the base unit and its packs; on a sale (step 4A) only the levels that may be sold. */
+export function unitsOf(p: PickableProduct, selling?: boolean): { key: string; label: string; per: number; packagingId: string | null }[] {
+  const base = !selling || p.baseSellable !== false ? [{ key: "", label: p.unit, per: 1, packagingId: null }] : [];
+  const packs = (p.packagings ?? []).filter((k) => !selling || k.sellable !== false)
+    .map((k) => ({ key: k.id ?? k.name, label: `${k.name} (${k.quantity})`, per: k.quantity, packagingId: k.id ?? null }));
+  return [...base, ...packs];
+}
+
+/** What one of a line's unit sells for, in centavos: the pack's own price when it has one (step 4A). */
+export function unitPrice(p: PickableProduct | undefined, line: Line): number {
+  if (!p) return 0;
+  const pack = line.packagingId ? p.packagings?.find((k) => k.id === line.packagingId) : undefined;
+  return pack?.price ?? p.sellingPrice * (line.per || 1);
+}
 
 type Failure = { ok: false; error: string; fields?: Record<string, string> };
 type Outcome<T> = { ok: true; data: T } | Failure;
@@ -106,6 +127,7 @@ export function LinesEditor({
   note,
   addProduct,
   limit,
+  selling,
 }: {
   products: PickableProduct[];
   lines: Line[];
@@ -120,6 +142,8 @@ export function LinesEditor({
   addProduct?: { org: Org; units: { code: string; name: string }[] };
   /** The most a line may ask for (what's available to send); none for stock coming in. */
   limit?: (productId: string) => number | undefined;
+  /** A sale (step 4A): only the units that may be sold are offered. */
+  selling?: boolean;
 }) {
   // Products added from here, listed until the page's own list has them.
   const [fresh, setFresh] = useState<PickableProduct[]>([]);
@@ -138,7 +162,12 @@ export function LinesEditor({
   }
 
   function set(i: number, change: Partial<Line>) {
-    const next = lines.map((line, j) => (j === i ? { ...line, ...change, ...(change.productId !== undefined && change.productId !== line.productId ? { per: 1 } : {}) } : line));
+    const first = (id: string) => {
+      const p = byId.get(id);
+      const u = p ? unitsOf(p, selling)[0] : undefined;
+      return { per: u?.per ?? 1, packagingId: u?.packagingId ?? null };
+    };
+    const next = lines.map((line, j) => (j === i ? { ...line, ...change, ...(change.productId !== undefined && change.productId !== line.productId ? first(change.productId) : {}) } : line));
     // Picking a product fills in its usual amount, when none has been typed.
     if (change.productId && money) {
       const p = byId.get(change.productId);
@@ -222,12 +251,14 @@ export function LinesEditor({
                         <select
                           suppressHydrationWarning
                           aria-label={`Line ${i + 1} unit`}
-                          value={String(line.per || 1)}
-                          onChange={(e) => set(i, { per: Number(e.target.value) || 1 })}
+                          value={unitsOf(p, selling).find((u) => (line.packagingId ? u.packagingId === line.packagingId : u.per === (line.per || 1)))?.key ?? ""}
+                          onChange={(e) => {
+                            const u = unitsOf(p, selling).find((x) => x.key === e.target.value);
+                            if (u) set(i, { per: u.per, packagingId: u.packagingId });
+                          }}
                           className="h-10 rounded-md border border-rule-strong bg-white px-1.5 text-meta text-ink"
                         >
-                          <option value="1">{p.unit}</option>
-                          {p.packagings.map((k) => <option key={k.name} value={String(k.quantity)}>{k.name} ({k.quantity})</option>)}
+                          {unitsOf(p, selling).map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
                         </select>
                       ) : (
                         <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>

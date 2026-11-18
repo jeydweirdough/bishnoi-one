@@ -283,9 +283,9 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
         {/* Its packs (step 14e): Strip = 10, Box = 100…; stock stays in its base unit. */}
         <Card className="mt-5 px-5 pt-4 pb-4">
           <SectionTitle icon="units">Packs</SectionTitle>
-          <PackagingsEditor productId={p.id} unit={p.unit} packs={p.packagings ?? []} canEdit={may("products.edit")} />
-          {(p.packagings ?? []).length > 0 && p.level.onHand > 0 && (
-            <p className="mt-2 text-meta text-ink-3">On hand: {p.level.onHand.toLocaleString()} {p.unit} = {inPacks(p.level.onHand, p.packagings ?? [], p.unit)}</p>
+          <PackagingsEditor productId={p.id} unit={p.unit} packs={p.packagings ?? []} canEdit={may("products.edit")} baseSellable={p.baseSellable !== false} sellingPrice={p.sellingPrice} />
+          {(p.inPacks?.onHand ?? inPacks(p.level.onHand, p.packagings ?? [], p.unit)) && (
+            <p className="mt-2 text-meta text-ink-3">On hand: {p.level.onHand.toLocaleString()} {p.unit} = {p.inPacks?.onHand ?? inPacks(p.level.onHand, p.packagings ?? [], p.unit)}</p>
           )}
         </Card>
 
@@ -325,7 +325,7 @@ export default async function ProductPage({ params }: { params: Params<{ id: str
               href: `/inventory/warehouses/${w.warehouse.id}`,
               name: w.warehouse.name,
               sub: [
-                `${fmt.count(w.onHand)} on hand`,
+                `${fmt.count(w.onHand)} on hand${w.inPacks ? ` (${w.inPacks})` : ""}`,
                 `${fmt.count(w.available)} available`,
                 w.reserved + w.allocated ? `${fmt.count(w.reserved + w.allocated)} held` : null,
                 w.damaged ? `${fmt.count(w.damaged)} damaged` : null,

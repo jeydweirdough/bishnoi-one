@@ -34,10 +34,12 @@ def lines_of(sale: dict, shipping: dict | None) -> list[dict]:
     lines = []
     for line in sale.get("lines") or []:
         sku, name = str(line.get("sku") or "")[:60] or None, str(line.get("name") or line.get("sku") or "Item")[:200]
+        # The unit sold, words only (Inventory step 4A): "Amlodipine 5 mg — 2 Boxes of 10". Quantity and price stay per base unit.
+        described = f"{name} — {str(line['soldAs'])[:60]}"[:200] if line.get("soldAs") else name
         category = str(line.get("vatCategory") or "standard")[:20]
         quantity = int(line.get("quantity") or 0)
         if quantity > 0:
-            lines.append({"ref": sku, "description": name, "quantity": quantity, "unitPriceCentavos": int(line.get("unitPriceCentavos") or 0),
+            lines.append({"ref": sku, "description": described, "quantity": quantity, "unitPriceCentavos": int(line.get("unitPriceCentavos") or 0),
                           "discountCentavos": int(line.get("discountCentavos") or 0), "category": category, "reliefEligible": False})
         free = int(line.get("freeQuantity") or 0)
         if free > 0:

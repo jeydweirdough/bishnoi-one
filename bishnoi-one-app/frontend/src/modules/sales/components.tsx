@@ -5,7 +5,7 @@ import { Check, Send, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { LinesEditor, blankLine, linesOut, useSave, type Line } from "@/src/modules/inventory/components/lines";
+import { LinesEditor, blankLine, unitPrice, useSave, type Line } from "@/src/modules/inventory/components/lines";
 import { makeFormat } from "@/src/modules/inventory/platform/lib/format";
 import type { Org } from "@/src/modules/inventory/platform/lib/types";
 import type { Reference } from "@/src/modules/inventory/lib/types";
@@ -83,13 +83,17 @@ export function SalesOrderForm({ org, reference }: { org: Org; reference: Pick<R
   const [form, setForm] = useState({ customerName: "", customerAddress: "", customerTin: "", warehouseId: warehouses[0]?.id ?? "", scheduledOn: "", notes: "" });
   const [lines, setLines] = useState<Line[]>([blankLine()]);
   const prices = Object.fromEntries(reference.products.map((p) => [p.id, p.sellingPrice]));
-  const total = lines.reduce((n, l) => n + (prices[l.productId] ?? 0) * (Number(l.quantity) || 0), 0);
+  const byId = new Map(reference.products.map((p) => [p.id, p]));
+  // In the unit picked (step 4A): a pack at its own price when it has one.
+  const total = lines.reduce((n, l) => n + unitPrice(byId.get(l.productId), l) * (Number(l.quantity) || 0), 0);
 
   function submit() {
     const input = {
       customerName: form.customerName.trim(), customerAddress: form.customerAddress.trim() || null, customerTin: form.customerTin.trim() || null,
       warehouseId: form.warehouseId || null, scheduledOn: form.scheduledOn || null, notes: form.notes.trim() || null,
-      lines: linesOut(lines, fmt).map(({ productId, quantity }) => ({ productId, quantity })),
+      // In the base unit to the API, with the pack sold (step 4A).
+      lines: lines.filter((l) => l.productId || l.quantity)
+        .map((l) => ({ productId: l.productId, quantity: (Number(l.quantity) || 0) * (l.per || 1), packagingId: l.packagingId || null })),
     };
     save(() => saveSalesOrder(null, input), (out) => ({ message: "Sales order saved as a draft", go: `/crm/sales/orders/${out.id}` }));
   }
@@ -125,7 +129,8 @@ export function SalesOrderForm({ org, reference }: { org: Org; reference: Pick<R
           onChange={setLines}
           errors={fields}
           fmt={fmt}
-          note={(id) => (prices[id] !== undefined ? `${fmt.peso(prices[id])} each, from the price list` : null)}
+          selling
+          note={(id) => (prices[id] !== undefined ? `${fmt.peso(prices[id])} per ${byId.get(id)?.unit ?? "unit"}, from the price list` : null)}
         />
         <p className="mt-3 text-right text-sm text-ink-2">
           Total <strong className="text-ink">{fmt.peso(total)}</strong>

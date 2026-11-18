@@ -112,6 +112,8 @@ def order_out(db: DB, o: Order) -> dict:
                 "quantity": line.quantity,
                 "unitPrice": line.unit_price,
                 "total": line.quantity * line.unit_price,
+                # How its sale line was sold: "2 Boxes of 10" (step 4A).
+                "soldAs": line.sold_as,
                 # What's free to take, besides what this order already holds.
                 "available": available(db, line.product_id, o.warehouse_id, exclude_order=o.id) if open_ else None,
                 "picks": line.picks or [],

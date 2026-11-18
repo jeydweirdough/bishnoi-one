@@ -5,7 +5,7 @@ holds (Strip = 10, Box = 100); forms let people type in packs and send the base 
 barcode counts the whole pack, and screens can show a quantity in packs ("1,050 = 10 Box + 5 Strip").
 
     GET    /inventory/products/{id}/packagings
-    POST   /inventory/products/{id}/packagings          {name, quantity, barcode}
+    POST   /inventory/products/{id}/packagings          {name, quantity, barcode, sellable, price}
     PATCH  /inventory/products/{id}/packagings/{pid}
     DELETE /inventory/products/{id}/packagings/{pid}
 """
@@ -27,7 +27,7 @@ Edit = allowed("products.edit")
 
 
 def packaging_out(p: Packaging) -> dict:
-    return {"id": p.id, "name": p.name, "quantity": p.quantity, "barcode": p.barcode}
+    return {"id": p.id, "name": p.name, "quantity": p.quantity, "barcode": p.barcode, "sellable": p.sellable, "price": p.price}
 
 
 def packagings_of(db: Session, product_ids: list[str] | None = None) -> dict[str, list[dict]]:
@@ -53,12 +53,24 @@ class PackagingIn(Api):
     name: str = Field(min_length=1, max_length=40)
     quantity: int = Field(ge=2, le=10**7)
     barcode: str | None = Field(None, max_length=64)
+    # Packs that can be broken (step 4A): may it be sold, and its own price (None = base price x quantity).
+    sellable: bool = True
+    price: int | None = Field(None, ge=0, le=10**12)
 
 
 class PackagingPatch(Api):
     name: str | None = Field(None, min_length=1, max_length=40)
     quantity: int | None = Field(None, ge=2, le=10**7)
     barcode: str | None = Field(None, max_length=64)
+    sellable: bool | None = None
+    price: int | None = Field(None, ge=0, le=10**12)
+
+
+def check_price(price: int | None, quantity: int, name: str) -> None:
+    """Sale lines keep their quantity in the base unit and a price per base unit (so the invoice's math stays
+    as it is): a pack's price must split evenly over what it holds."""
+    if price is not None and price % quantity:
+        raise field_error("price", f"A {name}'s price must split evenly over its {quantity:,} units (to the centavo).")
 
 
 def check(db: Session, product: Product, name: str | None, barcode: str | None, but: str | None = None) -> None:
@@ -79,7 +91,8 @@ def add_packaging(_: Edit, me: CurrentUser, db: DB, product_id: str, body: Packa
     product = found(db, Product, product_id, "product")
     name, barcode = body.name.strip(), (body.barcode or "").strip() or None
     check(db, product, name, barcode)
-    db.add(Packaging(product_id=product.id, name=name, quantity=body.quantity, barcode=barcode))
+    check_price(body.price, body.quantity, name)
+    db.add(Packaging(product_id=product.id, name=name, quantity=body.quantity, barcode=barcode, sellable=body.sellable, price=body.price))
     audit(db, me, "product.packaging_added", target=f"{product.name} · {name}", target_type="product", target_id=product.id)
     db.commit()
     return packagings_of(db, [product.id]).get(product.id, [])
@@ -97,8 +110,9 @@ def change_packaging(_: Edit, me: CurrentUser, db: DB, product_id: str, packagin
     if "name" in fields and fields["name"]:
         fields["name"] = fields["name"].strip()
     check(db, product, fields.get("name"), fields.get("barcode"), but=p.id)
+    check_price(fields["price"] if "price" in fields else p.price, fields.get("quantity") or p.quantity, fields.get("name") or p.name)
     for k, v in fields.items():
-        if v is not None or k == "barcode":
+        if v is not None or k in ("barcode", "price"):
             setattr(p, k, v)
     audit(db, me, "product.packaging_changed", target=f"{product.name} · {p.name}", target_type="product", target_id=product.id, fields=sorted(fields))
     db.commit()

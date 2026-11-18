@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from modules.inventory.models import Batch, Location, Movement, Order, OrderLine, Product, Sequence, Serial, Stock, Transfer, TransferLine, User
+from modules.inventory.models import Batch, Location, Movement, Order, OrderLine, Packaging, Product, Sequence, Serial, Stock, Transfer, TransferLine, User
 
 # How each kind moves on hand, given the movement's signed quantity:
 # 1: on hand changes by the quantity; 0: on hand stays (reserve, release, damage).
@@ -317,13 +317,16 @@ def available(db: Session, product_id: str, warehouse_id: str, *, exclude_order:
 
 
 def fefo(db: Session, product: Product, warehouse_id: str, quantity: int, *, batch_id: str | None = None) -> list[tuple[Stock, int]]:
-    """Where to take `quantity` from: first expired, first out."""
+    """Where to take `quantity` from: first expired, first out; among equal expiry, an opened pack first (step 4A):
+    a balance that isn't a whole number of the item's largest pack has a broken box, so it goes before full ones."""
+    largest = db.scalar(select(func.max(Packaging.quantity)).where(Packaging.product_id == product.id))
+    opened = [case((Stock.on_hand % largest != 0, 0), else_=1)] if largest else []
     q = (
         select(Stock)
         .outerjoin(Batch, Stock.batch_id == Batch.id)
         .join(Location, Stock.location_id == Location.id)
         .where(Stock.product_id == product.id, Stock.warehouse_id == warehouse_id, Stock.on_hand > Stock.damaged + Stock.on_hold)
-        .order_by(Batch.expires_on.is_(None), Batch.expires_on, Batch.received_at, Location.is_default.desc(), Location.code)
+        .order_by(Batch.expires_on.is_(None), Batch.expires_on, *opened, Batch.received_at, Location.is_default.desc(), Location.code)
     )
     if batch_id:
         q = q.where(Stock.batch_id == batch_id)

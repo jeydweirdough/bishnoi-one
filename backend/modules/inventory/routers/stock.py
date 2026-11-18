@@ -13,7 +13,9 @@ from modules.inventory.deps import DB, SettingsDep
 from modules.inventory.levels import by_product, by_warehouse, consigned_sql, levels_by_product, levels_by_warehouse, state, state_sql
 from modules.inventory.models import Batch, Category, Location, Movement, Product, Serial, Stock, Warehouse
 from modules.inventory.out import batch_ref, day, location_ref, product_ref, today, warehouse_ref
+from modules.inventory.packs import in_packs
 from modules.inventory.paging import Limit, Offset, cut, total
+from modules.inventory.routers.packagings import packagings_of
 
 router = APIRouter(prefix="/inventory", tags=["stock"])
 
@@ -60,6 +62,7 @@ def stock_overview(
     warehouses = {w.id: w for w in db.scalars(select(Warehouse))}
     sub = consigned_sql()
     theirs = {(pid, wid): int(n or 0) for pid, wid, n in db.execute(select(sub.c.product_id, sub.c.warehouse_id, sub.c.consigned))}
+    packs = packagings_of(db, list(products))
     rows = []
     for (pid, wid), level in levels.items():
         p = products.get(pid)
@@ -69,7 +72,9 @@ def stock_overview(
         if state_ and row_state != state_:
             continue
         rows.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[wid]), **level, "reorderPoint": p.reorder_point, "state": row_state,
-                     "value": max(0, level["onHand"] - theirs.get((pid, wid), 0)) * p.cost_price})
+                     "value": max(0, level["onHand"] - theirs.get((pid, wid), 0)) * p.cost_price,
+                     # On hand in packs (step 4A): "2 Boxes + 4 Strips"; the quantities stay in the base unit.
+                     "inPacks": in_packs(level["onHand"], packs.get(pid, []), p.unit.name)})
     rows.sort(key=lambda r: (r["product"]["name"].lower(), r["warehouse"]["code"]))
     total = {k: sum(r[k] for r in rows) for k in ("onHand", "damaged", "onHold", "reserved", "allocated", "available", "inTransit", "value")}
     return {"items": rows, "total": total}
@@ -129,11 +134,13 @@ def stock_page(db: DB, warehouse: str | None, q: str | None, category: str | Non
     page = db.execute(cut(select(matching).order_by(matching.c.name, matching.c.code, matching.c.product_id), limit, offset)).all()
     products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_({r.product_id for r in page})))}
     warehouses = {w.id: w for w in db.scalars(select(Warehouse).where(Warehouse.id.in_({r.warehouse_id for r in page})))}
+    packs = packagings_of(db, list(products))
     items = []
     for r in page:
         p = products[r.product_id]
         level = dict(zip(QUANTITIES, (int(r.on_hand or 0), int(r.damaged or 0), int(r.on_hold or 0), int(r.reserved or 0), int(r.allocated or 0), int(r.available or 0), int(r.in_transit or 0)), strict=True))
-        items.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[r.warehouse_id]), **level, "reorderPoint": p.reorder_point, "state": r.state, "value": int(r.value or 0)})
+        items.append({"product": product_ref(p), "warehouse": warehouse_ref(warehouses[r.warehouse_id]), **level, "reorderPoint": p.reorder_point, "state": r.state, "value": int(r.value or 0),
+                      "inPacks": in_packs(level["onHand"], packs.get(p.id, []), p.unit.name)})
     return {"items": items, "total": {k: int(v) for k, v in zip((*QUANTITIES, "value"), sums[:8], strict=True)}, "count": int(sums[8])}
 
 

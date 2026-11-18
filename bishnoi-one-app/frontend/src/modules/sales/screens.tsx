@@ -178,7 +178,8 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
                 <span className="font-medium">{l.product.name}</span>
                 <span className="block text-meta text-ink-3">{l.product.sku} · {l.product.unit}</span>
               </Td>
-              <Td num>{fmt.count(l.quantity)}</Td>
+              {/* In the base unit, with the unit sold (step 4A): "2 Boxes of 10". */}
+              <Td num>{fmt.count(l.quantity)}{l.unit?.soldAs && <span className="block text-meta text-ink-3">{l.unit.soldAs}</span>}</Td>
               <Td num>{l.freeQuantity ? fmt.count(l.freeQuantity) : "—"}</Td>
               <Td num>{fmt.peso(l.unitPrice)}</Td>
               <Td num>{l.discount ? fmt.peso(l.discount) : "—"}</Td>
